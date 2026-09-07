@@ -47,7 +47,10 @@ import {
   getManagedAccount,
   type ManagedAccount,
 } from '../helpers/managed/session';
-import { getRememberedManagedPortalUrl } from '../helpers/managed/api';
+import {
+  getRememberedManagedPortalUrl,
+  safePortalUrl,
+} from '../helpers/managed/api';
 import {
   envelopeWrapperKinds,
   getRecoverySecret,
@@ -88,6 +91,7 @@ import {
   decodePairingEnvelope,
   PairingEnvelopeError,
   PAIRING_URI_PREFIX,
+  signRequest,
 } from '@tomic/lib';
 import { isClientDbEnabled, setClientDbEnabled } from '../helpers/clientDbMode';
 import { PRODUCT_NAME } from '../helpers/managed/product';
@@ -1097,7 +1101,9 @@ function SyncPage() {
    * never heard of a portal.
    */
   const accountPortalUrl =
-    getManagedPortalUrl(managedInfo) ?? getRememberedManagedPortalUrl();
+    safePortalUrl(
+      getManagedPortalUrl(managedInfo) ?? getRememberedManagedPortalUrl(),
+    ) ?? null;
 
   async function promoteDrive() {
     if (!status.drive || promoting) return;
@@ -1262,16 +1268,33 @@ function SyncPage() {
 
     const canonicalNodeDid = rawToNodeDid(rawNodeId);
 
+    // The node only dials a peer for an agent with write rights on the drive,
+    // so the request is signed — there is nothing to send without one.
+    const agent = store.getAgent();
+
+    if (!agent) {
+      setPeerSyncResult('Error: Sign in before syncing with another device');
+
+      return;
+    }
+
     setPeerSyncing(true);
     setPeerSyncResult(null);
 
     try {
-      const res = await fetch(`${getLocalServerOrigin()}/iroh-sync`, {
+      const syncUrl = `${getLocalServerOrigin()}/iroh-sync`;
+      const headers = await signRequest(syncUrl, agent, {
+        'Content-Type': 'application/json',
+      });
+      const res = await fetch(syncUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ nodeId: canonicalNodeDid, drive: status.drive }),
       });
-      const data = await res.json();
+      // A refusal (401/403) may not carry JSON; still say what happened.
+      const data = await res
+        .json()
+        .catch(() => ({ error: `${res.status} ${res.statusText}`.trim() }));
 
       if (data.error) {
         setPeerSyncResult(`Error: ${data.error}`);

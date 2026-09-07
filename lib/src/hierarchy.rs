@@ -183,20 +183,26 @@ pub async fn check_append(
     for_agent: &ForAgent,
 ) -> AtomicResult<String> {
     match resource.get_parent(store).await {
-        Ok(parent) => {
-            if let Ok(msg) = check_rights(store, &parent, for_agent, Right::Append).await {
-                Ok(msg)
-            } else {
-                check_rights(store, resource, for_agent, Right::Write).await
-            }
-        }
+        // `Append` on the parent already honours the parent's `write` grants
+        // (see `check_rights_impl`). Do NOT fall back to the new resource's
+        // own `write` array: `resource` is built from the commit being
+        // checked, so its grants are whatever the signer put there.
+        Ok(parent) => check_rights(store, &parent, for_agent, Right::Append).await,
         Err(e) => {
+            let subject = resource.get_subject().to_string();
+            if subject.starts_with(crate::subject::DID_AD_AGENT_PREFIX) {
+                // An Agent resource is an identity. With no parent to grant
+                // anything, only the key it names (or the node itself) may
+                // create it — otherwise anyone could squat `did:ad:agent:X`
+                // with their own `write` grant before X ever signs in.
+                return check_agent_self_creation(store, &subject, for_agent);
+            }
             if resource
                 .get_classes(store)
                 .await?
                 .iter()
                 .any(|c| c.subject == urls::DRIVE)
-                || resource.get_subject().to_string().starts_with("did:")
+                || subject.starts_with("did:")
             {
                 // This string is not returned, it's just a check
                 Ok(String::from("Drive or DID without a parent can be created"))
@@ -205,6 +211,47 @@ pub async fn check_append(
             }
         }
     }
+}
+
+/// Whether `for_agent` may create the parentless Agent resource `subject`
+/// (`did:ad:agent:{pubkey}`): the agent itself, the node's own agent, or Sudo.
+fn check_agent_self_creation(
+    store: &impl Storelike,
+    subject: &str,
+    for_agent: &ForAgent,
+) -> AtomicResult<String> {
+    if for_agent == &ForAgent::Sudo {
+        return Ok("Sudo may create any Agent resource".into());
+    }
+    let normalized_for_agent = store
+        .normalize_subject(
+            &crate::agents::migrate_legacy_agent_subject(&for_agent.to_string())
+                .as_str()
+                .into(),
+        )
+        .to_string();
+    let same_key = |a: &str, b: &str| {
+        let strip = |s: &str| {
+            s.strip_prefix(crate::subject::DID_AD_AGENT_PREFIX)
+                .map(|k| k.to_string())
+        };
+        match (strip(a), strip(b)) {
+            (Some(ka), Some(kb)) => crate::authentication::public_keys_match(&ka, &kb),
+            _ => a == b,
+        }
+    };
+    if same_key(&normalized_for_agent, subject) {
+        return Ok("An agent may create its own Agent resource".into());
+    }
+    if let Ok(server_agent) = store.get_default_agent() {
+        let server = store.normalize_subject(&server_agent.subject).to_string();
+        if same_key(&server, &normalized_for_agent) {
+            return Ok("The node's own agent may create Agent resources".into());
+        }
+    }
+    Err(crate::errors::AtomicError::unauthorized(format!(
+        "Only {subject} itself may create its Agent resource; the commit was signed by {for_agent}"
+    )))
 }
 
 /// Recursively checks a Resource and its Parents for rights.
@@ -499,9 +546,10 @@ mod test {
         );
     }
 
-    // TODO: Add tests for:
-    // - basic check_write (should be false for newly created agent)
-    // - Malicious Commit (which grants itself write rights)
+    // The end-to-end checks for a malicious genesis (granting itself `write`
+    // to append under someone else's drive, or squatting another agent's
+    // `did:ad:agent:` resource) live in `commit::test`, next to the other
+    // signed-commit tests.
 
     mod auth_impact {
         use super::super::classify_auth_impact;
@@ -571,28 +619,6 @@ mod test {
             assert!(!impact.parent && !impact.destroy);
             assert!(impact.is_critical());
         }
-    }
-
-    #[tokio::test]
-    async fn authorization() {
-        let store = crate::Store::init().await.unwrap();
-        store.populate().await.unwrap();
-        // let agent = store.create_agent(Some("test_actor")).unwrap();
-        let subject = "https://localhost/new_thing";
-        let mut commitbuilder_1 = crate::commit::CommitBuilder::new(subject.into());
-        let property = crate::urls::DESCRIPTION;
-        let value = Value::new("Some value", &DataType::Markdown).unwrap();
-        commitbuilder_1.set(property.into(), value);
-        // let mut commitbuilder_2 = commitbuilder_1.clone();
-        // let commit_1 = commitbuilder_1.sign(&agent, &store).unwrap();
-        // Should fail if there is no self_url set in the store, and no parent in the commit
-        // TODO: FINISH THIS
-        // commit_1.apply_opts(&store, true, true, true, true).unwrap_err();
-        // commitbuilder_2.set(crate::urls::PARENT.into(), Value::AtomicUrl(crate::urls::AGENT.into()));
-        // let commit_2 = commitbuilder_2.sign(&agent, &store).unwrap();
-
-        // let resource = store.get_resource(&subject).unwrap();
-        // assert!(resource.get(property).unwrap().to_string() == value.to_string());
     }
 
     #[test]

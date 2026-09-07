@@ -37,7 +37,9 @@ export function TableRangeInput({
       setError(err);
 
       if (!err) {
-        resource.save();
+        resource.save().catch(e => {
+          console.error('Failed to save range constraint', e);
+        });
       }
     },
     [setMinLength, setMaxLength, resource],

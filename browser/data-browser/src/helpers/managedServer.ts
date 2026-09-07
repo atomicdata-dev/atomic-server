@@ -1,6 +1,6 @@
 import { signRequest, type Agent } from '@tomic/react';
 import { serverProps, peerProps } from './serverOntology';
-import { rememberManagedPortalUrl } from './managed/api';
+import { rememberManagedPortalUrl, safePortalUrl } from './managed/api';
 import { isRunningInTauri } from './tauri';
 import { isOriginWithoutNode } from './originNode';
 
@@ -127,8 +127,16 @@ export async function fetchManagedInfo(
           .filter((p): p is ServerPeer => p !== null)
       : [];
 
+    // Never taken as-is. A node names its own portal, and that name feeds the
+    // "Sign in" buttons and — on desktop — where the bearer token goes.
+    // Anything but an https: URL (http: on localhost) is dropped here, so no
+    // reader of `ManagedInfo` ever sees it. Whether it may *replace* the
+    // remembered portal is rememberManagedPortalUrl's decision: not while
+    // this device holds a token for a different one.
     const portalUrl =
-      rawPortalUrl && onLocalhost ? 'http://localhost:49237' : rawPortalUrl;
+      safePortalUrl(
+        rawPortalUrl && onLocalhost ? 'http://localhost:49237' : rawPortalUrl,
+      ) ?? null;
 
     // The desktop app learns where the control plane lives ONLY from here —
     // `tauri://localhost` has no same-origin `/api`. See rememberManagedPortalUrl.
@@ -233,7 +241,7 @@ export function accountCreationTarget(
   // A hosted build sends people to its own portal without waiting to be told
   // by a server, because the server it embeds is not one of ours.
   if (isHostedDistribution()) {
-    const portalUrl = managedPortalOverride() ?? info.portalUrl;
+    const portalUrl = safePortalUrl(managedPortalOverride() ?? info.portalUrl);
 
     if (portalUrl) {
       try {
@@ -247,7 +255,9 @@ export function accountCreationTarget(
     }
   }
 
-  if (info.managed && info.portalUrl) {
+  const nodePortal = safePortalUrl(info.portalUrl);
+
+  if (info.managed && nodePortal) {
     // `/signin`, not the portal root: the root is the landing page, so
     // someone who just clicked "Create account" would arrive at a sales
     // pitch and have to find the form. That path renders the bare
@@ -256,10 +266,10 @@ export function accountCreationTarget(
     try {
       return {
         kind: 'portal',
-        url: new URL('/signin', info.portalUrl).toString(),
+        url: new URL('/signin', nodePortal).toString(),
       };
     } catch {
-      return { kind: 'portal', url: info.portalUrl };
+      return { kind: 'portal', url: nodePortal };
     }
   }
 

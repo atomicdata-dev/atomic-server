@@ -181,7 +181,7 @@ async fn announce_drives_pkarr(
 }
 
 // Increase the maximum payload size (for POSTing a body, for example) to 50MB
-const PAYLOAD_MAX: usize = 50_242_880;
+pub(crate) const PAYLOAD_MAX: usize = 50_242_880;
 const SERVER_VERSION_HEADER: &str = "X-Atomic-Server-Version";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 

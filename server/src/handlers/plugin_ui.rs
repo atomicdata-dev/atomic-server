@@ -78,6 +78,11 @@ fn plugin_nonce() -> String {
 /// server. The plugin script is locked to a fresh per-response nonce; the host
 /// SPA hands over theme CSS via `postMessage` (see PluginView.tsx).
 fn render_plugin_ui_html(query_string: &str, css_exists: bool, nonce: &str) -> String {
+    // The query string is reflected into attributes of a same-origin page,
+    // so it must be attribute-escaped; a stray `"` would otherwise close the
+    // attribute and inject markup (a `<meta http-equiv=refresh>` is enough
+    // to redirect every visitor, CSP or not).
+    let query_string = super::single_page_app::escape_html(query_string);
     let js_url = format!(
         "/plugin-ui?{}",
         query_string.replace("format=html", "format=js")

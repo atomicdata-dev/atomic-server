@@ -71,6 +71,13 @@ fn write_config(path: &Path, config: Config) -> AtomicResult<String> {
 
     std::fs::write(path, out.clone())
         .map_err(|e| format!("Error writing config file to {:?}. {}", path, e))?;
+    // The file holds the agent's private key: owner-only, whatever the umask.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Could not restrict permissions of {:?}. {}", path, e))?;
+    }
     Ok(out)
 }
 

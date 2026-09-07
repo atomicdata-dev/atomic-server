@@ -4,7 +4,7 @@
 // route. Mirrors the captured `getManagedUser()` in helpers/managedUsage.ts.
 
 import { PRODUCT_NAME } from './product';
-import { managedFetch } from './api';
+import { managedFetch, setManagedDeviceToken } from './api';
 
 export type ManagedAccount = {
   email: string;
@@ -65,6 +65,9 @@ export async function logoutManagedSession(): Promise<void> {
   } catch {
     // No control plane reachable (self-hosted) — nothing to sign out of.
   } finally {
+    // On a linked device the session *is* the token. Signing out ends it,
+    // and with it the record of which portal it belonged to.
+    setManagedDeviceToken(null);
     pendingLogouts--;
   }
 }

@@ -65,10 +65,7 @@ pub async fn web_socket_handler(
     // The origin this socket was opened on, as the client sees it (scheme
     // and `Host`, honouring forwarded headers the way the rest of the server
     // does). The browser signs exactly this as `AUTH.requestedSubject`.
-    let request_origin = {
-        let info = req.connection_info();
-        Some(format!("{}://{}", info.scheme(), info.host()))
-    };
+    let request_origin = Some(crate::context::RequestContext::new(&req, &appstate).origin);
 
     let result = WsResponseBuilder::new(
         WebSocketConnection {

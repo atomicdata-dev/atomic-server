@@ -6,6 +6,7 @@ import { useDriveVault } from '../../helpers/managed/useDriveVault';
 import { listVaultDrives } from '../../helpers/managed/vault';
 import { getManagedAccount } from '../../helpers/managed/session';
 import { canHoldProviderCookie } from '../../helpers/managed/deviceLink';
+import { safePortalUrl } from '../../helpers/managed/api';
 import { openExternal } from '../../helpers/openExternal';
 import { PRODUCT_NAME } from '../../helpers/managed/product';
 import { LinkProviderPanel } from '../../components/Vault/LinkProviderPanel';
@@ -485,9 +486,13 @@ export function ConnectDeviceStep({
                       // link that lands on the portal, and this screen is
                       // where the restore happens. Leaving it means finding
                       // the way back through Sync.
-                      void openExternal(
-                        new URL('/signin', portalUrl!).toString(),
-                      );
+                      const portal = safePortalUrl(portalUrl);
+
+                      if (portal) {
+                        void openExternal(
+                          new URL('/signin', portal).toString(),
+                        );
+                      }
                     }}
                   >
                     {`Sign in to ${PRODUCT_NAME}`}

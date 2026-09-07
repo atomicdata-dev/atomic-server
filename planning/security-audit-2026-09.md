@@ -199,3 +199,40 @@ JavaScript (`pnpm audit --prod` in `browser/`): 21 advisories, 11 high. Runtime-
 ## G. Checked and found fine
 
 Ed25519 only, strict key lengths, JCS-canonical commit payloads; genesis cert binary format with cross-language vectors; auth timestamp window (10 s skew, 5 min max age); CSPRNG everywhere keys and nonces are made; vault crypto (XChaCha20-Poly1305, random 24-byte nonces, Argon2id 64 MiB, BLAKE3 subkeys, header as AAD); SSRF guard on bookmark and import fetches (IP-literal preflight, public-only resolver, per-redirect check); `/blob/{hash}` PUT admission; `/upload` write check before body read; `/download` served with `attachment` and `nosniff`; commit fan-out drive-scoped and read-checked on subscribe; WS AUTH bound to origin plus per-connection nonce; invite tokens re-check the issuer's current write right; protocol decoders bounds-checked with frame caps; WASM host fuel, memory limiter, no stdio, zip path-traversal guards; SPA CSP nonce from `SystemRandom` with `</script>` escaping tested; `prunetests` behind `debug_assertions`; agent secret never logged; Android cleartext off in release; Flutter secret in secure storage; deep-link handler JSON-escapes before eval; MCP bridge debug-only on loopback; deploy workflows gate on green CI for the exact SHA; signing material scrubbed with `if: always()`; host mode refuses to boot misconfigured; react-markdown without `rehype-raw`; plugin host-side `postMessage` checks `event.source`; non-extractable keypair in IDB; OPFS DB encrypted per agent; no `eval`/`new Function`/prototype-pollution helpers; no empty `catch` blocks.
+
+---
+
+## H. Status (same branch)
+
+Fixed on `claude/security-code-quality-audit-ahi0jo`:
+
+- **A1**: `desktop/zed backup settings.json`, the `.pnpm-store` cache and the vitest result file are removed from the tree and ignored. The two API keys are still valid until revoked at the vendors; that is not something a commit can do.
+- **A2**: `POST /iroh-sync` requires a signed agent: write on the drive when this node already holds it, or the sync policy's leave to bring a new drive here (any signed-in agent on an open node, the owner in Owner mode). Only answers `POST`. The two client calls sign the request. On the dial side, owner trust is now confined to the drive that was dialed for: pushes claiming another drive and removals outside it are judged on the peer's own rights (this also covers C2).
+- **A3**: `import_sync_push` checks every entry: an existing resource must carry the admitted drive as its stored `drive` stamp (or be the drive itself); a new one must resolve, via its stored parent or its own stamp, to that drive. Mismatches are skipped with a warning.
+- **A4**: for `/agents/{key}` subjects the key in the path is bound to the signing key in both header authentication and commit signature validation. Agent subjects on other hosts are refused instead of fetched. `legacy_agent_pubkey` in `agents.rs` is the single place that maps a legacy subject to its key.
+- **B1**: `check_append` no longer falls back to the new resource's own `write` array; `Append` on the parent already honours the parent's `write`. Regression test `genesis_cannot_grant_itself_append_via_its_own_write_array`.
+- **B2** (agent squatting): a parentless `did:ad:agent:{key}` genesis is accepted only from that key, the node's own agent, or Sudo. Regression test `agent_resource_can_only_be_created_by_its_own_key`. The `isA: Drive` parentless path is unchanged; see below.
+- **B3**: `RequestContext` takes the origin from `Host`/`X-Forwarded-*` only when the host is the configured domain, a subdomain of the base domain, or loopback; otherwise the configured origin is used. A server left on the default domain `localhost` keeps trusting the header. The WebSocket handler uses the same origin. Unit tests in `context.rs`.
+- **B4**: known peers now record the drives they were paired for; `/forget-peer` requires write on one of them, or the node's own agent (or the Owner-mode owner). Integration test covers both the refused stranger and the accepted drive writer.
+- **B6**: the desktop launcher and the Android options bind `127.0.0.1` unless `--ip`/`ATOMIC_IP` is given.
+- **B8**: a node-reported `portalUrl` is accepted only as an absolute `https:` URL (or `http:` on localhost); once a device token exists, the portal it was issued by is pinned and later nodes cannot move it; every navigation to a portal goes through `safePortalUrl`. Unit tests in `managed/api.test.ts`.
+- **C1**: `BLOB_RESPONSE` bytes must hash to the requested key.
+- **C3**: `Datatype.URI` rejects `javascript:`, `data:` and `vbscript:`; `isSafeHref` guards `AtomicLink`, `ValueComp`, `URICell` and file downloads.
+- **C4, C5**: `downloadUrl` is escaped in the meta tags; the `/plugin-ui` query string is attribute-escaped.
+- **C9**: rendition quality is rounded to whole numbers and width to a multiple of 64 (max 4096) before encoding and caching.
+- **C10**: multipart uploads are bounded by `PAYLOAD_MAX`.
+- **C11**: `limit` is capped at 500 in `/search` and `/vector_search`.
+- **C12**: LanceDB filter literals are quoted.
+- **C13**: `origin()` in `helpers.rs` no longer panics on unparsable input.
+- **C21**: `config.toml` (agent secret) is written with mode 0600.
+- **D**: plugin RPC ignores messages not from `window.parent`; the session cookie gets `Secure` on https.
+- **F**: `ValueComp` comma-case, unawaited `resource.save()` calls, CLI agent readiness, the commented-out tool block, the duplicate `EventManager`, `SIGNER` set twice, bitwise `&` on bools, the empty `authorization` test.
+
+Not fixed here:
+
+- **B5** (Iroh AUTH bound to the drive only): needs a protocol change so the dialer signs the responder's node id; both sides ship in this repo but deployed nodes and phones would stop pairing until upgraded, so it wants a versioned rollout rather than a silent change.
+- **B7** (desktop CSP disabled, devtools in release): enabling a CSP for the data-browser needs the app tested under it; the `devtools` cargo feature cannot be made profile-dependent without restructuring the desktop crate.
+- **B2** parentless creation for non-DID subjects claiming `isA: Drive`: server setup and the CLI create top-level drives this way; restricting it needs a decision on who may mint top-level resources on a node.
+- **C2, C6, C7, C8, C14, C15, C16, C17, C18, C19, C20, C22, C23, C24** and the remaining Low items: design or infrastructure changes, listed above with the fix direction.
+- Dependencies: `wasmtime` 45 (sandbox escape), `@tiptap/core` 3.23.6 and the `@modelcontextprotocol/sdk` transitive set need version bumps that should be tested on their own.
+- The `stringToSlug` duplicate stays: the data-browser copy fixes a case (`Meat & fish`) the lib copy gets wrong; port the fix into lib first.

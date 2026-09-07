@@ -19,6 +19,13 @@ export class RPCClient {
 
   constructor() {
     window.addEventListener('message', (e: MessageEvent<ServerMessage>) => {
+      // Only the host that embeds this plugin may answer it. The sandbox has a
+      // null origin so `e.origin` cannot be checked, but the source window can:
+      // anything else (a sibling frame, an opened popup) is ignored.
+      if (e.source !== window.parent) {
+        return;
+      }
+
       if (e.data.type === 'resource-notification') {
         const callbacks = this.subscriptions.get(e.data.resource.subject) ?? [];
 

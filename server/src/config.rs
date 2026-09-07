@@ -483,7 +483,7 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     let initialize = !std::path::Path::exists(&store_path) || opts.initialize;
     let repopulate_defaults = opts.repopulate_defaults;
 
-    if opts.https & opts.email.is_none() {
+    if opts.https && opts.email.is_none() {
         return Err(
             "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsencrypt.org."
                 .into(),

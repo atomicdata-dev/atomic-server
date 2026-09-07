@@ -71,6 +71,38 @@ describe('Datatypes', () => {
     expect(() => validateDatatype(int, Datatype.RESOURCEARRAY)).to.throw();
   });
 
+  it('validates URI values and refuses script schemes', ({ expect }) => {
+    expect(() =>
+      validateDatatype('https://example.com/a?b=c', Datatype.URI),
+    ).to.not.throw();
+    expect(() =>
+      validateDatatype('mailto:someone@example.com', Datatype.URI),
+    ).to.not.throw();
+
+    expect(() => validateDatatype('', Datatype.URI), 'empty').to.throw();
+    expect(() => validateDatatype(5, Datatype.URI), 'number').to.throw();
+    expect(
+      () => validateDatatype('not a url', Datatype.URI),
+      'relative',
+    ).to.throw();
+    expect(
+      () => validateDatatype('javascript:alert(1)', Datatype.URI),
+      'javascript:',
+    ).to.throw();
+    expect(
+      () => validateDatatype('  JavaScript:alert(1)', Datatype.URI),
+      'javascript: with case and whitespace',
+    ).to.throw();
+    expect(
+      () => validateDatatype('data:text/html,<b>x</b>', Datatype.URI),
+      'data:',
+    ).to.throw();
+    expect(
+      () => validateDatatype('vbscript:MsgBox(1)', Datatype.URI),
+      'vbscript:',
+    ).to.throw();
+  });
+
   it('validates LocalizedText values', ({ expect }) => {
     expect(() =>
       validateDatatype(

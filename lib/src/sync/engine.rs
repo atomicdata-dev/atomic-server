@@ -434,6 +434,17 @@ pub async fn handle_frame_full(
                 // too, since enrollment/quota state can change between the
                 // request and this response.
                 match store.take_pending_blob_request(&resp.hash) {
+                    // Blobs are content-addressed: the bytes must hash to the
+                    // key they are stored under, or any session that answers
+                    // a pending request poisons what every later reader of
+                    // that hash gets.
+                    Some(_drive) if blake3::hash(&resp.bytes).as_bytes() != &resp.hash => {
+                        tracing::warn!(
+                            "BLOB_RESPONSE: bytes do not hash to {}, dropped",
+                            hex::encode(resp.hash)
+                        );
+                        vec![]
+                    }
                     Some(drive) if store.sync_policy().admit_drive_write(&drive) => {
                         let _ = store.kv.insert(Tree::Blobs, &resp.hash, &resp.bytes);
                         vec![]
@@ -1437,6 +1448,10 @@ pub async fn import_sync_push(
     let mut count = 0;
     let mut blob_requests = Vec::new();
 
+    let base_domain = store.get_base_domain();
+    let normalize = |s: &str| crate::Subject::from_raw(s, base_domain.as_deref()).pure_id();
+    let admitted_drive = normalize(&push.drive);
+
     for entry in &push.entries {
         if super::tombstones::is_tombstoned(store, &entry.subject) {
             tracing::debug!(
@@ -1455,6 +1470,35 @@ pub async fn import_sync_push(
         // silently replaces the other's snapshot. Held per entry, released at
         // the end of each iteration.
         let _subject_guard = store.subject_locks.lock(&snapshot_key).await;
+
+        // Admission above was for `push.drive` as a whole. Each entry names
+        // its own subject, so an existing resource must actually live in
+        // that drive, or a peer admitted for one drive could overwrite any
+        // resource on this node (its ACLs included) by listing it here. Its
+        // stored `drive` stamp is authoritative and is read BEFORE the
+        // incoming delta is merged (mirrors `ws_apply::persist_update`).
+        let existing_resource = store
+            .get_resource(&crate::Subject::from_raw(
+                &snapshot_key,
+                base_domain.as_deref(),
+            ))
+            .await
+            .ok();
+        if let Some(existing) = &existing_resource {
+            let stored_drive = existing
+                .get(crate::urls::DRIVE_PROP)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| existing.get_subject().to_string());
+            if normalize(&stored_drive) != admitted_drive {
+                tracing::warn!(
+                    "import_sync_push: {} belongs to drive {}, not to {} this push was admitted for; skipped",
+                    entry.subject,
+                    stored_drive,
+                    push.drive
+                );
+                continue;
+            }
+        }
 
         // Load existing doc or create new
         let doc = if let Ok(Some(existing)) =
@@ -1513,6 +1557,36 @@ pub async fn import_sync_push(
 
         if resource.apply_state_doc(doc).is_err() {
             continue;
+        }
+
+        // A new subject: it may only enter the drive this push was admitted
+        // for. Its parent's stored drive decides when the parent is known
+        // here; otherwise the resource must stamp itself into that drive or
+        // be the drive root itself. (A peer gains nothing by stamping a NEW
+        // resource into a drive it already has write on.)
+        if existing_resource.is_none() {
+            let mut claimed = resource
+                .get(crate::urls::DRIVE_PROP)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| resource.get_subject().to_string());
+            if let Ok(parent_val) = resource.get(crate::urls::PARENT) {
+                let parent_subject = crate::Subject::from(parent_val.to_string());
+                if let Ok(parent_res) = store.get_resource(&parent_subject).await {
+                    claimed = parent_res
+                        .get(crate::urls::DRIVE_PROP)
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|_| parent_subject.to_string());
+                }
+            }
+            if normalize(&claimed) != admitted_drive {
+                tracing::warn!(
+                    "import_sync_push: new resource {} resolves to drive {}, not to {} this push was admitted for; skipped",
+                    entry.subject,
+                    claimed,
+                    push.drive
+                );
+                continue;
+            }
         }
 
         // Log what properties arrived

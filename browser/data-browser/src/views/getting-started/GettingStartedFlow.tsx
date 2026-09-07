@@ -23,6 +23,7 @@ import { Column } from '../../components/Row';
 import { NewIdentitySection } from '../../components/NewIdentitySection';
 import { getManagedAccount } from '../../helpers/managed/session';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
+import { safePortalUrl } from '../../helpers/managed/api';
 import {
   fetchManagedInfo,
   accountCreationTarget,
@@ -154,7 +155,10 @@ export function GettingStartedFlow({
       // The remembered provider covers the desktop and Android apps: their
       // embedded node names no portal, and the build may not either, but a
       // device that linked once knows exactly where its account lives.
-      setKnownPortalUrl(getManagedPortalUrl(info) ?? getRememberedProvider());
+      setKnownPortalUrl(
+        safePortalUrl(getManagedPortalUrl(info) ?? getRememberedProvider()) ??
+          null,
+      );
     });
 
     return () => {
@@ -795,7 +799,9 @@ export function GettingStartedFlow({
                     // Hosted build or managed node → create the account on the
                     // portal (email verification). FOSS node → local identity.
                     if (createTarget.kind === 'portal') {
-                      window.location.assign(createTarget.url);
+                      const url = safePortalUrl(createTarget.url);
+
+                      if (url) window.location.assign(url);
                     } else {
                       setStep('create');
                     }
@@ -1028,7 +1034,9 @@ export function GettingStartedFlow({
                           setError(undefined);
 
                           if (createTarget.kind === 'portal') {
-                            window.location.assign(createTarget.url);
+                            const url = safePortalUrl(createTarget.url);
+
+                            if (url) window.location.assign(url);
                           } else {
                             setStep('create');
                           }

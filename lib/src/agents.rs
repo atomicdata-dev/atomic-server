@@ -342,6 +342,24 @@ pub fn migrate_legacy_agent_subject(subject: &str) -> String {
     subject.to_string()
 }
 
+/// The public key a legacy HTTP agent subject (`https://host/agents/{pubkey}`
+/// or `internal:/agents/{pubkey}`) names, or `None` for any other subject.
+///
+/// Every rights check treats such a subject as `did:ad:agent:{pubkey}` (see
+/// [`migrate_legacy_agent_subject`]), so the key in the path IS the identity
+/// being claimed. Authentication and signature checks must therefore bind that
+/// key to the key that actually signed, rather than trust whatever `publicKey`
+/// a stored (or, worse, fetched) resource at that URL happens to carry.
+pub fn legacy_agent_pubkey(subject: &str) -> Option<String> {
+    let migrated = migrate_legacy_agent_subject(subject);
+    if migrated == subject {
+        return None;
+    }
+    migrated
+        .strip_prefix(crate::subject::DID_AD_AGENT_PREFIX)
+        .map(|k| k.to_string())
+}
+
 impl From<Agent> for ForAgent {
     fn from(agent: Agent) -> Self {
         ForAgent::AgentSubject(agent.subject)

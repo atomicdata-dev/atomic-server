@@ -12,8 +12,10 @@ import { generateIndex } from '../generateIndex.js';
 import { PropertyRecord } from '../PropertyRecord.js';
 import { generateExternals } from '../generateExternals.js';
 import { validateOntologies } from '../validateOntologies.js';
+import { ready } from '../store.js';
 
 export const ontologiesCommand = async (_args: string[]) => {
+  await ready;
   const propertyRecord = new PropertyRecord();
 
   console.log(

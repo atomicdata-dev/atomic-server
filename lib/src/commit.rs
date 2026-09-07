@@ -377,19 +377,25 @@ impl Commit {
                 .strip_prefix("did:ad:agent:")
                 .ok_or("Invalid did:ad:agent signer")?
                 .to_string()
-        } else if let Ok(resource) = store.get_resource(&signer_subject).await {
-            resource.get(urls::PUBLIC_KEY)?.to_string()
-        } else if let crate::Subject::Internal { url, .. } = &signer_subject {
-            // Legacy HTTP agents: extract key from URL path
-            let path = url.path();
-            if path.starts_with("/agents/") {
-                path.strip_prefix("/agents/").unwrap().to_string()
-            } else {
-                return Err(format!("Signer {} not found in store", commit.signer).into());
+        } else if let Some(path_key) = crate::agents::legacy_agent_pubkey(commit.signer.as_str()) {
+            // Legacy HTTP agents (`https://host/agents/{pubkey}`): rights
+            // checks treat this signer as `did:ad:agent:{pubkey}`, so the key
+            // in the path is the identity being claimed and is what the
+            // signature must verify against. A resource stored (or fetched)
+            // at that URL must not override it: anyone can publish a resource
+            // at `https://theirs/agents/<victim key>` carrying their own key.
+            path_key
+        } else if signer_subject.is_local() {
+            match store.get_resource(&signer_subject).await {
+                Ok(resource) => resource.get(urls::PUBLIC_KEY)?.to_string(),
+                Err(_) => return Err(format!("Signer {} not found in store", commit.signer).into()),
             }
         } else {
+            // Never fetch a signer over the network to learn its key: the
+            // fetch is unauthenticated SSRF and the body would be stored as
+            // a trusted resource.
             return Err(format!(
-                "Signer {} not found and cannot extract public key",
+                "Signer {} is hosted elsewhere; only did:ad:agent signers or agents known to this store can sign commits here",
                 commit.signer
             )
             .into());
@@ -1204,10 +1210,6 @@ impl Commit {
                 )?;
             }
         }
-        resource.set_unsafe(
-            SIGNER.into(),
-            Value::new(self.signer.as_str(), &DataType::AtomicUrl)?,
-        )?;
         if let Some(signature) = &self.signature {
             resource.set_unsafe(urls::SIGNATURE.into(), signature.clone().into())?;
         }
@@ -3203,6 +3205,136 @@ mod test {
         assert_eq!(commit_builder.subject, "https://localhost/test");
         assert!(commit_builder.loro_update.is_some());
         assert!(!commit_builder.destroy);
+    }
+
+    fn rights_opts() -> CommitOpts {
+        CommitOpts {
+            validate_signature: true,
+            validate_rights: true,
+            ..CommitOpts::no_validations_no_index()
+        }
+    }
+
+    /// A stranger's genesis naming someone else's drive as `parent`, with a
+    /// `write` array that lists the stranger, must be refused. The new
+    /// resource's grants are whatever the signer put in the commit under
+    /// check, so they can never stand in for `append` on the parent.
+    #[tokio::test]
+    async fn genesis_cannot_grant_itself_append_via_its_own_write_array() {
+        let (store, owner) = store_with_known_agent().await;
+
+        let mut drive_builder = CommitBuilder::new("placeholder".into());
+        drive_builder.set(
+            urls::IS_A.into(),
+            Value::from(vec![urls::DRIVE.to_string()]),
+        );
+        drive_builder.set(
+            urls::WRITE.into(),
+            Value::from(vec![owner.subject.to_string()]),
+        );
+        let drive_commit = Commit::create_did(drive_builder, &owner, &store)
+            .await
+            .unwrap();
+        let drive = store
+            .apply_commit(drive_commit, &rights_opts())
+            .await
+            .expect("an owner may create a parentless drive")
+            .resource_new
+            .unwrap()
+            .get_subject()
+            .to_string();
+
+        // Unknown to the store: a bare keypair is all an attacker needs.
+        let stranger = Agent::new(Some("stranger")).unwrap();
+        let mut child_builder = CommitBuilder::new("placeholder".into());
+        child_builder.set(urls::PARENT.into(), Value::AtomicUrl(drive.as_str().into()));
+        child_builder.set(
+            urls::WRITE.into(),
+            Value::from(vec![stranger.subject.to_string()]),
+        );
+        child_builder.set(urls::NAME.into(), Value::String("squatted".into()));
+        let child_commit = Commit::create_did(child_builder, &stranger, &store)
+            .await
+            .unwrap();
+        let child_subject = child_commit.subject.to_string();
+
+        let err = store
+            .apply_commit(child_commit, &rights_opts())
+            .await
+            .expect_err("a stranger must not create children in someone else's drive");
+        assert!(
+            store
+                .get_resource(&child_subject.as_str().into())
+                .await
+                .is_err(),
+            "refused child must not have been stored: {err}"
+        );
+
+        // The owner can still do exactly the same thing.
+        let mut own_child = CommitBuilder::new("placeholder".into());
+        own_child.set(urls::PARENT.into(), Value::AtomicUrl(drive.as_str().into()));
+        own_child.set(urls::NAME.into(), Value::String("mine".into()));
+        let own_commit = Commit::create_did(own_child, &owner, &store).await.unwrap();
+        store
+            .apply_commit(own_commit, &rights_opts())
+            .await
+            .expect("the drive's writer may append to it");
+    }
+
+    /// `did:ad:agent:{key}` is an identity. Nobody but that key (or the node
+    /// itself) may create it, or an attacker could squat a user's Agent
+    /// resource, complete with their own `write` grant, before the user's
+    /// first sign-in.
+    #[tokio::test]
+    async fn agent_resource_can_only_be_created_by_its_own_key() {
+        let (store, _known) = store_with_known_agent().await;
+        let victim = Agent::new(Some("victim")).unwrap();
+        let stranger = Agent::new(Some("stranger")).unwrap();
+
+        let squat = |signer: &Agent| {
+            let mut b = CommitBuilder::new(victim.subject.clone());
+            b.is_genesis = true;
+            b.set(
+                urls::IS_A.into(),
+                Value::from(vec![urls::AGENT.to_string()]),
+            );
+            b.set(urls::NAME.into(), Value::String("me".into()));
+            b.set(
+                urls::WRITE.into(),
+                Value::from(vec![signer.subject.to_string()]),
+            );
+            b
+        };
+
+        let by_stranger = squat(&stranger)
+            .sign(
+                &stranger,
+                &store,
+                &Resource::new(victim.subject.to_string()),
+            )
+            .await
+            .unwrap();
+        store
+            .apply_commit(by_stranger, &rights_opts())
+            .await
+            .expect_err("only the agent itself may create its Agent resource");
+        assert!(
+            store
+                .get_resource(&victim.subject)
+                .await
+                .map(|r| r.get(urls::WRITE).is_err())
+                .unwrap_or(true),
+            "the squatter's write grant must not have been stored"
+        );
+
+        let by_victim = squat(&victim)
+            .sign(&victim, &store, &Resource::new(victim.subject.to_string()))
+            .await
+            .unwrap();
+        store
+            .apply_commit(by_victim, &rights_opts())
+            .await
+            .expect("an agent creates its own Agent resource");
     }
 }
 

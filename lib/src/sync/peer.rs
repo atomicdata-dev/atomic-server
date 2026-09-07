@@ -1648,9 +1648,9 @@ pub async fn sync_drive_with_peer_using_outcome(
                         // sidebar) shows the friendly name without needing
                         // a separate codepath. `add_known_peer` is upsert
                         // and only overwrites `name` when non-empty.
-                        if !name.is_empty() {
-                            add_known_peer(store, &remote_key, name);
-                        }
+                        // Always, name or not: the drive is what a later
+                        // `forget-peer` is authorized against.
+                        add_known_peer_for_drive(store, &remote_key, name, drive);
                     }
                 }
                 continue;
@@ -1669,16 +1669,25 @@ pub async fn sync_drive_with_peer_using_outcome(
                         diff.remove.len()
                     );
                     for subject in &diff.remove {
-                        // Dial side: we chose this peer, so a remove targeting a
-                        // drive we own is honored even when the peer relaying it
-                        // is a different agent (trust_owned=true). A signed
-                        // envelope, when present, is applied as a COMMIT instead.
+                        // Dial side: we chose this peer, so a remove targeting
+                        // THE drive we dialed it for is honored even when the
+                        // peer relaying it is a different agent (trust_owned).
+                        // That trust stops at that drive: a peer dialed for a
+                        // shared drive must not get to delete in every drive
+                        // this node owns. Anything else is judged on the peer's
+                        // own rights. A signed envelope, when present, is
+                        // applied as a COMMIT instead.
+                        let in_dialed_drive =
+                            super::ws_apply::resolve_destroy_drive(store, subject)
+                                .await
+                                .map(|d| same_drive(store, &d, drive))
+                                .unwrap_or(false);
                         let envelope = diff.remove_commits.get(subject).map(String::as_str);
                         apply_peer_remove(
                             store,
                             &remote_agent,
                             subject,
-                            true,
+                            in_dialed_drive,
                             &mut drive_cache,
                             envelope,
                         )
@@ -1720,6 +1729,26 @@ pub async fn sync_drive_with_peer_using_outcome(
                 let mut last_chunk = false;
                 if let Some(push) = super::protocol::decode_sync_push(payload) {
                     last_chunk = push.last;
+                    if !same_drive(store, &push.drive, drive) {
+                        // We asked for one drive; owner trust below is for that
+                        // drive only. A push claiming another drive is judged
+                        // as if the peer had dialed us: on its own rights.
+                        tracing::warn!(
+                            "SYNC_PUSH for {} while syncing {}: applying without owner trust",
+                            push.drive,
+                            drive
+                        );
+                        if let Ok((count, _)) =
+                            super::engine::import_sync_push(&push, store, &remote_agent, false)
+                                .await
+                        {
+                            total_imported += count;
+                        }
+                        if last_chunk {
+                            break;
+                        }
+                        continue;
+                    }
                     // Import with the identity the peer proved via auth-back,
                     // NOT Sudo — dialing a peer never established the peer's
                     // write rights. `trust_owned=true`: WE dialed this peer, so
@@ -1984,6 +2013,13 @@ pub struct KnownPeer {
     /// a live connection. A hint alongside the relay, not a requirement.
     #[serde(default)]
     pub direct_addrs: Vec<String>,
+    /// The drives this node has dialed the peer for. This is what a
+    /// `forget-peer` request is authorized against: whoever may write one of
+    /// these drives chose to sync it with that device, and may undo that.
+    /// Empty for peers recorded before this was tracked; those can only be
+    /// forgotten by the node's own agent.
+    #[serde(default)]
+    pub drives: Vec<String>,
 }
 
 /// Get all known peers from the DB.
@@ -2016,6 +2052,12 @@ pub fn get_known_peers(store: &Db) -> Vec<KnownPeer> {
 
 /// Add a peer to the known peers list. Updates name if already known.
 pub fn add_known_peer(store: &Db, node_id: &str, name: &str) {
+    add_known_peer_for_drive(store, node_id, name, "");
+}
+
+/// [`add_known_peer`], also recording `drive` (when non-empty) as one of the
+/// drives this node dialed the peer for. See [`KnownPeer::drives`].
+pub fn add_known_peer_for_drive(store: &Db, node_id: &str, name: &str, drive: &str) {
     let key = normalize_node_id(node_id);
     let mut peers = get_known_peers(store);
     if let Some(existing) = peers
@@ -2025,9 +2067,17 @@ pub fn add_known_peer(store: &Db, node_id: &str, name: &str) {
         if !name.is_empty() {
             existing.name = name.to_string();
         }
+        if !drive.is_empty() && !existing.drives.iter().any(|d| d == drive) {
+            existing.drives.push(drive.to_string());
+        }
     } else {
         peers.push(KnownPeer {
             node_id: key,
+            drives: if drive.is_empty() {
+                vec![]
+            } else {
+                vec![drive.to_string()]
+            },
             last_sent: None,
             last_received: None,
             name: name.to_string(),
@@ -2075,6 +2125,7 @@ pub fn remember_peer_addr(
             last_synced: None,
             relay_url: None,
             direct_addrs: Vec::new(),
+            drives: Vec::new(),
         });
         peers.last_mut().unwrap()
     };
@@ -2167,6 +2218,7 @@ pub fn mark_peer_synced(store: &Db, node_id: &str, sent: Option<u32>, received: 
             last_synced: Some(now),
             relay_url: None,
             direct_addrs: Vec::new(),
+            drives: Vec::new(),
         });
     }
     let _ = store.kv.insert(
@@ -3664,4 +3716,12 @@ mod peer_sync_volume_tests {
         assert_eq!(peer.last_sent, Some(0));
         assert_eq!(peer.last_received, Some(2));
     }
+}
+
+/// Whether two drive subjects name the same drive, ignoring spelling
+/// (routing hints, localized vs. absolute form).
+fn same_drive(store: &Db, a: &str, b: &str) -> bool {
+    let base = store.get_base_domain();
+    crate::Subject::from_raw(a, base.as_deref()).pure_id()
+        == crate::Subject::from_raw(b, base.as_deref()).pure_id()
 }

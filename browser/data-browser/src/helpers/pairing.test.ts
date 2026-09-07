@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { encodePairingEnvelope } from '@tomic/lib';
+import { encodePairingEnvelope, type Agent } from '@tomic/lib';
 
 // The embedded-server origin is a Tauri concern; the pairing logic only needs
 // it to build a URL, so the real module (which touches `window`) stays out.
@@ -14,6 +14,23 @@ const { readKnownPeers } = await import('./knownPeers');
 
 const NODE = `did:ad:node:${'a'.repeat(64)}`;
 const DRIVE = 'https://atomicdata.dev/drive/abc';
+
+/**
+ * Just enough agent for `signRequest`: the headers it produces are what the
+ * server checks, and the real one needs a keypair and WebCrypto.
+ */
+const AGENT = {
+  subject: 'did:ad:agent:abc',
+  getPublicKey: async () => 'pk',
+  createSignature: async () => 'sig',
+} as unknown as Agent;
+
+const AUTH_HEADERS = [
+  'x-atomic-public-key',
+  'x-atomic-signature',
+  'x-atomic-timestamp',
+  'x-atomic-agent',
+];
 
 function installLocalStorage() {
   const store = new Map<string, string>();
@@ -69,7 +86,7 @@ describe('pairAndSync', () => {
   it('records the peer and reports what reconciled', async () => {
     const fetchMock = stubIrohSync({ count: 7, peerName: 'Joep’s phone' });
 
-    const outcome = await pairAndSync(NODE, DRIVE);
+    const outcome = await pairAndSync(NODE, DRIVE, AGENT);
 
     expect(outcome).toEqual({ count: 7, peerName: 'Joep’s phone' });
     expect(readKnownPeers()[0].nodeId).toBe(NODE);
@@ -79,6 +96,44 @@ describe('pairAndSync', () => {
     // embedded server, inside the desktop/mobile webview.
     expect(url).toBe('http://localhost:9883/iroh-sync');
     expect(JSON.parse(init.body)).toEqual({ nodeId: NODE, drive: DRIVE });
+    // Signed over the exact URL: the server only dials a peer for an agent
+    // with write rights on the drive, and rebuilds the signed subject from
+    // the request it received.
+    expect(init.headers['Content-Type']).toBe('application/json');
+
+    for (const header of AUTH_HEADERS) {
+      expect(init.headers[header], header).toBeTruthy();
+    }
+
+    expect(init.headers['x-atomic-agent']).toBe(AGENT.subject);
+  });
+
+  it('goes out unsigned without an agent, so the node’s refusal is what shows', async () => {
+    const fetchMock = stubIrohSync({ error: 'unauthorized' });
+
+    await expect(pairAndSync(NODE, DRIVE, undefined)).rejects.toThrow(
+      'unauthorized',
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+
+    for (const header of AUTH_HEADERS) {
+      expect(init.headers[header], header).toBeUndefined();
+    }
+  });
+
+  it('surfaces a refusal that carries no JSON body', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    }) as unknown as typeof fetch;
+
+    await expect(pairAndSync(NODE, DRIVE, AGENT)).rejects.toThrow(
+      '403 Forbidden',
+    );
   });
 
   it('sends exactly the shared /iroh-sync contract', async () => {
@@ -87,6 +142,7 @@ describe('pairAndSync', () => {
     await pairAndSync(
       pairingContract.nodeId as string,
       pairingContract.drive as string,
+      AGENT,
     );
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -99,7 +155,7 @@ describe('pairAndSync', () => {
   it('upgrades the peer label once the peer names itself', async () => {
     stubIrohSync({ count: 1, peerName: 'Tablet' });
 
-    await pairAndSync(NODE, DRIVE);
+    await pairAndSync(NODE, DRIVE, AGENT);
 
     expect(readKnownPeers()[0].label).toBe('Tablet');
   });
@@ -109,7 +165,7 @@ describe('pairAndSync', () => {
 
     // A device that has not signed in yet has no drive. Recording the peer
     // anyway is the point: a later sync can use it.
-    await expect(pairAndSync(NODE, undefined)).resolves.toBeUndefined();
+    await expect(pairAndSync(NODE, undefined, AGENT)).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(readKnownPeers()[0].nodeId).toBe(NODE);
   });
@@ -117,13 +173,15 @@ describe('pairAndSync', () => {
   it('throws the server-reported error', async () => {
     stubIrohSync({ error: 'no route to peer' });
 
-    await expect(pairAndSync(NODE, DRIVE)).rejects.toThrow('no route to peer');
+    await expect(pairAndSync(NODE, DRIVE, AGENT)).rejects.toThrow(
+      'no route to peer',
+    );
   });
 
   it('treats a blank peer name as no name', async () => {
     stubIrohSync({ count: 1, peerName: '   ' });
 
-    const outcome = await pairAndSync(NODE, DRIVE);
+    const outcome = await pairAndSync(NODE, DRIVE, AGENT);
 
     expect(outcome?.peerName).toBeUndefined();
     expect(readKnownPeers()[0].label).toContain('did:ad:node:');
@@ -132,7 +190,7 @@ describe('pairAndSync', () => {
   it('reports a non-numeric count as zero rather than NaN', async () => {
     stubIrohSync({ count: 'lots' });
 
-    expect((await pairAndSync(NODE, DRIVE))?.count).toBe(0);
+    expect((await pairAndSync(NODE, DRIVE, AGENT))?.count).toBe(0);
   });
 });
 
@@ -145,7 +203,7 @@ describe('runPairing', () => {
   it('decodes a real pairing code and syncs it', async () => {
     stubIrohSync({ count: 3 });
 
-    const result = await runPairing(validCode, DRIVE);
+    const result = await runPairing(validCode, DRIVE, AGENT);
 
     expect(result).toEqual({
       ok: true,
@@ -154,7 +212,11 @@ describe('runPairing', () => {
   });
 
   it('reports an unreadable code as a value, not a throw', async () => {
-    const result = await runPairing('atomic://pair?v=1&node=nonsense', DRIVE);
+    const result = await runPairing(
+      'atomic://pair?v=1&node=nonsense',
+      DRIVE,
+      AGENT,
+    );
 
     expect(result.ok).toBe(false);
   });
@@ -163,6 +225,7 @@ describe('runPairing', () => {
     const result = await runPairing(
       `atomic://pair?v=99&node=${NODE}&drives=*`,
       DRIVE,
+      AGENT,
     );
 
     expect(result).toMatchObject({ ok: false });
@@ -172,7 +235,7 @@ describe('runPairing', () => {
   it('surfaces a sync failure as a message', async () => {
     stubIrohSync({ error: 'peer is offline' });
 
-    expect(await runPairing(validCode, DRIVE)).toEqual({
+    expect(await runPairing(validCode, DRIVE, AGENT)).toEqual({
       ok: false,
       message: 'peer is offline',
     });
@@ -182,7 +245,7 @@ describe('runPairing', () => {
     const failing = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
     globalThis.fetch = failing as unknown as typeof fetch;
 
-    const result = await runPairing(validCode, DRIVE);
+    const result = await runPairing(validCode, DRIVE, AGENT);
 
     expect(result.ok).toBe(false);
     // The peer is recorded even though the sync failed, so retrying is a tap.

@@ -29,7 +29,7 @@ export function useAddToOntology(ontologySubject?: string) {
 
       if (!hasResolvedOntologySubject) {
         await resource.set(core.properties.parent, driveSubject);
-        resource.save();
+        await resource.save();
 
         return;
       }

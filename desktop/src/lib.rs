@@ -626,6 +626,11 @@ pub fn run() {
           config_dir.to_str().unwrap(),
           "--cache-dir",
           cache_dir.to_str().unwrap(),
+          // Loopback only: the server's default is `::` (every interface),
+          // which would expose the user's node to the whole network. Peers
+          // reach this device over Iroh, never over this HTTP port.
+          "--ip",
+          "127.0.0.1",
         ]);
         // `serve` persists this, so peers see the device rather than "localhost".
         if opts.device_name.is_none() {
@@ -638,7 +643,15 @@ pub fn run() {
 
       #[cfg(not(target_os = "android"))]
       let config = {
-        let opts = atomic_server_lib::config::read_opts();
+        let mut opts = atomic_server_lib::config::read_opts();
+        // Loopback only unless the user asked otherwise: the server's default
+        // is `::` (every interface), which would expose the node to the LAN.
+        // Peers reach this device over Iroh, never over this HTTP port.
+        if std::env::var_os("ATOMIC_IP").is_none()
+          && !std::env::args().any(|a| a == "--ip" || a.starts_with("--ip="))
+        {
+          opts.ip = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+        }
         atomic_server_lib::config::build_config(opts)
           .map_err(|e| format!("Initialization failed: {}", e))
           .expect("failed init config")
