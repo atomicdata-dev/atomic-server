@@ -18,7 +18,7 @@
  *     be opened, and the cache silently empties even though the server still
  *     has everything. That is exactly what "the content is gone" looks like.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import {
   before,
   getCurrentSubject,

@@ -14,7 +14,7 @@
  *   3. The unseen state is device-local: clearing it marks the badge unseen.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
   before,
   FRONTEND_URL,

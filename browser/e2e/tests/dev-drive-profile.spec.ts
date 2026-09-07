@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from './fixtures';
 import { FRONTEND_URL, currentDriveTitle } from './test-utils';
 import { applyCpuThrottle, envCpuThrottle } from './perf-attach';
 import * as fs from 'fs';

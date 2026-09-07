@@ -416,5 +416,47 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
 
 - `browser/data-browser/src/helpers/feedback.test.ts`: unavailable reporting, failed delivery, blank input and successful submission.
 - `browser/data-browser/src/helpers/sentry.test.ts`: runtime disable override, environment and build attribution.
-- `browser/e2e/tests/feedback.spec.ts`: sidebar form, failed Sentry transport, retained input and successful retry; uses a fake Sentry project with intercepted transport.
+- `browser/e2e/tests/feedback.spec.ts`: sidebar form, unavailable-reporting guidance, failed Sentry transport, retained input and successful retry; uses a fake Sentry project with intercepted transport.
 - Real Sentry evidence and remaining production gates: `planning/sentry-feedback-readiness.md`.
+
+### E2E browser diagnostic gate
+
+Every spec imports the automatic fixture in `browser/e2e/tests/fixtures.ts`.
+Unexpected console warnings/errors and uncaught exceptions fail; extra contexts
+and tabs are included. `browser-diagnostics.spec.ts` verifies capture, exact
+expectations and rejection behavior. See `planning/e2e-diagnostic-hygiene.md`
+for current failures. This does not assert Rust process logs or Sentry delivery.
+
+### Diagnostic root-cause follow-up (2026-09-07)
+
+Strict probes cover feedback, sign-in, account changes, recovery and chat. Store
+unit regressions cover loading personal-drive placeholders, database handoff,
+render-time snapshot notification, and attachment creation before a form is saved.
+WebSocket tests reject stale version-vector/reduced-sync responses after identity
+or drive changes. Managed tests cover cancellation, eligibility, and confirmed
+object collisions without a premature backup cursor advance. Concurrent local key
+creation and sign-in use a persistence regression test.
+
+See `planning/e2e-diagnostic-hygiene.md` and the SaaS
+`planning/E2E_DIAGNOSTICS.md` for current acceptance totals and open release gates.
+
+Additional regressions cover computed-filter membership invalidation, first-genesis
+fork bodies, cancelled outbox writes, GET error classification, missing-base delta
+recovery, and the known server-only browser capability fallback. Rust commit tests
+count document-body changes in the causality guard while retaining rejection of
+property writes that lose completely; expression tests exercise browser operator
+aliases. The editor Link lifecycle test preserves telephone links across multiple
+mounts without resetting or re-registering the global parser.
+
+### Save durability and identity lifecycle regressions
+
+- Client-library tests gate both the snapshot write and worker flush: an existing
+  resource's save cannot resolve before either durability barrier completes.
+- WebSocket tests deliver an old connection's close event after its replacement
+  opens and verify the Store stays connected.
+- HTTP and Loro-loader tests distinguish document-unload cancellation from an
+  active-page failure; real failures remain visible.
+- `initClientDb.handoff.test.ts` switches identities twice during the old worker's
+  flush and verifies the obsolete intermediate database is never attached.
+- Dashboard reload, offline tables, reconnect, search/deletion and generated
+  Next.js/SvelteKit sites cover the corresponding browser flows.

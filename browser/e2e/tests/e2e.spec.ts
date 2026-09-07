@@ -6,7 +6,7 @@
  * Try not to rely on hardcoded timeouts, as this is likely to lead to race conditions and flakiness in CI (slower hardware).
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import {
   FRONTEND_URL,
   spaUrl,
@@ -38,6 +38,8 @@ import {
   topBarShareButton,
   SEARCHBOX_PROPERTY_PLACEHOLDER,
   smoke,
+  devDrive,
+  makeDrivePublic,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -459,7 +461,7 @@ test.describe('data-browser', async () => {
     await expect(editableTitle(page)).toHaveRole('textbox');
   });
 
-  test('user drives page', async ({ page }) => {
+  test('user drives page', async ({ page, browser }) => {
     const initialDriveSubject = await getCurrentSubject(page);
     const initialDriveTitle = await currentDriveTitle(page).textContent();
 
@@ -489,7 +491,13 @@ test.describe('data-browser', async () => {
 
     // Opening a drive that is neither personal nor saved lands it in
     // Recently visited, which makes the section appear.
-    await changeDrive('https://atomicdata.dev', page);
+    const otherContext = await browser.newContext();
+    const otherPage = await otherContext.newPage();
+    await devDrive(otherPage);
+    const publicDrive = await getCurrentSubject(otherPage);
+    await makeDrivePublic(otherPage);
+    await changeDrive(publicDrive, page);
+    await otherContext.close();
     await openConfigureDrive(page);
     await expect(
       page.getByRole('heading', { name: 'Recently visited' }),

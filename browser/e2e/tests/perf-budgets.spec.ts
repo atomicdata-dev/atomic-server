@@ -20,7 +20,7 @@
  *     `pushCommits` round-trip distribution.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
   before,
   newResource,

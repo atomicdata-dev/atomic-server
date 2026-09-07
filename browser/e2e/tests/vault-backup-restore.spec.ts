@@ -22,7 +22,7 @@
  * control plane on :3030. Without it every test here skips rather than fails,
  * because a normal e2e run has no reason to have a control plane up.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import {
   FRONTEND_URL,
@@ -185,6 +185,15 @@ async function renameLocally(page: Page, title: string) {
   // reproduced (see "backups and pending writes" in
   // planning/CLOUD_VAULT_ARCHITECTURE.md) and the failure it was written for
   // turned out to be the restore-flush race, fixed in the worker.
+  await expect.poll(() => page.evaluate(async () => {
+    const subject = document.querySelector('main[about]')?.getAttribute('about');
+    if (!subject) return undefined;
+    const db = window.store.getClientDb();
+    const saved = await db?.getResource(subject);
+    if (!saved) return undefined;
+    await db?.flush();
+    return JSON.parse(saved)['https://atomicdata.dev/properties/name'];
+  })).toBe(title);
   await page.reload();
   await expect(sidebarEntry).toBeVisible({ timeout: 30_000 });
 }

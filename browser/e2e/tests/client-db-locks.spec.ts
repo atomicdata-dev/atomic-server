@@ -8,7 +8,7 @@
  * Chromium-only lock-steal recovery path (see `lib/src/client-db.ts`). Runs in
  * both chromium and firefox (see the `firefox` project in playwright.config.ts).
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { before, FRONTEND_URL } from './test-utils';
 
 /** Poll until the tab's ClientDb is ready and reported no init error. */

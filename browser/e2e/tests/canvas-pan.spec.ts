@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { before, devDrive, newResource } from './test-utils';
 
 const CANVAS_CLASS = 'https://atomicdata.dev/ontology/canvas/Canvas';

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { before, FRONTEND_URL, newDrive, signIn } from './test-utils';
 
 const props = {

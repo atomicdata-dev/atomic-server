@@ -1,5 +1,5 @@
 // oxlint-disable no-await-in-loop
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
   before,
   editableTitle,

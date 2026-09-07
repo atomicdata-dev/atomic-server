@@ -19,7 +19,7 @@
  * stdout for skimming.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, editableTitle, setTitle } from './test-utils';
 import { attachPerfSnapshot, resetPerfTrace } from './perf-attach';
 import { CollectionBuilder } from '@tomic/lib';

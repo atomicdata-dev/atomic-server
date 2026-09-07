@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, newDrive, newResource, setTitle } from './test-utils';
 
 test.describe('tags', () => {

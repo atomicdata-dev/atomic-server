@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import {
   before,
   editTitle,
@@ -344,6 +344,14 @@ test.describe('search', async () => {
       )
       .toBeGreaterThan(0);
 
+    // Finish loading the fonts already used by the page before cutting the
+    // network; an in-flight font download is unrelated to offline indexing.
+    await page.evaluate(async () => {
+      const downloads: Promise<FontFace>[] = [];
+      document.fonts.forEach(face => downloads.push(face.load()));
+      await Promise.all(downloads);
+      await document.fonts.ready;
+    });
     // Go offline: block the network and close the WebSocket.
     await context.setOffline(true);
     await page.evaluate(() => {

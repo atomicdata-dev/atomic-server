@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { generateKeyPair } from '@tomic/lib';
 import { FRONTEND_URL } from './test-utils';
 
@@ -49,14 +49,27 @@ test.describe('signing in on a device that holds none of the account’s data', 
     await page.getByLabel('Agent secret').fill(await strangerSecret());
   }
 
+  async function expectRecoveryStep(page: Page) {
+    // Managed installations offer account recovery first. Standalone nodes
+    // offer device pairing first; both must stop before opening a workspace.
+    await expect(
+      page.getByRole('heading', {
+        name: /^(Your data is on another device|Bring your data back)$/,
+      }),
+    ).toBeVisible({ timeout: 20_000 });
+  }
+
   test('stops, and says so, instead of opening a workspace', async ({
     page,
   }) => {
     await signInAsAStranger(page);
 
-    await expect(page.getByText('Your data is on another device')).toBeVisible({
-      timeout: 20_000,
+    await expectRecoveryStep(page);
+
+    const devices = page.getByText('…or bring it over from another device', {
+      exact: true,
     });
+    if (await devices.isVisible()) await devices.click();
 
     // And offers the way across, rather than only naming the problem.
     await expect(
@@ -67,9 +80,7 @@ test.describe('signing in on a device that holds none of the account’s data', 
   test('leaves no other workspace active', async ({ page }) => {
     await signInAsAStranger(page);
 
-    await expect(page.getByText('Your data is on another device')).toBeVisible({
-      timeout: 20_000,
-    });
+    await expectRecoveryStep(page);
 
     const drive = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('drive') ?? '""'),
@@ -90,9 +101,7 @@ test.describe('signing in on a device that holds none of the account’s data', 
   }) => {
     await signInAsAStranger(page);
 
-    await expect(page.getByText('Your data is on another device')).toBeVisible({
-      timeout: 20_000,
-    });
+    await expectRecoveryStep(page);
 
     const drive = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('drive') ?? '""'),
