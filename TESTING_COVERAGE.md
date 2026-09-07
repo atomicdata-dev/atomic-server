@@ -405,3 +405,9 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   Server/Vault, disabled, paused and unknown states. Paired SaaS
   `drive-switcher-hosting.spec.ts` checks menu rendering and refresh/error
   behavior against mocked receipts in the running browser app.
+
+- Billing return: `enrollment.test.ts` checks the typed 402 response; paired
+  SaaS `server-billing-live.spec.ts` follows a free account through mock checkout,
+  back to the selected drive, then explicit consent, replication and an
+  authenticated read from the real managed node. Plan purchase alone creates
+  no enrollment. Real Stripe-hosted test-card checkout remains a deployment check.

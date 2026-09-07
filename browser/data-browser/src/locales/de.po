@@ -7307,9 +7307,8 @@ msgstr ""
 msgid "Keep this workspace available when your devices are offline, with shareable links, search, and API access."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
-msgstr ""
+#~ msgid "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Cloud Server is on"
@@ -7410,4 +7409,16 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Hosting needs a Server plan. After payment, return here to finish setup."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Choose Server plan"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
 msgstr ""

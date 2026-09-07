@@ -61,6 +61,14 @@ const PROOF_ERROR_MESSAGES: Record<string, string> = {
     'your workspace, sign in with the identity that created it and retry.',
 };
 
+export class HostingPaymentRequiredError extends Error {
+  constructor() {
+    // This exception is a control signal; the route renders translated copy.
+    super(/* @wc-ignore */ 'Hosting payment required');
+    this.name = /* @wc-ignore */ 'HostingPaymentRequiredError';
+  }
+}
+
 /**
  * Say what actually went wrong.
  *
@@ -84,6 +92,10 @@ async function enrollmentError(response: Response): Promise<Error> {
     return new Error(
       `Your ${PRODUCT_NAME} session expired. Sign in and retry.`,
     );
+  }
+
+  if (response.status === 402) {
+    return new HostingPaymentRequiredError();
   }
 
   // A refused proof gets a sentence that says what the user can do about it;

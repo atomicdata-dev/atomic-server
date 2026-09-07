@@ -1,3 +1,4 @@
+import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import {
   useEffect,
   useState,
@@ -588,6 +589,9 @@ function SyncPage() {
   // known / not applicable; `false` = eligible but not enrolled (show the CTA);
   // `true` = already enrolled (hide it).
   const [cloudEnrolled, setCloudEnrolled] = useState<boolean | null>(null);
+  const [paymentRequiredDrive, setPaymentRequiredDrive] = useState<
+    string | null
+  >(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   // Resolved in an effect rather than read off a Resource during render: the
   // React Compiler memoizes on the proxy identity, so a resource that finishes
@@ -1122,6 +1126,7 @@ function SyncPage() {
     if (!drive || !agentSubject || cloudBusy) return;
 
     setCloudBusy(true);
+    setPaymentRequiredDrive(null);
 
     try {
       const args = {
@@ -1178,7 +1183,11 @@ function SyncPage() {
           : 'Connected to Cloud Server. Syncing this workspace…',
       );
     } catch (e) {
-      store.notifyError(e as Error);
+      if (e instanceof HostingPaymentRequiredError) {
+        setPaymentRequiredDrive(drive);
+      } else {
+        store.notifyError(e as Error);
+      }
     } finally {
       setCloudBusy(false);
     }
@@ -1522,6 +1531,21 @@ function SyncPage() {
                   {cloudServerBlocked && (
                     <ConnMeta>{cloudServerBlocked}</ConnMeta>
                   )}
+                  {paymentRequiredDrive !== null &&
+                    paymentRequiredDrive === status.drive &&
+                    accountPortalUrl && (
+                      <ConnMeta>
+                        Hosting needs a Server plan. After payment, return here
+                        to finish setup.
+                        <LearnMore
+                          {...externalLinkProps(
+                            `${accountPortalUrl}/billing?${new URLSearchParams({ drive: status.drive ?? '' })}`,
+                          )}
+                        >
+                          Choose Server plan
+                        </LearnMore>
+                      </ConnMeta>
+                    )}
                   <ConnActions>
                     {hostedCopyOrigin && (
                       <Button onClick={() => switchToServer(hostedCopyOrigin)}>
@@ -1590,8 +1614,8 @@ function SyncPage() {
             sharing permissions still control other users’ access.
           </p>
           <p>
-            Existing content stays in this drive. Hosting currently requires an
-            invitation for this drive.
+            Existing content stays in this drive. Hosting requires a Server plan
+            or an invitation for this drive.
           </p>
         </ConfirmationDialog>
 
