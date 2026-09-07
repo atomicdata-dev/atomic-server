@@ -5,6 +5,9 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+- Add Sync → Integrations for GitHub and Google OAuth imports into the running
+  server, with server-side token refresh and separate drives per signed-in user
+  ([#1381](https://github.com/ontola/atomic-server/issues/1381)).
 - Add `atomic-server import-oad`: import APIs described by OpenAPI documents and
   overlays through Reflector, with persistent drives and search indexing
   ([#1381](https://github.com/ontola/atomic-server/issues/1381)).

@@ -30,3 +30,5 @@ mod trace;
 // Force rebuild for blake3
 
 pub mod import_oad;
+
+pub mod integrations;

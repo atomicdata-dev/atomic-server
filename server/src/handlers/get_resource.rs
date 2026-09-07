@@ -23,8 +23,10 @@ pub async fn handle_get_resource(
     let headers = req.headers();
     let mut content_type = get_accept(headers);
     let origin = context.origin.clone();
-    let subject_string = if let Some(subj_end) = path {
-        let mut subj_end_string = subj_end.as_str();
+    let subject_string = if path.is_some() {
+        // Actix Path decodes %2F, but Reflector uses it inside namespace segments.
+        // Preserve the signed URL and the stored subject instead of changing identity.
+        let mut subj_end_string = req.uri().path().strip_prefix('/').unwrap_or_default();
         if subj_end_string.is_empty() {
             "/".to_string()
         } else {

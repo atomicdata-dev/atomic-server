@@ -18,6 +18,7 @@ use crate::plugins::wasm;
 // A good option here is to use Actors for things that can change (e.g. commit_monitor)
 #[derive(Clone)]
 pub struct AppState {
+    pub integrations: Arc<crate::integrations::State>,
     /// Contains all the data
     pub store: atomic_lib::Db,
     /// App Configuration
@@ -212,6 +213,7 @@ impl AppState {
             }
         }
         Ok(AppState {
+            integrations: Arc::new(crate::integrations::State::default()),
             store,
             config,
             commit_monitor,

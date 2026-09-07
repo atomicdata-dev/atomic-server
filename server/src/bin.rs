@@ -212,3 +212,5 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
         None => serve::serve(config).await,
     }
 }
+
+pub mod integrations;

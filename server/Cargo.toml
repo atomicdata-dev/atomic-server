@@ -14,7 +14,7 @@ homepage = "https://atomicserver.eu/"
 # has all these files regardless. It only shows up as a compile error inside
 # `cargo publish`'s verification build, i.e. mid-release. `wit/` was missing here
 # until v0.41.0-beta.2 and cost a tag to find.
-include = ["src/**/*", "Cargo.toml", "assets_tmp", "build.rs", "wit/**/*"]
+include = ["src/**/*", "Cargo.toml", "assets_tmp", "build.rs", "wit/**/*", "integrations/**/*"]
 license = "MIT"
 name = "atomic-server"
 readme = "./README.md"
@@ -33,7 +33,7 @@ static-files = "0.3.1"
 walkdir = "2"
 
 [dependencies]
-reflector-rs = { git = "https://github.com/localthought/reflector-rs", rev = "4aef40d6eb76be0cf23c5994c7b2c764255db37e" }
+reflector-rs = { git = "https://github.com/localthought/reflector-rs", rev = "ec3553bf705f2003cab743e4312bb2fee833f11c" }
 syncables = { git = "https://github.com/localthought/syncables-rs", rev = "9197f14deec88e612910606a2aeafc5d846a5033" }
 async-trait = "0.1.89"
 actix = "0.13.5"

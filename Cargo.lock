@@ -11559,7 +11559,7 @@ dependencies = [
 [[package]]
 name = "reflector-rs"
 version = "0.1.0"
-source = "git+https://github.com/localthought/reflector-rs?rev=4aef40d6eb76be0cf23c5994c7b2c764255db37e#4aef40d6eb76be0cf23c5994c7b2c764255db37e"
+source = "git+https://github.com/localthought/reflector-rs?rev=ec3553bf705f2003cab743e4312bb2fee833f11c#ec3553bf705f2003cab743e4312bb2fee833f11c"
 dependencies = [
  "anyhow",
  "async-trait",

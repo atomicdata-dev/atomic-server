@@ -1,3 +1,4 @@
+import { Integrations } from '../components/Integrations';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import {
   useEffect,
@@ -1339,6 +1340,7 @@ function SyncPage() {
       <ContainerNarrow>
         <h1>Sync</h1>
         <Lead>{summaryLine()}</Lead>
+        <Integrations server={status.serverUrl || window.location.origin} />
 
         {/* Everything our paid services own, in one card.
 

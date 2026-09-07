@@ -14,21 +14,6 @@ pub async fn run(store_path: &Path, uploads_path: &Path, origin: &str) -> Result
     let config = Config::from_env(&root)?;
     config.validate()?;
     ensure!(config.public_url == origin, "PUBLIC_URL must match the server origin ({origin}); configure --domain, --port and --https accordingly");
-    let credentials =
-        reflector_rs::oauth::resolve_credentials(&config.credentials, config.oauth.as_ref())
-            .await
-            .context("resolving API credentials")?;
-    let client = SyncClient::new(
-        ClientConfig {
-            document: config.openapi_document,
-            overlays: config.openapi_overlays,
-            credentials,
-            constants: config.constants,
-            ontology_base_url: config.public_url.clone(),
-        },
-        Arc::new(ReqwestFetch::new()),
-    )
-    .map_err(|e| anyhow::anyhow!("{e}"))?;
     let store = Arc::new(
         atomic_lib::Db::init_redb_file(store_path, Some(origin.to_owned()), uploads_path)
             .await
@@ -39,17 +24,38 @@ pub async fn run(store_path: &Path, uploads_path: &Path, origin: &str) -> Result
                 )
             })?,
     );
-    let storage = AtomicStorage::new(store.clone(), SubjectMapper::new(config.public_url))
-        .with_drive_owner(config.drive_owner);
-    let result = client.sync(&storage).await;
-    // Reflector persists partial progress too; index it even if a later page fails.
-    atomic_lib::search::build_search_index(&store)?;
-    let report = result.map_err(|e| anyhow::anyhow!("{e}"))?;
-    ensure!(
-        report.errors.is_empty(),
-        "import incomplete: {}",
-        report.errors.join("; ")
-    );
-    println!("OAD import finished: {report:?}");
+    for platform in &config.platforms {
+        let credentials = if platform.name == "github" {
+            reflector_rs::oauth::resolve_credentials(&platform.credentials, config.oauth.as_ref())
+                .await
+                .context("resolving API credentials")?
+        } else {
+            platform.credentials.clone()
+        };
+        let client = SyncClient::new(
+            ClientConfig {
+                document: platform.openapi_document.clone(),
+                overlays: platform.openapi_overlays.clone(),
+                credentials,
+                constants: platform.constants.clone(),
+                ontology_base_url: config.public_url.clone(),
+            },
+            Arc::new(ReqwestFetch::new()),
+        )
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let storage =
+            AtomicStorage::new(store.clone(), SubjectMapper::new(config.public_url.clone()))
+                .with_drive_owner(config.drive_owner.clone())
+                .with_dataset(platform.dataset_namespace());
+        let result = client.sync(&storage).await;
+        atomic_lib::search::build_search_index(&store)?;
+        let report = result.map_err(|e| anyhow::anyhow!("{e}"))?;
+        ensure!(
+            report.errors.is_empty(),
+            "import incomplete: {}",
+            report.errors.join("; ")
+        );
+        println!("OAD import finished: {report:?}");
+    }
     Ok(())
 }

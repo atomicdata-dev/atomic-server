@@ -205,6 +205,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .guard(guard::Method(Method::POST))
             .to(handlers::post_resource::handle_post_resource),
     )
+    .service(web::resource("/integrations").route(web::get().to(crate::integrations::list)))
+    .service(web::resource("/integrations/start").route(web::post().to(crate::integrations::start)))
+    .service(
+        web::resource("/integrations/callback").route(web::get().to(crate::integrations::callback)),
+    )
     .service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
     .service(web::resource("/drive-usage").to(handlers::drive_usage::handle_drive_usage))
     .service(

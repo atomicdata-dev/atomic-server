@@ -4912,6 +4912,7 @@ msgid "Recent activity {0}"
 msgstr ""
 
 #: src/chunks/Conference/ConferenceRoom.tsx
+#: src/components/Integrations.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Connecting…"
 msgstr ""
@@ -7421,4 +7422,32 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "Sign in to connect an integration."
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "Loading integrations…"
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "No integrations are configured on this server."
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "OAuth setup needed on the server"
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "Open imported data"
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "Connect an account to import its data into this server."
+msgstr ""
+
+#: src/components/Integrations.tsx
+msgid "Integrations"
 msgstr ""

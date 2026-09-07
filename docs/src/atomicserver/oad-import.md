@@ -9,19 +9,106 @@ Adding an API means providing a document and overlays, without generating
 API-specific Rust or JavaScript.
 
 This initial integration uses Reflector revision
-`4aef40d6eb76be0cf23c5994c7b2c764255db37e`. It supports a full read into local
+`ec3553bf705f2003cab743e4312bb2fee833f11c`. It supports a full read into local
 storage, including Reflector's bearer-token authentication and optional GitHub
 OAuth fallback. It does not run continuously or send local changes back to the
-source API. It is a server CLI workflow; there is no GUI importer yet.
+source API. The Sync page also supports interactive OAuth imports while the server is running.
 
-## Try the GitHub Issues example
+## Connect from the Sync page
+
+Start the server with `REFLECTOR_ROOT` pointing to a checkout of Reflector at the
+revision above. `/app/sync` has an **Integrations** section with one button per
+folder in `REFLECTOR_ROOT/spec`: currently **GitHub** (`github`) and **Google**
+(`google-calendar`). No server restart is needed between imports.
+
+Register OAuth applications with GitHub and Google. Use this callback URL for a
+local server on the default port:
+
+```text
+http://localhost:9883/integrations/callback
+```
+
+For other deployments, replace the origin with the server's configured public
+origin (the same `--domain`, `--port`, and `--https` settings it normally uses).
+Keep the callback path `/integrations/callback`.
+
+Set these variables **in the environment that starts AtomicServer**, or in its
+`.env` file. Do not commit filled credentials:
+
+```sh
+export REFLECTOR_ROOT="/absolute/path/to/reflector-rs"
+export GITHUB_CLIENT_ID="your GitHub OAuth app client ID"
+export GITHUB_CLIENT_SECRET="your GitHub OAuth app client secret"
+export GOOGLE_CLIENT_ID="your Google OAuth web client ID"
+export GOOGLE_CLIENT_SECRET="your Google OAuth web client secret"
+export GITHUB_API_CONSTANTS="owner=localthought,repo=test-repo-1"
+export GOOGLE_CALENDAR_API_CONSTANTS="calendarId=primary"
+atomic-server --domain localhost --port 9883
+```
+
+Enable the Calendar API for the Google project and configure its consent screen
+and test users as appropriate. GitHub requests the `repo` scope; Google requests
+`calendar.readonly` with offline access. The buttons show **OAuth setup needed**
+until their client credentials are configured. See the
+[GitHub OAuth guide](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)
+and [Google web-server OAuth guide](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+Click a button, authorize with the provider, and return to Sync. The server starts
+importing immediately using its existing open database; the page displays progress,
+completion or failure, and a link to the imported drive. Each signed-in agent has
+a separate import namespace and owns its imported drive. `DRIVE_OWNER`, `API_TOKEN`,
+`STORE_DIR`, `PUBLIC_URL`, and `PLATFORMS` are not used by this browser workflow.
+Use the platform-specific constants above to select the repository or calendar.
+
+Access and refresh tokens stay in server memory for the duration of the import.
+The importer refreshes an expiring token or retries a rejected token once when a
+refresh token is available. Providers do not always return refresh tokens. Tokens
+are discarded after the import; reconnecting starts OAuth again. There is no
+scheduled sync or credential persistence in this version. Pending authorization
+expires after ten minutes and an import is bounded to thirty minutes. Partial
+writes remain if an import fails or times out. Restarting the server clears jobs
+and pending authorization.
+
+### Declarative integration configuration
+
+The catalog reads one `*.openapi.yaml` / `*.openapi.json` document in each folder,
+then applies its `overlays/` YAML/JSON files in filename order. Its
+`components.securitySchemes` must declare an OAuth2 `authorizationCode` flow with
+`authorizationUrl`, `tokenUrl`, and `scopes`. Optional `x-authorization-params` on
+that flow supplies provider parameters such as Google's `access_type=offline`.
+
+The document or an overlay also supplies `x-atomic-integration` metadata:
+
+```json
+{
+  "label": "Example",
+  "clientIdEnv": "EXAMPLE_CLIENT_ID",
+  "clientSecretEnv": "EXAMPLE_CLIENT_SECRET",
+  "constants": {"account": "primary"}
+}
+```
+
+`<FOLDER_NAME>_API_CONSTANTS` overrides those defaults (uppercase, hyphens become
+underscores). Only administrators configuring files on the server can change
+OAuth endpoints and API documents; the browser submits just the integration ID.
+
+Reflector's current GitHub and Google Calendar overlays declare pre-obtained
+bearer tokens. This PR supplies supplemental **declarative** OAuth overlays in
+`server/integrations/` for those two folders. A folder's own OAuth flow and metadata
+take precedence, so the declarations can move upstream without changing the host.
+The generic server OAuth host handles state, PKCE, callback cookies and refresh;
+Reflector/syncables still handle resource discovery, pagination, ontology and data
+conversion. The supplemental declarations do not change the CLI's existing token
+configuration.
+
+## Try the GitHub Issues CLI example
 
 Build `atomic-server` from this branch, then obtain Reflector's example document
 and overlays:
 
 ```sh
 git clone https://github.com/localthought/reflector-rs.git
-git -C reflector-rs checkout 4aef40d6eb76be0cf23c5994c7b2c764255db37e
+git -C reflector-rs checkout ec3553bf705f2003cab743e4312bb2fee833f11c
 export REFLECTOR_ROOT="$PWD/reflector-rs"
 export PUBLIC_URL="http://localhost:9883"
 export API_CONSTANTS="owner=localthought,repo=test-repo-1"
@@ -55,7 +142,7 @@ Reflector reads these environment variables (AtomicServer also loads `.env`):
 | Variable | Purpose / default |
 | --- | --- |
 | `REFLECTOR_ROOT` | Root for relative document/overlay paths; current directory by default. |
-| `OPENAPI_DOCUMENT` | Defaults to `spec/github-issues.openapi.yaml` under the root. |
+| `OPENAPI_DOCUMENT` | Defaults to `spec/github/github-issues.openapi.yaml` under the root. |
 | `OPENAPI_OVERLAYS` | Comma-separated paths, applied in order; defaults to Reflector's GitHub auth, pagination, and CRUD-causality overlays. Use `,` for no overlays (an empty value selects defaults). |
 | `API_CONSTANTS` | Comma-separated `key=value` bindings; defaults to `owner=localthought,repo=test-repo-1`. Use `,` for no constants. |
 | `API_TOKEN` / `GITHUB_TOKEN` | Bearer token; anonymous requests if neither is set. |
@@ -64,7 +151,7 @@ Reflector reads these environment variables (AtomicServer also loads `.env`):
 | `OAUTH_REDIRECT_ADDR`, `OAUTH_SCOPE` | GitHub OAuth callback address and scope; defaults to `127.0.0.1:8901` and `repo`. |
 
 The document and overlay files are external configuration, not bundled into the
-server binary. See [Reflector's documentation](https://github.com/localthought/reflector-rs/tree/4aef40d6eb76be0cf23c5994c7b2c764255db37e)
+server binary. See [Reflector's documentation](https://github.com/localthought/reflector-rs/tree/ec3553bf705f2003cab743e4312bb2fee833f11c)
 for the overlay format, OAuth setup, and data mapping.
 
 ## Storage and failures
