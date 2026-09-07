@@ -1931,7 +1931,7 @@ function SyncPage() {
               </AddServerForm>
             ) : (
               <AddButton onClick={() => setShowAddServer(true)}>
-                <FaPlus aria-hidden /> Connect a device
+                <FaPlus aria-hidden /> <span>Connect a device</span>
               </AddButton>
             )}
           </AddRow>
@@ -2010,13 +2010,13 @@ function SyncPage() {
                     store.setWebSocketDebug(e.target.checked);
                   }}
                 />
-                {wsDebug ? 'Logging to console' : 'Off'}
+                <span>{wsDebug ? 'Logging to console' : 'Off'}</span>
               </DetailValue>
             </DevRow>
           </DevGrid>
 
           <DevActivityTitle>
-            Recent activity
+            <span>Recent activity</span>
             {status.pendingDirtyCount > 0 && (
               <PendingCount>{status.pendingDirtyCount} unsynced</PendingCount>
             )}

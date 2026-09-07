@@ -176,7 +176,9 @@ export abstract class CodeGenerator {
     subject: string,
     type: 'property' | 'class',
   ): Promise<string | undefined> {
-    const origin = new URL(subject).origin;
+    const origin = /^https?:/.test(subject)
+      ? new URL(subject).origin
+      : this.store.getServerUrl();
     const collection = await new CollectionBuilder(this.store, origin)
       .setProperty(
         type === 'property'

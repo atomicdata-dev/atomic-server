@@ -263,7 +263,7 @@ export function ResourceContextMenu({
         {confirmingAction?.id === 'delete' ? (
           <>
             <p>
-              Are you sure you want to delete{' '}
+              <span>Are you sure you want to delete</span>{' '}
               <ResourceInline subject={ctx.subject} />
             </p>
             <ResourceUsage resource={ctx.resource} />

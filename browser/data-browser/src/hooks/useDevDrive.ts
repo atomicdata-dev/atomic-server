@@ -42,6 +42,8 @@ function resolveDevServer(): string {
  * unless we're loaded from the Vite dev server, in which case localhost:9883)
  * and switches to it. Only intended for development / E2E-test use.
  */
+const CLIPBOARD_DENIED = 'NotAllowedError';
+
 export function useDevDrive() {
   const store = useStore();
   const { setAgent, setDrive, setServer } = useSettings();
@@ -60,6 +62,7 @@ export function useDevDrive() {
       const newAgent = new Agent(agentProvider, agentDID);
 
       store.setAgent(newAgent);
+      await store.waitForClientDb(10_000);
 
       // `agentName` pipes `DEV_DRIVE_AGENT_NAME` into the same
       // agent-resource save that `createDrive` already does (to wire up
@@ -90,10 +93,21 @@ export function useDevDrive() {
       let copied = false;
 
       try {
-        await navigator.clipboard.writeText(finalSecret);
-        copied = true;
+        if (document.hasFocus() && navigator.userActivation?.isActive) {
+          await navigator.clipboard.writeText(finalSecret);
+          copied = true;
+        }
       } catch (e) {
-        console.warn('[DevDrive] clipboard.writeText failed:', e);
+        if (
+          !(
+            e &&
+            typeof e === 'object' &&
+            'name' in e &&
+            e.name === CLIPBOARD_DENIED
+          )
+        ) {
+          console.error('[DevDrive] clipboard.writeText failed:', e);
+        }
       }
 
       toast.success(

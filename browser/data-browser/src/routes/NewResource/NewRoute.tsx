@@ -107,10 +107,10 @@ function NewResourceSelector() {
     <Container>
       <Column gap='2rem'>
         <h1>
-          Create new resource{' '}
+          <span>Create new resource</span>{' '}
           {calculatedParent && (
             <>
-              under
+              <span>under</span>
               <ResourceInline subject={calculatedParent} />
             </>
           )}

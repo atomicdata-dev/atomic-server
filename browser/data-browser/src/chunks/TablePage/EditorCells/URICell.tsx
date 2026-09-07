@@ -18,7 +18,7 @@ function URICellEdit({
 
   return (
     <InputBase
-      value={value as string}
+      value={(value as string | undefined) ?? ''}
       type='url'
       autoFocus
       onChange={handleChange}

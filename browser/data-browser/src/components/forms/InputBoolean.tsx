@@ -20,7 +20,7 @@ export default function InputBoolean({
 
   return (
     <>
-      <Checkbox checked={value} onChange={setValue} {...otherProps} />
+      <Checkbox checked={value ?? false} onChange={setValue} {...otherProps} />
       {err && <ErrMessage>{err.message}</ErrMessage>}
     </>
   );

@@ -158,6 +158,17 @@ describe('ensureVaultBackup', () => {
   });
 
   /** The second pass must not enrol again: the key is already in hand. */
+  it('does not enroll a drive while the local identity disagrees with the portal account', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({ identityMatches: vi.fn(async () => false) });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toEqual({
+      status: 'skipped',
+      reason: 'account identity needs reconciliation',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+  });
+
   it('reuses the enrollment on later passes', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();
@@ -166,8 +177,45 @@ describe('ensureVaultBackup', () => {
     await ensureVaultBackup(store, DRIVE, deps);
 
     expect(deps.setUpVaultForDrive).toHaveBeenCalledTimes(1);
-    expect(deps.hasAccount).toHaveBeenCalledTimes(1);
+    expect(deps.hasAccount).toHaveBeenCalledTimes(2);
     expect(deps.runVaultBackup).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not attempt to claim a drive backed up by another account', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({ canEnroll: vi.fn(async () => false) });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+      reason: 'drive backup belongs to another account',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse an enrollment after the account session ends', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps();
+    await ensureVaultBackup(store, DRIVE, deps);
+    vi.mocked(deps.hasAccount).mockResolvedValue(false);
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels an in-flight backup when the agent changes', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      runVaultBackup: vi.fn(async args => {
+        store.setAgent(undefined);
+        expect(args.signal?.aborted).toBe(true);
+        throw new Error('ClientDb worker destroyed');
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it('shares one pass between concurrent callers', async () => {

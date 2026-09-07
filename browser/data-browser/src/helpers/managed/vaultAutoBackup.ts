@@ -1,6 +1,7 @@
 import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
 import {
   agentVaultProof,
+  canEnrollVault,
   getVaultState,
   listVaultDrives,
   recoverDriveKey,
@@ -16,7 +17,8 @@ import {
 } from './vault';
 import { loadVaultKeyOps } from './vaultKeyOps';
 import { getOrCreateDeviceId } from './devices';
-import { getManagedAccount } from './session';
+import { getManagedAccount, onManagedLogout } from './session';
+import { evaluateIdentityReconciliation } from './reconcile';
 import { nodeVault } from './nodeVault';
 import { isRunningInTauri } from '../tauri';
 
@@ -51,6 +53,9 @@ import { isRunningInTauri } from '../tauri';
 export type VaultAutoBackupDeps = {
   /** Whether a control-plane session exists. Nothing here works without one. */
   hasAccount: () => Promise<boolean>;
+  canEnroll?: typeof canEnrollVault;
+  /** Enrollment must wait until the local identity matches the portal account. */
+  identityMatches?: (agentSubject: string) => Promise<boolean>;
   loadKeys: () => Promise<VaultKeyOps & { proofMessage: Uint8Array }>;
   /** The lane this device writes to, or null when it has no identity yet. */
   laneId: () => Promise<string | null>;
@@ -110,6 +115,9 @@ export function isVaultOptedOut(driveSubject: string): boolean {
 }
 
 const defaultDeps: VaultAutoBackupDeps = {
+  canEnroll: canEnrollVault,
+  identityMatches: async subject =>
+    (await evaluateIdentityReconciliation(subject)).ok,
   // A self-hosted server answers `/api/me` with whatever it likes; that is
   // "no account", not a failure worth logging.
   hasAccount: async () =>
@@ -247,8 +255,22 @@ async function ensureVaultBackupOnce(
     return { status: 'skipped', reason: 'backup switched off for this drive' };
   }
 
+  const controller = new AbortController();
+  const { signal } = controller;
+  const stop = () => controller.abort();
+  const offAgent = store.on(StoreEvents.AgentChanged, next => {
+    if (next?.subject !== agent.subject) stop();
+  });
+  const offLogout = onManagedLogout(stop);
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', stop);
   try {
+    // Cached keys do not imply that the account session is still valid.
+    if (!(await deps.hasAccount())) {
+      return { status: 'skipped', reason: 'no account session' };
+    }
+    signal.throwIfAborted();
     const db = await deps.db(store);
+    signal.throwIfAborted();
     const lane = await deps.laneId();
 
     if (!db || !lane) {
@@ -273,11 +295,31 @@ async function ensureVaultBackupOnce(
     const metadataKey = JSON.stringify(metadata);
 
     if (!known || (known.metadata ?? '{}') !== metadataKey) {
-      if (!(await deps.hasAccount())) {
-        return { status: 'skipped', reason: 'no account session' };
+      if (
+        deps.identityMatches &&
+        !(await deps.identityMatches(agent.subject))
+      ) {
+        return {
+          status: 'skipped',
+          reason: 'account identity needs reconciliation',
+        };
       }
-
+      signal.throwIfAborted();
+      if (deps.canEnroll && !(await deps.canEnroll(driveSubject, signal))) {
+        return {
+          status: 'skipped',
+          reason: 'drive backup belongs to another account',
+        };
+      }
       const keys = await deps.loadKeys();
+      const proof = await agentVaultProof(agent, keys.proofMessage);
+      if (store.getAgent()?.subject !== agent.subject) {
+        return {
+          status: 'skipped',
+          reason: 'identity changed during backup setup',
+        };
+      }
+      signal.throwIfAborted();
       const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
         keys,
         driveSubject,
@@ -285,7 +327,7 @@ async function ensureVaultBackupOnce(
         agentSubject: agent.subject,
         // The agent signs a fixed message; its key is never read. That is what
         // keeps non-extractable and hardware-backed keys usable here.
-        agentSecret: await agentVaultProof(agent, keys.proofMessage),
+        agentSecret: proof,
       });
       known = {
         drivePseudonym: enrollment.drive_pseudonym,
@@ -296,8 +338,16 @@ async function ensureVaultBackupOnce(
       enrolled.set(driveSubject, known);
     }
 
+    if (store.getAgent()?.subject !== agent.subject) {
+      return {
+        status: 'skipped',
+        reason: 'identity changed during backup setup',
+      };
+    }
+    signal.throwIfAborted();
     const held = known;
     const outcome = await deps.runVaultBackup({
+      signal,
       db,
       driveSubject,
       drivePseudonym: held.drivePseudonym,
@@ -321,6 +371,7 @@ async function ensureVaultBackupOnce(
         return fresh;
       },
     });
+    signal.throwIfAborted();
     notifyVaultChanged(driveSubject);
 
     return outcome;
@@ -328,12 +379,23 @@ async function ensureVaultBackupOnce(
     // A stale key or enrollment must not be reused after a failure; the next
     // attempt re-derives both from the control plane.
     enrolled.delete(driveSubject);
+    if (signal.aborted) {
+      return {
+        status: 'skipped',
+        reason: 'backup cancelled by account change',
+      };
+    }
     console.warn('[cloud-vault] backup failed', error);
 
     return {
       status: 'failed',
       error: error instanceof Error ? error : new Error(String(error)),
     };
+  } finally {
+    offAgent();
+    offLogout();
+    if (typeof window !== 'undefined')
+      window.removeEventListener('pagehide', stop);
   }
 }
 
@@ -509,7 +571,8 @@ export function watchForVaultBackups(
     store.on(StoreEvents.ResourceManuallyCreated, schedule),
   ];
   win?.document.addEventListener('visibilitychange', onHidden);
-  win?.addEventListener('pagehide', flush);
+  // A pagehide is too late to start an upload: navigation aborts its fetches.
+  // Visibility changes already give active backups their earlier opportunity.
 
   return () => {
     if (timer) clearTimeout(timer);
@@ -518,6 +581,5 @@ export function watchForVaultBackups(
     pending = undefined;
     unsubscribe.forEach(off => off());
     win?.document.removeEventListener('visibilitychange', onHidden);
-    win?.removeEventListener('pagehide', flush);
   };
 }

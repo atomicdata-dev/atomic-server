@@ -1,3 +1,4 @@
+// @wc-ignore-file
 export enum LangEnv {
   React = 'react',
   Other = 'other',

@@ -1,5 +1,5 @@
 import type { Extensions } from '@tiptap/core';
-import { Link } from '@tiptap/extension-link';
+import { Link } from './Link';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import TextAlign from '@tiptap/extension-text-align';
 import {
@@ -42,15 +42,6 @@ const linkExtension = Link.extend({
 }).configure({
   autolink: true,
   openOnClick: true,
-  protocols: [
-    'http',
-    'https',
-    'mailto',
-    {
-      scheme: 'tel',
-      optionalSlashes: true,
-    },
-  ],
   HTMLAttributes: {
     class: 'tiptap-link',
     rel: 'noopener noreferrer',

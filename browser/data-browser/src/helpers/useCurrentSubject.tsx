@@ -4,6 +4,9 @@ import { useLocation, useSearch } from '@tanstack/react-router';
 import { paths } from '../routes/paths';
 import { ShowRoute } from '../routes/ShowRoute';
 import { getLocalServerOrigin } from './tauri';
+import { getHomeDrive } from './homeDrive';
+import { useStore } from '@tomic/react';
+import { isDev } from '../config';
 
 type setFunc = (latestValue: string) => void;
 
@@ -16,6 +19,7 @@ export function useCurrentSubject(
   replace?: boolean,
 ): [string | undefined, setFunc] {
   const { subject: subjectQ } = useSearch({ strict: false });
+  const store = useStore();
 
   const navigate = useNavigateWithTransition();
   const navigateShow = ShowRoute.useNavigate();
@@ -34,6 +38,9 @@ export function useCurrentSubject(
   }
 
   if (subjectQ === undefined) {
+    if (pathname === '/' && !getHomeDrive())
+      return [undefined, handleSetSubject];
+
     if (pathname.startsWith('/app/')) {
       return [undefined, handleSetSubject];
     }
@@ -43,7 +50,9 @@ export function useCurrentSubject(
     // In Tauri the window origin (tauri://localhost) isn't a fetchable
     // subject; the embedded server's origin is.
     const subject =
-      getLocalServerOrigin() + correctedPathName + window.location.search;
+      (isDev() ? store.getServerUrl() : getLocalServerOrigin()) +
+      correctedPathName +
+      window.location.search;
 
     return [subject, handleSetSubject];
   }

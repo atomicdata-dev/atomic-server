@@ -23,7 +23,8 @@ export function Graph({ ontology }: GraphProps): JSX.Element {
 const GraphWrapper = styled.div`
   position: var(--ontology-graph-position);
   display: grid;
-  place-items: center;
+  place-items: stretch;
+  min-width: 0;
   background-color: ${p => p.theme.colors.bg1};
   border: 1px solid ${p => p.theme.colors.bg2};
   aspect-ratio: var(--ontology-graph-ratio);

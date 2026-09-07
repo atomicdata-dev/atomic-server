@@ -110,8 +110,12 @@ const SettingsAgent: React.FunctionComponent = () => {
     navigate({ to: paths.welcome, replace: true });
   }
 
-  function handleSignOut() {
+  async function handleSignOut() {
     const currentDrive = drive;
+    // Finish clearing the cookie before a subsequent sign-in can set a new one.
+    // A late logout response otherwise invalidates the newly-created session.
+    await logoutManagedSession();
+    await saveAgentToIDB(undefined);
 
     // Everything that makes the UI say "signed out" happens now, synchronously.
     // `store.setAgent` drives a `useSyncExternalStore`, so the app re-renders
@@ -126,12 +130,6 @@ const SettingsAgent: React.FunctionComponent = () => {
     // workspace — say that, don't fall back to the server's own.
     setDrive('');
     navigate({ to: paths.welcome, replace: true });
-
-    // The rest is cleanup the user should never wait on: persist the cleared
-    // agent, and end the control-plane session so signing out here signs out
-    // of a managed account too (no-op when self-hosted).
-    saveAgentToIDB(undefined);
-    void logoutManagedSession();
 
     // Best-effort: if the drive we just left was private, forget it from
     // history too, so it does not reappear as a suggestion to a signed-out

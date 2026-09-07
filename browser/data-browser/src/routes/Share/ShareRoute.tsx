@@ -87,7 +87,7 @@ function SharePage(): JSX.Element {
             <span>
               <Button onClick={() => setShowInviteForm(true)}>
                 <FaShare />
-                Create Invite
+                <span>Create Invite</span>
               </Button>
             </span>
           )}
@@ -139,7 +139,7 @@ function SharePage(): JSX.Element {
             </Card>
           )}
           <p>
-            Read more about permissions in the{' '}
+            <span>Read more about permissions in the</span>{' '}
             <a
               target='_blank'
               href='https://docs.atomicdata.dev/hierarchy'

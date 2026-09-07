@@ -114,7 +114,16 @@ export function FeedbackMenuItem() {
                   />
                 </InputWrapper>
               </label>
-              {(!enabled || failed) && (
+              {!enabled && (
+                <p role='status'>
+                  Feedback reporting is unavailable on this installation. Email{' '}
+                  <a href='mailto:info@ontola.io'>
+                    {/* @wc-ignore */ 'info@ontola.io'}
+                  </a>
+                  .
+                </p>
+              )}
+              {failed && (
                 <p role='alert'>
                   Feedback could not be sent. Your text is still here. Try again
                   or email{' '}

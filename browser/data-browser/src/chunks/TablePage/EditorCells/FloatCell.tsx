@@ -23,7 +23,7 @@ function FloatCellEdit({
 }: EditCellProps<JSONValue>): JSX.Element {
   return (
     <InputBase
-      value={value as number}
+      value={(value as number | undefined) ?? ''}
       type='number'
       autoFocus
       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

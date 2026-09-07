@@ -1,6 +1,6 @@
 // Managed account + per-drive usage helpers, talking to the control-plane `/api`
 // base (same endpoint as the other managed helpers).
-import { PRODUCT_NAME } from './managed/product';
+import { getManagedAccount } from './managed/session';
 import { getManagedApiBase } from './managed/api';
 import { createManagedSyncEnrollment } from './managed/enrollment';
 
@@ -10,19 +10,7 @@ export type ManagedUser = {
 };
 
 export async function getManagedUser(): Promise<ManagedUser | null> {
-  const response = await fetch(`${getManagedApiBase()}/me`, {
-    credentials: 'include',
-  });
-
-  if (response.status === 204 || response.status === 401) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Could not check ${PRODUCT_NAME} session.`);
-  }
-
-  return response.json();
+  return getManagedAccount() as Promise<ManagedUser | null>;
 }
 
 export type DriveUsageInfo = {
@@ -41,7 +29,7 @@ export type DriveUsageInfo = {
 export async function getDriveUsage(
   driveSubject: string,
 ): Promise<DriveUsageInfo | null> {
-  if (!driveSubject) return null;
+  if (!driveSubject || !(await getManagedAccount())) return null;
 
   const response = await fetch(`${getManagedApiBase()}/sync-enrollments`, {
     credentials: 'include',

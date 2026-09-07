@@ -158,7 +158,7 @@ const AppSettings: React.FunctionComponent = () => {
                 </Column>
                 <CheckboxLabel>
                   <Checkbox checked={colorfulMode} onChange={setColorfulMode} />{' '}
-                  Colorful mode
+                  <span>Colorful mode</span>
                 </CheckboxLabel>
               </Column>
             </SettingsSection>
@@ -169,21 +169,21 @@ const AppSettings: React.FunctionComponent = () => {
                     checked={enabledPanels.has(Panel.Ontologies)}
                     onChange={changePanelPref(Panel.Ontologies)}
                   />{' '}
-                  Enable Ontology panel
+                  <span>Enable Ontology panel</span>
                 </CheckboxLabel>
                 <CheckboxLabel>
                   <Checkbox
                     checked={enabledPanels.has(Panel.AIChats)}
                     onChange={changePanelPref(Panel.AIChats)}
                   />{' '}
-                  Enable AIChats panel
+                  <span>Enable AIChats panel</span>
                 </CheckboxLabel>
                 <CheckboxLabel>
                   <Checkbox
                     checked={hideTemplates}
                     onChange={setHideTemplates}
                   />{' '}
-                  Hide templates on new resource page
+                  <span>Hide templates on new resource page</span>
                 </CheckboxLabel>
               </Column>
             </SettingsSection>
@@ -197,14 +197,14 @@ const AppSettings: React.FunctionComponent = () => {
                     checked={viewTransitionsDisabled}
                     onChange={checked => setViewTransitionsDisabled(checked)}
                   />{' '}
-                  Disable page transition animations
+                  <span>Disable page transition animations</span>
                 </CheckboxLabel>
                 <CheckboxLabel>
                   <Checkbox
                     checked={sidebarKeyboardDndEnabled}
                     onChange={checked => setSidebarKeyboardDndEnabled(checked)}
                   />{' '}
-                  Enable keyboard drag & drop in sidebar
+                  <span>Enable keyboard drag & drop in sidebar</span>
                 </CheckboxLabel>
               </Column>
             </SettingsSection>

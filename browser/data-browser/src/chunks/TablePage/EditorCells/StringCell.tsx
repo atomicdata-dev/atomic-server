@@ -21,7 +21,7 @@ function StringCellEdit({
 
   return (
     <InputBase
-      value={localValue}
+      value={localValue ?? ''}
       autoFocus
       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
         setLocalValue(e.target.value);

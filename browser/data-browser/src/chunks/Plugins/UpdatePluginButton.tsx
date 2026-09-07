@@ -125,7 +125,7 @@ const UpdatePluginButton: React.FC<UpdatePluginButtonProps> = ({ plugin }) => {
       <label>
         <Button subtle as='div'>
           <FaUpload />
-          Update
+          <span>Update</span>
         </Button>
         <input
           ref={fileInputRef}

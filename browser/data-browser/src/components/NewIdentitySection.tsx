@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Agent, JSCryptoProvider, core, useStore } from '@tomic/react';
 import { fetchPrivateDriveSubject } from '../helpers/privateDrive';
 import { isOriginWithoutNode } from '../helpers/originNode';
 import { useSettings } from '../helpers/AppSettings';
 import { saveAgentToIDB } from '../helpers/agentStorage';
+import { reopenRestoredDrive } from '../helpers/driveData';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../helpers/navigation';
 import { Button } from './Button';
@@ -100,6 +101,7 @@ export function NewIdentitySection({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [identity, setIdentity] = useState<IdentityData | null>(null);
+  const creatingIdentity = useRef(false);
   /** True after the user copies the secret or saves the backup file. */
   const [secretBackedUp, setSecretBackedUp] = useState(false);
   /** Set once a backup resolves; shown once, then never again. */
@@ -124,6 +126,10 @@ export function NewIdentitySection({
   // ─── Step: Create Identity ───────────────────────────────────────────────
 
   async function handleCreate() {
+    // React StrictMode replays mount effects. A second key generation would
+    // replace the active agent while the first identity is still onboarding.
+    if (creatingIdentity.current) return;
+    creatingIdentity.current = true;
     setStep('creating');
     setLoading(true);
     setError(undefined);
@@ -158,6 +164,7 @@ export function NewIdentitySection({
 
       setStep('profile');
     } catch (e) {
+      creatingIdentity.current = false;
       setError(e instanceof Error ? e.message : String(e));
       setStep('idle');
     } finally {
@@ -276,9 +283,12 @@ export function NewIdentitySection({
    * be a second thing to store. With no backup, the reveal + verify steps
    * stay — it really is the only copy.
    */
-  function finishWithoutSecretStep() {
+  async function finishWithoutSecretStep() {
     if (identity?.driveSubject) {
       setDrive(identity.driveSubject);
+      // An earlier lookup can have cached "not found" before creation.
+      // Read the now-persisted drive and profile before opening the workspace.
+      await reopenRestoredDrive(store, identity.driveSubject);
       navigate(constructOpenURL(identity.driveSubject));
     }
 

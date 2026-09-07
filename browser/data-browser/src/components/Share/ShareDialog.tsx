@@ -127,7 +127,7 @@ export function ShareDialog({
                   {canWrite && (
                     <Button onClick={() => setView('invite')}>
                       <FaShare />
-                      Create Invite
+                      <span>Create Invite</span>
                     </Button>
                   )}
                 </Row>
@@ -160,7 +160,7 @@ export function ShareDialog({
                       onClick={() => setShowInherited(!showInherited)}
                     >
                       {showInherited ? <FaChevronDown /> : <FaChevronRight />}
-                      Inherited permissions
+                      <span>Inherited permissions</span>
                     </InheritedToggle>
                     {showInherited && (
                       <RightsCard>
@@ -187,9 +187,9 @@ export function ShareDialog({
           <>
             <Dialog.Title>
               <BackButton onClick={() => setView('share')}>
-                <FaArrowLeft /> Back
+                <FaArrowLeft /> <span>Back</span>
               </BackButton>
-              Create Invite
+              <span>Create Invite</span>
             </Dialog.Title>
             <Dialog.Content>
               <InviteForm target={resource} />
@@ -264,7 +264,7 @@ function CopyLinkButton({ subject }: { subject: string }): JSX.Element {
   return (
     <Button subtle onClick={handleCopy}>
       <FaLink />
-      Copy link
+      <span>Copy link</span>
     </Button>
   );
 }

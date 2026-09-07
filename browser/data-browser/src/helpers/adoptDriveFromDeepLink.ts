@@ -1,4 +1,4 @@
-import { enableLoro, server, type Store } from '@tomic/react';
+import { enableLoro, isUnauthorized, server, type Store } from '@tomic/react';
 
 /** Server-managed property stamping every resource with its drive at genesis. */
 const DRIVE_PROP = 'https://atomicdata.dev/properties/drive';
@@ -95,6 +95,9 @@ export async function adoptDriveFromDeepLink(store: Store): Promise<void> {
 
     store.setDrive(drive);
   } catch (e) {
+    // An anonymous private link stays driveless until the sign-in flow unlocks
+    // it. Its access-denied resource renders that flow; adoption did not fail.
+    if (!store.getAgent() && e instanceof Error && isUnauthorized(e)) return;
     // Resource unreachable — keep the current drive.
     console.warn('[adoptDriveFromDeepLink] could not resolve drive:', e);
   }

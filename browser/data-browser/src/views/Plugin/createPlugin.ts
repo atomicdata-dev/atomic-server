@@ -8,6 +8,7 @@ import {
   type Server,
 } from '@tomic/react';
 import toast from 'react-hot-toast';
+import { useCustomViews } from '@components/CustomViewProvider';
 
 interface CreatePluginProps {
   metadata: PluginMetadata;
@@ -18,6 +19,7 @@ interface CreatePluginProps {
 
 export function useCreatePlugin() {
   const store = useStore();
+  const { refresh: refreshCustomViews } = useCustomViews();
 
   const createPluginResource = async ({
     metadata,
@@ -71,6 +73,7 @@ export function useCreatePlugin() {
       drive.props.plugins?.filter(p => p !== plugin.subject),
     );
     await drive.save();
+    await refreshCustomViews();
   };
 
   const updatePlugin = async (

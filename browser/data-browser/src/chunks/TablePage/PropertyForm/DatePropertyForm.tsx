@@ -38,7 +38,7 @@ export function DatePropertyForm({
     <Suspense>
       <CheckboxLabel>
         <Checkbox onChange={setIncludeTime} checked={includeTime} />
-        Include Time
+        <span>Include Time</span>
       </CheckboxLabel>
 
       <DateFormatPicker

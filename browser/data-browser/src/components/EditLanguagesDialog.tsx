@@ -155,7 +155,7 @@ export function EditLanguagesDialog({
                   onClick={addTag}
                 >
                   <Row gap='.5rem' center>
-                    <FaPlus /> Add
+                    <FaPlus /> <span>Add</span>
                   </Row>
                 </Button>
               </Row>

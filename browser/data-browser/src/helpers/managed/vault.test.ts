@@ -137,6 +137,51 @@ describe('backupDrive', () => {
    * would make quota drift upward on every dropped connection — usage the user
    * never consumed and cannot clear.
    */
+  it('does not upload or advance the backup cursor after cancellation during export', async () => {
+    const controller = new AbortController();
+    const db: VaultCapableDb = {
+      vaultExport: vi.fn(async () => {
+        controller.abort();
+        return sealedPack(PACK_KEY);
+      }),
+      vaultImport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+    };
+    const calls = mockFetch(() => undefined);
+    await expect(
+      backupDrive({ db, ...PASS, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(calls).toHaveLength(0);
+    expect(db.vaultCommitSegment).not.toHaveBeenCalled();
+  });
+
+  it('re-exports under a fresh checkpoint number when a confirmed object already occupies it', async () => {
+    const secondKey = CKPT_KEY.replace('000001', '000002');
+    const db: VaultCapableDb = {
+      vaultExport: vi.fn().mockResolvedValueOnce(sealedCheckpoint(CKPT_KEY))
+        .mockResolvedValueOnce(sealedCheckpoint(secondKey)),
+      vaultImport: vi.fn(), vaultCommitSegment: vi.fn(),
+    };
+    let request = 0;
+    const calls = mockFetch(url => {
+      if (url.endsWith('/upload-urls')) {
+        const occupied = request++ === 0;
+        return { ok: true, json: async () => ({ uploads: [{
+          object_id: occupied ? 'old' : 'new',
+          object_key: occupied ? CKPT_KEY : secondKey,
+          already_stored: occupied, url: occupied ? '' : 'https://s3.test/new',
+          headers: [], size_bytes: 8,
+        }] }) };
+      }
+    });
+    expect(await backupDrive({ db, ...PASS, driveHasCheckpoint: false }))
+      .toMatchObject({ status: 'backed-up', objectKey: secondKey });
+    expect(calls.filter(call => call.method === 'PUT').map(call => call.url))
+      .toEqual(['https://s3.test/new']);
+    expect(db.vaultExport).toHaveBeenCalledTimes(2);
+    expect(db.vaultCommitSegment).toHaveBeenCalledTimes(1);
+  });
+
   it('confirms only after storage accepts the bytes', async () => {
     const db: VaultCapableDb = {
       vaultExport: vi.fn(async () => sealedPack(PACK_KEY)),

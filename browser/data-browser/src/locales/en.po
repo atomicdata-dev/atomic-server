@@ -297,6 +297,7 @@ msgid "Also use for chat titles and follow-up prompts"
 msgstr "Also use for chat titles and follow-up prompts"
 
 #: src/chunks/AI/AISetupPanel.tsx
+#: src/components/Share/ShareDialog.tsx
 msgid "Back"
 msgstr "Back"
 
@@ -358,10 +359,8 @@ msgstr "No custom classes found on the current drive."
 msgid "You"
 msgstr "You"
 
-#. 0: summaryText && ( <ChevronIcon expanded={expanded}> <FaChevronRight /> </ChevronIcon> )
-#: src/chunks/AI/CompactSeparatorWidget.tsx
-msgid "{0} Context compacted"
-msgstr "{0} Context compacted"
+#~ msgid "{0} Context compacted"
+#~ msgstr "{0} Context compacted"
 
 #: src/chunks/AI/CompactSeparatorWidget.tsx
 msgid "Show summary"
@@ -690,23 +689,17 @@ msgstr "Loading skill: <0/>"
 msgid "Loading skill: <0/> {0} <1/>"
 msgstr "Loading skill: <0/> {0} <1/>"
 
-#. 0: ' '
-#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
-msgid "Reading{0} <0/>"
-msgstr "Reading{0} <0/>"
+#~ msgid "Reading{0} <0/>"
+#~ msgstr "Reading{0} <0/>"
 
-#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
-msgid "Creating <0/>"
-msgstr "Creating <0/>"
+#~ msgid "Creating <0/>"
+#~ msgstr "Creating <0/>"
 
-#. 0: propertyResource.title
-#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
-msgid "Editing {0} on <0/>"
-msgstr "Editing {0} on <0/>"
+#~ msgid "Editing {0} on <0/>"
+#~ msgstr "Editing {0} on <0/>"
 
-#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
-msgid "Editing <0/>"
-msgstr "Editing <0/>"
+#~ msgid "Editing <0/>"
+#~ msgstr "Editing <0/>"
 
 #: src/chunks/AI/AIChatMessageParts/ReasoningMessage.tsx
 msgid "Thinking..."
@@ -1410,20 +1403,17 @@ msgstr "Keyboard shortcuts"
 msgid "by {0}"
 msgstr "by {0}"
 
-#: src/views/Plugin/PluginPage.tsx
-msgid "<0/> Uninstall"
-msgstr "<0/> Uninstall"
+#~ msgid "<0/> Uninstall"
+#~ msgstr "<0/> Uninstall"
 
 #: src/views/Plugin/PluginPage.tsx
 msgid "Plugin Description"
 msgstr "Plugin Description"
 
-#: src/views/Plugin/PluginPage.tsx
-msgid "<0/> Config"
-msgstr "<0/> Config"
+#~ msgid "<0/> Config"
+#~ msgstr "<0/> Config"
 
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
-#: src/views/Plugin/PluginPage.tsx
 msgid "<0/> Save"
 msgstr "<0/> Save"
 
@@ -1435,6 +1425,7 @@ msgstr "Are you sure you want to uninstall this plugin?"
 msgid "Uninstall Plugin"
 msgstr "Uninstall Plugin"
 
+#: src/views/Plugin/PluginPage.tsx
 #: src/views/Plugin/PluginPage.tsx
 msgid "Uninstall"
 msgstr "Uninstall"
@@ -1533,6 +1524,7 @@ msgstr "Textual Description <0/>"
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/OntologyPage/NewClassButton.tsx
 #: src/views/OntologyPage/NewPropertyButton.tsx
+#: src/views/Plugin/PluginPage.tsx
 msgid "Save"
 msgstr "Save"
 
@@ -1541,10 +1533,8 @@ msgstr "Save"
 msgid "Uploaded {0} files."
 msgstr "Uploaded {0} files."
 
-#. 0: ' '; 1: calculatedParent && ( <> under <ResourceInline subject={calculatedParent} /> </> )
-#: src/routes/NewResource/NewRoute.tsx
-msgid "Create new resource{0} {1}"
-msgstr "Create new resource{0} {1}"
+#~ msgid "Create new resource{0} {1}"
+#~ msgstr "Create new resource{0} {1}"
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Templates"
@@ -1602,34 +1592,24 @@ msgstr "Main color"
 msgid "Appearance"
 msgstr "Appearance"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Enable Ontology panel"
-msgstr "<0/>{0} Enable Ontology panel"
+#~ msgid "<0/>{0} Enable Ontology panel"
+#~ msgstr "<0/>{0} Enable Ontology panel"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Enable AIChats panel"
-msgstr "<0/>{0} Enable AIChats panel"
+#~ msgid "<0/>{0} Enable AIChats panel"
+#~ msgstr "<0/>{0} Enable AIChats panel"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Hide templates on new resource page"
-msgstr "<0/>{0} Hide templates on new resource page"
+#~ msgid "<0/>{0} Hide templates on new resource page"
+#~ msgstr "<0/>{0} Hide templates on new resource page"
 
 #: src/routes/AppSettings.tsx
 msgid "Panels & Templates"
 msgstr "Panels & Templates"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Disable page transition animations"
-msgstr "<0/>{0} Disable page transition animations"
+#~ msgid "<0/>{0} Disable page transition animations"
+#~ msgstr "<0/>{0} Disable page transition animations"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Enable keyboard drag & drop in sidebar"
-msgstr "<0/>{0} Enable keyboard drag & drop in sidebar"
+#~ msgid "<0/>{0} Enable keyboard drag & drop in sidebar"
+#~ msgstr "<0/>{0} Enable keyboard drag & drop in sidebar"
 
 #: src/routes/AppSettings.tsx
 msgid "Accessibility"
@@ -1761,6 +1741,7 @@ msgstr "Manage account & plan →"
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
+#: src/components/EditLanguagesDialog.tsx
 msgid "Add"
 msgstr "Add"
 
@@ -1831,9 +1812,8 @@ msgstr "Share settings saved"
 msgid "Permissions for"
 msgstr "Permissions for"
 
-#: src/routes/Share/ShareRoute.tsx
-msgid "<0/> Create Invite"
-msgstr "<0/> Create Invite"
+#~ msgid "<0/> Create Invite"
+#~ msgstr "<0/> Create Invite"
 
 #: src/components/Share/ShareDialog.tsx
 #: src/routes/Share/ShareRoute.tsx
@@ -1924,10 +1904,8 @@ msgstr "Click to edit title"
 msgid "Download file ({0})"
 msgstr "Download file ({0})"
 
-#: src/chunks/TablePage/TableExportDialog.tsx
-#: src/views/File/DownloadButton.tsx
-msgid "<0/> Download"
-msgstr "<0/> Download"
+#~ msgid "<0/> Download"
+#~ msgstr "<0/> Download"
 
 #: src/views/File/FilePreview.tsx
 msgid "Sorry, your browser doesn't support embedded videos."
@@ -1979,6 +1957,7 @@ msgstr "List View"
 msgid "Grid View"
 msgstr "Grid View"
 
+#: src/routes/NewResource/NewRoute.tsx
 #: src/views/FolderPage/GridView.tsx
 msgid "Create new resource"
 msgstr "Create new resource"
@@ -2078,6 +2057,7 @@ msgstr "Copied error to clipboard"
 
 #: src/chunks/TablePage/EditorCells/AtomicURLCell.tsx
 #: src/components/Toaster.tsx
+#: src/components/forms/InputResourceArray.tsx
 msgid "Clear"
 msgstr "Clear"
 
@@ -2220,9 +2200,8 @@ msgstr "Sign in"
 msgid "Go the the User Settings page"
 msgstr "Go the the User Settings page"
 
-#: src/components/forms/ResourceField.tsx
-msgid "<0/> This field is calculated server-side."
-msgstr "<0/> This field is calculated server-side."
+#~ msgid "<0/> This field is calculated server-side."
+#~ msgstr "<0/> This field is calculated server-side."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Could not parse that secret."
@@ -2427,9 +2406,8 @@ msgstr "<0/> Delete"
 msgid "Indexing vector data for this drive. AI search may be briefly out of date."
 msgstr "Indexing vector data for this drive. AI search may be briefly out of date."
 
-#: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
-msgid "<0/> Resource with error"
-msgstr "<0/> Resource with error"
+#~ msgid "<0/> Resource with error"
+#~ msgstr "<0/> Resource with error"
 
 #: src/components/Tag/CreateTagRow.tsx
 msgid "New tag"
@@ -2645,10 +2623,8 @@ msgstr "That property already exists in this resource. It can only be added once
 msgid "Cannot save edits: Agent does not have edit rights"
 msgstr "Cannot save edits: Agent does not have edit rights"
 
-#. 0: showAdvanced ? <FaCaretDown /> \\: <FaCaretRight />
-#: src/components/forms/ResourceForm.tsx
-msgid "{0} Advanced"
-msgstr "{0} Advanced"
+#~ msgid "{0} Advanced"
+#~ msgstr "{0} Advanced"
 
 #: src/components/forms/ResourceForm.tsx
 msgid "Add another property..."
@@ -2776,21 +2752,18 @@ msgstr "Class name"
 msgid "Allows only:"
 msgstr "Allows only:"
 
-#: src/views/OntologyPage/NewClassButton.tsx
-msgid "<0/> Add class"
-msgstr "<0/> Add class"
+#~ msgid "<0/> Add class"
+#~ msgstr "<0/> Add class"
 
 #: src/views/OntologyPage/NewClassButton.tsx
 msgid "New Class"
 msgstr "New Class"
 
-#: src/views/OntologyPage/CreateInstanceButton.tsx
-msgid "<0/> New Instance"
-msgstr "<0/> New Instance"
+#~ msgid "<0/> New Instance"
+#~ msgstr "<0/> New Instance"
 
-#: src/views/OntologyPage/NewPropertyButton.tsx
-msgid "<0/> Add property"
-msgstr "<0/> Add property"
+#~ msgid "<0/> Add property"
+#~ msgstr "<0/> Add property"
 
 #: src/views/OntologyPage/NewPropertyButton.tsx
 msgid "New Property"
@@ -2831,9 +2804,8 @@ msgstr "Sorry, there is no support for editing nested resources yet"
 msgid "Add an item to the {0} list"
 msgstr "Add an item to the {0} list"
 
-#: src/components/forms/InputResourceArray.tsx
-msgid "<0/> Clear"
-msgstr "<0/> Clear"
+#~ msgid "<0/> Clear"
+#~ msgstr "<0/> Clear"
 
 #: src/components/forms/InputResourceArray.tsx
 msgid "Remove all items from this list"
@@ -3103,17 +3075,15 @@ msgstr "Open tag page"
 #~ msgid "{0} Inherited permissions"
 #~ msgstr "{0} Inherited permissions"
 
-#: src/components/Share/ShareDialog.tsx
-msgid "<0><0/> Back</0> Create Invite"
-msgstr "<0><0/> Back</0> Create Invite"
+#~ msgid "<0><0/> Back</0> Create Invite"
+#~ msgstr "<0><0/> Back</0> Create Invite"
 
 #: src/components/Share/ShareDialog.tsx
 msgid "Link copied to clipboard"
 msgstr "Link copied to clipboard"
 
-#: src/components/Share/ShareDialog.tsx
-msgid "<0/> Copy link"
-msgstr "<0/> Copy link"
+#~ msgid "<0/> Copy link"
+#~ msgstr "<0/> Copy link"
 
 #: src/components/ResourceContextMenu/ParentContextMenuTrigger.tsx
 msgid "More"
@@ -3285,13 +3255,11 @@ msgstr "Only allow its value to be selected from the following tags:"
 msgid "Search for a {0} or enter a URL..."
 msgstr "Search for a {0} or enter a URL..."
 
-#: src/views/CodeUsage/ResourceCodeUsage.tsx
-msgid "Read a property: <0/>"
-msgstr "Read a property: <0/>"
+#~ msgid "Read a property: <0/>"
+#~ msgstr "Read a property: <0/>"
 
-#: src/views/CodeUsage/ResourceCodeUsage.tsx
-msgid "<0/> Typescript"
-msgstr "<0/> Typescript"
+#~ msgid "<0/> Typescript"
+#~ msgstr "<0/> Typescript"
 
 #: src/components/Drives/WSIndicator.tsx
 msgid "Websocket Connected"
@@ -3419,9 +3387,8 @@ msgstr "Copy code"
 msgid "The update's identifier does not match the existing plugin."
 msgstr "The update's identifier does not match the existing plugin."
 
-#: src/chunks/Plugins/UpdatePluginButton.tsx
-msgid "<0/> Update"
-msgstr "<0/> Update"
+#~ msgid "<0/> Update"
+#~ msgstr "<0/> Update"
 
 #: src/chunks/Plugins/UpdatePluginButton.tsx
 msgid "Change Version"
@@ -3451,10 +3418,8 @@ msgstr "Please fill in all fields"
 msgid "Failed to install plugin"
 msgstr "Failed to install plugin"
 
-#: src/chunks/Plugins/NewPluginButton.tsx
-#: src/chunks/Plugins/NewPluginButton.tsx
-msgid "<0/> Upload Plugin"
-msgstr "<0/> Upload Plugin"
+#~ msgid "<0/> Upload Plugin"
+#~ msgstr "<0/> Upload Plugin"
 
 #: src/chunks/Plugins/NewPluginButton.tsx
 msgid "Add Plugin"
@@ -3634,10 +3599,8 @@ msgstr "External Property"
 msgid "Export table as CSV"
 msgstr "Export table as CSV"
 
-#. 0: ' '
-#: src/chunks/TablePage/TableExportDialog.tsx
-msgid "<0/>{0} Reference resources by subject instead of name."
-msgstr "<0/>{0} Reference resources by subject instead of name."
+#~ msgid "<0/>{0} Reference resources by subject instead of name."
+#~ msgstr "<0/>{0} Reference resources by subject instead of name."
 
 #: src/chunks/TablePage/TableFilterBar.tsx
 msgid "Table filters"
@@ -3843,9 +3806,8 @@ msgstr "Quote"
 msgid "Image"
 msgstr "Image"
 
-#: src/chunks/TablePage/PropertyForm/DatePropertyForm.tsx
-msgid "<0/> Include Time"
-msgstr "<0/> Include Time"
+#~ msgid "<0/> Include Time"
+#~ msgstr "<0/> Include Time"
 
 #: src/chunks/TablePage/PropertyForm/EditPropertyDialog.tsx
 msgid "Edit Column"
@@ -4434,8 +4396,11 @@ msgstr "properties have"
 msgid "as a classtype."
 msgstr "as a classtype."
 
-#~ msgid "Create Invite"
-#~ msgstr "Create Invite"
+#: src/components/Share/ShareDialog.tsx
+#: src/components/Share/ShareDialog.tsx
+#: src/routes/Share/ShareRoute.tsx
+msgid "Create Invite"
+msgstr "Create Invite"
 
 #. 0: status.blockedCount
 #: src/components/SideBar/SyncMenuItem.tsx
@@ -4559,86 +4524,72 @@ msgstr "Select File"
 msgid "{0} preview"
 msgstr "{0} preview"
 
-#. 0: imports; 1: await this.generateJSCodeBasic(); 2: propSubjectRef
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid ""
-"{0}{1}\n"
-"const value = resource.get({2});\n"
-""
-msgstr ""
-"{0}{1}\n"
-"const value = resource.get({2});\n"
-""
+#~ msgid ""
+#~ "{0}{1}\n"
+#~ "const value = resource.get({2});\n"
+#~ ""
+#~ msgstr ""
+#~ "{0}{1}\n"
+#~ "const value = resource.get({2});\n"
+#~ ""
 
-#. 0: imports; 1: genericName ?? ''; 2: this.resource.subject
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid "{0}const resource = await store.getResource{1}('{2}');"
-msgstr "{0}const resource = await store.getResource{1}('{2}');"
+#~ msgid "{0}const resource = await store.getResource{1}('{2}');"
+#~ msgstr "{0}const resource = await store.getResource{1}('{2}');"
 
-#. 0: await this.generateTSCodeBasic(); 1: resourceShorthand ?? `resource.get('${prop}')`
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid ""
-"{0}\n"
-"const value = {1};\n"
-""
-msgstr ""
-"{0}\n"
-"const value = {1};\n"
-""
+#~ msgid ""
+#~ "{0}\n"
+#~ "const value = {1};\n"
+#~ ""
+#~ msgstr ""
+#~ "{0}\n"
+#~ "const value = {1};\n"
+#~ ""
 
-#. 0: imports; 1: this.resource.subject
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid ""
-"{0}const Component = () => {\n"
-"  const resource = useResource('{1}');\n"
-"\n"
-"  return <div>{resource.title}</div>;\n"
-"}"
-msgstr ""
-"{0}const Component = () => {\n"
-"  const resource = useResource('{1}');\n"
-"\n"
-"  return <div>{resource.title}</div>;\n"
-"}"
+#~ msgid ""
+#~ "{0}const Component = () => {\n"
+#~ "  const resource = useResource('{1}');\n"
+#~ "\n"
+#~ "  return <div>{resource.title}</div>;\n"
+#~ "}"
+#~ msgstr ""
+#~ "{0}const Component = () => {\n"
+#~ "  const resource = useResource('{1}');\n"
+#~ "\n"
+#~ "  return <div>{resource.title}</div>;\n"
+#~ "}"
 
-#. 0: imports; 1: this.resource.subject; 2: hook; 3: propSubjectRef
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid ""
-"{0}\n"
-"const Component = () => {\n"
-"  const resource = useResource('{1}');\n"
-"  const [value] = {2}(resource, {3});\n"
-"\n"
-"  return <div>{value}</div>;\n"
-"}"
-msgstr ""
-"{0}\n"
-"const Component = () => {\n"
-"  const resource = useResource('{1}');\n"
-"  const [value] = {2}(resource, {3});\n"
-"\n"
-"  return <div>{value}</div>;\n"
-"}"
+#~ msgid ""
+#~ "{0}\n"
+#~ "const Component = () => {\n"
+#~ "  const resource = useResource('{1}');\n"
+#~ "  const [value] = {2}(resource, {3});\n"
+#~ "\n"
+#~ "  return <div>{value}</div>;\n"
+#~ "}"
+#~ msgstr ""
+#~ "{0}\n"
+#~ "const Component = () => {\n"
+#~ "  const resource = useResource('{1}');\n"
+#~ "  const [value] = {2}(resource, {3});\n"
+#~ "\n"
+#~ "  return <div>{value}</div>;\n"
+#~ "}"
 
-#. 0: imports; 1: genericName; 2: this.resource.subject; 3: propUsage
-#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
-msgid ""
-"{0}\n"
-"const Component = () => {\n"
-"  const resource = useResource{1}('{2}');\n"
-"{3}\n"
-"}"
-msgstr ""
-"{0}\n"
-"const Component = () => {\n"
-"  const resource = useResource{1}('{2}');\n"
-"{3}\n"
-"}"
+#~ msgid ""
+#~ "{0}\n"
+#~ "const Component = () => {\n"
+#~ "  const resource = useResource{1}('{2}');\n"
+#~ "{3}\n"
+#~ "}"
+#~ msgstr ""
+#~ "{0}\n"
+#~ "const Component = () => {\n"
+#~ "  const resource = useResource{1}('{2}');\n"
+#~ "{3}\n"
+#~ "}"
 
-#. 0: prefix; 1: formatImportNames(prefix, names); 2: file
-#: src/views/CodeUsage/generators/generatorUtils.ts
-msgid "{0}import {1} from '{2}';"
-msgstr "{0}import {1} from '{2}';"
+#~ msgid "{0}import {1} from '{2}';"
+#~ msgstr "{0}import {1} from '{2}';"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewOntologyDialog.tsx
 msgid "An ontology is a collection of classes and properties that together describe a concept. Great for data models."
@@ -4652,10 +4603,8 @@ msgstr "Title is used to construct the subject, keep in mind that the subject ca
 msgid "Creating table <0/>"
 msgstr "Creating table <0/>"
 
-#. 0.0: count
-#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
-msgid "Creating <0>{0} resources</0>"
-msgstr "Creating <0>{0} resources</0>"
+#~ msgid "Creating <0>{0} resources</0>"
+#~ msgstr "Creating <0>{0} resources</0>"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Due date"
@@ -4692,9 +4641,7 @@ msgid "Open the parent of this resource."
 msgstr "Open the parent of this resource."
 
 #. 0: ' '
-#. 0: ' '
 #: src/components/OverlayContainer.tsx
-#: src/components/ResourceContextMenu/index.tsx
 msgid "Are you sure you want to delete{0} <0/>"
 msgstr "Are you sure you want to delete{0} <0/>"
 
@@ -4940,10 +4887,8 @@ msgstr "WebSocket debug"
 msgid "Developer"
 msgstr "Developer"
 
-#. 0: status.pendingDirtyCount > 0 && ( <PendingCount>{status.pendingDirtyCount} unsynced</PendingCount> )
-#: src/routes/SyncRoute.tsx
-msgid "Recent activity {0}"
-msgstr "Recent activity {0}"
+#~ msgid "Recent activity {0}"
+#~ msgstr "Recent activity {0}"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 #: src/routes/SyncRoute.tsx
@@ -5125,9 +5070,8 @@ msgstr "Work in progress. Resources here are visible to people who can write to 
 msgid "Discard"
 msgstr "Discard"
 
-#: src/components/ForkBar.tsx
-msgid "<0/> Merge"
-msgstr "<0/> Merge"
+#~ msgid "<0/> Merge"
+#~ msgstr "<0/> Merge"
 
 #: src/components/ForkBar.tsx
 msgid "No changes yet."
@@ -5431,9 +5375,8 @@ msgstr "Languages"
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
-#: src/components/EditLanguagesDialog.tsx
-msgid "<0/> Add"
-msgstr "<0/> Add"
+#~ msgid "<0/> Add"
+#~ msgstr "<0/> Add"
 
 #. 0: ' '
 #: src/components/EditLanguagesDialog.tsx
@@ -5521,10 +5464,8 @@ msgstr "Add {0}"
 msgid "{0} title…"
 msgstr "{0} title…"
 
-#. 0: ' '
-#: src/routes/AppSettings.tsx
-msgid "<0/>{0} Colorful mode"
-msgstr "<0/>{0} Colorful mode"
+#~ msgid "<0/>{0} Colorful mode"
+#~ msgstr "<0/>{0} Colorful mode"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave video call"
@@ -5955,14 +5896,14 @@ msgstr "Untitled entry"
 msgid "What are you working on?"
 msgstr "What are you working on?"
 
-#: src/chunks/TablePage/Timer/TimerToolbar.tsx
-msgid "<0/> Start"
-msgstr "<0/> Start"
+#~ msgid "<0/> Start"
+#~ msgstr "<0/> Start"
 
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Stop"
 msgstr "Stop"
 
+#: src/chunks/TablePage/Timer/TimerToolbar.tsx
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 msgid "Start"
@@ -6584,9 +6525,8 @@ msgstr "Back up now"
 msgid "Backups are paused. You can still restore what is already stored."
 msgstr "Backups are paused. You can still restore what is already stored."
 
-#: src/components/Vault/VaultPanel.tsx
-msgid "<0/> Restore"
-msgstr "<0/> Restore"
+#~ msgid "<0/> Restore"
+#~ msgstr "<0/> Restore"
 
 #. 0: minutes
 #: src/components/Vault/VaultPanel.tsx
@@ -6786,7 +6726,9 @@ msgstr "Signed in as {0}."
 msgid "Email recovery"
 msgstr "Email recovery"
 
+#. 0: count
 #. 0: nodeUsage.resourceCount.toLocaleString()
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 #: src/routes/SyncRoute.tsx
 msgid "{0} resources"
 msgstr "{0} resources"
@@ -7013,7 +6955,6 @@ msgid "Your private drive keeps its name. It is tied to your account, not to a p
 msgstr "Your private drive keeps its name. It is tied to your account, not to a project."
 
 #: src/components/Drives/PersonalDriveBadge.tsx
-#: src/components/Drives/PrivateDriveBadge.tsx
 msgid "<0/> Private"
 msgstr "<0/> Private"
 
@@ -7303,20 +7244,14 @@ msgstr "Envelope present, but its signature did not verify"
 msgid "No signed envelope covers this change on this node"
 msgstr "No signed envelope covers this change on this node"
 
-#. 0: ' '; 1: signed ? ( <SignedBy attribution={signed} /> ) \\: ( <UnattributedBy peer={version.peer} /> ); 2: version.message && !signed && <> — {version.message}</>
-#: src/routes/History/VersionTitle.tsx
-msgid "Edited <0/>{0} {1} {2}"
-msgstr "Edited <0/>{0} {1} {2}"
+#~ msgid "Edited <0/>{0} {1} {2}"
+#~ msgstr "Edited <0/>{0} {1} {2}"
 
-#. 0: ' '
-#: src/routes/History/VersionTitle.tsx
-msgid "by <0/>{0} <1/>"
-msgstr "by <0/>{0} <1/>"
+#~ msgid "by <0/>{0} <1/>"
+#~ msgstr "by <0/>{0} <1/>"
 
-#. 0: shortPeer; 1: ' '
-#: src/routes/History/VersionTitle.tsx
-msgid "by peer {0}{1} <0>Unattributed</0>"
-msgstr "by peer {0}{1} <0>Unattributed</0>"
+#~ msgid "by peer {0}{1} <0>Unattributed</0>"
+#~ msgstr "by peer {0}{1} <0>Unattributed</0>"
 
 #: src/routes/SyncRoute.tsx
 msgid "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
@@ -7490,3 +7425,176 @@ msgstr "Feedback <0/>"
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Email for a reply (optional) <0/>"
 msgstr "Email for a reply (optional) <0/>"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Feedback reporting is unavailable on this installation. Email"
+msgstr "Feedback reporting is unavailable on this installation. Email"
+
+#: src/components/Drives/PrivateDriveBadge.tsx
+msgid "Private"
+msgstr "Private"
+
+#: src/components/Share/ShareDialog.tsx
+msgid "Copy link"
+msgstr "Copy link"
+
+#: src/components/forms/ResourceForm.tsx
+msgid "Advanced"
+msgstr "Advanced"
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "under"
+msgstr "under"
+
+#: src/routes/Share/ShareRoute.tsx
+msgid "Read more about permissions in the"
+msgstr "Read more about permissions in the"
+
+#: src/routes/Share/ShareRoute.tsx
+msgid "Atomic Data Docs"
+msgstr "Atomic Data Docs"
+
+#: src/components/ResourceContextMenu/index.tsx
+msgid "Are you sure you want to delete"
+msgstr "Are you sure you want to delete"
+
+#: src/chunks/TablePage/TableExportDialog.tsx
+#: src/views/File/DownloadButton.tsx
+msgid "Download"
+msgstr "Download"
+
+#: src/views/OntologyPage/NewClassButton.tsx
+msgid "Add class"
+msgstr "Add class"
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Edited"
+msgstr "Edited"
+
+#: src/routes/History/VersionTitle.tsx
+msgid "by"
+msgstr "by"
+
+#. 0: shortPeer
+#: src/routes/History/VersionTitle.tsx
+msgid "by peer {0}"
+msgstr "by peer {0}"
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Unattributed"
+msgstr "Unattributed"
+
+#: src/chunks/TablePage/TableExportDialog.tsx
+msgid "Reference resources by subject instead of name."
+msgstr "Reference resources by subject instead of name."
+
+#: src/components/forms/FilePicker/FilePicker.tsx
+msgid "Preparing file…"
+msgstr "Preparing file…"
+
+#: src/components/forms/FilePicker/FilePicker.tsx
+msgid "Could not prepare file. Select it again to retry."
+msgstr "Could not prepare file. Select it again to retry."
+
+#: src/components/Vault/VaultPanel.tsx
+msgid "Restore"
+msgstr "Restore"
+
+#: src/views/OntologyPage/NewPropertyButton.tsx
+msgid "Add property"
+msgstr "Add property"
+
+#: src/chunks/TablePage/PropertyForm/DatePropertyForm.tsx
+msgid "Include Time"
+msgstr "Include Time"
+
+#: src/views/OntologyPage/CreateInstanceButton.tsx
+msgid "New Instance"
+msgstr "New Instance"
+
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+msgid "Creating"
+msgstr "Creating"
+
+#. 0: propertyResource.title
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+msgid "Editing {0} on"
+msgstr "Editing {0} on"
+
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+msgid "Editing"
+msgstr "Editing"
+
+#: src/components/ForkBar.tsx
+msgid "Merge"
+msgstr "Merge"
+
+#: src/components/forms/ResourceField.tsx
+msgid "This field is calculated server-side."
+msgstr "This field is calculated server-side."
+
+#: src/views/CodeUsage/ResourceCodeUsage.tsx
+msgid "Read a property:"
+msgstr "Read a property:"
+
+#: src/views/CodeUsage/ResourceCodeUsage.tsx
+msgid "Typescript"
+msgstr "Typescript"
+
+#: src/routes/AppSettings.tsx
+msgid "Colorful mode"
+msgstr "Colorful mode"
+
+#: src/routes/AppSettings.tsx
+msgid "Enable Ontology panel"
+msgstr "Enable Ontology panel"
+
+#: src/routes/AppSettings.tsx
+msgid "Enable AIChats panel"
+msgstr "Enable AIChats panel"
+
+#: src/routes/AppSettings.tsx
+msgid "Hide templates on new resource page"
+msgstr "Hide templates on new resource page"
+
+#: src/routes/AppSettings.tsx
+msgid "Disable page transition animations"
+msgstr "Disable page transition animations"
+
+#: src/routes/AppSettings.tsx
+msgid "Enable keyboard drag & drop in sidebar"
+msgstr "Enable keyboard drag & drop in sidebar"
+
+#: src/chunks/Plugins/NewPluginButton.tsx
+#: src/chunks/Plugins/NewPluginButton.tsx
+msgid "Upload Plugin"
+msgstr "Upload Plugin"
+
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+msgid "Reading"
+msgstr "Reading"
+
+#: src/views/Plugin/PluginPage.tsx
+msgid "Config"
+msgstr "Config"
+
+#: src/chunks/Plugins/UpdatePluginButton.tsx
+msgid "Update"
+msgstr "Update"
+
+#: src/chunks/AI/CompactSeparatorWidget.tsx
+msgid "Context compacted"
+msgstr "Context compacted"
+
+#: src/routes/SyncRoute.tsx
+msgid "unsynced"
+msgstr "unsynced"
+
+#: src/routes/SyncRoute.tsx
+msgid "Recent activity"
+msgstr "Recent activity"
+
+#: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
+msgid "Resource with error"
+msgstr "Resource with error"

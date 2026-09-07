@@ -51,7 +51,7 @@ export function ResourceCodeUsage({
   return (
     <Column fullHeight>
       <Column wrapItems as='label'>
-        Read a property:
+        <span>Read a property:</span>
         <PropSelector
           classSubject={classSubject}
           onPropSelect={setSelectedProp}
@@ -59,7 +59,7 @@ export function ResourceCodeUsage({
       </Column>
       <CheckboxLabel>
         <Checkbox onChange={setTypescriptEnabled} checked={typescriptEnabled} />
-        Typescript
+        <span>Typescript</span>
       </CheckboxLabel>
       <CodeUsage
         generator={generator}

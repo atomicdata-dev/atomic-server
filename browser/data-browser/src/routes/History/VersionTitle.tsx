@@ -45,7 +45,8 @@ export function VersionTitle({
 
   return (
     <span>
-      Edited <time dateTime={date.toISOString()}>{formattedDate}</time>{' '}
+      <span>Edited</span>{' '}
+      <time dateTime={date.toISOString()}>{formattedDate}</time>{' '}
       {signed ? (
         <SignedBy attribution={signed} />
       ) : (
@@ -64,7 +65,7 @@ function SignedBy({ attribution }: { attribution: Attribution }): JSX.Element {
 
   return (
     <>
-      by <ResourceInline subject={attribution.signer} />{' '}
+      <span>by</span> <ResourceInline subject={attribution.signer} />{' '}
       <Badge
         $verified={attribution.verified}
         title={title}
@@ -83,7 +84,7 @@ function UnattributedBy({ peer }: { peer?: string }): JSX.Element | null {
 
   return (
     <>
-      by peer {shortPeer}{' '}
+      <span>by peer {shortPeer}</span>{' '}
       <Badge
         $verified={false}
         title='No signed envelope covers this change on this node'

@@ -67,6 +67,7 @@
     "fast-json-patch": "^3.1.1",
     "idb-keyval": "^6.2.4",
     "katex": "^0.16.45",
+    "linkifyjs": "4.3.3",
     "loro-crdt": "^1.12.1",
     "ollama-ai-provider-v2": "^3.5.1",
     "polished": "^4.3.1",

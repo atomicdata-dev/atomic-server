@@ -9,14 +9,14 @@ function BooleanCellEdit({
   value,
   onChange,
 }: EditCellProps<JSONValue>): JSX.Element {
-  return <Checkbox autoFocus checked={value as boolean} onChange={onChange} />;
+  return <Checkbox autoFocus checked={Boolean(value)} onChange={onChange} />;
 }
 
 function BooleanCellDisplay({
   value,
   onChange,
 }: DisplayCellProps<JSONValue>): JSX.Element {
-  return <Checkbox checked={value as boolean} onChange={onChange} />;
+  return <Checkbox checked={Boolean(value)} onChange={onChange} />;
 }
 
 export const BooleanCell: CellContainer<JSONValue> = {

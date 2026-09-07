@@ -28,6 +28,11 @@ overrides:
   '@opentelemetry/core': '>=2.8.0 <3.0.0'
   markdown-it: '>=14.2.0 <15.0.0'
 
+patchedDependencies:
+  '@reactflow/core':
+    hash: 935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e
+    path: patches/@reactflow__core.patch
+
 importers:
 
   .:
@@ -288,6 +293,9 @@ importers:
       katex:
         specifier: ^0.16.45
         version: 0.16.47
+      linkifyjs:
+        specifier: 4.3.3
+        version: 4.3.3
       loro-crdt:
         specifier: ^1.12.1
         version: 1.12.1
@@ -13100,7 +13108,7 @@ snapshots:
 
   '@reactflow/background@11.3.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       classcat: 5.0.5
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -13111,7 +13119,7 @@ snapshots:
 
   '@reactflow/controls@11.2.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       classcat: 5.0.5
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -13120,7 +13128,7 @@ snapshots:
       - '@types/react'
       - immer
 
-  '@reactflow/core@11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@reactflow/core@11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@types/d3': 7.4.3
       '@types/d3-drag': 3.0.7
@@ -13139,7 +13147,7 @@ snapshots:
 
   '@reactflow/minimap@11.7.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@types/d3-selection': 3.0.11
       '@types/d3-zoom': 3.0.8
       classcat: 5.0.5
@@ -13154,7 +13162,7 @@ snapshots:
 
   '@reactflow/node-resizer@2.2.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       classcat: 5.0.5
       d3-drag: 3.0.0
       d3-selection: 3.0.0
@@ -13167,7 +13175,7 @@ snapshots:
 
   '@reactflow/node-toolbar@1.3.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       classcat: 5.0.5
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -19044,7 +19052,7 @@ snapshots:
     dependencies:
       '@reactflow/background': 11.3.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@reactflow/controls': 11.2.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@reactflow/core': 11.11.4(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@reactflow/core': 11.11.4(patch_hash=935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e)(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@reactflow/minimap': 11.7.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@reactflow/node-resizer': 2.2.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@reactflow/node-toolbar': 1.3.14(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)

@@ -1,0 +1,2 @@
+overrides:
+  '@tomic/plugin': 'link:../../../browser/plugin'
