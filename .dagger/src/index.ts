@@ -717,6 +717,7 @@ export class AtomicServer {
     const installed = pnpmContainer
       .withFile('/repo/browser/package.json', browser.file('package.json'))
       .withFile('/repo/browser/pnpm-lock.yaml', browser.file('pnpm-lock.yaml'))
+      .withDirectory('/repo/browser/patches', browser.directory('patches'))
       .withFile(
         '/repo/browser/pnpm-workspace.yaml',
         browser.file('pnpm-workspace.yaml'),
@@ -954,6 +955,7 @@ export class AtomicServer {
     const workspaceContainer = pnpmContainer
       .withFile('/app/package.json', browser.file('package.json'))
       .withFile('/app/pnpm-lock.yaml', browser.file('pnpm-lock.yaml'))
+      .withDirectory('/app/patches', browser.directory('patches'))
       .withFile('/app/pnpm-workspace.yaml', browser.file('pnpm-workspace.yaml'))
       .withFile(
         '/app/data-browser/package.json',
@@ -1599,6 +1601,7 @@ export class AtomicServer {
         '/app/pnpm-workspace.yaml',
         browserContainer.file('/app/pnpm-workspace.yaml'),
       )
+      .withDirectory('/app/patches', browserContainer.directory('/app/patches'))
       .withDirectory(
         '/app/e2e',
         this.source
