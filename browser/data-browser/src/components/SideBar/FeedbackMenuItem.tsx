@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { FaComment } from 'react-icons/fa6';
 import * as Sentry from '@sentry/react';
 import {
@@ -23,6 +23,8 @@ import {
 import { submitFeedback } from '../../helpers/feedback';
 
 export function FeedbackMenuItem() {
+  const messageId = useId();
+  const emailId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const [dialogProps, showDialog, hideDialog] = useDialog({ triggerRef });
@@ -32,10 +34,12 @@ export function FeedbackMenuItem() {
   const [failed, setFailed] = useState(false);
   const [sent, setSent] = useState(false);
   const enabled = Sentry.isEnabled();
+
   async function send() {
     if (!emailRef.current?.reportValidity()) return;
     setBusy(true);
     setFailed(false);
+
     try {
       await submitFeedback(message, email);
       setSent(true);
@@ -46,6 +50,7 @@ export function FeedbackMenuItem() {
       setBusy(false);
     }
   }
+
   return (
     <>
       <SideBarMenuRow
@@ -82,10 +87,11 @@ export function FeedbackMenuItem() {
                 optional email go to the Atomic team through Sentry. Please
                 leave out private workspace content.
               </p>
-              <label>
+              <label htmlFor={messageId}>
                 Feedback
                 <InputWrapper>
                   <TextAreaStyled
+                    id={messageId}
                     rows={5}
                     maxLength={10000}
                     value={message}
@@ -95,10 +101,11 @@ export function FeedbackMenuItem() {
                   />
                 </InputWrapper>
               </label>
-              <label>
+              <label htmlFor={emailId}>
                 Email for a reply (optional)
                 <InputWrapper>
                   <InputStyled
+                    id={emailId}
                     type='email'
                     ref={emailRef}
                     value={email}
