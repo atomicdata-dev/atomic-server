@@ -167,6 +167,19 @@ describe('evaluateServerReconciliation', () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it('keeps the source server when placement exists but no data has arrived', async () => {
+    mockFetch({
+      account: { email: 'a@example.com' },
+      enrollments: [enrollment({ status: 'Pending', resource_count: 0 })],
+    });
+    expect(
+      await evaluateServerReconciliation(
+        'https://source.example',
+        'did:ad:drive1',
+      ),
+    ).toEqual({ ok: true });
+  });
+
   it('is ok when the matching enrollment has no http_origin yet', async () => {
     mockFetch({
       account: { email: 'a@example.com' },

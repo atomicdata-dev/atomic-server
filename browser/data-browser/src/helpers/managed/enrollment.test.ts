@@ -50,15 +50,15 @@ const failureOf = async (promise: Promise<unknown>): Promise<Error> => {
  * fleet in production read as a mysterious backup failure with no next step.
  */
 describe('createManagedSyncEnrollment failures', () => {
-  it('passes on the reason the server gave, with the upgrade link', async () => {
+  it('returns a typed payment requirement for the hosting handoff', async () => {
     failWith(402, {
       error: 'Cloud Server requires a subscription',
       upgrade_url: 'https://portal.example/billing',
     });
 
-    await expect(enroll()).rejects.toThrow(
-      /Cloud Server requires a subscription.*portal\.example\/billing/,
-    );
+    await expect(enroll()).rejects.toMatchObject({
+      name: 'HostingPaymentRequiredError',
+    });
   });
 
   /** Actionable, and distinct from "we are broken". */
@@ -261,6 +261,7 @@ describe('createManagedSyncEnrollment with an agent', () => {
       agentSubject: agent.subject!,
       agent,
       genesisCert: 'AQID',
+      hostingConsentVersion: 1,
     });
 
     expect(managedFetch).toHaveBeenCalledTimes(2);
@@ -272,6 +273,7 @@ describe('createManagedSyncEnrollment with an agent', () => {
 
     expect(managedFetch.mock.calls[1][0]).toBe('/sync-enrollments');
     const body = bodyOf(managedFetch.mock.calls[1]);
+    expect(body.hosting_consent_version).toBe(1);
     const proof = body.proof as Record<string, unknown>;
     expect(proof.nonce).toBe('nonce-1');
     expect(proof.genesis_cert).toBe('AQID');

@@ -36,6 +36,8 @@ export type MenuItemMinimial = {
   helper?: string;
   id: string;
   icon?: ReactNode;
+  /** Compact trailing metadata, such as a drive service state. */
+  suffix?: ReactNode;
   disabled?: boolean;
   header?: boolean;
   /**
@@ -506,6 +508,7 @@ export function DropdownMenu({
                 id,
                 disabled,
                 shortcut,
+                suffix,
                 icon,
                 header,
                 keepOpen,
@@ -529,6 +532,7 @@ export function DropdownMenu({
                   selected={useKeys && effectiveSelectedIndex === i}
                   icon={icon}
                   shortcut={shortcut}
+                  suffix={suffix}
                   header={header}
                   // In searchable mode focus stays in the filter input;
                   // selection is shown by highlight + scrolled into view.
@@ -574,6 +578,7 @@ export function MenuItem({
   helper,
   disabled,
   shortcut,
+  suffix,
   icon,
   label,
   header,
@@ -624,6 +629,7 @@ export function MenuItem({
     >
       {icon}
       <StyledLabel>{label}</StyledLabel>
+      {suffix}
       {shortcut && <StyledShortcut shortcut={shortcut} />}
     </MenuItemStyled>
   );

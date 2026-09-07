@@ -61,6 +61,14 @@ const PROOF_ERROR_MESSAGES: Record<string, string> = {
     'your workspace, sign in with the identity that created it and retry.',
 };
 
+export class HostingPaymentRequiredError extends Error {
+  constructor() {
+    // This exception is a control signal; the route renders translated copy.
+    super(/* @wc-ignore */ 'Hosting payment required');
+    this.name = /* @wc-ignore */ 'HostingPaymentRequiredError';
+  }
+}
+
 /**
  * Say what actually went wrong.
  *
@@ -84,6 +92,10 @@ async function enrollmentError(response: Response): Promise<Error> {
     return new Error(
       `Your ${PRODUCT_NAME} session expired. Sign in and retry.`,
     );
+  }
+
+  if (response.status === 402) {
+    return new HostingPaymentRequiredError();
   }
 
   // A refused proof gets a sentence that says what the user can do about it;
@@ -236,6 +248,7 @@ export async function createManagedSyncEnrollment({
   agentSubject,
   agent,
   genesisCert,
+  hostingConsentVersion,
 }: {
   driveSubject: string;
   agentSubject: string;
@@ -243,6 +256,7 @@ export async function createManagedSyncEnrollment({
   agent?: Agent;
   /** The drive's `genesis` propval, for a drive that is not the agent's personal drive. */
   genesisCert?: string;
+  hostingConsentVersion?: number;
 }): Promise<ManagedSyncEnrollmentResult> {
   // Identity convergence happens silently at app boot (IdentityReconcileGate);
   // by the time we enroll, the active agent is the account's agent. Enrolling
@@ -268,6 +282,7 @@ export async function createManagedSyncEnrollment({
     body: JSON.stringify({
       drive_subject: driveSubject,
       agent_subject: agentSubject,
+      hosting_consent_version: hostingConsentVersion,
       ...(proof ? { proof } : {}),
     }),
   });

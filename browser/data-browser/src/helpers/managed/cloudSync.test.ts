@@ -129,6 +129,7 @@ describe('enableCloudSyncForDrive', () => {
     const result = await enableCloudSyncForDrive({
       store: store as never,
       drive: 'did:ad:somedrive',
+      hostingConsentAccepted: true,
       agentSubject: 'did:ad:agent:abc',
       setServer,
       managedInfo: { managed: true, portalUrl: 'https://portal.example' },

@@ -165,3 +165,28 @@ Gaps worth knowing, rather than rediscovering:
 *If you change vocabulary or a flow here, change it in both clients and update
 this table. A person moving from the phone to the laptop should not notice
 they moved.*
+
+## Cloud Server setup (2026-09-07)
+
+The hosted browser now offers setup for existing portable drives on another
+server. The source's `/replicate-drive` copies its complete data and verifies
+receipt; the browser keeps its source connection and offers “Use Cloud Server”
+only after that copy succeeds. Local-only drives connect to the assigned node
+before promotion. Enrollment alone is not a successful transfer: pending or
+empty placements must not override the source on the next app launch.
+
+The account portal hands setup to `/app/sync?drive=…`, preserving the selected
+drive. It shows hosting beside each drive and keeps unfinished setup actionable.
+The confirmation explains that hosting is a readable copy, distinct from Vault.
+Flutter has no equivalent managed-hosting setup action; its generic device
+connections are unchanged. The browser's source-server path also applies to an
+embedded node, but native runtime verification remains separate.
+
+### Hosting consent and drive switcher (2026-09-07)
+
+The hosting action explains Local, Vault and Server before an explicit “Agree
+and enable Cloud Server” action. The paired control plane requires consent
+version 1 and persists account, agent and server timestamp on the enrollment.
+Existing records retain unknown consent; no consent is inferred from a drive
+being present. Browser switcher rows carry compact service state labels, with
+one Storage and hosting action for details. Unknown cloud status stays explicit.

@@ -1,3 +1,5 @@
+import styled from 'styled-components';
+import { useDriveHostingStates } from '../../hooks/useDriveHostingStates';
 import { Resource, core, server, useResources } from '@tomic/react';
 import {
   FaCaretDown,
@@ -6,6 +8,7 @@ import {
   FaPlus,
   FaSquareCheck,
   FaRegCircle,
+  FaCloud,
 } from 'react-icons/fa6';
 import { useSettings } from '../../helpers/AppSettings';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -34,6 +37,10 @@ export function DriveSwitcher({
 }: {
   Trigger?: DropdownTriggerComponent;
 }) {
+  const hosting = useDriveHostingStates();
+  const badge = (subject: string) => (
+    <HostingState>{hosting.states(subject)}</HostingState>
+  );
   const navigate = useNavigateWithTransition();
   const { drive, setDrive, agent } = useSettings();
   const { privateDrive } = usePrivateDrive();
@@ -61,7 +68,8 @@ export function DriveSwitcher({
           {
             id: privateDrive,
             label: 'Private drive',
-            helper: 'Your personal space — visible only to you.',
+            helper: 'Switch to your personal drive.',
+            suffix: badge(privateDrive),
             disabled: false,
             onClick: (): void => switchTo(privateDrive),
             icon: privateDrive === drive ? <FaSquareCheck /> : <FaHouse />,
@@ -72,6 +80,7 @@ export function DriveSwitcher({
       .filter(([_, resource]) => !resource.error)
       .map(([subject, resource]) => ({
         id: subject,
+        suffix: badge(subject),
         label: getTitle(resource),
         helper: `Switch to ${getTitle(resource)}`,
         disabled: false,
@@ -91,12 +100,22 @@ export function DriveSwitcher({
     ...Array.from(recentDrivesMap.entries()).map(([subject, resource]) => ({
       label: getTitle(resource),
       id: subject,
+      suffix: badge(subject),
       helper: `Switch to ${getTitle(resource)}`,
       icon: subject === drive ? <FaSquareCheck /> : <FaRegCircle />,
       onClick: (): void => switchTo(subject),
       disabled: false,
     })),
     DIVIDER,
+    {
+      id: 'drive-hosting',
+      label: 'Storage and hosting',
+      icon: <FaCloud />,
+      helper:
+        'Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server.',
+      onClick: () =>
+        navigate(`/app/sync?drive=${encodeURIComponent(drive ?? '')}`),
+    },
     {
       id: 'manage-drives',
       label: 'Manage drives',
@@ -108,5 +127,20 @@ export function DriveSwitcher({
     },
   ];
 
-  return <DropdownMenu Trigger={Trigger} items={items} />;
+  return (
+    <DropdownMenu
+      Trigger={Trigger}
+      items={items}
+      bindActive={active => {
+        if (active) void hosting.refresh();
+      }}
+    />
+  );
 }
+
+const HostingState = styled.span`
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: ${p => p.theme.colors.textLight};
+  white-space: nowrap;
+`;

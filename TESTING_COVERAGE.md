@@ -382,3 +382,32 @@ Not covered: Flutter `create_drive` still mints a random DID (the Rust
 machine with the old machine offline.
 
 Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enrollment and refresh after edits; SaaS `enrollment_display_metadata_refreshes_and_survives_legacy_clients` verifies persistence and account ownership.
+
+## Cloud Server setup
+
+- `data-browser/src/helpers/managed/cloudSync.setup.test.ts`: missing placement,
+  source-server replication and refusal, assigned-server connection ordering,
+  and failed connection without local-drive promotion.
+- `data-browser/src/helpers/managed/reconcile.test.ts`: pending/empty placements
+  do not switch the app away from its source.
+- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup opens the selected
+  existing drive, never creates a content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/server-hosting-live.spec.ts`: opt-in real sign-in,
+  grant, signed enrollment, setup UI, source replication and destination HTTP
+  read. Requires two isolated nodes and dev magic links (`ATOMIC_HOSTING_LIVE=1`).
+  Verified with plain and managed destinations. `ATOMIC_HOSTING_MANAGED=1`
+  additionally checks Active usage receipts and the switcher state. Production
+  deployment and Desktop/Tauri replication are not runtime-tested.
+
+- Hosting consent: `cloudSync.setup.test.ts` refuses transfer/enrollment without
+  an explicit agreement; paired SaaS HTTP tests enforce and record version 1.
+- `driveHostingState.test.ts` covers Local/Remote, empty placement, combined
+  Server/Vault, disabled, paused and unknown states. Paired SaaS
+  `drive-switcher-hosting.spec.ts` checks menu rendering and refresh/error
+  behavior against mocked receipts in the running browser app.
+
+- Billing return: `enrollment.test.ts` checks the typed 402 response; paired
+  SaaS `server-billing-live.spec.ts` follows a free account through mock checkout,
+  back to the selected drive, then explicit consent, replication and an
+  authenticated read from the real managed node. Plan purchase alone creates
+  no enrollment. Real Stripe-hosted test-card checkout remains a deployment check.

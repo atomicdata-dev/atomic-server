@@ -4846,9 +4846,8 @@ msgstr "<0/> and{0} <1/> are typing"
 msgid "Private drive"
 msgstr "Private drive"
 
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Your personal space — visible only to you."
-msgstr "Your personal space — visible only to you."
+#~ msgid "Your personal space — visible only to you."
+#~ msgstr "Your personal space — visible only to you."
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Manage drives"
@@ -5090,10 +5089,8 @@ msgstr "Your workspace hasn’t opened here yet. It may still be settling — re
 msgid "No {0} portal is configured for this server."
 msgstr "No {0} portal is configured for this server."
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Backing up this workspace to {0}…"
-msgstr "Backing up this workspace to {0}…"
+#~ msgid "Backing up this workspace to {0}…"
+#~ msgstr "Backing up this workspace to {0}…"
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/Vault/VaultPanel.tsx
@@ -5101,14 +5098,11 @@ msgstr "Backing up this workspace to {0}…"
 msgid "Setting up…"
 msgstr "Setting up…"
 
-#: src/routes/SyncRoute.tsx
-msgid "Sign-in wasn’t completed — nothing was backed up."
-msgstr "Sign-in wasn’t completed — nothing was backed up."
+#~ msgid "Sign-in wasn’t completed — nothing was backed up."
+#~ msgstr "Sign-in wasn’t completed — nothing was backed up."
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Could not enable {0} backup."
-msgstr "Could not enable {0} backup."
+#~ msgid "Could not enable {0} backup."
+#~ msgstr "Could not enable {0} backup."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Skip anyway"
@@ -6560,6 +6554,7 @@ msgid "Bearer {0}"
 msgstr "Bearer {0}"
 
 #: src/routes/SyncRoute.tsx
+#: src/routes/SyncRoute.tsx
 msgid "Set up Cloud Server"
 msgstr "Set up Cloud Server"
 
@@ -6821,10 +6816,8 @@ msgstr "Open a workspace to see whether it can be hosted."
 msgid "This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here."
 msgstr "This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here."
 
-#. 0: serverHostname ?? 'another server'
-#: src/routes/SyncRoute.tsx
-msgid "Already set up for this workspace. This app is reading from {0} instead."
-msgstr "Already set up for this workspace. This app is reading from {0} instead."
+#~ msgid "Already set up for this workspace. This app is reading from {0} instead."
+#~ msgstr "Already set up for this workspace. This app is reading from {0} instead."
 
 #: src/routes/SyncRoute.tsx
 msgid "This server"
@@ -6839,10 +6832,8 @@ msgstr "{0} doesn’t offer hosting, so it can’t be switched on from here."
 msgid "Checking whether this workspace is hosted…"
 msgstr "Checking whether this workspace is hosted…"
 
-#. 0: serverHostname ?? 'another server'
-#: src/routes/SyncRoute.tsx
-msgid "This workspace already lives on {0}. Moving it here is a migration, not a backup."
-msgstr "This workspace already lives on {0}. Moving it here is a migration, not a backup."
+#~ msgid "This workspace already lives on {0}. Moving it here is a migration, not a backup."
+#~ msgstr "This workspace already lives on {0}. Moving it here is a migration, not a backup."
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Checking this workspace’s backup…"
@@ -7325,3 +7316,143 @@ msgstr "by <0/>{0} <1/>"
 #: src/routes/History/VersionTitle.tsx
 msgid "by peer {0}{1} <0>Unattributed</0>"
 msgstr "by peer {0}{1} <0>Unattributed</0>"
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
+msgstr "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
+
+#: src/routes/SyncRoute.tsx
+msgid "Sign-in wasn’t completed — hosting setup was cancelled."
+msgstr "Sign-in wasn’t completed — hosting setup was cancelled."
+
+#: src/routes/SyncRoute.tsx
+msgid "Could not set up Cloud Server."
+msgstr "Could not set up Cloud Server."
+
+#: src/routes/SyncRoute.tsx
+msgid "Cloud Server received this workspace. Your source server is still connected."
+msgstr "Cloud Server received this workspace. Your source server is still connected."
+
+#: src/routes/SyncRoute.tsx
+msgid "Connected to Cloud Server. Syncing this workspace…"
+msgstr "Connected to Cloud Server. Syncing this workspace…"
+
+#: src/routes/SyncRoute.tsx
+msgid "Keep this workspace available when your devices are offline, with shareable links, search, and API access."
+msgstr "Keep this workspace available when your devices are offline, with shareable links, search, and API access."
+
+#~ msgid "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
+#~ msgstr "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
+
+#: src/routes/SyncRoute.tsx
+msgid "Cloud Server is on"
+msgstr "Cloud Server is on"
+
+#: src/routes/SyncRoute.tsx
+msgid "Sync again"
+msgstr "Sync again"
+
+#: src/routes/SyncRoute.tsx
+msgid "Finish Cloud Server setup"
+msgstr "Finish Cloud Server setup"
+
+#: src/routes/SyncRoute.tsx
+msgid "This workspace has been copied to Cloud Server. You’re still using the source server."
+msgstr "This workspace has been copied to Cloud Server. You’re still using the source server."
+
+#: src/routes/SyncRoute.tsx
+msgid "Use Cloud Server"
+msgstr "Use Cloud Server"
+
+#: src/routes/SyncRoute.tsx
+msgid "See plans"
+msgstr "See plans"
+
+#: src/routes/SyncRoute.tsx
+msgid "<0>Local:</0> data stays on your devices unless you connect a service or share it."
+msgstr "<0>Local:</0> data stays on your devices unless you connect a service or share it."
+
+#: src/routes/SyncRoute.tsx
+msgid "<0>Cloud Vault:</0> an encrypted backup that the provider cannot read. It does not host your workspace."
+msgstr "<0>Cloud Vault:</0> an encrypted backup that the provider cannot read. It does not host your workspace."
+
+#: src/routes/SyncRoute.tsx
+msgid "<0>Cloud Server:</0> you agree to us storing and processing a readable copy of this drive to provide hosting. Your sharing permissions still control other users’ access."
+msgstr "<0>Cloud Server:</0> you agree to us storing and processing a readable copy of this drive to provide hosting. Your sharing permissions still control other users’ access."
+
+#: src/routes/SyncRoute.tsx
+msgid "Agree and enable Cloud Server"
+msgstr "Agree and enable Cloud Server"
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Switch to your personal drive."
+msgstr "Switch to your personal drive."
+
+#: src/hooks/useDriveHostingStates.ts
+msgid "Cloud unknown"
+msgstr "Cloud unknown"
+
+#: src/hooks/useDriveHostingStates.ts
+msgid "Checking cloud…"
+msgstr "Checking cloud…"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Server"
+msgstr "Server"
+
+#: src/helpers/managed/driveHostingState.ts
+#: src/helpers/managed/driveHostingState.ts
+msgid "Server setup"
+msgstr "Server setup"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Server paused"
+msgstr "Server paused"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Server error"
+msgstr "Server error"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Server unknown"
+msgstr "Server unknown"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Local"
+msgstr "Local"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Remote"
+msgstr "Remote"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Vault"
+msgstr "Vault"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Vault setup"
+msgstr "Vault setup"
+
+#: src/helpers/managed/driveHostingState.ts
+msgid "Vault paused"
+msgstr "Vault paused"
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Storage and hosting"
+msgstr "Storage and hosting"
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
+msgstr "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
+
+#: src/routes/SyncRoute.tsx
+msgid "Hosting needs a Server plan. After payment, return here to finish setup."
+msgstr "Hosting needs a Server plan. After payment, return here to finish setup."
+
+#: src/routes/SyncRoute.tsx
+msgid "Choose Server plan"
+msgstr "Choose Server plan"
+
+#: src/routes/SyncRoute.tsx
+msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+msgstr "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
