@@ -9,7 +9,7 @@ Adding an API means providing a document and overlays, without generating
 API-specific Rust or JavaScript.
 
 This initial integration uses Reflector revision
-`ec3553bf705f2003cab743e4312bb2fee833f11c`. It supports a full read into local
+`bcc0575dcca31c2dddec466298bc5de609fd90c7`. It supports a full read into local
 storage, including Reflector's bearer-token authentication and optional GitHub
 OAuth fallback. It does not run continuously or send local changes back to the
 source API. The Sync page also supports interactive OAuth imports while the server is running.
@@ -111,7 +111,7 @@ and overlays:
 
 ```sh
 git clone https://github.com/localthought/reflector-rs.git
-git -C reflector-rs checkout ec3553bf705f2003cab743e4312bb2fee833f11c
+git -C reflector-rs checkout bcc0575dcca31c2dddec466298bc5de609fd90c7
 export REFLECTOR_ROOT="$PWD/reflector-rs"
 export PUBLIC_URL="http://localhost:9883"
 export API_CONSTANTS="owner=localthought,repo=test-repo-1"
@@ -154,7 +154,7 @@ Reflector reads these environment variables (AtomicServer also loads `.env`):
 | `OAUTH_REDIRECT_ADDR`, `OAUTH_SCOPE` | GitHub OAuth callback address and scope; defaults to `127.0.0.1:8901` and `repo`. |
 
 The document and overlay files are external configuration, not bundled into the
-server binary. See [Reflector's documentation](https://github.com/localthought/reflector-rs/tree/ec3553bf705f2003cab743e4312bb2fee833f11c)
+server binary. See [Reflector's documentation](https://github.com/localthought/reflector-rs/tree/bcc0575dcca31c2dddec466298bc5de609fd90c7)
 for the overlay format, OAuth setup, and data mapping.
 
 ## Storage and failures

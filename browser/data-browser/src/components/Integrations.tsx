@@ -60,6 +60,7 @@ function IntegrationList({ server, agent }: { server: string; agent?: Agent }) {
             ? [item.job.drive]
             : [],
         );
+
         if (imported.length) {
           const subject = await fetchPrivateDriveSubject(store, agent);
           if (!subject)
@@ -68,11 +69,13 @@ function IntegrationList({ server, agent }: { server: string; agent?: Agent }) {
           if (cancelled) return;
           const saved = home.getArray(urls.properties.drives);
           const missing = imported.filter(drive => !saved.includes(drive));
+
           if (missing.length) {
             await home.set(urls.properties.drives, [...saved, ...missing]);
             await home.save();
           }
         }
+
         setError(undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
