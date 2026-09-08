@@ -9,17 +9,25 @@ Adding an API means providing a document and overlays, without generating
 API-specific Rust or JavaScript.
 
 This initial integration uses Reflector revision
-`bcc0575dcca31c2dddec466298bc5de609fd90c7`. It supports a full read into local
-storage, including Reflector's bearer-token authentication and optional GitHub
-OAuth fallback. It does not run continuously or send local changes back to the
-source API. The Sync page also supports interactive OAuth imports while the server is running.
+`a299b200bf06d2c1e5902da90ecd643fa9a7a2ae`. It supports a full read into
+local storage, including Reflector's bearer-token authentication and
+optional GitHub OAuth fallback. It does not run continuously or send local
+changes back to the source API. The Sync page also supports interactive
+OAuth imports while the server is running.
 
 ## Connect from the Sync page
 
 Start the server with `REFLECTOR_ROOT` pointing to a checkout of Reflector at the
-revision above. `/app/sync` has an **Integrations** section with one button per
-folder in `REFLECTOR_ROOT/spec`: currently **GitHub** (`github`) and **Google**
-(`google-calendar`). No server restart is needed between imports.
+revision above, with `REFLECTOR_ROOT/spec` populated — Reflector's own
+`scripts/fetch-oad.sh` fetches the GitHub and Google Calendar OAD documents
+and overlays from [`localthought/openapi-directory`](https://github.com/localthought/openapi-directory)
+and [`localthought/overlays`](https://github.com/localthought/overlays) into
+`spec/<id>/`; they aren't vendored in Reflector's own repo any more. Set
+`OAD_INTEGRATIONS` to the comma-separated list of `spec/<id>` folders to
+offer, e.g. `OAD_INTEGRATIONS=github,google-calendar` for both. `/app/sync`
+then has an **Integrations** section with one button per listed id:
+currently **GitHub** (`github`) and **Google** (`google-calendar`). No server
+restart is needed between imports.
 
 Register OAuth applications with GitHub and Google. Use this callback URL for a
 local server on the default port:
@@ -37,6 +45,7 @@ Set these variables **in the environment that starts AtomicServer**, or in its
 
 ```sh
 export REFLECTOR_ROOT="/absolute/path/to/reflector-rs"
+export OAD_INTEGRATIONS="github,google-calendar"
 export GITHUB_CLIENT_ID="your GitHub OAuth app client ID"
 export GITHUB_CLIENT_SECRET="your GitHub OAuth app client secret"
 export GOOGLE_CLIENT_ID="your Google OAuth web client ID"
@@ -111,7 +120,8 @@ and overlays:
 
 ```sh
 git clone https://github.com/localthought/reflector-rs.git
-git -C reflector-rs checkout bcc0575dcca31c2dddec466298bc5de609fd90c7
+git -C reflector-rs checkout a299b200bf06d2c1e5902da90ecd643fa9a7a2ae
+./reflector-rs/scripts/fetch-oad.sh   # populates reflector-rs/spec/ — not vendored any more
 export REFLECTOR_ROOT="$PWD/reflector-rs"
 export PUBLIC_URL="http://localhost:9883"
 export API_CONSTANTS="owner=localthought,repo=test-repo-1"

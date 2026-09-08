@@ -71,6 +71,7 @@ async fn live_oauth_refresh_import_and_isolation() {
     let child = Command::new(assert_cmd::cargo::cargo_bin!("atomic-server"))
         .env_clear()
         .env("REFLECTOR_ROOT", &root)
+        .env("OAD_INTEGRATIONS", "test")
         .env("TEST_OAUTH_ID", "test-client")
         .env("TEST_OAUTH_SECRET", "test-secret")
         .args([

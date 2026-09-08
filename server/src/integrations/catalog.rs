@@ -55,18 +55,20 @@ pub fn root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// Which `spec/<id>` folders under [`root`] to offer as integrations, e.g.
+/// `OAD_INTEGRATIONS=github,google-calendar`. Reflector's OAD documents and
+/// overlays aren't vendored in its own repo any more (they live in
+/// localthought/openapi-directory and localthought/overlays, fetched by
+/// Reflector's `scripts/fetch-oad.sh` into `spec/` — see its README), so we
+/// no longer infer the catalog by scanning the filesystem for whatever
+/// happens to be there: the operator names exactly which ids to offer.
+const OAD_INTEGRATIONS_ENV: &str = "OAD_INTEGRATIONS";
+
 pub fn discover(root: &Path) -> Result<Vec<Integration>> {
-    let spec = root.join("spec");
-    if !spec.exists() {
-        return Ok(vec![]);
-    }
+    let ids = std::env::var(OAD_INTEGRATIONS_ENV).unwrap_or_default();
     let mut result = vec![];
-    for entry in std::fs::read_dir(spec)? {
-        let entry = entry?;
-        if !entry.file_type()?.is_dir() {
-            continue;
-        }
-        result.push(load(&entry.path())?);
+    for id in ids.split(',').map(str::trim).filter(|id| !id.is_empty()) {
+        result.push(load(&root.join("spec").join(id))?);
     }
     result.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(result)
