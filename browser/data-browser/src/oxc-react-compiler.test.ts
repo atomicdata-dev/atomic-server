@@ -29,6 +29,16 @@ function walkTsx(dir: string, acc: string[] = []): string[] {
 }
 
 describe('oxc-transform-react', () => {
+  it('does not evaluate TipTap command getters while rendering the node menu', () => {
+    const filename = join(srcDir, 'chunks/RTE/NodeSelectMenu.tsx');
+    const result = compile(filename, readFileSync(filename, 'utf8'));
+    expect(result.fatal).toBe(false);
+    const component = result.code.slice(
+      result.code.indexOf('function NodeSelectMenu'),
+    );
+    expect(component).not.toContain('.commands');
+  });
+
   it('outlines captured callbacks into the enclosing function, not module scope', () => {
     // Regression for oxc#25536 (fixed in 0.145). The community
     // oxc-plugin-react-compiler@0.2 and oxc-transform-react@0.144 hoisted

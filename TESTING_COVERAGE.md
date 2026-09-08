@@ -460,3 +460,8 @@ mounts without resetting or re-registering the global parser.
   flush and verifies the obsolete intermediate database is never attached.
 - Dashboard reload, offline tables, reconnect, search/deletion and generated
   Next.js/SvelteKit sites cover the corresponding browser flows.
+
+The node-type toolbar lifecycle is covered by `NodeSelectMenu.test.tsx` (destroyed
+editors do not expose state/commands) and `oxc-react-compiler.test.ts` (production
+compilation does not hoist command getters into render). `sentry.test.ts` covers
+packaged WebView initialization without server-injected Sentry configuration.
