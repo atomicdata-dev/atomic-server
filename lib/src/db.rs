@@ -3720,6 +3720,23 @@ impl Storelike for Db {
         Box::new(result)
     }
 
+    fn resources_with_prefix(&self, prefix: &str) -> Box<dyn Iterator<Item = Resource> + Send> {
+        let base_domain = self.base_domain.clone();
+        Box::new(
+            self.kv
+                .scan_prefix(Tree::Resources, prefix.as_bytes())
+                .filter_map(move |item| {
+                    let (subject_bytes, resource_bin) = item.expect(DB_CORRUPT_MSG);
+                    Db::map_kv_item_to_resource(
+                        &subject_bytes,
+                        &resource_bin,
+                        false,
+                        base_domain.as_deref(),
+                    )
+                }),
+        )
+    }
+
     async fn post_resource(
         &self,
         subject: &str,
@@ -3822,6 +3839,39 @@ impl std::fmt::Debug for Db {
 mod resolver_tests {
     use super::*;
     use crate::{test_utils::setup_test_env, urls, Resource, Storelike, Value};
+
+    #[tokio::test]
+    async fn resource_prefix_scan_matches_local_subjects() {
+        let store = Db::init_temp("resource_prefix_scan").await.unwrap();
+        for subject in [
+            "internal:/prefix-test/a/1",
+            "internal:/prefix-test/a/2",
+            "internal:/prefix-test/ab/1",
+        ] {
+            let resource = Resource::new(subject.into());
+            store
+                .add_resource_opts(&resource, false, true, true)
+                .await
+                .unwrap();
+        }
+        let actual: std::collections::BTreeSet<_> = store
+            .resources_with_prefix("internal:/prefix-test/a/")
+            .map(|r| r.get_subject().to_string())
+            .collect();
+        assert_eq!(
+            actual,
+            std::collections::BTreeSet::from([
+                "internal:/prefix-test/a/1".to_owned(),
+                "internal:/prefix-test/a/2".to_owned()
+            ])
+        );
+        assert_eq!(
+            store
+                .resources_with_prefix("internal:/prefix-test/missing/")
+                .count(),
+            0
+        );
+    }
 
     #[tokio::test]
     async fn resolves_root_to_drive_subject() {

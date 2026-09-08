@@ -420,3 +420,5 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
 | engine | Pagination, ontology derivation, and OAuth tests live upstream in reflector-rs / syncables-rs; not rerun by this workspace. |
 | glue / flow | `server/tests/it/integrations.rs`: real running server + mock OAuth/API provider, signed discovery/start, PKCE, browser cookie/state binding, callback replay, token refresh, immediate import, drive reads, agent isolation and denied consent. |
 | flow | Sync UI manually verified against a temporary server; real GitHub/Google consent requires operator-provided OAuth app credentials. |
+
+- `db::resolver_tests::resource_prefix_scan_matches_local_subjects` checks exact local subject-prefix boundaries and empty results for importer cleanup scans.

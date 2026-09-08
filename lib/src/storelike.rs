@@ -275,6 +275,16 @@ pub trait Storelike: Sized + Send + Sync {
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
     fn all_resources(&self, include_external: bool) -> Box<dyn Iterator<Item = Resource> + Send>;
 
+    /// Iterates local resources whose stored subject starts with `prefix`.
+    /// Backends can use their key index instead of decoding the entire store.
+    fn resources_with_prefix(&self, prefix: &str) -> Box<dyn Iterator<Item = Resource> + Send> {
+        let prefix = prefix.to_owned();
+        Box::new(
+            self.all_resources(false)
+                .filter(move |resource| resource.get_subject().as_str().starts_with(&prefix)),
+        )
+    }
+
     /// Takes a Commit and applies it to the Store.
     /// This includes changing the resource, writing the changes, verifying the checks specified in your CommitOpts
     /// The returned CommitResponse contains the new resource and the saved Commit Resource.
