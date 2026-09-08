@@ -851,8 +851,10 @@ msgid "Learn more & get involved"
 msgstr "Learn more & get involved"
 
 #. 0: metadata.version
+#. 0: metadata.version
 #. 0: __APP_VERSION__
 #. 0: resource.props.version
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/routes/AboutRoute.tsx
 #: src/routes/AboutRoute.tsx
 #: src/views/Plugin/PluginPage.tsx
@@ -1416,7 +1418,9 @@ msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #. 0: metadata.author
+#. 0: metadata.author
 #. 0: resource.props.pluginAuthor
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/views/Plugin/PluginPage.tsx
 #: src/views/Plugin/PluginPage.tsx
 msgid "by {0}"
@@ -7300,6 +7304,7 @@ msgid "Enable keyboard drag & drop in sidebar"
 msgstr "Enable keyboard drag & drop in sidebar"
 
 #: src/chunks/Plugins/NewPluginButton.tsx
+#: src/chunks/Plugins/NewPluginButton.tsx
 msgid "Upload Plugin"
 msgstr "Upload Plugin"
 
@@ -7630,7 +7635,6 @@ msgid "Button.tsx"
 msgstr "Button.tsx"
 
 #: src/chunks/AppPage/AppFrame.tsx
-#: src/chunks/AppPage/index.tsx
 msgid "This app has no entry point, so there is nothing to open."
 msgstr "This app has no entry point, so there is nothing to open."
 
