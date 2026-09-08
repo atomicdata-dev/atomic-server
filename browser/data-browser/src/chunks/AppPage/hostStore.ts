@@ -1,3 +1,4 @@
+import { canViewAccess } from '@helpers/extensions/viewPolicy';
 import type { Store } from '@tomic/react';
 import {
   CollectionBuilder,
@@ -23,7 +24,7 @@ import {
 
 export interface HostRequest {
   __atomic: true;
-  id: number;
+  id: number | string;
   op: string;
   subject?: string;
   property?: string;
@@ -34,20 +35,18 @@ export interface HostRequest {
 }
 
 export interface HostReply {
-  id: number;
+  id: number | string;
   result?: unknown;
   error?: string;
 }
-
-/** How far up a parent chain to look before deciding a subject is elsewhere. */
-const MAX_DEPTH = 12;
 
 export function isHostRequest(data: unknown): data is HostRequest {
   return (
     typeof data === 'object' &&
     data !== null &&
     (data as HostRequest).__atomic === true &&
-    typeof (data as HostRequest).id === 'number'
+    (typeof (data as HostRequest).id === 'number' ||
+      typeof (data as HostRequest).id === 'string')
   );
 }
 
@@ -63,20 +62,7 @@ export async function isWithinApp(
   subject: string,
   app: string,
 ): Promise<boolean> {
-  let current = subject;
-
-  for (let depth = 0; depth < MAX_DEPTH; depth++) {
-    if (current === app) return true;
-
-    const resource = await store.getResource(current);
-    const parent = resource.get(core.properties.parent) as string | undefined;
-
-    if (!parent || parent === current) return false;
-
-    current = parent;
-  }
-
-  return false;
+  return canViewAccess(store, subject, { kind: 'app', root: app }, 'write');
 }
 
 export async function handleRequest(
@@ -124,7 +110,11 @@ export async function handleRequest(
 
       if (resource.error) throw resource.error;
 
-      return { subject: resource.subject, propVals: resource.getPropVals() };
+      return {
+        subject: resource.subject,
+        title: resource.title,
+        propVals: resource.getPropVals(),
+      };
     }
 
     case 'query': {
@@ -157,7 +147,7 @@ export async function handleRequest(
 
       const created = await store.getResource(subject);
 
-      return { subject, propVals: created.getPropVals() };
+      return { subject, title: created.title, propVals: created.getPropVals() };
     }
 
     case 'save': {
@@ -257,7 +247,7 @@ async function refuseOutsideApp(
 }
 
 function required(value: string | undefined, name: string): string {
-  if (value === undefined || value === '') {
+  if (typeof value !== 'string' || value === '') {
     throw new Error(`${name} is required`);
   }
 

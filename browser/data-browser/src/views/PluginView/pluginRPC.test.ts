@@ -65,6 +65,8 @@ function fixture() {
 
   return {
     adapter,
+    wire: (data: unknown) =>
+      receive({ source: target, data } as unknown as MessageEvent),
     send,
     target,
     store,
@@ -147,4 +149,48 @@ it('does not resume a write when its permission dialog outlives the view', async
   await new Promise(resolve => setTimeout(resolve, 0));
   expect(f.rows.get('outside')!.save).not.toHaveBeenCalled();
   expect(f.target.postMessage).not.toHaveBeenCalled();
+});
+
+it('accepts v1 requests without trusting caller-supplied policy and acknowledges watches', async () => {
+  const f = fixture();
+  const wire = (id: number, op: string, args: unknown) =>
+    f.wire({ type: 'atomic.view.request', version: 1, id, op, args });
+  wire(1, 'get', { subject: 'did:ad:page' });
+  await vi.waitFor(() =>
+    expect(f.target.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'atomic.view.response',
+        version: 1,
+        id: 1,
+        result: expect.objectContaining({
+          subject: 'did:ad:page',
+          props: expect.any(Object),
+        }),
+      }),
+      '*',
+    ),
+  );
+  wire(2, 'patch', {
+    policy: { kind: 'app', root: 'outside' },
+    commit: { subject: 'outside', set: { [core.properties.name]: 'No' } },
+  });
+  await vi.waitFor(() => expect(f.permission).toHaveBeenCalled());
+  expect(f.rows.get('outside')!.save).not.toHaveBeenCalled();
+  wire(3, 'subscribe', { subject: 'did:ad:page' });
+  await vi.waitFor(() =>
+    expect(f.target.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 3, result: true }),
+      '*',
+    ),
+  );
+  wire(4, 'unsubscribe', { subject: 'did:ad:page' });
+  await vi.waitFor(() => expect(f.stop).toHaveBeenCalled());
+  wire(5, 'create', {});
+  await vi.waitFor(() =>
+    expect(f.target.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 5, error: expect.any(String) }),
+      '*',
+    ),
+  );
+  f.adapter.stopServer();
 });

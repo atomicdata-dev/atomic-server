@@ -1,3 +1,5 @@
+import { isViewRequest } from '@tomic/plugin';
+import { viewSession } from '@helpers/extensions/viewSession';
 import { useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
@@ -137,7 +139,14 @@ function AppFrameSession({
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
-    const bridge = new FrameBridge(frame, (data, session) => {
+    const bridge = new FrameBridge(frame, (wire, originalSession) => {
+      const canonical = isViewRequest(wire);
+      const data = canonical
+        ? { ...wire.args, __atomic: true, id: wire.id, op: wire.op }
+        : wire;
+      const session = canonical
+        ? viewSession(originalSession, wire.id)
+        : originalSession;
       const message = data as Record<string, unknown>;
 
       if (message.type === '__atomic_plugin_error') {

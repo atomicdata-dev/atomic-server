@@ -15,7 +15,9 @@ let nextId = 0;
 const pending = new Map();
 
 window.addEventListener('message', event => {
+  if (event.source !== window.parent) return;
   const message = event.data;
+  if (message?.type !== 'atomic.view.response' || message.version !== 1) return;
 
   if (!message || message.id === undefined) return;
 
@@ -37,7 +39,7 @@ function send(op, payload) {
 
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    window.parent.postMessage({ __atomic: true, id, op, ...payload }, '*');
+    window.parent.postMessage({ type: 'atomic.view.request', version: 1, id, op, args: payload }, '*');
 
     // A host that never answers would otherwise leave the plugin waiting
     // forever with no way to tell that from a slow query.
@@ -111,7 +113,7 @@ export const store = {
   async getResource(subject) {
     const result = await send('get', { subject });
 
-    return makeResource(result.subject, result.propVals);
+    return makeResource(result.subject, result.props);
   },
 
   /** Subjects matching a property/value pair, scoped to this drive. */
@@ -126,7 +128,7 @@ export const store = {
   async newResource({ parent, isA = [], propVals = {} } = {}) {
     const result = await send('create', { parent, isA, propVals });
 
-    return makeResource(result.subject, result.propVals);
+    return makeResource(result.subject, result.props);
   },
 
   /**
@@ -139,7 +141,7 @@ export const store = {
    */
   subscribe(subject, handler) {
     const listener = event => {
-      if (event.data && event.data.__atomicChanged === subject) handler();
+      if (event.source === window.parent && event.data?.type === 'atomic.view.change' && event.data.version === 1 && event.data.subject === subject) handler();
     };
 
     window.addEventListener('message', listener);
