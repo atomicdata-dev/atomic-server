@@ -16,7 +16,7 @@ export type RequestPermissionFn = (subject: string) => Promise<boolean>;
 export function useRequestPermissionDialog(
   plugin: string,
   type: 'read' | 'write',
-): [RequestPermissionFn, React.ReactNode] {
+): [RequestPermissionFn, React.ReactNode, (subject: string) => boolean] {
   const [show, setShow] = useState(false);
   const [requestedSubject, setRequestedSubject] = useState<string | undefined>(
     undefined,
@@ -134,7 +134,13 @@ export function useRequestPermissionDialog(
     />
   );
 
-  return [requestPermission, dialog];
+  return [
+    requestPermission,
+    dialog,
+    subject =>
+      permissionsRef.current.allowAll ||
+      permissionsRef.current.allowed.includes(subject),
+  ];
 }
 
 interface ScopeGrantResult {

@@ -3,7 +3,7 @@ import { useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
 import { usePluginRPC } from '@views/PluginView/pluginRPC';
 import styled from 'styled-components';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signRequest } from '@tomic/lib';
 import { ErrorBlock } from '@components/ErrorLook';
 
@@ -41,8 +41,11 @@ export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
   const store = useStore();
   const { getUIPluginData } = useCustomViews();
   const pluginData = getUIPluginData(plugin);
-  const [frameRef, resourcePickerDialog] = usePluginRPC(pluginData);
   const stylesheet = useCreateThemeVars();
+  const [frameRef, resourcePickerDialog] = usePluginRPC(
+    pluginData,
+    `${resetCss}\n${stylesheet}`,
+  );
   const pluginUrl = `${store.getServerUrl()}/plugin-ui?drive=${encodeURIComponent(drive)}&plugin=${encodeURIComponent(plugin)}`;
   const src = `${pluginUrl}&format=html`;
 
@@ -102,37 +105,7 @@ export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
     };
   }, [pluginUrl, hasCss, store, frameRef]);
 
-  // Hand the reset + theme CSS to the null-origin iframe via postMessage. The
-  // iframe applies it to its `<style id="__atomic_theme">`. We (re)send on the
-  // iframe's ready signal and whenever the theme changes.
-  const readyRef = useRef(false);
-
-  useEffect(() => {
-    const css = `${resetCss}\n${stylesheet}`;
-
-    const post = () =>
-      frameRef.current?.contentWindow?.postMessage(
-        { type: '__atomic_style', css },
-        '*',
-      );
-
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== frameRef.current?.contentWindow) return;
-
-      if ((e.data as { type?: string })?.type === '__atomic_plugin_ready') {
-        readyRef.current = true;
-        post();
-      }
-    };
-
-    window.addEventListener('message', onMessage);
-
-    // Theme changed after the iframe was already up → push the update.
-    if (readyRef.current) {
-      post();
-    }
-
-    return () => window.removeEventListener('message', onMessage);
+  return () => window.removeEventListener('message', onMessage);
   }, [stylesheet, frameRef]);
 
   return (

@@ -1,9 +1,10 @@
 # Atomic extensions: one lifecycle, explicit boundaries
 
 Status: product direction agreed with the user, 2026-09-08; technical migration
-proposed. This describes the target, not guarantees already implemented. Current
+in progress. This describes the target, not guarantees already implemented. Current
 extension work is on PR #1307; Reflector integration is proposed in PR #1383.
-No migration below is complete.
+Workspace navigation and shared frame transport have implementation checkpoints below;
+the complete package and permission migration remains open.
 
 **An extension is a package of capabilities. Atomic owns its authority and
 execution. Apps contain the work, connections synchronize external data, and
@@ -307,6 +308,30 @@ remain visible instead of appearing as an empty workspace.
 
 Exit: neither view implementation has its own permission policy. Delete the old
 bridge only after supported installed packages have an explicit migration path.
+
+### Implementation checkpoint: one frame transport (2026-09-08)
+
+- [x] `helpers/extensions/FrameBridge.ts` owns frame source validation, theme
+  delivery, subscription teardown and reply lifetimes for both generated apps
+  and packaged views. Three message listeners and two subscription owners become
+  one transport implementation.
+- [x] Remove transport from `AppFrame` and the old `RPCServer`. Keep a
+  `LegacyViewAdapter` for the installed SDK wire format and existing grants;
+  `pluginRPC.tsx` now only connects React context and dialogs to that adapter.
+- [x] A ready handshake invalidates the prior document's subscriptions and late
+  replies. A normal load event only sends style: it must not delete subscriptions
+  the new document established while loading. Unmount cleans up once.
+- [x] Recheck packaged view read grants before each notification. Closing a view
+  while its write-permission dialog is pending cannot resume that write. Changing
+  an app, drive or table remounts its frame session and drops the old source token.
+- [ ] Converge authorization policy and the public SDK envelope. Generated app
+  writes still use the app identity and host endpoint; packaged views retain their
+  existing scope/grant rules. Sharing transport does not widen either policy.
+
+No additional runtime or installed-package migration was introduced. Existing
+source-generated `__atomic` messages and packaged SDK `requestId` messages remain
+compatible adapters. This checkpoint removes duplicated plumbing; it does not
+claim that all extension execution and permission models are now unified.
 
 ### 3. Converge installation and background state
 

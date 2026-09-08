@@ -16,7 +16,12 @@ const BIRD =
   'https://atomicdata.dev/01k10mtpp8fkkmsd6tkm9qrqyw/defaultontology/class/bird';
 
 test.describe('Plugins', () => {
-  test.beforeEach(before);
+  test.beforeEach(async ({ page }, testInfo) => {
+    // This is a self-hosted plugin test, independent of a developer's SaaS session.
+    // 204 is the supported no-account response; do not contact localhost:3030.
+    await page.route('**/api/me', route => route.fulfill({ status: 204 }));
+    await before({ page }, testInfo);
+  });
 
   test('install a plugin', async ({ page, context }) => {
     // Two upload + commit + plugin-install chains, a full bird-creation

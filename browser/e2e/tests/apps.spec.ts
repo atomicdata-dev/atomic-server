@@ -77,7 +77,13 @@ test.describe('apps', () => {
     // table UI — which is the point of not having the app draw a list:
     // sorting, filtering and editing come from the table, not from the app.
     const sidebar = page.getByRole('navigation').last();
-    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar
+      .locator('[data-sidebar-id]')
+      .filter({
+        has: page.getByRole('button', { name: 'New app', exact: true }),
+      })
+      .getByRole('button', { name: 'Expand folder' })
+      .click();
     await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
 
     // The table renders the row the app made, with the table's own UI around
@@ -97,7 +103,13 @@ test.describe('apps', () => {
 
     // Open the app's own table and add the app as a second way to see it.
     const sidebar = page.getByRole('navigation').last();
-    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar
+      .locator('[data-sidebar-id]')
+      .filter({
+        has: page.getByRole('button', { name: 'New app', exact: true }),
+      })
+      .getByRole('button', { name: 'Expand folder' })
+      .click();
     await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
     await expect(main.getByRole('tablist')).toBeVisible();
 

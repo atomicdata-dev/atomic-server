@@ -1380,3 +1380,19 @@ These checks do not prove live AI generation, provider sync, multi-repository ro
 ownership, disconnect revocation, or consolidation of the other UI runtimes.
 `store.test.ts` reproduces and fixes an HTTP fetch returning undefined when its
 response has a canonical subject different from the requested query URL.
+
+## Shared iframe bridge (2026-09-08)
+
+`FrameBridge.test.ts` covers both wire envelopes, wrong-frame requests and ready
+messages, theme updates, subscription deduplication, initial load versus document
+replacement, and teardown dropping late replies/subscriptions. `pluginRPC.test.ts`
+exercises the actual legacy adapter: permitted edits, denied outside writes,
+protection of plugin resources, notification grant revocation, host navigation,
+and permission responses arriving after unmount. Existing `hostStore.test.ts`
+keeps the generated app identity/subtree write checks exercised.
+
+The generated-app and packaged-plugin browser suites exercise the shared bridge
+through their real entry points. Packaged installation uses the bundled fixture
+and real server; its unrelated SaaS `/api/me` probe is explicitly stubbed to the
+supported 204 no-account response. These checks do not prove a common permission
+policy or a new SDK migration: those models are deliberately unchanged.
