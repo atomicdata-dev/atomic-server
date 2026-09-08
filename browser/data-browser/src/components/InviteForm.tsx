@@ -34,9 +34,11 @@ interface InviteFormProps {
 export function InviteForm({ target, inDialog }: InviteFormProps) {
   const [agent] = useCurrentAgent();
   const profile = useResource(agent?.subject);
+
   if (agent?.subject && profile.error) {
     return <ErrorLook>{profile.error.message}</ErrorLook>;
   }
+
   if (agent?.subject && !profile.isReady()) return null;
 
   return (
@@ -169,6 +171,7 @@ function InviteFormLayout({
       </>
     );
   }
+
   return (
     <Column gap='1rem'>
       {children}

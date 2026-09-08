@@ -450,6 +450,12 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `client-db.test.ts` verifies that cold worker initialization does not steal
+  its own Web Lock or emit a false ghost-leader warning.
+- `store.private-drive.test.ts` verifies that linking a private drive on a
+  nodeless origin preserves the local profile without fetching it from the SPA.
+
+
 - Client-library tests gate both the snapshot write and worker flush: an existing
   resource's save cannot resolve before either durability barrier completes.
 - WebSocket tests deliver an old connection's close event after its replacement
