@@ -4697,18 +4697,20 @@ export class Store {
 
     const normalized = this.normalizeSubject(subject);
 
-    return this.addLoroSubscriber(this.subscribers, normalized, callback, () =>
-      this.subscribeWebSocket(normalized),
+    return this.addLoroSubscriber(
+      this.subscribers,
+      normalized,
+      callback,
+      () => this.subscribeWebSocket(normalized),
+      () =>
+        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+          normalized,
+        ),
     );
   }
 
-  /** v2 uses drive-level WS subscriptions — every resource in the drive
-   *  is delivered through the single `SUB <drive>` sent in
-   *  {@link WSClient.handleOpen}. The server's `CommitMonitor` fans
-   *  CommitMessages out to drive subscribers when the commit's target
-   *  lives under that drive. This per-resource entry-point is kept as
-   *  a no-op for API stability — callers don't need to gate themselves.
-   *  The lookup confirms the origin's WS exists. */
+  /** Drive resources use drive-wide fan-out. Mounted agent profiles also need
+   * a targeted subscription: another user's profile is outside our drive. */
   public subscribeWebSocket(subject: string): void {
     if (!this._serverConnected) return;
     const normalized = this.normalizeSubject(subject);
@@ -4723,7 +4725,9 @@ export class Store {
     }
 
     try {
-      this.getWebSocketForSubject(subject);
+      const ws = this.getWebSocketForSubject(subject);
+      if (this.subscribers.has(normalized))
+        ws?.subscribeAgentProfile(normalized);
     } catch (e) {
       console.error(e);
     }
@@ -4976,8 +4980,12 @@ export class Store {
     const subs = this.subscribers.get(normalized);
     if (!subs) return;
     const filtered = subs.filter(cb => cb !== callback);
-    if (filtered.length === 0) this.subscribers.delete(normalized);
-    else this.subscribers.set(normalized, filtered);
+    if (filtered.length === 0) {
+      this.subscribers.delete(normalized);
+      this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+        normalized,
+      );
+    } else this.subscribers.set(normalized, filtered);
   }
 
   /**
