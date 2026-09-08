@@ -471,3 +471,12 @@ maximum delay, queued edits across drive switches, late account availability,
 connectivity recovery, enrollment rediscovery after reload, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
+
+## Paged table hydration count (2026-09-08)
+
+`collection-page-assemble.test.ts` reproduces 90 rows becoming 150 when deferred
+hydration notifications re-add rows outside page zero. Covers full-query membership
+and reconciling optimistic additions already represented in that query. The other
+collection sorting, drive-scope and empty-result regressions are run alongside it.
+Verified in the user's Zen integration table: total is 90, final rows render, and
+the phantom loading rows are gone. No source issue records were edited.
