@@ -109,19 +109,6 @@ export function isDerivedShortname(shortname: string, label: string): boolean {
   return shortname === base || new RegExp(`^${base}-\\d+$`).test(shortname);
 }
 
-/** Drops the label copy a form-generated Property used to carry. The Label
- * lives on the FormField; a second copy here only went stale. Returns whether
- * anything changed, so the caller can skip a needless save. */
-function dropLegacyName(property: Resource): boolean {
-  if (property.get(core.properties.name) === undefined) {
-    return false;
-  }
-
-  property.remove(core.properties.name);
-
-  return true;
-}
-
 /**
  * Keeps a Form's questions in sync with the generated data class: adding an
  * input field creates the mapped Property (via the same primitive Tables use
@@ -235,23 +222,19 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         | string
         | undefined;
 
-      let changed = dropLegacyName(property);
-
       // A shortname the user typed themselves is pinned — only one still
       // derived from the old label follows the rename.
-      if (!shortname || isDerivedShortname(shortname, previousLabel)) {
-        const next = uniqueShortname(
-          stringToSlug(newLabel),
-          await takenShortnames(store, dataClass, propertySubject),
-        );
-
-        if (next !== shortname) {
-          await property.set(core.properties.shortname, next);
-          changed = true;
-        }
+      if (shortname && !isDerivedShortname(shortname, previousLabel)) {
+        return;
       }
 
-      if (changed) {
+      const next = uniqueShortname(
+        stringToSlug(newLabel),
+        await takenShortnames(store, dataClass, propertySubject),
+      );
+
+      if (next !== shortname) {
+        await property.set(core.properties.shortname, next);
         await property.save();
       }
     },
@@ -284,7 +267,6 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
       }
 
       const property = await store.getResource(propertySubject);
-      dropLegacyName(property);
       await property.set(core.properties.shortname, shortname);
       await property.save();
 

@@ -61,7 +61,7 @@ what keeps de-duplicated slugs (`radio-group-2`) counting as auto-derived.
       whose label lives elsewhere. `name` is written only when given.
 - [x] `useFormFieldPropertySync.ts` — `createField` derives a unique shortname
       and passes no `name`; `renameField` re-derives the shortname when it is
-      still auto-derived and strips a legacy `name`; new
+      still auto-derived; new
       `setFieldShortname(field, shortname)` for the manual override, returning
       a collision/validation error instead of throwing.
 - [x] `FieldSettingsPanel.tsx` — a **Data name** row under Label. Deliberately
