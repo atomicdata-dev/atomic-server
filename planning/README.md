@@ -74,6 +74,7 @@ Remaining work, not "this file exists."
 | [`json-schema-code-first.md`](./json-schema-code-first.md) | **Proposal**; `defineSchema` + frozen `did:ad:` schemas in flight in PR #1262 (not on `develop`). Code-first JSON Schema → local DID-backed Class/Property resources. |
 | [`SDK-API-design.md`](./SDK-API-design.md) | SDK / agent DX direction. |
 | [`plugins.md`](./plugins.md) | **Partial, off `develop`** — one plugin model (`run` end to end, per-app agents, unattended runs). The code lives on `feat/plugin-model` (PR #1307), not `develop`. Absorbed `llm-wasm-gui-plugins.md`, `importers.md`, `habits-app.md` (2026-09-01); the habits RPC-`query` blocker is a line in it. |
+| [`api-plugins.md`](./api-plugins.md) | **Exploratory, off `develop`** — rebuilding PR #1383 (OpenAPI/OAuth imports) on the plugin model. `pets` (trivial, no provider) lands the touch points first; discovery through a localthought proxy is next, not designed yet. |
 | [`personal-information-suite.md`](./personal-information-suite.md) | **Exploration.** Contacts, calendar, email. Nothing built. |
 | [`social-apps.md`](./social-apps.md) | Requirements for social-network-shaped apps. Companion to `zones.md`. |
 | [`android-data-reuse.md`](./android-data-reuse.md) | **Draft.** One store/agent/Iroh node per Android device. Supersedes `on-device-atomic-daemon.md` (deleted 2026-09-01; desktop remainder is a note in `virtual-drive.md`). |
