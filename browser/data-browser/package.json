@@ -146,8 +146,8 @@
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
     "preview": "vite preview",
     "start": "vite",
-    "test": "vitest run",
-    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run --exclude scripts/integration-mcp.test.mjs && node --test scripts/integration-mcp.test.mjs",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
     "clean-translations": "pnpm exec wuchale --clean"
   }
 }

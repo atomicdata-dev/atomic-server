@@ -192,9 +192,71 @@ export {
 } from './plugin-app.js';
 export {
   parseManifest,
+  validateManifest,
+  type DeclaredOperation,
   secretsMentionedIn,
   originsMentionedIn,
   type DeclaredSecret,
   type PluginManifest,
 } from './plugin-manifest.js';
 export { describePlugin } from './plugin-runner.js';
+
+export {
+  reconcileRecord,
+  acknowledgedBaseline,
+  type SyncRecord,
+  type SyncValue,
+  type SyncConflict,
+  type SyncDecision,
+} from './plugin-reconcile.js';
+
+export {
+  publishPluginRelease,
+  pinPluginRelease,
+  readExternalOperation,
+  approveExternalIntent,
+  readConnectionState,
+  readConnectionSubjects,
+  checkpointConnection,
+  type ConnectionState,
+  type ConnectionCheckpoint,
+  inspectExternalOperation,
+  confirmExternalOperation,
+  type ExternalOperation,
+  type ExternalOperationStatus,
+  type PluginRelease,
+  type ExternalIntent,
+  type ExternalReceipt,
+  type PluginTarget,
+  previewPluginSync,
+  applyPluginSync,
+  getPluginSync,
+  type PluginSyncSession,
+} from './plugin-connection.js';
+
+export {
+  pluginSyncSchedule,
+  type PluginSyncSchedule,
+} from './plugin-connection.js';
+export * from './integration-actions.js';
+
+export { taskSchema } from './task-schema.js';
+
+export { timeTrackingSchema } from './time-tracking-schema.js';
+
+export { executeServerPlugin } from './plugin-server.js';
+export {
+  importRecords,
+  resolveImportConflict,
+  claimImportIdentity,
+  IMPORT_BASELINE,
+  IMPORT_LOCAL_ID,
+  type ImportRecord,
+  type ImportHost,
+} from './import-records.js';
+
+export { resumableInstallation } from './resumable-installation.js';
+
+export * from './import-resolution.js';
+
+export * from './import-reference-review.js';

@@ -29,21 +29,59 @@ use crate::plugins::{
 /// one. Bounded rather than exhaustive, like every other parent walk here: a
 /// cycle would otherwise hang a scheduled run, and nothing legitimate nests an
 /// app's own plugins deeper than this.
-pub async fn app_signing_for(db: &Db, drive: &str, plugin: &str) -> Option<AppAgentKey> {
+pub async fn app_signing_for(
+    db: &Db,
+    drive: &str,
+    plugin: &str,
+) -> Result<Option<AppAgentKey>, String> {
     let mut subject = plugin.to_string();
-
-    for _ in 0..3 {
-        let key = AppAgentKey::new(drive, &subject);
-
-        if db.get_app_agent_info(&key).ok().flatten().is_some() {
-            return Some(key);
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..64 {
+        if !seen.insert(subject.clone()) {
+            return Err("app hierarchy contains a cycle".into());
         }
-
-        let resource = db.get_resource(&subject.as_str().into()).await.ok()?;
-        subject = resource.get(urls::PARENT).ok()?.to_string();
+        let key = AppAgentKey::new(drive, &subject);
+        if db
+            .get_app_agent_info(&key)
+            .map_err(|e| e.to_string())?
+            .is_some()
+        {
+            return Ok(Some(key));
+        }
+        if Subject::from(subject.as_str()).pure_id() == Subject::from(drive).pure_id() {
+            return Ok(None);
+        }
+        let resource = db
+            .get_resource(&subject.as_str().into())
+            .await
+            .map_err(|e| e.to_string())?;
+        subject = resource
+            .get(urls::PARENT)
+            .map_err(|e| e.to_string())?
+            .to_string();
     }
+    Err("app hierarchy is too deep".into())
+}
 
-    None
+pub async fn check_effective_read(
+    db: &Db,
+    resource: &Resource,
+    account: &ForAgent,
+    app: Option<&AppAgentKey>,
+) -> Result<(), String> {
+    atomic_lib::hierarchy::check_read(db, resource, account)
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(key) = app {
+        let info = db
+            .get_app_agent_info(key)
+            .map_err(|e| e.to_string())?
+            .ok_or("app identity is missing")?;
+        atomic_lib::hierarchy::check_read(db, resource, &ForAgent::AgentSubject(info.agent.into()))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 pub struct StoreApplyHost {
@@ -94,8 +132,17 @@ impl StoreApplyHost {
 
         check_write(&self.store, &resource, &self.for_agent)
             .await
-            .map(|_| ())
-            .map_err(|e| format!("not allowed to write to {subject}: {e}"))
+            .map_err(|e| e.to_string())?;
+        if let Some(agent) = self.app_agent()? {
+            check_write(
+                &self.store,
+                &resource,
+                &ForAgent::AgentSubject(agent.subject),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+        Ok(())
     }
 
     async fn value_for(&self, property: &str, value: Json) -> Result<Value, String> {
@@ -129,6 +176,15 @@ impl PlanHost for StoreApplyHost {
     }
 
     async fn get_property(&mut self, subject: &str) -> Option<(String, String)> {
+        let resource = self.store.get_resource(&subject.into()).await.ok()?;
+        check_effective_read(
+            &self.store,
+            &resource,
+            &self.for_agent,
+            self.signing_as.as_ref(),
+        )
+        .await
+        .ok()?;
         let property = self.store.get_property(subject).await.ok()?;
 
         Some((property.data_type.to_string(), property.shortname))
@@ -139,6 +195,14 @@ impl PlanHost for StoreApplyHost {
         // that was never created, and both mean the same thing for planning:
         // there is nothing here to change.
         let resource = self.store.get_resource(&subject.into()).await.ok()?;
+        check_effective_read(
+            &self.store,
+            &resource,
+            &self.for_agent,
+            self.signing_as.as_ref(),
+        )
+        .await
+        .ok()?;
 
         // Through JSON-AD, so the planner compares against the same shape the
         // plugin was given when it read the resource.
@@ -184,7 +248,9 @@ impl ApplyHost for StoreApplyHost {
         }
 
         for (property, value) in request.prop_vals {
-            let value = self.value_for(&property, value).await?;
+            let value = self
+                .value_for(&property, stamp_import_approval(&property, value))
+                .await?;
 
             resource
                 .set_unsafe(property, value)
@@ -221,7 +287,9 @@ impl ApplyHost for StoreApplyHost {
             .map_err(|e| format!("{subject} could not be read: {e}"))?;
 
         for (property, value) in prop_vals {
-            let value = self.value_for(&property, value).await?;
+            let value = self
+                .value_for(&property, stamp_import_approval(&property, value))
+                .await?;
 
             resource
                 .set_unsafe(property, value)
@@ -317,4 +385,17 @@ fn json_to_value(value: Json, datatype: &DataType) -> Result<Value, String> {
 /// rather than by path.
 fn is_did(subject: &str) -> bool {
     subject.starts_with("did:")
+}
+
+/// Mark each approved import write, even when two previews have identical data.
+fn stamp_import_approval(property: &str, mut value: Json) -> Json {
+    if property == urls::IMPORT_BASELINE {
+        if let Some(object) = value.as_object_mut() {
+            object.insert(
+                "approval".into(),
+                Json::String(atomic_lib::utils::random_string(32)),
+            );
+        }
+    }
+    value
 }

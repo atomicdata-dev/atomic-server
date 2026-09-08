@@ -19,6 +19,7 @@ mod invite_token;
 mod jsonerrors;
 mod metrics;
 mod node_key;
+pub mod oauth;
 pub mod plugins;
 mod routes;
 pub mod serve;

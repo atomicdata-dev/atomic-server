@@ -1,5 +1,29 @@
 [
   {
+    "@id": "https://atomicdata.dev/properties/importReferenceReview",
+    "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Property"],
+    "https://atomicdata.dev/properties/shortname": "import-reference-review",
+    "https://atomicdata.dev/properties/description": "Signed reviewed link values and their predecessors for safe reference updates.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/importResolution",
+    "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Property"],
+    "https://atomicdata.dev/properties/shortname": "import-resolution",
+    "https://atomicdata.dev/properties/description": "Reviewed primary record and original snapshots for non-destructive import identity resolution.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/importBaseline",
+    "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Property"],
+    "https://atomicdata.dev/properties/shortname": "import-baseline",
+    "https://atomicdata.dev/properties/description": "Last source values and their predecessor for conflict-safe import updates. Local edits do not update this baseline.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties"
+  },
+  {
     "@id": "https://atomicdata.dev",
     "https://atomicdata.dev/properties/read": [
       "https://atomicdata.dev/agents/publicAgent"

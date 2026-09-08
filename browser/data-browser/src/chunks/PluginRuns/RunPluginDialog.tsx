@@ -1,3 +1,5 @@
+import { ImportCollision } from './ImportCollision';
+import { ImportConflict } from './ImportConflict';
 import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
@@ -53,6 +55,8 @@ interface RunPluginDialogProps {
    * diff from the one being approved.
    */
   verdict?: string;
+  /** Saved proposals may also come from an interactive file import. */
+  triggerKind?: 'manual' | 'cron';
   /** Called once a reviewed background verdict has been dealt with. */
   onReviewed?: () => void;
 }
@@ -70,6 +74,7 @@ export function RunPluginDialog({
   show,
   onShowChange,
   verdict,
+  triggerKind = 'cron',
   onReviewed,
 }: RunPluginDialogProps): React.JSX.Element {
   const store = useStore();
@@ -96,7 +101,7 @@ export function RunPluginDialog({
     (async () => {
       if (verdict !== undefined) {
         const result = await prepareFromVerdict(store, verdict, {
-          kind: 'cron',
+          kind: triggerKind,
           at: Date.now(),
           subject,
         });
@@ -123,6 +128,7 @@ export function RunPluginDialog({
 
       if (!cancelled) setPrepared(result);
     })().catch((e: Error) => {
+      if (cancelled) return;
       toast.error(`Could not run this plugin: ${e.message}`);
       closeDialog();
     });
@@ -130,7 +136,7 @@ export function RunPluginDialog({
     return () => {
       cancelled = true;
     };
-  }, [show, subject, drive, store, closeDialog, verdict]);
+  }, [show, subject, drive, store, closeDialog, verdict, triggerKind]);
 
   const apply = useCallback(async () => {
     if (!prepared) return;
@@ -156,7 +162,7 @@ export function RunPluginDialog({
         ? `Applied ${report.applied}, ${report.failed} failed`
         : `Applied ${report.applied} changes`,
     );
-    onReviewed?.();
+    if (report.failed === 0 && !report.stoppedEarly) onReviewed?.();
     closeDialog(true);
   }, [prepared, store, subject, drive, closeDialog, onReviewed]);
 
@@ -192,14 +198,26 @@ export function RunPluginDialog({
             )}
             {plan!.blocked && (
               <Message $tone='error'>
-                Nothing can be written until these are fixed.
+                This import is paused. Review the issues below, then preview it
+                again.
               </Message>
             )}
-            {plan!.problems.map((problem, i) => (
-              <Message key={i} $tone={problem.severity}>
-                {problem.message}
-              </Message>
-            ))}
+            {plan!.problems.map((problem, i) =>
+              problem.importCollision ? (
+                <ImportCollision key={i} subjects={problem.importCollision} />
+              ) : problem.importConflict &&
+                problem.subject &&
+                problem.property ? (
+                <ImportConflict
+                  key={`${problem.subject}-${problem.property}`}
+                  problem={problem}
+                />
+              ) : (
+                <Message key={i} $tone={problem.severity}>
+                  {problem.message}
+                </Message>
+              ),
+            )}
             {plan!.changes.length === 0 && !plan!.blocked && (
               <Message $tone='warning'>This run proposes no changes.</Message>
             )}
@@ -238,7 +256,7 @@ export function RunPluginDialog({
       </Dialog.Content>
       <Dialog.Actions>
         <Button subtle onClick={dismiss} disabled={applying}>
-          Cancel
+          {plan?.blocked ? 'Close' : 'Cancel'}
         </Button>
         <Button onClick={apply} disabled={nothingToApply || applying}>
           {applying

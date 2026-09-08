@@ -5,9 +5,9 @@
 //! plugin's `agent_secret` in its own table for exactly that reason, and this
 //! follows it.
 //!
-//! Stored in plaintext at rest, as `agent_secret` is. That is a deliberate
-//! deferral, not an oversight: see `planning/encryption.md` for the key
-//! hierarchy this should eventually sit under.
+//! AtomicServer wraps values with its node key; legacy stores without a key
+//! remain readable. Host-only connection references let multiple plugins share
+//! authorization without copying credentials.
 
 use serde::{Deserialize, Serialize};
 
@@ -69,12 +69,16 @@ pub struct PluginSecret {
     /// leaves you guessing.
     pub last_used_at: Option<i64>,
     pub use_count: u64,
+    /// Append-only: persisted MessagePack structs are positional.
+    #[serde(default)]
+    pub connection: Option<PluginSecretKey>,
 }
 
 impl PluginSecret {
     pub fn new(value: String, origins: Vec<String>, created_at: i64) -> Self {
         Self {
             value,
+            connection: None,
             origins,
             created_at,
             last_used_at: None,
@@ -162,6 +166,52 @@ mod store_tests {
             vec!["https://api.notion.com".to_string()],
             1_700_000_000_000,
         )
+    }
+
+    #[test]
+    fn legacy_positional_credentials_remain_readable() {
+        let bytes = rmp_serde::to_vec(&(
+            "token",
+            vec!["https://api.notion.com"],
+            123i64,
+            None::<i64>,
+            0u64,
+        ))
+        .unwrap();
+        let decoded = PluginSecret::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.value, "token");
+        assert!(decoded.connection.is_none());
+    }
+
+    #[tokio::test]
+    async fn connection_references_follow_rotation_and_revocation_without_leaking() {
+        let db = db("connection_reference").await;
+        db.set_node_key([7u8; crate::vault::keys::KEK_LEN]);
+        let shared = PluginSecretKey::new("did:ad:drive", "connection:test", "notion");
+        db.set_plugin_secret(&shared, &secret()).unwrap();
+        let mut alias = PluginSecret::new(String::new(), vec!["https://api.notion.com".into()], 1);
+        alias.connection = Some(shared.clone());
+        db.set_plugin_secret(&key(), &alias).unwrap();
+        let read = || {
+            db.use_plugin_secret(&key(), "https://api.notion.com", 2, |v| v.to_owned())
+                .unwrap()
+        };
+        assert_eq!(read(), Some("tok-abc".into()));
+        assert!(db
+            .use_plugin_secret(&key(), "https://evil.test", 2, |_| ())
+            .unwrap()
+            .is_none());
+        let mut rotated = secret();
+        rotated.value = "rotated".into();
+        db.set_plugin_secret(&shared, &rotated).unwrap();
+        assert_eq!(read(), Some("rotated".into()));
+        db.delete_plugin_secret(&shared).unwrap();
+        assert!(read().is_none());
+        alias.connection.as_mut().unwrap().drive = "other-drive".into();
+        db.set_plugin_secret(&key(), &alias).unwrap();
+        assert!(db
+            .use_plugin_secret(&key(), "https://api.notion.com", 2, |_| ())
+            .is_err());
     }
 
     const NODE_KEY: [u8; crate::vault::keys::KEK_LEN] = [7u8; crate::vault::keys::KEK_LEN];

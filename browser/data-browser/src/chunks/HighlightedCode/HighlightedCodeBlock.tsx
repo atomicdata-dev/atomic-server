@@ -32,8 +32,11 @@ export default function AsyncHighlightedCodeBlock({
   };
 
   useEffect(() => {
-    if (!ref.current) return;
-    setTimeout(() => Prism.highlightElement(ref.current!), 0);
+    const element = ref.current;
+    if (!element) return;
+    const timer = setTimeout(() => Prism.highlightElement(element), 0);
+
+    return () => clearTimeout(timer);
   }, [code, language]);
 
   useEffect(() => {

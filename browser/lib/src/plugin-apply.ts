@@ -1,3 +1,4 @@
+import { IMPORT_BASELINE } from './import-records.js';
 import type { PlannedChange, RunPlan } from './plugin-plan.js';
 import type { JSONValue } from './value.js';
 
@@ -46,7 +47,10 @@ export interface ApplyStore {
 export function applyHostFromStore(store: ApplyStore): ApplyHost {
   return {
     create: async request => {
-      const resource = await store.newResource(request);
+      const resource = await store.newResource({
+        ...request,
+        propVals: stampImportApproval(request.propVals),
+      });
       await resource.save();
 
       // Read the subject after saving: for a DID agent the store mints it from
@@ -56,7 +60,9 @@ export function applyHostFromStore(store: ApplyStore): ApplyHost {
     set: async (subject, propVals) => {
       const resource = await store.getResource(subject);
 
-      for (const [property, value] of Object.entries(propVals)) {
+      for (const [property, value] of Object.entries(
+        stampImportApproval(propVals),
+      )) {
         // Validation stays on: the planner already fetched every property, so
         // this reads the store cache rather than the network.
         await resource.set(property, value);
@@ -484,4 +490,19 @@ function describeError(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
 
   return String(e);
+}
+
+/** A new approval marker distinguishes an import write from a local edit that
+ * leaves its source baseline untouched, including identical concurrent previews. */
+export function stampImportApproval(
+  values: Record<string, JSONValue>,
+): Record<string, JSONValue> {
+  const baseline = values[IMPORT_BASELINE];
+  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline))
+    return values;
+
+  return {
+    ...values,
+    [IMPORT_BASELINE]: { ...baseline, approval: crypto.randomUUID() },
+  };
 }

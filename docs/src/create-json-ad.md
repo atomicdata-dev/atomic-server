@@ -136,3 +136,31 @@ We can simply refer to the `localId`, instead of some URL that does not exist ye
 
 Press the `import` button in the resource menu (at the bottom of the screen).
 Then you paste your JSON-AD in the text area, and press `import`.
+
+## Source-aware plugin imports
+
+Sandboxed importers can use the shared `importRecords` helper to persist source
+identities in the same `localId` property. Its batch aliases resolve links to
+existing resources or newly created resources. Plugin identity is scoped to the
+immediate destination parent. JSON-AD imports retain their import-root subtree
+namespace for nested local references; ambiguous existing matches are errors.
+
+The helper also writes `https://atomicdata.dev/properties/importBaseline`, a JSON
+object containing the last mapped source `values`, `previous` source values and
+a host-generated `approval` marker. This allows repeat imports to preserve local
+edits, update clean fields, and report divergent edits before approval. The
+server validates baseline transitions again when committing. Ordinary JSON-AD
+imports do not automatically gain this source-merge policy.
+
+One server rejects duplicate `(parent, localId)` identity claims during normal
+indexed writes. This is not a distributed uniqueness guarantee for independent
+offline peers. An interrupted multi-record import can be previewed again to
+reuse completed records; it is not an atomic transaction across the entire batch.
+
+A reviewed conflict resolution can additionally record a `resolution` entry per
+property, containing the observed value (`present` and optional `value`) and the
+chosen `local` or `source` outcome. The server verifies the observed value before
+accepting this explicit baseline transition. Resolution saves a separate signed
+edit; users must preview the import again before applying its other changes.
+Append-only statement imports do not offer source replacement for changed bank
+transactions.

@@ -11,6 +11,7 @@ import {
   pluginSchema,
   recordRun,
   runPlugin,
+  executeServerPlugin,
   type ApplyReport,
   type EnsuredSchema,
   type RunPlan,
@@ -50,7 +51,10 @@ export function pluginClassesFor(
 
   if (cached) return cached;
 
-  const resolving = ensureSchema(store, drive, pluginSchema());
+  const resolving = ensureSchema(store, drive, pluginSchema()).catch(error => {
+    schemaByDrive.delete(drive);
+    throw error;
+  });
   schemaByDrive.set(drive, resolving);
 
   return resolving;
@@ -170,18 +174,33 @@ export function run(input) {
  */
 export async function createPlugin(
   store: Store,
-  target: { parent: string; drive: string },
+  target: { parent: string; drive: string; localId?: string },
   name = 'New plugin',
   source = STARTER_SOURCE,
+  schemas: Record<string, string> = {},
 ): Promise<string> {
   const schema = await pluginClassesFor(store, target.drive);
+
+  if (target.localId) {
+    const existing = await store.findByLocalId(
+      target.drive,
+      target.parent,
+      target.localId,
+    );
+    if (existing) return existing.subject;
+  }
 
   const plugin = await store.newResource({
     parent: target.parent,
     isA: [schema.classes['plugin-script']],
     propVals: {
+      ...(target.localId
+        ? { 'https://atomicdata.dev/properties/localId': target.localId }
+        : {}),
       'https://atomicdata.dev/properties/name': name,
+      'https://atomicdata.dev/properties/emoji': '🔌',
       [schema.properties['plugin-source']]: source,
+      [schema.properties['plugin-schemas']]: schemas,
       [schema.properties.trigger]: 'manual',
     },
   });
@@ -305,6 +324,8 @@ export function usePluginManifest(source: string | undefined): PluginManifest {
 }
 
 export interface PreparedRun {
+  schemas?: Record<string, string>;
+  source?: string;
   plan: RunPlan;
   trigger: RunTrigger;
   timedOut: boolean;
@@ -328,13 +349,28 @@ export async function prepareRun(
   // A plugin that reaches the network or spends a credential cannot run in the
   // browser: the sandbox has no I/O, and a secret the page could read would not
   // be a secret. Placement follows from that rather than being configured.
-  const serverPlaced = target ? await needsServer(store, target) : false;
+  const declaration = await describePlugin(source, {
+    createWorker: () =>
+      new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+  });
+  const serverPlaced = target
+    ? (declaration.operations?.length ?? 0) > 0 ||
+      (await needsServer(store, target))
+    : false;
+
+  const schema = target
+    ? await pluginClassesFor(store, target.drive)
+    : undefined;
+  const instance = target ? await store.getResource(target.plugin) : undefined;
+  const schemas = (
+    schema ? instance?.get(schema.properties['plugin-schemas']) : undefined
+  ) as Record<string, string> | undefined;
 
   const { verdict, timedOut } = serverPlaced
-    ? await runOnServer(store, source, trigger, target!)
+    ? await runOnServer(store, source, trigger, target!, schemas)
     : await runPlugin(
         source,
-        { trigger },
+        { trigger, schemas },
         {
           createWorker: () =>
             new Worker(pluginWorkerUrl, { type: 'module' }) as never,
@@ -343,17 +379,21 @@ export async function prepareRun(
 
   const plan = await planVerdict(verdict, planHostFromStore(store));
 
-  return { plan, trigger, timedOut, serverPlaced };
+  return { plan, trigger, timedOut, serverPlaced, source, schemas };
 }
 
 /**
- * A plugin belongs on the server once it has a secret: that is the only way it
- * can reach anything, and the browser could never hold one.
+ * Credentials and referenced integration actions require the server host.
  */
 async function needsServer(
   store: Store,
   target: { plugin: string; drive: string },
 ): Promise<boolean> {
+  const terms = await findSchema(store, target.drive, pluginSchema());
+  const refs = terms.properties?.['automation-integrations'];
+  const integrations =
+    refs && (await store.getResource(target.plugin)).get(refs);
+  if (Array.isArray(integrations) && integrations.length > 0) return true;
   const agent = store.getAgent();
 
   if (!agent) return false;
@@ -385,39 +425,13 @@ async function runOnServer(
   source: string,
   trigger: RunTrigger,
   target: { plugin: string; drive: string },
+  schemas?: Record<string, string>,
 ): Promise<{ verdict: Verdict; timedOut: boolean }> {
-  const agent = store.getAgent();
-
-  if (!agent) throw new Error('Not signed in');
-
-  const url = `${store.getServerUrl()}/plugin-run`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...(await signRequest(url, agent, {})),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      drive: target.drive,
-      plugin: target.plugin,
-      source,
-      input: JSON.stringify({ trigger }),
-    }),
+  const body = await executeServerPlugin(store, {
+    ...target,
+    source,
+    input: { trigger, schemas },
   });
-
-  if (!response.ok) {
-    throw new Error(
-      errorMessageFromResponse(await response.text(), response.status),
-    );
-  }
-
-  // Absent fields arrive as `null`, not `undefined`: `error !== undefined` was
-  // true for every successful run, so every one of them took the error branch
-  // and reported "the run produced nothing".
-  const body = (await response.json()) as {
-    verdict?: string | null;
-    error?: string | null;
-  };
 
   if (body.error || !body.verdict) {
     return {
@@ -479,6 +493,8 @@ export async function applyRun(
     drive: target.drive,
     trigger: prepared.trigger,
     plan: prepared.plan,
+    source: prepared.source,
+    schemas: prepared.schemas,
     report,
   });
 
@@ -535,6 +551,8 @@ export async function recordBlockedRun(
     drive: target.drive,
     trigger: prepared.trigger,
     plan: prepared.plan,
+    source: prepared.source,
+    schemas: prepared.schemas,
   });
 
   notifyRunsChanged(target.plugin);

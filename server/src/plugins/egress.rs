@@ -182,6 +182,33 @@ pub async fn refuse_url(url: &str) -> Option<String> {
     None
 }
 
+/// Resolve once and return only checked destinations for the host HTTP client.
+pub async fn checked_addresses(url: &url::Url) -> Result<Vec<std::net::SocketAddr>, String> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err("only HTTP and HTTPS are fetchable".into());
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("credentials belong in host-owned secrets, not URLs".into());
+    }
+    let host = url.host_str().ok_or("URL has no host")?;
+    let port = url.port_or_known_default().ok_or("URL has no port")?;
+    let addresses: Vec<_> = tokio::net::lookup_host((host.trim_matches(['[', ']']), port))
+        .await
+        .map_err(|e| format!("could not resolve {host}: {e}"))?
+        .collect();
+    if addresses.is_empty() {
+        return Err("host resolved to no addresses".into());
+    }
+    for address in &addresses {
+        if let Some(refusal) = refuse_address(address.ip()) {
+            return Err(format!(
+                "{host} resolves to a refused address ({refusal:?})"
+            ));
+        }
+    }
+    Ok(addresses)
+}
+
 /// The `scheme://host[:port]` of a URL, which is what an origin allowlist and a
 /// secret's scope are both expressed in.
 pub fn origin_of(url: &url::Url) -> Result<String, String> {

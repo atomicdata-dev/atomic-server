@@ -72,10 +72,9 @@ pub async fn record_run(
         serde_json::to_value(report.map(|r| &r.outcomes)).map_err(|e| e.to_string())?,
     )?;
 
-    // Only after something was actually applied: persisting a cursor for a run
-    // that wrote nothing would tell the next run to skip work never done.
+    // Empty pages can complete; partial pages must never advance the cursor.
     if let (Some(report), Some(cursor)) = (report, plan.cursor.as_ref()) {
-        if report.applied > 0 {
+        if !plan.blocked && report.failed == 0 && !report.stopped_early {
             put("run-cursor", json!(cursor))?;
         }
     }

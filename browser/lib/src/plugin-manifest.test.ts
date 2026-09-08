@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { validateManifest } from './plugin-manifest.js';
 import { describe, expect, it } from 'vitest';
 import {
   originsMentionedIn,
@@ -126,4 +128,71 @@ describe('originsMentionedIn', () => {
     // Which is exactly the case nobody should be pre-authorising by guess.
     expect(originsMentionedIn('const url = base + path;')).toEqual([]);
   });
+});
+
+describe('versioned manifest conformance', () => {
+  const cases = JSON.parse(
+    readFileSync(
+      new URL('../../../testdata/plugin-manifests.json', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  for (const fixture of cases) {
+    it(fixture.name, () => {
+      if (fixture.valid)
+        expect(() => validateManifest(fixture.manifest)).not.toThrow();
+      else expect(() => validateManifest(fixture.manifest)).toThrow();
+    });
+  }
+});
+
+it('validates action schemas and operation references without extending capabilities', () => {
+  const raw = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../integrations/github-issues/manifest.fixture.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  expect(validateManifest(raw).actions?.map(a => a.name)).toEqual([
+    'get_issue',
+    'create_issue',
+  ]);
+  expect(() =>
+    validateManifest({
+      ...raw,
+      actions: [{ ...raw.actions[0], operation: 'undeclared' }],
+    }),
+  ).toThrow();
+  expect(() =>
+    validateManifest({
+      ...raw,
+      actions: [
+        {
+          ...raw.actions[0],
+          inputSchema: {
+            ...raw.actions[0].inputSchema,
+            additionalProperties: true,
+          },
+        },
+      ],
+    }),
+  ).toThrow();
+  expect(() =>
+    validateManifest({
+      ...raw,
+      actions: [
+        {
+          ...raw.actions[0],
+          inputSchema: {
+            ...raw.actions[0].inputSchema,
+            $ref: 'https://remote/schema',
+          },
+        },
+      ],
+    }),
+  ).toThrow();
 });

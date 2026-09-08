@@ -57,6 +57,14 @@ export interface Problem {
   message: string;
   subject?: string;
   property?: string;
+  /** Source-aware import conflict; values are data, never executable instructions. */
+  importCollision?: string[];
+  importConflict?: {
+    source: JSONValue;
+    current?: JSONValue;
+    previous?: JSONValue;
+    appendOnly: boolean;
+  };
 }
 
 export interface Verdict {
@@ -173,6 +181,23 @@ function parseProblems(raw: unknown): Problem[] {
     if (typeof entry.subject === 'string') problem.subject = entry.subject;
 
     if (typeof entry.property === 'string') problem.property = entry.property;
+    if (
+      Array.isArray(entry.importCollision) &&
+      entry.importCollision.length >= 2 &&
+      entry.importCollision.length <= 100 &&
+      entry.importCollision.every(subject => typeof subject === 'string')
+    )
+      problem.importCollision = [...new Set(entry.importCollision)].sort();
+
+    if (
+      isPlainObject(entry.importConflict) &&
+      'source' in entry.importConflict &&
+      typeof entry.importConflict.appendOnly === 'boolean'
+    ) {
+      problem.importConflict = entry.importConflict as unknown as NonNullable<
+        Problem['importConflict']
+      >;
+    }
 
     return [problem];
   });

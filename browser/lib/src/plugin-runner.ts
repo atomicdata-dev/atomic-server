@@ -245,7 +245,14 @@ export async function describePlugin(
     worker.onmessage = event => {
       const data = event.data;
 
-      finish(data?.ok ? parseManifest(safeParse(data.json)) : { secrets: [] });
+      try {
+        finish(
+          data?.ok ? parseManifest(safeParse(data.json)) : { secrets: [] },
+        );
+      } catch {
+        // Draft inspection is forgiving; activation validates again on the host.
+        finish({ secrets: [] });
+      }
     };
 
     worker.onerror = () => finish({ secrets: [] });

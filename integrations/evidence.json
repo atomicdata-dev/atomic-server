@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-08T10:56:37.644Z",
+  "layer": "all",
+  "live": {
+    "status": "not-run",
+    "reason": "Offline certification never authorizes or runs provider writes"
+  },
+  "integrations": [
+    {
+      "id": "clockify",
+      "version": "0.1.0",
+      "owner": "Ontola",
+      "support": "experimental",
+      "apiVersion": "v1",
+      "declaredCapabilities": [
+        "completed-entries:import",
+        "projects:import",
+        "person:import"
+      ],
+      "bundleSha256": "e669e6c3bd3f2b2f67eda7d6b1be62ab0cf70ca3fe82e00f90caa1f194b2f50d",
+      "checks": [
+        {
+          "name": "reproducible-bundle",
+          "status": "passed"
+        },
+        {
+          "name": "typecheck",
+          "status": "passed"
+        },
+        {
+          "name": "fixtures",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::clockify_tests::completed_entries_are_proposals_in_the_real_sandbox",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::clockify_tests::discovery_runs_in_the_real_sandbox_and_minimizes_output",
+          "status": "passed"
+        }
+      ],
+      "status": "passed",
+      "fixtureCounts": {
+        "passed": 18,
+        "skipped": 0,
+        "failed": 0
+      }
+    },
+    {
+      "id": "github-issues",
+      "version": "0.1.0",
+      "owner": "Ontola",
+      "support": "experimental",
+      "apiVersion": "2022-11-28",
+      "declaredCapabilities": [
+        "issues.title:two-way",
+        "issues.body:two-way",
+        "issues.status:two-way",
+        "issues.create:two-way"
+      ],
+      "bundleSha256": "aa016fe662616b57241d5685e3dca237243631a1e6719bbe46281a26bb1dac67",
+      "checks": [
+        {
+          "name": "reproducible-bundle",
+          "status": "passed"
+        },
+        {
+          "name": "typecheck",
+          "status": "passed"
+        },
+        {
+          "name": "fixtures",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::sync_session_tests::sandbox_import_merge_columns_and_noop_with_real_atomic_storage",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::sync_session_tests::sandbox_create_uncertain_response_is_not_repeated",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::sync_session_tests::sandbox_conflicts_missing_and_stale_reads_fail_closed",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::sync_session_tests::sandbox_new_card_binds_issue_and_next_sync_does_not_repeat_write",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::sync_session_tests::compatible_release_upgrade_preserves_bindings_and_pending_release",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::sandbox_actions_prepare_validate_and_pin_without_writing",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::sandbox_automation_action_requires_reference_and_release_pin",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::action_approval_rejects_stale_actor_and_expiry_and_never_repeats_uncertain_writes",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::history_keeps_uncertainty_and_replay_returns_completed_receipt",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::grants_pin_actor_source_release_config_and_can_be_revoked",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::actions::tests::recovery_requires_fresh_read_evidence_and_never_resends",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::triggers::tests::integration_approval_resumes_same_event_without_repeating_write",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::scheduler::tests::integration_approval_resumes_same_scheduled_run_without_repeating_write",
+          "status": "passed"
+        }
+      ],
+      "status": "passed",
+      "fixtureCounts": {
+        "passed": 7,
+        "skipped": 3,
+        "failed": 0
+      }
+    },
+    {
+      "id": "mt940",
+      "version": "0.1.0",
+      "owner": "Ontola",
+      "support": "experimental",
+      "apiVersion": "MT940 subset",
+      "declaredCapabilities": [
+        "bank-statements:import"
+      ],
+      "bundleSha256": "e9df730295936a019b6429b40eecb4fd0c456311467a690a0456b691b37af7a6",
+      "checks": [
+        {
+          "name": "reproducible-bundle",
+          "status": "passed"
+        },
+        {
+          "name": "typecheck",
+          "status": "passed"
+        },
+        {
+          "name": "fixtures",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::bank_statement_tests::bank_statement_proposes_exact_nested_transactions",
+          "status": "passed"
+        }
+      ],
+      "status": "passed",
+      "fixtureCounts": {
+        "passed": 9,
+        "skipped": 0,
+        "failed": 0
+      }
+    },
+    {
+      "id": "notion",
+      "version": "0.1.0",
+      "owner": "Ontola",
+      "support": "experimental",
+      "apiVersion": "2026-03-11",
+      "declaredCapabilities": [
+        "pages.plain-title:two-way",
+        "pages.scalar-fields:two-way",
+        "pages.create:two-way",
+        "schema.property-name:two-way",
+        "views.table-board-subset:two-way"
+      ],
+      "bundleSha256": "3dc0895e812441bc6736a44706103efb1e48792cdcaadfcb0d00b4c746a266b5",
+      "checks": [
+        {
+          "name": "reproducible-bundle",
+          "status": "passed"
+        },
+        {
+          "name": "typecheck",
+          "status": "passed"
+        },
+        {
+          "name": "fixtures",
+          "status": "passed"
+        },
+        {
+          "name": "plugins::notion_sync_tests::notion_bundle_syncs_both_directions_and_renames_without_rebinding",
+          "status": "passed"
+        }
+      ],
+      "status": "passed",
+      "fixtureCounts": {
+        "passed": 16,
+        "skipped": 1,
+        "failed": 0
+      }
+    }
+  ],
+  "status": "passed"
+}

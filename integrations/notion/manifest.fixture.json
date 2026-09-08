@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "secrets": [
+    {
+      "name": "notion",
+      "origin": "https://api.notion.com",
+      "description": "Notion connection shared with this data source"
+    }
+  ],
+  "operations": [
+    {
+      "id": "schema",
+      "method": "GET",
+      "url": "https://api.notion.com/v1/data_sources/11111111-1111-1111-1111-111111111111",
+      "effect": "read"
+    },
+    {
+      "id": "rename",
+      "method": "PATCH",
+      "url": "https://api.notion.com/v1/data_sources/11111111-1111-1111-1111-111111111111",
+      "effect": "write"
+    },
+    {
+      "id": "query",
+      "method": "POST",
+      "url": "https://api.notion.com/v1/data_sources/11111111-1111-1111-1111-111111111111/query",
+      "effect": "read"
+    },
+    {
+      "id": "page",
+      "method": "GET",
+      "url": "https://api.notion.com/v1/pages/{uuid}",
+      "effect": "read"
+    },
+    {
+      "id": "create",
+      "method": "POST",
+      "url": "https://api.notion.com/v1/pages",
+      "effect": "write"
+    },
+    {
+      "id": "update",
+      "method": "PATCH",
+      "url": "https://api.notion.com/v1/pages/{uuid}",
+      "effect": "write"
+    },
+    {
+      "id": "views",
+      "method": "GET",
+      "url": "https://api.notion.com/v1/views",
+      "effect": "read"
+    },
+    {
+      "id": "view",
+      "method": "GET",
+      "url": "https://api.notion.com/v1/views/{uuid}",
+      "effect": "read"
+    },
+    {
+      "id": "view-update",
+      "method": "PATCH",
+      "url": "https://api.notion.com/v1/views/{uuid}",
+      "effect": "write"
+    }
+  ]
+}

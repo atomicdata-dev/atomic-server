@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createApp, describeApp, updateApp } from './plugin-app.js';
 import { core, dataBrowser, server } from './index.js';
-import type { SchemaStore } from './plugin-schema.js';
+import { ensureSchema, type SchemaStore } from './plugin-schema.js';
 import type { JSONValue } from './value.js';
 
 /**
@@ -40,6 +40,15 @@ function fakeStore() {
   });
 
   const store: SchemaStore = {
+    findByLocalId: async (_drive: string, parent: string, id: string) => {
+      const entry = [...resources.entries()].find(
+        ([, values]) =>
+          values[core.properties.parent] === parent &&
+          values[core.properties.localId] === id,
+      );
+
+      return entry ? wrap(entry[0]) : undefined;
+    },
     // Signed in: issuing a key is something an agent does, and refusing when
     // signed out is one of `issueAccessAgent`'s own rules.
     getAgent: () => ({ subject: 'did:ad:agent:me' }),
@@ -84,6 +93,55 @@ function fakeStore() {
 const SOURCE = 'export function view({ root }) { root.textContent = "hi"; }';
 
 describe('createApp', () => {
+  it('binds shared vocabulary without rewriting its constraints', async () => {
+    const { store, resources } = fakeStore();
+    const subject = 'https://schemas.test/Shared';
+    const original = {
+      [core.properties.isA]: [core.classes.class],
+      [core.properties.requires]: ['https://schemas.test/required'],
+    };
+    resources.set(subject, original);
+    const ensured = await ensureSchema(store, 'drive', {
+      properties: [],
+      classes: [
+        {
+          subject,
+          shortname: 'shared',
+          name: 'Shared',
+          description: '',
+          requires: [],
+        },
+      ],
+    });
+    expect(ensured.classes.shared).toBe(subject);
+    expect(resources.get(subject)).toEqual(original);
+  });
+
+  it('binds two apps to a shared row class without copying or editing it', async () => {
+    const { store, resources } = fakeStore();
+    const shared = 'https://schemas.test/Task';
+    const definition = {
+      [core.properties.isA]: [core.classes.class],
+      [core.properties.name]: 'Task',
+    };
+    resources.set(shared, definition);
+    const first = await createApp(store, {
+      drive: 'drive',
+      name: 'Planning',
+      source: SOURCE,
+      rowClass: shared,
+    });
+    const second = await createApp(store, {
+      drive: 'drive',
+      name: 'Tracker',
+      source: SOURCE,
+      rowClass: shared,
+    });
+    expect(first.rowClass).toBe(shared);
+    expect(second.rowClass).toBe(shared);
+    expect(resources.get(first.data)?.[core.properties.classtype]).toBe(shared);
+    expect(resources.get(shared)).toEqual(definition);
+  });
   it('puts every part of the app under the app', async () => {
     const { store, resources } = fakeStore();
 

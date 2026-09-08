@@ -1,3 +1,4 @@
+import { taskSchema, timeTrackingSchema } from '@tomic/lib';
 import type { IconType } from 'react-icons';
 import {
   FaBook,
@@ -60,11 +61,21 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     spec: {
       columns: [
         {
-          name: 'Status',
-          type: 'select',
-          options: ['Todo', 'Doing', 'Done'],
+          name: 'Description',
+          type: 'markdown',
+          propertySubject: taskSchema.properties.body,
         },
-        { name: 'Assignee', type: 'text' },
+        {
+          name: 'Status',
+          propertySubject: taskSchema.properties.status,
+          type: 'select',
+          options: ['Todo', 'Doing', 'Blocked', 'Done'],
+        },
+        {
+          name: 'Assignee',
+          type: 'text',
+          propertySubject: taskSchema.properties.assignee,
+        },
         {
           name: 'Priority',
           type: 'select',
@@ -92,13 +103,26 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
       columns: [
         {
           name: 'Status',
+          propertySubject: taskSchema.properties.status,
           type: 'select',
           options: ['Todo', 'Doing', 'Blocked', 'Done'],
         },
-        { name: 'Due date', type: 'date' },
-        { name: 'Assignee', type: 'text' },
+        {
+          name: 'Due date',
+          type: 'date',
+          propertySubject: taskSchema.properties.dueDate,
+        },
+        {
+          name: 'Assignee',
+          type: 'text',
+          propertySubject: taskSchema.properties.assignee,
+        },
         { name: 'Estimate', type: 'decimal', description: 'In hours' },
-        { name: 'Notes', type: 'markdown' },
+        {
+          name: 'Description',
+          type: 'markdown',
+          propertySubject: taskSchema.properties.body,
+        },
       ],
       views: [
         {
@@ -127,14 +151,17 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     rowName: 'Time entry',
     icon: FaStopwatch,
     spec: {
+      schema: timeTrackingSchema(),
       columns: [
-        { name: 'Start', type: 'datetime' },
-        { name: 'End', type: 'datetime' },
+        { name: 'Start', type: 'datetime', schemaProperty: 'work-start' },
+        { name: 'End', type: 'datetime', schemaProperty: 'work-end' },
         {
           name: 'Project',
-          type: 'select',
-          options: ['Admin', 'Client work', 'Internal'],
+          type: 'relation',
+          schemaProperty: 'work-project',
         },
+        { name: 'Person', type: 'relation', schemaProperty: 'work-person' },
+        { name: 'Billable', type: 'checkbox', schemaProperty: 'work-billable' },
       ],
       views: [
         {

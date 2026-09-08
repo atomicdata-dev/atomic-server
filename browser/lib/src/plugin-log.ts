@@ -31,6 +31,34 @@ export function pluginSchema(): SchemaSpec {
   return {
     properties: [
       {
+        shortname: 'automation-integrations',
+        name: 'Used integrations',
+        description:
+          'Integrations this automation uses for events or connected data.',
+        datatype: Datatype.RESOURCEARRAY,
+      },
+      {
+        shortname: 'automation-trigger',
+        name: 'Automation trigger',
+        description:
+          'Integration and declared event that start this independent automation.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'plugin-connection',
+        name: 'Integration connection',
+        description:
+          'Pinned sync release, configuration and available automation events.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'plugin-schemas',
+        name: 'Schema bindings',
+        description:
+          'Explicit schema identities used by this plugin instance and run.',
+        datatype: Datatype.JSON,
+      },
+      {
         shortname: 'plugin-source',
         name: 'Source',
         description:
@@ -149,6 +177,9 @@ export interface RecordRunOptions {
   /** Absent when the plan was blocked and never applied. */
   report?: ApplyReport;
   name?: string;
+  /** Exact executed source; never reread the mutable draft when logging. */
+  source?: string;
+  schemas?: Record<string, string>;
 }
 
 /**
@@ -176,9 +207,21 @@ export async function recordRun(
       []) as unknown as JSONValue,
   };
 
-  // Only after something was actually applied: persisting a cursor for a run
-  // that wrote nothing would tell the next run to skip work never done.
-  if (options.report && options.report.applied > 0 && options.plan.cursor) {
+  if (options.source !== undefined) {
+    propVals[schema.properties['plugin-source']] = options.source;
+  }
+
+  if (options.schemas !== undefined)
+    propVals[schema.properties['plugin-schemas']] = options.schemas;
+
+  // An empty page can complete successfully; a partially applied page cannot.
+  if (
+    !options.plan.blocked &&
+    options.report &&
+    options.report.failed === 0 &&
+    !options.report.stoppedEarly &&
+    options.plan.cursor !== undefined
+  ) {
     propVals[schema.properties['run-cursor']] = options.plan.cursor;
   }
 

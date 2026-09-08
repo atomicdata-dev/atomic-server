@@ -14,6 +14,8 @@ import type { JSONValue } from './value.js';
  */
 
 export interface PropertySpec {
+  /** Reuse this vocabulary term without editing or copying it. */
+  subject?: string;
   /** Stable within the spec; also the resource's shortname. */
   shortname: string;
   name: string;
@@ -23,6 +25,8 @@ export interface PropertySpec {
 }
 
 export interface ClassSpec {
+  /** Reuse this class without editing or copying it. */
+  subject?: string;
   shortname: string;
   name: string;
   description: string;
@@ -47,9 +51,16 @@ interface SchemaResource {
   get(property: string): unknown;
   set(property: string, value: JSONValue): Promise<void>;
   save(): Promise<unknown>;
+  pushListItem?(property: string, value: JSONValue): void;
 }
 
 export interface SchemaStore {
+  /** Authoritative lookup must include saved terms not yet linked to the ontology. */
+  findByLocalId(
+    drive: string,
+    parent: string,
+    localId: string,
+  ): Promise<SchemaResource | undefined>;
   getResource(subject: string): Promise<SchemaResource>;
   newResource(opts: {
     parent: string;
@@ -65,10 +76,9 @@ export interface SchemaStore {
  * than making a parallel set, which matters because a plugin's first run and
  * its hundredth take the same path.
  *
- * Not safe against two runs racing on a drive that has neither — both would
- * create. Rare enough to leave, loud enough to notice (two classes with one
- * shortname), and the fix belongs with a general schema registry rather than
- * here.
+ * Native localIds recover saved terms even when the ontology-link write was
+ * interrupted. Concurrent duplicate creates on one server reuse its winner;
+ * ambiguous shortnames are errors, never arbitrary bindings.
  */
 export async function ensureSchema(
   store: SchemaStore,
@@ -81,6 +91,7 @@ export async function ensureSchema(
   const properties = await ensureAll(
     store,
     ontology,
+    drive,
     core.properties.properties,
     spec.properties,
     property => ({
@@ -100,6 +111,7 @@ export async function ensureSchema(
   const classes = await ensureAll(
     store,
     ontology,
+    drive,
     core.properties.classes,
     spec.classes,
     klass => ({
@@ -157,13 +169,16 @@ export async function findSchema(
 async function pick(
   store: SchemaStore,
   subjects: string[],
-  specs: Array<{ shortname: string }>,
+  specs: Array<{ shortname: string; subject?: string }>,
 ): Promise<Record<string, string>> {
   const found = await byShortname(store, subjects);
 
   return Object.fromEntries(
     specs
-      .map(spec => [spec.shortname, found.get(spec.shortname)] as const)
+      .map(
+        spec =>
+          [spec.shortname, spec.subject ?? found.get(spec.shortname)] as const,
+      )
       .filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
 }
@@ -211,9 +226,10 @@ async function reconcile(
   if (changed) await resource.save();
 }
 
-async function ensureAll<T extends { shortname: string }>(
+async function ensureAll<T extends { shortname: string; subject?: string }>(
   store: SchemaStore,
   ontology: SchemaResource,
+  drive: string,
   listProperty: string,
   specs: T[],
   build: (spec: T) => { isA: string[]; propVals: Record<string, JSONValue> },
@@ -224,12 +240,44 @@ async function ensureAll<T extends { shortname: string }>(
   const added: string[] = [];
 
   for (const spec of specs) {
-    const hit = found.get(spec.shortname);
+    if (spec.subject) {
+      const shared = await store.getResource(spec.subject);
+      const desired = build(spec);
+      const classes = asList(shared.get(core.properties.isA));
+
+      if (!desired.isA.every(klass => classes.includes(klass))) {
+        throw new Error(`incompatible schema binding: ${spec.subject}`);
+      }
+
+      const datatype = desired.propVals[core.properties.datatype];
+
+      if (datatype && shared.get(core.properties.datatype) !== datatype) {
+        throw new Error(`incompatible property datatype: ${spec.subject}`);
+      }
+
+      result[spec.shortname] = spec.subject;
+      if (!existing.includes(spec.subject) && !added.includes(spec.subject))
+        added.push(spec.subject);
+      continue;
+    }
+
+    const localId = `schema:${listProperty === core.properties.properties ? 'property' : 'class'}:${spec.shortname}`;
+    const orphan = found.has(spec.shortname)
+      ? undefined
+      : await store.findByLocalId(drive, ontology.subject, localId);
+    const hit = found.get(spec.shortname) ?? orphan?.subject;
 
     if (hit) {
       result[spec.shortname] = hit;
-      await reconcile(store, hit, build(spec).propVals);
-
+      const resource = await store.getResource(hit);
+      const desired = build(spec);
+      const datatype = desired.propVals[core.properties.datatype];
+      if (datatype && resource.get(core.properties.datatype) !== datatype)
+        throw new Error(
+          `incompatible recovered schema datatype: ${spec.shortname}`,
+        );
+      await reconcile(store, hit, desired.propVals);
+      if (!existing.includes(hit)) added.push(hit);
       continue;
     }
 
@@ -237,16 +285,39 @@ async function ensureAll<T extends { shortname: string }>(
     const created = await store.newResource({
       parent: ontology.subject,
       isA,
-      propVals,
+      propVals: { ...propVals, [core.properties.localId]: localId },
     });
-    await created.save();
+    let saved = created;
 
-    result[spec.shortname] = created.subject;
-    added.push(created.subject);
+    try {
+      await created.save();
+    } catch (error) {
+      const recovered = await store.findByLocalId(
+        drive,
+        ontology.subject,
+        localId,
+      );
+      if (!recovered) throw error;
+      saved = recovered;
+    }
+
+    result[spec.shortname] = saved.subject;
+    added.push(saved.subject);
   }
 
   if (added.length > 0) {
-    await ontology.set(listProperty, [...existing, ...added]);
+    const current = asList(ontology.get(listProperty));
+    const missing = [...new Set(added)].filter(
+      subject => !current.includes(subject),
+    );
+
+    if (ontology.pushListItem) {
+      for (const subject of missing)
+        ontology.pushListItem(listProperty, subject);
+    } else {
+      await ontology.set(listProperty, [...current, ...missing]);
+    }
+
     await ontology.save();
   }
 
@@ -266,7 +337,16 @@ async function byShortname(
     }),
   );
 
-  return new Map(entries.filter(([shortname]) => shortname !== ''));
+  const result = new Map<string, string>();
+
+  for (const [shortname, subject] of entries) {
+    if (!shortname) continue;
+    if (result.has(shortname) && result.get(shortname) !== subject)
+      throw new Error(`ambiguous schema shortname: ${shortname}`);
+    result.set(shortname, subject);
+  }
+
+  return result;
 }
 
 async function findOntology(

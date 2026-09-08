@@ -94,6 +94,9 @@ pub async fn fixture(name: &str) -> Fixture {
 
     for (shortname, datatype) in [
         ("plugin-source", urls::MARKDOWN),
+        ("plugin-schemas", urls::JSON),
+        ("plugin-connection", urls::JSON),
+        ("automation-integrations", urls::RESOURCE_ARRAY),
         ("trigger", urls::STRING),
         ("started-at", urls::TIMESTAMP),
         ("run-status", urls::STRING),

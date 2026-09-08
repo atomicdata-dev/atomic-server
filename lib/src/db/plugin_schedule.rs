@@ -50,6 +50,11 @@ pub struct AutoApplyGrant {
     /// question "what did I actually look at when I agreed to this" has an
     /// answer a year later.
     pub reviewed_run: Option<String>,
+    /// Immutable source snapshot approved for unattended execution.
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub release: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +76,12 @@ pub struct PluginSchedule {
     /// load without the grant, which is the safe direction.
     #[serde(default)]
     pub auto_apply: Option<AutoApplyGrant>,
+    /// Principal authorizing reads during unattended execution.
+    #[serde(default)]
+    pub run_as: Option<String>,
+    /// A persisted claim; an interrupted run must be reconciled before retry.
+    #[serde(default)]
+    pub running: bool,
 }
 
 impl PluginSchedule {
@@ -83,6 +94,8 @@ impl PluginSchedule {
         }
 
         Ok(Self {
+            run_as: None,
+            running: false,
             interval_seconds,
             next_run_at: now + (interval_seconds as i64) * 1000,
             last_run_at: None,
@@ -147,6 +160,24 @@ mod tests {
     use super::*;
 
     const HOUR: u64 = 3600;
+
+    #[test]
+    fn old_schedule_and_grant_sequences_still_decode_without_authorization() {
+        let old = (
+            60_u64,
+            100_i64,
+            None::<i64>,
+            None::<String>,
+            None::<String>,
+            Some(("agent", 0_i64, Some("review"))),
+        );
+        let bytes = rmp_serde::to_vec(&old).unwrap();
+        let loaded = PluginSchedule::from_bytes(&bytes).unwrap();
+        assert_eq!(loaded.interval_seconds, 60);
+        assert_eq!(loaded.run_as, None);
+        assert!(!loaded.running);
+        assert_eq!(loaded.auto_apply.unwrap().source, None);
+    }
 
     #[test]
     fn a_new_schedule_is_not_immediately_due() {

@@ -1067,12 +1067,17 @@ export async function newResource(klass: string, page: Page) {
     // click times out. Gate on the button's visibility explicitly — its
     // appearance IS the "class is searchable" readiness signal — with a budget
     // that tolerates a slow index flush instead of a blind pre-sleep.
-    const classLabel = klass.toLowerCase() === 'chatroom' ? 'Chat room' : klass;
+    const label =
+      (
+        {
+          'document-v2': 'Document',
+          chatroom: 'Chat room',
+          'ai-chat': 'AI chat',
+        } as Record<string, string>
+      )[klass] ?? klass;
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const classButton = page.getByRole('main').getByRole('button', {
-      name: new RegExp(
-        `^${classLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-        'i',
-      ),
+      name: new RegExp(`^${escaped}$`, 'i'),
     });
     await classButton.waitFor({ state: 'visible', timeout: 30000 });
     await classButton.click();

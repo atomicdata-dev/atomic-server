@@ -38,7 +38,6 @@ import {
   type MergeForkOptions,
 } from './forks.js';
 import { GENESIS, properties, instances } from './urls.js';
-import { isCommitSubject } from './local-outbox.js';
 import {
   valToArray,
   type JSONValue,
@@ -1135,6 +1134,9 @@ export class Resource<C extends OptionalClass = any> {
     isFirstCommit: boolean,
     commitMessage?: string,
   ): { bytes: Uint8Array; versionAfterExport: VersionVector } | undefined {
+    // Incremental saves bypass signChanges; they still need datatype tags for
+    // newly added JSON/reference fields before capturing the signed delta.
+    this.writeDatatypeTags();
     const bytes = this.exportLoroDeltaInternal(isFirstCommit, commitMessage);
     if (!bytes) return undefined;
     if (!this._loroDoc) return undefined;

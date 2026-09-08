@@ -8475,6 +8475,1308 @@ msgstr ""
 msgid "I’ve signed in"
 msgstr ""
 
+#: src/components/SideBar/AppMenu.tsx src/routes/IntegrationStore.tsx
+msgid "Integrations"
+msgstr ""
+
+#: src/components/SideBar/AppMenu.tsx
+msgid "Discover published integrations"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Review the saved proposal and run history before continuing."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Resume saved run"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Search integrations"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Search integrations, domains or standards"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Linked standards"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Publisher and release"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Creating draft…"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Create draft"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "Runs automatically when matching records are added."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "Require review"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "Automation"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "Review pending event"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Resume sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Approve sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Preview sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Sync complete."
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Your integrations"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Pause background sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Enable background sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Sync continues on the server. You can close this page."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Checks every minute, even with the browser closed."
+msgstr ""
+
+#. 0: changes.length
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "{0} records"
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "No write was recorded. Fix the reported error, then resume sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "A response is saved. Resume sync to reuse it."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid ""
+"An Atomic write or checkpoint needs inspection. Resume uses saved receipts "
+"and stops if a previous write is uncertain."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "Sync needs attention"
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "The saved run is paused. Completed steps are kept when you resume."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid ""
+"Check the provider before retrying an operation whose result is uncertain."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "Inspect saved result"
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid ""
+"The request may have succeeded. After verifying it with the provider, record "
+"its response below. This does not send the write again."
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "Verified response (status and body JSON)"
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "How you verified the result"
+msgstr ""
+
+#: src/chunks/PluginRuns/SyncRecovery.tsx
+msgid "Record verified result and resume"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid ""
+"Sync issue titles, descriptions and status with a kanban board. Review the "
+"first import before enabling background sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "Repository"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "GitHub token"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "Connect GitHub"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "events queued. They remain saved while waiting for review."
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Creating automation…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Create automation"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Automations"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Event"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid "Enable automatic execution"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Your automations"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationIntegrations.tsx
+msgid "Automations using this integration"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationIntegrations.tsx
+msgid "Uses integrations"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Compatibility notes"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid "Data source ID"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid ""
+"Use the data source UUID from Notion, not a database URL. Share its database "
+"with your Notion connection first."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid "Notion connection token"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid ""
+"The token is stored on your AtomicServer. Formatted text, relations, "
+"formulas and filtered views need additional mappings. Compatibility notes "
+"appear on the connection before you approve any sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid "Connect Notion"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "Repository test results"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "Checking test evidence…"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "No matching test evidence is available for this bundle."
+msgstr ""
+
+#. 0: evidence.checks
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "Offline checks passed: {0}"
+msgstr ""
+
+#. 0: new Date(evidence.testedAt).toLocaleDateString()
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "Tested on: {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "Live provider checks are not included in these results."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationEvidence.tsx
+msgid "These results are over 30 days old."
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "Save and test sample"
+msgstr ""
+
+#. 0: eventName
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "When: {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "Automation JavaScript"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid ""
+"Save your code and run it against a matching record. Review proposed changes "
+"before applying them. If no record matches, sync one first."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginTrigger.tsx
+msgid ""
+"Test a sample and review its changes, then enable automatic execution. Until "
+"then, the next event waits for review."
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Automation name"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid ""
+"The next screen opens an editable JavaScript starter. Automatic execution "
+"stays off until you enable it."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "GitHub issues"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Keep GitHub issues and your kanban board in sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Sync titles, descriptions and status in both directions. Create issues from "
+"either app."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Start automations when a new issue is discovered."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Issues only. Comments and pull requests are not synced."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Notion"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Work with your Notion database in Atomic."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Sync supported row fields, property names and table or board views."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Start automations from newly discovered rows."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Formatted text, relations, formulas and filtered views need additional "
+"mappings."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Supported scope"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Set up connection"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid ""
+"Connect your apps and keep your work in sync. Add automations when you need "
+"them."
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "View or edit JavaScript"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "Build with the Atomic assistant"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid ""
+"Describe the behavior you want. The assistant can update this automation and "
+"help test it before you enable it."
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "What would you like to change?"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "Ask Atomic assistant"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "Test before enabling"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Describe what should happen and when."
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Build with Atomic assistant"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid ""
+"Let the Atomic assistant help build and test an automation. Your integration "
+"can keep syncing without one."
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "What would you like to automate?"
+msgstr ""
+
+#: src/chunks/PluginRuns/CreateEventAutomation.tsx
+msgid "Advanced: write JavaScript yourself"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Choose an action"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid ""
+"Use this integration once, without creating an automation. Writes wait for "
+"your review."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Choose a value"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Read from integration"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Prepare for review"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Exact request"
+msgstr ""
+
+#. 0: p.intent.url
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Destination: {0}"
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Approve action"
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+#: src/chunks/PluginRuns/IntegrationActions.tsx
+msgid "Cancel action"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Action history"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Confirmed after checking the provider:"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Provider result"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "No completed actions yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Choose an automation"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Review each write"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Allow automatic writes"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Automatic writes allowed"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Writes require review"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid ""
+"This automation may send this action without asking each time, using the "
+"inputs its approved code supplies."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Automation action permissions"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid ""
+"Permissions apply to this connection, action and exact automation code for "
+"30 days. Changes need a new review. Sync settings are independent."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Allowed action"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Write approval"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Save action permission"
+msgstr ""
+
+#. 0: new Date(g.expires_at).toLocaleString()
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Expires: {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Revoke permission"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Completed"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Outcome unknown — check the provider before continuing"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Provider returned an error — action was not retried"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Cancelled"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Review expired"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Connection changed — prepare a new action"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Waiting for review"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Choose a read action"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid ""
+"Find the created record in the connected app. Look it up below, then confirm "
+"only if it is the result of this action. This never sends the write again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Provider lookup"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Check and recover"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "How does this record match the action?"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Look up provider result"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "I verified this is the action result"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid ""
+"Actions are shown newest first. Uncertain writes stay here until you check "
+"their outcome."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Load more actions"
+msgstr ""
+
+#. 0: preview.scanned; 1: preview.eligible; 2: ' '
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Checked {0} old actions; {1}{2} eligible for cleanup."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Actions archived:"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Check next batch"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Preview cleanup"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionActivity.tsx
+msgid "Action details archived. This action ID remains reserved."
+msgstr ""
+
+#. 0: preview.reclaimableBytes
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Payload reduction: {0} bytes. Database file size may stay the same."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Archive action details"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid "Clean up old action details"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Abandoned by an operator"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Unfinished — keeps this action available"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid ""
+"Abandon this run permanently. Existing effects remain, and future scheduled "
+"runs stay enabled. Uncertain provider results still need reconciliation."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Reason for abandoning this run"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Abandon this run"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Consuming run"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Inspect consuming runs"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "No tracked runs. This action remains protected from automation cleanup."
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionConsumers.tsx
+msgid "Automation runs using this action"
+msgstr ""
+
+#: src/chunks/PluginRuns/ActionHistoryCleanup.tsx
+msgid ""
+"Remove old action payloads while keeping IDs, outcomes and recovery "
+"evidence. Completed results must be at least 30 days old. Automation results "
+"also require every consuming run to have finished or been explicitly "
+"abandoned at least 30 days ago. Unfinished runs, untracked usage, uncertain "
+"or failed writes, and receipts with an unknown completion date are kept."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid "Enter a data source ID and connection token to continue."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotionManual.tsx
+msgid ""
+"Connect a Notion database, then review what will sync before making changes."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "Enter a repository and token to continue."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Allow pop-ups for Atomic, then try connecting again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Notion workspace"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Search by name"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Find a database"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Find databases"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Untitled database"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Choose a database"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Database"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Can’t find your database?"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid ""
+"Only databases shared with this connection appear. Reconnect to select more "
+"pages in Notion, then search again. A database with multiple data sources "
+"can appear more than once."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Load more databases"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid ""
+"No databases found. Try another name, or reconnect and grant access to the "
+"database in Notion."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Connect another workspace"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Advanced setup with a token"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid ""
+"Choose what to sync from Notion. You’ll review the first sync before any "
+"changes are applied."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Loading connections…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid ""
+"Notion sign-in needs to be configured by your server administrator. Existing "
+"connections can still be used."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Reconnect Notion"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Connecting to Notion…"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Community plugins"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid ""
+"Published code you can adapt. Creating a draft does not connect an app or "
+"enable sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Finding databases…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Setting up your database…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectNotion.tsx
+msgid "Continue to sync setup"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "New issue board"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "Sync into"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid ""
+"Existing tables appear when they use the shared task schema. GitHub supports "
+"Todo, Doing and Done; Blocked cards must be resolved before syncing. "
+"Existing cards are included in the preview."
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+msgid "Loading proposal…"
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+msgid ""
+"This proposal is no longer awaiting review. Check the integration history "
+"for its outcome."
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+msgid "Proposal cancelled."
+msgstr ""
+
+#: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
+msgid "Review this external action before approving it."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Clockify"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Bring your completed work into the Time Tracker."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Import completed entries with project and person links, start/end times and "
+"billable flags."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Review imports before applying them. This first version does not sync "
+"changes back."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Your entries only; up to 31 days. No active timers, updates, deletions, "
+"tags, task links, rates or custom fields."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Enter your Clockify API key."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Clockify import"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Clockify time entries"
+msgstr ""
+
+#. 0: workspaces.find(w => w.id === workspace)?.name
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Clockify: {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Clockify API key"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Find my workspaces"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid ""
+"Find your API key in Clockify profile settings. It is stored on your "
+"AtomicServer and only used for read requests."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid ""
+"Bring your completed entries into the Time Tracker template, linked to "
+"projects and the person who logged them. Review every proposed import first."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Workspace"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Past 7 days"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Past 30 days"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Import my completed entries"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+#: src/chunks/PluginRuns/ImportMT940.tsx
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Preparing preview…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Preview import"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Experimental integration. Preview proposed changes before approving them."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "New Time Tracker table"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Import into"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid ""
+"Compatible Time Tracker tables appear here. Their views and existing entries "
+"are kept."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Open time entries"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid "Manage import"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid ""
+"Your import setup is saved. Open the table, or manage this import to review "
+"future runs and its schedule."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid "Create GitHub token"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid ""
+"Name, Issues read/write access and a 30-day expiry are prefilled. Check the "
+"resource owner, choose Only select repositories and select your repository. "
+"Generate the token, then paste it below."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectGitHub.tsx
+msgid ""
+"Your token is stored on your AtomicServer. Create the atomic:doing label in "
+"GitHub to use the Doing column."
+msgstr ""
+
+#: src/chunks/PluginRuns/NewAutomation.tsx
+msgid "New automation"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Advanced: one-off actions and permissions"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid ""
+"No automations yet. Create one to respond to events from your connected apps."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Bank statements"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Import bank transactions from bunq and other MT940 exports."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"Preview exact amounts, dates, account references and original descriptions "
+"in a Bank transactions table."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Upload a statement when you need it. No bank token required."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid ""
+"MT940 files only, up to 500 transactions and 512 KB. No payment initiation "
+"or live bank sync. Bank-specific formats may need additional support."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Bank transactions"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Transactions"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Bank statement file"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid ""
+"Import bank transactions from an MT940 statement. No bank connection or "
+"token is needed."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid ""
+"In bunq: open your bank account, choose Settings, then Export statement and "
+"select MT940."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "bunq export instructions"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid ""
+"Your file is processed in the plugin sandbox on your AtomicServer. Review "
+"transactions before saving them. Up to 500 transactions per file."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Open bank transactions"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectClockify.tsx
+msgid ""
+"Each run imports your entries from the selected number of days before that "
+"run. Running timers and breaks are skipped. Repeating the import updates "
+"changed source fields, preserves local edits and asks you to resolve "
+"conflicts. It never deletes entries."
+msgstr ""
+
+#. 0: JSON.stringify(conflict.current) ?? 'Empty'
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid "Your value: {0}"
+msgstr ""
+
+#. 0: JSON.stringify(conflict.source)
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid "Source value: {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid "Resolution saved. Close this dialog and preview the import again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid ""
+"This statement changed an existing transaction. Check the statement and its "
+"bank reference before importing again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid "Keep my value"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportConflict.tsx
+msgid "Use source value"
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid "Replacement code"
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid "Review Clockify update"
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid "Update the Clockify importer"
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid ""
+"Repeated imports will update unchanged local fields when Clockify changes, "
+"preserve your edits, and ask you to resolve conflicts. Shared source "
+"identities prevent duplicate imports on this server."
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid ""
+"This replaces the importer code, including any custom edits. Your workspace, "
+"date range, destination table and stored key are kept. Existing records are "
+"checked on the next preview."
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid "Updating…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ClockifyUpgrade.tsx
+msgid "Apply importer update"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportMT940.tsx
+msgid "Default Bank transactions table"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Duplicate source records"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Refresh comparison"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Review copies"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Use as primary"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "These copies have the same values."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Save primary record"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Different values"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportResolutionNotice.tsx
+msgid ""
+"This original copy is kept for its history and existing links. Future "
+"imports update <0/>."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Use this value"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid ""
+"Choose which copy future imports should update. Both originals, their "
+"history and existing links are kept. Choose values below to combine "
+"information in the primary record."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid ""
+"Fields without a choice keep the primary record’s value. If another copy "
+"changes offline, you will need to review the copies again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportResolutionNotice.tsx
+msgid "Review links to original copies"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Refresh link review"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Find links to these copies"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Included"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Include"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Links confirmed"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "No supported links found in this drive."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Update selected links"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Checking records…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "Update links to the primary record"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid ""
+"Optionally update links in records you can read in this drive. Original "
+"copies, hierarchy, text and history stay intact. Each record is saved "
+"separately."
+msgstr ""
+
+#. 0: String(rows[subject][core.properties.name] ?? subject)
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Value from {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid ""
+"Primary record saved. You can review links below or close this dialog and "
+"preview the import again."
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Primary record"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportCollision.tsx
+msgid "Original copy"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "From original"
+msgstr ""
+
+#: src/chunks/PluginRuns/ImportReferences.tsx
+msgid "To primary"
+msgstr ""
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "This import is paused. Review the issues below, then preview it again."
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid ""
+"No matches. Try another search or describe your idea to the assistant above."
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Table template"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Describe your idea and build it with the Atomic assistant."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Loading importer…"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Integration sections"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Activity"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Code"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Loading your data…"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Opening view"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Choose which view opens when you visit this integration or its table."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Edit with AI"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid ""
+"Use this integration in workflows. Describe what should happen and let the "
+"assistant help you build it."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Applying sync…"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationConnection.tsx
+msgid "Checking for changes. This may take a moment."
+msgstr ""
+
 #~ msgid ""
 #~ "Enter your recovery code to show your secret or add a passkey on this "
 #~ "device. Your existing recovery code will keep working."

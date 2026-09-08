@@ -68,7 +68,11 @@ pub async fn handle_plugin_run(
         db: std::sync::Arc::new(store.clone()),
         plugin: body.plugin.clone(),
         drive: body.drive.clone(),
+        for_agent: agent,
+        manifest: js_runtime::describe_manifest(&body.source).await?,
     };
+
+    host.validate_binding().await?;
 
     let outcome = runtime.run(&body.source, &body.input, host).await?;
 

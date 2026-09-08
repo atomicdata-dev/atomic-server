@@ -377,9 +377,14 @@ async fn an_app_cannot_write_outside_itself() {
     .await;
 
     assert_eq!(response.status(), 400);
+    let body: serde_json::Value = serde_json::from_str(&body_of(response)).unwrap();
+    assert_eq!(body["https://atomicdata.dev/properties/errorCode"], 3);
     assert!(
-        body_of(response).contains("not allowed to write"),
-        "the refusal should say what was refused",
+        body["https://atomicdata.dev/properties/description"]
+            .as_str()
+            .unwrap()
+            .contains("https://atomicdata.dev/properties/write"),
+        "the refusal should identify the denied write permission",
     );
 }
 

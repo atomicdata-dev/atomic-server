@@ -13,12 +13,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
+use atomic_lib::agents::ForAgent;
 use atomic_lib::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
-use atomic_lib::{agents::ForAgent, DbEvent};
 use tokio::sync::Mutex;
 
 use crate::appstate::AppState;
-use crate::plugins::apply::{apply_plan, ApplyOptions};
+use crate::plugins::apply::ApplyOptions;
 use crate::plugins::js_runtime;
 use crate::plugins::plan::plan_verdict;
 use crate::plugins::run_log;
@@ -115,64 +115,142 @@ pub fn spawn(appstate: AppState) {
     let mut events = appstate.store.subscribe_events();
 
     actix_web::rt::spawn(async move {
-        while let Ok(event) = events.recv().await {
-            let DbEvent::QueryMembershipChanged {
-                query_id,
-                subject,
-                added,
-                ..
-            } = event
-            else {
-                continue;
-            };
-
-            let triggers = match appstate.store.plugin_triggers_for_query(&query_id) {
-                Ok(triggers) => triggers,
-                Err(e) => {
-                    tracing::warn!("could not read plugin triggers: {e}");
-                    continue;
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            drain(&appstate, &guard).await;
+            tokio::select! {
+                _ = tick.tick() => {},
+                event = events.recv() => {
+                    if matches!(event, Err(tokio::sync::broadcast::error::RecvError::Closed)) { break; }
+                    // Lag only loses a wake-up, never the persisted work.
                 }
-            };
-
-            for (key, trigger) in triggers {
-                let edge = Edge::of(added);
-
-                if !trigger.wants(edge) {
-                    continue;
-                }
-
-                fire(&appstate, &guard, key, trigger, &subject, edge).await;
             }
         }
     });
 }
 
-async fn fire(
-    appstate: &AppState,
-    guard: &Arc<Mutex<Guard>>,
-    key: PluginTriggerKey,
-    trigger: PluginTrigger,
-    subject: &str,
-    edge: Edge,
-) {
-    let now = atomic_lib::utils::now();
-
-    if let Err(reason) = guard.lock().await.admit(&key.plugin, subject, edge, now) {
-        // A rate stop is a fault worth surfacing; the other two are the guard
-        // doing its job on every ordinary echo.
-        if reason.starts_with("stopped after") {
-            tracing::warn!(plugin = %key.plugin, "{reason}");
-            record_error(appstate, &key, &trigger, reason);
-        }
-
-        return;
-    }
-
-    match run(appstate, guard, &key, &trigger, subject, edge, now).await {
-        Ok(summary) => tracing::info!(plugin = %key.plugin, "{edge:?} on {subject}: {summary}"),
+async fn drain(appstate: &AppState, guard: &Arc<Mutex<Guard>>) {
+    let _worker = appstate.store.lock_plugin("trigger-delivery").await;
+    let events = match appstate.store.queued_plugin_events() {
+        Ok(events) => events,
         Err(e) => {
-            tracing::warn!(plugin = %key.plugin, "triggered run failed: {e}");
-            record_error(appstate, &key, &trigger, e);
+            tracing::error!("cannot read plugin event queue: {e}");
+            return;
+        }
+    };
+    let mut attempted = 0;
+    for mut event in events {
+        if attempted >= 100 {
+            break;
+        }
+        let key = event.key.clone();
+        let trigger = match appstate.store.get_plugin_trigger(&key) {
+            Ok(Some(trigger)) => trigger,
+            Ok(None) => {
+                let _ = appstate.store.acknowledge_plugin_event(&event);
+                continue;
+            }
+            Err(_) => continue,
+        };
+        let journal = super::journal::Journal::new(
+            &appstate.store,
+            &key.drive,
+            &key.plugin,
+            &format!("query:{}", event.id),
+        );
+        match journal.terminal() {
+            Ok(Some(_)) => {
+                let mut stored = trigger.clone();
+                if stored.pending_verdict == event.verdict {
+                    stored.pending_verdict = None;
+                    stored.last_error = None;
+                    if let Err(e) = appstate.store.set_plugin_trigger(&key, &stored) {
+                        record_error(appstate, &key, &trigger, e.to_string());
+                        continue;
+                    }
+                }
+                if let Err(e) = appstate.store.acknowledge_plugin_event(&event) {
+                    record_error(appstate, &key, &trigger, e.to_string());
+                }
+                continue;
+            }
+            Err(e) => {
+                record_error(appstate, &key, &trigger, e);
+                continue;
+            }
+            Ok(None) => {}
+        }
+        let mut resuming_action = false;
+        if let Some(waits) = event.verdict.as_deref().and_then(super::actions::waits) {
+            let actor = trigger
+                .run_as
+                .as_deref()
+                .or_else(|| trigger.auto_apply.as_ref().map(|g| g.agent.as_str()))
+                .unwrap_or_default();
+            match super::actions::waits_ready(
+                Arc::new(appstate.store.clone()),
+                &key.drive,
+                actor,
+                &waits,
+            )
+            .await
+            {
+                Ok(false) => continue,
+                Err(e) => {
+                    record_error(appstate, &key, &trigger, e);
+                    continue;
+                }
+                Ok(true) => {
+                    event.verdict = None;
+                    event.waiting_for_review = false;
+                    resuming_action = true;
+                }
+            }
+        }
+        if event.waiting_for_review {
+            if trigger.pending_verdict.is_none() {
+                let _ = appstate.store.acknowledge_plugin_event(&event);
+                continue;
+            }
+            if trigger.auto_apply.is_none() {
+                continue;
+            }
+            event.waiting_for_review = false;
+        }
+        if trigger.last_error.is_some()
+            || (trigger.pending_verdict.is_some() && event.verdict.is_none() && !resuming_action)
+        {
+            continue;
+        }
+        if event.verdict.is_none() && !resuming_action {
+            let mut protection = guard.lock().await;
+            if protection
+                .written
+                .remove(&(key.plugin.clone(), event.subject.clone()))
+            {
+                let _ = appstate.store.acknowledge_plugin_event(&event);
+                continue;
+            }
+            // Queue identities, unlike a subject/time window, distinguish two
+            // genuine arrivals and survive slow or paused delivery.
+            if let Err(reason) =
+                protection.admit(&key.plugin, &event.id, event.edge, atomic_lib::utils::now())
+            {
+                if reason.starts_with("stopped after") {
+                    record_error(appstate, &key, &trigger, reason);
+                }
+                continue;
+            }
+        }
+        attempted += 1;
+        match run(appstate, guard, &key, &trigger, &mut event).await {
+            Ok(_) if !event.waiting_for_review => {
+                if let Err(e) = appstate.store.acknowledge_plugin_event(&event) {
+                    record_error(appstate, &key, &trigger, e.to_string());
+                }
+            }
+            Ok(_) => {}
+            Err(e) => record_error(appstate, &key, &trigger, e),
         }
     }
 }
@@ -183,43 +261,106 @@ async fn run(
     guard: &Arc<Mutex<Guard>>,
     key: &PluginTriggerKey,
     trigger: &PluginTrigger,
-    subject: &str,
-    edge: Edge,
-    now: i64,
+    event: &mut atomic_lib::db::plugin_trigger::QueuedEvent,
 ) -> Result<String, String> {
+    let subject = event.subject.as_str();
+    let edge = event.edge;
+    let now = event.at;
     let source = plugin_source(&appstate.store, &key.drive, &key.plugin)
         .await
         .ok_or("the plugin has no source")?;
 
+    let source = match &trigger.auto_apply {
+        Some(grant) => match &grant.release {
+            Some(id) => {
+                appstate
+                    .store
+                    .get_plugin_release(id)
+                    .map_err(|e| e.to_string())?
+                    .source
+            }
+            None => grant
+                .source
+                .clone()
+                .ok_or("reactivate auto-apply to pin the approved source")?,
+        },
+        None => source,
+    };
     let runtime = js_runtime::embedded_runtime().map_err(|e| e.to_string())?;
 
+    let agent = trigger
+        .run_as
+        .as_ref()
+        .or_else(|| trigger.auto_apply.as_ref().map(|g| &g.agent))
+        .ok_or("reactivate this trigger to authorize its reads")?;
+    let execution_agent = ForAgent::AgentSubject(agent.as_str().into());
     let host = js_runtime::StoreHost {
         db: Arc::new(appstate.store.clone()),
         plugin: key.plugin.clone(),
         drive: key.drive.clone(),
+        for_agent: execution_agent,
+        manifest: js_runtime::describe_manifest(&source).await?,
     };
 
     // The subject is the resource that moved, not the plugin: what a query
     // trigger is *about* is that row.
-    let input = format!(
-        "{{\"trigger\":{{\"kind\":\"query\",\"at\":{now},\"subject\":{:?},\"edge\":{:?}}}}}",
-        subject,
-        edge.as_str(),
-    );
+    host.validate_binding().await?;
 
-    let verdict = runtime
-        .run(&source, &input, host)
-        .await
-        .map_err(|e| e.to_string())??;
+    let schemas = match trigger
+        .auto_apply
+        .as_ref()
+        .and_then(|grant| grant.release.as_ref())
+    {
+        Some(id) => {
+            appstate
+                .store
+                .get_plugin_release(id)
+                .map_err(|e| e.to_string())?
+                .schemas
+        }
+        None if trigger.auto_apply.is_none() => {
+            super::scheduler::plugin_schema_bindings(&appstate.store, &key.drive, &key.plugin)
+                .await?
+        }
+        None => Default::default(),
+    };
+    let input = serde_json::json!({"trigger":{"kind":"query","id":event.id,"at":now,"subject":subject,"edge":edge.as_str()},"schemas":schemas}).to_string();
 
+    let authorization = serde_json::json!([agent, source]).to_string();
+    if event
+        .authorization
+        .as_ref()
+        .is_some_and(|old| old != &authorization)
+    {
+        return Err("the event's approved source or account changed; resolve its saved proposal before continuing".into());
+    }
+    event.authorization = Some(authorization);
+    let verdict = match &event.verdict {
+        Some(verdict) => verdict.clone(),
+        None => runtime
+            .run_triggered(&source, &input, host)
+            .await
+            .map_err(|e| e.to_string())??,
+    };
+    event.verdict = Some(verdict.clone());
+    let action_wait = super::actions::waits(&verdict).is_some();
+    event.waiting_for_review = action_wait || trigger.auto_apply.is_none();
+    appstate
+        .store
+        .save_plugin_event(event)
+        .map_err(|e| e.to_string())?;
+
+    let mut stored = trigger.clone();
+    stored.pending_verdict = Some(verdict.clone());
+    appstate
+        .store
+        .set_plugin_trigger(key, &stored)
+        .map_err(|e| e.to_string())?;
+    if action_wait {
+        return Ok("waiting for integration action approval".into());
+    }
     let Some(grant) = trigger.auto_apply.clone() else {
-        // Without a grant a triggered run has nowhere to wait: unlike a
-        // schedule, there is no single next run to attach a verdict to, and
-        // the edge that produced it will not come round again.
-        return Ok(format!(
-            "produced a verdict, but this trigger may not write ({} bytes withheld)",
-            verdict.len(),
-        ));
+        return Ok("proposal saved for review; trigger paused until resolved".into());
     };
 
     let terms = drive_terms(&appstate.store, &key.drive)
@@ -241,15 +382,30 @@ async fn run(
             &key.drive,
             &key.plugin,
         )
-        .await,
+        .await?,
     };
 
     let plan = plan_verdict(&parsed, &mut apply_host).await;
+    let journal = super::journal::Journal::new(
+        &appstate.store,
+        &key.drive,
+        &key.plugin,
+        &format!("query:{}", event.id),
+    );
+    let plan = journal.plan(&plan)?;
 
     let report = if plan.blocked {
         None
     } else {
-        Some(apply_plan(&plan, &mut apply_host, ApplyOptions::default()).await?)
+        Some(
+            super::apply::apply_plan_recorded(
+                &plan,
+                &mut apply_host,
+                ApplyOptions::default(),
+                Some(&journal),
+            )
+            .await?,
+        )
     };
 
     if let Some(report) = &report {
@@ -284,6 +440,20 @@ async fn run(
     .await
     .map_err(|e| format!("{summary}, but the run could not be recorded: {e}"))?;
 
+    if plan.blocked
+        || report
+            .as_ref()
+            .is_some_and(|r| r.failed > 0 || r.stopped_early)
+    {
+        return Err(summary);
+    }
+    journal.finish(&summary)?;
+    stored.pending_verdict = None;
+    stored.last_error = None;
+    appstate
+        .store
+        .set_plugin_trigger(key, &stored)
+        .map_err(|e| e.to_string())?;
     Ok(summary)
 }
 
@@ -294,7 +464,12 @@ fn record_error(
     trigger: &PluginTrigger,
     error: String,
 ) {
-    let mut stored = trigger.clone();
+    let mut stored = appstate
+        .store
+        .get_plugin_trigger(key)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| trigger.clone());
     stored.last_error = Some(error);
 
     if let Err(e) = appstate.store.set_plugin_trigger(key, &stored) {
@@ -324,10 +499,19 @@ mod tests {
         }
     }
 
-    fn arm(fixture: &Fixture, auto_apply: bool) -> PluginTriggerKey {
+    async fn arm(fixture: &Fixture, auto_apply: bool) -> PluginTriggerKey {
         let key = PluginTriggerKey::new(&fixture.drive, &fixture.plugin);
         let mut trigger = PluginTrigger::new(watched_query(fixture), true, false).unwrap();
 
+        trigger.run_as = Some(
+            fixture
+                .appstate
+                .store
+                .get_default_agent()
+                .unwrap()
+                .subject
+                .to_string(),
+        );
         if auto_apply {
             trigger.auto_apply = Some(AutoApplyGrant {
                 agent: fixture
@@ -339,6 +523,9 @@ mod tests {
                     .to_string(),
                 granted_at: 0,
                 reviewed_run: None,
+                release: None,
+                source: plugin_source(&fixture.appstate.store, &fixture.drive, &fixture.plugin)
+                    .await,
             });
         }
 
@@ -394,10 +581,329 @@ mod tests {
     }
 
     #[actix_rt::test]
+    async fn abandoned_event_is_acknowledged_without_applying_its_saved_plan() {
+        let mut f = fixture("abandoned_event").await;
+        write_plugin(&mut f, "Must stay absent").await;
+        let key = arm(&f, false).await;
+        add_watched(&f, "Arrival").await;
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        let event = f.appstate.store.queued_plugin_events().unwrap().remove(0);
+        let journal = super::super::journal::Journal::new(
+            &f.appstate.store,
+            &key.drive,
+            &key.plugin,
+            &format!("query:{}", event.id),
+        );
+        journal.abandon("operator", "No longer needed").unwrap();
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert!(journal.finished().unwrap().is_none());
+        assert_eq!(children_named(&f, &f.drive, "Must stay absent").await, 0);
+    }
+
+    #[actix_rt::test]
+    async fn finished_event_acknowledges_without_replaying_or_reading_old_waits() {
+        let mut f = fixture("finished_event").await;
+        write_plugin(&mut f, "Finished event once").await;
+        let key = arm(&f, true).await;
+        add_watched(&f, "Arrival").await;
+        let mut event = f.appstate.store.queued_plugin_events().unwrap().remove(0);
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        let journal = super::super::journal::Journal::new(
+            &f.appstate.store,
+            &key.drive,
+            &key.plugin,
+            &format!("query:{}", event.id),
+        );
+        let finished = journal.finished().unwrap().unwrap();
+        event.waiting_for_review = true;
+        event.verdict = Some(r#"{"integrationWaits":[{"connection":"gone","id":"gone"}]}"#.into());
+        f.appstate.store.save_plugin_event(&event).unwrap();
+        let mut trigger = f.appstate.store.get_plugin_trigger(&key).unwrap().unwrap();
+        trigger.pending_verdict = event.verdict.clone();
+        f.appstate.store.set_plugin_trigger(&key, &trigger).unwrap();
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert!(f
+            .appstate
+            .store
+            .get_plugin_trigger(&key)
+            .unwrap()
+            .unwrap()
+            .pending_verdict
+            .is_none());
+        assert_eq!(children_named(&f, &f.drive, "Finished event once").await, 1);
+        assert_eq!(journal.finished().unwrap().unwrap(), finished);
+    }
+
+    #[actix_rt::test]
+    #[ignore = "subprocess helper"]
+    async fn child_persists_arrival_then_exits_without_cleanup() {
+        let Ok(path) = std::env::var("ATOMIC_TRIGGER_CRASH_REPORT") else {
+            return;
+        };
+        let mut f = fixture("trigger_hard_restart").await;
+        write_plugin(&mut f, "After hard restart").await;
+        arm(&f, true).await;
+        add_watched(&f, "Arrived before crash").await;
+        f.appstate.store.flush().unwrap();
+        std::fs::write(
+            path,
+            serde_json::to_vec(&serde_json::json!({
+                "data": f.appstate.config.store_path.parent().unwrap(),
+                "config": f.appstate.config.config_dir,
+                "drive": f.drive, "plugin": f.plugin,
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        // exit bypasses destructors and the database's graceful shutdown.
+        std::process::exit(73);
+    }
+
+    #[actix_rt::test]
+    async fn a_hard_restart_delivers_a_saved_arrival_once() {
+        use clap::Parser;
+        let report = std::env::temp_dir().join(format!(
+            "atomic-trigger-{}.json",
+            atomic_lib::utils::random_string(16)
+        ));
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "plugins::triggers::tests::child_persists_arrival_then_exits_without_cleanup",
+                "--exact",
+                "--ignored",
+            ])
+            .env("ATOMIC_TRIGGER_CRASH_REPORT", &report)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(73));
+        let meta: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&report).unwrap()).unwrap();
+        let opts = crate::config::Opts::parse_from([
+            "atomic-server",
+            "--data-dir",
+            meta["data"].as_str().unwrap(),
+            "--config-dir",
+            meta["config"].as_str().unwrap(),
+        ]);
+        let appstate = AppState::init(crate::config::build_config(opts).unwrap())
+            .await
+            .unwrap();
+        let drive = meta["drive"].as_str().unwrap().to_string();
+        let f = Fixture {
+            terms: drive_terms(&appstate.store, &drive).await.unwrap(),
+            appstate,
+            drive,
+            plugin: meta["plugin"].as_str().unwrap().into(),
+        };
+        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 1);
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(children_named(&f, &f.drive, "After hard restart").await, 1);
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(children_named(&f, &f.drive, "After hard restart").await, 1);
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        std::fs::remove_file(report).unwrap();
+    }
+
+    #[actix_rt::test]
+    async fn scripts_receive_the_persisted_event_identity() {
+        let mut f = fixture("trigger_identity").await;
+        write_plugin(&mut f, "placeholder").await;
+        let source = format!(
+            r#"export function run(ctx) {{
+            if (!ctx.trigger.id) throw new Error('missing durable event identity');
+            return {{ intents: [{{op:'create',localId:'event',parent:{:?},isA:[],set:{{
+                'https://atomicdata.dev/properties/name':ctx.trigger.id
+            }}}}],problems:[] }};
+        }}"#,
+            f.drive
+        );
+        let mut plugin = f
+            .appstate
+            .store
+            .get_resource(&f.plugin.as_str().into())
+            .await
+            .unwrap();
+        plugin
+            .set(
+                f.terms.property("plugin-source").unwrap().into(),
+                Value::Markdown(source),
+                &f.appstate.store,
+            )
+            .await
+            .unwrap();
+        plugin.save(&f.appstate.store).await.unwrap();
+        arm(&f, true).await;
+        add_watched(&f, "arrived").await;
+        let id = f.appstate.store.queued_plugin_events().unwrap()[0]
+            .id
+            .clone();
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(children_named(&f, &f.drive, &id).await, 1);
+    }
+
+    #[actix_rt::test]
+    async fn enabling_automatic_delivery_keeps_the_waiting_event() {
+        let mut f = fixture("trigger_enable_with_backlog").await;
+        write_plugin(&mut f, "Kept waiting event").await;
+        let key = arm(&f, false).await;
+        add_watched(&f, "waiting").await;
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        let previous = f.appstate.store.get_plugin_trigger(&key).unwrap().unwrap();
+        arm(&f, true).await;
+        let mut updated = f.appstate.store.get_plugin_trigger(&key).unwrap().unwrap();
+        updated.pending_verdict = previous.pending_verdict;
+        f.appstate.store.set_plugin_trigger(&key, &updated).unwrap();
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(children_named(&f, &f.drive, "Kept waiting event").await, 1);
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+    }
+
+    #[actix_rt::test]
+    async fn queued_arrivals_survive_no_listener_and_a_pending_review() {
+        let mut f = fixture("plugin_durable_arrivals").await;
+        write_plugin(&mut f, "Durable notification").await;
+        let key = arm(&f, false).await;
+        add_watched(&f, "first").await;
+        add_watched(&f, "second").await;
+        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 2);
+        let guard = Arc::new(Mutex::new(Guard::default()));
+        drain(&f.appstate, &guard).await;
+        drain(&f.appstate, &guard).await;
+        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 2);
+        // Resolve the first review, then approve future execution. A fresh
+        // worker has no in-memory state from the previous delivery attempt.
+        arm(&f, true).await;
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(
+            children_named(&f, &f.drive, "Durable notification").await,
+            1
+        );
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(
+            children_named(&f, &f.drive, "Durable notification").await,
+            1
+        );
+        assert!(f
+            .appstate
+            .store
+            .get_plugin_trigger(&key)
+            .unwrap()
+            .unwrap()
+            .last_error
+            .is_none());
+    }
+
+    #[actix_rt::test]
+    async fn integration_approval_resumes_same_event_without_repeating_write() {
+        let mut f = fixture("action_continuation").await;
+        write_plugin(&mut f, "After issue approval").await;
+        let original = plugin_source(&f.appstate.store, &f.drive, &f.plugin)
+            .await
+            .unwrap();
+        let release = f
+            .appstate
+            .store
+            .publish_plugin_release(&atomic_lib::db::plugin_release::PluginRelease {
+                source: include_str!("../../../integrations/github-issues/plugin.js").into(),
+                manifest: serde_json::from_str(include_str!(
+                    "../../../integrations/github-issues/manifest.fixture.json"
+                ))
+                .unwrap(),
+                runtime: atomic_lib::db::plugin_release::RUNTIME.into(),
+                schemas: Default::default(),
+            })
+            .unwrap();
+        let mut plugin = f
+            .appstate
+            .store
+            .get_resource(&f.plugin.as_str().into())
+            .await
+            .unwrap();
+        plugin.set_unsafe(f.terms.property("plugin-connection").unwrap().into(),Value::Json(serde_json::json!({"release":release,"config":{"repository":"atomic-fixtures/issues"}}))).unwrap();
+        plugin
+            .set_unsafe(
+                f.terms.property("automation-integrations").unwrap().into(),
+                Value::ResourceArray(vec![f.plugin.as_str().into()]),
+            )
+            .unwrap();
+        let source=format!("{}\nexport function run(ctx) {{ctx.integration({{connection:{},release:{},call:{{action:'create_issue',arguments:{{title:'Synthetic'}},id:ctx.trigger.id}}}});return original(ctx);}}",original.replace("function run(","function original("),serde_json::json!(f.plugin),serde_json::json!(release));
+        plugin
+            .set_unsafe(
+                f.terms.property("plugin-source").unwrap().into(),
+                Value::Markdown(source),
+            )
+            .unwrap();
+        plugin.save(&f.appstate.store).await.unwrap();
+        arm(&f, true).await;
+        add_watched(&f, "Arrival").await;
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(
+            children_named(&f, &f.drive, "After issue approval").await,
+            0
+        );
+        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 1);
+        let host = js_runtime::StoreHost {
+            db: Arc::new(f.appstate.store.clone()),
+            drive: f.drive.clone(),
+            plugin: f.plugin.clone(),
+            for_agent: ForAgent::AgentSubject(
+                f.appstate
+                    .store
+                    .get_default_agent()
+                    .unwrap()
+                    .subject
+                    .clone(),
+            ),
+            manifest: None,
+        };
+        let p = super::super::actions::proposals(&host)
+            .await
+            .unwrap()
+            .remove(0);
+        struct Provider(usize);
+        #[async_trait::async_trait]
+        impl super::super::external::ExternalHost for Provider {
+            async fn execute(
+                &mut self,
+                _: &super::super::external::ExternalIntent,
+            ) -> Result<super::super::external::Receipt, String> {
+                self.0 += 1;
+                Ok(super::super::external::Receipt {
+                    status: 201,
+                    body: "{}".into(),
+                })
+            }
+        }
+        let mut provider = Provider(0);
+        super::super::external::execute(
+            &f.appstate.store,
+            &serde_json::json!([f.drive, f.plugin]).to_string(),
+            &p.release,
+            &p.id,
+            &p.intent,
+            &mut provider,
+        )
+        .await
+        .unwrap();
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+        assert_eq!(provider.0, 1);
+        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(
+            children_named(&f, &f.drive, "After issue approval").await,
+            1
+        );
+    }
+
+    #[actix_rt::test]
     async fn a_resource_entering_the_query_runs_the_plugin() {
         let mut fixture = fixture("plugin_trigger_enter").await;
         write_plugin(&mut fixture, "Saw an arrival").await;
-        arm(&fixture, true);
+        arm(&fixture, true).await;
         spawn(fixture.appstate.clone());
 
         add_watched(&fixture, "Arrived").await;
@@ -409,7 +915,7 @@ mod tests {
     async fn without_a_grant_a_triggered_run_writes_nothing() {
         let mut fixture = fixture("plugin_trigger_no_grant").await;
         write_plugin(&mut fixture, "Should not exist").await;
-        arm(&fixture, false);
+        let key = arm(&fixture, false).await;
         spawn(fixture.appstate.clone());
 
         add_watched(&fixture, "Arrived").await;
@@ -417,6 +923,14 @@ mod tests {
         // Give the listener the same budget the passing case gets, so this is
         // "it ran and refused to write" rather than "we did not wait".
         assert_eq!(wait_for(&fixture, "Should not exist", 1).await, 0);
+        assert!(fixture
+            .appstate
+            .store
+            .get_plugin_trigger(&key)
+            .unwrap()
+            .unwrap()
+            .pending_verdict
+            .is_some());
     }
 
     #[actix_rt::test]

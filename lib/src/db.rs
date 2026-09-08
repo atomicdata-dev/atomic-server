@@ -13,6 +13,7 @@ mod migrations;
 #[cfg(all(feature = "db-redb", target_arch = "wasm32"))]
 pub mod opfs_backend;
 pub mod plugin_meta;
+pub mod plugin_release;
 pub mod plugin_schedule;
 pub mod plugin_secret;
 pub mod plugin_trigger;
@@ -338,6 +339,7 @@ pub struct Db {
     /// a commit and a sync apply cannot replace each other's snapshot. Per
     /// store, not global — see [`crate::subject_lock`].
     pub(crate) subject_locks: crate::subject_lock::SubjectLocks,
+    plugin_locks: crate::subject_lock::SubjectLocks,
     /// Where the DB is stored on disk.
     #[allow(dead_code)]
     path: std::path::PathBuf,
@@ -381,6 +383,143 @@ fn default_sync_policy() -> Arc<RwLock<Arc<dyn crate::sync::policy::SyncPolicy>>
 }
 
 impl Db {
+    /// Persist already-admitted replica state, including independently created
+    /// duplicate import identities. Keep both subjects available for review;
+    /// authoring paths must still enforce identity uniqueness.
+    pub async fn persist_replicated_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        // Review validation holds this same identity lock while reading all
+        // copies. Replica changes must not land halfway through that review.
+        let _identity_guard = if let Some((parent, id)) = crate::import_identity::identity(resource)
+        {
+            Some(
+                self.subject_locks
+                    .lock(&format!(
+                        "import-identity:{}",
+                        serde_json::to_string(&(parent.pure_id(), &id))?
+                    ))
+                    .await,
+            )
+        } else {
+            None
+        };
+        self.persist_resource_projection(resource, false, true, true)
+            .await
+    }
+
+    async fn persist_resource_projection(
+        &self,
+        resource: &Resource,
+        check_required_props: bool,
+        update_index: bool,
+        overwrite_existing: bool,
+    ) -> AtomicResult<()> {
+        // This only works if no external functions rely on using add_resource for atom-like operations!
+        // However, add_atom uses set_propvals, which skips the validation.
+        let subject = self.normalize_subject(resource.get_subject());
+        let subject_str = subject.pure_id();
+        let existing = self.get_propvals(&subject_str).ok();
+        if !overwrite_existing && existing.is_some() {
+            return Err(format!(
+                "Failed to add: '{}', already exists, should not be overwritten.",
+                resource.get_subject()
+            )
+            .into());
+        }
+        if check_required_props {
+            resource.check_required_props(self).await?;
+        }
+        // Build a single transaction for index updates + resource persistence
+        let mut transaction = Transaction::new();
+
+        if update_index {
+            // Persist DID routing hint if available
+            if let Subject::Did {
+                drive_hint: Some(hint),
+                ..
+            } = &subject
+            {
+                transaction.push(Operation {
+                    tree: Tree::DidMapping,
+                    method: Method::Insert,
+                    key: subject_str.as_bytes().to_vec(),
+                    val: Some(hint.as_bytes().to_vec()),
+                });
+            }
+
+            if let Some(pv) = existing {
+                let subject = resource.get_subject();
+                // Evict against the state that is going away, not the one
+                // replacing it. Whether an entry belongs in a watched query's
+                // member list — and under which sort key it was filed — are
+                // facts about the old values. Handing over the new resource
+                // asks instead whether the *new* values still match, and a row
+                // edited out of a filtered view answers no, so the entry that
+                // needs deleting is the one deletion is skipped for. The row
+                // then stays listed in that view until the index is rebuilt.
+                let old = Resource::from_propvals(pv.clone(), subject.clone());
+                for (prop, val) in pv.iter() {
+                    let remove_atom = crate::Atom::new(subject.clone(), prop.into(), val.clone());
+                    self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
+                        .map_err(|e| {
+                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
+                        })?;
+                }
+            }
+            for a in resource.to_atoms() {
+                self.add_atom_to_index(&a, resource, &mut transaction)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
+            }
+            crate::search::index_resource(self, resource, &mut transaction)?;
+        }
+        // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
+        // state. Derive and
+        // persist it here UNCONDITIONALLY for every CRDT resource — in the
+        // same transaction as the `Tree::Resources` write — so the invariant
+        // holds that every resource blob is paired with a current snapshot.
+        // (The old code only wrote the snapshot when the propvals lacked a
+        // `loroUpdate`, so any resource that had been through `apply_state_doc`
+        // — i.e. every sync import — had its snapshot write silently skipped.)
+        // The `loroUpdate` propval is stripped from the `Tree::Resources`
+        // blob: that blob is a pure derived projection, not a second home for
+        // the CRDT state. Commits are native (immutable, not CRDT) — they get
+        // no snapshot and keep their `loroUpdate` payload in the blob.
+        let mut propvals = resource.get_propvals().clone();
+        if !subject.is_commit_did() {
+            let snapshot = resource.build_state_doc()?.export_snapshot();
+            propvals.remove(crate::urls::LORO_UPDATE);
+            transaction.push(Operation {
+                tree: Tree::LoroSnapshots,
+                method: Method::Insert,
+                key: subject_str.as_bytes().to_vec(),
+                val: Some(snapshot),
+            });
+        }
+
+        // Persist the resource data in the same transaction
+        let resource_bin = encode_propvals(&propvals)?;
+        transaction.push(Operation {
+            tree: Tree::Resources,
+            method: Method::Insert,
+            key: subject_str.as_bytes().to_vec(),
+            val: Some(resource_bin),
+        });
+        self.apply_transaction(&mut transaction)?;
+        if crate::import_identity::identity(resource).is_some() {
+            self.flush()?;
+        }
+        let _ = self.db_events.send(DbEvent::Changed {
+            subject: resource.get_subject().without_params(),
+            delta: None,
+            // Attributed here, while the importing write is still on the stack:
+            // the live push loop uses it to avoid sending an update straight
+            // back to the peer it came from.
+            source_id: crate::sync::ws_apply::current_import_source(),
+            is_new: false,
+            from_commit: false,
+        });
+        Ok(())
+    }
+
     /// Install a sync admission/quota policy (managed nodes). The default is
     /// [`crate::sync::policy::OpenPolicy`] (allow everything, no quotas).
     pub fn set_sync_policy(&self, policy: Arc<dyn crate::sync::policy::SyncPolicy>) {
@@ -472,6 +611,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -513,6 +653,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -550,6 +691,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -648,6 +790,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -802,6 +945,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -2155,7 +2299,24 @@ impl Db {
             return Ok(None);
         }
 
-        let out = f(&self.unwrap_secret(&secret.value)?);
+        // References are one hop, same drive, and restricted by BOTH origin lists.
+        // Rotating/revoking the connection affects every bound plugin immediately.
+        let resolved = if let Some(target) = &secret.connection {
+            if target.drive != key.drive {
+                return Err("cross-drive credential reference".into());
+            }
+            let Some(bytes) = self.kv.get(Tree::PluginSecret, &target.encode()?)? else {
+                return Ok(None);
+            };
+            let shared = PluginSecret::from_bytes(&bytes)?;
+            if shared.connection.is_some() || !shared.allows(origin) {
+                return Ok(None);
+            }
+            self.unwrap_secret(&shared.value)?
+        } else {
+            self.unwrap_secret(&secret.value)?
+        };
+        let out = f(&resolved);
 
         secret.record_use(at);
         self.kv
@@ -2330,6 +2491,11 @@ impl Db {
         }
 
         Ok(due)
+    }
+
+    /// Exclusion scoped to this database and plugin operation namespace.
+    pub async fn lock_plugin(&self, key: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        self.plugin_locks.lock(key).await
     }
 
     pub fn set_plugin_trigger(
@@ -2587,6 +2753,55 @@ impl Db {
         transaction: &mut Transaction,
         source_id: Option<&str>,
     ) -> AtomicResult<()> {
+        // Persist delivery before publishing the wake-up. A crashed or lagging
+        // subscriber can replay the queue; it is never the owner of the event.
+        // A sorted member moving positions has a delete and insert in this
+        // batch, which is not a membership edge.
+        let mut edges = std::collections::BTreeMap::new();
+        for op in transaction
+            .iter()
+            .filter(|op| op.tree == Tree::QueryMembers)
+        {
+            if let Some((query, subject)) = query_index::parse_members_key_id_subject(&op.key) {
+                let delta = edges.entry((query, subject)).or_insert(0i32);
+                *delta += if matches!(op.method, Method::Insert) {
+                    1
+                } else {
+                    -1
+                };
+            }
+        }
+        for ((query, subject), delta) in edges {
+            if delta == 0 {
+                continue;
+            }
+            let edge = plugin_trigger::Edge::of(delta > 0);
+            for (key, trigger) in self.plugin_triggers_for_query(&query)? {
+                if !trigger.wants(edge) {
+                    continue;
+                }
+                let event = plugin_trigger::QueuedEvent {
+                    id: format!(
+                        "{:020}-{}",
+                        crate::utils::now(),
+                        crate::utils::random_string(24)
+                    ),
+                    key,
+                    subject: subject.clone(),
+                    edge,
+                    at: crate::utils::now(),
+                    verdict: None,
+                    waiting_for_review: false,
+                    authorization: None,
+                };
+                transaction.push(Operation {
+                    tree: Tree::PluginMeta,
+                    method: Method::Insert,
+                    key: format!("plugin-event/v1/{}", event.id).into_bytes(),
+                    val: Some(serde_json::to_vec(&event)?),
+                });
+            }
+        }
         self.kv.apply_batch(transaction)?;
 
         for op in transaction.iter() {
@@ -3345,108 +3560,30 @@ impl Storelike for Db {
         update_index: bool,
         overwrite_existing: bool,
     ) -> AtomicResult<()> {
-        // This only works if no external functions rely on using add_resource for atom-like operations!
-        // However, add_atom uses set_propvals, which skips the validation.
-        let subject = self.normalize_subject(resource.get_subject());
-        let subject_str = subject.pure_id();
-        let existing = self.get_propvals(&subject_str).ok();
-        if !overwrite_existing && existing.is_some() {
-            return Err(format!(
-                "Failed to add: '{}', already exists, should not be overwritten.",
-                resource.get_subject()
-            )
-            .into());
-        }
-        if check_required_props {
-            resource.check_required_props(self).await?;
-        }
-        // Build a single transaction for index updates + resource persistence
-        let mut transaction = Transaction::new();
-
-        if update_index {
-            // Persist DID routing hint if available
-            if let Subject::Did {
-                drive_hint: Some(hint),
-                ..
-            } = &subject
-            {
-                transaction.push(Operation {
-                    tree: Tree::DidMapping,
-                    method: Method::Insert,
-                    key: subject_str.as_bytes().to_vec(),
-                    val: Some(hint.as_bytes().to_vec()),
-                });
-            }
-
-            if let Some(pv) = existing {
-                let subject = resource.get_subject();
-                // Evict against the state that is going away, not the one
-                // replacing it. Whether an entry belongs in a watched query's
-                // member list — and under which sort key it was filed — are
-                // facts about the old values. Handing over the new resource
-                // asks instead whether the *new* values still match, and a row
-                // edited out of a filtered view answers no, so the entry that
-                // needs deleting is the one deletion is skipped for. The row
-                // then stays listed in that view until the index is rebuilt.
-                let old = Resource::from_propvals(pv.clone(), subject.clone());
-                for (prop, val) in pv.iter() {
-                    let remove_atom = crate::Atom::new(subject.clone(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
-                        .map_err(|e| {
-                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
-                        })?;
+        let _import_guard = if let Some((parent, id)) = crate::import_identity::identity(resource) {
+            let guard = self
+                .subject_locks
+                .lock(&format!(
+                    "import-identity:{}",
+                    serde_json::to_string(&(parent.pure_id(), &id))?
+                ))
+                .await;
+            if let Some(found) = crate::import_identity::find_existing(self, &parent, &id).await? {
+                if Subject::from(found).pure_id() != resource.get_subject().pure_id() {
+                    return Err("Import identity already exists; preview again instead of creating a duplicate".into());
                 }
             }
-            for a in resource.to_atoms() {
-                self.add_atom_to_index(&a, resource, &mut transaction)
-                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
-            }
-            crate::search::index_resource(self, resource, &mut transaction)?;
-        }
-        // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
-        // state. Derive and
-        // persist it here UNCONDITIONALLY for every CRDT resource — in the
-        // same transaction as the `Tree::Resources` write — so the invariant
-        // holds that every resource blob is paired with a current snapshot.
-        // (The old code only wrote the snapshot when the propvals lacked a
-        // `loroUpdate`, so any resource that had been through `apply_state_doc`
-        // — i.e. every sync import — had its snapshot write silently skipped.)
-        // The `loroUpdate` propval is stripped from the `Tree::Resources`
-        // blob: that blob is a pure derived projection, not a second home for
-        // the CRDT state. Commits are native (immutable, not CRDT) — they get
-        // no snapshot and keep their `loroUpdate` payload in the blob.
-        let mut propvals = resource.get_propvals().clone();
-        if !subject.is_commit_did() {
-            let snapshot = resource.build_state_doc()?.export_snapshot();
-            propvals.remove(crate::urls::LORO_UPDATE);
-            transaction.push(Operation {
-                tree: Tree::LoroSnapshots,
-                method: Method::Insert,
-                key: subject_str.as_bytes().to_vec(),
-                val: Some(snapshot),
-            });
-        }
-
-        // Persist the resource data in the same transaction
-        let resource_bin = encode_propvals(&propvals)?;
-        transaction.push(Operation {
-            tree: Tree::Resources,
-            method: Method::Insert,
-            key: subject_str.as_bytes().to_vec(),
-            val: Some(resource_bin),
-        });
-        self.apply_transaction(&mut transaction)?;
-        let _ = self.db_events.send(DbEvent::Changed {
-            subject: resource.get_subject().without_params(),
-            delta: None,
-            // Attributed here, while the importing write is still on the stack:
-            // the live push loop uses it to avoid sending an update straight
-            // back to the peer it came from.
-            source_id: crate::sync::ws_apply::current_import_source(),
-            is_new: false,
-            from_commit: false,
-        });
-        Ok(())
+            Some(guard)
+        } else {
+            None
+        };
+        self.persist_resource_projection(
+            resource,
+            check_required_props,
+            update_index,
+            overwrite_existing,
+        )
+        .await
     }
 
     /// Apply a single signed Commit to the Db.
@@ -3491,6 +3628,50 @@ impl Storelike for Db {
 
         let commit_response = commit.validate_and_build_response(opts, store).await?;
 
+        if let Some(old) = &commit_response.resource_old {
+            if old.get(crate::urls::IMPORT_RESOLUTION).is_ok() {
+                let same_identity = commit_response.resource_new.as_ref().is_some_and(|new| {
+                    crate::import_identity::identity(old) == crate::import_identity::identity(new)
+                });
+                if !same_identity {
+                    return Err(
+                        "A reviewed primary record must retain its identity and history".into(),
+                    );
+                }
+            }
+        }
+        let import_guard = if let Some(new) = &commit_response.resource_new {
+            crate::import_identity::validate_baseline(commit_response.resource_old.as_ref(), new)?;
+            crate::import_identity::validate_reference_review(
+                commit_response.resource_old.as_ref(),
+                new,
+            )?;
+            if let Some((parent, id)) = crate::import_identity::identity(new) {
+                let guard = self
+                    .subject_locks
+                    .lock(&format!(
+                        "import-identity:{}",
+                        serde_json::to_string(&(parent.pure_id(), &id))?
+                    ))
+                    .await;
+                if let Some(found) = crate::import_identity::validate_candidate(
+                    self,
+                    commit_response.resource_old.as_ref(),
+                    new,
+                )
+                .await?
+                {
+                    if Subject::from(found).pure_id() != new.get_subject().pure_id() {
+                        return Err("Import identity already exists; preview again instead of creating a duplicate".into());
+                    }
+                }
+                Some(guard)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let mut transaction = Transaction::new();
 
         let mut root_subject: Option<String> = None;
@@ -3643,6 +3824,19 @@ impl Storelike for Db {
             commit_response.source_id.as_deref(),
         )?;
 
+        // An import receipt may be the only evidence available when retrying
+        // after a process kill. Persist identity, snapshot and index before ACK.
+        if [&commit_response.resource_new, &commit_response.resource_old]
+            .into_iter()
+            .filter_map(|r| r.as_ref())
+            .any(|r| {
+                crate::import_identity::identity(r).is_some()
+                    || r.get(crate::urls::IMPORT_REFERENCE_REVIEW).is_ok()
+            })
+        {
+            store.flush()?;
+        }
+
         // Notify subscribers
         let subject = commit_response.commit.subject.without_params();
         let is_destroy = commit_response.commit.destroy.unwrap_or(false);
@@ -3685,6 +3879,7 @@ impl Storelike for Db {
         // exact self-reentrancy `subject_lock` warns against and deadlocks the
         // request forever, since nothing else can ever release a lock this
         // task already holds.
+        drop(import_guard);
         drop(subject_guard);
 
         // AFTER APPLY COMMIT HANDLERS
