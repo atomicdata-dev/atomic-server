@@ -8,6 +8,7 @@ import {
   dataBrowser,
 } from '@tomic/lib';
 import {
+  isEmbeddedVaultDrive,
   ensureVaultBackup,
   forgetEnrolledVaults,
   onVaultChanged,
@@ -439,6 +440,123 @@ describe('watchForVaultBackups', () => {
     return { win: win as unknown as Window, doc, listeners };
   }
 
+  it('backs up during continuous editing by the maximum delay', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    const deps = fakeDeps();
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 1000,
+      maxWaitMs: 2000,
+      window: null,
+    });
+
+    for (let i = 0; i < 5; i++) {
+      store.notifyResourceSaved(store.getResourceLoading(`${DRIVE}/doc`));
+      await vi.advanceTimersByTimeAsync(500);
+    }
+
+    expect(deps.runVaultBackup).toHaveBeenCalled();
+    stop();
+  });
+
+  it('retains pending backups when switching drives', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    const other = 'did:ad:drive:other';
+    store.registerLocalOnlyDrive(DRIVE);
+    store.registerLocalOnlyDrive(other);
+    store.setDrive(DRIVE);
+    const deps = fakeDeps();
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 1000,
+      window: null,
+    });
+    store.notifyResourceSaved(store.getResourceLoading(`${DRIVE}/doc`));
+    store.setDrive(other);
+    store.notifyResourceSaved(store.getResourceLoading(`${other}/doc`));
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(
+      vi
+        .mocked(deps.runVaultBackup)
+        .mock.calls.map(([args]) => args.driveSubject),
+    ).toEqual(expect.arrayContaining([DRIVE, other]));
+    stop();
+  });
+
+  it('retries when the account becomes available without another edit', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    const deps = fakeDeps({ hasAccount: vi.fn(async () => false) });
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 10,
+      retryMs: 100,
+      window: null,
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+    vi.mocked(deps.hasAccount).mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(110);
+    expect(deps.runVaultBackup).toHaveBeenCalled();
+    stop();
+  });
+
+  it('rediscovers an existing enrollment after reload without an edit', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    const deps = fakeDeps();
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 10,
+      window: null,
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(deps.listVaultDrives).toHaveBeenCalled();
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('recognizes Tauri embedded nodes but excludes external servers', async () => {
+    const local = new Store({
+      serverUrl: 'http://localhost:9883',
+      connect: false,
+    });
+    const remote = new Store({
+      serverUrl: 'https://example.com',
+      connect: false,
+    });
+    vi.stubGlobal('window', {
+      __TAURI_INTERNALS__: {},
+      location: { protocol: 'tauri:', hostname: 'localhost' },
+    });
+
+    try {
+      expect(isEmbeddedVaultDrive(local)).toBe(true);
+      expect(isEmbeddedVaultDrive(remote)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retries pending work immediately when connectivity returns', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    const deps = fakeDeps({ hasAccount: vi.fn(async () => false) });
+    const { win, listeners } = fakeWindow();
+    const stop = watchForVaultBackups(store, deps, { idleMs: 10, window: win });
+    await vi.advanceTimersByTimeAsync(20);
+    vi.mocked(deps.hasAccount).mockResolvedValue(true);
+    listeners.get('online')!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
   it('backs the open local-only drive up once the edits stop', async () => {
     vi.useFakeTimers();
     const store = await signedInStore();
@@ -471,7 +589,7 @@ describe('watchForVaultBackups', () => {
     vi.useFakeTimers();
     const store = await signedInStore();
     store.setDrive(DRIVE);
-    const deps = fakeDeps();
+    const deps = fakeDeps({ listVaultDrives: vi.fn(async () => []) });
     const { win } = fakeWindow();
     const stop = watchForVaultBackups(store, deps, { idleMs: 10, window: win });
 

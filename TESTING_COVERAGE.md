@@ -465,3 +465,9 @@ The node-type toolbar lifecycle is covered by `NodeSelectMenu.test.tsx` (destroy
 editors do not expose state/commands) and `oxc-react-compiler.test.ts` (production
 compilation does not hoist command getters into render). `sentry.test.ts` covers
 packaged WebView initialization without server-injected Sentry configuration.
+
+Automatic Vault scheduling (`vaultAutoBackup.test.ts`) covers sustained-edit
+maximum delay, queued edits across drive switches, late account availability,
+connectivity recovery, enrollment rediscovery after reload, and distinguishing
+Tauri embedded nodes from remote servers. Native background execution after OS
+suspension remains outside this scheduler's guarantees.

@@ -4,6 +4,7 @@ import { useSettings } from '../helpers/AppSettings';
 import { deviceHasDriveData } from '../helpers/driveData';
 import { fetchPrivateDriveSubject } from '../helpers/privateDrive';
 import {
+  AUTO_BACKUP_RETRY_MS,
   ensureVaultBackup,
   watchForVaultBackups,
 } from '../helpers/managed/vaultAutoBackup';
@@ -16,8 +17,8 @@ import {
  * drive and backs it up once — which is how an account that predates automatic
  * backup, or that only ever signs in on this device, gets covered without
  * going through sign-in again. After that it backs the open drive up again a
- * while after each edit. Both are no-ops without a control-plane session, so
- * a self-hosted install pays one failed `/api/me` per sign-in and nothing else.
+ * while after each edit. Periodic retries cover late account linking and data
+ * arriving after startup. Both paths require an eligible account session.
  */
 export function CloudVaultWatcher() {
   const store = useStore();
@@ -31,22 +32,39 @@ export function CloudVaultWatcher() {
 
     let cancelled = false;
 
-    void (async () => {
-      const drive = await fetchPrivateDriveSubject(store, agent).catch(
-        () => undefined,
-      );
+    let checking = false;
 
-      if (cancelled || !drive) return;
+    const check = async () => {
+      if (checking || cancelled) return;
+      checking = true;
 
-      // Nothing to back up from a device that does not hold the drive — and
-      // sign-in handles that device by restoring instead.
-      if (!(await deviceHasDriveData(store, drive))) return;
+      try {
+        const drive = await fetchPrivateDriveSubject(store, agent).catch(
+          () => undefined,
+        );
 
-      if (!cancelled) void ensureVaultBackup(store, drive);
-    })();
+        if (cancelled || !drive) return;
+
+        // Nothing to back up from a device that does not hold the drive — and
+        // sign-in handles that device by restoring instead.
+        if (!(await deviceHasDriveData(store, drive))) return;
+
+        if (!cancelled) await ensureVaultBackup(store, drive);
+      } finally {
+        checking = false;
+      }
+    };
+
+    void check();
+    // Account linking, restored data and connectivity can arrive after mount.
+    const retry = setInterval(() => void check(), AUTO_BACKUP_RETRY_MS);
+    const onOnline = () => void check();
+    window.addEventListener('online', onOnline);
 
     return () => {
       cancelled = true;
+      clearInterval(retry);
+      window.removeEventListener('online', onOnline);
     };
     // `agent` is a new object on every settings render; its subject is what
     // identifies a sign-in.
