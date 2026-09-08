@@ -87,6 +87,12 @@ async function buildStyling(
     animatePageTransitions: stylingJson.animatePageTransitions as
       | boolean
       | undefined,
+    // Raw, unlike the published runtime: the server runs this through
+    // lightningcss (`sanitize_custom_css`) and there is no such parser in the
+    // browser bundle. A preview is the owner's own CSS on the owner's own
+    // screen, so the difference only shows up as *more* forgiving here —
+    // CSS the server would reject still renders in the dialog.
+    customCss: form.get(forms.properties.formCustomCss) as string | undefined,
   };
 
   const coverImage = form.get(forms.properties.coverImage) as

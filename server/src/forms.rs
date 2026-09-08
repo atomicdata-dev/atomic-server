@@ -9,6 +9,9 @@
 
 use std::collections::{HashMap, HashSet};
 
+use lightningcss::rules::CssRule;
+use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
+use lightningcss::targets::{Browsers, Targets};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 
@@ -97,6 +100,11 @@ pub struct FormStyling {
     /// kiosks and other shared devices.
     #[serde(rename = "saveDrafts", skip_serializing_if = "Option::is_none")]
     pub save_drafts: Option<bool>,
+    /// The owner's own CSS, already through [sanitize_custom_css]. The
+    /// renderer injects it into the `atomic-form-custom` cascade layer, scoped
+    /// to the form's root element (`FormShell::wrapCustomCss`).
+    #[serde(rename = "customCss", skip_serializing_if = "Option::is_none")]
+    pub custom_css: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -750,7 +758,92 @@ fn build_form_styling(form: &Resource) -> FormStyling {
         show_progress_bar: get_bool("showProgressBar"),
         animate_page_transitions: get_bool("animatePageTransitions"),
         save_drafts: get_bool("saveDrafts"),
+        custom_css: form
+            .get(atomic_lib::urls::FORM_CUSTOM_CSS)
+            .ok()
+            .map(|v| v.to_string())
+            .as_deref()
+            .and_then(sanitize_custom_css),
     }
+}
+
+/// Upper bound on stored custom CSS. Anything past it is dropped whole rather
+/// than truncated — half a stylesheet renders worse than none. The builder
+/// enforces the same limit up front, so hitting this means a hand-written
+/// commit.
+pub const MAX_CUSTOM_CSS_BYTES: usize = 50 * 1024;
+
+/// Browser floor for downleveling custom CSS. Matches what the renderer's own
+/// stylesheet already requires of a visitor — `@scope` (Chrome 118, Safari
+/// 17.4, Firefox 128) is the binding constraint, since `wrapCustomCss` puts
+/// every custom rule inside one. Newer syntax than this (relative colors,
+/// `light-dark()`, style queries) gets compiled down for free; going lower
+/// would be theatre, as the `@scope` wrapper would drop the rules anyway.
+fn custom_css_targets() -> Targets {
+    const fn v(major: u32, minor: u32) -> Option<u32> {
+        Some((major << 16) | (minor << 8))
+    }
+
+    Targets::from(Browsers {
+        chrome: v(118, 0),
+        edge: v(118, 0),
+        safari: v(17, 4),
+        ios_saf: v(17, 4),
+        firefox: v(128, 0),
+        ..Browsers::default()
+    })
+}
+
+/// Parses, sanitizes and minifies a form owner's custom CSS.
+///
+/// Returns `None` — dropping the CSS rather than shipping it — when the input
+/// is empty, over [MAX_CUSTOM_CSS_BYTES], or does not parse. Silently losing
+/// styles is not great, but it beats serving a broken stylesheet to visitors,
+/// and the builder lints the CSS as it is typed so this is a backstop rather
+/// than the owner's first sight of the error.
+///
+/// Sanitizing is one rule: **`@import` is stripped**. Left in, it would make
+/// every visitor's browser fetch a stylesheet from a third-party host on page
+/// load — a request the owner can make deliberately by inlining what they
+/// need, but not one that should ride along invisibly. `@font-face` with a
+/// remote `src` is deliberately left alone: it carries the same third-party
+/// request, but it is also the single most common reason to write custom CSS
+/// at all, and unlike `@import` it cannot bring in arbitrary rules.
+///
+/// Re-serializing from the parsed AST has a second effect worth naming: the
+/// output is structurally sound by construction, so CSS that closes its braces
+/// early cannot escape the `@layer`/`@scope` wrapper the renderer puts around
+/// it.
+pub fn sanitize_custom_css(css: &str) -> Option<String> {
+    if css.trim().is_empty() || css.len() > MAX_CUSTOM_CSS_BYTES {
+        return None;
+    }
+
+    let mut sheet = StyleSheet::parse(css, ParserOptions::default()).ok()?;
+
+    sheet
+        .rules
+        .0
+        .retain(|rule| !matches!(rule, CssRule::Import(_)));
+
+    let targets = custom_css_targets();
+
+    sheet
+        .minify(MinifyOptions {
+            targets,
+            ..MinifyOptions::default()
+        })
+        .ok()?;
+
+    let printed = sheet
+        .to_css(PrinterOptions {
+            minify: true,
+            targets,
+            ..PrinterOptions::default()
+        })
+        .ok()?;
+
+    Some(printed.code).filter(|code| !code.is_empty())
 }
 
 async fn build_page_definition(
@@ -2618,6 +2711,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn definition_carries_sanitized_custom_css() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        form.set(
+            urls::FORM_CUSTOM_CSS.into(),
+            Value::String(
+                "@import url('https://evil.example/x.css');\n\
+                 /* my theme */\n\
+                 .atomic-form-card {\n  border-radius: 42px;\n}\n"
+                    .into(),
+            ),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        let css = styling.custom_css.as_deref().unwrap();
+
+        assert!(css.contains(".atomic-form-card"));
+        assert!(css.contains("42px"));
+        assert!(!css.contains("@import"), "sanitized on the way out: {css}");
+        assert!(!css.contains("my theme"), "minified on the way out: {css}");
+
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert_eq!(wire["customCss"], json!(css));
+    }
+
+    #[tokio::test]
+    async fn definition_omits_custom_css_when_unset() {
+        let store = init_store().await;
+        let (form, _email_prop) = build_test_form(&store).await;
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+
+        assert!(styling.custom_css.is_none());
+        // Absent, not null — the renderer's `styling.customCss` check is a
+        // truthiness test and the wire format stays as small as it was.
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert!(wire.get("customCss").is_none());
+    }
+
+    #[tokio::test]
     async fn definition_can_disable_progress_bar() {
         let store = init_store().await;
         let (mut form, _email_prop) = build_test_form(&store).await;
@@ -4054,6 +4192,78 @@ mod tests {
                 assert_eq!(conditions[0].value, json!("trigger@example.com"));
             }
             other => panic!("expected a Field block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sanitize_custom_css_minifies_and_keeps_rules() {
+        let css = sanitize_custom_css(
+            "/* a comment */\n.atomic-form-card {\n  border-radius: 24px;\n}\n",
+        )
+        .unwrap();
+
+        assert!(css.contains(".atomic-form-card"));
+        assert!(css.contains("24px"));
+        // Minified: the comment and the pretty-printing are gone.
+        assert!(!css.contains("comment"));
+        assert!(!css.contains('\n'));
+    }
+
+    #[test]
+    fn sanitize_custom_css_strips_imports() {
+        let css =
+            sanitize_custom_css("@import url('https://evil.example/x.css');\n.a { color: red }")
+                .unwrap();
+
+        assert!(
+            !css.contains("@import") && !css.contains("evil.example"),
+            "@import must not reach a visitor's browser, got: {css}"
+        );
+        assert!(css.contains(".a"), "the rest of the sheet survives: {css}");
+    }
+
+    #[test]
+    fn sanitize_custom_css_keeps_font_face() {
+        let css = sanitize_custom_css(
+            "@font-face { font-family: Foo; src: url(https://fonts.example/f.woff2) }",
+        )
+        .unwrap();
+
+        assert!(css.contains("@font-face"));
+        assert!(css.contains("fonts.example"));
+    }
+
+    #[test]
+    fn sanitize_custom_css_rejects_unparseable_and_empty() {
+        assert_eq!(sanitize_custom_css("   \n  "), None);
+        assert_eq!(sanitize_custom_css("this is not css {{{{"), None);
+        // Parseable but contributes nothing — no point shipping a <style> tag.
+        assert_eq!(sanitize_custom_css("/* just a comment */"), None);
+    }
+
+    #[test]
+    fn sanitize_custom_css_rejects_oversized() {
+        let huge = format!(
+            ".a {{ color: red }}{}",
+            " ".repeat(MAX_CUSTOM_CSS_BYTES)
+        );
+
+        assert_eq!(sanitize_custom_css(&huge), None);
+    }
+
+    #[test]
+    fn sanitize_custom_css_reserializes_brace_breakouts() {
+        // A shell-escape attempt: close our @scope/@layer wrapper, then write
+        // a top-level rule. Round-tripping through the AST means the printed
+        // output is balanced whatever the input did.
+        let css = sanitize_custom_css(".a { color: red } } } body { display: none }");
+
+        if let Some(code) = css {
+            assert_eq!(
+                code.matches('{').count(),
+                code.matches('}').count(),
+                "output must be brace-balanced, got: {code}"
+            );
         }
     }
 }

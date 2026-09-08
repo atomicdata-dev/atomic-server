@@ -8610,3 +8610,38 @@ msgstr "The most characters an answer may carry. Going over is shown as an error
 #: src/chunks/FormBuilder/PageSettingsPanel.tsx
 msgid "Page"
 msgstr "Page"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Custom CSS"
+msgstr "Custom CSS"
+
+#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+#~ msgstr "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Your CSS only sees the form: <0/> is its outermost element (override the <1/> variables there), and <2/> and <3/> are out of reach.{0} <4/> is stripped when the form is served — paste in what you need instead."
+msgstr "Your CSS only sees the form: <0/> is its outermost element (override the <1/> variables there), and <2/> and <3/> are out of reach.{0} <4/> is stripped when the form is served — paste in what you need instead."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Every class you can target is in{0} <0>the form renderer's stylesheet</0> ."
+msgstr "Every class you can target is in{0} <0>the form renderer's stylesheet</0> ."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need <0/>{0} — a plain <1/> rule already wins."
+msgstr "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need <0/>{0} — a plain <1/> rule already wins."
+
+#. 0: Math.round(bytes / 1024); 1: MAX_CUSTOM_CSS_BYTES / 1024
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Too long: {0} KB of CSS, the limit is {1} KB. Longer stylesheets are dropped entirely when the form is served."
+msgstr "Too long: {0} KB of CSS, the limit is {1} KB. Longer stylesheets are dropped entirely when the form is served."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "This block is never closed — everything after it is part of it."
+msgstr "This block is never closed — everything after it is part of it."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Closing brace without a matching opening one."
+msgstr "Closing brace without a matching opening one."

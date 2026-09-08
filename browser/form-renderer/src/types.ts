@@ -286,6 +286,13 @@ export interface FormStyling {
    * in). Off unless set to `true`. A visitor's `prefers-reduced-motion`
    * always wins over `true`. */
   animatePageTransitions?: boolean;
+  /** The form owner's own CSS, injected by `FormShell` into the
+   * `atomic-form-custom` cascade layer and scoped to the form's root element.
+   * Overrides anything in `base.css` without needing `!important` — see
+   * `wrapCustomCss`. Sanitized and minified server-side
+   * (`server/src/forms.rs::sanitize_custom_css`); a builder preview injects it
+   * unsanitized, since it is the owner's own CSS on the owner's own screen. */
+  customCss?: string;
 }
 
 /** Captcha client config, filled in by the server for published forms

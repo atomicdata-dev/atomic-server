@@ -1,6 +1,6 @@
 export { FormRenderer } from './FormRenderer.js';
 export type { FormRendererProps, SubmitResult } from './FormRenderer.js';
-export { FormShell, stylingVars } from './FormShell.js';
+export { FormShell, stylingVars, wrapCustomCss } from './FormShell.js';
 export type { FormShellProps } from './FormShell.js';
 export { FormMarkdown } from './FormMarkdown.js';
 export type { FormMarkdownProps } from './FormMarkdown.js';

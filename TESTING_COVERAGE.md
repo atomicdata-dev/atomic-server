@@ -622,6 +622,11 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Scheduling end to end: a close-at in the past and an open-at in the future each 410 the definition, the HTML page (still embeddable) and submit; clearing both bounds reopens the form, for a real anonymous visitor too | `server/src/tests.rs::form_submission_flow` (step 7b) + `browser/e2e/tests/forms-submission.spec.ts` ("a scheduled window opens and closes a published form") |
 | A GET of a Form serves the *persisted* Loro snapshot: the class extender's `form-submission-summary` is in the JSON-AD but never as a Loro op the store does not have (the op that parked every later commit from a builder tab that had hydrated over HTTP) | `server/src/tests.rs::form_submission_flow` (step 2b) + `lib/src/class_extender.rs::extended_get_serves_the_persisted_snapshot` |
 | Visitor-facing form routes forbid HTTP caching (`Cache-Control: no-store` on the definition, 200 and 410 alike) — a cached 410 is what made the builder's publish look like it never reached the server | `server/src/tests.rs::form_submission_flow` (steps 1 and 2) |
+| Custom CSS is sanitized and minified on the way out: `@import` stripped (it would fetch a third-party sheet into every visitor's browser), `@font-face` kept, empty / unparseable / over-50 KB dropped whole, and brace breakouts re-serialized balanced so they cannot escape the renderer's `@layer`/`@scope` wrapper | `server/src/forms.rs` (`sanitize_custom_css_minifies_and_keeps_rules` … `sanitize_custom_css_reserializes_brace_breakouts`) |
+| Sanitized custom CSS reaches `styling.customCss` in the definition, and the key is absent from the wire format when unset | `server/src/forms.rs::definition_carries_sanitized_custom_css` + `definition_omits_custom_css_when_unset` |
+| The renderer wraps custom CSS in `@layer atomic-form-custom` + `@scope (.atomic-form-shell)` verbatim, and injects nothing at all when there is none | `browser/form-renderer/src/customCss.test.ts` |
+| The builder's CSS editor catches what would silently lose an owner's work: unbalanced braces (ignoring braces inside comments and strings) and CSS past the server's byte cap | `browser/data-browser/src/chunks/CodeEditor/cssLint.test.ts` |
+| Custom CSS end to end: written in the builder, published, and applied for an anonymous visitor on the real `/form/:id` route — including the layering claim itself, since a bare `h1` (0-0-1) overrides the renderer's `.atomic-form-title` (0-1-0), which only a later cascade layer can do; plus `:scope` re-theming through `--atomic-form-*`, `@import` gone from the served definition, and a `body` rule matching nothing (`@scope` held) | `browser/e2e/tests/forms-submission.spec.ts` ("a published form carries the owner's custom CSS") |
 
 Previously listed here as "Not covered (scheduling, blocked by a sync bug)":
 the reopen half of the scheduling e2e. Two things were going on, neither of
@@ -636,6 +641,14 @@ did work, so the server converged; what kept the test — and a console
 `fetch` — reporting the old state was Chromium replaying a cached `410` for
 the definition URL. The e2e probe now fetches with `cache: 'no-store'` and the
 server sends `Cache-Control: no-store` on those routes.
+
+Not covered (custom CSS): only one browser. `@scope` sets the floor at Chrome
+118 / Safari 17.4 / Firefox 128 and the suite is chromium-only, so a visitor
+below that floor silently gets the base styling and no test would notice. The
+e2e above deliberately asserts the *layer* rather than just "some CSS applied"
+— an identical `h1` rule placed in `atomic-form-base` loses to
+`.atomic-form-title`, and in `atomic-form-custom` wins, so that assertion fails
+if the layering regresses rather than passing on a coincidence.
 
 Not covered (extended types): the client-side mirror of the new validators in
 `browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the

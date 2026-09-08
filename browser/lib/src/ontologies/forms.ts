@@ -33,6 +33,7 @@ export const forms = {
     formFieldType: 'https://atomicdata.dev/properties/form-field-type',
     formFieldOptions: 'https://atomicdata.dev/properties/form-field-options',
     formStyling: 'https://atomicdata.dev/properties/form-styling',
+    formCustomCss: 'https://atomicdata.dev/properties/form-custom-css',
     formSubmissionSummary:
       'https://atomicdata.dev/properties/form-submission-summary',
     formAccess: 'https://atomicdata.dev/properties/form-access',
@@ -59,6 +60,7 @@ export const forms = {
       'https://atomicdata.dev/properties/form-settings',
       'https://atomicdata.dev/properties/form-publish-id',
       'https://atomicdata.dev/properties/form-styling',
+      'https://atomicdata.dev/properties/form-custom-css',
       'https://atomicdata.dev/properties/form-access',
       'https://atomicdata.dev/properties/cover-image',
       'https://atomicdata.dev/properties/image-position',
@@ -133,6 +135,7 @@ declare module '../index.js' {
         | typeof forms.properties.formSettings
         | typeof forms.properties.formPublishId
         | typeof forms.properties.formStyling
+        | typeof forms.properties.formCustomCss
         | typeof forms.properties.formAccess
         | typeof forms.properties.coverImage
         | typeof forms.properties.imagePosition;
@@ -202,6 +205,7 @@ declare module '../index.js' {
     [forms.properties.formFieldType]: string;
     [forms.properties.formFieldOptions]: JSONValue;
     [forms.properties.formStyling]: JSONValue;
+    [forms.properties.formCustomCss]: string;
     [forms.properties.formSubmissionSummary]: JSONValue;
     [forms.properties.formAccess]: string;
     [forms.properties.formCode]: string;
@@ -230,6 +234,7 @@ declare module '../index.js' {
     [forms.properties.formFieldType]: 'formFieldType';
     [forms.properties.formFieldOptions]: 'formFieldOptions';
     [forms.properties.formStyling]: 'formStyling';
+    [forms.properties.formCustomCss]: 'formCustomCss';
     [forms.properties.formSubmissionSummary]: 'formSubmissionSummary';
     [forms.properties.formAccess]: 'formAccess';
     [forms.properties.formCode]: 'formCode';

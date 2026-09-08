@@ -261,6 +261,7 @@ pub const REQUIRED: &str = "https://atomicdata.dev/properties/required";
 pub const FORM_FIELD_TYPE: &str = "https://atomicdata.dev/properties/form-field-type";
 pub const FORM_FIELD_OPTIONS: &str = "https://atomicdata.dev/properties/form-field-options";
 pub const FORM_STYLING: &str = "https://atomicdata.dev/properties/form-styling";
+pub const FORM_CUSTOM_CSS: &str = "https://atomicdata.dev/properties/form-custom-css";
 pub const FORM_SUBMISSION_SUMMARY: &str =
     "https://atomicdata.dev/properties/form-submission-summary";
 pub const FORM_ACCESS: &str = "https://atomicdata.dev/properties/form-access";

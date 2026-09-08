@@ -8620,3 +8620,38 @@ msgstr "El número máximo de caracteres que puede tener una respuesta. Superarl
 #: src/chunks/FormBuilder/PageSettingsPanel.tsx
 msgid "Page"
 msgstr "Página"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Custom CSS"
+msgstr "CSS personalizado"
+
+#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+#~ msgstr "Se aplica al formulario publicado y a la vista previa. Se superpone a los estilos propios del formulario, por lo que nunca necesitas{0} <0/> — una regla <1/> sencilla ya gana."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Your CSS only sees the form: <0/> is its outermost element (override the <1/> variables there), and <2/> and <3/> are out of reach.{0} <4/> is stripped when the form is served — paste in what you need instead."
+msgstr "Tu CSS solo ve el formulario: <0/> es su elemento más externo (sobrescribe las variables <1/> allí), y <2/> y <3/> están fuera de alcance.{0} <4/> se elimina cuando se sirve el formulario — pega lo que necesites en su lugar."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Every class you can target is in{0} <0>the form renderer's stylesheet</0> ."
+msgstr "Cada clase a la que puedes apuntar está en{0} <0>la hoja de estilos del renderizador del formulario</0>."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need <0/>{0} — a plain <1/> rule already wins."
+msgstr "Se aplica al formulario publicado y a la Vista previa. Se superpone sobre los estilos propios del formulario, por lo que nunca necesita <0/>{0} — ya gana una regla simple <1/>."
+
+#. 0: Math.round(bytes / 1024); 1: MAX_CUSTOM_CSS_BYTES / 1024
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Too long: {0} KB of CSS, the limit is {1} KB. Longer stylesheets are dropped entirely when the form is served."
+msgstr "Demasiado largo: {0} KB de CSS, el límite es {1} KB. Las hojas de estilo más largas se descartan por completo al servir el formulario."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "This block is never closed — everything after it is part of it."
+msgstr "Este bloque nunca se cierra: todo lo que sigue es parte de él."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Closing brace without a matching opening one."
+msgstr "Llave de cierre sin una de apertura que coincida."

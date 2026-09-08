@@ -94,6 +94,16 @@
     "https://atomicdata.dev/properties/shortname": "form-styling"
   },
   {
+    "@id": "https://atomicdata.dev/properties/form-custom-css",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Custom CSS for a published Form, written by the form owner. Injected into the `atomic-form-custom` cascade layer and scoped to the form's root element, so it overrides the renderer's own styles without needing `!important`, and cannot affect anything outside the form. Inside it, `:scope` is the form root (that is where the `--atomic-form-*` theme variables are overridden; `:root` is out of reach). The class names it targets are documented by the renderer's stylesheet: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/form-renderer/src/style.css . `@import` rules are stripped when the form is served.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-custom-css"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/form-access",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
     "https://atomicdata.dev/properties/description": "Who can open a published Form. One of: public (anyone with the link; the default when absent), invite-only (a valid, unused FormInviteCode is required to view and submit).",
@@ -163,6 +173,7 @@
       "https://atomicdata.dev/properties/form-settings",
       "https://atomicdata.dev/properties/form-publish-id",
       "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/form-custom-css",
       "https://atomicdata.dev/properties/form-access",
       "https://atomicdata.dev/properties/cover-image",
       "https://atomicdata.dev/properties/image-position"
@@ -436,6 +447,7 @@
       "https://atomicdata.dev/properties/form-field-type",
       "https://atomicdata.dev/properties/form-field-options",
       "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/form-custom-css",
       "https://atomicdata.dev/properties/form-submission-summary",
       "https://atomicdata.dev/properties/form-access",
       "https://atomicdata.dev/properties/form-code",

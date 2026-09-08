@@ -20,6 +20,8 @@ import { IconButton } from '@components/IconButton/IconButton';
 import { Column, Row } from '@components/Row';
 import { Popover } from '@components/Popover';
 import { SettingsGroup, SettingsSection } from '@components/Settings';
+import { CSSEditor } from '@components/CSSEditor';
+import { ExternalLink } from '@components/ExternalLink';
 import { useDebounce } from '@helpers/useDebounce';
 import { FormAccessSection } from './FormAccessSection';
 import { FormScheduleSection } from './FormScheduleSection';
@@ -68,8 +70,9 @@ interface SettingsTabProps {
  * page: Appearance (cover image, colors, roundness, spacing — previewed 1:1
  * by the Preview dialog and the published runtime via the definition's
  * `styling` object), Form access (public vs invite-only + invite link
- * management) and Schedule (the optional open/close window on top of the
- * publish switch). */
+ * management), Schedule (the optional open/close window on top of the
+ * publish switch) and Custom CSS (collapsed — an escape hatch for what the
+ * Appearance controls cannot express). */
 export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
   return (
     <Wrapper>
@@ -82,6 +85,9 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
         </SettingsSection>
         <SettingsSection label='Appearance' initialState>
           <AppearanceSettings resource={resource} />
+        </SettingsSection>
+        <SettingsSection label='Custom CSS'>
+          <CustomCssSettings resource={resource} />
         </SettingsSection>
       </SettingsGroup>
     </Wrapper>
@@ -242,6 +248,94 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
           Half-filled answers are kept in the visitor&apos;s own browser, so
           closing the tab does not lose them, and are cleared once they submit.
           Turn this off for kiosks and other shared devices.
+        </Hint>
+      </Section>
+    </Sections>
+  );
+}
+
+/** Where the class names custom CSS targets are documented. The stylesheet is
+ * the documentation: a hand-written list of hooks here would drift from it
+ * within a release, and `.atomic-form-*` is public API precisely because that
+ * file says what it is. Pinned to `develop` rather than a tag so it tracks the
+ * renderer a running server actually ships. */
+const RENDERER_STYLESHEET_URL =
+  'https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/form-renderer/src/style.css';
+
+const CSS_PLACEHOLDER = `:scope {
+  --atomic-form-accent: #7c3aed;
+}
+
+.atomic-form-card {
+  border-radius: 24px;
+}`;
+
+/** The escape hatch under the Appearance controls: CSS the owner writes, which
+ * the renderer injects into the `atomic-form-custom` cascade layer scoped to
+ * the form's root element. Because layer order beats specificity, a one-class
+ * rule written here wins over anything in the renderer's stylesheet without
+ * `!important` — which is the whole point of the feature. */
+function CustomCssSettings({ resource }: SettingsTabProps): JSX.Element {
+  const [customCss, setCustomCss] = useString(
+    resource,
+    forms.properties.formCustomCss,
+    { commit: true },
+  );
+
+  const [draft, setDraft] = useState(customCss ?? '');
+  // Every keystroke fires onChange; commit at rest instead of per character.
+  const debounced = useDebounce(draft, 500);
+
+  useEffect(() => {
+    if (debounced !== (customCss ?? '')) {
+      setCustomCss(debounced === '' ? undefined : debounced);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced]);
+
+  // Switching builder tabs unmounts this; without a flush, edits made inside
+  // the debounce window would be lost. Same shape as ColorSetting's flush.
+  const latest = useRef({ draft, customCss, setCustomCss });
+  useEffect(() => {
+    latest.current = { draft, customCss, setCustomCss };
+  });
+  useEffect(
+    () => () => {
+      const pending = latest.current;
+
+      if (pending.draft !== (pending.customCss ?? '')) {
+        pending.setCustomCss(pending.draft === '' ? undefined : pending.draft);
+      }
+    },
+    [],
+  );
+
+  return (
+    <Sections>
+      <Section>
+        <CSSEditor
+          initialValue={customCss ?? ''}
+          placeholder={CSS_PLACEHOLDER}
+          onChange={setDraft}
+        />
+        <Hint>
+          Applies to the published form and to Preview. It is layered on top of
+          the form&apos;s own styles, so you never need <code>!important</code>{' '}
+          — a plain <code>.atomic-form-card</code> rule already wins.
+        </Hint>
+        <Hint>
+          Your CSS only sees the form: <code>:scope</code> is its outermost
+          element (override the <code>--atomic-form-*</code> variables there),
+          and <code>:root</code> and <code>body</code> are out of reach.{' '}
+          <code>@import</code> is stripped when the form is served — paste in
+          what you need instead.
+        </Hint>
+        <Hint>
+          Every class you can target is in{' '}
+          <ExternalLink to={RENDERER_STYLESHEET_URL}>
+            the form renderer&apos;s stylesheet
+          </ExternalLink>
+          .
         </Hint>
       </Section>
     </Sections>

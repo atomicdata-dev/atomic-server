@@ -1,48 +1,77 @@
-/* Minimal styling for @tomic/form-renderer. Import this file once
+/* Styling for @tomic/form-renderer. Import this file once
    (`import '@tomic/form-renderer/style.css'`) alongside the component.
-   Everything of ours is scoped under `.atomic-form-*` class names so it can
-   be safely loaded next to a host app's own styles. */
+   Everything of ours is under `.atomic-form-*` class names so it can be safely
+   loaded next to a host app's own styles.
+
+   Every one of those class names is public API: a form owner's custom CSS
+   targets them, and this file is the documentation for it. Renaming one is a
+   breaking change for published forms.
+
+   Two cascade layers, in this order:
+
+   - `atomic-form-base` — everything below.
+   - `atomic-form-custom` — the owner's custom CSS (`styling.customCss`),
+     injected at runtime by `FormShell`. Declared here but left empty.
+
+   Layer order beats specificity, so a one-class rule an owner writes wins over
+   a three-class rule of ours without `!important`, and we stay free to change
+   our own selectors' specificity without breaking their form. */
+@layer atomic-form-base, atomic-form-custom;
 
 /* The only styles this pulls in from elsewhere: the phone field's country
    selector comes from `react-phone-number-input`, and importing its
    stylesheet here keeps consumers on a single import. Resolved by the
-   consumer's bundler, from the copy of the package this one depends on. */
-@import 'react-phone-number-input/style.css';
+   consumer's bundler, from the copy of the package this one depends on.
+   `layer()` puts it in our base layer — left unlayered it would beat both the
+   rules below and the owner's custom CSS. */
+@import 'react-phone-number-input/style.css' layer(atomic-form-base);
 
-:root {
-  --atomic-form-accent: #1e43a3;
-  --atomic-form-text: #1a1a1a;
-  --atomic-form-text-light: #6b7280;
-  --atomic-form-bg: #ffffff;
-  --atomic-form-border: #d9dce1;
-  --atomic-form-error: #c0392b;
-  --atomic-form-radius: 0.5rem;
-  /* Vertical space between the blocks of a page. Overridden per form by the
+/* Everything from here to the closing brace at the end of the file is inside
+   the base layer — keep that `}` last. Wrapping the file cost a one-time
+   re-indent of every rule (oxfmt's doing, not a choice), so a `git log -p` of
+   this file crosses one large whitespace commit.
+
+   One file rather than an `@import`ed `base.css`, by the way: a relative
+   `@import` does not resolve when a consumer's Vite serves this package from
+   outside its own project root (`/@fs/…`), which is exactly how the
+   data-browser loads it — postcss-import ends up reading `./base.css` against
+   the process cwd and the whole stylesheet 500s. Bare specifiers like the one
+   above resolve fine; relative ones do not. */
+@layer atomic-form-base {
+  :root {
+    --atomic-form-accent: #1e43a3;
+    --atomic-form-text: #1a1a1a;
+    --atomic-form-text-light: #6b7280;
+    --atomic-form-bg: #ffffff;
+    --atomic-form-border: #d9dce1;
+    --atomic-form-error: #c0392b;
+    --atomic-form-radius: 0.5rem;
+    /* Vertical space between the blocks of a page. Overridden per form by the
      `fieldSpacing` styling key (see `stylingVars`). */
-  --atomic-form-field-gap: 1.5rem;
-  /* Info-box hues that are not derived from the form's own palette. The other
+    --atomic-form-field-gap: 1.5rem;
+    /* Info-box hues that are not derived from the form's own palette. The other
      three (info, note, danger) follow accent / text-light / error, and so are
      declared with the derived properties below. */
-  --atomic-form-info-box-tip: #0d9488;
-  --atomic-form-info-box-success: #15803d;
-  --atomic-form-info-box-warning: #b45309;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --atomic-form-accent: #6d9bff;
-    --atomic-form-text: #f2f2f2;
-    --atomic-form-text-light: #a0a5ad;
-    --atomic-form-bg: #16181d;
-    --atomic-form-border: #33363d;
-    --atomic-form-error: #ff6b5e;
-    --atomic-form-info-box-tip: #2dd4bf;
-    --atomic-form-info-box-success: #4ade80;
-    --atomic-form-info-box-warning: #fbbf24;
+    --atomic-form-info-box-tip: #0d9488;
+    --atomic-form-info-box-success: #15803d;
+    --atomic-form-info-box-warning: #b45309;
   }
-}
 
-/* Interaction colors, derived from the four theme colors above so a form
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --atomic-form-accent: #6d9bff;
+      --atomic-form-text: #f2f2f2;
+      --atomic-form-text-light: #a0a5ad;
+      --atomic-form-bg: #16181d;
+      --atomic-form-border: #33363d;
+      --atomic-form-error: #ff6b5e;
+      --atomic-form-info-box-tip: #2dd4bf;
+      --atomic-form-info-box-success: #4ade80;
+      --atomic-form-info-box-warning: #fbbf24;
+    }
+  }
+
+  /* Interaction colors, derived from the four theme colors above so a form
    with custom styling gets matching hover states for free. Mixing towards
    `--atomic-form-text` moves *away* from the background in either color
    scheme, so the same formula reads correctly light and dark.
@@ -51,125 +80,126 @@
    custom property is substituted against the element the property is
    declared on, so a copy on the shell is what picks up the per-form
    overrides FormShell writes there as inline styles. */
-:root,
-.atomic-form-shell {
-  /* Hover border for inputs — a step darker than the resting border. */
-  --atomic-form-border-hover: color-mix(
-    in srgb,
-    var(--atomic-form-border) 60%,
-    var(--atomic-form-text)
-  );
-  /* Translucent wash behind hovered rows, cells and secondary buttons. */
-  --atomic-form-hover-bg: color-mix(
-    in srgb,
-    var(--atomic-form-text) 8%,
-    transparent
-  );
-  /* Primary button hover — darker in light mode, lighter in dark mode. */
-  --atomic-form-accent-hover: color-mix(
-    in srgb,
-    var(--atomic-form-accent) 82%,
-    var(--atomic-form-text)
-  );
-  --atomic-form-transition: 120ms ease;
-  /* An `info` box carries the form's own accent, so a themed form gets a
+  :root,
+  .atomic-form-shell {
+    /* Hover border for inputs — a step darker than the resting border. */
+    --atomic-form-border-hover: color-mix(
+      in srgb,
+      var(--atomic-form-border) 60%,
+      var(--atomic-form-text)
+    );
+    /* Translucent wash behind hovered rows, cells and secondary buttons. */
+    --atomic-form-hover-bg: color-mix(
+      in srgb,
+      var(--atomic-form-text) 8%,
+      transparent
+    );
+    /* Primary button hover — darker in light mode, lighter in dark mode. */
+    --atomic-form-accent-hover: color-mix(
+      in srgb,
+      var(--atomic-form-accent) 82%,
+      var(--atomic-form-text)
+    );
+    --atomic-form-transition: 120ms ease;
+    /* An `info` box carries the form's own accent, so a themed form gets a
      matching callout for free; `note` is deliberately colorless, and `danger`
      shares the hue errors already use. */
-  --atomic-form-info-box-info: var(--atomic-form-accent);
-  --atomic-form-info-box-note: var(--atomic-form-text-light);
-  --atomic-form-info-box-danger: var(--atomic-form-error);
-}
+    --atomic-form-info-box-info: var(--atomic-form-accent);
+    --atomic-form-info-box-note: var(--atomic-form-text-light);
+    --atomic-form-info-box-danger: var(--atomic-form-error);
+  }
 
-.atomic-form-progress {
-  height: 0.35rem;
-  background: var(--atomic-form-border);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 1.5rem;
-}
+  .atomic-form-progress {
+    height: 0.35rem;
+    background: var(--atomic-form-border);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
 
-.atomic-form-progress-bar {
-  height: 100%;
-  background: var(--atomic-form-accent);
-  transition: width 200ms ease;
-}
+  .atomic-form-progress-bar {
+    height: 100%;
+    background: var(--atomic-form-accent);
+    transition: width 200ms ease;
+  }
 
-.atomic-form-blocks {
-  display: flex;
-  flex-direction: column;
-  gap: var(--atomic-form-field-gap);
-}
+  .atomic-form-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--atomic-form-field-gap);
+  }
 
-/* Page transitions (Next / Back). The two phases have deliberately different
+  /* Page transitions (Next / Back). The two phases have deliberately different
    shapes: the page leaves as one block, and arrives as its parts. Durations
    are mirrored in `pageTransition.ts` — the content swap and the end of the
    fade-in are both driven from JS. Only played by a form that opted in with
    `styling.animatePageTransitions: true`, and never for anyone who asks for
    reduced motion (below). */
-.atomic-form-blocks {
-  --atomic-form-page-exit: 150ms;
-  /* How far the leaving page travels before it is gone. */
-  --atomic-form-page-shift: 4rem;
-  /* How far it zooms out on its way out. */
-  --atomic-form-page-zoom: 0.94;
-  /* Gap between one arriving element's fade and the next one's, on a page
+  .atomic-form-blocks {
+    --atomic-form-page-exit: 150ms;
+    /* How far the leaving page travels before it is gone. */
+    --atomic-form-page-shift: 4rem;
+    /* How far it zooms out on its way out. */
+    --atomic-form-page-zoom: 0.94;
+    /* Gap between one arriving element's fade and the next one's, on a page
      short enough to afford it. */
-  --atomic-form-stagger-step: 35ms;
-  /* The longest the cascade as a whole may take. A page with more elements
+    --atomic-form-stagger-step: 35ms;
+    /* The longest the cascade as a whole may take. A page with more elements
      than fit at the step above shortens its step to land inside this. */
-  --atomic-form-stagger-wave: 2000ms;
-  /* How long a single element takes to fade in. */
-  --atomic-form-stagger-fade: 350ms;
-}
-
-.atomic-form-blocks-exit-forward,
-.atomic-form-blocks-exit-back {
-  will-change: transform, opacity;
-}
-
-.atomic-form-blocks-exit-forward {
-  animation: atomic-form-page-exit-up var(--atomic-form-page-exit) ease-in both;
-}
-
-.atomic-form-blocks-exit-back {
-  animation: atomic-form-page-exit-down var(--atomic-form-page-exit) ease-in
-    both;
-}
-
-/* Leaving: zoom out first, then slide away and fade. */
-@keyframes atomic-form-page-exit-up {
-  0% {
-    opacity: 1;
-    transform: none;
+    --atomic-form-stagger-wave: 2000ms;
+    /* How long a single element takes to fade in. */
+    --atomic-form-stagger-fade: 350ms;
   }
 
-  45% {
-    opacity: 1;
+  .atomic-form-blocks-exit-forward,
+  .atomic-form-blocks-exit-back {
+    will-change: transform, opacity;
   }
 
-  100% {
-    opacity: 0;
-    transform: translateX(calc(-1 * var(--atomic-form-page-shift)));
-  }
-}
-
-@keyframes atomic-form-page-exit-down {
-  0% {
-    opacity: 1;
-    transform: scale(1);
+  .atomic-form-blocks-exit-forward {
+    animation: atomic-form-page-exit-up var(--atomic-form-page-exit) ease-in
+      both;
   }
 
-  45% {
-    opacity: 1;
+  .atomic-form-blocks-exit-back {
+    animation: atomic-form-page-exit-down var(--atomic-form-page-exit) ease-in
+      both;
   }
 
-  100% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-}
+  /* Leaving: zoom out first, then slide away and fade. */
+  @keyframes atomic-form-page-exit-up {
+    0% {
+      opacity: 1;
+      transform: none;
+    }
 
-/* Arriving: no movement at all, just each element fading in a beat after the
+    45% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+      transform: translateX(calc(-1 * var(--atomic-form-page-shift)));
+    }
+  }
+
+  @keyframes atomic-form-page-exit-down {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    45% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+
+  /* Arriving: no movement at all, just each element fading in a beat after the
    one above it.
 
    The generic half of this: anything marked `atomic-form-stagger` inside an
@@ -178,1276 +208,1276 @@
    the index comes from the component that owns the order, so a nested list
    can offset from its parent's slot rather than fighting it). Nothing here is
    specific to blocks. */
-.atomic-form-blocks-enter .atomic-form-stagger {
-  animation: atomic-form-stagger-in var(--atomic-form-stagger-fade)
-    linear(
-      0,
-      0.009 1.4%,
-      0.032 2.8%,
-      0.131 6%,
-      0.265 9.1%,
-      0.675 17.6%,
-      0.88 22.8%,
-      0.953 25.2%,
-      1.014 27.7%,
-      1.062 30.3%,
-      1.094 32.9%,
-      1.121 37.2%,
-      1.121 42.2%,
-      1.102 46.7%,
-      1.019 61.2%,
-      0.989 71.5%,
-      0.985 81.1%,
-      1
-    )
-    both;
-  /* Every element's delay from its own index and one number the container
+  .atomic-form-blocks-enter .atomic-form-stagger {
+    animation: atomic-form-stagger-in var(--atomic-form-stagger-fade)
+      linear(
+        0,
+        0.009 1.4%,
+        0.032 2.8%,
+        0.131 6%,
+        0.265 9.1%,
+        0.675 17.6%,
+        0.88 22.8%,
+        0.953 25.2%,
+        1.014 27.7%,
+        1.062 30.3%,
+        1.094 32.9%,
+        1.121 37.2%,
+        1.121 42.2%,
+        1.102 46.7%,
+        1.019 61.2%,
+        0.989 71.5%,
+        0.985 81.1%,
+        1
+      )
+      both;
+    /* Every element's delay from its own index and one number the container
      publishes: how many steps the cascade spans. Short pages get the full
      step; longer ones divide the wave instead, so the order always holds and
      the page never takes longer to open. */
-  animation-delay: calc(
-    var(--atomic-form-stagger-index, 0) *
-      min(
-        var(--atomic-form-stagger-step),
-        var(--atomic-form-stagger-wave) /
-          var(--atomic-form-stagger-span, 1)
-      )
-  );
-  will-change: opacity;
-}
-
-@keyframes atomic-form-stagger-in {
-  0% {
-    opacity: 0;
-    transform: translateX(30px) scale(0.95);
+    animation-delay: calc(
+      var(--atomic-form-stagger-index, 0) *
+        min(
+          var(--atomic-form-stagger-step),
+          var(--atomic-form-stagger-wave) / var(--atomic-form-stagger-span, 1)
+        )
+    );
+    will-change: opacity;
   }
 
-  75% {
-    transform: translateX(0px) scale(1);
-  }
-  100% {
-    opacity: 1;
-  }
-}
+  @keyframes atomic-form-stagger-in {
+    0% {
+      opacity: 0;
+      transform: translateX(30px) scale(0.95);
+    }
 
-/* Belt and braces: FormRenderer already skips the animation (and the pause it
+    75% {
+      transform: translateX(0px) scale(1);
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /* Belt and braces: FormRenderer already skips the animation (and the pause it
    would add) when the visitor asks for reduced motion, but a definition
    rendered by another host, or a media-query change mid-animation, must not
    move either. */
-@media (prefers-reduced-motion: reduce) {
-  .atomic-form-blocks-exit-forward,
-  .atomic-form-blocks-exit-back,
-  .atomic-form-blocks-enter .atomic-form-stagger {
-    animation: none;
+  @media (prefers-reduced-motion: reduce) {
+    .atomic-form-blocks-exit-forward,
+    .atomic-form-blocks-exit-back,
+    .atomic-form-blocks-enter .atomic-form-stagger {
+      animation: none;
+    }
+
+    .atomic-form-progress-bar {
+      transition: none;
+    }
   }
 
-  .atomic-form-progress-bar {
-    transition: none;
+  .atomic-form-heading {
+    color: var(--atomic-form-text);
+    margin: 0;
   }
-}
 
-.atomic-form-heading {
-  color: var(--atomic-form-text);
-  margin: 0;
-}
+  .atomic-form-paragraph {
+    color: var(--atomic-form-text-light);
+    line-height: 1.5;
+  }
 
-.atomic-form-paragraph {
-  color: var(--atomic-form-text-light);
-  line-height: 1.5;
-}
+  .atomic-form-paragraph > :first-child {
+    margin-top: 0;
+  }
 
-.atomic-form-paragraph > :first-child {
-  margin-top: 0;
-}
+  .atomic-form-paragraph > :last-child {
+    margin-bottom: 0;
+  }
 
-.atomic-form-paragraph > :last-child {
-  margin-bottom: 0;
-}
+  .atomic-form-paragraph a {
+    color: var(--atomic-form-accent);
+  }
 
-.atomic-form-paragraph a {
-  color: var(--atomic-form-accent);
-}
+  .atomic-form-paragraph ul,
+  .atomic-form-paragraph ol {
+    padding-left: 1.25rem;
+  }
 
-.atomic-form-paragraph ul,
-.atomic-form-paragraph ol {
-  padding-left: 1.25rem;
-}
+  .atomic-form-paragraph code {
+    font-family: Monaco, monospace;
+    font-size: 0.9em;
+    background: var(--atomic-form-border);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
+  }
 
-.atomic-form-paragraph code {
-  font-family: Monaco, monospace;
-  font-size: 0.9em;
-  background: var(--atomic-form-border);
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.2rem;
-}
+  .atomic-form-paragraph img,
+  .atomic-form-description img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--atomic-form-radius);
+  }
 
-.atomic-form-paragraph img,
-.atomic-form-description img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--atomic-form-radius);
-}
-
-/* Callout blocks. Every variant is the same box with a different hue, so a
+  /* Callout blocks. Every variant is the same box with a different hue, so a
    host app can restyle one by overriding a single custom property. `info` is
    also the fallback for an unknown style (see `infoBoxStyle`). */
-.atomic-form-info-box {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-info);
-  border-left: 3px solid var(--atomic-form-info-box-color);
-  background: color-mix(
-    in srgb,
-    var(--atomic-form-info-box-color) 10%,
-    transparent
-  );
-  border-radius: var(--atomic-form-radius);
-  padding: 0.75rem 1rem;
-  color: var(--atomic-form-text);
-  line-height: 1.5;
-}
+  .atomic-form-info-box {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-info);
+    border-left: 3px solid var(--atomic-form-info-box-color);
+    background: color-mix(
+      in srgb,
+      var(--atomic-form-info-box-color) 10%,
+      transparent
+    );
+    border-radius: var(--atomic-form-radius);
+    padding: 0.75rem 1rem;
+    color: var(--atomic-form-text);
+    line-height: 1.5;
+  }
 
-.atomic-form-info-box--info {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-info);
-}
+  .atomic-form-info-box--info {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-info);
+  }
 
-.atomic-form-info-box--note {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-note);
-}
+  .atomic-form-info-box--note {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-note);
+  }
 
-.atomic-form-info-box--tip {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-tip);
-}
+  .atomic-form-info-box--tip {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-tip);
+  }
 
-.atomic-form-info-box--success {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-success);
-}
+  .atomic-form-info-box--success {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-success);
+  }
 
-.atomic-form-info-box--warning {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-warning);
-}
+  .atomic-form-info-box--warning {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-warning);
+  }
 
-.atomic-form-info-box--danger {
-  --atomic-form-info-box-color: var(--atomic-form-info-box-danger);
-}
+  .atomic-form-info-box--danger {
+    --atomic-form-info-box-color: var(--atomic-form-info-box-danger);
+  }
 
-.atomic-form-info-box-title {
-  margin: 0 0 0.25rem;
-  font-weight: 600;
-  color: var(--atomic-form-info-box-color);
-}
+  .atomic-form-info-box-title {
+    margin: 0 0 0.25rem;
+    font-weight: 600;
+    color: var(--atomic-form-info-box-color);
+  }
 
-.atomic-form-info-box-body > :first-child {
-  margin-top: 0;
-}
+  .atomic-form-info-box-body > :first-child {
+    margin-top: 0;
+  }
 
-.atomic-form-info-box-body > :last-child {
-  margin-bottom: 0;
-}
+  .atomic-form-info-box-body > :last-child {
+    margin-bottom: 0;
+  }
 
-.atomic-form-info-box-body a {
-  color: var(--atomic-form-info-box-color);
-}
+  .atomic-form-info-box-body a {
+    color: var(--atomic-form-info-box-color);
+  }
 
-.atomic-form-info-box-body ul,
-.atomic-form-info-box-body ol {
-  padding-left: 1.25rem;
-}
+  .atomic-form-info-box-body ul,
+  .atomic-form-info-box-body ol {
+    padding-left: 1.25rem;
+  }
 
-.atomic-form-info-box-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--atomic-form-radius);
-}
+  .atomic-form-info-box-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--atomic-form-radius);
+  }
 
-.atomic-form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
+  .atomic-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
 
-.atomic-form-label {
-  font-weight: 600;
-  color: var(--atomic-form-text);
-}
+  .atomic-form-label {
+    font-weight: 600;
+    color: var(--atomic-form-text);
+  }
 
-.atomic-form-required {
-  color: var(--atomic-form-error);
-  margin-left: 0.2rem;
-}
+  .atomic-form-required {
+    color: var(--atomic-form-error);
+    margin-left: 0.2rem;
+  }
 
-.atomic-form-description {
-  color: var(--atomic-form-text-light);
-  font-size: 0.9rem;
-}
+  .atomic-form-description {
+    color: var(--atomic-form-text-light);
+    font-size: 0.9rem;
+  }
 
-.atomic-form-description > :first-child {
-  margin-top: 0;
-}
+  .atomic-form-description > :first-child {
+    margin-top: 0;
+  }
 
-.atomic-form-description > :last-child {
-  margin-bottom: 0;
-}
+  .atomic-form-description > :last-child {
+    margin-bottom: 0;
+  }
 
-.atomic-form-description a {
-  color: var(--atomic-form-accent);
-}
+  .atomic-form-description a {
+    color: var(--atomic-form-accent);
+  }
 
-.atomic-form-input {
-  font: inherit;
-  color: var(--atomic-form-text);
-  background: var(--atomic-form-bg);
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  padding: 0.6rem 0.75rem;
-  width: 100%;
-  box-sizing: border-box;
-  transition:
-    border-color var(--atomic-form-transition),
-    background-color var(--atomic-form-transition);
-}
+  .atomic-form-input {
+    font: inherit;
+    color: var(--atomic-form-text);
+    background: var(--atomic-form-bg);
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    padding: 0.6rem 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+    transition:
+      border-color var(--atomic-form-transition),
+      background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-input:hover:not(:disabled) {
-  border-color: var(--atomic-form-border-hover);
-}
+  .atomic-form-input:hover:not(:disabled) {
+    border-color: var(--atomic-form-border-hover);
+  }
 
-/* Focus reads as a thicker accent edge: the border itself turns accent and
+  /* Focus reads as a thicker accent edge: the border itself turns accent and
    the outline sits flush against it (offset 0) rather than as a detached
    ring, so it is clearly a step up from the hover border. */
-.atomic-form-input:focus {
-  border-color: var(--atomic-form-accent);
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 0;
-}
+  .atomic-form-input:focus {
+    border-color: var(--atomic-form-accent);
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 0;
+  }
 
-/* Native constraint failures — a malformed email or URL, a number outside
+  /* Native constraint failures — a malformed email or URL, a number outside
    min/max — turn the border red. `:user-invalid` rather than `:invalid` so a
    field stays neutral while it is still being filled in, and only complains
    once the visitor has typed something and moved on. Requiredness is checked
    by the JS layer instead, which renders `.atomic-form-error` below the
    field. The `:hover` twin is needed because `:hover:not(:disabled)` above
    is a specificity step higher than a bare `:user-invalid`. */
-.atomic-form-input:user-invalid,
-.atomic-form-input:user-invalid:hover:not(:disabled) {
-  border-color: var(--atomic-form-error);
-}
+  .atomic-form-input:user-invalid,
+  .atomic-form-input:user-invalid:hover:not(:disabled) {
+    border-color: var(--atomic-form-error);
+  }
 
-.atomic-form-input:user-invalid:focus {
-  border-color: var(--atomic-form-error);
-  outline-color: var(--atomic-form-error);
-}
+  .atomic-form-input:user-invalid:focus {
+    border-color: var(--atomic-form-error);
+    outline-color: var(--atomic-form-error);
+  }
 
-/* The same red border for failures only the JS layer can see — today, a text
+  /* The same red border for failures only the JS layer can see — today, a text
    answer past its maximum length. `:user-invalid` cannot express that: there
    is no native constraint for "too long" that does not also stop the typing.
    Kept beside its native twin so the two never drift apart. */
-.atomic-form-input[aria-invalid='true'],
-.atomic-form-input[aria-invalid='true']:hover:not(:disabled) {
-  border-color: var(--atomic-form-error);
-}
+  .atomic-form-input[aria-invalid='true'],
+  .atomic-form-input[aria-invalid='true']:hover:not(:disabled) {
+    border-color: var(--atomic-form-error);
+  }
 
-.atomic-form-input[aria-invalid='true']:focus {
-  border-color: var(--atomic-form-error);
-  outline-color: var(--atomic-form-error);
-}
+  .atomic-form-input[aria-invalid='true']:focus {
+    border-color: var(--atomic-form-error);
+    outline-color: var(--atomic-form-error);
+  }
 
-.atomic-form-textarea {
-  resize: vertical;
-}
+  .atomic-form-textarea {
+    resize: vertical;
+  }
 
-/* Country pickers (the `country` field and an address's country subfield)
+  /* Country pickers (the `country` field and an address's country subfield)
    are native selects wearing the input's skin. */
-.atomic-form-select {
-  cursor: pointer;
-  /* Safari gives selects a taller intrinsic box than inputs; matching the
+  .atomic-form-select {
+    cursor: pointer;
+    /* Safari gives selects a taller intrinsic box than inputs; matching the
      line height keeps a select and an input the same height side by side in
      the address grid. */
-  line-height: 1.2;
-}
+    line-height: 1.2;
+  }
 
-/* Phone: the bordered box moves to the container so the country selector and
+  /* Phone: the bordered box moves to the container so the country selector and
    the number input read as a single control. */
-.atomic-form-phone {
-  --PhoneInput-color--focus: var(--atomic-form-accent);
-  --PhoneInputCountryFlag-borderColor: var(--atomic-form-border);
-  --PhoneInputCountrySelectArrow-color: var(--atomic-form-text-light);
-  color: var(--atomic-form-text);
-  background: var(--atomic-form-bg);
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  padding-left: 0.75rem;
-  box-sizing: border-box;
-  transition: border-color var(--atomic-form-transition);
-}
+  .atomic-form-phone {
+    --PhoneInput-color--focus: var(--atomic-form-accent);
+    --PhoneInputCountryFlag-borderColor: var(--atomic-form-border);
+    --PhoneInputCountrySelectArrow-color: var(--atomic-form-text-light);
+    color: var(--atomic-form-text);
+    background: var(--atomic-form-bg);
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    padding-left: 0.75rem;
+    box-sizing: border-box;
+    transition: border-color var(--atomic-form-transition);
+  }
 
-.atomic-form-phone:hover:not(:focus-within) {
-  border-color: var(--atomic-form-border-hover);
-}
+  .atomic-form-phone:hover:not(:focus-within) {
+    border-color: var(--atomic-form-border-hover);
+  }
 
-.atomic-form-phone:focus-within {
-  border-color: var(--atomic-form-accent);
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 0;
-}
+  .atomic-form-phone:focus-within {
+    border-color: var(--atomic-form-accent);
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 0;
+  }
 
-.atomic-form-phone .atomic-form-input {
-  border: none;
-  background: transparent;
-  padding-left: 0;
-  width: auto;
-}
+  .atomic-form-phone .atomic-form-input {
+    border: none;
+    background: transparent;
+    padding-left: 0;
+    width: auto;
+  }
 
-.atomic-form-phone .atomic-form-input:focus {
-  outline: none;
-}
+  .atomic-form-phone .atomic-form-input:focus {
+    outline: none;
+  }
 
-/* Choice rows carry their own padding so hovering highlights a pill around
+  /* Choice rows carry their own padding so hovering highlights a pill around
    the whole row, not just the text. The negative inline-start margin pulls
    the control back under the field label, keeping the left edge aligned. */
-.atomic-form-checkbox-row,
-.atomic-form-choice-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--atomic-form-text);
-  cursor: pointer;
-  padding: 0.3rem 0.5rem;
-  margin-inline-start: -0.5rem;
-  border-radius: var(--atomic-form-radius);
-  transition: background-color var(--atomic-form-transition);
-}
+  .atomic-form-checkbox-row,
+  .atomic-form-choice-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--atomic-form-text);
+    cursor: pointer;
+    padding: 0.3rem 0.5rem;
+    margin-inline-start: -0.5rem;
+    border-radius: var(--atomic-form-radius);
+    transition: background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-checkbox-row:hover,
-.atomic-form-choice-row:hover {
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-checkbox-row:hover,
+  .atomic-form-choice-row:hover {
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-checkbox-row:has(input:focus-visible),
-.atomic-form-choice-row:has(input:focus-visible) {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
-}
+  .atomic-form-checkbox-row:has(input:focus-visible),
+  .atomic-form-choice-row:has(input:focus-visible) {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 1px;
+  }
 
-.atomic-form-checkbox-row input,
-.atomic-form-choice-row input {
-  cursor: pointer;
-}
+  .atomic-form-checkbox-row input,
+  .atomic-form-choice-row input {
+    cursor: pointer;
+  }
 
-.atomic-form-choice-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
+  .atomic-form-choice-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
 
-/* A multi-select that has reached its maximum: the options still to be had
+  /* A multi-select that has reached its maximum: the options still to be had
    go flat instead of the form growing an error nobody asked for. Hover stays
    quiet too, or the row would still read as clickable. */
-.atomic-form-choice-row[data-disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  .atomic-form-choice-row[data-disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
-.atomic-form-choice-row[data-disabled]:hover {
-  background: transparent;
-}
+  .atomic-form-choice-row[data-disabled]:hover {
+    background: transparent;
+  }
 
-.atomic-form-choice-row[data-disabled] input {
-  cursor: not-allowed;
-}
+  .atomic-form-choice-row[data-disabled] input {
+    cursor: not-allowed;
+  }
 
-/* The "Select up to 3 options" line under a bounded multi-pick question.
+  /* The "Select up to 3 options" line under a bounded multi-pick question.
    Reads like the field's description, one notch quieter. */
-.atomic-form-hint {
-  color: var(--atomic-form-text-light);
-  font-size: 0.85rem;
-  margin: 0.15rem 0 0;
-}
+  .atomic-form-hint {
+    color: var(--atomic-form-text-light);
+    font-size: 0.85rem;
+    margin: 0.15rem 0 0;
+  }
 
-/* The line under a length-bounded text question: the minimum in words on the
+  /* The line under a length-bounded text question: the minimum in words on the
    left, the `5/200` count on the right. With no minimum the count is all
    there is, and `margin-left: auto` keeps it against the right edge. */
-.atomic-form-length-meter {
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-}
+  .atomic-form-length-meter {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
 
-.atomic-form-length-count {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
+  .atomic-form-length-count {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
 
-/* Past the maximum. The border goes red too (see `aria-invalid` above); this
+  /* Past the maximum. The border goes red too (see `aria-invalid` above); this
    is the half that says by how much. */
-.atomic-form-length-count[data-over] {
-  color: var(--atomic-form-error);
-}
+  .atomic-form-length-count[data-over] {
+    color: var(--atomic-form-error);
+  }
 
-/* The characters past the maximum, coloured inside the input itself. Painted
+  /* The characters past the maximum, coloured inside the input itself. Painted
    through the CSS Custom Highlight API over a range `createValueRange()`
    hands back — see `overflowHighlight.ts`, which registers the ranges only
    where both APIs exist. A browser without `::highlight()` drops this rule
    as unparseable, which is exactly the wanted outcome: the counter and the
    red border already carry the message. */
-::highlight(atomic-form-overflow) {
-  color: var(--atomic-form-error);
-}
+  ::highlight(atomic-form-overflow) {
+    color: var(--atomic-form-error);
+  }
 
-.atomic-form-error {
-  color: var(--atomic-form-error);
-  margin: 0;
-  font-size: 0.9rem;
-}
+  .atomic-form-error {
+    color: var(--atomic-form-error);
+    margin: 0;
+    font-size: 0.9rem;
+  }
 
-.atomic-form-submit-error {
-  margin-top: 1rem;
-}
+  .atomic-form-submit-error {
+    margin-top: 1rem;
+  }
 
-.atomic-form-honeypot {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
+  .atomic-form-honeypot {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
 
-.atomic-form-nav {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 2rem;
-}
+  .atomic-form-nav {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
 
-.atomic-form-button {
-  font: inherit;
-  font-weight: 600;
-  color: var(--atomic-form-on-accent, white);
-  background: var(--atomic-form-accent);
-  border: none;
-  border-radius: var(--atomic-form-radius);
-  padding: 0.65rem 1.5rem;
-  cursor: pointer;
-  transition:
-    background-color var(--atomic-form-transition),
-    border-color var(--atomic-form-transition);
-}
+  .atomic-form-button {
+    font: inherit;
+    font-weight: 600;
+    color: var(--atomic-form-on-accent, white);
+    background: var(--atomic-form-accent);
+    border: none;
+    border-radius: var(--atomic-form-radius);
+    padding: 0.65rem 1.5rem;
+    cursor: pointer;
+    transition:
+      background-color var(--atomic-form-transition),
+      border-color var(--atomic-form-transition);
+  }
 
-.atomic-form-button:hover:not(:disabled) {
-  background: var(--atomic-form-accent-hover);
-}
+  .atomic-form-button:hover:not(:disabled) {
+    background: var(--atomic-form-accent-hover);
+  }
 
-.atomic-form-button:focus-visible {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 2px;
-}
+  .atomic-form-button:focus-visible {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 2px;
+  }
 
-.atomic-form-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+  .atomic-form-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 
-.atomic-form-button-secondary {
-  background: transparent;
-  color: var(--atomic-form-text);
-  border: 1px solid var(--atomic-form-border);
-}
+  .atomic-form-button-secondary {
+    background: transparent;
+    color: var(--atomic-form-text);
+    border: 1px solid var(--atomic-form-border);
+  }
 
-/* After the primary hover rule so the secondary variant keeps its outline
+  /* After the primary hover rule so the secondary variant keeps its outline
    look instead of filling with the accent color. */
-.atomic-form-button-secondary:hover:not(:disabled) {
-  background: var(--atomic-form-hover-bg);
-  border-color: var(--atomic-form-border-hover);
-}
+  .atomic-form-button-secondary:hover:not(:disabled) {
+    background: var(--atomic-form-hover-bg);
+    border-color: var(--atomic-form-border-hover);
+  }
 
-.atomic-form-success {
-  color: var(--atomic-form-text);
-  font-size: 1.1rem;
-  text-align: center;
-  padding: 3rem 1rem;
-}
+  .atomic-form-success {
+    color: var(--atomic-form-text);
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 3rem 1rem;
+  }
 
-/* ── Extended field types ────────────────────────────────────────────────
+  /* ── Extended field types ────────────────────────────────────────────────
    dropdown, currency, likert, rating, picture choice, choice matrix,
    table input and address. All dependency-free and themed off the same
    --atomic-form-* custom properties as the basic inputs. */
 
-.atomic-form-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
+  .atomic-form-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-.atomic-form-select {
-  appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, currentColor 50%),
-    linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position:
-    calc(100% - 1.1rem) 55%,
-    calc(100% - 0.75rem) 55%;
-  background-size: 0.35rem 0.35rem;
-  background-repeat: no-repeat;
-  padding-right: 2rem;
-}
+  .atomic-form-select {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 1.1rem) 55%,
+      calc(100% - 0.75rem) 55%;
+    background-size: 0.35rem 0.35rem;
+    background-repeat: no-repeat;
+    padding-right: 2rem;
+  }
 
-/* Multi-select combobox (`dropdown-multi`). The closed trigger carries the
+  /* Multi-select combobox (`dropdown-multi`). The closed trigger carries the
    chosen options as chips, so an answer stays readable without opening the
    menu; the menu itself is a listbox of tickable rows. See MultiSelect.tsx. */
-.atomic-form-combobox {
-  position: relative;
-}
+  .atomic-form-combobox {
+    position: relative;
+  }
 
-.atomic-form-combobox-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  /* A multi-select's chips set the height, so the fixed one
+  .atomic-form-combobox-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    /* A multi-select's chips set the height, so the fixed one
      `.atomic-form-input` gives text inputs would clip them — keep it as a
      floor instead. */
-  height: auto;
-  min-height: 2.75rem;
-  padding-top: 0.35rem;
-  padding-bottom: 0.35rem;
-  padding-right: 2rem;
-}
+    height: auto;
+    min-height: 2.75rem;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    padding-right: 2rem;
+  }
 
-.atomic-form-combobox-trigger:focus-visible,
-.atomic-form-combobox-trigger-open {
-  border-color: var(--atomic-form-accent);
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 0;
-}
+  .atomic-form-combobox-trigger:focus-visible,
+  .atomic-form-combobox-trigger-open {
+    border-color: var(--atomic-form-accent);
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 0;
+  }
 
-.atomic-form-combobox-answer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem;
-  flex: 1;
-  min-width: 0;
-}
+  .atomic-form-combobox-answer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 1;
+    min-width: 0;
+  }
 
-/* Single-select: the chosen option reads as the field's value, so it gets no
+  /* Single-select: the chosen option reads as the field's value, so it gets no
    chip treatment — just the text, and the ✕ that empties the field again. */
-.atomic-form-combobox-value {
-  overflow-wrap: anywhere;
-}
+  .atomic-form-combobox-value {
+    overflow-wrap: anywhere;
+  }
 
-/* The single-select's ✕ — a direct child, where a chip's sits nested inside
+  /* The single-select's ✕ — a direct child, where a chip's sits nested inside
    `.atomic-form-combobox-chip`. It belongs at the trailing edge next to the
    caret, not trailing the label, so that its position holds still as the
    answer changes length. */
-.atomic-form-combobox-answer > button {
-  margin-left: auto;
-}
+  .atomic-form-combobox-answer > button {
+    margin-left: auto;
+  }
 
-.atomic-form-combobox-placeholder {
-  color: var(--atomic-form-text-light);
-}
+  .atomic-form-combobox-placeholder {
+    color: var(--atomic-form-text-light);
+  }
 
-.atomic-form-combobox-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  max-width: 100%;
-  padding: 0.1rem 0.2rem 0.1rem 0.5rem;
-  font-size: 0.85em;
-  line-height: 1.5;
-  border-radius: calc(var(--atomic-form-radius) * 0.75);
-  background: color-mix(
-    in srgb,
-    var(--atomic-form-accent) 14%,
-    var(--atomic-form-bg)
-  );
-  color: var(--atomic-form-text);
-  overflow-wrap: anywhere;
-}
+  .atomic-form-combobox-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+    padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+    font-size: 0.85em;
+    line-height: 1.5;
+    border-radius: calc(var(--atomic-form-radius) * 0.75);
+    background: color-mix(
+      in srgb,
+      var(--atomic-form-accent) 14%,
+      var(--atomic-form-bg)
+    );
+    color: var(--atomic-form-text);
+    overflow-wrap: anywhere;
+  }
 
-.atomic-form-combobox-answer button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 1.15rem;
-  height: 1.15rem;
-  padding: 0;
-  font: inherit;
-  font-size: 0.8em;
-  line-height: 1;
-  color: var(--atomic-form-text-light);
-  background: none;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  transition:
-    color var(--atomic-form-transition),
-    background-color var(--atomic-form-transition);
-}
+  .atomic-form-combobox-answer button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    font: inherit;
+    font-size: 0.8em;
+    line-height: 1;
+    color: var(--atomic-form-text-light);
+    background: none;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition:
+      color var(--atomic-form-transition),
+      background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-combobox-answer button:hover {
-  color: var(--atomic-form-text);
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-combobox-answer button:hover {
+    color: var(--atomic-form-text);
+    background: var(--atomic-form-hover-bg);
+  }
 
-/* The same caret `.atomic-form-select` draws, but as an element rather than a
+  /* The same caret `.atomic-form-select` draws, but as an element rather than a
    background — the trigger is a flex row, not a native select. */
-.atomic-form-combobox-arrow {
-  flex-shrink: 0;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-right: -1.25rem;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translateY(-0.15em) rotate(45deg);
-  color: var(--atomic-form-text-light);
-}
+  .atomic-form-combobox-arrow {
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: -1.25rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-0.15em) rotate(45deg);
+    color: var(--atomic-form-text-light);
+  }
 
-.atomic-form-combobox-panel {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--atomic-form-bg);
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
-}
+  .atomic-form-combobox-panel {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--atomic-form-bg);
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  }
 
-/* Beats the `display: flex` above, which would otherwise win over the UA's
+  /* Beats the `display: flex` above, which would otherwise win over the UA's
    `[hidden] { display: none }` on specificity. */
-.atomic-form-combobox-panel[hidden] {
-  display: none;
-}
+  .atomic-form-combobox-panel[hidden] {
+    display: none;
+  }
 
-.atomic-form-combobox-panel-up {
-  top: auto;
-  bottom: calc(100% + 0.25rem);
-}
+  .atomic-form-combobox-panel-up {
+    top: auto;
+    bottom: calc(100% + 0.25rem);
+  }
 
-.atomic-form-combobox-filter {
-  font: inherit;
-  color: var(--atomic-form-text);
-  background: var(--atomic-form-bg);
-  border: none;
-  border-bottom: 1px solid var(--atomic-form-border);
-  padding: 0.6rem 0.75rem;
-}
+  .atomic-form-combobox-filter {
+    font: inherit;
+    color: var(--atomic-form-text);
+    background: var(--atomic-form-bg);
+    border: none;
+    border-bottom: 1px solid var(--atomic-form-border);
+    padding: 0.6rem 0.75rem;
+  }
 
-.atomic-form-combobox-filter:focus {
-  outline: none;
-}
+  .atomic-form-combobox-filter:focus {
+    outline: none;
+  }
 
-.atomic-form-combobox-menu {
-  list-style: none;
-  margin: 0;
-  padding: 0.25rem;
-  max-height: 15rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
+  .atomic-form-combobox-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 
-/* `margin` and `list-style` are reset explicitly, not left to the `<ul>`:
+  /* `margin` and `list-style` are reset explicitly, not left to the `<ul>`:
    this package renders inside host pages whose own `ul li` rules would
    otherwise indent every row and space it out (the data-browser's global
    stylesheet does exactly that). The 0.5rem left padding is all the inset
    there should be — with the menu's own 0.25rem it puts the checkbox under
    the first character of the filter box above it. */
-.atomic-form-combobox-option {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin: 0;
-  padding: 0.45rem 0.5rem;
-  list-style: none;
-  border-radius: calc(var(--atomic-form-radius) * 0.75);
-  cursor: pointer;
-}
+  .atomic-form-combobox-option {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0.45rem 0.5rem;
+    list-style: none;
+    border-radius: calc(var(--atomic-form-radius) * 0.75);
+    cursor: pointer;
+  }
 
-/* Keyboard and pointer share one highlight: downshift moves
+  /* Keyboard and pointer share one highlight: downshift moves
    `highlightedIndex` on hover too, so a `:hover` rule would double up. */
-.atomic-form-combobox-option[data-highlighted] {
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-combobox-option[data-highlighted] {
+    background: var(--atomic-form-hover-bg);
+  }
 
-/* Same story as the disabled choice row: past the maximum the remaining
+  /* Same story as the disabled choice row: past the maximum the remaining
    options grey out. Downshift still moves the highlight past them, so the
    `[data-highlighted]` background above never lands on one. */
-.atomic-form-combobox-option[data-disabled] {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+  .atomic-form-combobox-option[data-disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 
-/* Which row is the current answer, for the single-select — it has no
+  /* Which row is the current answer, for the single-select — it has no
    checkbox column to say so. Colour and weight rather than a glyph: a tick
    in the checkbox's place would suggest the rows toggle independently. */
-.atomic-form-combobox-option[data-current] {
-  color: var(--atomic-form-accent);
-  font-weight: 600;
-}
+  .atomic-form-combobox-option[data-current] {
+    color: var(--atomic-form-accent);
+    font-weight: 600;
+  }
 
-.atomic-form-combobox-check {
-  flex-shrink: 0;
-  position: relative;
-  width: 1rem;
-  height: 1rem;
-  border: 1px solid var(--atomic-form-border-hover);
-  border-radius: 0.25rem;
-  transition:
-    background-color var(--atomic-form-transition),
-    border-color var(--atomic-form-transition);
-}
+  .atomic-form-combobox-check {
+    flex-shrink: 0;
+    position: relative;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid var(--atomic-form-border-hover);
+    border-radius: 0.25rem;
+    transition:
+      background-color var(--atomic-form-transition),
+      border-color var(--atomic-form-transition);
+  }
 
-.atomic-form-combobox-check[data-checked] {
-  background: var(--atomic-form-accent);
-  border-color: var(--atomic-form-accent);
-}
+  .atomic-form-combobox-check[data-checked] {
+    background: var(--atomic-form-accent);
+    border-color: var(--atomic-form-accent);
+  }
 
-.atomic-form-combobox-check[data-checked]::after {
-  content: '';
-  position: absolute;
-  left: 0.3rem;
-  top: 0.1rem;
-  width: 0.25rem;
-  height: 0.5rem;
-  border-right: 2px solid var(--atomic-form-bg);
-  border-bottom: 2px solid var(--atomic-form-bg);
-  transform: rotate(45deg);
-}
+  .atomic-form-combobox-check[data-checked]::after {
+    content: '';
+    position: absolute;
+    left: 0.3rem;
+    top: 0.1rem;
+    width: 0.25rem;
+    height: 0.5rem;
+    border-right: 2px solid var(--atomic-form-bg);
+    border-bottom: 2px solid var(--atomic-form-bg);
+    transform: rotate(45deg);
+  }
 
-.atomic-form-combobox-empty {
-  margin: 0;
-  padding: 0.55rem 0.5rem;
-  list-style: none;
-  color: var(--atomic-form-text-light);
-}
+  .atomic-form-combobox-empty {
+    margin: 0;
+    padding: 0.55rem 0.5rem;
+    list-style: none;
+    color: var(--atomic-form-text-light);
+  }
 
-/* Like the phone field, the bordered box moves to the container so the
+  /* Like the phone field, the bordered box moves to the container so the
    currency symbol sits inside the input's frame rather than floating next to
    it. The container is a `<label>` (see FieldInput), so clicking the symbol
    or the padding around it focuses the number. */
-.atomic-form-currency {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--atomic-form-text);
-  background: var(--atomic-form-bg);
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  padding-left: 0.75rem;
-  box-sizing: border-box;
-  cursor: text;
-  transition: border-color var(--atomic-form-transition);
-}
+  .atomic-form-currency {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--atomic-form-text);
+    background: var(--atomic-form-bg);
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    padding-left: 0.75rem;
+    box-sizing: border-box;
+    cursor: text;
+    transition: border-color var(--atomic-form-transition);
+  }
 
-.atomic-form-currency:hover:not(:focus-within) {
-  border-color: var(--atomic-form-border-hover);
-}
+  .atomic-form-currency:hover:not(:focus-within) {
+    border-color: var(--atomic-form-border-hover);
+  }
 
-.atomic-form-currency:focus-within {
-  border-color: var(--atomic-form-accent);
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 0;
-}
+  .atomic-form-currency:focus-within {
+    border-color: var(--atomic-form-accent);
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 0;
+  }
 
-/* The inner input's border is `none`, so an out-of-range amount has to turn
+  /* The inner input's border is `none`, so an out-of-range amount has to turn
    the container red instead. The `:hover` and `:focus-within` twins clear
    the specificity of the two rules above. */
-.atomic-form-currency:has(input:user-invalid),
-.atomic-form-currency:has(input:user-invalid):hover,
-.atomic-form-currency:has(input:user-invalid):focus-within {
-  border-color: var(--atomic-form-error);
-  outline-color: var(--atomic-form-error);
-}
+  .atomic-form-currency:has(input:user-invalid),
+  .atomic-form-currency:has(input:user-invalid):hover,
+  .atomic-form-currency:has(input:user-invalid):focus-within {
+    border-color: var(--atomic-form-error);
+    outline-color: var(--atomic-form-error);
+  }
 
-.atomic-form-currency .atomic-form-input {
-  flex: 1;
-  width: auto;
-  border: none;
-  background: transparent;
-  padding-left: 0;
-}
+  .atomic-form-currency .atomic-form-input {
+    flex: 1;
+    width: auto;
+    border: none;
+    background: transparent;
+    padding-left: 0;
+  }
 
-.atomic-form-currency .atomic-form-input:focus {
-  outline: none;
-}
+  .atomic-form-currency .atomic-form-input:focus {
+    outline: none;
+  }
 
-.atomic-form-currency-symbol {
-  color: var(--atomic-form-text-light);
-  font-weight: 600;
-}
+  .atomic-form-currency-symbol {
+    color: var(--atomic-form-text-light);
+    font-weight: 600;
+  }
 
-.atomic-form-likert {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  width: 100%;
-}
+  .atomic-form-likert {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    width: 100%;
+  }
 
-.atomic-form-likert-end {
-  color: var(--atomic-form-text-light);
-  font-size: 0.9rem;
-}
+  .atomic-form-likert-end {
+    color: var(--atomic-form-text-light);
+    font-size: 0.9rem;
+  }
 
-/* Takes whatever width the min/max end labels leave over and spreads the
+  /* Takes whatever width the min/max end labels leave over and spreads the
    steps across it, so the scale reads as a full-width ruler rather than a
    cluster of radios hugging the left edge. The gap is only a floor for when
    the row is too narrow for `space-around` to give any. */
-.atomic-form-likert-scale {
-  display: flex;
-  flex: 1;
-  justify-content: space-around;
-  gap: 0.25rem;
-}
+  .atomic-form-likert-scale {
+    display: flex;
+    flex: 1;
+    justify-content: space-around;
+    gap: 0.25rem;
+  }
 
-.atomic-form-likert-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--atomic-form-text);
-  cursor: pointer;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--atomic-form-radius);
-  transition: background-color var(--atomic-form-transition);
-}
+  .atomic-form-likert-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--atomic-form-text);
+    cursor: pointer;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--atomic-form-radius);
+    transition: background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-likert-step:hover {
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-likert-step:hover {
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-likert-step:has(input:focus-visible) {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
-}
+  .atomic-form-likert-step:has(input:focus-visible) {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 1px;
+  }
 
-/* Outer element is the hover zone (see RatingField); `fit-content` keeps it
+  /* Outer element is the hover zone (see RatingField); `fit-content` keeps it
    hugging the glyphs so the preview clears as soon as the pointer leaves
    them. The inner element is the radiogroup and the flex row. */
-.atomic-form-rating {
-  width: fit-content;
-}
+  .atomic-form-rating {
+    width: fit-content;
+  }
 
-.atomic-form-rating-scale {
-  display: flex;
-  gap: 0.2rem;
-}
+  .atomic-form-rating-scale {
+    display: flex;
+    gap: 0.2rem;
+  }
 
-/* `atomic-form-rating-step-hot` is set by FieldInput on every step up to
+  /* `atomic-form-rating-step-hot` is set by FieldInput on every step up to
    and including the pointer, so the whole run lights up together the way a
    star rating is expected to preview. */
-.atomic-form-rating-step {
-  cursor: pointer;
-  font-size: 1.6rem;
-  line-height: 1;
-  color: var(--atomic-form-accent);
-}
+  .atomic-form-rating-step {
+    cursor: pointer;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--atomic-form-accent);
+  }
 
-.atomic-form-rating-step span {
-  display: block;
-  transition:
-    transform var(--atomic-form-transition),
-    color var(--atomic-form-transition);
-}
+  .atomic-form-rating-step span {
+    display: block;
+    transition:
+      transform var(--atomic-form-transition),
+      color var(--atomic-form-transition);
+  }
 
-.atomic-form-rating-step-hot span {
-  color: var(--atomic-form-accent-hover);
-  transform: scale(1.15);
-}
+  .atomic-form-rating-step-hot span {
+    color: var(--atomic-form-accent-hover);
+    transform: scale(1.15);
+  }
 
-.atomic-form-rating-step input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-}
+  .atomic-form-rating-step input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
 
-.atomic-form-rating-step input:focus-visible + span {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 2px;
-  border-radius: 0.2rem;
-}
+  .atomic-form-rating-step input:focus-visible + span {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 2px;
+    border-radius: 0.2rem;
+  }
 
-.atomic-form-picture-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-  gap: 0.75rem;
-}
+  .atomic-form-picture-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: 0.75rem;
+  }
 
-.atomic-form-picture-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  color: var(--atomic-form-text);
-  cursor: pointer;
-  transition:
-    border-color var(--atomic-form-transition),
-    background-color var(--atomic-form-transition);
-}
+  .atomic-form-picture-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    color: var(--atomic-form-text);
+    cursor: pointer;
+    transition:
+      border-color var(--atomic-form-transition),
+      background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-picture-card:hover {
-  border-color: var(--atomic-form-border-hover);
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-picture-card:hover {
+    border-color: var(--atomic-form-border-hover);
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-picture-card:has(input:focus-visible) {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 2px;
-}
+  .atomic-form-picture-card:has(input:focus-visible) {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 2px;
+  }
 
-/* The `:hover` twin keeps the accent edge on a card that is already picked,
+  /* The `:hover` twin keeps the accent edge on a card that is already picked,
    overriding the plain hover border above. */
-.atomic-form-picture-card-selected,
-.atomic-form-picture-card-selected:hover {
-  border-color: var(--atomic-form-accent);
-  box-shadow: 0 0 0 1px var(--atomic-form-accent);
-}
+  .atomic-form-picture-card-selected,
+  .atomic-form-picture-card-selected:hover {
+    border-color: var(--atomic-form-accent);
+    box-shadow: 0 0 0 1px var(--atomic-form-accent);
+  }
 
-.atomic-form-picture-card img,
-.atomic-form-picture-placeholder {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: calc(var(--atomic-form-radius) / 1.5);
-  background: var(--atomic-form-border);
-}
+  .atomic-form-picture-card img,
+  .atomic-form-picture-placeholder {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: calc(var(--atomic-form-radius) / 1.5);
+    background: var(--atomic-form-border);
+  }
 
-.atomic-form-picture-label {
-  font-size: 0.9rem;
-  text-align: center;
-}
+  .atomic-form-picture-label {
+    font-size: 0.9rem;
+    text-align: center;
+  }
 
-/* Tables (choice matrix + table input) scroll inside their own container so
+  /* Tables (choice matrix + table input) scroll inside their own container so
    a wide scale can't force the whole page sideways. */
-.atomic-form-matrix-wrapper {
-  overflow-x: auto;
-}
+  .atomic-form-matrix-wrapper {
+    overflow-x: auto;
+  }
 
-.atomic-form-matrix,
-.atomic-form-table-input {
-  border-collapse: collapse;
-  width: 100%;
-  color: var(--atomic-form-text);
-}
+  .atomic-form-matrix,
+  .atomic-form-table-input {
+    border-collapse: collapse;
+    width: 100%;
+    color: var(--atomic-form-text);
+  }
 
-.atomic-form-matrix th,
-.atomic-form-matrix td,
-.atomic-form-table-input th,
-.atomic-form-table-input td {
-  border-bottom: 1px solid var(--atomic-form-border);
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  font-weight: normal;
-}
+  .atomic-form-matrix th,
+  .atomic-form-matrix td,
+  .atomic-form-table-input th,
+  .atomic-form-table-input td {
+    border-bottom: 1px solid var(--atomic-form-border);
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    font-weight: normal;
+  }
 
-.atomic-form-matrix thead th,
-.atomic-form-table-input thead th {
-  font-size: 0.85rem;
-  color: var(--atomic-form-text-light);
-  text-align: center;
-}
+  .atomic-form-matrix thead th,
+  .atomic-form-table-input thead th {
+    font-size: 0.85rem;
+    color: var(--atomic-form-text-light);
+    text-align: center;
+  }
 
-.atomic-form-table-input thead th {
-  text-align: left;
-}
+  .atomic-form-table-input thead th {
+    text-align: left;
+  }
 
-.atomic-form-matrix tbody td {
-  text-align: center;
-}
+  .atomic-form-matrix tbody td {
+    text-align: center;
+  }
 
-.atomic-form-matrix tbody tr {
-  transition: background-color var(--atomic-form-transition);
-}
+  .atomic-form-matrix tbody tr {
+    transition: background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-matrix tbody tr:hover {
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-matrix tbody tr:hover {
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-matrix-cell {
-  display: inline-flex;
-  padding: 0.35rem;
-  cursor: pointer;
-  border-radius: 999px;
-  transition: background-color var(--atomic-form-transition);
-}
+  .atomic-form-matrix-cell {
+    display: inline-flex;
+    padding: 0.35rem;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-matrix-cell:hover {
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-matrix-cell:hover {
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-matrix-cell:has(input:focus-visible) {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
-}
+  .atomic-form-matrix-cell:has(input:focus-visible) {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 1px;
+  }
 
-.atomic-form-matrix-cell input {
-  cursor: pointer;
-}
+  .atomic-form-matrix-cell input {
+    cursor: pointer;
+  }
 
-.atomic-form-row-button {
-  font: inherit;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: var(--atomic-form-text-light);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  border-radius: var(--atomic-form-radius);
-  transition:
-    color var(--atomic-form-transition),
-    background-color var(--atomic-form-transition);
-}
+  .atomic-form-row-button {
+    font: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--atomic-form-text-light);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--atomic-form-radius);
+    transition:
+      color var(--atomic-form-transition),
+      background-color var(--atomic-form-transition);
+  }
 
-.atomic-form-row-button:hover {
-  color: var(--atomic-form-error);
-  background: var(--atomic-form-hover-bg);
-}
+  .atomic-form-row-button:hover {
+    color: var(--atomic-form-error);
+    background: var(--atomic-form-hover-bg);
+  }
 
-.atomic-form-row-button:focus-visible {
-  outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
-}
+  .atomic-form-row-button:focus-visible {
+    outline: 2px solid var(--atomic-form-accent);
+    outline-offset: 1px;
+  }
 
-.atomic-form-add-row {
-  margin-top: 0.75rem;
-  padding: 0.4rem 1rem;
-  font-size: 0.9rem;
-}
+  .atomic-form-add-row {
+    margin-top: 0.75rem;
+    padding: 0.4rem 1rem;
+    font-size: 0.9rem;
+  }
 
-.atomic-form-address {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.75rem;
-}
+  .atomic-form-address {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
 
-.atomic-form-address-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
+  .atomic-form-address-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
 
-.atomic-form-address-field:first-child,
-.atomic-form-address-field:nth-child(2) {
-  grid-column: 1 / -1;
-}
+  .atomic-form-address-field:first-child,
+  .atomic-form-address-field:nth-child(2) {
+    grid-column: 1 / -1;
+  }
 
-.atomic-form-address-label {
-  font-size: 0.85rem;
-  color: var(--atomic-form-text-light);
-}
+  .atomic-form-address-label {
+    font-size: 0.85rem;
+    color: var(--atomic-form-text-light);
+  }
 
-/* ── FormShell: page chrome + cover-image layouts ─────────────────────────
+  /* ── FormShell: page chrome + cover-image layouts ─────────────────────────
    The shell fills whatever its host gives it (the published form-app makes
    #root viewport-high; the builder's preview dialog just wraps content). */
 
-.atomic-form-shell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 100%;
-  background: var(--atomic-form-bg);
-  accent-color: var(--atomic-form-accent);
-}
-
-.atomic-form-content-pane {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  flex: 1;
-  padding: 2rem 1rem;
-}
-
-.atomic-form-card {
-  width: 100%;
-  max-width: 40rem;
-  min-width: 0;
-}
-
-.atomic-form-title {
-  color: var(--atomic-form-text);
-  margin: 0 0 1.5rem;
-}
-
-/* top: image banner above the title, inside the card column. */
-.atomic-form-banner {
-  display: block;
-  width: 100%;
-  max-height: 16rem;
-  object-fit: cover;
-  border-radius: var(--atomic-form-radius);
-  margin-bottom: 1.5rem;
-}
-
-/* left / right: viewport-high image pane next to the scrolling form pane. */
-.atomic-form-shell-left,
-.atomic-form-shell-right {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-}
-
-.atomic-form-shell-right {
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-}
-
-.atomic-form-image-pane {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-}
-
-.atomic-form-shell-right .atomic-form-image-pane {
-  order: 2;
-}
-
-.atomic-form-image-pane img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-@media (max-width: 44rem) {
-  .atomic-form-shell-left,
-  .atomic-form-shell-right {
+  .atomic-form-shell {
+    position: relative;
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 100%;
+    background: var(--atomic-form-bg);
+    accent-color: var(--atomic-form-accent);
+  }
+
+  .atomic-form-content-pane {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    flex: 1;
+    padding: 2rem 1rem;
+  }
+
+  .atomic-form-card {
+    width: 100%;
+    max-width: 40rem;
+    min-width: 0;
+  }
+
+  .atomic-form-title {
+    color: var(--atomic-form-text);
+    margin: 0 0 1.5rem;
+  }
+
+  /* top: image banner above the title, inside the card column. */
+  .atomic-form-banner {
+    display: block;
+    width: 100%;
+    max-height: 16rem;
+    object-fit: cover;
+    border-radius: var(--atomic-form-radius);
+    margin-bottom: 1.5rem;
+  }
+
+  /* left / right: viewport-high image pane next to the scrolling form pane. */
+  .atomic-form-shell-left,
+  .atomic-form-shell-right {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+
+  .atomic-form-shell-right {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 
   .atomic-form-image-pane {
-    position: static;
-    height: 12rem;
-    order: 0;
+    position: sticky;
+    top: 0;
+    height: 100svh;
   }
-}
 
-/* behind / full: image covers the whole shell, content floats on top. */
-.atomic-form-backdrop {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  .atomic-form-shell-right .atomic-form-image-pane {
+    order: 2;
+  }
 
-.atomic-form-shell-behind .atomic-form-card {
-  align-self: flex-start;
-  background: var(--atomic-form-bg);
-  padding: 2rem 1.75rem;
-  border-radius: calc(var(--atomic-form-radius) * 1.5);
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
-}
+  .atomic-form-image-pane img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
-/* full: no card chrome — the form sits directly on the image. Inputs keep
+  @media (max-width: 44rem) {
+    .atomic-form-shell-left,
+    .atomic-form-shell-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .atomic-form-image-pane {
+      position: static;
+      height: 12rem;
+      order: 0;
+    }
+  }
+
+  /* behind / full: image covers the whole shell, content floats on top. */
+  .atomic-form-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .atomic-form-shell-behind .atomic-form-card {
+    align-self: flex-start;
+    background: var(--atomic-form-bg);
+    padding: 2rem 1.75rem;
+    border-radius: calc(var(--atomic-form-radius) * 1.5);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
+  }
+
+  /* full: no card chrome — the form sits directly on the image. Inputs keep
    their own background so they stay usable on busy images. */
 
-/* ── embed (Phase 6): shrink-to-content instead of filling the viewport ──
+  /* ── embed (Phase 6): shrink-to-content instead of filling the viewport ──
    The published runtime reports its content height to the embedding page
    via `postMessage` and expects the iframe to be resized to match — a
    `min-height: 100%` chain would report the iframe's *current* (often
    stale) height back to itself instead of the form's real height. Image
    panes drop their viewport-sticky layout for the same reason, reusing the
    narrow-viewport treatment below. */
-.atomic-form-shell-embed {
-  min-height: 0;
-  flex: initial;
-}
+  .atomic-form-shell-embed {
+    min-height: 0;
+    flex: initial;
+  }
 
-.atomic-form-shell-embed .atomic-form-content-pane {
-  padding: 1rem;
-}
+  .atomic-form-shell-embed .atomic-form-content-pane {
+    padding: 1rem;
+  }
 
-.atomic-form-shell-embed.atomic-form-shell-left,
-.atomic-form-shell-embed.atomic-form-shell-right {
-  display: flex;
-  flex-direction: column;
-}
+  .atomic-form-shell-embed.atomic-form-shell-left,
+  .atomic-form-shell-embed.atomic-form-shell-right {
+    display: flex;
+    flex-direction: column;
+  }
 
-.atomic-form-shell-embed .atomic-form-image-pane {
-  position: static;
-  height: 12rem;
-  order: 0;
-}
+  .atomic-form-shell-embed .atomic-form-image-pane {
+    position: static;
+    height: 12rem;
+    order: 0;
+  }
 
-/* ── ALTCHA captcha card (published runtime only) ──
+  /* ── ALTCHA captcha card (published runtime only) ──
    Maps the widget's theming variables onto the form theme so custom colors
    and roundness from the Settings tab apply to it in both color schemes. */
-.atomic-form-captcha {
-  margin-top: 1.25rem;
-}
+  .atomic-form-captcha {
+    margin-top: 1.25rem;
+  }
 
-.atomic-form-captcha altcha-widget {
-  display: block;
-  --altcha-color-base: var(--atomic-form-bg);
-  --altcha-color-base-content: var(--atomic-form-text);
-  --altcha-border-color: var(--atomic-form-border);
-  --altcha-border-radius: var(--atomic-form-radius);
-  --altcha-checkbox-border-color: var(--atomic-form-border);
-  --altcha-color-primary: var(--atomic-form-accent);
-  --altcha-color-error: var(--atomic-form-error);
-  --altcha-spinner-color: var(--atomic-form-accent);
-  --altcha-max-width: 100%;
-}
+  .atomic-form-captcha altcha-widget {
+    display: block;
+    --altcha-color-base: var(--atomic-form-bg);
+    --altcha-color-base-content: var(--atomic-form-text);
+    --altcha-border-color: var(--atomic-form-border);
+    --altcha-border-radius: var(--atomic-form-radius);
+    --altcha-checkbox-border-color: var(--atomic-form-border);
+    --altcha-color-primary: var(--atomic-form-accent);
+    --altcha-color-error: var(--atomic-form-error);
+    --altcha-spinner-color: var(--atomic-form-accent);
+    --altcha-max-width: 100%;
+  }
 
-/* ── Resume-draft dialog ──
+  /* ── Resume-draft dialog ──
    Asked on load when answers were recovered from the visitor's localStorage
    (see `draft.ts`). A native <dialog> opened with `showModal()`, so the
    backdrop, focus trap and Escape handling come from the browser. It sits
    inside the form, which is what lets it inherit the form's theme
    variables — the top layer changes painting order, not inheritance. */
-.atomic-form-draft-dialog {
-  /* Reset the UA's centering box before re-centering: `inset: 0` + auto
+  .atomic-form-draft-dialog {
+    /* Reset the UA's centering box before re-centering: `inset: 0` + auto
      margins is the one approach that lands the same in every engine. */
-  inset: 0;
-  margin: auto;
-  width: min(26rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
-  box-sizing: border-box;
-  padding: 1.5rem;
-  border: 1px solid var(--atomic-form-border);
-  border-radius: var(--atomic-form-radius);
-  background: var(--atomic-form-bg);
-  color: var(--atomic-form-text);
-}
+    inset: 0;
+    margin: auto;
+    width: min(26rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 1.5rem;
+    border: 1px solid var(--atomic-form-border);
+    border-radius: var(--atomic-form-radius);
+    background: var(--atomic-form-bg);
+    color: var(--atomic-form-text);
+  }
 
-.atomic-form-draft-dialog::backdrop {
-  /* Not a theme variable: the backdrop must read as "behind everything" in
+  .atomic-form-draft-dialog::backdrop {
+    /* Not a theme variable: the backdrop must read as "behind everything" in
      both color schemes, and a translucent black does that whatever the form's
      own background is. `::backdrop` also cannot see the element's inherited
      custom properties in every engine. */
-  background: rgba(0, 0, 0, 0.45);
-}
+    background: rgba(0, 0, 0, 0.45);
+  }
 
-.atomic-form-draft-title {
-  margin: 0 0 0.5rem;
-  font-size: 1.15rem;
-  line-height: 1.3;
-}
+  .atomic-form-draft-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
 
-.atomic-form-draft-text {
-  margin: 0;
-  color: var(--atomic-form-text-light);
-  font-size: 0.95rem;
-}
+  .atomic-form-draft-text {
+    margin: 0;
+    color: var(--atomic-form-text-light);
+    font-size: 0.95rem;
+  }
 
-.atomic-form-draft-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  .atomic-form-draft-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
 }

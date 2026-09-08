@@ -8620,3 +8620,38 @@ msgstr "Le nombre maximum de caractères qu'une réponse peut contenir. Le dépa
 #: src/chunks/FormBuilder/PageSettingsPanel.tsx
 msgid "Page"
 msgstr "Page"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Custom CSS"
+msgstr "CSS personnalisé"
+
+#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+#~ msgstr "S'applique au formulaire publié et à l'aperçu. Il est superposé aux styles propres du formulaire, de sorte que vous n'avez jamais besoin{0} <0/> — une règle <1/> simple suffit."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Your CSS only sees the form: <0/> is its outermost element (override the <1/> variables there), and <2/> and <3/> are out of reach.{0} <4/> is stripped when the form is served — paste in what you need instead."
+msgstr "Votre CSS ne voit que le formulaire : <0/> est son élément le plus externe (surchargez les variables <1/> là-bas), et <2/> et <3/> sont hors de portée.{0} <4/> est supprimé lorsque le formulaire est servi — collez ce dont vous avez besoin à la place."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Every class you can target is in{0} <0>the form renderer's stylesheet</0> ."
+msgstr "Chaque classe que vous pouvez cibler se trouve dans{0} <0>la feuille de style du moteur de rendu du formulaire</0>."
+
+#. 0: ' '
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need <0/>{0} — a plain <1/> rule already wins."
+msgstr "S'applique au formulaire publié et à l'aperçu. Il est superposé aux styles du formulaire lui-même, donc vous n'avez jamais besoin de <0/>{0} — une simple règle <1/> l'emporte déjà."
+
+#. 0: Math.round(bytes / 1024); 1: MAX_CUSTOM_CSS_BYTES / 1024
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Too long: {0} KB of CSS, the limit is {1} KB. Longer stylesheets are dropped entirely when the form is served."
+msgstr "Trop long : {0} Ko de CSS, la limite est de {1} Ko. Les feuilles de style plus longues sont entièrement supprimées lorsque le formulaire est servi."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "This block is never closed — everything after it is part of it."
+msgstr "Ce bloc n'est jamais fermé : tout ce qui suit en fait partie."
+
+#: src/chunks/CodeEditor/cssLint.ts
+msgid "Closing brace without a matching opening one."
+msgstr "Accolade fermante sans accolade ouvrante correspondante."

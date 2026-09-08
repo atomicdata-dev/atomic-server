@@ -46,6 +46,10 @@ dialoguer = "0.12"
 directories = "6"
 dotenv = "0.15"
 futures = "0.3.32"
+# Parses, sanitizes and minifies form owners' custom CSS before it is served
+# to visitors (`src/forms.rs::sanitize_custom_css`). Same engine Vite uses for
+# the frontend, so what the builder previews and what the server ships agree.
+lightningcss = "1.0.0-alpha.72"
 percent-encoding = "2.3.2"
 regex = "1.12.3"
 rio_api = "0.8.6"

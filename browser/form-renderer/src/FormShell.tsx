@@ -84,6 +84,41 @@ export function stylingVars(styling: FormDefinition['styling']): CSSProperties {
   return vars as CSSProperties;
 }
 
+/** The cascade layer a form owner's custom CSS is injected into. Declared
+ * (empty) by `style.css` after `atomic-form-base`, so these rules win over
+ * everything the renderer ships no matter how specific ours are — and no
+ * matter whether this `<style>` element is parsed before or after the
+ * stylesheet. */
+const CUSTOM_LAYER = 'atomic-form-custom';
+
+/**
+ * Wraps a form owner's CSS so it lands in the `atomic-form-custom` layer and
+ * cannot escape the form's own root element.
+ *
+ * The `@scope` matters most for the builder's Preview dialog, which renders a
+ * `FormShell` inside the data-browser: unscoped, a `body { background: black }`
+ * would repaint the builder around it. Scoping the same way in both places
+ * also keeps the preview a faithful preview — the published runtime obeys
+ * exactly the rules the dialog did.
+ *
+ * Inside the scope, `:scope` is the form root. That is where an owner
+ * overrides the theme variables (`:scope { --atomic-form-accent: #f0f }`),
+ * since `:root` refers to the document element and is therefore out of reach.
+ *
+ * Nothing here defends against CSS that closes our braces early and writes
+ * top-level rules. It does not need to on a published form — the server
+ * re-serializes the CSS from a parsed AST first
+ * (`server/src/forms.rs::sanitize_custom_css`), so what arrives is structurally
+ * sound. In a preview the text is the owner's own, unsent, on their own screen.
+ */
+export function wrapCustomCss(css: string | undefined): string | undefined {
+  const trimmed = css?.trim();
+
+  if (!trimmed) return undefined;
+
+  return `@layer ${CUSTOM_LAYER} {\n@scope (.atomic-form-shell) {\n${trimmed}\n}\n}`;
+}
+
 /**
  * The page chrome around a rendered form: cover image (in any of its five
  * position modes), title, card, and the CSS-variable theming from
@@ -99,12 +134,17 @@ export function FormShell({
   const { styling } = definition;
   const imageUrl = styling.imageUrl;
   const position = imageUrl ? (styling.imagePosition ?? 'top') : 'plain';
+  const customCss = wrapCustomCss(styling.customCss);
 
   return (
     <div
       className={`atomic-form-shell atomic-form-shell-${position} ${embed ? 'atomic-form-shell-embed' : ''} ${className ?? ''}`}
       style={stylingVars(styling)}
     >
+      {/* Rendered in place rather than hoisted to <head>: React only hoists a
+          <style> carrying `href` + `precedence`, and in-place keeps the rules
+          next to the element they are scoped to. */}
+      {customCss && <style>{customCss}</style>}
       {imageUrl && (position === 'behind' || position === 'full') && (
         <img className='atomic-form-backdrop' src={imageUrl} alt='' />
       )}
