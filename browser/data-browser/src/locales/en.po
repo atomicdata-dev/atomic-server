@@ -9934,6 +9934,63 @@ msgstr "Applying sync…"
 msgid "Checking for changes. This may take a moment."
 msgstr "Checking for changes. This may take a moment."
 
+#: src/routes/IntegrationStore.tsx
+msgid "Your connections"
+msgstr "Your connections"
+
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connection settings"
+msgstr "Connection settings"
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "On demand"
+msgstr "On demand"
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Choose which view opens when you visit this workspace."
+msgstr "Choose which view opens when you visit this workspace."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connections"
+msgstr "Connections"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Loading workspace…"
+msgstr "Loading workspace…"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No connections yet."
+msgstr "No connections yet."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No automations yet."
+msgstr "No automations yet."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid ""
+"Connect services to this workspace. Your data and views stay here when sync "
+"is paused."
+msgstr ""
+"Connect services to this workspace. Your data and views stay here when sync "
+"is paused."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect a service"
+msgstr "Connect a service"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid ""
+"Automations act on your data and can use connected services. Sync works "
+"independently."
+msgstr ""
+"Automations act on your data and can use connected services. Sync works "
+"independently."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "This integration creates a new workspace for its imported data."
+msgstr "This integration creates a new workspace for its imported data."
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Context compacted"
 

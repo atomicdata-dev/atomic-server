@@ -9777,6 +9777,63 @@ msgstr ""
 msgid "Checking for changes. This may take a moment."
 msgstr ""
 
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Publish to integration store"
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Your connections"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connection settings"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "On demand"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Choose which view opens when you visit this workspace."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connections"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Loading workspace…"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No connections yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No automations yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid ""
+"Connect services to this workspace. Your data and views stay here when sync "
+"is paused."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect a service"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid ""
+"Automations act on your data and can use connected services. Sync works "
+"independently."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "This integration creates a new workspace for its imported data."
+msgstr ""
+
 #~ msgid ""
 #~ "Enter your recovery code to show your secret or add a passkey on this "
 #~ "device. Your existing recovery code will keep working."

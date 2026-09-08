@@ -3575,7 +3575,7 @@ export class Store {
       });
     }
 
-    return this.resources.get(normalizedSubject)!;
+    return this.resources.get(this.resolveSubject(subject))!;
   }
 
   public getAllSubjects(): string[] {

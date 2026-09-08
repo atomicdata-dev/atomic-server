@@ -14,7 +14,13 @@ import {
 } from '../../../../../integrations/github-issues/atomic';
 import source from '../../../../../integrations/github-issues/plugin.js?raw';
 
-export function ConnectGitHub({ drive }: { drive: string }) {
+export function ConnectGitHub({
+  drive,
+  workspace,
+}: {
+  drive: string;
+  workspace?: string;
+}) {
   const store = useStore();
   const navigate = useNavigateWithTransition();
   const [tables, setTables] = useState<
@@ -26,7 +32,11 @@ export function ConnectGitHub({ drive }: { drive: string }) {
     let active = true;
     compatibleTables(store, drive)
       .then(items => {
-        if (active) setTables(items);
+        if (active) {
+          setTables(items);
+          if (workspace && items.some(item => item.subject === workspace))
+            setTargetTable(workspace);
+        }
       })
       .catch(e => {
         if (active) setError(String(e));
@@ -35,7 +45,7 @@ export function ConnectGitHub({ drive }: { drive: string }) {
     return () => {
       active = false;
     };
-  }, [store, drive]);
+  }, [store, drive, workspace]);
   const [repository, setRepository] = useState('');
   const tokenUrl = new URL(
     'https://github.com/settings/personal-access-tokens/new',
@@ -76,7 +86,7 @@ export function ConnectGitHub({ drive }: { drive: string }) {
         targetTable || undefined,
       );
       setToken('');
-      navigate(constructOpenURL(connection.plugin));
+      navigate(constructOpenURL(connection.table));
     } catch (e) {
       setError(String(e));
     } finally {

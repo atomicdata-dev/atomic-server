@@ -6,18 +6,9 @@ import {
   useString,
   useTitle,
 } from '@tomic/react';
-import { TableResource } from '@chunks/TablePage/TableResource';
 import { Column } from '@components/Row';
 import { BasicSelect as Select } from '@components/forms/BasicSelect';
 import { useState } from 'react';
-
-export function IntegrationDataView({ subject }: { subject: string }) {
-  const resource = useResource(subject);
-  if (resource.error) return <p role='alert'>{resource.error.message}</p>;
-  if (resource.loading) return <p>Loading your data…</p>;
-
-  return <TableResource resource={resource} />;
-}
 
 export function IntegrationDefaultView({ subject }: { subject: string }) {
   const resource = useResource(subject);
@@ -50,9 +41,7 @@ export function IntegrationDefaultView({ subject }: { subject: string }) {
           <ViewOption key={view} subject={view} />
         ))}
       </Select>
-      <p>
-        Choose which view opens when you visit this integration or its table.
-      </p>
+      <p>Choose which view opens when you visit this workspace.</p>
       {error && <p role='alert'>{error}</p>}
     </Column>
   );

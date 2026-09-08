@@ -184,7 +184,7 @@ export function ConnectNotion({ drive }: { drive: string }) {
       const result = await installNotion(store, drive, database, {
         connection: selected,
       });
-      navigate(constructOpenURL(result.plugin));
+      navigate(constructOpenURL(result.table));
     } catch (e) {
       setError(String(e));
     } finally {

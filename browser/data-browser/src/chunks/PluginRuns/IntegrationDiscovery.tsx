@@ -78,9 +78,11 @@ export function bundledIntegrations() {
 export function IntegrationDiscovery({
   entry,
   drive,
+  workspace,
 }: {
   entry: ReturnType<typeof bundledIntegrations>[number];
   drive?: string;
+  workspace?: string;
 }) {
   const [dialog, show, , isOpen] = useDialog();
 
@@ -101,6 +103,9 @@ export function IntegrationDiscovery({
             them.
           </p>
         </details>
+        {workspace && (entry.id === 'notion' || entry.id === 'mt940') && (
+          <p>This integration creates a new workspace for its imported data.</p>
+        )}
         <IntegrationEvidence id={entry.id} />
         <Button disabled={!drive} onClick={show}>
           Set up connection
@@ -119,9 +124,9 @@ export function IntegrationDiscovery({
               (entry.id === 'mt940' ? (
                 <MT940Setup drive={drive} />
               ) : entry.id === 'clockify' ? (
-                <ClockifySetup drive={drive} />
+                <ClockifySetup drive={drive} workspace={workspace} />
               ) : entry.id === 'github-issues' ? (
-                <GitHubSetup drive={drive} />
+                <GitHubSetup drive={drive} workspace={workspace} />
               ) : (
                 <NotionSetup drive={drive} />
               ))}

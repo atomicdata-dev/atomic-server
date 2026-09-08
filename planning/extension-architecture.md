@@ -243,7 +243,7 @@ provider merely because a package was migrated.
 
 ### 1. Establish the workspace/connection distinction
 
-- [ ] Trace one existing GitHub installation from connection to task table, default
+- [x] Trace one existing GitHub installation from connection to task table, default
   view, automation and credentials; specify those relationships without assigning
   new subjects or changing ownership.
 - [ ] Make that existing table/board the workspace entry point, with connection
@@ -251,7 +251,7 @@ provider merely because a package was migrated.
   URLs as routes to its settings; do not break bookmarks or recovery links.
 - [ ] Offer “existing workspace” or “new workspace” during connection setup and
   verify independent sync, automation enablement and disconnect behavior.
-- [ ] Identify the workspace root using existing resource relationships. Do not
+- [x] Identify the workspace root using existing resource relationships. Do not
   introduce a new App class or silently reparent existing resources to satisfy UX.
 - [ ] Inventory manifests, UI bridges, execution paths, grants and state owners;
   link each to its replacement or explicitly retained role.
@@ -264,6 +264,38 @@ Exit: an existing GitHub user lands on their board, can find connection settings
 and create a separate automation, and keeps their data after disconnecting. There
 is one documented place for an author to start; every old surface is accounted
 for. No new runtime is required to achieve this phase.
+
+### Implementation checkpoint: workspace navigation (2026-09-08)
+
+- [x] Shared `@tomic/lib` workspace resolver and `plugin-workspace` property.
+  GitHub, Notion, Clockify and MT940 installers write it. Existing connections
+  resolve their old JSON destination without migration writes.
+- [x] Native tables own rendering and default views. Connection pages link back to
+  the workspace and retain sync, credentials, activity and code; the duplicate
+  embedded table renderer is removed.
+- [x] Tables expose Connections and Automations. The assistant gets explicit
+  workspace context; script creation saves source and workspace/connection links
+  together. Empty connection references identify an independent on-demand
+  automation, without enabling a job or granting access.
+- [x] Catalog connections link to workspace and settings separately. GitHub and
+  Clockify setup accept a compatible existing workspace; Notion and MT940 disclose
+  that they create a new one.
+- [ ] Surface live connection status in workspace controls and implement explicit
+  disconnect with revocation across schedules/actions. Pause is not disconnect.
+- [ ] Consolidate sidebar presentation without rewriting existing containment.
+  Old tables remain nested under their connection; navigation association grants
+  no authority and is intentionally separate from the resource parent.
+- [ ] Generalize workspace discovery beyond native tables to generated apps and
+  multi-table workspaces. This checkpoint is the first vertical slice, not a
+  complete migration of all plugin models.
+
+Findings: GitHub currently excludes tables already used by a connection. Keep
+that safeguard: two repositories targeting the same table can publish each
+other's cards until sync has explicit row ownership. Workspace relationships can
+represent several connections, but that does not override provider restrictions.
+Legacy workspace discovery scans authorized, paginated plugin resources on opening
+controls; an indexed migration is still needed for large catalogs. Query failures
+remain visible instead of appearing as an empty workspace.
 
 ### 2. Unify views before migrating all packages
 
