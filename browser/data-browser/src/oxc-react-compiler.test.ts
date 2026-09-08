@@ -139,5 +139,7 @@ describe('oxc-transform-react', () => {
 
     expect(fatals).toEqual([]);
     expect(compiled).toBeGreaterThan(400);
-  });
+    // This compiles the whole app, not a single unit; cold CI CPUs need
+    // more than Vitest's five-second default.
+  }, 30_000);
 });
