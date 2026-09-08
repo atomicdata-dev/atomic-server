@@ -262,9 +262,12 @@ and sandbox/scheduler integration remain unverified; this is a manual host runne
   regenerate the repository evidence asset against the exact shipped bundles.
 - [x] Native server suite: 203 passed, three ignored subprocess helpers.
 - [x] Focused installation recovery and creation catalog: five Chromium flows passed.
-- [ ] Update older `plugins.spec.ts` flows for management tabs and the new
-  chat-first automation entry point; the old publication flow expected a
-  Code-tab button on the default screen. Full browser regression is not green.
+- [x] Update publication and importer test navigation for tabs, scope template
+  selectors to their dialog, and expect evidence for all four integrations.
+  Publication, Notion validation, Clockify import/reimport/upgrade and MT940
+  import/reimport focused Chromium checks pass.
+- [ ] Migrate and rerun the seven remaining legacy `plugins.spec.ts` scenarios,
+  including the old automation form assumptions. Full regression is unverified.
 - [ ] Live-provider and live-model acceptance remain separate from fixture checks.
 
 Current implementation and remaining scope are tracked in `plugin-runtime-v1.md`,
