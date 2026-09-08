@@ -472,3 +472,13 @@ connectivity recovery, enrollment rediscovery after reload, account expiry durin
 encryption and in-flight requests, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
+
+## Collaboration profile onboarding
+
+The `e2e.spec.ts` authorization/invite and chatroom journeys now complete the
+full-name step for inviter and new invitee, retain the secret-backup step, and
+verify subsequent shared access. The chatroom journey also checks the named
+personal drive. Browser warnings/errors fail these tests, including localization
+render warnings. The authorization journey also covers cropped avatar upload, metadata and image
+download from the recipient account, and existing-agent acceptance. SaaS
+email-to-drive acceptance still needs dedicated flow coverage.

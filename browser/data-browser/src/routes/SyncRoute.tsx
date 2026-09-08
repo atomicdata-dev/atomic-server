@@ -47,7 +47,10 @@ import {
   getManagedAccount,
   type ManagedAccount,
 } from '../helpers/managed/session';
-import { getRememberedManagedPortalUrl } from '../helpers/managed/api';
+import {
+  managedFetch,
+  getRememberedManagedPortalUrl,
+} from '../helpers/managed/api';
 import {
   envelopeWrapperKinds,
   getRecoverySecret,
@@ -337,6 +340,7 @@ function ServerCard({
     <SyncCard
       active={isActive}
       provider={isCloud}
+      embedded={isCloud}
       icon={isCloud ? <FaCloud /> : <FaServer />}
       iconTone={isCloud ? 'provider' : 'neutral'}
       title={isCloud ? 'Cloud Server' : serverLabel(server)}
@@ -383,7 +387,11 @@ function ServerCard({
       facts={isActive ? facts : undefined}
       // A node id identifies this server's node, so it belongs on the server —
       // not buried in Developer.
-      nodeId={isActive && serverNodeId ? rawToNodeDid(serverNodeId) : undefined}
+      nodeId={
+        !isCloud && isActive && serverNodeId
+          ? rawToNodeDid(serverNodeId)
+          : undefined
+      }
       footer={
         isCloud && managedInfo.portalUrl ? (
           <ManagedLink
@@ -463,6 +471,7 @@ interface SyncCardProps {
   provider?: boolean;
   /** The standalone spacing "This device" uses; the list cards sit tighter. */
   spacious?: boolean;
+  embedded?: boolean;
 }
 
 function SyncCard({
@@ -480,12 +489,18 @@ function SyncCard({
   active,
   provider,
   spacious,
+  embedded,
 }: SyncCardProps): JSX.Element {
   const store = useStore();
   const shown = (facts ?? []).filter((f): f is string => !!f);
 
   return (
-    <ConnCard $active={active} $provider={provider} $spacious={spacious}>
+    <ConnCard
+      $active={active}
+      $provider={provider}
+      $spacious={spacious}
+      $embedded={embedded}
+    >
       <CardIcon $tone={iconTone}>{icon}</CardIcon>
       <ConnBody>
         <ConnTopRow>
@@ -645,6 +660,35 @@ function SyncPage() {
   const [managedAccount, setManagedAccount] = useState<ManagedAccount | null>(
     null,
   );
+
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setSubscriptionStatus(null);
+    if (!managedAccount) return;
+    const controller = new AbortController();
+    managedFetch(`/billing/subscription`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok) return;
+        const subscription = await response.json();
+
+        if (!controller.signal.aborted) {
+          setSubscriptionStatus(
+            subscription.plan === 'server' ? subscription.status : 'free',
+          );
+        }
+      })
+      .catch(() => {
+        /* Unknown is not an unpaid subscription. */
+      });
+
+    return () => controller.abort();
+  }, [managedAccount]);
 
   /**
    * Where this account's encrypted backup actually is.
@@ -1378,7 +1422,11 @@ function SyncPage() {
                 <AccountLabel>{PRODUCT_NAME}</AccountLabel>
                 <AccountEmail data-testid='provider-account'>
                   {managedAccount
-                    ? 'Your cloud services'
+                    ? subscriptionStatus === 'active'
+                      ? 'Your Cloud Server subscription is active'
+                      : subscriptionStatus === 'trialing'
+                        ? 'Your Cloud Server trial is active'
+                        : 'Your cloud services'
                     : 'Cloud services for this workspace'}
                 </AccountEmail>
               </AccountBody>
@@ -2454,6 +2502,7 @@ const ConnCard = styled.div<{
   $active?: boolean;
   $provider?: boolean;
   $spacious?: boolean;
+  $embedded?: boolean;
 }>`
   ${cardBase}
   margin-bottom: ${p => (p.$spacious ? '1.5rem' : '0.6rem')};
@@ -2464,6 +2513,16 @@ const ConnCard = styled.div<{
         ? p.theme.colors.textLight
         : undefined};
   background: ${p => (p.$provider ? `${p.theme.colors.main}0a` : undefined)};
+  ${p =>
+    p.$embedded &&
+    css`
+      border: 0;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      box-shadow: none;
+    `}
 `;
 
 /** A call to action, but still one of the cards in this list. The button

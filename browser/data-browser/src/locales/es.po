@@ -1031,13 +1031,11 @@ msgstr "Ya tengo una cuenta"
 msgid "Agent created!"
 msgstr "¡Agente creado!"
 
-#: src/views/InvitePage.tsx
-msgid "Enter a name"
-msgstr "Introduce un nombre"
+#~ msgid "Enter a name"
+#~ msgstr "Introduce un nombre"
 
-#: src/views/InvitePage.tsx
-msgid "Agent Name"
-msgstr "Nombre del Agente"
+#~ msgid "Agent Name"
+#~ msgstr "Nombre del Agente"
 
 #: src/views/InvitePage.tsx
 msgid "Agent Secret"
@@ -1259,6 +1257,7 @@ msgstr "Lienzo"
 msgid "Save failed: {0}"
 msgstr "Error al guardar: {0}"
 
+#: src/components/TeamProfileStep.tsx
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Saving…"
 msgstr "Guardando…"
@@ -2645,9 +2644,8 @@ msgstr "Permitir ediciones"
 msgid "Invite text (optional)"
 msgstr "Texto de invitación (opcional)"
 
-#: src/components/InviteForm.tsx
-msgid "Limit Usages (optional)"
-msgstr "Limitar usos (opcional)"
+#~ msgid "Limit Usages (optional)"
+#~ msgstr "Limitar usos (opcional)"
 
 #: src/components/InviteForm.tsx
 msgid "Invite created and copied to clipboard! 🚀"
@@ -4384,7 +4382,6 @@ msgstr ""
 msgid "as a classtype."
 msgstr ""
 
-#: src/components/Share/ShareDialog.tsx
 #: src/components/Share/ShareDialog.tsx
 #: src/routes/Share/ShareRoute.tsx
 msgid "Create Invite"
@@ -7570,4 +7567,58 @@ msgstr "Asignar derechos"
 
 #: src/helpers/managed/vault.ts
 msgid "Your account session has ended. Sign in again to resume backup."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Full name"
+msgstr ""
+
+#~ msgid "Profile picture (optional) <0/>"
+#~ msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Save and continue"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Picture ready to save."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "How your colleagues see you"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "You can add or change your picture later in your profile."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server subscription is active"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server trial is active"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Profile picture (optional)"
+msgstr ""
+
+#~ msgid "Your selected profile picture"
+#~ msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Your selected avatar"
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
 msgstr ""

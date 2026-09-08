@@ -1,3 +1,4 @@
+import { getRuntimeManagedPortalUrl } from './api';
 // Turning on hosted sync for a local or server-hosted drive —
 // the Cloud Server action on the /sync page. This is the bridge between
 // the open-core connection layer (connect a server, promote a local drive) and
@@ -33,6 +34,8 @@ import { signRequest, type Store } from '@tomic/react';
  * explicit build-time `VITE_MANAGED_PORTAL_URL` override for local dev.
  */
 export function getManagedPortalUrl(info?: ManagedInfo | null): string | null {
+  const runtime = getRuntimeManagedPortalUrl();
+  if (runtime) return runtime;
   const fromEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_MANAGED_PORTAL_URL as string | undefined)

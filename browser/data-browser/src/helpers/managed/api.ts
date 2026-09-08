@@ -1,3 +1,25 @@
+declare global {
+  interface Window {
+    __ATOMIC_MANAGED__?: { portalUrl?: string };
+  }
+}
+
+export function getRuntimeManagedPortalUrl(): string | null {
+  const value =
+    typeof window === 'undefined'
+      ? undefined
+      : window.__ATOMIC_MANAGED__?.portalUrl;
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 // [RECOVERY-RECONSTRUCTED] The original `helpers/managed/api.ts` was never captured
 // in any Claude transcript (it predates the recovery window and isn't on the
 // pushed `did` branch). Reconstructed from its call sites: every managed helper
@@ -71,6 +93,8 @@ function portalFromEnv(): string | null {
 
 /** Base URL of the control-plane API (includes the `/api` prefix). */
 export function getManagedApiBase(): string {
+  const runtime = getRuntimeManagedPortalUrl();
+  if (runtime) return `${runtime}/api`;
   const fromEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_MANAGED_API_BASE as string | undefined)

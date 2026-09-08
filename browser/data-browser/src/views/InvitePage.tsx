@@ -1,3 +1,4 @@
+import { TeamProfileStep } from '../components/TeamProfileStep';
 import {
   useBoolean,
   useNumber,
@@ -8,6 +9,7 @@ import {
   generateKeyPair,
   server,
   core,
+  dataBrowser,
   useStore,
   type Server,
   SubtleCryptoProvider,
@@ -26,19 +28,17 @@ import { useWelcomeLayoutEffect } from '../hooks/useWelcomeLayoutEffect';
 import { Shell, Card, CardTitle, CtaButton } from './getting-started/chrome';
 import { Logo } from '../components/Logo';
 
-import { useId, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { fetchPrivateDriveSubject } from '@helpers/privateDrive';
 import { saveAgentToIDB } from '@helpers/agentStorage';
 import { Dialog, useDialog } from '@components/Dialog';
 import { CodeBlock } from '@components/CodeBlock';
 import { styled } from 'styled-components';
-import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import Field from '@components/forms/Field';
 
 /** A View that opens an invite */
 function InvitePage({ resource }: ResourcePageProps): JSX.Element {
-  const nameInputId = useId();
   const store = useStore();
   const [usagesLeft] = useNumber(resource, server.properties.usagesLeft);
   const [write] = useBoolean(resource, server.properties.write);
@@ -56,9 +56,13 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   const [agentTitle] = useTitle(agentResource, 15);
   const [redirectURL, setRedirectURL] = useState<string | undefined>(undefined);
   const [agentSecret, setAgentSecret] = useState<string | undefined>();
-  const [agentName, setAgentName] = useState<string | undefined>(undefined);
   const [hasCopiedSecret, setHasCopiedSecret] = useState(false);
   const [isNewAgent, setIsNewAgent] = useState(false);
+  const [reviewProfile, setReviewProfile] = useState(false);
+  const [pendingKeys, setPendingKeys] = useState<{
+    crypto?: CryptoKeyPair;
+    real: KeyPair;
+  }>();
 
   const getRedirectDestination = async (
     redirect: Resource<Server.Redirect>,
@@ -123,17 +127,14 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   const persistAgentAfterInvite = async (
     subject: string,
     destination: string | undefined,
-    name?: string,
   ): Promise<{ privateDrive?: string; hostDrive?: string }> => {
     store.getResourceLoading(subject);
     let privateDriveSubject: string | undefined;
     let hostDriveSubject: string | undefined;
 
     try {
-      // --- 1. Agent identity: name, isA, privateDrive pointer ---
-      if (name?.trim()) {
-        await agentResource.set(core.properties.name, name.trim());
-      }
+      // Keep the name saved in the shared profile step.
+      const name = agentResource.get(core.properties.name);
 
       const currentIsA =
         (await agentResource.get(core.properties.isA)) ?? ([] as string[]);
@@ -259,11 +260,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
         return;
       }
 
-      const drives = await persistAgentAfterInvite(
-        agentSubject,
-        redirectURL,
-        agentName,
-      );
+      const drives = await persistAgentAfterInvite(agentSubject, redirectURL);
 
       goToRedirect(undefined, activateDrive(drives));
     },
@@ -308,7 +305,8 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       await newAgentResource.save();
 
       setAgent(newAgent);
-      handleAccept({ crypto: cryptoKeyPair, real: keypair });
+      setPendingKeys({ crypto: cryptoKeyPair, real: keypair });
+      setReviewProfile(true);
     } catch (error) {
       store.notifyError(error);
     }
@@ -380,7 +378,6 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
         const drives = await persistAgentAfterInvite(
           agentSubject!,
           destination,
-          undefined,
         );
 
         goToRedirect(destination, activateDrive(drives));
@@ -389,7 +386,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       return;
     }
 
-    // New agent: show dialog (secret, name) then on Continue we persist and redirect
+    // New agent: back up the secret, then persist and redirect.
     setRedirectURL(destination);
     show();
   };
@@ -413,7 +410,15 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
             You've been invited to {write ? 'edit' : 'view'}
             {resourceName ? ` "${resourceName}"` : ''}
           </CardTitle>
-          {usagesLeft === 0 ? (
+          {reviewProfile && agentSubject ? (
+            <TeamProfileStep
+              subject={agentSubject}
+              onContinue={async () => {
+                await handleAccept(pendingKeys);
+                setReviewProfile(false);
+              }}
+            />
+          ) : usagesLeft === 0 ? (
             <DescriptionWrap>
               Sorry, this invite has no usages left. Ask for a new one.
             </DescriptionWrap>
@@ -422,7 +427,14 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
               {agentSubject ? (
                 <CtaButton
                   data-test='accept-existing'
-                  onClick={() => handleAccept()}
+                  disabled={!agentResource.isReady()}
+                  onClick={() => {
+                    if (agentResource.get(dataBrowser.properties.icon)) {
+                      void handleAccept();
+                    } else {
+                      setReviewProfile(true);
+                    }
+                  }}
                 >
                   Accept as {agentTitle}
                 </CtaButton>
@@ -449,18 +461,6 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
           <h1>Agent created!</h1>
         </Dialog.Title>
         <Dialog.Content>
-          <Field label='Agent Name' fieldId={nameInputId}>
-            <InputWrapper>
-              <InputStyled
-                type='text'
-                value={agentName ?? ''}
-                onChange={e => setAgentName(e.target.value)}
-                id={nameInputId}
-                spellCheck='false'
-                placeholder='Enter a name'
-              />
-            </InputWrapper>
-          </Field>
           {isNewAgent && agentSecret && (
             <Field label='Agent Secret'>
               <p>
