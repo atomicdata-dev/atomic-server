@@ -1,4 +1,5 @@
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
+import { DiscoverWorkspace } from '../views/getting-started/DiscoverWorkspace';
 import {
   useEffect,
   useState,
@@ -1035,6 +1036,10 @@ function SyncPage() {
   const cloudServerBlocked = cloudServerBlocker();
 
   function summaryLine(): string {
+    if (driveMissing) {
+      return 'This device does not have this workspace yet. Fetch it from a device that has it.';
+    }
+
     if (localOnlyDrive) {
       return 'This workspace is stored only on this device — it isn’t backed up or synced anywhere.';
     }
@@ -1628,21 +1633,31 @@ function SyncPage() {
             </CardIcon>
             <ConnBody>
               <ConnTitle>Your data is on another device</ConnTitle>
-              <ConnSub>
-                {/* Either code below brings it over: this device's when it is a
+              {isNode && status.drive ? (
+                <DiscoverWorkspace
+                  key={status.drive}
+                  drive={status.drive}
+                  onConnected={() => setDriveMissing(false)}
+                />
+              ) : (
+                <>
+                  <ConnSub>
+                    {/* Either code below brings it over: this device's when it is a
                     node, otherwise the server's — the other device scans it and
                     syncs the drive somewhere this one can read. */}
-                {pairNodeId
-                  ? 'You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it.'
-                  : 'You’re signed in, but this device doesn’t have your workspace yet. Connect a device that has it.'}
-              </ConnSub>
-              <ConnActions>
-                {!pairNodeId && (
-                  <Button onClick={() => setShowAddServer(true)}>
-                    Connect a device
-                  </Button>
-                )}
-              </ConnActions>
+                    {pairNodeId
+                      ? 'You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it.'
+                      : 'You’re signed in, but this device doesn’t have your workspace yet. Connect a device that has it.'}
+                  </ConnSub>
+                  <ConnActions>
+                    {!pairNodeId && (
+                      <Button onClick={() => setShowAddServer(true)}>
+                        Connect a device
+                      </Button>
+                    )}
+                  </ConnActions>
+                </>
+              )}
             </ConnBody>
           </LocalDriveNotice>
         )}
@@ -1735,16 +1750,18 @@ function SyncPage() {
           {/* About *other* devices specifically. This device and any cloud
               services are listed above, so the old "not syncing anywhere"
               wording now sat under entries proving otherwise. */}
-          {connectionCount === 0 && connectionServers.length === 0 && (
-            <EmptyConnections>
-              <p>No other devices yet — your data is safe on this one.</p>
-              <p>
-                {isNode
-                  ? 'Pair another device to sync directly, or connect an always-on one to reach your data from anywhere.'
-                  : 'Connect an always-on device to back up your data and reach it from anywhere.'}
-              </p>
-            </EmptyConnections>
-          )}
+          {!driveMissing &&
+            connectionCount === 0 &&
+            connectionServers.length === 0 && (
+              <EmptyConnections>
+                <p>No other devices yet — your data is safe on this one.</p>
+                <p>
+                  {isNode
+                    ? 'Pair another device to sync directly, or connect an always-on one to reach your data from anywhere.'
+                    : 'Connect an always-on device to back up your data and reach it from anywhere.'}
+                </p>
+              </EmptyConnections>
+            )}
 
           {/* Servers we do not own — one stable list; the active one is marked,
               not moved. A managed node is deliberately absent: it moved up into

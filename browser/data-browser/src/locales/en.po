@@ -7621,3 +7621,86 @@ msgstr "Use local Ollama"
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Connect local Ollama"
 msgstr "Connect local Ollama"
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Find your workspace"
+msgstr "Find your workspace"
+
+#~ msgid "Looking for your workspace on your other devices…"
+#~ msgstr "Looking for your workspace on your other devices…"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We couldn’t find a reachable device with your workspace."
+msgstr "We couldn’t find a reachable device with your workspace."
+
+#~ msgid "We found your workspace on {0}."
+#~ msgstr "We found your workspace on {0}."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Fetch a copy to this device so you can open it here."
+msgstr "Fetch a copy to this device so you can open it here."
+
+#~ msgid "Fetching workspace…"
+#~ msgstr "Fetching workspace…"
+
+#~ msgid "Fetch workspace"
+#~ msgstr "Fetch workspace"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Look here"
+msgstr "Look here"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Address where your workspace lives"
+msgstr "Address where your workspace lives"
+
+#~ msgid "We found your workspace on {0} ."
+#~ msgstr "We found your workspace on {0} ."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "A device was found, but this account cannot read the workspace there."
+msgstr "A device was found, but this account cannot read the workspace there."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We could not check your workspace. Try again or enter its address below."
+msgstr "We could not check your workspace. Try again or enter its address below."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Connection details"
+msgstr "Connection details"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Your secret was accepted. Preparing this device…"
+msgstr "Your secret was accepted. Preparing this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking for your workspace on this device…"
+msgstr "Checking for your workspace on this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking whether your account has a backup to restore…"
+msgstr "Checking whether your account has a backup to restore…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Looking for a device that has your workspace…"
+msgstr "Looking for a device that has your workspace…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Fetching your workspace to this device…"
+msgstr "Fetching your workspace to this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Opening your workspace"
+msgstr "Opening your workspace"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "This may take a little while. Please keep this window open."
+msgstr "This may take a little while. Please keep this window open."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We found your workspace"
+msgstr "We found your workspace"
+
+#: src/routes/SyncRoute.tsx
+msgid "This device does not have this workspace yet. Fetch it from a device that has it."
+msgstr "This device does not have this workspace yet. Fetch it from a device that has it."

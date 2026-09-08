@@ -11,6 +11,8 @@ pub mod engine;
 #[cfg(all(test, feature = "iroh", feature = "db-redb"))]
 mod iroh_e2e;
 #[cfg(feature = "iroh")]
+pub mod discover;
+#[cfg(feature = "iroh")]
 pub mod peer;
 pub mod policy;
 pub mod protocol;
