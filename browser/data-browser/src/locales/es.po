@@ -7621,4 +7621,22 @@ msgstr ""
 
 #: src/components/InviteForm.tsx
 msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama detected"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Looking for local Ollama…"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama could not be reached. Start Ollama and connect."
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Use local Ollama"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Connect local Ollama"
 msgstr ""

@@ -482,3 +482,18 @@ personal drive. Browser warnings/errors fail these tests, including localization
 render warnings. The authorization journey also covers cropped avatar upload, metadata and image
 download from the recipient account, and existing-agent acceptance. SaaS
 email-to-drive acceptance still needs dedicated flow coverage.
+`ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
+only after expanding AI settings, one-click URL acceptance and persistence after
+reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
+successfully against local Ollama on 2026-09-08. The shared setup-panel component
+is not separately covered by this probe. The existing Vite-only Wuchale/React
+key warning when expanding AI settings is explicitly expected; other console
+errors remain failures.
+
+`username-live.spec.ts` changes the owner's display name through user settings
+while a different agent reads an existing chat message. It asserts the author
+updates without a reload and verifies a second change after the reader reloads.
+`websockets.test.ts` checks targeted profile SUB frames, subscription replay,
+multiple-reader cleanup through both Store unsubscribe APIs, and retaining
+ordinary document drive-wide fan-out. Profiles no longer depend on being inside
+the reader's active drive to receive live updates.

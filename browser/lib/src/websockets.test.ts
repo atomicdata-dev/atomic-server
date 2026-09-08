@@ -425,6 +425,49 @@ describe('WSClient drive subscription', () => {
     vi.restoreAllMocks();
   });
 
+  it('subscribes mounted agent profiles, restores them on reconnect, and releases the last reader', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('profile-subscription'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    store.setServerConnected(true);
+    const subject = 'did:ad:agent:other-user';
+    const changed = vi.fn();
+    const stopFirst = store.subscribe(subject, changed);
+    const stopSecond = store.subscribe(subject, vi.fn());
+    const subjects = (tag: number) =>
+      framesWithTag(socket, tag).map(frame =>
+        new TextDecoder().decode(frame.subarray(1)),
+      );
+    expect(subjects(Tag.SUB)).toEqual([subject]);
+    stopFirst();
+    expect(subjects(Tag.UNSUB)).toEqual([]);
+    // Connection-open/auth replay restores mounted profiles as well as drives.
+    (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+    expect(subjects(Tag.SUB)).toEqual([subject, subject]);
+    stopSecond();
+    expect(subjects(Tag.UNSUB)).toEqual([subject]);
+    (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+    expect(subjects(Tag.SUB)).toHaveLength(2);
+    // Legacy callers release through Store.unsubscribe rather than the disposer.
+    store.subscribe(subject, changed);
+    store.unsubscribe(subject, changed);
+    expect(subjects(Tag.UNSUB)).toEqual([subject, subject]);
+    // Ordinary resources continue using drive-wide fan-out.
+    const stopDocument = store.subscribe('did:ad:document', vi.fn());
+    expect(subjects(Tag.SUB)).toEqual([subject, subject, subject]);
+    stopDocument();
+    expect(subjects(Tag.UNSUB)).toEqual([subject, subject]);
+    client.close();
+  });
+
   it('UNSUBs the previous drive when the store switches drives', async ({
     expect,
   }) => {

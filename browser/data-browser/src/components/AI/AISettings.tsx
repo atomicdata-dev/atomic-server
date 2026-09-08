@@ -1,3 +1,4 @@
+import { LocalOllamaDiscovery } from '@components/AI/LocalOllamaDiscovery';
 import * as React from 'react';
 import { Column, Row } from '@components/Row';
 import { Checkbox, CheckboxLabel } from '@components/forms/Checkbox';
@@ -203,6 +204,7 @@ const AISettings: React.FC = () => {
                   <SubSection>
                     <SubSectionTitle>Ollama</SubSectionTitle>
                     <Column gap='0.5rem'>
+                      {!ollamaUrl && <LocalOllamaDiscovery />}
                       <Subtle>
                         Host your own AI models locally using{' '}
                         <a
@@ -219,17 +221,18 @@ const AISettings: React.FC = () => {
                         enabled={true}
                       >
                         <Row center gap='1ch'>
-                          {isOllamaUrlValid ? (
-                            <FaCheck
-                              title='Server found'
-                              color={theme.colors.main}
-                            />
-                          ) : (
-                            <FaTriangleExclamation
-                              title='Server not responding'
-                              color={theme.colors.warning}
-                            />
-                          )}
+                          {ollamaUrl &&
+                            (isOllamaUrlValid ? (
+                              <FaCheck
+                                title='Server found'
+                                color={theme.colors.main}
+                              />
+                            ) : (
+                              <FaTriangleExclamation
+                                title='Server not responding'
+                                color={theme.colors.warning}
+                              />
+                            ))}
                           <label htmlFor='ollama-url'>Ollama API Url</label>
                         </Row>
                         <InputWrapper>
