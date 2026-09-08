@@ -4,7 +4,7 @@
 // route. Mirrors the captured `getManagedUser()` in helpers/managedUsage.ts.
 
 import { PRODUCT_NAME } from './product';
-import { managedFetch } from './api';
+import { hasManagedApi, managedFetch } from './api';
 
 export type ManagedAccount = {
   email: string;
@@ -59,6 +59,7 @@ export async function logoutManagedSession(): Promise<void> {
   for (const listener of logoutListeners) listener();
 
   try {
+    if (!hasManagedApi()) return;
     await managedFetch(`/logout`, {
       method: 'POST',
     });

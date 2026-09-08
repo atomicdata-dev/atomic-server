@@ -91,6 +91,16 @@ function portalFromEnv(): string | null {
   return fromEnv ? trimTrailingSlashes(fromEnv) : null;
 }
 
+/** FOSS installations have no SaaS session to end. */
+export function hasManagedApi(): boolean {
+  return Boolean(
+    getRuntimeManagedPortalUrl() ||
+    getRememberedManagedPortalUrl() ||
+    portalFromEnv() ||
+    import.meta.env?.VITE_MANAGED_API_BASE,
+  );
+}
+
 /** Base URL of the control-plane API (includes the `/api` prefix). */
 export function getManagedApiBase(): string {
   const runtime = getRuntimeManagedPortalUrl();

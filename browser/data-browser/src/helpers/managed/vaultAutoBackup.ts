@@ -1,4 +1,5 @@
-import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
+import { driveDisplayMetadata } from './driveDisplayMetadata';
+import { StoreEvents, type Store } from '@tomic/lib';
 import {
   VaultSessionEndedError,
   agentVaultProof,
@@ -283,18 +284,7 @@ async function ensureVaultBackupOnce(
     let known = enrolled.get(driveSubject);
 
     // Display metadata is shared with SaaS; read it from the local drive.
-    const drive = store.resources.get(driveSubject);
-    const name = drive?.get(core.properties.name);
-    const emoji = drive?.get(dataBrowser.properties.emoji);
-    const metadata = {
-      name: typeof name === 'string' ? name : undefined,
-      emoji:
-        typeof emoji === 'string'
-          ? emoji
-          : typeof name === 'string'
-            ? ''
-            : undefined,
-    };
+    const metadata = await driveDisplayMetadata(store, driveSubject);
     const metadataKey = JSON.stringify(metadata);
 
     if (!known || (known.metadata ?? '{}') !== metadataKey) {

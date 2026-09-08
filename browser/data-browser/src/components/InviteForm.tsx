@@ -128,7 +128,7 @@ function InviteFormContent({
           {isSaas && (
             <p>
               {allowEdits
-                ? 'Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free.'
+                ? 'Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free.'
                 : 'Viewers are free. Allowing edits requires a team editor seat for Cloud Server.'}
             </p>
           )}

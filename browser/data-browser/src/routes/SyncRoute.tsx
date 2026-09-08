@@ -654,14 +654,15 @@ function SyncPage() {
 
   useEffect(() => {
     setSubscriptionStatus(null);
-    if (!managedAccount) return;
+    if (!managedAccount || !status.drive) return;
+    const drive = status.drive;
     const controller = new AbortController();
-    managedFetch(`/billing/subscription`, {
+    managedFetch(`/billing/subscription?${new URLSearchParams({ drive })}`, {
       credentials: 'include',
       signal: controller.signal,
     })
       .then(async response => {
-        if (!response.ok) return;
+        if (!response.ok || response.status === 204) return;
         const subscription = await response.json();
 
         if (!controller.signal.aborted) {
@@ -675,7 +676,7 @@ function SyncPage() {
       });
 
     return () => controller.abort();
-  }, [managedAccount]);
+  }, [managedAccount, status.drive]);
 
   /**
    * Where this account's encrypted backup actually is.

@@ -7615,12 +7615,13 @@ msgstr ""
 msgid "Your selected avatar"
 msgstr ""
 
-#: src/components/InviteForm.tsx
-msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
-msgstr ""
+#~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+#~ msgstr ""
 
 #: src/components/InviteForm.tsx
 msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+msgstr ""
+
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
 msgstr ""
@@ -7639,4 +7640,8 @@ msgstr ""
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Connect local Ollama"
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
 msgstr ""

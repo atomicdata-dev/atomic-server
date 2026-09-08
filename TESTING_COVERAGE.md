@@ -513,3 +513,10 @@ unenrolled/local drives and shared drives confirmed directly by their node.
 `sync-devices.spec.ts` renders a managed connection with zero data for the selected
 drive, injects another drive's completed sync, and verifies that Cloud Server
 stays off with its setup action visible.
+
+- Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
+  present only in local storage, as well as rename/emoji refresh. Manual enable
+  and automatic backup share `driveDisplayMetadata`; only name and emoji are sent.
+- FOSS logout: `helpers/managed/session.test.ts` verifies that an installation
+  with no configured control plane makes no SaaS logout request (the CI smoke
+  test exposed a 405 at `/api/logout`).

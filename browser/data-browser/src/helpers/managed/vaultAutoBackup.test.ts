@@ -117,6 +117,25 @@ afterEach(() => {
 });
 
 describe('ensureVaultBackup', () => {
+  it('shares display metadata when the drive is only in local storage', async () => {
+    const store = await signedInStore();
+    vi.spyOn(store, 'getClientDb').mockReturnValue({
+      getResource: vi.fn(async () =>
+        JSON.stringify({
+          [core.properties.name]: 'Personal notes',
+          [dataBrowser.properties.emoji]: '📒',
+        }),
+      ),
+    } as unknown as ReturnType<Store['getClientDb']>);
+    const deps = fakeDeps();
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.setUpVaultForDrive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { name: 'Personal notes', emoji: '📒' },
+      }),
+    );
+  });
+
   it('shares the drive name and emoji and refreshes them after edits', async () => {
     const store = await signedInStore();
     const drive = new Resource(DRIVE);
