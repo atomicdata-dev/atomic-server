@@ -471,3 +471,11 @@ maximum delay, queued edits across drive switches, late account availability,
 connectivity recovery, enrollment rediscovery after reload, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
+
+`ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
+only after expanding AI settings, one-click URL acceptance and persistence after
+reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
+successfully against local Ollama on 2026-09-08. The shared setup-panel component
+is not separately covered by this probe. The existing Vite-only Wuchale/React
+key warning when expanding AI settings is explicitly expected; other console
+errors remain failures.
