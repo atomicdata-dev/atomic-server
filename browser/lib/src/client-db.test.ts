@@ -59,6 +59,7 @@ describe('ClientDbWorker cold initialization', () => {
     );
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const db = new ClientDbWorker('wasm-url', 'worker-url');
+
     try {
       const initialized = db.init('https://example.com');
       await vi.advanceTimersByTimeAsync(3100);
