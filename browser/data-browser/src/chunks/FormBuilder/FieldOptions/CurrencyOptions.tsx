@@ -5,6 +5,7 @@ import { BasicSelect } from '@components/forms/BasicSelect';
 import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
+import { Divider } from './Divider';
 
 /** Currencies the renderer knows a symbol for (`CURRENCY_SYMBOLS` in
  * `@tomic/form-renderer`'s FieldInput); anything else renders as its code. */
@@ -48,6 +49,7 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
+      <Divider />
       <FieldPair>
         <BoundField
           label='Min'

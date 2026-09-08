@@ -5,6 +5,7 @@ import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
+import { Divider } from './Divider';
 
 interface NumberOptionsProps {
   field: Resource;
@@ -31,6 +32,7 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
           setOptions={setOptions}
         />
       </FieldPair>
+      <Divider />
       <Field label='Placeholder'>
         <InputWrapper>
           <InputStyled

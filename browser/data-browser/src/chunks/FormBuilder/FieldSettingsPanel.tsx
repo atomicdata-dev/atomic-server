@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaPencil } from 'react-icons/fa6';
-import Field from '@components/forms/Field';
+import Field, { FieldLabel } from '@components/forms/Field';
 import { IconButton } from '@components/IconButton/IconButton';
 import InputSwitcher from '@components/forms/InputSwitcher';
 import {
@@ -24,6 +24,7 @@ import { useDebounce } from '@helpers/useDebounce';
 import { slugWhileTyping, stringToSlug } from '@helpers/stringToSlug';
 import { TextOptions } from './FieldOptions/TextOptions';
 import { CountryDefaultField } from './FieldOptions/CountryDefaultField';
+import { Divider } from './FieldOptions/Divider';
 import { NumberOptions } from './FieldOptions/NumberOptions';
 import { ChoiceOptions } from './FieldOptions/ChoiceOptions';
 import { CurrencyOptions } from './FieldOptions/CurrencyOptions';
@@ -31,10 +32,15 @@ import { LikertOptions, RatingOptions } from './FieldOptions/ScaleOptions';
 import { PictureChoiceOptions } from './FieldOptions/PictureChoiceOptions';
 import { MatrixOptions } from './FieldOptions/MatrixOptions';
 import { TableInputOptions } from './FieldOptions/TableInputOptions';
-import type { FormFieldType } from './fieldTypes';
+import {
+  FIELD_TYPE_META,
+  type AddableFieldType,
+  type FormFieldType,
+} from './fieldTypes';
 import { InfoBoxOptions } from './FieldOptions/InfoBoxOptions';
 import { useFormFieldPropertySync } from './useFormFieldPropertySync';
 import { ConditionsEditor } from './ConditionsEditor';
+import { PanelHeader } from './PanelHeader';
 
 interface FieldSettingsPanelProps {
   fieldSubject: string;
@@ -62,12 +68,34 @@ export function FieldSettingsPanel({
   const isParagraph = classes.includes(forms.classes.formParagraph);
   const isInfoBox = classes.includes(forms.classes.formInfoBox);
 
+  // Layout blocks don't carry `formFieldType` — their type comes from `isA`
+  // instead. Undefined while the field is still loading.
+  const addableType: AddableFieldType | undefined = isHeading
+    ? 'heading'
+    : isParagraph
+      ? 'paragraph'
+      : isInfoBox
+        ? 'info-box'
+        : (fieldType as AddableFieldType | undefined);
+
+  const header = addableType && (
+    <>
+      <PanelHeader
+        icon={FIELD_TYPE_META[addableType].icon}
+        label={FIELD_TYPE_META[addableType].label}
+      />
+      <Divider />
+    </>
+  );
+
   if (isHeading) {
     return (
       <Panel>
-        <Field label='Heading text' required>
+        {header}
+        <Field label="Heading text" required>
           <FieldLabelInput field={field} renameField={renameField} />
         </Field>
+        <Divider />
         <ConditionsEditor
           resource={field}
           form={form}
@@ -80,7 +108,9 @@ export function FieldSettingsPanel({
   if (isInfoBox) {
     return (
       <Panel>
+        {header}
         <InfoBoxOptions field={field} />
+        <Divider />
         <ConditionsEditor
           resource={field}
           form={form}
@@ -93,7 +123,8 @@ export function FieldSettingsPanel({
   if (isParagraph) {
     return (
       <Panel>
-        <Field label='Paragraph text' required>
+        {header}
+        <Field label="Paragraph text" required>
           <InputSwitcher
             commit
             resource={field}
@@ -101,6 +132,7 @@ export function FieldSettingsPanel({
             required
           />
         </Field>
+        <Divider />
         <ConditionsEditor
           resource={field}
           form={form}
@@ -110,9 +142,13 @@ export function FieldSettingsPanel({
     );
   }
 
+  const hasTypeOptions =
+    !!fieldType && !TYPES_WITHOUT_OPTIONS.has(fieldType as FormFieldType);
+
   return (
     <Panel>
-      <Field label='Label' required>
+      {header}
+      <Field label="Label" required>
         <FieldLabelInput field={field} renameField={renameField} />
       </Field>
       {/* Keyed on the field: selecting another question remounts the row, so a
@@ -122,16 +158,20 @@ export function FieldSettingsPanel({
         field={field}
         setFieldShortname={setFieldShortname}
       />
-      <Field label='Helper text'>
+      <Divider />
+      <Field label="Helper text">
         <InputSwitcher commit resource={field} property={descriptionProp} />
       </Field>
-      <Field label='Required'>
+      <Divider />
+      <Field label="Required">
         <InputSwitcher commit resource={field} property={requiredProp} />
       </Field>
+      {hasTypeOptions && <Divider />}
       <TypeOptions
         field={field}
         type={fieldType as FormFieldType | undefined}
       />
+      <Divider />
       <ConditionsEditor
         resource={field}
         form={form}
@@ -140,6 +180,14 @@ export function FieldSettingsPanel({
     </Panel>
   );
 }
+
+/** Question types with nothing to configure — see `TypeOptions` below. */
+const TYPES_WITHOUT_OPTIONS = new Set<FormFieldType>([
+  'checkbox',
+  'date',
+  'datetime',
+  'address',
+]);
 
 interface FieldLabelInputProps {
   field: Resource;
@@ -174,7 +222,7 @@ function FieldLabelInput({
   return (
     <InputWrapper>
       <InputStyled
-        data-testid='field-label-input'
+        data-testid="field-label-input"
         value={draft}
         onChange={e => setDraft(e.target.value)}
       />
@@ -258,14 +306,14 @@ function FieldShortnameField({
   // label — rather than expanding into a full labelled Field, so clicking the
   // pencil doesn't shove the rest of the panel down.
   return (
-    <div title='How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again.'>
+    <div title="How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again.">
       <ShortnameRow>
         <ShortnameLabel>Data name</ShortnameLabel>
         {editing ? (
           <ShortnameInputWrapper $invalid={!!error}>
             <InputStyled
               ref={inputRef}
-              data-testid='field-shortname-input'
+              data-testid="field-shortname-input"
               value={draft}
               placeholder={derived}
               onChange={e => setDraft(slugWhileTyping(e.target.value))}
@@ -284,14 +332,14 @@ function FieldShortnameField({
           </ShortnameInputWrapper>
         ) : (
           <>
-            <ShortnameValue data-testid='field-shortname-value'>
+            <ShortnameValue data-testid="field-shortname-value">
               {shortname ?? derived}
             </ShortnameValue>
             <IconButton
-              type='button'
-              title='Edit data name'
-              size='0.8em'
-              data-testid='field-shortname-edit'
+              type="button"
+              title="Edit data name"
+              size="0.8em"
+              data-testid="field-shortname-edit"
               onClick={startEditing}
             >
               <FaPencil />
@@ -322,9 +370,10 @@ function TypeOptions({
       return (
         <>
           <TextOptions field={field} />
+          <Divider />
           <CountryDefaultField
             field={field}
-            helper='The country the number selector starts on. Visitors can still pick another one.'
+            helper="The country the number selector starts on. Visitors can still pick another one."
           />
         </>
       );
@@ -332,6 +381,7 @@ function TypeOptions({
       return (
         <>
           <TextOptions field={field} />
+          <Divider />
           <CountryDefaultField
             field={field}
             helper='Pre-selected when the form opens. Leave on "No default" to make the visitor choose.'
@@ -365,7 +415,14 @@ function TypeOptions({
 }
 
 const Panel = styled(Column)`
-  gap: 0.75rem;
+  gap: ${p => p.theme.size(5)};
+
+  /* Lighter than the app-wide default: this panel is a dense stack of
+     settings, not a form the user is filling in, so the labels should read
+     as quiet captions rather than compete with the values below them. */
+  ${FieldLabel} {
+    color: ${p => p.theme.colors.textLight};
+  }
 `;
 
 /** The Data name row: quiet by design — it is metadata about the question,

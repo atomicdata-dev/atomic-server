@@ -2,6 +2,7 @@ import { Resource } from '@tomic/react';
 import type { JSX } from 'react';
 import { StringListEditor } from './StringListEditor';
 import { useFieldOptions } from './useFieldOptions';
+import { Divider } from './Divider';
 
 interface MatrixOptionsProps {
   field: Resource;
@@ -24,6 +25,7 @@ export function MatrixOptions({ field }: MatrixOptionsProps): JSX.Element {
         newItemLabel={index => `Statement ${index}`}
         itemTestId='matrix-row-input'
       />
+      <Divider />
       <StringListEditor
         label='Columns (answers)'
         value={(options.columns as string[] | undefined) ?? []}

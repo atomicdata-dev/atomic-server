@@ -8,6 +8,7 @@ import {
 import Field from '@components/forms/Field';
 import { BasicSelect } from '@components/forms/BasicSelect';
 import InputSwitcher from '@components/forms/InputSwitcher';
+import { Divider } from './Divider';
 
 /** The style names, capitalized. The stored values stay lowercase. */
 const STYLE_LABELS: Record<InfoBoxStyle, string> = {
@@ -52,9 +53,11 @@ export function InfoBoxOptions({ field }: InfoBoxOptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
+      <Divider />
       <Field label='Title'>
         <InputSwitcher commit resource={field} property={nameProp} />
       </Field>
+      <Divider />
       <Field label='Text' required>
         <InputSwitcher
           commit

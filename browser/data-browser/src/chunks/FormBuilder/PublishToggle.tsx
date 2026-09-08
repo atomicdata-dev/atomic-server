@@ -31,7 +31,7 @@ export function PublishToggle({ resource }: PublishToggleProps): JSX.Element {
   const availability = getFormAvailability({ publishedAt, openAt, closeAt });
 
   return (
-    <Row gap='0.5rem' center>
+    <Row gap="0.5rem" center>
       {availability.state === 'not-yet-open' && (
         <Badge title={`Opens ${formatScheduleMoment(availability.opensAt)}`}>
           Scheduled
@@ -43,8 +43,8 @@ export function PublishToggle({ resource }: PublishToggleProps): JSX.Element {
         </Badge>
       )}
       <Button
-        type='button'
-        subtle={!isPublished}
+        type="button"
+        subtle
         onClick={() => setPublishedAt(isPublished ? undefined : Date.now())}
       >
         {isPublished ? 'Unpublish' : 'Publish'}

@@ -14,6 +14,7 @@ import { AddButton } from './StringListEditor';
 import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
+import { Divider } from './Divider';
 
 interface TableColumn {
   label: string;
@@ -113,6 +114,7 @@ export function TableInputOptions({
           </AddButton>
         </Column>
       </Field>
+      <Divider />
       <FieldPair>
         <BoundField
           label='Min rows'

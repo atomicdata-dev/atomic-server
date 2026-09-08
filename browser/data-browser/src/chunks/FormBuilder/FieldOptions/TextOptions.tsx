@@ -5,6 +5,7 @@ import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { useFieldOptions, type FieldOptionsBag } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
+import { Divider } from './Divider';
 
 interface TextOptionsProps {
   field: Resource;
@@ -34,7 +35,10 @@ export function TextOptions({
         </InputWrapper>
       </Field>
       {lengthBounds && (
-        <LengthBounds options={options} setOptions={setOptions} />
+        <>
+          <Divider />
+          <LengthBounds options={options} setOptions={setOptions} />
+        </>
       )}
     </>
   );

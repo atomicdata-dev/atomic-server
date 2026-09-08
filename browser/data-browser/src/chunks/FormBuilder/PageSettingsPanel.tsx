@@ -10,8 +10,8 @@ import {
 import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
-import { FaTrash } from 'react-icons/fa6';
-import Field from '@components/forms/Field';
+import { FaFileLines, FaTrash } from 'react-icons/fa6';
+import Field, { FieldLabel } from '@components/forms/Field';
 import InputSwitcher from '@components/forms/InputSwitcher';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
@@ -21,6 +21,8 @@ import {
 } from '@components/ConfirmationDialog';
 import { ConditionsEditor } from './ConditionsEditor';
 import { deleteFormPage } from './deleteFormPage';
+import { PanelHeader } from './PanelHeader';
+import { Divider } from './FieldOptions/Divider';
 
 interface PageSettingsPanelProps {
   pageSubject: string;
@@ -51,6 +53,8 @@ export function PageSettingsPanel({
 
   return (
     <Panel>
+      <PanelHeader icon={FaFileLines} label='Page' />
+      <Divider />
       <Field label='Name' required>
         <InputSwitcher
           commit
@@ -60,6 +64,7 @@ export function PageSettingsPanel({
           data-testid='page-name-input'
         />
       </Field>
+      <Divider />
       <ConditionsEditor resource={page} form={form} beforePage={pageSubject} />
       <Spacer />
       {canDelete && (
@@ -95,8 +100,15 @@ export function PageSettingsPanel({
 }
 
 const Panel = styled(Column)`
-  gap: 0.75rem;
+  gap: ${p => p.theme.size(5)};
   min-height: 100%;
+
+  /* Lighter than the app-wide default: this panel is a dense stack of
+     settings, not a form the user is filling in, so the labels should read
+     as quiet captions rather than compete with the values below them. */
+  ${FieldLabel} {
+    color: ${p => p.theme.colors.textLight};
+  }
 `;
 
 const Spacer = styled.div`
@@ -106,9 +118,4 @@ const Spacer = styled.div`
 const DeleteButton = styled(Button)`
   align-self: flex-end !important;
   color: ${p => p.theme.colors.alert};
-`;
-
-const Divider = styled.hr`
-  border-top: 1px solid ${p => p.theme.colors.bg2};
-  width: 100%;
 `;

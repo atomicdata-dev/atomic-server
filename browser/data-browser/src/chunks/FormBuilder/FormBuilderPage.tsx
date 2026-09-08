@@ -165,6 +165,7 @@ const Shell = styled.div`
 const TitleSlot = styled.div`
   flex-shrink: 0;
   padding: ${p => p.theme.size()};
+  background-color: ${p => p.theme.colors.bg};
 `;
 
 /**
@@ -222,6 +223,7 @@ const TabsSlot = styled.div`
   gap: 0.25rem;
   padding-inline: ${p => p.theme.size()};
   border-bottom: 1px solid ${p => p.theme.colors.bg2};
+  background-color: ${p => p.theme.colors.bg};
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
@@ -273,6 +275,7 @@ const SettingsSlot = styled.div`
   border-left: 1px solid ${p => p.theme.colors.bg2};
   min-height: 0;
   overflow-y: auto;
+  background-color: ${p => p.theme.colors.bg};
 `;
 
 const PageBarSlot = styled.div`

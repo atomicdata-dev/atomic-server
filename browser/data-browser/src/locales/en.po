@@ -8606,3 +8606,7 @@ msgstr "Max length"
 #: src/chunks/FormBuilder/FieldOptions/TextOptions.tsx
 msgid "The most characters an answer may carry. Going over is shown as an error rather than blocked, but the form cannot be submitted until it is back under."
 msgstr "The most characters an answer may carry. Going over is shown as an error rather than blocked, but the form cannot be submitted until it is back under."
+
+#: src/chunks/FormBuilder/PageSettingsPanel.tsx
+msgid "Page"
+msgstr "Page"

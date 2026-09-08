@@ -4,6 +4,7 @@ import { LinkableTagList } from './LinkableTagList';
 import { BoundField } from './BoundField';
 import { FieldPair } from './FieldPair';
 import { useFieldOptions } from './useFieldOptions';
+import { Divider } from './Divider';
 
 interface ChoiceOptionsProps {
   field: Resource;
@@ -44,7 +45,12 @@ export function ChoiceOptions({
         removeLabel='Remove option'
         itemTestId='choice-option-input'
       />
-      {multiple && <SelectionBounds field={field} />}
+      {multiple && (
+        <>
+          <Divider />
+          <SelectionBounds field={field} />
+        </>
+      )}
     </>
   );
 }

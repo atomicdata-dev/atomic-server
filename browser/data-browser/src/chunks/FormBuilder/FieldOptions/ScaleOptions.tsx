@@ -6,6 +6,7 @@ import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { useDebounce } from '@helpers/useDebounce';
 import { useFieldOptions, type FieldOptionsBag } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
+import { Divider } from './Divider';
 
 interface OptionsProps {
   field: Resource;
@@ -35,6 +36,7 @@ export function LikertOptions({ field }: OptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
+      <Divider />
       <FieldPair>
         <LabelInput
           label='Low end label'
