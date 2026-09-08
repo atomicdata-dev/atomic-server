@@ -15,6 +15,57 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## How to read this
 
+Clockify: `integrations/clockify/plugin.test.ts` covers linked proposals, time
+instants, repeat imports, pagination and failure handling.
+`plugins::clockify_tests::completed_entries_are_proposals_in_the_real_sandbox`
+runs the shipped bundle in the real Rust sandbox with a fixture provider. A second
+Clockify sandbox test verifies discovery and minimized response fields.
+`plugins.spec.ts` covers named workspace discovery, date selection, schema/table
+creation and visible preview transport failures. All offline certification layers
+pass. `clockify-import.integration.test.ts` applies proposals through the real TS Store
+with mocked HTTP, verifies signed Loro updates, final Project/Person DID links,
+and skips records on repeat import. Planner regressions cover temporary in-plan
+links, class constraints and rejection of unrelated temporary subjects. The shared
+`plugin-server.test.ts` covers signed execution, malformed responses and errors.
+A second Clockify browser test runs discovery/mapping inside the real sandbox,
+approves three linked resources into the local server and reruns against its DB
+with no duplicate proposals. It reuses an existing Time Tracker, preserves its
+views and customized property name, and opens it through the completed setup.
+The same browser flow asserts that supporting records are children of the app,
+then previews/applies a legacy root-level project's move back into it and verifies
+a no-op repeat. Fixture tests reject moving manually organized or unrelated data.
+Live installed-source upgrade and cleanup of the user's earlier root records have
+not been performed.
+`integrations/clockify/atomic.test.ts` checks read-only table compatibility by
+identity, datatype, required fields and related-class constraints. Only provider HTTP is replaced with synthetic data;
+this does not certify actual Clockify access or the host HTTP permission layer.
+Live provider reads, regional origins and two-way sync remain unverified or
+unimplemented.
+
+Integration maintenance: `node integrations/tooling/certify.mjs` automatically
+discovers provider packages, verifies reproducible shipped bundles and types,
+runs fixture suites and exact Rust sandbox tests, and exports JSON evidence.
+`integrations/tooling/certify.test.mjs` covers zero-test refusal and missing
+metadata. Dagger's JS gate discovers provider packages, while Rust includes all provider
+fixtures. Reports explicitly distinguish selected offline layers and unrun live
+checks. GitHub's compatible code-only upgrade preserves bindings and prevents
+replacement of pending effects across upgrade/rollback. Mapping migrations and
+scheduled live canaries remain uncovered. Evidence guards reject changed bundles,
+partial/failed reports and invalid dates; old results are labelled. The Notion
+setup browser test opens all three bundled cards' offline evidence disclosures.
+
+Integration UX: `plugins.spec.ts` covers search before credential setup, lazy
+GitHub/Notion dialogs, and creating an automation from a connected integration.
+It edits JavaScript, saves and reviews a real proposed effect, enables execution,
+returns to review mode and checks history. The trigger HTTP response regression
+`response_filters_round_trip_into_updates` ensures GET filter values can be sent
+back to POST; tagged database values previously broke the enable button.
+The GitHub setup flow also covers opting into assistant-led automation creation:
+request and integration context survive a model-setup handoff, and source editing
+stays collapsed. A unit test checks draft/context binding. The advanced path still
+tests save, sample review and enablement. These checks do not call a live LLM or
+certify generated JavaScript quality.
+
 Coverage is split by *layer*, because the same flow can be well covered in one
 and absent in another:
 
@@ -159,6 +210,26 @@ Not covered: table `contains`; Playwright search overlay on the KV path; Flutter
 ---
 
 ## Blind spots
+
+### Plugin execution lifecycle (2026-09-05)
+
+On `feat/plugin-model`, the JS plugin suite and Rust server plugin suite cover
+caller-scoped get/query, verified drive binding, source pinning after edits,
+review/source matching, no replay of pending/interrupted schedules, preservation
+of query proposals, empty/partial checkpoint decisions, schema reuse and shared
+TS/Rust manifest validation. `lib/src/db/plugin_schedule.rs` also decodes an old
+MessagePack schedule containing an old approval. See
+[plugin-model-review](planning/plugin-model-review.md) for limits and progress.
+
+Remaining gaps:
+
+- App/connection capability scope in addition to account authorization.
+- Complete immutable release/installation lifecycle and permission upgrades.
+- Remote write receipts, provider idempotency and uncertain-result recovery.
+- Crash recovery of partially applied creates; current policy pauses for review.
+- Durable event queue/backfill while a trigger's proposal waits for review.
+- Egress streaming-cap and DNS pinning tests against a controlled HTTP provider.
+- Connector convergence under normalization, concurrent edits and lost responses.
 
 Ordered by how much they would hurt.
 
@@ -471,6 +542,409 @@ maximum delay, queued edits across drive switches, late account availability,
 connectivity recovery, enrollment rediscovery after reload, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
+## Plugin release and recovery additions
+
+| Flow | Layer | Where |
+|---|---|---|
+| Immutable package identity, corruption refusal, explicit public catalog | protocol | `lib/src/db/plugin_release.rs` |
+| Local replay reuses created identities; uncertain receipt blocks duplication | glue | `server/src/plugins/apply.rs` |
+| Duplicate external delivery and lost response after provider write | glue | `server/src/plugins/external.rs` |
+| Independent edits, conflicting edits, tombstones, partial pages, acknowledged baseline | glue | `browser/lib/src/plugin-reconcile.test.ts` |
+| Signed publication/write SDK refuses anonymous calls and never blindly retries | glue | `browser/lib/src/plugin-connection.test.ts` |
+| Publish, discover, create independent draft | flow | `browser/e2e/tests/plugins.spec.ts` |
+
+Not covered: real provider conformance, durable trigger edge backfill and upgrades.
+Catalog badges remain unverified. Recovery and baseline coverage is listed below.
+
+Plugin recovery follow-up (2026-09-06): `plugins/external.rs` tests confirmed-applied
+recovery after a lost provider response, audit retention, evidence validation,
+connection isolation and refusing receipt replacement. `plugins/connection_state.rs`
+tests stale checkpoints, divergent projections, whole-page atomicity, identity
+collisions, empty pages and tombstones. `plugin-connection.test.ts` covers recovery
+SDK serialization and refusing automatic retry of a stale checkpoint. These are
+host-contract tests; provider verification and a recovery UI remain uncovered.
+
+## GitHub issues ↔ kanban pilot
+
+`server/src/plugins/sync_session_tests.rs` runs the shipped provider bundle in
+QuickJS/WASM against real Atomic persistence and a simulated GitHub host. It covers
+imports, creations, independent/competing edits, kanban transitions, unrelated
+labels, stale previews, uncertain-write refusal, approval identities and an
+imported issue triggering a linked chatroom Message through the ordinary trigger
+engine. `connection_state` tests cover idempotent checkpoint recovery.
+
+`integrations/github-issues/adapter.test.ts` covers pagination, PR exclusion,
+manifest scope, failed reads and bundle drift. `automation.test.ts` checks the
+message-action template. `atomic.live.test.ts` is opt-in and installs the real
+bundle/private release/kanban through an isolated HTTP server without GitHub calls.
+`plugins.spec.ts` covers sidebar discovery, icons and browser sandbox approval.
+
+Live GitHub conformance, durable event replay, concurrent-edit atomicity,
+background sync and scale/performance are not covered. Dagger's Rust test feature
+selection now includes the sandbox; the updated container gate has not been run.
+
+
+### Background sync and independent JS automations (2026-09-06)
+
+- `plugins/triggers.rs`: transactional event backlog while no listener runs or a
+  review is pending, preserving a waiting event when auto-execution is enabled,
+  and subprocess termination/reopen before notification delivery.
+- `plugins/sync_worker.rs`: completed-review grant requirement, pinned background
+  execution, no repeat on a quiet tick, and hard restart midway through a saved
+  session without a browser or duplicate Atomic create.
+- `plugins/sync_session_tests.rs`: hard termination after provider acceptance,
+  uncertain-result refusal, verified-receipt recovery without resending, and
+  discovery markers excluding initial backfill/local-origin issues.
+- `plugins.spec.ts`: UI-only GitHub installation, code-first event wiring into an
+  independent automation with explicit integration references, sync approvals and
+  persisted background toggles. The background check closes the browser context
+  and reads status independently until a new scheduled run completes.
+
+Still not certified: live GitHub failure recovery, multi-provider remote-action workflows, guided
+Atomic uncertain-write recovery, query-outbox performance/retention at scale and
+the Dagger container gate. Queue storage prevents loss; it does not imply
+cross-system exactly-once execution or automatic reconciliation of uncertain writes.
+
+### Live connector query snapshots
+
+`integrations/github-issues/atomic.live.test.ts` now reproduces repeated
+server-authoritative membership reads after five sequential inserts. This caught
+merging generated query snapshots as editable CRDT data; the connection reader
+now replaces query snapshots. This opt-in HTTP regression needs only a local
+AtomicServer, and performs no GitHub calls.
+
+`integrations/github-issues/github.live.test.ts` passed against the actual private
+`ontola/atomic-github-sync-sandbox` repository. Explicit opt-in only: verifies
+bidirectional issues, kanban status/labels, creation from Atomic and background
+discovery -> independent JavaScript Atomic notification. Closes synthetic issues
+and pauses polling afterwards. This does not certify real-provider crash recovery,
+large-repository performance, email/push or chat delivery.
+
+### Notion connector pilot (2026-09-06)
+
+- Live setup exposed missing UUID path matching. `uuid_paths_are_single_canonical_segments`
+  covers constrained UUID authorization and rejection of path escapes; the Notion
+  sandbox fixture now checks every simulated request against the real matcher
+  using a manifest fixture verified against the TypeScript provider declaration.
+
+- `integrations/notion/model.test.ts`: stable property IDs, sparse patches,
+  null/false/zero, option identities, rich-text refusal, long-text chunks,
+  preservation of provider-only view configuration and title/display-name conflicts.
+- `integrations/notion/plugin.test.ts`: preview, schema changes, pagination loops,
+  independent edits/conflicts, stale approvals and provider access/rate-limit errors.
+- `integrations/notion/package.test.ts`: exact shipped bundle reproducibility and
+  POST-read versus PATCH-write manifest classification.
+- `integrations/notion/atomic.live.test.ts`: optional real local Atomic installer
+  with simulated Notion metadata; native properties and view bindings. No Notion calls.
+- `server/src/plugins/notion_sync_tests.rs`: shipped bundle in actual QuickJS/WASM,
+  real Atomic plan/apply and connection journals; bidirectional rows, property
+  renames, independent view name/column changes preserving widths, local remote
+  creation and refusal to duplicate an uncertain accepted create.
+- `plugins.spec.ts`: Notion UI identifier validation before credential writes;
+  shared integration preview/background flow remains covered by its existing E2E.
+
+Live manual coverage: restricted personal database setup, initial title import,
+Atomic-to-Notion title edit and Notion-to-Atomic edit, verified in both UIs. The
+first imported table needed a reload to show membership: refresh/invalidation gap.
+Missing provider code is now rejected before setup mutations (package regression).
+
+Not certified: broader live Notion APIs, Notion background discovery delivery, board edits
+in a live workspace, formatted page content, incremental sync or view parity
+outside the explicitly supported subset. Plain-text fidelity refusals and
+compatibility notes are part of the pilot contract, not full import coverage.
+
+### Named integration actions
+
+- Rust `plugins::actions::tests`: actual GitHub JS/WASM preparation, strict inputs,
+  actor checks, explicit automation reference/release pin, stable call IDs, stale
+  and expired approval, successful and uncertain-write retry protection (fake provider).
+- `browser/lib/src/integration-actions.test.ts` and `plugin-manifest.test.ts`:
+  MCP adapter/shared signed API contract and bounded action schema validation.
+- GitHub install Playwright flow: named action form and sandbox-backed preparation;
+  approval transport stubbed so no live GitHub issue is created.
+- `plugins::actions::tests`: persisted history, cancellation, fresh recovery evidence,
+  source/actor/configuration-pinned grants, app-scoped access, revocation, manual
+  preview refusing automatic writes, and the fresh-call rate limit.
+- Trigger and scheduler `integration_approval_resumes_*` tests: saved waits,
+  same-input replay, receipt reuse, one Atomic effect after approval (fake provider).
+- `browser/data-browser/scripts/integration-mcp.test.mjs`: real SDK stdio handshake,
+  signed loopback requests, no approval tool and refusal of remote plaintext origins.
+- Extended GitHub browser flow: cancellation, granting/revoking action permissions,
+  recovery inspection followed by explicit confirmation (provider responses stubbed).
+- Open: live provider recovery, production load, history archival,
+  remote HTTP/OAuth MCP deployment and provider-specific automatic matching.
+
+History pagination regression: `plugins::actions::tests::history_pages_migrate_ties_and_isolate_actors_under_load`
+seeds 2,001 action records, migrates legacy rows, traverses tied timestamps,
+inserts during traversal, rejects invalid cursors/page limits and excludes another
+actor's records. It also verifies that expired history does not enter the pending
+approval list. Browser `plugins.spec.ts` checks Load more and recovery together;
+`integration-actions.test.ts` checks signed pagination requests. Production load
+and worst-case automation-retention load remain untested.
+
+Manual action retention: `compaction_preserves_ids_and_skips_provider_and_automation_records`
+covers non-mutating preview, payload reduction, idempotent application, refusal of
+archived IDs and approvals, and preservation of recent/manual provider attempts
+and automation-originated records. The JS signed API test verifies preview defaults;
+`plugins.spec.ts` checks that preview sends no cleanup mutation and the archive
+button explicitly applies it (synthetic cleanup response). Physical database
+shrinkage and compaction of consumed automation receipts are not covered.
+
+Completed manual retention:
+`completed_manual_retention_preserves_journal_tombstones_and_recent_recovery`
+verifies explicit opt-in, 30-day settlement age, preservation of unknown-age/failed/
+automation receipts, removal of duplicate recovery payloads, per-action counts,
+idempotent cleanup, and refusal of direct executor retries against archived IDs.
+The cleanup browser regression checks the real signed preview endpoint on a fresh
+connection, then the opt-in request and explicit application using a synthetic batch.
+Production retention/load measurements remain open; this test does not establish a safe deletion policy for automation receipts.
+
+Completed automation acknowledgement: scheduler and trigger tests named
+`finished_*_acknowledges_without_replaying_or_reading_old_waits` first execute a
+successful run, then restore an interrupted schedule/queued event with unusable
+integration waits. Fresh worker passes acknowledge the terminal run, preserve its
+completion marker and create no second effect. These simulate the persisted crash
+window; they do not kill a process at that exact instruction. Concurrent consumer/cleanup lock-race stress testing remains open.
+
+Automation receipt ownership:
+`automation_retention_waits_for_every_consumer_and_preserves_untracked_calls`
+checks multiple consumers, completion age, a new active consumer preventing
+cleanup, finished-run refusal, old-client opt-out and permanently protected
+untracked access. Runtime test
+`only_host_triggered_runs_own_receipts_and_js_cannot_change_the_identity`
+checks public trigger spoofing and mutation of the trusted trigger ID in JS.
+The cleanup UI passes explicit automation opt-in through the signed endpoint.
+Worst-case consumer-count load and abandoned-consumer reconciliation remain open.
+
+Consumer abandonment: `abandoning_a_consumer_is_audited_busy_safe_and_preserves_uncertainty`
+checks busy-worker refusal, unrelated IDs, wrong actor, required reason, immutable
+audit, refusal of future plan/receipt use, a fresh retention period, no approval
+when all consumers were abandoned, and preservation of uncertain provider status.
+Scheduler/trigger `abandoned_*_is_acknowledged_without_applying_its_saved_plan`
+tests cover terminal acknowledgement without writes. The browser uses synthetic
+consumer responses to check inspection, required reason and one explicit abandon
+request; the JS client test checks the signed request fields. Deleted-automation
+reconciliation and per-run (rather than per-worker) concurrency remain open.
+
+Notion setup UX: `plugins.spec.ts` now covers empty-form feedback (previously
+silently disabled), invalid identifiers before credential storage, Enter submission
+and a mocked credential-storage rejection with a visible error and retry enabled.
+OAuth and named database discovery now have coverage described below; live provider verification remains open.
+
+Notion OAuth: `handlers::integration_oauth::tests` covers state ownership,
+expiry and consumption plus connection ownership and sanitized database choices.
+`notionAuth.test.ts` checks popup origin/source/state and cancellation cleanup.
+`db::plugin_secret::store_tests` covers shared reference rotation/revocation,
+origin/drive restrictions and legacy positional MessagePack decoding. Browser
+`Notion OAuth selects a database by name and reports revoked access` uses mocked
+provider authorization/discovery (not live Notion). Live OAuth and automatic
+refresh remain unverified/unimplemented respectively.
+
+Shared OAuth handoff: `oauth::handoff::tests` tests ownership across server,
+agent, drive, provider and attempt, wrong retrieval proof, pending polling,
+single-use delivery, concurrent redemption, duplicate completion, expiry,
+credential removal and cleanup pagination past active entries. Service HTTP transport/authentication now has the tests described below.
+Production TLS deployment and live provider exchanges remain unverified.
+
+OAuth HTTP transport: `oauth::service::tests` covers missing credentials,
+body-forged server identity, cross-server redemption, callback cancellation and
+replay, bounded per-host admission, URL validation and a real loopback HTTP
+client/service round trip. `notionAuth.test.ts` covers managed local polling and
+abort. Playwright runs the same Notion setup fixture in direct and managed modes,
+through native mapping creation, plus the manual fallback. These are authored
+provider responses; production TLS/proxy configuration, real Notion consent,
+refresh, immediate remote cancellation and SaaS deployment remain unverified.
+
+Integration UX walkthrough (2026-09-07): desktop browser checked discovery and
+connection dialogs. Four focused `plugins.spec.ts` cases pass, including the
+Notion “Continue to sync setup” transition and GitHub automation creation.
+Provider calls are fixtures; this does not verify live account authorization.
+
+`discoverIntegrations.test.ts` checks assistant capability search, exclusion of
+nonconnection drafts, partial failures and drives without a plugin schema.
+It does not validate model tool selection or live provider credential health.
+
+Assistant event previews: `previewTrigger.test.ts` checks event identity, payload,
+clock validation and manual fallback. The existing Rust runtime authority test
+was rerun successfully. New in-chat proposal controls use host refetch and existing
+approve/cancel endpoints; browser interaction and live-model behavior are not yet covered.
+
+Task schema/template pilot: `tableTemplates.test.ts` checks shared references
+across Issue Tracker and Project Tasks. `task-schema.test.ts` checks the embedded
+vocabulary against exported identities/options. `client-proxy.test.ts` checks
+identity-preserving local schema resolution and rejects an unrelated proxy
+identity. `plugins.spec.ts` adds GitHub setup into an existing Project Tasks
+table, shared property identities, and preservation of its views. This verifies
+setup, not live provider reconciliation against existing task records.
+# GitHub token setup shortcut
+
+The connection form now links to GitHub's fine-grained token template with
+Issues write access and the owner from a valid owner/repository input. Catalog
+extraction was checked; live GitHub token generation has not been tested.
+
+New automation and integration shortcuts open a fresh assistant chat with resource
+context, requesting user intent before draft creation. Browser acceptance of
+these entry points and assistant-led creation remains open.
+
+## MT940 bank statement importer
+
+`integrations/mt940/parser.test.ts` has nine scenarios covering signed exact
+amounts, reversals, balance reconciliation, invalid/truncated input, multiple
+accounts, date rollover, multiline descriptions, nesting, reimport/conflict
+handling, reference-free overlap, identical legitimate rows and resource bounds.
+JSON-shaped narratives are rejected until legacy text materialization is fixed.
+`plugins::bank_statement_tests::bank_statement_proposes_exact_nested_transactions`
+runs the shipped JS in real QuickJS/WASM and verifies balance failures and
+network-free proposals. Offline certification passes and is recorded in the
+integration store's bundle-matched evidence.
+
+`browser/e2e/tests/mt940.spec.ts` uses a synthetic statement with the real Worker,
+server runtime, planner and signed persistence. It verifies invalid-file errors,
+preview/apply, visible transaction amounts, reopening the installed importer,
+and zero-change reimport. `/tmp/mt940-table.png` is the reviewed table screenshot.
+No real bunq bank data has been tested. Installation recovery and exact-decimal
+table aggregation remain uncovered. Shared identity concurrency is tested below.
+
+## Shared import identity and source baselines
+
+`browser/lib/src/import-records.test.ts` covers native localId persistence,
+immediate-parent identity scope, ambiguous duplicates, local/source conflicts,
+append-only source changes, existing links, interrupted batch replanning and
+legacy adoption. `plugin-apply.test.ts` also verifies distinct approval markers
+without modifying the reviewed proposal. The Clockify Store integration test
+uses real typed resources, Loro commits and DID link rewriting with mocked HTTP.
+
+`lib::import_identity::tests` covers these real-Db scenarios: concurrent signed identity
+claims have one winner (the same ID in another destination succeeds), and stale
+baselines/duplicate approvals cannot overwrite newer source values or local edits.
+The existing `did_import_resolves_forward_local_id_references` regression confirms
+JSON-AD nested references and reimport retain their subtree namespace.
+
+MT940 and Clockify pass offline provider certification (27 fixture tests plus
+their real QuickJS/WASM tests). Three Chromium flows pass against the rebuilt
+local server: MT940 validation/import/reimport, Clockify setup/transport errors,
+and Clockify linked import/reimport and parent migration. No live provider writes.
+
+Remaining: offline-peer identity collision repair and whole-batch atomicity.
+Process-abort recovery, lost-receipt recovery and browser conflict review
+are covered by the follow-up checks below.
+
+### Import follow-up acceptance
+
+- Shared mapper/verdict/apply/Clockify Store suite: 54 tests pass. The Store test
+  now injects a lost receipt after durable creation, then replans and applies only
+  the missing two records. This is failure injection, not an OS-process kill.
+- Core identity suite: three real-Db tests, including reviewed local-value
+  preservation and stale-resolution rejection.
+- Installer/Clockify update helpers: three tests for recovery after a lost receipt,
+  failed-query refusal, JSON-only settings extraction and replacement generation.
+- Browser: MT940 and both Clockify flows pass. The linked Clockify flow now also
+  exercises both conflict choices, clean repreview, and a reviewed installed-code
+  update that restores the bundled source without changing its settings.
+- All four provider certifications pass (50 offline fixtures; four live cases
+  skipped intentionally). GitHub and Notion real-runtime tests additionally assert
+  persisted provider-qualified native localIds while retaining two-way behavior.
+- `lib/tests/import_durability.rs` aborts a child process after an acknowledged
+  DID import, reopens redb and verifies identity lookup plus continued nested writes.
+  Removing the commit flush reproduces loss; restoring it passes.
+- Schema unit tests recover unattached saved terms. The resumable-installation
+  helper reuses saved logical steps while preserving repeated identical rows.
+  `installation-recovery.spec.ts` injects a lost table-class receipt and checks
+  that retries reuse the class, table and view.
+- Duplicate-review fixture covers record links and blocked Apply; it does not
+  simulate replication between independent nodes.
+- Still unfinished: cross-node collision repair, universal adoption of resumable
+  setup, and live account upgrades.
+
+### Recovery verification (2026-09-07)
+
+Five Chromium flows pass against rebuilt native/WASM code: interrupted table
+installation, duplicate-source review, MT940 import/reimport, Clockify setup
+errors and Clockify linked import/conflict/upgrade. Both changed providers pass
+full offline certification. Frontend typecheck and client declaration build pass.
+The three core identity tests pass, with the stale-baseline regression repeated
+15 times to exercise concurrent Loro ordering. These checks make no live provider
+writes and do not demonstrate offline collision repair.
+
+### Offline duplicate preservation
+
+`import_identity::tests::offline_duplicates_remain_visible_after_sync_in_both_orders`
+creates the same source identity independently in two databases. Bulk SYNC_PUSH
+and live UPDATE each preserve both DID resources and their distinct names in
+both arrival orders and on replay. Lookup reports ambiguity and a third authored
+import is rejected. This exercises the real persistence/index path, but not
+network transport, OS-process isolation or reviewed alias/reference repair.
+
+### Reviewed primary-record decisions (2026-09-07)
+
+- Native identity regression now saves a signed decision, rejects a stale member
+  snapshot, keeps both original values, survives replay, and reopens review on a
+  new offline edit. Both bulk/live arrival orders remain covered.
+- `import-resolution.test.ts` covers ordering, primary updates, retained-copy
+  changes, missing/unseen members and competing decisions followed by re-review.
+  The mapper test verifies subsequent proposals target only the reviewed primary.
+- Connection-state test verifies alias provenance, preserved baseline, incremented
+  revision, idempotent reads and rejection of the earlier checkpoint revision.
+- `drain-datatype-tags.test.ts` reproduces and fixes newly added JSON values becoming
+  strings on incremental saves. The full client suite has 564 passing tests.
+- Five Chromium flows pass against rebuilt native/WASM code. Duplicate review uses
+  real authenticated SYNC_PUSH plus a signed primary decision and fresh lookup;
+  the other flows cover setup recovery, MT940 and Clockify. It does not yet test
+  field consolidation, graph-wide relinking or independent OS-process resolution.
+- Frontend typecheck and client declaration build pass. Clockify and MT940 offline
+  certifications pass; no live provider writes were made by these tests.
+
+### Reviewed field consolidation
+
+`import-resolution.test.ts` covers explicit choices, absent fields, protected
+fields and unknown members. The native offline-duplicate regression now rejects
+an unfulfilled choice and persists the reviewed field value while preserving
+the retained record, through both replica ingress paths and arrival orders.
+`import-reference-review.test.ts` covers typed links, preserved array order and
+multiplicity, skipped history/text/JSON, lost acknowledgements, stale records and
+idempotent retry after partial completion. The native signed-commit test verifies
+that a stale link update cannot overwrite a newer value, while normal edits can
+retain the review receipt. Five native identity tests pass.
+
+The Chromium duplicate-review flow now also selects a value from the other copy,
+saves it to the primary, discovers a typed incoming link, applies it and verifies
+that refreshing finds no remaining supported links. Broader graph-wide discovery,
+all-or-nothing multi-record transactions and actual network partitions remain
+outside this coverage.
+
+The extended link-review browser flow also edits a second record after preview:
+its link stays unchanged, the other record is confirmed, and reopening the primary
+page resumes discovery without duplicating completed writes. Five focused browser
+flows passed across the final runs (setup recovery, duplicate review, MT940 and
+Clockify), with 567 client tests, native checks and offline certifications passing.
+
+### Searchable creation catalog (2026-09-08)
+
+`new-resource-catalog.spec.ts` verifies searchable table and website templates in
+folders, selection passed to table setup, server-confirmed nesting for table and
+website imports (both parent URL parameters), and the minimal assistant prompt
+on a 390px viewport. It checks that the request remains editable when a model
+needs connecting; it does not send a live model request. The blank-table setup
+regression also passes. `creationCatalog.test.ts` covers catalog completeness,
+multiword search and the assistant parent context. Frontend typecheck passes.
+
+## Integration workspace tabs (2026-09-08)
+
+`browser/e2e/tests/integration-workspace.spec.ts` installs a GitHub connection
+without provider credentials and verifies its kanban opens by default, source and
+secrets are hidden until their tabs are selected, automation creation is available,
+and a changed opening-view setting survives reload. Uses the existing table view
+renderer and table-default-view property. Typecheck passes. No live provider sync
+or standalone custom AppFrame behavior is exercised by this test.
+
+The integration workspace browser check also visits all management tabs and
+verifies Edit with AI opens the assistant with an editing request. Screenshots
+were inspected for tab spacing. This verifies handoff, not live model edits.
+
+The integration workspace test holds the preview HTTP response to verify the
+spinner, busy label and disabled button, then returns a provider error and checks
+that the error is visible and preview can be retried. No live provider request is
+made for this failure-path check.
 
 ## Paged table hydration count (2026-09-08)
 

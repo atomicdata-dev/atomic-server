@@ -318,6 +318,7 @@ describe('deferred collection membership', () => {
         collection.applyResourceChange(resource.subject, resource),
       );
     });
+
     // Another collection can announce these records before this query resolves.
     for (const subject of subjects.slice(30)) {
       const resource = new Resource(subject);
@@ -325,6 +326,7 @@ describe('deferred collection membership', () => {
       resource.loading = false;
       collection.applyResourceChange(subject, resource);
     }
+
     await collection.refresh();
     await Promise.resolve();
     expect(collection.totalMembers).toBe(90);

@@ -39,3 +39,6 @@ scratchpad
 
 .bin/
 .fastembed_cache
+
+# Generated integration certification evidence
+/artifacts/integration-certification/

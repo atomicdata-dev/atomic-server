@@ -410,6 +410,31 @@ impl KvStore for RedbStore {
         }
     }
 
+    fn range_page(
+        &self,
+        tree: Tree,
+        start: Vec<u8>,
+        end: Vec<u8>,
+        limit: usize,
+    ) -> crate::errors::AtomicResult<Vec<KvPair>> {
+        let tx = self
+            .db
+            .begin_read()
+            .map_err(|e| format!("redb read tx: {e}"))?;
+        let table = tx
+            .open_table(table_def(tree))
+            .map_err(|e| format!("redb open table: {e}"))?;
+        let rows = table
+            .range(start.as_slice()..end.as_slice())
+            .map_err(|e| format!("redb range: {e}"))?;
+        rows.take(limit)
+            .map(|row| {
+                let (k, v) = row.map_err(|e| format!("redb range entry: {e}"))?;
+                Ok((k.value().to_vec(), v.value().to_vec()))
+            })
+            .collect()
+    }
+
     fn iter_tree(&self, tree: Tree) -> KvIter {
         let tx = match self.db.begin_read() {
             Ok(tx) => tx,

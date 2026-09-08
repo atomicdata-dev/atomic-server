@@ -14,6 +14,7 @@ export type TriggerKind =
   | 'cron'
   | 'timer'
   | 'webhook'
+  | 'query'
   | 'query:entered'
   | 'query:left'
   | 'query:changed'
@@ -22,6 +23,9 @@ export type TriggerKind =
 
 export interface RunTrigger {
   kind: TriggerKind;
+  /** Stable delivery identity across retries and server restarts. */
+  id?: string;
+  edge?: 'enter' | 'leave';
   /**
    * When the host started this run. The only clock a plugin gets: the sandbox
    * freezes `Date` to it so two runs over the same input agree, which is what
@@ -35,6 +39,7 @@ export interface RunTrigger {
 }
 
 export interface RunInput {
+  schemas?: Record<string, string>;
   trigger: RunTrigger;
   /** Already-parsed records. The host owns acquisition and parsing. */
   records?: JSONValue[];

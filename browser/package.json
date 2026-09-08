@@ -33,7 +33,8 @@
     "start": "pnpm run -r --parallel start",
     "typedoc": "typedoc --options ./typedoc.json",
     "typedoc-publish": "pnpm run typedoc && if [ -z \"$NETLIFY_AUTH_TOKEN\" ]; then echo 'NETLIFY_AUTH_TOKEN not set — skipping deploy (typedoc built only)'; exit 0; fi && netlify link --id a628f703-2dc1-4305-93d2-4ddc16c13f75 --auth $NETLIFY_AUTH_TOKEN && netlify deploy --dir data-browser/publish/docs/ ${NETLIFY_PROD:+--prod} --auth $NETLIFY_AUTH_TOKEN",
-    "typecheck": "pnpm run -r --parallel typecheck"
+    "typecheck": "pnpm run -r --parallel typecheck",
+    "certify:integrations": "node ../integrations/tooling/certify.mjs"
   },
   "husky": {
     "hooks": {

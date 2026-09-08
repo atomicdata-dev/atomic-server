@@ -1497,15 +1497,6 @@ pub async fn import_sync_push(
             }
         };
 
-        let snapshot = doc.export_snapshot();
-        if store
-            .kv
-            .insert(Tree::LoroSnapshots, snapshot_key.as_bytes(), &snapshot)
-            .is_err()
-        {
-            continue;
-        }
-
         // No `get_resource` — `apply_state_doc` rebuilds propvals from the
         // merged doc, so the read would be discarded. Sync builds directly.
         let subject = crate::Subject::from_raw(&snapshot_key, store.get_base_domain().as_deref());
@@ -1526,7 +1517,13 @@ pub async fn import_sync_push(
             has_strokes,
         );
 
-        let _ = store.add_resource_opts(&resource, false, true, true).await;
+        store
+            .persist_replicated_resource(&resource)
+            .await
+            .map_err(|error| SyncPushRejected {
+                drive: push.drive.clone(),
+                reason: format!("Failed to persist {}: {error}", entry.subject),
+            })?;
         count += 1;
 
         // Check for missing blobs

@@ -37,7 +37,7 @@ pub struct ScheduleQuery {
 
 /// Scheduling a plugin means it will spend that plugin's secrets unattended, so
 /// it takes the same rights as changing it.
-async fn authorize(
+pub(crate) async fn authorize(
     appstate: &AppState,
     req: &actix_web::HttpRequest,
     context: &crate::context::RequestContext,
@@ -68,7 +68,7 @@ pub async fn handle_set_schedule(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&appstate, &req, &context, &body.plugin).await?;
+    let agent = authorize(&appstate, &req, &context, &body.plugin).await?;
 
     let key = PluginScheduleKey::new(&body.drive, &body.plugin);
 
@@ -82,8 +82,10 @@ pub async fn handle_set_schedule(
             let existing = appstate.store.get_plugin_schedule(&key)?;
             let now = atomic_lib::utils::now();
             let mut schedule = PluginSchedule::new(interval, now)?;
+            schedule.run_as = Some(agent.to_string());
 
             if let Some(previous) = existing {
+                schedule.running = previous.running;
                 schedule.last_run_at = previous.last_run_at;
                 schedule.pending_verdict = previous.pending_verdict;
                 schedule.last_error = previous.last_error;
@@ -171,7 +173,9 @@ pub async fn handle_set_auto_apply(
         return Ok(HttpResponse::Ok().json(read(&appstate, &key)?));
     }
 
-    let reviewed = reviewed_run(&appstate, &body.drive, &body.plugin).await?;
+    let (reviewed, approved_source) = reviewed_run(&appstate, &body.drive, &body.plugin).await?;
+
+    crate::plugins::js_runtime::describe_manifest(&approved_source).await?;
 
     let ForAgent::AgentSubject(subject) = &agent else {
         return Err(AtomicServerError::bad_request(
@@ -183,6 +187,24 @@ pub async fn handle_set_auto_apply(
         agent: subject.to_string(),
         granted_at: atomic_lib::utils::now(),
         reviewed_run: Some(reviewed),
+        release: Some(
+            appstate.store.publish_plugin_release(
+                &atomic_lib::db::plugin_release::PluginRelease {
+                    source: approved_source.clone(),
+                    manifest: serde_json::json!(
+                        crate::plugins::js_runtime::describe_manifest(&approved_source).await?
+                    ),
+                    runtime: atomic_lib::db::plugin_release::RUNTIME.into(),
+                    schemas: crate::plugins::scheduler::plugin_schema_bindings(
+                        &appstate.store,
+                        &body.drive,
+                        &body.plugin,
+                    )
+                    .await?,
+                },
+            )?,
+        ),
+        source: Some(approved_source),
     });
 
     appstate.store.set_plugin_schedule(&key, &schedule)?;
@@ -223,7 +245,7 @@ pub async fn reviewed_run(
     appstate: &AppState,
     drive: &str,
     plugin: &str,
-) -> AtomicServerResult<String> {
+) -> AtomicServerResult<(String, String)> {
     let terms = drive_terms(&appstate.store, drive)
         .await
         .ok_or_else(|| AtomicServerError::bad_request("This drive has no plugin vocabulary yet"))?;
@@ -231,13 +253,39 @@ pub async fn reviewed_run(
         .property("run-status")
         .ok_or_else(|| AtomicServerError::bad_request("This drive has no run records yet"))?;
     let started_property = terms.property("started-at");
+    let source_property = terms
+        .property("plugin-source")
+        .ok_or_else(|| AtomicServerError::bad_request("No plugin source property"))?;
+    let current_source = crate::plugins::scheduler::plugin_source(&appstate.store, drive, plugin)
+        .await
+        .ok_or_else(|| AtomicServerError::bad_request("The plugin has no source"))?;
 
+    let current_schemas =
+        crate::plugins::scheduler::plugin_schema_bindings(&appstate.store, drive, plugin).await?;
     let plugin_resource = appstate.store.get_resource(&plugin.into()).await?;
     let runs = plugin_resource.get_children(&appstate.store).await?;
 
     let mut best: Option<(i64, String)> = None;
 
     for run in runs {
+        let reviewed_schemas: std::collections::BTreeMap<String, String> = terms
+            .property("plugin-schemas")
+            .and_then(|p| run.get(p).ok())
+            .and_then(|v| serde_json::from_str(&v.to_string()).ok())
+            .unwrap_or_default();
+        if reviewed_schemas != current_schemas {
+            continue;
+        }
+
+        if run
+            .get(source_property)
+            .ok()
+            .map(|v| v.to_string())
+            .as_deref()
+            != Some(current_source.as_str())
+        {
+            continue;
+        }
         let Ok(status) = run.get(status_property) else {
             continue;
         };
@@ -258,11 +306,12 @@ pub async fn reviewed_run(
         }
     }
 
-    best.map(|(_, subject)| subject).ok_or_else(|| {
-        AtomicServerError::bad_request(
-            "Run this plugin and apply its changes once before letting it write on its own",
-        )
-    })
+    best.map(|(_, subject)| (subject, current_source))
+        .ok_or_else(|| {
+            AtomicServerError::bad_request(
+                "Run this plugin and apply its changes once before letting it write on its own",
+            )
+        })
 }
 
 fn read(
@@ -274,4 +323,43 @@ fn read(
         .get_plugin_schedule(key)?
         .as_ref()
         .map(PluginScheduleInfo::from))
+}
+
+/// Resume the saved plan under its original approval, never rerun the script.
+pub async fn handle_resume(
+    appstate: web::Data<AppState>,
+    body: web::Json<ScheduleQuery>,
+    req: actix_web::HttpRequest,
+    context: crate::context::RequestContext,
+) -> AtomicServerResult<HttpResponse> {
+    authorize(&appstate, &req, &context, &body.plugin).await?;
+    let _execution = crate::plugins::scheduler::EXECUTION_LOCK.lock().await;
+    let key = PluginScheduleKey::new(&body.drive, &body.plugin);
+    let mut schedule = appstate
+        .store
+        .get_plugin_schedule(&key)?
+        .ok_or_else(|| AtomicServerError::bad_request("No schedule to resume"))?;
+    let verdict = schedule
+        .pending_verdict
+        .clone()
+        .ok_or_else(|| AtomicServerError::bad_request("No saved proposal to resume"))?;
+    let grant = schedule.auto_apply.clone().ok_or_else(|| {
+        AtomicServerError::bad_request("Resume requires the original unattended approval")
+    })?;
+    let at = schedule
+        .last_run_at
+        .ok_or_else(|| AtomicServerError::bad_request("No original run timestamp"))?;
+    schedule.running = true;
+    appstate.store.set_plugin_schedule(&key, &schedule)?;
+    let result = crate::plugins::scheduler::auto_apply(&appstate, &key, &verdict, &grant, at).await;
+    schedule.running = false;
+    match result {
+        Ok(_) => {
+            schedule.pending_verdict = None;
+            schedule.last_error = None;
+        }
+        Err(error) => schedule.last_error = Some(error),
+    }
+    appstate.store.set_plugin_schedule(&key, &schedule)?;
+    Ok(HttpResponse::Ok().json(PluginScheduleInfo::from(&schedule)))
 }

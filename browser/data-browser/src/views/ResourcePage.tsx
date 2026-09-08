@@ -1,3 +1,4 @@
+import { ImportResolutionNotice } from '@chunks/PluginRuns/ImportResolutionNotice';
 import { useEffect, useState, lazy, Suspense } from 'react';
 import {
   useResource,
@@ -218,6 +219,7 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
           <ForkBar resource={resource} />
           {/* And on the original: the forks proposing changes to it. */}
           <PendingForks resource={resource} />
+          <ImportResolutionNotice resource={resource} />
           <ReturnComponent resource={resource} />
         </Suspense>
       </ErrorBoundary>

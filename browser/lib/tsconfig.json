@@ -7,9 +7,16 @@
     "moduleResolution": "NodeNext",
     "declaration": true,
     "declarationMap": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "isolatedDeclarations": true,
-  "include": ["./src"],
-  "references": []
+  "include": [
+    "./src"
+  ],
+  "references": [],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
 }

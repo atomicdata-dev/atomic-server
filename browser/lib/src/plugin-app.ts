@@ -27,6 +27,8 @@ export interface CreateAppOptions {
   name: string;
   /** The module whose `view()` renders the app. */
   source: string;
+  /** Reuse an existing class; its definition is never copied or edited. */
+  rowClass?: string;
   description?: string;
   /**
    * One emoji, shown wherever the app is listed.
@@ -85,6 +87,21 @@ export async function createApp(
   store: SchemaStore,
   options: CreateAppOptions,
 ): Promise<CreatedApp> {
+  const sharedClass = options.rowClass
+    ? await store.getResource(options.rowClass)
+    : undefined;
+
+  if (sharedClass) {
+    const sharedClasses = sharedClass.get(core.properties.isA);
+
+    if (
+      !Array.isArray(sharedClasses) ||
+      !sharedClasses.includes(core.classes.class)
+    ) {
+      throw new Error('rowClass must resolve to an Atomic Class');
+    }
+  }
+
   const schema = await ensureSchema(store, options.drive, pluginSchema());
 
   const app = await store.newResource({
@@ -126,17 +143,19 @@ export async function createApp(
   // the data rather than the app can just open it.
   const rows = options.rowName ?? { singular: 'Item', plural: 'Items' };
 
-  const rowClass = await store.newResource({
-    parent: ontology.subject,
-    isA: [core.classes.class],
-    propVals: {
-      [core.properties.shortname]: slug(rows.singular),
-      [core.properties.name]: rows.singular,
-      [core.properties.description]: `A row in ${options.name}.`,
-      [core.properties.recommends]: [core.properties.name],
-    },
-  });
-  await rowClass.save();
+  const rowClass =
+    sharedClass ??
+    (await store.newResource({
+      parent: ontology.subject,
+      isA: [core.classes.class],
+      propVals: {
+        [core.properties.shortname]: slug(rows.singular),
+        [core.properties.name]: rows.singular,
+        [core.properties.description]: `A row in ${options.name}.`,
+        [core.properties.recommends]: [core.properties.name],
+      },
+    }));
+  if (!sharedClass) await rowClass.save();
 
   // Registered on the ontology, or it is a class the app's own vocabulary
   // does not list — and nothing that reads the ontology would find it.
@@ -293,9 +312,7 @@ export async function describeApp(
   const resource = await store.getResource(app);
 
   const entrypointProp = schema.properties?.entrypoint;
-  const entrypoint = entrypointProp
-    ? resource.get(entrypointProp)
-    : undefined;
+  const entrypoint = entrypointProp ? resource.get(entrypointProp) : undefined;
 
   const data = schema.properties?.['app-data']
     ? resource.get(schema.properties['app-data'])
@@ -356,7 +373,9 @@ export async function updateApp(
     const sourceProp = schema.properties?.['plugin-source'];
 
     if (!sourceProp) {
-      throw new Error('This drive has no plugin schema, so apps cannot be read.');
+      throw new Error(
+        'This drive has no plugin schema, so apps cannot be read.',
+      );
     }
 
     const script = await store.getResource(current.entrypoint);

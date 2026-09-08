@@ -435,3 +435,60 @@ describe('problems from the run', () => {
     expect(plan.blocked).toBe(true);
   });
 });
+
+describe('temporary references from the real Store', () => {
+  it('accepts only in-plan temporary references and preserves class constraints', async () => {
+    const run = async (
+      link: unknown,
+      datatype = Datatype.ATOMIC_URL,
+      classType?: string,
+    ) => {
+      const host = makeHost();
+      host.createSubject = () => '_new:planned';
+      host.getProperty = async subject => ({
+        ...property(subject, datatype),
+        classType,
+      });
+      host.readResource = async () => ({});
+
+      return planVerdict(
+        verdict({
+          intents: [
+            {
+              op: 'create',
+              localId: 'created',
+              parent: 'https://x',
+              isA: ['https://x/Person'],
+              set: {},
+            },
+            {
+              op: 'set',
+              subject: 'https://x/existing',
+              set: { [LINK]: link as JSONValue },
+            },
+          ],
+        }),
+        host,
+      );
+    };
+
+    expect((await run('local:created')).blocked).toBe(false);
+    expect((await run(['local:created'], Datatype.RESOURCEARRAY)).blocked).toBe(
+      false,
+    );
+    expect((await run('_new:not-in-this-plan')).blocked).toBe(true);
+    expect(
+      (
+        await run(
+          ['local:created', '_new:not-in-this-plan'],
+          Datatype.RESOURCEARRAY,
+        )
+      ).blocked,
+    ).toBe(true);
+    expect((await run('local:created', Datatype.INTEGER)).blocked).toBe(true);
+    expect(
+      (await run('local:created', Datatype.ATOMIC_URL, 'https://x/Project'))
+        .blocked,
+    ).toBe(true);
+  });
+});

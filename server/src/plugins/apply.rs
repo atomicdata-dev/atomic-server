@@ -17,7 +17,7 @@ use serde_json::Value as Json;
 
 use crate::plugins::plan::{Op, PlannedChange, RunPlan};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ChangeStatus {
     Applied,
@@ -26,7 +26,7 @@ pub enum ChangeStatus {
     NotAttempted,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeOutcome {
     pub op: String,
@@ -39,7 +39,7 @@ pub struct ChangeOutcome {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Default, serde::Serialize)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplyReport {
     pub outcomes: Vec<ChangeOutcome>,
@@ -86,6 +86,15 @@ pub async fn apply_plan(
     host: &mut impl ApplyHost,
     options: ApplyOptions,
 ) -> Result<ApplyReport, String> {
+    apply_plan_recorded(plan, host, options, None).await
+}
+
+pub async fn apply_plan_recorded(
+    plan: &RunPlan,
+    host: &mut impl ApplyHost,
+    options: ApplyOptions,
+    journal: Option<&super::journal::Journal>,
+) -> Result<ApplyReport, String> {
     if plan.blocked {
         return Err(
             "refusing to apply a blocked plan: resolve its errors or drop the offending changes first"
@@ -105,7 +114,7 @@ pub async fn apply_plan(
     let mut outcomes = Vec::with_capacity(ordered.len());
     let mut stopped = false;
 
-    for change in ordered {
+    for (index, change) in ordered.into_iter().enumerate() {
         if stopped {
             outcomes.push(outcome(
                 change,
@@ -117,13 +126,26 @@ pub async fn apply_plan(
             continue;
         }
 
+        if let Some(journal) = journal {
+            if let Some(previous) = journal.begin(index)? {
+                if previous.subject != change.subject {
+                    subjects.insert(change.subject.clone(), previous.subject.clone());
+                }
+                outcomes.push(previous);
+                continue;
+            }
+        }
         match apply_change(change, host, &subjects, &planned_subjects).await {
             Ok((subject, status)) => {
                 if subject != change.subject {
                     subjects.insert(change.subject.clone(), subject.clone());
                 }
 
-                outcomes.push(outcome(change, &subject, status, None));
+                let receipt = outcome(change, &subject, status, None);
+                if let Some(journal) = journal {
+                    journal.complete(index, &receipt)?;
+                }
+                outcomes.push(receipt);
             }
             Err(e) => {
                 outcomes.push(outcome(
@@ -517,6 +539,56 @@ mod tests {
             from: None,
             to,
         }
+    }
+
+    #[tokio::test]
+    async fn journal_reuses_created_subjects_without_repeating_writes() {
+        let db = atomic_lib::Db::init_temp("journal_replay").await.unwrap();
+        let journal = super::super::journal::Journal::new(&db, "drive", "plugin", "run-1");
+        let original = plan(vec![
+            create("local:a", vec![]),
+            create(
+                "local:b",
+                vec![property(
+                    "https://x/link",
+                    Some(Json::String("local:a".into())),
+                )],
+            ),
+        ]);
+        let saved = journal.plan(&original).unwrap();
+        let mut host = FakeHost::default();
+        let first = apply_plan_recorded(&saved, &mut host, ApplyOptions::default(), Some(&journal))
+            .await
+            .unwrap();
+        let reopened = super::super::journal::Journal::new(&db, "drive", "plugin", "run-1");
+        let saved = reopened.plan(&plan(vec![])).unwrap();
+        let second =
+            apply_plan_recorded(&saved, &mut host, ApplyOptions::default(), Some(&reopened))
+                .await
+                .unwrap();
+        assert_eq!(host.creates.len(), 2);
+        assert_eq!(first.subjects, second.subjects);
+        assert_eq!(
+            host.creates[1].prop_vals["https://x/link"],
+            Json::String("did:ad:real-1".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_missing_receipt_stops_recovery_before_a_duplicate_create() {
+        let db = atomic_lib::Db::init_temp("journal_uncertain")
+            .await
+            .unwrap();
+        let journal = super::super::journal::Journal::new(&db, "drive", "plugin", "run-1");
+        let saved = journal
+            .plan(&plan(vec![create("local:a", vec![])]))
+            .unwrap();
+        assert!(journal.begin(0).unwrap().is_none());
+        let mut host = FakeHost::default();
+        let result =
+            apply_plan_recorded(&saved, &mut host, ApplyOptions::default(), Some(&journal)).await;
+        assert!(result.unwrap_err().contains("reconcile"));
+        assert!(host.creates.is_empty());
     }
 
     #[tokio::test]

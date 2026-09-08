@@ -68,6 +68,11 @@ pub struct PluginTrigger {
     #[serde(default)]
     pub auto_apply: Option<AutoApplyGrant>,
     pub last_error: Option<String>,
+    /// Principal authorizing reads during unattended execution.
+    #[serde(default)]
+    pub run_as: Option<String>,
+    #[serde(default)]
+    pub pending_verdict: Option<String>,
 }
 
 impl PluginTrigger {
@@ -79,6 +84,8 @@ impl PluginTrigger {
         }
 
         Ok(Self {
+            run_as: None,
+            pending_verdict: None,
             query,
             on_enter,
             on_leave,
@@ -99,21 +106,25 @@ impl PluginTrigger {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginTriggerInfo {
+    pub queued_events: usize,
     pub query: QueryFilter,
     pub on_enter: bool,
     pub on_leave: bool,
     pub auto_apply: Option<AutoApplyGrant>,
     pub last_error: Option<String>,
+    pub pending_verdict: Option<String>,
 }
 
 impl From<&PluginTrigger> for PluginTriggerInfo {
     fn from(trigger: &PluginTrigger) -> Self {
         Self {
+            queued_events: 0,
             query: trigger.query.clone(),
             on_enter: trigger.on_enter,
             on_leave: trigger.on_leave,
             auto_apply: trigger.auto_apply.clone(),
             last_error: trigger.last_error.clone(),
+            pending_verdict: trigger.pending_verdict.clone(),
         }
     }
 }
@@ -143,5 +154,48 @@ mod tests {
 
         assert!(enter_only.wants(Edge::Enter));
         assert!(!enter_only.wants(Edge::Leave));
+    }
+}
+
+/// A query edge persisted in the same batch as the resource and membership.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueuedEvent {
+    pub id: String,
+    pub key: PluginTriggerKey,
+    pub subject: String,
+    pub edge: Edge,
+    pub at: i64,
+    pub verdict: Option<String>,
+    pub waiting_for_review: bool,
+    #[serde(default)]
+    pub authorization: Option<String>,
+}
+
+impl crate::Db {
+    pub fn queued_plugin_events(&self) -> crate::errors::AtomicResult<Vec<QueuedEvent>> {
+        self.kv
+            .scan_prefix(super::trees::Tree::PluginMeta, b"plugin-event/v1/")
+            .map(|entry| {
+                let (_, value) = entry?;
+                Ok(serde_json::from_slice(&value)?)
+            })
+            .collect()
+    }
+    pub fn save_plugin_event(&self, event: &QueuedEvent) -> crate::errors::AtomicResult<()> {
+        self.kv.insert(
+            super::trees::Tree::PluginMeta,
+            format!("plugin-event/v1/{}", event.id).as_bytes(),
+            &serde_json::to_vec(event)?,
+        )?;
+        self.flush()?;
+        Ok(())
+    }
+    pub fn acknowledge_plugin_event(&self, event: &QueuedEvent) -> crate::errors::AtomicResult<()> {
+        self.kv.remove(
+            super::trees::Tree::PluginMeta,
+            format!("plugin-event/v1/{}", event.id).as_bytes(),
+        )?;
+        self.flush()?;
+        Ok(())
     }
 }

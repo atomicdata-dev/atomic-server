@@ -464,3 +464,20 @@ describe('failures', () => {
     expect(report.failed).toBe(1);
   });
 });
+
+describe('import approval markers', () => {
+  it('distinguishes repeated approvals without mutating the reviewed proposal', async () => {
+    const { stampImportApproval } = await import('./plugin-apply.js');
+    const { IMPORT_BASELINE } = await import('./import-records.js');
+    const proposal = {
+      [IMPORT_BASELINE]: { values: { name: 'A' }, previous: {} },
+    };
+    const first = stampImportApproval(proposal);
+    const second = stampImportApproval(proposal);
+    expect(first).not.toEqual(second);
+    expect(proposal[IMPORT_BASELINE]).not.toHaveProperty('approval');
+    expect(stampImportApproval({ name: 'local edit' })).toEqual({
+      name: 'local edit',
+    });
+  });
+});

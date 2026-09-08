@@ -1,3 +1,4 @@
+import { taskSchema } from './task-schema.js';
 import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
@@ -2589,6 +2590,45 @@ export class Store {
     return ontology;
   }
 
+  /** Authoritative import/setup identity lookup; never infer absence from an incomplete cache. */
+  public async findByLocalId(
+    drive: string,
+    parent: string,
+    localId: string,
+  ): Promise<Resource | undefined> {
+    const { readConnectionSubjects } = await import('./plugin-connection.js');
+    const subjects = await readConnectionSubjects(
+      this,
+      drive,
+      core.properties.localId,
+      localId,
+    );
+    const matches: Resource[] = [];
+
+    for (const subject of subjects) {
+      const resource = await this.fetchResourceFromServer(subject, {
+        noWebSocket: true,
+      });
+      if (resource.error) throw resource.error;
+      const actualParent = resource.get(core.properties.parent);
+      if (
+        typeof actualParent === 'string' &&
+        actualParent.split('?')[0] === parent.split('?')[0]
+      )
+        matches.push(resource);
+    }
+
+    if (!matches.length) return undefined;
+    const { resolvedImportSubject } = await import('./import-resolution.js');
+    const chosen = resolvedImportSubject(
+      Object.fromEntries(matches.map(r => [r.subject, r.getPropVals()])),
+    );
+    if (!chosen)
+      throw new Error('Ambiguous destination/localId; review all copies again');
+
+    return matches.find(r => r.subject === chosen);
+  }
+
   public async search(query: string, opts: SearchOpts = {}): Promise<string[]> {
     const parentScope = Array.isArray(opts.parents)
       ? opts.parents[0]
@@ -3251,6 +3291,21 @@ export class Store {
   /**
    * Always fetches the resource from the server then adds it to the store.
    */
+  /** Read authoritative server values without merging optimistic local edits.
+   * Use when confirming a reviewed operation, not for ordinary cached reads. */
+  public async readServerSnapshot(
+    subject: string,
+  ): Promise<Readonly<ReturnType<Resource['getPropVals']>>> {
+    const agent = this.getAgent();
+    const { resource } = await this.client.fetchResourceHTTP(subject, {
+      signInfo: agent ? { agent, serverURL: this.getServerUrl() } : undefined,
+      serverURL: this.getServerUrl(),
+    });
+    if (resource.error) throw resource.error;
+
+    return resource.getPropVals();
+  }
+
   public async fetchResourceFromServer<C extends OptionalClass = UnknownClass>(
     /** The resource URL to be fetched */
     subject: string,
@@ -3272,6 +3327,21 @@ export class Store {
       forceOverride?: boolean;
     } = {},
   ): Promise<Resource<C>> {
+    // Embedded pilot vocabulary must resolve through the installed host, not
+    // depend on a public catalog deployment being available.
+    if (
+      [
+        ...Object.values(taskSchema.properties),
+        ...Object.values(taskSchema.tags),
+        'https://atomicdata.dev/task/v1',
+        core.properties.importBaseline,
+        core.properties.importResolution,
+        core.properties.importReferenceReview,
+      ].includes(subject)
+    ) {
+      opts = { ...opts, fromProxy: true, noWebSocket: true };
+    }
+
     const normalizedSubject = this.normalizeSubject(subject);
 
     // In-flight dedup. SideBarDrive and DrivePage both call

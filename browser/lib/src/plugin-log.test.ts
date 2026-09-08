@@ -41,6 +41,16 @@ const makeStore = (seed: Record<string, Stored> = {}) => {
 
   const store = {
     world,
+    findByLocalId: async (_drive: string, parent: string, id: string) => {
+      const matches = Object.values(world).filter(
+        r =>
+          r.props[core.properties.parent] === parent &&
+          r.props[core.properties.localId] === id,
+      );
+      if (matches.length > 1) throw new Error('ambiguous');
+
+      return matches[0] ? wrap(matches[0]) : undefined;
+    },
     getResource: vi.fn(async (subject: string) => {
       world[subject] ??= { subject, isA: [], props: {} };
 
@@ -56,7 +66,11 @@ const makeStore = (seed: Record<string, Stored> = {}) => {
         world[subject] = {
           subject,
           isA: opts.isA,
-          props: { ...opts.propVals },
+          props: {
+            ...opts.propVals,
+            [core.properties.parent]: opts.parent,
+            [core.properties.isA]: opts.isA,
+          },
         };
 
         return wrap(world[subject]);
@@ -86,6 +100,15 @@ const report = (over: Partial<ApplyReport> = {}): ApplyReport => ({
 });
 
 describe('ensureSchema', () => {
+  it('reattaches saved schema terms after an interrupted ontology update', async () => {
+    const store = makeStore();
+    const first = await ensureSchema(store, DRIVE, pluginSchema());
+    store.world[ONTOLOGY].props[core.properties.properties] = [];
+    store.world[ONTOLOGY].props[core.properties.classes] = [];
+    const count = store.newResource.mock.calls.length;
+    expect(await ensureSchema(store, DRIVE, pluginSchema())).toEqual(first);
+    expect(store.newResource.mock.calls.length).toBe(count);
+  });
   it('creates the classes and properties a spec asks for', async () => {
     const store = makeStore();
 
@@ -234,7 +257,7 @@ describe('recordRun', () => {
     ]);
   });
 
-  it('keeps the cursor only when something was actually written', async () => {
+  it('advances a successful empty page but not a partial page', async () => {
     const store = makeStore();
     const schema = await ensureSchema(store, DRIVE, pluginSchema());
     const cursorProp = schema.properties['run-cursor'];
@@ -252,11 +275,19 @@ describe('recordRun', () => {
       drive: DRIVE,
       trigger,
       plan: plan({ cursor: 'page-2' }),
-      report: report({ applied: 0, failed: 1 }),
+      report: report({ applied: 0, failed: 0 }),
     });
 
     expect(store.world[wrote].props[cursorProp]).toBe('page-2');
-    expect(store.world[wroteNothing].props[cursorProp]).toBeUndefined();
+    expect(store.world[wroteNothing].props[cursorProp]).toBe('page-2');
+    const partial = await recordRun(store, {
+      parent: 'https://x/plugin',
+      drive: DRIVE,
+      trigger,
+      plan: plan({ cursor: 'page-3' }),
+      report: report({ applied: 1, failed: 1, stoppedEarly: true }),
+    });
+    expect(store.world[partial].props[cursorProp]).toBeUndefined();
   });
 });
 

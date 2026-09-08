@@ -34,18 +34,27 @@ They are used for performing custom queries, or calculating dynamic attributes.
 */
 
 #[cfg(feature = "wasm-plugins")]
+pub mod actions;
+#[cfg(feature = "wasm-plugins")]
 pub mod apply;
 pub mod bind_drive;
 pub mod bookmark;
 pub mod chatroom;
+#[cfg(feature = "wasm-plugins")]
+pub mod connection_state;
 pub mod did;
 pub mod egress;
 pub mod export;
+#[cfg(feature = "wasm-plugins")]
+pub mod external;
 pub mod files;
 pub mod importer;
 pub mod invite;
 #[cfg(feature = "wasm-plugins")]
+pub mod journal;
+#[cfg(feature = "wasm-plugins")]
 pub mod js_runtime;
+pub mod manifest;
 pub mod path;
 #[cfg(feature = "wasm-plugins")]
 pub mod plan;
@@ -71,3 +80,21 @@ pub mod versioning;
 pub mod view_token;
 #[cfg(feature = "wasm-plugins")]
 pub mod wasm;
+
+#[cfg(feature = "wasm-plugins")]
+pub mod sync_session;
+#[cfg(all(test, feature = "wasm-plugins"))]
+mod sync_session_tests;
+
+#[cfg(feature = "wasm-plugins")]
+pub mod sync_worker;
+
+#[cfg(all(test, feature = "wasm-plugins"))]
+mod notion_sync_tests;
+
+#[cfg(test)]
+mod clockify_tests;
+
+#[cfg(test)]
+#[path = "mt940_tests.rs"]
+mod bank_statement_tests;

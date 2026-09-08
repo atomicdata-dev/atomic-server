@@ -224,7 +224,109 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .guard(guard::Method(Method::POST))
             .to(handlers::plugin_ui::handle_mint_view_token),
     )
+    .service(
+        web::resource("/plugin-release-pin").route(web::post().to(handlers::plugin_release::pin)),
+    )
+    .service(
+        web::resource("/plugin-external-read")
+            .route(web::post().to(handlers::plugin_external::read)),
+    )
     .service(web::resource("/plugin-list").to(handlers::plugin_ui::handle_plugin_list))
+    .service(
+        web::resource("/integration-action-history-compact")
+            .route(web::post().to(handlers::integration_action::compact_history)),
+    )
+    .service(
+        web::resource("/integration-action-consumers")
+            .route(web::post().to(handlers::integration_action::consumers)),
+    )
+    .service(
+        web::resource("/integration-action-consumer-abandon")
+            .route(web::post().to(handlers::integration_action::abandon_consumer)),
+    )
+    .service(
+        web::resource("/integration-action-history")
+            .route(web::post().to(handlers::integration_action::history)),
+    )
+    .service(
+        web::resource("/integration-action-cancel")
+            .route(web::post().to(handlers::integration_action::cancel)),
+    )
+    .service(
+        web::resource("/integration-action-grant")
+            .route(web::post().to(handlers::integration_action::grant)),
+    )
+    .service(
+        web::resource("/integration-action-grants")
+            .route(web::post().to(handlers::integration_action::grants)),
+    )
+    .service(
+        web::resource("/integration-action-recovery-inspect")
+            .route(web::post().to(handlers::integration_action::inspect_recovery)),
+    )
+    .service(
+        web::resource("/integration-action-recovery-confirm")
+            .route(web::post().to(handlers::integration_action::confirm_recovery)),
+    )
+    .service(
+        web::resource("/integration-actions")
+            .route(web::post().to(handlers::integration_action::list)),
+    )
+    .service(
+        web::resource("/integration-action-call")
+            .route(web::post().to(handlers::integration_action::invoke)),
+    )
+    .service(
+        web::resource("/integration-action-proposals")
+            .route(web::post().to(handlers::integration_action::proposals)),
+    )
+    .service(
+        web::resource("/integration-action-approve")
+            .route(web::post().to(handlers::integration_action::approve)),
+    )
+    .service(
+        web::resource("/plugin-sync-preview").route(web::post().to(handlers::plugin_sync::preview)),
+    )
+    .service(
+        web::resource("/plugin-sync-apply").route(web::post().to(handlers::plugin_sync::apply)),
+    )
+    .service(
+        web::resource("/plugin-sync-schedule")
+            .route(web::post().to(handlers::plugin_sync::schedule)),
+    )
+    .service(
+        web::resource("/plugin-sync-status").route(web::post().to(handlers::plugin_sync::status)),
+    )
+    .service(
+        web::resource("/plugin-connection-state")
+            .route(web::post().to(handlers::plugin_connection::read)),
+    )
+    .service(
+        web::resource("/plugin-connection-checkpoint")
+            .route(web::post().to(handlers::plugin_connection::checkpoint)),
+    )
+    .service(
+        web::resource("/plugin-external-status")
+            .route(web::post().to(handlers::plugin_external::status)),
+    )
+    .service(
+        web::resource("/plugin-external-confirm")
+            .route(web::post().to(handlers::plugin_external::confirm)),
+    )
+    .service(
+        web::resource("/plugin-external-apply")
+            .route(web::post().to(handlers::plugin_external::apply)),
+    )
+    .service(
+        web::resource("/plugin-package/{id}")
+            .route(web::get().to(handlers::plugin_release::package)),
+    )
+    .service(
+        web::resource("/plugin-catalog").route(web::get().to(handlers::plugin_release::catalog)),
+    )
+    .service(
+        web::resource("/plugin-release").route(web::post().to(handlers::plugin_release::publish)),
+    )
     .service(
         web::resource("/plugin-run")
             .guard(guard::Method(Method::POST))
@@ -235,6 +337,10 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .route(web::post().to(handlers::plugin_schedule::handle_set_schedule))
             .route(web::get().to(handlers::plugin_schedule::handle_get_schedule))
             .route(web::delete().to(handlers::plugin_schedule::handle_clear_pending)),
+    )
+    .service(
+        web::resource("/plugin-resume")
+            .route(web::post().to(handlers::plugin_schedule::handle_resume)),
     )
     .service(
         web::resource("/plugin-auto-apply")
@@ -262,6 +368,30 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .route(web::post().to(handlers::plugin_secret::handle_set_secret))
             .route(web::get().to(handlers::plugin_secret::handle_list_secrets))
             .route(web::delete().to(handlers::plugin_secret::handle_delete_secret)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/list")
+            .route(web::post().to(handlers::integration_oauth::list)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/start")
+            .route(web::post().to(handlers::integration_oauth::start)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/finish")
+            .route(web::post().to(handlers::integration_oauth::finish)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/callback")
+            .route(web::get().to(handlers::integration_oauth::callback)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/discover")
+            .route(web::post().to(handlers::integration_oauth::discover)),
+    )
+    .service(
+        web::resource("/integration-oauth/notion/bind")
+            .route(web::post().to(handlers::integration_oauth::bind)),
     )
     // Serve pre-compressed brotli assets when:
     //   - The client sends `Accept-Encoding: br`, AND

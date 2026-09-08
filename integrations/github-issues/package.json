@@ -1,0 +1,33 @@
+{
+  "name": "@atomic-integrations/github-issues",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Experimental GitHub issues to Atomic kanban adapter",
+  "atomicCertification": {
+    "owner": "Ontola",
+    "support": "experimental",
+    "apiVersion": "2022-11-28",
+    "capabilities": [
+      "issues.title:two-way",
+      "issues.body:two-way",
+      "issues.status:two-way",
+      "issues.create:two-way"
+    ],
+    "sandboxTests": [
+      "plugins::sync_session_tests::sandbox_import_merge_columns_and_noop_with_real_atomic_storage",
+      "plugins::sync_session_tests::sandbox_create_uncertain_response_is_not_repeated",
+      "plugins::sync_session_tests::sandbox_conflicts_missing_and_stale_reads_fail_closed",
+      "plugins::sync_session_tests::sandbox_new_card_binds_issue_and_next_sync_does_not_repeat_write",
+      "plugins::sync_session_tests::compatible_release_upgrade_preserves_bindings_and_pending_release",
+      "plugins::actions::tests::sandbox_actions_prepare_validate_and_pin_without_writing",
+      "plugins::actions::tests::sandbox_automation_action_requires_reference_and_release_pin",
+      "plugins::actions::tests::action_approval_rejects_stale_actor_and_expiry_and_never_repeats_uncertain_writes",
+      "plugins::actions::tests::history_keeps_uncertainty_and_replay_returns_completed_receipt",
+      "plugins::actions::tests::grants_pin_actor_source_release_config_and_can_be_revoked",
+      "plugins::actions::tests::recovery_requires_fresh_read_evidence_and_never_resends",
+      "plugins::triggers::tests::integration_approval_resumes_same_event_without_repeating_write",
+      "plugins::scheduler::tests::integration_approval_resumes_same_scheduled_run_without_repeating_write"
+    ]
+  }
+}

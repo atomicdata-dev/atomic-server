@@ -1000,6 +1000,7 @@ export class Collection {
   ): 'ok' | 'no-db' {
     if (result.count === 0) {
       this._queriedMembers.clear();
+
       // Empty local result is normally authoritative — but it's ambiguous
       // until THIS drive has been synced (the index may be mid-populate, or
       // never populated at all). Once its sync has completed we trust the
@@ -1030,6 +1031,7 @@ export class Collection {
     }
 
     this._queriedMembers = new Set(filterIndexLeakage(result.subjects));
+
     // Notifications may have arrived while the local query was pending.
     // Its full result already accounts for them, even outside page zero.
     for (const subject of this._queriedMembers) {

@@ -10,6 +10,9 @@ interface host {
   */
   fetch: func(request: string) -> result<string, string>;
 
+  /// Invoke a named action on an explicitly referenced integration. Writes only prepare review.
+  invoke-action: func(request: string) -> result<string, string>;
+
   /// A resource as JSON-AD.
   get-resource: func(subject: string) -> result<string, string>;
 

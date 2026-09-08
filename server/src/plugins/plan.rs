@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use atomic_lib::{datatype::match_datatype, Value};
 use serde_json::Value as Json;
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Error,
@@ -21,7 +21,7 @@ pub enum Severity {
 
 /// Serialized into the run log, so its shape is the browser's: the same
 /// records render in the same UI whichever planner produced them.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Problem {
     pub severity: Severity,
     pub message: String,
@@ -39,7 +39,7 @@ impl Problem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Op {
     Create,
     Set,
@@ -47,7 +47,7 @@ pub enum Op {
     Destroy,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlannedProperty {
     pub property: String,
     pub shortname: Option<String>,
@@ -55,7 +55,7 @@ pub struct PlannedProperty {
     pub to: Option<Json>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlannedChange {
     pub op: Op,
     pub subject: String,
@@ -66,7 +66,7 @@ pub struct PlannedChange {
     pub problems: Vec<Problem>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RunPlan {
     pub changes: Vec<PlannedChange>,
     pub problems: Vec<Problem>,

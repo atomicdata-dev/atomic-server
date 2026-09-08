@@ -168,8 +168,8 @@ impl ClientDb {
     pub async fn put_resource(&self, json_ad: &str) -> Result<(), JsError> {
         // `SaveOpts::DontSave` keeps `parse_json_ad_resource` from calling
         // `store.add_resource()` (which validates required props) during
-        // parsing. The explicit `add_resource_opts(false, true, true)` below is
-        // the intended persistence step — it skips validation deliberately.
+        // parsing. This is admitted replica state, not a new authored import:
+        // preserve duplicate identities so they remain available for review.
         let resource = atomic_lib::parse::parse_json_ad_resource(
             json_ad,
             self.db(),
@@ -182,7 +182,7 @@ impl ClientDb {
         .await
         .map_err(to_js_err)?;
         self.db()
-            .add_resource_opts(&resource, false, true, true)
+            .persist_replicated_resource(&resource)
             .await
             .map_err(to_js_err)?;
         Ok(())
@@ -589,10 +589,11 @@ impl ClientDb {
             )
             .await
             {
-                // Store without indexing — we build the index once at the end
+                // Preserve admitted replicas, including independent import identities.
+                // The final rebuild still reconciles parent-dependent indexes.
                 if self
                     .db()
-                    .add_resource_opts(&resource, false, false, true)
+                    .persist_replicated_resource(&resource)
                     .await
                     .is_ok()
                 {

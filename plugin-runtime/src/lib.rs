@@ -70,6 +70,9 @@ globalThis.__atomic = (function () {
 
   // Parsed, like `read` and `query`: a plugin wants `res.status` and
   // `res.body`, not a string it has to remember to parse.
+  input.integration = function (request) {
+    return JSON.parse(unwrap(__hostAction(JSON.stringify(request))));
+  };
   input.http = function (request) {
     return JSON.parse(unwrap(__hostFetch(JSON.stringify(request))));
   };
@@ -127,6 +130,16 @@ impl Guest for Component {
                 )
                 .map_err(|e| e.to_string())?;
 
+            globals
+                .set(
+                    "__hostAction",
+                    Function::new(ctx.clone(), |request: String| {
+                        encode(host::invoke_action(&request))
+                    })
+                    .map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())?;
+
             ctx.eval::<(), _>(PRELUDE)
                 .map_err(|e| describe(&ctx, e, "runtime prelude"))?;
 
@@ -145,6 +158,21 @@ impl Guest for Component {
                 .finish::<()>()
                 .map_err(|e| describe(&ctx, e, "plugin source"))?;
 
+            if ctx
+                .eval::<bool, _>("__atomic.describe === true")
+                .unwrap_or(false)
+            {
+                let manifest: rquickjs::Value = module
+                    .get("manifest")
+                    .unwrap_or_else(|_| rquickjs::Value::new_null(ctx.clone()));
+                globals
+                    .set("__manifest", manifest)
+                    .map_err(|e| e.to_string())?;
+                return ctx
+                    .eval::<String, _>("JSON.stringify(__manifest ?? null)")
+                    .map_err(|e| describe(&ctx, e, "manifest"));
+            }
+
             let run: Function = module
                 .get("run")
                 .map_err(|_| "the plugin does not export a run() function".to_string())?;
@@ -153,8 +181,11 @@ impl Guest for Component {
 
             // `run` returns the verdict; the host parses and validates it, so
             // anything shaped wrong is reported in the preview rather than here.
-            ctx.eval::<String, _>("JSON.stringify(__run(__atomic) ?? null)")
-                .map_err(|e| describe(&ctx, e, "run()"))
+            ctx.eval::<rquickjs::Promise, _>(
+                "(async () => JSON.stringify((await __run(__atomic)) ?? null))()",
+            )
+            .and_then(|promise| promise.finish::<String>())
+            .map_err(|e| describe(&ctx, e, "run()"))
         })
     }
 }

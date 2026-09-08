@@ -12,6 +12,7 @@ import { styled } from 'styled-components';
 import { useSettings } from '../../../../../helpers/AppSettings';
 import { BetaBadge } from '../../../../BetaBadge';
 import { Button } from '../../../../Button';
+import { Row } from '../../../../Row';
 import {
   useDialog,
   Dialog,
@@ -64,6 +65,7 @@ const suggestRowName = (tableName: string, template: TableTemplate): string =>
 export const NewTableDialog: FC<NewTableDialogProps> = ({
   parent,
   initialExistingClass,
+  initialTemplateId,
   onClose,
   skipNavigation,
   onCreated,
@@ -76,11 +78,15 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
   const [existingClass, setExistingClass] = useState<string | undefined>(
     initialExistingClass,
   );
-  const [name, setName] = useState('Table');
-  const [templateId, setTemplateId] = useState('blank');
+  const initialTemplate =
+    TABLE_TEMPLATES.find(t => t.id === initialTemplateId) ?? TABLE_TEMPLATES[0];
+  const [name, setName] = useState(() => defaultNameFor(initialTemplate));
+  const [templateId, setTemplateId] = useState(initialTemplate.id);
+  const [showTemplatePicker, setShowTemplatePicker] =
+    useState(!initialTemplateId);
   // What a single row is called ("Issue", "Employee") — names the row class.
   // Follows the table name (singularized) until the user edits it themselves.
-  const [rowName, setRowName] = useState('Row');
+  const [rowName, setRowName] = useState(initialTemplate.rowName);
   const [rowNameEdited, setRowNameEdited] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
@@ -221,41 +227,53 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
           <WiderDialogContent key='content'>
             <form id={formId} onSubmit={onSubmit}>
               <Field key='template' label='Start from'>
-                <TemplateGrid>
-                  {TABLE_TEMPLATES.map(template => (
-                    <TemplateCard
-                      key={template.id}
-                      type='button'
-                      $selected={template.id === templateId}
-                      onClick={() => {
-                        setTemplateId(template.id);
+                {!showTemplatePicker && (
+                  <Row>
+                    <strong>
+                      {TABLE_TEMPLATES.find(t => t.id === templateId)?.title}
+                    </strong>
+                    <Button subtle onClick={() => setShowTemplatePicker(true)}>
+                      Change template
+                    </Button>
+                  </Row>
+                )}
+                {showTemplatePicker && (
+                  <TemplateGrid>
+                    {TABLE_TEMPLATES.map(template => (
+                      <TemplateCard
+                        key={template.id}
+                        type='button'
+                        $selected={template.id === templateId}
+                        onClick={() => {
+                          setTemplateId(template.id);
 
-                        // Follow the template's default name, but never
-                        // overwrite a name the user typed themselves.
-                        const isDefaultName = TABLE_TEMPLATES.some(
-                          t => name === defaultNameFor(t),
-                        );
-                        const nextName = isDefaultName
-                          ? defaultNameFor(template)
-                          : name;
-                        setName(nextName);
+                          // Follow the template's default name, but never
+                          // overwrite a name the user typed themselves.
+                          const isDefaultName = TABLE_TEMPLATES.some(
+                            t => name === defaultNameFor(t),
+                          );
+                          const nextName = isDefaultName
+                            ? defaultNameFor(template)
+                            : name;
+                          setName(nextName);
 
-                        if (!rowNameEdited) {
-                          setRowName(suggestRowName(nextName, template));
-                        }
-                      }}
-                      title={template.description}
-                    >
-                      <TemplateHeading key='title'>
-                        <template.icon key='icon' aria-hidden />
-                        <strong key='name'>{template.title}</strong>
-                      </TemplateHeading>
-                      <TemplateDescription key='description'>
-                        {template.description}
-                      </TemplateDescription>
-                    </TemplateCard>
-                  ))}
-                </TemplateGrid>
+                          if (!rowNameEdited) {
+                            setRowName(suggestRowName(nextName, template));
+                          }
+                        }}
+                        title={template.description}
+                      >
+                        <TemplateHeading key='title'>
+                          <template.icon key='icon' aria-hidden />
+                          <strong key='name'>{template.title}</strong>
+                        </TemplateHeading>
+                        <TemplateDescription key='description'>
+                          {template.description}
+                        </TemplateDescription>
+                      </TemplateCard>
+                    ))}
+                  </TemplateGrid>
+                )}
               </Field>
               <Field key='name' required label='Name'>
                 <InputWrapper>

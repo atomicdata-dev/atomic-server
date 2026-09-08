@@ -1,4 +1,4 @@
-import { validateDatatype } from './datatypes.js';
+import { Datatype, validateDatatype } from './datatypes.js';
 import {
   LOCAL_REF_PREFIX,
   type Intent,
@@ -339,7 +339,25 @@ async function checkProperties(
     }
 
     try {
-      validateDatatype(value, property.datatype);
+      // Store-backed plans use temporary _new: subjects until genesis signing.
+      // Only references to resources this very plan creates may defer URL
+      // validation. applyPlan rewrites them to their final DIDs before saving.
+      const isPlannedLink = (v: JSONValue) =>
+        typeof v === 'string' && inPlanClasses.has(v);
+
+      if (property.datatype === Datatype.ATOMIC_URL && isPlannedLink(value)) {
+        // Class constraints are still checked below on the original value.
+      } else if (
+        property.datatype === Datatype.RESOURCEARRAY &&
+        Array.isArray(value)
+      ) {
+        validateDatatype(
+          value.filter(v => !isPlannedLink(v)),
+          property.datatype,
+        );
+      } else {
+        validateDatatype(value, property.datatype);
+      }
     } catch (e) {
       change.problems.push({
         severity: 'error',

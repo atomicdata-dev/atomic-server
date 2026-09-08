@@ -437,6 +437,7 @@ const AISidebar: React.FC = () => {
     // auto-inserted context item.
     // When the user opens the AI sidebar and the chat is completely empty, we add the current subject to the context.
     if (
+      !pendingAsk &&
       isOpen &&
       currentSubject &&
       messages.length === 0 &&
@@ -456,6 +457,7 @@ const AISidebar: React.FC = () => {
     currentSubject,
     messages.length,
     contextItems.length,
+    pendingAsk,
     setContextItems,
   ]);
 

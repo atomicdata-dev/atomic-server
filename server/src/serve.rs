@@ -386,6 +386,8 @@ where
     // Runs plugins because the data moved. Idle on a server with no triggers.
     #[cfg(feature = "wasm-plugins")]
     crate::plugins::triggers::spawn(appstate.clone());
+    #[cfg(feature = "wasm-plugins")]
+    crate::plugins::sync_worker::spawn(appstate.clone());
 
     // Embedder hook: the store, indexes and transports are up, but the HTTP
     // server hasn't started accepting connections yet. A managed-node wrapper
@@ -394,6 +396,11 @@ where
     // server passes a no-op (see `serve`), so it never phones home.
     on_ready(&appstate);
 
+    let oauth_service =
+        crate::oauth::service::AuthorizationService::from_env(appstate.store.clone())?;
+    if let Some(service) = &oauth_service {
+        service.spawn_cleanup();
+    }
     let server = HttpServer::new(move || {
         let cors = Cors::permissive().expose_headers([SERVER_VERSION_HEADER]);
 
@@ -409,6 +416,12 @@ where
             .wrap(tracing_actix_web::TracingLogger::<AtomicRootSpanBuilder>::new())
             .wrap(middleware::Compress::default())
             // Here are the actual handlers / endpoints
+            .configure(|cfg| {
+                if let Some(service) = &oauth_service {
+                    cfg.app_data(web::Data::from(service.clone()));
+                    crate::oauth::service::routes(cfg);
+                }
+            })
             .configure(crate::routes::config_routes)
             .default_service(web::to(|| {
                 tracing::error!("Wrong route, should not happen with normal requests");

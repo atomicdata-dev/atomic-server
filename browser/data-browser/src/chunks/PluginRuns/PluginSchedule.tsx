@@ -126,6 +126,25 @@ export function PluginSchedule({
     void clearPending();
   }, [reviewedNonce, clearPending]);
 
+  const resumePending = async () => {
+    const result = await request(
+      store,
+      `${store.getServerUrl()}/plugin-resume`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ drive, plugin }),
+      },
+    );
+
+    if (!result.ok) {
+      toast.error(result.error);
+
+      return;
+    }
+
+    setSchedule(result.body as ScheduleInfo | null);
+  };
+
   const pending = schedule?.pendingVerdict ?? undefined;
 
   // A schedule set elsewhere — by an earlier version, or through the endpoint —
@@ -196,15 +215,18 @@ export function PluginSchedule({
             <Column gap='0.1rem'>
               <strong>A background run has changes waiting</strong>
               <Muted>
-                It ran without writing anything, because nothing is applied
-                without you seeing it first.
+                Review the saved proposal and run history before continuing.
               </Muted>
             </Column>
             <Row gap='0.5rem' center>
               <Button subtle onClick={clearPending}>
                 Discard
               </Button>
-              <Button onClick={() => onReview(pending)}>Review</Button>
+              {schedule?.autoApply ? (
+                <Button onClick={resumePending}>Resume saved run</Button>
+              ) : (
+                <Button onClick={() => onReview(pending)}>Review</Button>
+              )}
             </Row>
           </Row>
         </Pending>
