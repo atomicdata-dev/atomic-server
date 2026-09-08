@@ -390,6 +390,28 @@ re-enrollment/revocation. Revocation cannot undo an already accepted provider wr
 existing uncertainty/recovery receipts must remain intact. This checkpoint does not
 claim the deferred GitHub live migration or all extension lifecycles are complete.
 
+### Implementation checkpoint: activation snapshots and upgrade review (2026-09-08)
+
+- [x] Use the existing connection resource as the current release/configuration
+  binding, read through one module shared by actions and sync.
+- [x] Refuse a stale sync preview approval or background-sync grant after release
+  or settings change. Stop due work with a stored, user-visible error requiring
+  a new preview/review; do not silently execute its older configuration.
+- [x] Remember whether a preview/grant requires a connection binding, so removing
+  activation cannot turn it into a legacy unbound run. Preserve old stored formats.
+- [x] Keep already-approved recovery on its original release/configuration and
+  receipts. Upgrade/rollback must not replay an uncertain provider write.
+- [x] Test compatible upgrades with a real active binding, unchanged record IDs,
+  stale approvals, changed polling settings, and missing activation.
+
+This uses existing resource edits as activation and existing preview approval as
+review; it adds no second activation database or provider-specific migration.
+Package editing/publishing UX and legacy packaged UI grants remain open. Packaged
+plugins already have server-held identities in PluginMeta; their interactive write
+grants are browser-held. Migrating the signer requires migrating those grants and
+validating page scope server-side, not copying keys into another store or silently
+broadening plugin ACLs.
+
 ### 4. Prove declarative authoring fits
 
 - [ ] Adapt one Reflector provider, preferably its existing Google Calendar pilot,
