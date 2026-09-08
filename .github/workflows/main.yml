@@ -275,6 +275,9 @@ jobs:
           set -euo pipefail
           # Dependency workspaces do not inherit this repo's atomic_lib patch.
           reflector_patch=(--config "patch.\"https://github.com/ontola/atomic-server\".atomic_lib.path=\"$GITHUB_WORKSPACE/atomic-server/lib\"")
+          # atomic-saas commits its lockfile. Refresh the already-locked Git
+          # source so Cargo can select the patched local crate before build.
+          cargo "${reflector_patch[@]}" update -p atomic_lib
           cargo "${reflector_patch[@]}" check --all-targets
           cargo "${reflector_patch[@]}" clippy --all-targets -- -D warnings
           cargo "${reflector_patch[@]}" test --all-targets

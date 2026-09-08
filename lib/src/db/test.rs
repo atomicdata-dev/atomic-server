@@ -141,13 +141,13 @@ async fn destroy_resource_and_check_collection() {
     // (peer-id allocation differs per run) — the logical state is what matters.
     // Using the full to_json_ad here would compare the base64 of those snapshots
     // and flake even when the logical state is identical.
-    fn json_ad_without_loro(r: &crate::Resource) -> String {
+    fn json_ad_without_loro(r: &crate::Resource) -> serde_json::Value {
         let mut json: serde_json::Value =
             serde_json::from_str(&r.to_json_ad(None).unwrap()).unwrap();
         if let Some(obj) = json.as_object_mut() {
             obj.remove(crate::urls::LORO_UPDATE);
         }
-        serde_json::to_string(&json).unwrap()
+        json
     }
     assert_eq!(
         json_ad_without_loro(resp.resource_old.as_ref().unwrap()),
