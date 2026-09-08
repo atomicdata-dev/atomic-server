@@ -58,6 +58,7 @@ test('MT940 rejects unbalanced files, previews in sandbox and skips repeat impor
     .getByRole('region', { name: 'Your integrations' })
     .getByRole('link', { name: 'Bank statements' })
     .click();
+  await page.getByRole('tab', { name: 'Run', exact: true }).click();
   await expect(page.locator('#mt940-file')).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Run', exact: true }),
