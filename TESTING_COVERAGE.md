@@ -479,3 +479,11 @@ successfully against local Ollama on 2026-09-08. The shared setup-panel componen
 is not separately covered by this probe. The existing Vite-only Wuchale/React
 key warning when expanding AI settings is explicitly expected; other console
 errors remain failures.
+
+`username-live.spec.ts` changes the owner's display name through user settings
+while a different agent reads an existing chat message. It asserts the author
+updates without a reload and verifies a second change after the reader reloads.
+`websockets.test.ts` checks targeted profile SUB frames, subscription replay,
+multiple-reader cleanup through both Store unsubscribe APIs, and retaining
+ordinary document drive-wide fan-out. Profiles no longer depend on being inside
+the reader's active drive to receive live updates.
