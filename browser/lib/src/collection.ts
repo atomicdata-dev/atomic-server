@@ -268,6 +268,8 @@ export class Collection {
   private params: CollectionParams;
 
   private _totalMembers = 0;
+  /** Full local query membership, including rows outside cached pages. */
+  private _queriedMembers = new Set<string>();
 
   /** Statistics from the last loaded page. The store computes them over every
    *  matching resource, so any page carries the same numbers. */
@@ -336,6 +338,12 @@ export class Collection {
     return parseInt(this.params.page_size, 10);
   }
 
+  /** Read at notification time, before deferring a membership update.
+   * Query hydration is not a new row; the guard ends when assembly finishes. */
+  public get isAssemblingPage(): boolean {
+    return this._assemblingPage;
+  }
+
   public get totalMembers(): number {
     return this._totalMembers;
   }
@@ -395,6 +403,7 @@ export class Collection {
   public clearPages(): void {
     this.pages = new Map();
     this._memberIndex.clear();
+    this._queriedMembers.clear();
     // Note: `_optimisticAdds` is preserved on `clearPages` — they
     // represent subjects we trust are members (locally-created and
     // confirmed at the resource layer); the next `setPage` merges
@@ -599,9 +608,16 @@ export class Collection {
     // Fast path for the overwhelming majority of events: a resource we
     // don't track had a property change that doesn't make it a member.
     // Bail before the more expensive add/remove logic below.
-    if (!matches && !currentlyMember) return 'unchanged';
+    if (!matches && !currentlyMember) {
+      return this._queriedMembers.has(subject)
+        ? 'membership-stale'
+        : 'unchanged';
+    }
 
     if (matches && !currentlyMember) {
+      // A later page being hydrated (possibly by another collection) is not
+      // a new member. The count already includes the complete query result.
+      if (this._queriedMembers.has(subject)) return 'unchanged';
       // Local-only drafts (`newResource()` created a genesis but no commit
       // has been signed-and-applied yet) shouldn't count as members.
       // `resource.new === true` until `signChanges` runs. Each
@@ -711,6 +727,7 @@ export class Collection {
     // Share the index too — both clones look at the same `pages` Map,
     // so they should observe the same membership.
     collection._memberIndex = this._memberIndex;
+    collection._queriedMembers = this._queriedMembers;
 
     return collection;
   }
@@ -985,6 +1002,7 @@ export class Collection {
     drive: string | undefined,
   ): 'ok' | 'no-db' {
     if (result.count === 0) {
+      this._queriedMembers.clear();
       // Empty local result is normally authoritative — but it's ambiguous
       // until THIS drive has been synced (the index may be mid-populate, or
       // never populated at all). Once its sync has completed we trust the
@@ -1012,6 +1030,13 @@ export class Collection {
       }
 
       return 'no-db';
+    }
+
+    this._queriedMembers = new Set(filterIndexLeakage(result.subjects));
+    // Notifications may have arrived while the local query was pending.
+    // Its full result already accounts for them, even outside page zero.
+    for (const subject of this._queriedMembers) {
+      this._optimisticAdds.delete(subject);
     }
 
     if (

@@ -284,3 +284,51 @@ describe('collection page assemble does not flash unsorted members', () => {
     expect(await collection.getMembersOnPage(0)).toEqual([ALICE, BOB]);
   });
 });
+
+describe('deferred collection membership', () => {
+  it('does not count later pages again when hydration notifications are deferred', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setDrive(DRIVE);
+    const subjects = Array.from(
+      { length: 90 },
+      (_, i) => `did:ad:resource:row-${i}`,
+    );
+    store.setClientDb(
+      mockClientDb(async () => ({
+        subjects,
+        count: 90,
+        resources: subjects.map((s, i) => jsonAd(s, i)),
+      })),
+    );
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+      },
+      true,
+    );
+    const unsubscribe = store.on(StoreEvents.ResourceUpdated, resource => {
+      queueMicrotask(() =>
+        collection.applyResourceChange(resource.subject, resource),
+      );
+    });
+    // Another collection can announce these records before this query resolves.
+    for (const subject of subjects.slice(30)) {
+      const resource = new Resource(subject);
+      resource.applyHydratedValues([[core.properties.parent, TABLE]]);
+      resource.loading = false;
+      collection.applyResourceChange(subject, resource);
+    }
+    await collection.refresh();
+    await Promise.resolve();
+    expect(collection.totalMembers).toBe(90);
+    expect(await collection.getMemberWithIndex(89)).toBeDefined();
+    unsubscribe();
+  });
+});

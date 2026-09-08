@@ -885,3 +885,11 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `e2e.spec.ts` verify Continue remains clickable while feedback is offered.
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
+## Paged table hydration count (2026-09-08)
+
+`collection-page-assemble.test.ts` reproduces 90 rows becoming 150 when deferred
+hydration notifications re-add rows outside page zero. Covers full-query membership
+and reconciling optimistic additions already represented in that query. The other
+collection sorting, drive-scope and empty-result regressions are run alongside it.
+Verified in the user's Zen integration table: total is 90, final rows render, and
+the phantom loading rows are gone. No source issue records were edited.
