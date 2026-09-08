@@ -19,6 +19,7 @@ server/js-build.log
 .netlify
 scratchpad
 .claude
+.codex
 .antigravitycli
 
 # Release binaries and one-off rustc scratch files at repo root
