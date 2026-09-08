@@ -17,50 +17,16 @@ use crate::plugins::{
     plan::PlanHost,
 };
 
-/// Reads for the planner, writes for the applier.
-///
-/// `for_agent` is whoever the run is acting for. The commit itself is signed
-/// by the server's own agent — it is the only key the server holds — so
-/// without this check a plugin would be a way to write anywhere on the server
-/// regardless of who set it up.
-/// The app a plugin belongs to, if that app has a key.
-///
-/// A plugin's parent is its app — an entry point and a handler both sit under
-/// one. Bounded rather than exhaustive, like every other parent walk here: a
-/// cycle would otherwise hang a scheduled run, and nothing legitimate nests an
-/// app's own plugins deeper than this.
+/// Compatibility accessor for callers that only need the installation signer.
+/// Ownership and lifecycle validation live in the shared installation resolver.
 pub async fn app_signing_for(
     db: &Db,
     drive: &str,
     plugin: &str,
 ) -> Result<Option<AppAgentKey>, String> {
-    let mut subject = plugin.to_string();
-    let mut seen = std::collections::HashSet::new();
-    for _ in 0..64 {
-        if !seen.insert(subject.clone()) {
-            return Err("app hierarchy contains a cycle".into());
-        }
-        let key = AppAgentKey::new(drive, &subject);
-        if db
-            .get_app_agent_info(&key)
-            .map_err(|e| e.to_string())?
-            .is_some()
-        {
-            return Ok(Some(key));
-        }
-        if Subject::from(subject.as_str()).pure_id() == Subject::from(drive).pure_id() {
-            return Ok(None);
-        }
-        let resource = db
-            .get_resource(&subject.as_str().into())
-            .await
-            .map_err(|e| e.to_string())?;
-        subject = resource
-            .get(urls::PARENT)
-            .map_err(|e| e.to_string())?
-            .to_string();
-    }
-    Err("app hierarchy is too deep".into())
+    Ok(super::installation::resolve(db, drive, plugin)
+        .await?
+        .signing_as)
 }
 
 pub async fn check_effective_read(
@@ -97,12 +63,25 @@ pub struct StoreApplyHost {
 }
 
 impl StoreApplyHost {
-    /// Writes, signed by the app when it has a key of its own.
-    ///
-    /// Falling back to the store's default agent is what every write did
-    /// before app keys existed; an app created since always has one, so the
-    /// fallback covers only apps that predate this.
-    /// The app's signing agent, when this host is acting for one.
+    /// All execution paths resolve the same installation and retain the actor's
+    /// rights as an independent bound on effects.
+    pub async fn for_installation(
+        store: &Db,
+        drive: &str,
+        plugin: &str,
+        for_agent: ForAgent,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            store: store.clone(),
+            for_agent,
+            signing_as: super::installation::resolve(store, drive, plugin)
+                .await?
+                .signing_as,
+        })
+    }
+
+    /// A selected installation must still have a key at effect time. Only an
+    /// explicitly legacy host may use the default signer.
     fn app_agent(&self) -> Result<Option<atomic_lib::agents::Agent>, String> {
         let Some(key) = &self.signing_as else {
             return Ok(None);
@@ -110,7 +89,9 @@ impl StoreApplyHost {
 
         self.store
             .with_app_agent(key, |agent| agent.clone())
-            .map_err(|e| format!("could not read {}'s key: {e}", key.app))
+            .map_err(|e| format!("could not read {}'s key: {e}", key.app))?
+            .map(Some)
+            .ok_or_else(|| "installation identity is missing or revoked".to_string())
     }
 
     async fn commit(&self, resource: &mut Resource, what: &str) -> Result<(), String> {
@@ -398,4 +379,44 @@ fn stamp_import_approval(property: &str, mut value: Json) -> Json {
         }
     }
     value
+}
+
+#[cfg(test)]
+mod installation_tests {
+    use super::*;
+    use atomic_lib::{agents::Agent, db::app_agent::AppAgent};
+
+    #[actix_rt::test]
+    async fn revoked_installation_never_falls_back_to_server_signing() {
+        let mut fixture = crate::plugins::test_fixture::fixture("revoked_installation").await;
+        crate::plugins::test_fixture::write_plugin(&mut fixture, "revocation test").await;
+        let db = &fixture.appstate.store;
+        let key = AppAgentKey::new(&fixture.drive, &fixture.plugin);
+        let agent = Agent::new(None).unwrap();
+        db.set_app_agent(
+            &key,
+            &AppAgent::new(agent.subject.to_string(), agent.build_secret().unwrap(), 0),
+        )
+        .unwrap();
+        let selected = app_signing_for(db, &fixture.drive, &fixture.plugin)
+            .await
+            .unwrap();
+        assert_eq!(selected, Some(key.clone()));
+        let host = StoreApplyHost {
+            store: db.clone(),
+            for_agent: ForAgent::AgentSubject(agent.subject),
+            signing_as: selected,
+        };
+        db.delete_app_agent(&key).unwrap();
+        assert!(
+            host.app_agent().is_err(),
+            "an already-selected installation must fail closed after revocation"
+        );
+        assert!(
+            app_signing_for(db, &fixture.drive, &fixture.plugin)
+                .await
+                .is_err(),
+            "a future run must not treat revoked as legacy"
+        );
+    }
 }

@@ -1,10 +1,5 @@
 //! Persisted polling grants reuse the same sandbox session and effect journals.
-use super::{
-    js_runtime::StoreHost,
-    manifest::Manifest,
-    store_host::{app_signing_for, StoreApplyHost},
-    sync_session,
-};
+use super::{js_runtime::StoreHost, manifest::Manifest, store_host::StoreApplyHost, sync_session};
 use atomic_lib::{agents::ForAgent, db::trees::Tree, Db};
 use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -143,11 +138,8 @@ async fn execute(db: &Db, drive: &str, plugin: &str) -> Result<(), String> {
             }
         }
     }
-    let mut atomic = StoreApplyHost {
-        store: db.clone(),
-        for_agent: host.for_agent.clone(),
-        signing_as: app_signing_for(db, drive, plugin).await?,
-    };
+    let mut atomic =
+        StoreApplyHost::for_installation(db, drive, plugin, host.for_agent.clone()).await?;
     let current = session.unwrap();
     let result =
         sync_session::advance(db, drive, plugin, &current.run, &actor, host, &mut atomic).await;

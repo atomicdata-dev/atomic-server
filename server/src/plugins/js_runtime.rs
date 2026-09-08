@@ -297,27 +297,7 @@ impl StoreHost {
             .get_resource(&self.plugin.as_str().into())
             .await
             .map_err(|e| e.to_string())?;
-        let expected = atomic_lib::Subject::from(self.drive.as_str()).pure_id();
-        let mut current = resource.clone();
-        let mut seen = std::collections::HashSet::new();
-        loop {
-            if seen.len() >= 64 {
-                return Err("plugin parent hierarchy is too deep".into());
-            }
-            if !seen.insert(current.get_subject().pure_id()) {
-                return Err("plugin parent hierarchy contains a cycle".into());
-            }
-            if let Some(drive) = current.get_drive() {
-                if drive.pure_id() != expected {
-                    return Err("the plugin does not belong to this drive".into());
-                }
-                break;
-            }
-            current = current
-                .get_parent(self.db.as_ref())
-                .await
-                .map_err(|_| "the plugin has no owning drive".to_string())?;
-        }
+        super::installation::resolve(self.db.as_ref(), &self.drive, &self.plugin).await?;
         check_write(self.db.as_ref(), &resource, &self.for_agent)
             .await
             .map(|_| ())

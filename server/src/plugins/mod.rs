@@ -49,6 +49,8 @@ pub mod export;
 pub mod external;
 pub mod files;
 pub mod importer;
+#[cfg(feature = "wasm-plugins")]
+pub mod installation;
 pub mod invite;
 #[cfg(feature = "wasm-plugins")]
 pub mod journal;

@@ -93,8 +93,8 @@ pub async fn handle_get_app_agent(
     ))
 }
 
-/// Revokes by forgetting. The agent resource and its ACL entries stay: what
-/// stops mattering is that this node can act as it.
+/// Erases the signing key and retains a revocation tombstone. The agent
+/// resource and ACL entries stay; future runs cannot fall back to server signing.
 #[tracing::instrument(skip(appstate, req))]
 pub async fn handle_delete_app_agent(
     appstate: web::Data<AppState>,

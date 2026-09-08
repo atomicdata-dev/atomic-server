@@ -39,6 +39,14 @@ pub struct AppAgentInfo {
     pub created_at: i64,
 }
 
+/// Lifecycle of the existing installation identity; never includes key material.
+#[derive(Debug, Clone)]
+pub enum AppAgentState {
+    Legacy,
+    Active(AppAgentInfo),
+    Revoked,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppAgent {
     /// The agent's own subject, kept beside the secret so a caller can learn
@@ -47,6 +55,9 @@ pub struct AppAgent {
     /// The Ed25519 secret, as `Agent::buildSecret` produces it.
     pub secret: String,
     pub created_at: i64,
+    /// Durable tombstone: deleting a key must not restore legacy signing.
+    #[serde(default)]
+    pub revoked: bool,
 }
 
 impl AppAgent {
@@ -55,6 +66,7 @@ impl AppAgent {
             agent,
             secret,
             created_at,
+            revoked: false,
         }
     }
 
@@ -69,6 +81,14 @@ impl AppAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pre_lifecycle_records_decode_as_active() {
+        let old = rmp_serde::to_vec(&("did:ad:agent:old", "wrapped-secret", 42_i64)).unwrap();
+        let stored = AppAgent::from_bytes(&old).unwrap();
+        assert!(!stored.revoked);
+        assert_eq!(stored.agent, "did:ad:agent:old");
+    }
 
     #[test]
     fn info_cannot_carry_the_key() {
@@ -184,11 +204,93 @@ mod store_tests {
         .expect("stored");
 
         db.delete_app_agent(&key()).expect("deleted");
+        db.delete_app_agent(&key()).expect("idempotent");
+        assert!(db.app_agent_was_revoked(&key()).unwrap());
+        assert!(db.get_app_agent_info(&key()).unwrap().is_none());
+        let bytes = db
+            .kv
+            .get(crate::db::trees::Tree::AppAgent, &key().encode().unwrap())
+            .unwrap()
+            .unwrap();
+        let tombstone = AppAgent::from_bytes(&bytes).unwrap();
+        assert!(tombstone.revoked);
+        assert!(tombstone.secret.is_empty());
 
         assert!(db
             .with_app_agent(&key(), |a| a.subject.to_string())
             .expect("read")
             .is_none());
+    }
+
+    #[test]
+    fn revocation_survives_process_exit_without_destructors() {
+        let path = std::env::temp_dir().join(format!(
+            "atomic-revocation-{}",
+            crate::utils::random_string(12)
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "db::app_agent::store_tests::revoke_then_exit",
+                "--exact",
+                "--ignored",
+            ])
+            .env("ATOMIC_REVOCATION_TEST_DIR", &path)
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(7));
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let db = Db::init_redb_file(&path, None, &path.join("uploads"))
+                .await
+                .unwrap();
+            assert!(db.app_agent_was_revoked(&key()).unwrap());
+            assert!(db.get_app_agent_info(&key()).unwrap().is_none());
+            assert!(db.with_app_agent(&key(), |_| ()).unwrap().is_none());
+        });
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    #[ignore = "subprocess fixture for revocation durability"]
+    fn revoke_then_exit() {
+        let Ok(path) = std::env::var("ATOMIC_REVOCATION_TEST_DIR") else {
+            return;
+        };
+        let path = std::path::PathBuf::from(path);
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let db = Db::init_redb_file(&path, None, &path.join("uploads"))
+                .await
+                .unwrap();
+            db.set_node_key(NODE_KEY);
+            let agent = Agent::new(None).unwrap();
+            db.set_app_agent(
+                &key(),
+                &AppAgent::new(agent.subject.to_string(), agent.build_secret().unwrap(), 0),
+            )
+            .unwrap();
+            db.flush().unwrap();
+            db.delete_app_agent(&key()).unwrap();
+            // No drop or extra flush: the revoke operation must make it durable.
+            std::process::exit(7);
+        });
+    }
+
+    #[tokio::test]
+    async fn reconnect_restores_only_the_explicitly_provisioned_identity() {
+        let db = db("reconnect").await;
+        db.set_node_key(NODE_KEY);
+        db.delete_app_agent(&key()).unwrap();
+        let agent = Agent::new(None).unwrap();
+        db.set_app_agent(
+            &key(),
+            &AppAgent::new(agent.subject.to_string(), agent.build_secret().unwrap(), 0),
+        )
+        .unwrap();
+        assert!(!db.app_agent_was_revoked(&key()).unwrap());
+        assert_eq!(
+            db.get_app_agent_info(&key()).unwrap().unwrap().agent,
+            agent.subject.to_string()
+        );
     }
 
     #[tokio::test]
