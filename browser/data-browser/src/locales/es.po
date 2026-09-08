@@ -7567,3 +7567,23 @@ msgstr "Recurso con error"
 #: src/views/Plugin/AssignRights.tsx
 msgid "Assign Rights"
 msgstr "Asignar derechos"
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama detected"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Looking for local Ollama…"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama could not be reached. Start Ollama and connect."
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Use local Ollama"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Connect local Ollama"
+msgstr ""

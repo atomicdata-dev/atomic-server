@@ -63,7 +63,6 @@ export function FeedbackMenuItem() {
         }}
         style={{
           border: 0,
-          background: 'transparent',
           font: 'inherit',
           cursor: 'pointer',
         }}
