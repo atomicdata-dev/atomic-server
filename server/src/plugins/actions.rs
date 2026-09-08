@@ -131,31 +131,12 @@ pub struct Archive {
     pub state: String,
     pub payload_hash: String,
 }
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Binding {
-    pub release: String,
-    pub config: Value,
-}
+pub use super::release_binding::Binding;
 pub async fn binding(host: &StoreHost) -> Result<Binding, String> {
     host.validate_binding().await?;
-    let terms = drive_terms(&host.db, &host.drive)
-        .await
-        .ok_or("drive schema unavailable")?;
-    let property = terms
-        .property("plugin-connection")
-        .ok_or("not an integration connection")?;
-    let resource = host
-        .db
-        .get_resource(&host.plugin.as_str().into())
-        .await
-        .map_err(|e| e.to_string())?;
-    serde_json::from_str(
-        &resource
-            .get(property)
-            .map_err(|e| e.to_string())?
-            .to_string(),
-    )
-    .map_err(|e| format!("invalid connection: {e}"))
+    super::release_binding::read(&host.db, &host.drive, &host.plugin)
+        .await?
+        .ok_or_else(|| "not an integration connection".into())
 }
 fn prefix(host: &StoreHost) -> String {
     format!(

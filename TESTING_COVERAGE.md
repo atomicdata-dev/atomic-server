@@ -1427,3 +1427,14 @@ scope denial; provider fixtures cover existing release/receipt/sync behavior.
 erased key material, explicit reconnect and a subprocess that exits without
 running destructors. Reopening the database must still show a revoked identity.
 These checks do not migrate packaged UI signing or certify live provider delivery.
+
+
+## Activation and upgrades (2026-09-08)
+
+`release_binding::tests` covers release/configuration comparison, absent/removed
+bindings and unchanged parent links. `sync_session_tests` rejects stale unapproved
+previews without provider writes and exercises compatible upgrades/rollback with
+an actual connection binding while retaining original receipts. The background
+worker regression proves a due job stops with a stored error when activation
+settings change, rather than writing with an older grant. Existing subprocess
+recovery tests continue to exercise already-approved work across process exit.

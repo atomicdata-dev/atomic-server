@@ -60,6 +60,8 @@ pub struct Session {
     pub started_at: i64,
     pub release: String,
     pub config: Value,
+    #[serde(default)]
+    pub binding_required: bool,
     pub connection: State,
     pub proposal: Value,
     pub problems: Vec<Problem>,
@@ -119,12 +121,15 @@ pub async fn preview<H: PluginHost>(
     if read(db, drive, plugin)?.is_some_and(|s| s.approved_by.is_some() && s.status != "complete") {
         return Err("resume the existing approved sync first".into());
     }
+    let binding_required =
+        super::release_binding::require_current(db, drive, plugin, release, &config, false).await?;
     let package = db.get_plugin_release(release).map_err(|e| e.to_string())?;
     let mut session = Session {
         started_at: atomic_lib::utils::now(),
         run: atomic_lib::utils::random_string(40),
         release: release.into(),
         config,
+        binding_required,
         connection: connection_state::read_resolved(db, drive, plugin).await?,
         proposal: Value::Null,
         problems: vec![],
@@ -179,6 +184,17 @@ where
     }
     if session.status == "complete" {
         return Ok(session);
+    }
+    if session.approved_by.is_none() {
+        session.binding_required = super::release_binding::require_current(
+            db,
+            drive,
+            plugin,
+            &session.release,
+            &session.config,
+            session.binding_required,
+        )
+        .await?;
     }
     session.approved_by = Some(actor.into());
     session.status = "running".into();
