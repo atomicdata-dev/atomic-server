@@ -503,3 +503,13 @@ updates without a reload and verifies a second change after the reader reloads.
 multiple-reader cleanup through both Store unsubscribe APIs, and retaining
 ordinary document drive-wide fan-out. Profiles no longer depend on being inside
 the reader's active drive to receive live updates.
+
+
+### Per-drive Cloud Server display
+
+`driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
+asynchronous hosting/usage results to the selected drive and server. It covers
+unenrolled/local drives and shared drives confirmed directly by their node.
+`sync-devices.spec.ts` renders a managed connection with zero data for the selected
+drive, injects another drive's completed sync, and verifies that Cloud Server
+stays off with its setup action visible.

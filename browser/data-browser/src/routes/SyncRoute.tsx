@@ -1,3 +1,11 @@
+import {
+  deriveNodeStatuses,
+  currentDriveSync,
+  currentDriveValue,
+  hasHostedDriveConnection,
+  type ScopedDriveValue,
+  type NodeStatus,
+} from '../helpers/driveSyncStatus';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import {
   useEffect,
@@ -118,7 +126,6 @@ export const SyncRoute = createRoute({
   getParentRoute: () => appRoute,
 });
 
-type NodeStatus = 'synced' | 'syncing' | 'unsynced' | 'offline' | 'unknown';
 type KnownPeer = { nodeId: string; label: string; lastSync?: string };
 
 const NODE_DID_PREFIX = 'did:ad:node:';
@@ -139,38 +146,6 @@ function normalizeStoredPeer(peer: KnownPeer): KnownPeer | undefined {
   if (nodeDidToRaw(peer.nodeId)) return peer;
 
   return undefined;
-}
-
-function deriveNodeStatuses(status: StoreSyncStatus): {
-  local: NodeStatus;
-  server: NodeStatus;
-  line: NodeStatus;
-} {
-  const local: NodeStatus = 'synced';
-
-  if (!status.serverConnected) {
-    return {
-      local,
-      server: 'offline',
-      line: 'offline',
-    };
-  }
-
-  if (status.syncInProgress) {
-    return { local, server: 'syncing', line: 'syncing' };
-  }
-
-  if (status.pendingDirtyCount > 0) {
-    return { local, server: 'unsynced', line: 'unsynced' };
-  }
-
-  // Only claim "synced" if we've actually completed a drive sync.
-  // Otherwise we're connected but haven't confirmed the data matches.
-  if (!status.lastDriveSync) {
-    return { local, server: 'unknown', line: 'unknown' };
-  }
-
-  return { local, server: 'synced', line: 'synced' };
 }
 
 function StatusIcon({ status }: { status: NodeStatus }) {
@@ -221,6 +196,7 @@ type ServerCardProps = {
   server: string;
   status: StoreSyncStatus;
   managedInfo: ManagedInfo;
+  cloudHosted: boolean;
   /** Sync status of the server actually in use. */
   serverStatus: NodeStatus;
   hasWorkingLocalStore: boolean;
@@ -274,6 +250,7 @@ function ServerCard({
   server,
   status,
   managedInfo,
+  cloudHosted,
   serverStatus,
   hasWorkingLocalStore,
   nodeUsage,
@@ -283,8 +260,11 @@ function ServerCard({
   onRemove,
 }: ServerCardProps) {
   const store = useStore();
-  const isActive = sameOrigin(server, status.serverUrl);
-  const isCloud = isActive && managedInfo.managed;
+  const isActive =
+    sameOrigin(server, status.serverUrl) &&
+    !!status.drive &&
+    store.isLiveSyncedDrive(status.drive);
+  const isCloud = isActive && cloudHosted;
   const serverHostname = status.serverUrl
     ? new URL(status.serverUrl).hostname
     : undefined;
@@ -298,8 +278,9 @@ function ServerCard({
         )
       : null;
 
-  const syncedAgo = status.lastDriveSync
-    ? formatTimeAgo(new Date(status.lastDriveSync.timestamp))
+  const driveSync = isActive ? currentDriveSync(status) : undefined;
+  const syncedAgo = driveSync
+    ? formatTimeAgo(new Date(driveSync.timestamp))
     : null;
   const usedBytes = nodeUsage
     ? nodeUsage.blobBytes + nodeUsage.loroBytes
@@ -332,7 +313,7 @@ function ServerCard({
     );
   }
 
-  if (status.lastDriveSync) {
+  if (driveSync) {
     facts.push(syncedAgo ? `Synced ${syncedAgo}` : 'Synced just now');
   }
 
@@ -603,7 +584,13 @@ function SyncPage() {
   // Cloud Server (SaaS) hosting state for the active drive. `null` = not yet
   // known / not applicable; `false` = eligible but not enrolled (show the CTA);
   // `true` = already enrolled (hide it).
-  const [cloudEnrolled, setCloudEnrolled] = useState<boolean | null>(null);
+  const [cloudEnrollment, setCloudEnrollment] =
+    useState<ScopedDriveValue<boolean> | null>(null);
+  const cloudEnrolled = currentDriveValue(
+    cloudEnrollment,
+    status.drive,
+    status.serverUrl,
+  );
   const [cloudBusy, setCloudBusy] = useState(false);
   // Resolved in an effect rather than read off a Resource during render: the
   // React Compiler memoizes on the proxy identity, so a resource that finishes
@@ -823,7 +810,13 @@ function SyncPage() {
   // Resource count + bytes from the connected node's `/drive-usage` — generic,
   // works on any atomic-server (self-hosted included). Signed with the agent
   // because the endpoint enforces read access to the drive.
-  const [nodeUsage, setNodeUsage] = useState<NodeDriveUsage | null>(null);
+  const [nodeUsageState, setNodeUsageState] =
+    useState<ScopedDriveValue<NodeDriveUsage> | null>(null);
+  const nodeUsage = currentDriveValue(
+    nodeUsageState,
+    status.drive,
+    status.serverUrl,
+  );
 
   // Sign in with a secret on a fresh device and you get the identity but none
   // of the data. Detect that so the page can lead with "pair a device".
@@ -856,7 +849,7 @@ function SyncPage() {
 
     // A local-only drive isn't on the server — asking for its usage 500s.
     if (!drive || !serverUrl || !agent || store.isLocalOnlyDrive(drive)) {
-      setNodeUsage(null);
+      setNodeUsageState(null);
 
       return;
     }
@@ -864,10 +857,13 @@ function SyncPage() {
     let cancelled = false;
     fetchNodeDriveUsage(serverUrl, drive, agent)
       .then(usage => {
-        if (!cancelled) setNodeUsage(usage);
+        if (!cancelled)
+          setNodeUsageState(
+            usage ? { drive, server: serverUrl, value: usage } : null,
+          );
       })
       .catch(() => {
-        if (!cancelled) setNodeUsage(null);
+        if (!cancelled) setNodeUsageState(null);
       });
 
     return () => {
@@ -927,7 +923,7 @@ function SyncPage() {
     const drive = status.drive;
 
     if (!drive || !isCloudSyncAvailable(managedInfo)) {
-      setCloudEnrolled(null);
+      setCloudEnrollment(null);
 
       return;
     }
@@ -935,16 +931,18 @@ function SyncPage() {
     let cancelled = false;
     driveHasCloudEnrollment(drive)
       .then(has => {
-        if (!cancelled) setCloudEnrolled(has);
+        if (!cancelled)
+          setCloudEnrollment({ drive, server: status.serverUrl, value: has });
       })
       .catch(() => {
-        if (!cancelled) setCloudEnrolled(false);
+        if (!cancelled)
+          setCloudEnrollment({ drive, server: status.serverUrl, value: false });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [status.drive, managedInfo]);
+  }, [status.drive, status.serverUrl, managedInfo]);
 
   useEffect(() => {
     const refresh = () => setStatus(store.getSyncStatus());
@@ -1002,6 +1000,8 @@ function SyncPage() {
   // other device" and call moving it to Cloud Server "a migration".
   const showServerConn =
     !!status.serverUrl &&
+    !!status.drive &&
+    store.isLiveSyncedDrive(status.drive) &&
     !embeddedActive &&
     !isOriginWithoutNode(status.serverUrl);
   const pairedPeers = isNode ? knownPeers : [];
@@ -1096,13 +1096,20 @@ function SyncPage() {
     }.`;
   }
 
+  const cloudHosted = hasHostedDriveConnection(
+    !!status.drive && store.isLiveSyncedDrive(status.drive),
+    managedInfo.managed,
+    cloudEnrolled,
+    nodeUsage?.resourceCount,
+  );
+
   /** The provider's own node, when this drive is on one. */
   const managedServer =
     connectionServers.find(server => isManagedServer(server)) ?? null;
 
   /** Is this one of ours? Mirrors `isCloud` inside the card renderer. */
   function isManagedServer(server: string): boolean {
-    return sameOrigin(server, status.serverUrl) && managedInfo.managed;
+    return sameOrigin(server, status.serverUrl) && cloudHosted;
   }
 
   /**
@@ -1214,7 +1221,11 @@ function SyncPage() {
         }
       }
 
-      setCloudEnrolled(true);
+      setCloudEnrollment({
+        drive: status.drive!,
+        server: status.serverUrl,
+        value: true,
+      });
       if (result.replicated)
         setHostedCopy({ drive, origin: result.httpOrigin });
       toast.success(
@@ -1554,6 +1565,7 @@ function SyncPage() {
                   server={managedServer}
                   status={status}
                   managedInfo={managedInfo}
+                  cloudHosted={cloudHosted}
                   serverStatus={nodes.server}
                   hasWorkingLocalStore={hasWorkingLocalStore}
                   nodeUsage={nodeUsage}
@@ -1807,6 +1819,7 @@ function SyncPage() {
                 server={server}
                 status={status}
                 managedInfo={managedInfo}
+                cloudHosted={cloudHosted}
                 serverStatus={nodes.server}
                 hasWorkingLocalStore={hasWorkingLocalStore}
                 nodeUsage={nodeUsage}
