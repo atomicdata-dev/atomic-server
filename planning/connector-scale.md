@@ -5,6 +5,15 @@ with many major and niche domain applications without bloating Atomic.
 GitHub and Notion pilots now run in the shared sandbox and have bounded live
 checks. Broader support, monitoring and release operations remain incomplete.
 
+## Product direction (2026-09-08)
+
+Follow [extension-architecture.md](extension-architecture.md): an app is the
+workspace; an integration is a discoverable connector; a connection attaches a
+configured source to that workspace; an automation is independent JS behavior
+that may use connections. The current connection-as-workspace UI is a migration
+starting point, not the target. Sync must remain useful without an automation.
+Existing implementation checklists below do not claim this UX migration is done.
+
 ## Maintenance pipeline progress
 
 ### Discovery and automation journey
