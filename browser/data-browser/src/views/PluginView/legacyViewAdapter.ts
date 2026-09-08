@@ -1,3 +1,6 @@
+import { isViewRequest, packagedViewOperations } from '@tomic/plugin';
+import { viewSession } from '@helpers/extensions/viewSession';
+import { canViewAccess, type ViewPolicy } from '@helpers/extensions/viewPolicy';
 // @wc-ignore-file
 import {
   FrameBridge,
@@ -7,7 +10,6 @@ import {
   Client,
   core,
   server,
-  urls,
   type JSONArray,
   type JSONValue,
   type Resource,
@@ -78,8 +80,28 @@ export class LegacyViewAdapter {
     this.requestReadPermission = requestReadPermission;
     this.hasReadPermission = hasReadPermission;
     this.requestWritePermission = requestWritePermission;
-    this.bridge = new FrameBridge(iFrame, (data, session) => {
-      const message = data as Partial<RPCMessage>;
+    this.bridge = new FrameBridge(iFrame, (data, originalSession) => {
+      const canonical = isViewRequest(data);
+      const session = canonical
+        ? viewSession(originalSession, data.id)
+        : originalSession;
+      const type = canonical
+        ? Object.keys(packagedViewOperations).find(
+            key => packagedViewOperations[key as MessageType] === data.op,
+          )
+        : undefined;
+
+      if (canonical && !type) {
+        session.post({
+          error: /* @wc-ignore */ 'This view does not support that operation',
+        });
+
+        return;
+      }
+
+      const message = (
+        canonical ? { type, args: data.args, requestId: String(data.id) } : data
+      ) as Partial<RPCMessage>;
       if (
         typeof message.type !== 'string' ||
         typeof message.requestId !== 'string'
@@ -161,7 +183,11 @@ export class LegacyViewAdapter {
   private async handleQuery(
     message: Request<MessageType.QUERY>,
   ): Promise<void> {
-    this.sendResponse(message, 'not implemented');
+    this.sendError(
+      message,
+      'unsupported-operation',
+      /* @wc-ignore */ 'Query is not supported by packaged views',
+    );
   }
 
   private async handleCommit(
@@ -235,7 +261,11 @@ export class LegacyViewAdapter {
   private async handleSearch(
     message: Request<MessageType.SEARCH>,
   ): Promise<void> {
-    this.sendResponse(message, 'not implemented');
+    this.sendError(
+      message,
+      'unsupported-operation',
+      /* @wc-ignore */ 'Search is not supported by packaged views',
+    );
   }
 
   private async handleGetContext(
@@ -298,6 +328,8 @@ export class LegacyViewAdapter {
       const allowed = await this.requestReadPermission(message.args.subject);
 
       if (!allowed) {
+        this.sendResponse(message, false);
+
         return;
       }
     }
@@ -323,12 +355,14 @@ export class LegacyViewAdapter {
           .catch(() => message.session.unwatch(subject));
       }),
     );
+    this.sendResponse(message, true);
   }
 
   private async handleUnsubscribe(
     message: Request<MessageType.UNSUBSCRIBE>,
   ): Promise<void> {
     message.session.unwatch(message.args.subject);
+    this.sendResponse(message, true);
   }
 
   private sendResponse(message: Request, data: unknown): void {
@@ -352,103 +386,22 @@ export class LegacyViewAdapter {
     });
   }
 
-  private async canPluginReadResource(resource: Resource): Promise<boolean> {
-    const pluginAgent = this.pluginResource.get(server.properties.pluginAgent);
-
-    const pageSubject = this.context.resource.subject;
-    const pageClasses =
-      (this.context.resource.props[core.properties.isA] as string[]) ?? [];
-
-    const permittedRoots = [pageSubject, ...pageClasses];
-
-    const canRead = (r: Resource): boolean => {
-      if (permittedRoots.includes(r.subject)) {
-        return true;
-      }
-
-      const parent = r.get(core.properties.parent);
-
-      if (permittedRoots.includes(parent)) {
-        return true;
-      }
-
-      if (
-        r
-          .get(core.properties.read)
-          ?.some(
-            agent =>
-              agent === urls.instances.publicAgent || agent === pluginAgent,
-          )
-      ) {
-        return true;
-      }
-
-      if (r.get(core.properties.write)?.includes(pluginAgent)) {
-        return true;
-      }
-
-      return false;
+  private get policy(): ViewPolicy {
+    return {
+      kind: 'packaged',
+      root: this.context.resource.subject,
+      classes:
+        (this.context.resource.props[core.properties.isA] as string[]) ?? [],
+      agent: this.pluginResource.get(server.properties.pluginAgent),
     };
-
-    if (canRead(resource)) {
-      return true;
-    }
-
-    // Check if the resource is a child of the page resource or if any parent gives the plugin read rights.
-    const parents = await this.store.getResourceAncestry(resource);
-
-    for (const parent of parents) {
-      const r = await this.store.getResource(parent);
-
-      if (canRead(r)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
-  private async canPluginWriteResource(resource: Resource): Promise<boolean> {
-    const pluginAgent = this.pluginResource.get(server.properties.pluginAgent);
+  private canPluginReadResource(resource: Resource): Promise<boolean> {
+    return canViewAccess(this.store, resource.subject, this.policy, 'read');
+  }
 
-    const canWrite = (r: Resource): boolean => {
-      if (r.subject === this.context.resource.subject) {
-        return true;
-      }
-
-      const parent = r.get(core.properties.parent);
-
-      if (parent === this.context.resource.subject) {
-        return true;
-      }
-
-      if (r.get(core.properties.write)?.includes(pluginAgent)) {
-        return true;
-      }
-
-      return false;
-    };
-
-    if (resource.subject === this.context.resource.subject) {
-      return true;
-    }
-
-    if (canWrite(resource)) {
-      return true;
-    }
-
-    // Check if the resource is a child of the page resource or if any parent gives the plugin write rights.
-    const parents = await this.store.getResourceAncestry(resource);
-
-    for (const parent of parents) {
-      const r = await this.store.getResource(parent);
-
-      if (canWrite(r)) {
-        return true;
-      }
-    }
-
-    return false;
+  private canPluginWriteResource(resource: Resource): Promise<boolean> {
+    return canViewAccess(this.store, resource.subject, this.policy, 'write');
   }
 
   /**

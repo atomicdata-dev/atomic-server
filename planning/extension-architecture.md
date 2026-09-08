@@ -324,7 +324,7 @@ bridge only after supported installed packages have an explicit migration path.
 - [x] Recheck packaged view read grants before each notification. Closing a view
   while its write-permission dialog is pending cannot resume that write. Changing
   an app, drive or table remounts its frame session and drops the old source token.
-- [ ] Converge authorization policy and the public SDK envelope. Generated app
+- [x] Share the authorization evaluator and version the public SDK envelope (see next checkpoint). Generated app
   writes still use the app identity and host endpoint; packaged views retain their
   existing scope/grant rules. Sharing transport does not widen either policy.
 
@@ -332,6 +332,25 @@ No additional runtime or installed-package migration was introduced. Existing
 source-generated `__atomic` messages and packaged SDK `requestId` messages remain
 compatible adapters. This checkpoint removes duplicated plumbing; it does not
 claim that all extension execution and permission models are now unified.
+
+### Implementation checkpoint: shared policy and v1 wire contract (2026-09-08)
+
+- [x] Replace duplicated ancestry/grant checks with `canViewAccess`, using
+  host-selected app and packaged profiles. Preserve signing identities, class
+  scope, public/agent grants, app depth limits and packaged deep ancestry.
+- [x] New packaged and generated SDK clients use one versioned request/reply
+  envelope and resource shape. Keep decoding installed clients at the boundary.
+- [x] Reject unsupported operations explicitly; acknowledge subscription setup
+  and removal instead of retaining unresolved requests.
+- [x] Test both actual clients against the contract, wrong-window replies,
+  scope spoofing, deep grants, cycles, teardown and compatibility replies.
+- [ ] Migrate operation capabilities and backend signing to one installation
+  authority model. Shared preflight policy does not itself unify those identities.
+
+New SDK builds require a v1 host; rollout order and supported operations are in
+`browser/plugin/README.md`. There is no speculative retry of writes in a legacy
+format. This removes duplicated policy traversal and wire formats for new clients,
+while retaining thin compatibility decoders for already installed packages.
 
 ### 3. Converge installation and background state
 

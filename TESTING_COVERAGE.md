@@ -1394,5 +1394,19 @@ keeps the generated app identity/subtree write checks exercised.
 The generated-app and packaged-plugin browser suites exercise the shared bridge
 through their real entry points. Packaged installation uses the bundled fixture
 and real server; its unrelated SaaS `/api/me` probe is explicitly stubbed to the
-supported 204 no-account response. These checks do not prove a common permission
-policy or a new SDK migration: those models are deliberately unchanged.
+supported 204 no-account response.
+
+`viewPolicy.test.ts` covers host-selected scopes, inherited public/agent grants,
+deep packaged ancestry, bounded app writes, cycles and unavailable ancestors.
+`viewSession.test.ts` checks canonical resource/error replies. The actual packaged
+and generated SDK clients share conformance tests in
+`browser/plugin/src/viewProtocol.test.ts`, including ignoring foreign-window replies.
+The packaged adapter additionally tests canonical requests, caller-supplied policy
+spoofing, subscription acknowledgements and unsupported operations.
+
+`apps.spec.ts` runs the first write scenario with both the served SDK and this
+checkout's v1 JS asset. The latter explicitly intercepts only `format=client`;
+resource creation and signing still use the real local backend. This verifies the
+new asset without claiming a rebuilt Rust binary. Backend signing identities and
+per-profile operation capabilities remain distinct; this is not certification of
+a common installation authority model.
