@@ -63,7 +63,13 @@ fn host_is_served_here(host: &str, opts: &crate::config::Opts) -> bool {
     if domain.is_empty() || domain == "localhost" {
         return true;
     }
-    if hostname == domain || matches!(hostname.as_str(), "localhost" | "127.0.0.1" | "[::1]") {
+    // `*.localhost` is loopback by definition (RFC 6761; browsers resolve it
+    // without DNS), which is how the e2e suite and local multi-tenant setups
+    // reach one server under several names.
+    if hostname == domain
+        || matches!(hostname.as_str(), "localhost" | "127.0.0.1" | "[::1]")
+        || hostname.ends_with(".localhost")
+    {
         return true;
     }
     if let Some(base) = opts.base_domain.as_deref() {
@@ -123,6 +129,16 @@ mod tests {
         assert!(host_is_served_here("joep.atomicserver.eu", &o));
         assert!(host_is_served_here("localhost:9883", &o));
         assert!(host_is_served_here("[::1]:9883", &o));
+    }
+
+    #[test]
+    fn dot_localhost_names_are_loopback() {
+        // CI serves the SPA at `atomic.localhost` for a server whose domain
+        // is `atomic`, so the browser signs for the former.
+        let o = opts("atomic", None);
+        assert!(host_is_served_here("atomic.localhost:9883", &o));
+        assert!(host_is_served_here("tenant.atomic.localhost", &o));
+        assert!(!host_is_served_here("localhost.evil.example", &o));
     }
 
     #[test]
