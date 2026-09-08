@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { automationAssistantAsk } from './automationAssistant';
+import {
+  automationAssistantAsk,
+  newAutomationAssistantAsk,
+} from './automationAssistant';
 
 it('hands the assistant the existing draft and selected integration without changing sync', () => {
   const ask = automationAssistantAsk(
@@ -21,4 +24,16 @@ it('hands the assistant the existing draft and selected integration without chan
   expect(ask.prompt).toContain('Update the attached automation draft');
   expect(ask.prompt).toContain('Test the automation');
   expect(ask.prompt).toContain('Keep the integration sync schedule unchanged');
+});
+
+it('keeps workspace context independent of optional connections and does not request execution', () => {
+  const ask = newAutomationAssistantAsk('did:ad:drive', [], 'did:ad:workspace');
+  expect(
+    ask.context?.map(item => item.type === 'atomic-resource' && item.subject),
+  ).toEqual(['did:ad:drive', 'did:ad:workspace']);
+  expect(ask.prompt).toContain('a connection is optional');
+  expect(ask.prompt).toContain(
+    'Do not create anything until I describe the behavior',
+  );
+  expect(ask.prompt).toContain('Keep integration sync settings unchanged');
 });

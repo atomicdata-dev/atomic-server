@@ -174,7 +174,13 @@ export function run(input) {
  */
 export async function createPlugin(
   store: Store,
-  target: { parent: string; drive: string; localId?: string },
+  target: {
+    parent: string;
+    drive: string;
+    localId?: string;
+    workspace?: string;
+    connections?: string[];
+  },
   name = 'New plugin',
   source = STARTER_SOURCE,
   schemas: Record<string, string> = {},
@@ -199,6 +205,12 @@ export async function createPlugin(
         : {}),
       'https://atomicdata.dev/properties/name': name,
       'https://atomicdata.dev/properties/emoji': '🔌',
+      ...(target.workspace !== undefined
+        ? { [schema.properties['plugin-workspace']]: target.workspace }
+        : {}),
+      ...(target.connections !== undefined
+        ? { [schema.properties['automation-integrations']]: target.connections }
+        : {}),
       [schema.properties['plugin-source']]: source,
       [schema.properties['plugin-schemas']]: schemas,
       [schema.properties.trigger]: 'manual',
@@ -215,10 +227,21 @@ export async function setPluginSource(
   plugin: string,
   drive: string,
   source: string,
+  association: { workspace?: string; connections?: string[] } = {},
 ): Promise<void> {
   const schema = await pluginClassesFor(store, drive);
   const resource = await store.getResource(plugin);
   await resource.set(schema.properties['plugin-source'], source);
+  if (association.workspace !== undefined)
+    await resource.set(
+      schema.properties['plugin-workspace'],
+      association.workspace,
+    );
+  if (association.connections !== undefined)
+    await resource.set(
+      schema.properties['automation-integrations'],
+      association.connections,
+    );
   await resource.save();
 }
 

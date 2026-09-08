@@ -3,11 +3,10 @@ import { useAISettings } from '@components/AI/AISettingsContext';
 import { editIntegrationAssistant } from './editIntegrationAssistant';
 import { FaWandMagicSparkles } from 'react-icons/fa6';
 import { NewAutomation } from './NewAutomation';
+import { AtomicLink } from '@components/AtomicLink';
+import { pluginWorkspace } from '@tomic/react';
 import { Tabs } from '@components/Tabs';
-import {
-  IntegrationDataView,
-  IntegrationDefaultView,
-} from './IntegrationDataView';
+import { IntegrationDefaultView } from './IntegrationDataView';
 import { ClockifyUpgrade } from './ClockifyUpgrade';
 import { AutomationIntegrations } from './AutomationIntegrations';
 import {
@@ -96,16 +95,11 @@ export function PluginPage({
 
         if (active) {
           setFileImporter(!!config?.mt940);
-          const connectionTable = (
-            connection?.config as { table?: string } | undefined
-          )?.table;
-          setDataTable(
-            connectionTable || config?.table || config?.mt940?.table,
-          );
+          setDataTable(pluginWorkspace(resource, schema.properties ?? {}));
         }
       })
-      .catch(() => {
-        if (active) setFileImporter(false);
+      .catch(error => {
+        if (active) toast.error(String(error));
       });
 
     return () => {
@@ -148,11 +142,14 @@ export function PluginPage({
           </Button>
         </PageHeader>
 
+        {dataTable && (
+          <AtomicLink subject={dataTable}>Open workspace</AtomicLink>
+        )}
+
         <WorkspaceTabs
           key={`${resource.subject}:${dataTable || 'none'}:${!!automation}`}
           label='Integration sections'
           tabs={[
-            ...(dataTable ? [{ value: 'data', label: 'Workspace' }] : []),
             {
               value: 'manage',
               label: connection ? 'Sync' : automation ? 'Automation' : 'Run',
@@ -165,11 +162,6 @@ export function PluginPage({
             ...(!automation ? [{ value: 'code', label: 'Code' }] : []),
           ]}
         >
-          {dataTable && (
-            <Panel value='data'>
-              <IntegrationDataView subject={dataTable} />
-            </Panel>
-          )}
           <Panel value='manage'>
             <Column gap='1.5rem'>
               {!connection && !automation && !fileImporter && (

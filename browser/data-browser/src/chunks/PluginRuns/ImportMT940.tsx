@@ -195,6 +195,10 @@ export function ImportMT940({
           properties: terms.properties,
         };
         const schema = await ensureSchema(store, drive, pluginSchema());
+        await resource.set(
+          schema.properties['plugin-workspace'],
+          table.subject,
+        );
         await resource.set(schema.properties['plugin-schemas'], {
           mt940: config,
         });

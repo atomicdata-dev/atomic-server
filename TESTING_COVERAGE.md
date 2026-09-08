@@ -928,11 +928,11 @@ needs connecting; it does not send a live model request. The blank-table setup
 regression also passes. `creationCatalog.test.ts` covers catalog completeness,
 multiword search and the assistant parent context. Frontend typecheck passes.
 
-## Integration workspace tabs (2026-09-08)
+## Workspace and connection navigation (2026-09-08)
 
 `browser/e2e/tests/integration-workspace.spec.ts` installs a GitHub connection
-without provider credentials and verifies its kanban opens by default, source and
-secrets are hidden until their tabs are selected, automation creation is available,
+without provider credentials and verifies the native kanban workspace opens,
+connection settings keep source and secrets behind their tabs, automation creation is available,
 and a changed opening-view setting survives reload. Uses the existing table view
 renderer and table-default-view property. Typecheck passes. No live provider sync
 or standalone custom AppFrame behavior is exercised by this test.
@@ -954,3 +954,16 @@ and reconciling optimistic additions already represented in that query. The othe
 collection sorting, drive-scope and empty-result regressions are run alongside it.
 Verified in the user's Zen integration table: total is 90, final rows render, and
 the phantom loading rows are gone. No source issue records were edited.
+
+Workspace separation coverage: `plugin-workspace.test.ts` checks explicit and
+legacy destinations, malformed configuration, authorization failure propagation,
+and exclusion of automations (including empty connection lists). The workspace
+browser spec removes the new relationship to exercise old GitHub installs, opens
+native kanban then connection settings, preserves the opening view, checks sync
+preview errors, and starts assistant chat without a connection. It also creates
+an on-demand script through the authoring helper and finds it from its workspace.
+`plugins.spec.ts` covers reuse of an existing task template with its views intact.
+These checks do not prove live AI generation, provider sync, multi-repository row
+ownership, disconnect revocation, or consolidation of the other UI runtimes.
+`store.test.ts` reproduces and fixes an HTTP fetch returning undefined when its
+response has a canonical subject different from the requested query URL.
