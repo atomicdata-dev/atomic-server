@@ -308,6 +308,21 @@ const TARGETS = [
     };
   }),
 
+  // Android uses these checked-in launcher resources, not desktop/icons.
+  ...['mdpi:48:108', 'hdpi:72:162', 'xhdpi:96:216', 'xxhdpi:144:324', 'xxxhdpi:192:432'].map(d => {
+    const [density, size, foreground] = d.split(':');
+    return {
+      mark: 'atomic', root: SERVER_ROOT,
+      label: `atomic-server: Tauri Android ${density}`,
+      dir: `desktop/gen/android/app/src/main/res/mipmap-${density}`,
+      files: [
+        png('ic_launcher.png', Number(size), 'flat'),
+        png('ic_launcher_round.png', Number(size), 'flat'),
+        png('ic_launcher_foreground.png', Number(foreground), 'maskable'),
+      ],
+    };
+  }),
+
   /* Sibling repos — skipped when the checkout is not present. */
   {
     mark: 'atomic',
@@ -338,6 +353,14 @@ const TARGETS = [
 /* ------------------------------------------------------------------ */
 /* Driver                                                              */
 /* ------------------------------------------------------------------ */
+
+// Xcode builds from its own checked-in asset catalog, not desktop/icons/ios.
+const iosIcons = TARGETS.find(target => target.dir === 'desktop/icons/ios');
+TARGETS.push({
+  ...iosIcons,
+  label: 'atomic-server: Tauri Xcode app icon catalog',
+  dir: 'desktop/gen/apple/Assets.xcassets/AppIcon.appiconset',
+});
 
 const TMP = mkdtempSync(path.join(tmpdir(), 'atomic-brand-'));
 let written = 0;

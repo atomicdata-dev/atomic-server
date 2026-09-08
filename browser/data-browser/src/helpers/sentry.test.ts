@@ -13,6 +13,18 @@ describe('Sentry configuration', () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
+  it('initializes packaged WebViews without injected server configuration', () => {
+    vi.stubGlobal('window', {});
+    vi.stubEnv('VITE_SENTRY_ENVIRONMENT', 'staging');
+    initSentry();
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dsn: 'https://public@example.com/123',
+        environment: 'staging',
+        release: 'atomic-data-browser@test+abc123',
+      }),
+    );
+  });
   it('allows a runtime empty DSN to disable a configured build', () => {
     vi.stubGlobal('window', { __ATOMIC_SENTRY__: { dsn: '' } });
     initSentry();

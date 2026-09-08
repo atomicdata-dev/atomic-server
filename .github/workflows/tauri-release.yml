@@ -55,6 +55,9 @@ permissions:
 # webview on `tauri://localhost` cannot hold the portal's session cookie.
 env:
   VITE_MANAGED_PORTAL_URL: https://atomicserver.eu
+  # Official packaged apps have no server-injected browser config.
+  VITE_SENTRY_DSN: https://b08842f7f4ac1d5bea3415049eb226c0@o1378995.ingest.us.sentry.io/4512015907291136
+  VITE_SENTRY_ENVIRONMENT: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
 
 jobs:
   # Secrets are not readable from a job-level `if:`, so the availability of each
