@@ -10,6 +10,7 @@ import {
   listVaultDrives,
   type VaultEnrollment,
 } from '../helpers/managed/vault';
+import { getManagedAccount } from '../helpers/managed/session';
 import { driveHostingState } from '../helpers/managed/driveHostingState';
 
 type Services = {
@@ -32,6 +33,14 @@ export function useDriveHostingStates() {
     const request = ++generation.current;
 
     try {
+      if (!(await getManagedAccount())) {
+        if (request !== generation.current) return;
+        setServices({ servers: [], vaults: [], agent });
+        setUnavailable(false);
+
+        return;
+      }
+
       const [response, vaults] = await Promise.all([
         managedFetch('/sync-enrollments', {}),
         listVaultDrives(),

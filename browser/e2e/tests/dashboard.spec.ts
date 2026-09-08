@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import {
   before,
   editableTitle,
@@ -293,8 +293,9 @@ test.describe('dashboards', () => {
     await page.getByTestId('new-dashboard-name').fill('Overview');
     await page.getByTestId('new-dashboard-create').click();
 
-    // The title is an input, so it holds a value rather than text.
-    await expect(editableTitle(page)).toHaveValue('Overview', {
+    await expect(
+      page.getByRole('textbox', { name: 'Set a title' }),
+    ).toHaveValue('Overview', {
       timeout: 15_000,
     });
 
@@ -443,6 +444,7 @@ test.describe('dashboards', () => {
     await page.getByTestId('block-function').selectOption('avg');
     await page.getByTestId('block-target').selectOption({ label: 'amount' });
     await page.getByTestId('block-save').click();
+    await expect(page.getByTestId('block-save')).not.toBeVisible();
 
     // 946.5 over four rows.
     await expect(block(page, 'Average spend')).toContainText('236.63', {

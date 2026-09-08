@@ -1,3 +1,4 @@
+import { RequestCancelledError } from './error.js';
 /**
  * Single durable queue for "writes that haven't reached the server".
  *
@@ -645,6 +646,9 @@ export class LocalOutbox {
         const stillLive = this.entries.get(entry.subject);
         if (stillLive) stillLive.failures = 0;
       } catch (e) {
+        // Explicit disconnect cancels the attempt, not the durable write.
+        // Keep it queued for reconnect without escalating retry failures.
+        if (e instanceof RequestCancelledError) return;
         live.lastAttemptError = e instanceof Error ? e.message : String(e);
         console.warn(
           '[Outbox] drain failed for subject:',

@@ -694,18 +694,25 @@ pub trait Storelike: Sized + Send + Sync {
 pub enum FilterOperator {
     /// Scalar equality or array membership (`contains_value`). The default.
     #[default]
+    #[serde(alias = "eq")]
     Equal,
     /// Numeric/lexical greater-than.
+    #[serde(alias = "gt")]
     GreaterThan,
     /// Numeric/lexical greater-than-or-equal.
+    #[serde(alias = "gte")]
     GreaterThanOrEqual,
     /// Numeric/lexical less-than.
+    #[serde(alias = "lt")]
     LessThan,
     /// Numeric/lexical less-than-or-equal.
+    #[serde(alias = "lte")]
     LessThanOrEqual,
     /// String prefix match.
+    #[serde(alias = "starts_with")]
     StartsWith,
     /// String substring match.
+    #[serde(alias = "contains")]
     Contains,
 }
 

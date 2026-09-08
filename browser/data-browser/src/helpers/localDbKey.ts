@@ -1,4 +1,4 @@
-import { del, get, keys, set } from 'idb-keyval';
+import { del, get, keys, set, update } from 'idb-keyval';
 
 /**
  * Per-agent encryption keys for the local OPFS ClientDb cache.
@@ -213,8 +213,14 @@ export async function getOrCreateSessionDbKey(
   }
 
   const fingerprint = await agentDbFingerprint(agentSubject);
-  const dbKey = generateDbKey();
-  await set(SESSION_KEY_PREFIX + fingerprint, dbKey);
+  // One readwrite transaction also serializes callers in other browser tabs.
+  // A read followed by set can hand the worker a key that another caller replaces.
+  let dbKey!: Uint8Array;
+  await update<Uint8Array>(SESSION_KEY_PREFIX + fingerprint, current => {
+    dbKey = current ?? generateDbKey();
+
+    return dbKey;
+  });
 
   return dbKey;
 }
@@ -269,8 +275,7 @@ export async function ensureDbKeyOnSignIn(
     }
   }
 
-  const dbKey = generateDbKey();
-  await set(SESSION_KEY_PREFIX + fingerprint, dbKey);
+  const dbKey = await getOrCreateSessionDbKey(agentSubject);
   await set(WRAPPED_KEY_PREFIX + fingerprint, await wrapDbKey(kek, dbKey));
 
   return dbKey;

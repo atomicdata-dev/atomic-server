@@ -1,4 +1,4 @@
-import { test, expect, Locator } from '@playwright/test';
+import { test, expect, Locator } from './fixtures';
 import {
   signIn,
   newDrive,

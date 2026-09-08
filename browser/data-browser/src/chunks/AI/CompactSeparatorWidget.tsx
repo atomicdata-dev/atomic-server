@@ -24,6 +24,7 @@ export const CompactSeparatorWidget: React.FC<CompactSeparatorWidgetProps> = ({
   summaryText,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const label = 'Context compacted';
 
   return (
     <CompactSeparatorContainer data-compact-separator>
@@ -39,7 +40,7 @@ export const CompactSeparatorWidget: React.FC<CompactSeparatorWidgetProps> = ({
               <FaChevronRight />
             </ChevronIcon>
           )}
-          Context compacted
+          <span>{label}</span>
         </CompactSeparatorLabel>
         <CompactSeparatorLine />
       </CompactSeparatorRow>

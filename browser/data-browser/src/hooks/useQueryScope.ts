@@ -1,6 +1,5 @@
-import { useSearch } from '@tanstack/react-router';
+import { useSearch, useNavigate } from '@tanstack/react-router';
 import { paths } from '../routes/paths';
-import { SearchRoute } from '../routes/Search/SearchRoute';
 
 export interface QueryScopeHandler {
   scope: string | undefined;
@@ -12,7 +11,7 @@ export function useQueryScopeHandler(subject: string): QueryScopeHandler;
 export function useQueryScopeHandler(): Omit<QueryScopeHandler, 'enableScope'>;
 export function useQueryScopeHandler(subject?: string): QueryScopeHandler {
   const { queryscope } = useSearch({ strict: false });
-  const navigate = SearchRoute.useNavigate();
+  const navigate = useNavigate();
 
   const enableScope = () => {
     navigate({

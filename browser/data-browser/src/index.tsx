@@ -1,3 +1,4 @@
+import { reactErrorHandler } from '@sentry/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { sha256, sha512 } from '@noble/hashes/sha2.js';
@@ -65,7 +66,11 @@ if (
 // Before the first render, so errors thrown while mounting are reported too.
 initSentry();
 
-const root = createRoot(document.getElementById('root')!);
+const root = createRoot(document.getElementById('root')!, {
+  onCaughtError: reactErrorHandler(),
+  onUncaughtError: reactErrorHandler(),
+  onRecoverableError: reactErrorHandler(),
+});
 root.render(
   <StrictMode>
     <App />

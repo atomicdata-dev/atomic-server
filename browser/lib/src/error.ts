@@ -169,3 +169,8 @@ export class AtomicError extends Error {
     }
   }
 }
+
+/** An operation cancelled by this client, rather than refused by the server. */
+export class RequestCancelledError extends Error {
+  override name = 'RequestCancelledError';
+}

@@ -48,6 +48,7 @@ function mockClientDb(
     isReady: true,
     waitForReady: async () => true,
     query,
+    flush: async () => undefined,
     putResourceWithSnapshot: async () => undefined,
   } as unknown as ClientDbWorker;
 }
@@ -72,6 +73,37 @@ function wireLiveMembership(store: Store, collection: Collection): () => void {
 }
 
 describe('collection page assemble does not flash unsorted members', () => {
+  it('requeries computed filters instead of admitting a row on stored properties alone', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        expression_filters: [
+          {
+            expression: { kind: 'difference', from: 0, to: 10 },
+            operator: 'gte',
+            value: 100,
+          },
+        ],
+      },
+      true,
+    );
+    const resource = new Resource(ALICE);
+    resource.setStore(store);
+    await resource.set(core.properties.parent, TABLE, false);
+    expect(collection.applyResourceChange(ALICE, resource)).toBe(
+      'membership-stale',
+    );
+    expect(pageMembers(collection)).toEqual([]);
+  });
+
   it('does not optimistic-add hydrated members in query-arrival order', async ({
     expect,
   }) => {

@@ -215,7 +215,7 @@ export function VaultPanel({
             onClick={vault.backupNow}
             disabled={busy || suspended}
           >
-            <FaCloudArrowUp /> {busy ? 'Working…' : 'Back up now'}
+            <FaCloudArrowUp /> <span>{busy ? 'Working…' : 'Back up now'}</span>
           </Button>
           <Button
             data-testid='vault-restore'
@@ -223,7 +223,7 @@ export function VaultPanel({
             onClick={handleRestore}
             disabled={busy}
           >
-            <FaRotateLeft /> Restore
+            <FaRotateLeft /> <span>Restore</span>
           </Button>
           <Button
             data-testid='vault-disable'

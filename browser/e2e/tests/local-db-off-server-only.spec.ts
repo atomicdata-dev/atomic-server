@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
   before,
   newDrive,
@@ -63,9 +63,12 @@ test('drive contents load with Local DB disabled (server-only)', async ({
 
   // Sanity: ClientDb really is absent (we're exercising the server-only path).
   await expect
-    .poll(() => page.evaluate(() => !window.store.getClientDb()), {
-      timeout: 10000,
-    })
+    .poll(
+      () => page.evaluate(() => !!window.store && !window.store.getClientDb()),
+      {
+        timeout: 10000,
+      },
+    )
     .toBe(true);
 
   await expect(page.getByText('LocalDbOffChild').first()).toBeVisible({
@@ -113,9 +116,12 @@ test('UI-created drive contents load with Local DB disabled', async ({
   );
 
   await expect
-    .poll(() => page.evaluate(() => !window.store.getClientDb()), {
-      timeout: 10000,
-    })
+    .poll(
+      () => page.evaluate(() => !!window.store && !window.store.getClientDb()),
+      {
+        timeout: 10000,
+      },
+    )
     .toBe(true);
 
   await expect(page.getByText('UiDriveOffChild').first()).toBeVisible({

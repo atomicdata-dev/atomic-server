@@ -1,6 +1,6 @@
 import { EditorContent, useEditor } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
-import { Link } from '@tiptap/extension-link';
+import { Link } from './Link';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Typography } from '@tiptap/extension-typography';
 import { Markdown } from '@tiptap/markdown';
@@ -58,15 +58,6 @@ export default function AsyncMarkdownEditor({
     Typography,
     TableKit,
     Link.configure({
-      protocols: [
-        'http',
-        'https',
-        'mailto',
-        {
-          scheme: 'tel',
-          optionalSlashes: true,
-        },
-      ],
       HTMLAttributes: {
         class: 'tiptap-link',
         rel: 'noopener noreferrer',

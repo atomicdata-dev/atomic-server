@@ -22,7 +22,7 @@
  * control plane on :3030. Without it every test here skips rather than fails,
  * because a normal e2e run has no reason to have a control plane up.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import {
   FRONTEND_URL,
@@ -44,20 +44,6 @@ const PORTAL_URL =
  * is not one.
  */
 const uniqueEmail = () => `vault-${randomUUID()}@localhost`;
-
-/**
- * The managed node every portal-created drive is assigned to.
- *
- * Not `test-utils`' `SERVER_URL` (9883): that points the test *helpers* at a
- * standalone server, while a drive created through the control plane lives on
- * the managed node the SPA is built against — `VITE_ATOMIC_SERVER_URL` in
- * `data-browser/.env.development`, and the same value `vault-stack.sh` gives
- * the control plane as `ATOMIC_SAAS_DEV_NODE_ORIGIN`.
- */
-const NODE_ORIGIN = process.env.ATOMIC_VAULT_NODE_ORIGIN ?? 'localhost:9885';
-const NODE_URL_PATTERN = new RegExp(
-  NODE_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-);
 
 /**
  * The control plane answers `/api/me` with 401 when nobody is signed in, which
@@ -185,6 +171,22 @@ async function renameLocally(page: Page, title: string) {
   // reproduced (see "backups and pending writes" in
   // planning/CLOUD_VAULT_ARCHITECTURE.md) and the failure it was written for
   // turned out to be the restore-flush race, fixed in the worker.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const subject = document
+          .querySelector('main[about]')
+          ?.getAttribute('about');
+        if (!subject) return undefined;
+        const db = window.store.getClientDb();
+        const saved = await db?.getResource(subject);
+        if (!saved) return undefined;
+        await db?.flush();
+
+        return JSON.parse(saved)['https://atomicdata.dev/properties/name'];
+      }),
+    )
+    .toBe(title);
   await page.reload();
   await expect(sidebarEntry).toBeVisible({ timeout: 30_000 });
 }
@@ -296,12 +298,11 @@ test.describe('Cloud Vault backup and restore', () => {
     // or not the vault works, and a restore that silently did nothing still
     // passes. Making the canary somewhere the node can never see it is what
     // makes "it came back" mean "it came back from the vault".
-    await page.context().route(NODE_URL_PATTERN, route => route.abort());
-    await page.context().routeWebSocket(NODE_URL_PATTERN, ws => ws.close());
-    // `routeWebSocket` only governs sockets opened after it is installed, and
-    // onboarding already opened one. Without this reload the commit leaves over
-    // that live socket and the node learns the canary anyway.
-    await page.reload();
+    await page.evaluate(() => {
+      const store = window.store;
+      store.registerLocalOnlyDrive(store.getDrive());
+      store.getDefaultWebSocket()?.close();
+    });
 
     const canary = `Vault canary ${timestamp()}`;
     await newResource('folder', page);
@@ -338,6 +339,8 @@ test.describe('Cloud Vault backup and restore', () => {
       // onboarding, so reach the app the way the dashboard's own drive link
       // does. The app then asks how to sign in.
       await fresh.goto(await signUpAndGetMagicLink(email));
+      // The portal exchanges the token before setting the session cookie.
+      await fresh.waitForURL(url => !url.searchParams.has('token'));
       await fresh.goto(driveUrl);
 
       // "Forgot it? Restore from …" is the portal path: the account is known from
@@ -354,30 +357,15 @@ test.describe('Cloud Vault backup and restore', () => {
       await fresh.getByLabel('Recovery code').fill(recoveryCode);
       await fresh.getByRole('button', { name: 'Restore & sign in' }).click();
 
-      // Argon2id, so the wait here is seconds rather than milliseconds.
-      //
-      // The account is restored at this point and the app knows the workspace
-      // is not on this device. Because the account has a vault with something
-      // in it, that screen must offer to restore from it — the whole point of
-      // having a backup is not being sent to find a second device. Enrolment
-      // belongs to the account rather than the device, so a freshly restored
-      // agent has to see the offer without any local state to go on.
-      await expect(fresh.getByTestId('vault-restore-offer')).toBeVisible({
-        timeout: 120_000,
-      });
-
-      // The heart of the test: the workspace is genuinely not here yet.
-      // Without this the assertion below cannot distinguish a restore from a
-      // page that already had the data.
-      await expect(fresh.getByRole('button', { name: canary })).toBeHidden();
-
-      await fresh.getByTestId('vault-restore-now').click();
-
-      // A successful restore navigates to the drive. Wait for that to land
-      // before going anywhere else: the navigation is fired by the app, so a
-      // `goto` issued while it is in flight gets replaced by it, and the next
-      // assertion then polls a page it was never on.
+      // The server still knows the original drive, so sign-in opens it.
+      // Only Vault knows the canary created in local-only mode above.
       await fresh.waitForURL(/\/app\/show\?subject=/, { timeout: 90_000 });
+      await expect(fresh.getByRole('button', { name: canary })).toBeHidden();
+      await openSync(fresh);
+      await expect(fresh.getByTestId('vault-restore')).toBeEnabled({
+        timeout: 30_000,
+      });
+      await fresh.getByTestId('vault-restore').click();
       await expect(
         fresh.getByRole('button', { name: canary }).first(),
       ).toBeVisible({ timeout: 90_000 });

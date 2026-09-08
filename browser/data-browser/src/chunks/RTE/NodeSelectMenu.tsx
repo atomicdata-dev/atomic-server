@@ -3,6 +3,7 @@ import { useTipTapEditor } from './TiptapContext';
 import { useEditorState, type Editor } from '@tiptap/react';
 
 const getSelectedNode = (editor: Editor): string => {
+  if (editor.isDestroyed) return 'paragraph';
   if (editor.isActive('codeBlock')) return 'codeBlock';
   if (editor.isActive('orderedList')) return 'orderedList';
   if (editor.isActive('bulletList')) return 'bulletList';
@@ -25,7 +26,24 @@ const nodeData = (name: string): [title: string, level?: number] => {
   return [name];
 };
 
-export function NodeSelectMenu(): React.JSX.Element {
+// Keep command getters inside the event handler. Compiler-inferred callback
+// dependencies otherwise read them during render, after TipTap teardown.
+function changeNodeType(editor: Editor, nodeType: string) {
+  if (editor.isDestroyed) return;
+  const [targetNodeTitle, level] = nodeData(nodeType);
+
+  if (nodeType === 'orderedList') {
+    editor.commands.toggleOrderedList();
+  } else if (nodeType === 'bulletList') {
+    editor.commands.toggleBulletList();
+  } else if (nodeType === 'taskList') {
+    editor.commands.toggleTaskList();
+  } else {
+    editor.commands.setNode(targetNodeTitle, level ? { level } : undefined);
+  }
+}
+
+export function NodeSelectMenu(): React.JSX.Element | null {
   const editor = useTipTapEditor();
   const { activeNode } = useEditorState({
     editor,
@@ -34,27 +52,13 @@ export function NodeSelectMenu(): React.JSX.Element {
     }),
   });
 
-  if (!editor) return <></>;
-
-  const changeNodeType = (nodeType: string) => {
-    const [targetNodeTitle, level] = nodeData(nodeType);
-
-    if (nodeType === 'orderedList') {
-      editor.commands.toggleOrderedList();
-    } else if (nodeType === 'bulletList') {
-      editor.commands.toggleBulletList();
-    } else if (nodeType === 'taskList') {
-      editor.commands.toggleTaskList();
-    } else {
-      editor.commands.setNode(targetNodeTitle, level ? { level } : undefined);
-    }
-  };
+  if (!editor || editor.isDestroyed) return null;
 
   return (
     <BasicSelect
       value={activeNode}
       disabled={editor.isActive('image')}
-      onChange={e => changeNodeType(e.target.value)}
+      onChange={e => changeNodeType(editor, e.target.value)}
     >
       <option value='paragraph'>Paragraph</option>
       <option value='codeBlock'>Codeblock</option>

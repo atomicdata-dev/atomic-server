@@ -1,3 +1,4 @@
+// @wc-ignore-file
 import { CodeGenerator } from './CodeGenerator';
 import { renderImports, LangEnv } from './generatorUtils';
 

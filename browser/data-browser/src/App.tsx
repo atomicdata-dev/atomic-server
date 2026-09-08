@@ -133,6 +133,8 @@ const storedAgent = await getAgentFromIDB();
 const locked = shouldLock(storedAgent?.subject);
 
 if (locked) {
+  // A locked identity must not restore and subscribe its private drive anonymously.
+  driveStorage.set('');
   await saveAgentToIDB(undefined);
 }
 
@@ -154,9 +156,7 @@ if (initialDrive) {
   // An HTTP URL with a path is a real legacy drive and is safe to
   // restore: `setDrive` will not follow a foreign origin.
   if (Client.isBareHttpOrigin(initialDrive)) {
-    console.warn(
-      `[atomic] Ignoring stored drive '${initialDrive}': it is a server origin, not a workspace.`,
-    );
+    driveStorage.set('');
   } else {
     store.setDrive(initialDrive);
   }
@@ -194,7 +194,7 @@ if (
 // Fire-and-forget: resolves once the resource is fetched, and `setDrive`
 // propagates into AppSettings via the DriveChanged event.
 import { adoptDriveFromDeepLink } from './helpers/adoptDriveFromDeepLink';
-adoptDriveFromDeepLink(store);
+if (!locked) adoptDriveFromDeepLink(store);
 
 import { bootstrap } from './bootstrap';
 bootstrap(store);

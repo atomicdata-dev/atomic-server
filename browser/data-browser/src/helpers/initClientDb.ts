@@ -71,6 +71,10 @@ export function initClientDb(store: Store): void {
 }
 
 function scheduleStart(store: Store, agentSubject: string | undefined): void {
+  // Detach synchronously on identity change: a caller can save immediately
+  // after setAgent(), before the serialized restart has derived the new key.
+  // It must not write to the previous identity's worker (or its destroyed RPC).
+  if (currentIdentity !== agentSubject) store.setClientDb(undefined);
   restartChain = restartChain
     .then(() => startForIdentity(store, agentSubject))
     .catch(err => {
@@ -124,15 +128,32 @@ async function startForIdentity(
 ): Promise<void> {
   // AgentChanged also fires for same-identity re-signins; only an actual
   // identity change warrants tearing down the worker.
-  if (currentIdentity !== null && currentIdentity === agentSubject) return;
+  if (store.getAgent()?.subject !== agentSubject) return;
+  if (currentWorker && currentIdentity === agentSubject) return;
 
   const isFirstStart = currentIdentity === null;
   currentIdentity = agentSubject;
 
   if (currentWorker) {
-    currentWorker.destroy();
+    const previous = currentWorker;
     currentWorker = undefined;
+
+    // Finish queued writes and fsync before releasing this identity's OPFS
+    // lock. Abrupt termination rejected writes and could discard recent edits.
+    try {
+      if (await previous.waitForReady()) await previous.flush();
+    } catch (error) {
+      store.notifyError(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    } finally {
+      previous.destroy();
+    }
   }
+
+  // Another identity may have arrived while the previous worker flushed.
+  // Do not briefly attach its predecessor and release saves into the wrong DB.
+  if (store.getAgent()?.subject !== agentSubject) return;
 
   let dbName = ANON_DB_NAME;
   let dbKey: Uint8Array | undefined;
@@ -141,6 +162,8 @@ async function startForIdentity(
     dbName = await dbNameForAgent(agentSubject);
     dbKey = await resolveDbKey(agentSubject);
   }
+
+  if (store.getAgent()?.subject !== agentSubject) return;
 
   const wasmUrl = wasmJsUrl();
 
@@ -243,7 +266,12 @@ async function startForIdentity(
     // exactly what the per-agent split exists to prevent. A fresh
     // per-agent database gets its ~200 bundled defaults from the
     // Rust-side `populate::bootstrap` instead.
-    if (!isFirstStart) return;
+    if (
+      !isFirstStart ||
+      currentWorker !== clientDb ||
+      store.getAgent()?.subject !== agentSubject
+    )
+      return;
 
     const endPostInit = perfSpan('clientdb.postInit');
     // Skip the seed entirely when:
@@ -385,7 +413,11 @@ async function startForIdentity(
       // (leader election spans seconds) was still running. A destroyed
       // worker must not re-attach itself over its replacement or surface
       // errors the replacement already resolved.
-      if (currentWorker !== clientDb) return;
+      if (
+        currentWorker !== clientDb ||
+        store.getAgent()?.subject !== agentSubject
+      )
+        return;
 
       // Re-emit so the sync page picks up clientDbReady: true.
       // The previous "safety net" reseed at this point — every
@@ -403,12 +435,16 @@ async function startForIdentity(
       // ghost-leader lock it couldn't reclaim). Surface that to the user —
       // otherwise the app silently renders empty, unpersisted resources with
       // no explanation of why local caching/offline isn't working.
-      if (clientDb.initError) {
+      if (clientDb.initError && !clientDb.unsupportedEnvironment) {
         store.notifyError(clientDb.initError);
       }
     })
     .catch(err => {
-      if (currentWorker !== clientDb) return;
+      if (
+        currentWorker !== clientDb ||
+        store.getAgent()?.subject !== agentSubject
+      )
+        return;
 
       console.warn('[ClientDb] Failed to initialize:', err);
       // Re-emit so the Sync page can show the error (clientDbError).

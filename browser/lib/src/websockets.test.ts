@@ -1,3 +1,5 @@
+import { Resource } from './resource.js';
+import { AtomicError, ErrorType } from './error.js';
 import { describe, it, vi, afterEach } from 'vitest';
 import { testStore } from './test-store.js';
 import { WSClient } from './websockets.js';
@@ -119,6 +121,38 @@ describe('WSClient handshake', () => {
     vi.useRealTimers();
   });
 
+  it('a replaced socket cannot mark the new connection offline on its late close', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    // Match the primary origin checked by reportConnected.
+    vi.spyOn(store, 'getServerUrl').mockReturnValue('https://example.com');
+    client.close();
+    store.setServerConnected(true);
+    socket.fire('close', { code: 1000, reason: '', wasClean: true });
+    expect(store.serverConnected).toBe(true);
+  });
+
+  it.each([
+    ['Resource not found. did:ad:missing', ErrorType.NotFound],
+    ['Unauthorized. did:ad:private', ErrorType.Unauthorized],
+    ['Storage unavailable', ErrorType.Server],
+  ])('classifies legacy GET errors: %s', async (message, errorType) => {
+    const { expect } = await import('vitest');
+    const { client, socket } = await connectedClient();
+    vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+    const result = client.fetch('did:ad:missing');
+    const rejected = expect(result).rejects.toMatchObject({ type: errorType });
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+    );
+    const frame = framesWithTag(socket, Tag.GET)[0];
+    const requestId = new DataView(frame.buffer, frame.byteOffset).getUint16(1);
+    socket.receive(encodeError(requestId, ErrorCode.UNKNOWN, message));
+    await rejected;
+    client.close();
+  });
+
   it('introduces itself with a HELLO listing its capabilities on open', async ({
     expect,
   }) => {
@@ -129,6 +163,29 @@ describe('WSClient handshake', () => {
     expect(decodeHelloCaps(hellos[0].subarray(1))).toEqual([
       ...CLIENT_CAPABILITIES,
     ]);
+    client.close();
+  });
+
+  it('does not send presence until the current identity is authenticated', async ({
+    expect,
+  }) => {
+    const { client, socket } = await connectedClient();
+    socket.receive(encodeChallenge('presence-test'));
+    client.subscribePresence('did:ad:drive');
+    client.sendPresenceUpdate('did:ad:drive', new Uint8Array([1]));
+    const presenceSubscriptions = () =>
+      socket.sent.filter(frame =>
+        new TextDecoder().decode(frame).startsWith('PRESENCE_SUBSCRIBE '),
+      );
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    expect(presenceSubscriptions()).toHaveLength(0);
+    expect(framesWithTag(socket, Tag.EPHEMERAL)).toHaveLength(0);
+    socket.receive(encodeAuthOk([]));
+    await vi.waitFor(() => expect(presenceSubscriptions()).toHaveLength(1));
+    client.sendPresenceUpdate('did:ad:drive', new Uint8Array([2]));
+    expect(framesWithTag(socket, Tag.EPHEMERAL)).toHaveLength(1);
     client.close();
   });
 
@@ -189,6 +246,65 @@ describe('WSClient drive sync probe', () => {
     vi.restoreAllMocks();
   });
 
+  it('does not send a sync probe computed for a previous identity', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(store, 'computeDriveSyncState').mockImplementation(async () => {
+      store.setAgent(undefined);
+
+      return {
+        drive: 'did:ad:drive',
+        driveHash: 'hash',
+        peers: [],
+        resources: {},
+      } as never;
+    });
+    await (
+      client as unknown as { startVVSync: (drive: string) => Promise<void> }
+    ).startVVSync('did:ad:drive');
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(0);
+    client.close();
+  });
+
+  it('stops range reconciliation when the identity changes between replies', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('cancel-sync'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+      drive: 'did:ad:drive',
+      driveHash: 'hash',
+      peers: [],
+      resources: {},
+    } as never);
+    const internal = client as unknown as {
+      sendReducedSyncState: (drive: string) => Promise<void>;
+      startVVSync: (drive: string) => Promise<void>;
+      rbsrFingerprints: () => Promise<string[]>;
+      rbsrItems: () => Promise<never[]>;
+    };
+    vi.spyOn(internal, 'rbsrFingerprints').mockImplementation(async () => {
+      store.setAgent(undefined);
+
+      return ['ff'.repeat(32)];
+    });
+    const items = vi.spyOn(internal, 'rbsrItems').mockResolvedValue([]);
+    const warning = vi.spyOn(console, 'warn');
+    await internal.startVVSync('did:ad:drive');
+    await internal.sendReducedSyncState('did:ad:drive');
+    expect(items).not.toHaveBeenCalled();
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(1);
+    expect(warning).not.toHaveBeenCalled();
+    client.close();
+  });
+
   it('probes with a binary SYNC and reconciles on SYNC_RESEND', async ({
     expect,
   }) => {
@@ -246,6 +362,14 @@ describe('WSClient live collaboration', () => {
     expect,
   }) => {
     const { client, socket, store } = await connectedClient();
+
+    socket.receive(encodeChallenge('collaboration'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
 
     // Outbound: one binary frame per channel, agent left for the server.
     client.sendLoroEphemeralUpdate('did:ad:doc', new Uint8Array([1]));
@@ -305,6 +429,13 @@ describe('WSClient drive subscription', () => {
     expect,
   }) => {
     const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('drive-subscription'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
     vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
     const subscribe = (
       client as unknown as { subscribeToDrive: () => void }
@@ -326,6 +457,12 @@ describe('WSClient drive subscription', () => {
     expect(new TextDecoder().decode(unsubs[0].subarray(1))).toBe(
       'did:ad:drive-a',
     );
+    expect(framesWithTag(socket, Tag.SUB)).toHaveLength(3);
+    const missingDrive = new Resource('did:ad:missing-drive');
+    missingDrive.setError(new AtomicError('Not here', ErrorType.NotFound));
+    store.resources.set(missingDrive.subject, missingDrive);
+    vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:missing-drive');
+    subscribe();
     expect(framesWithTag(socket, Tag.SUB)).toHaveLength(3);
     client.close();
   });
@@ -466,7 +603,6 @@ describe('WSClient SYNC_DIFF and the outbox', () => {
           getLoroDoc: () => ({ subject }),
         }) as unknown as ReturnType<typeof store.resources.get>,
     );
-    const { Resource } = await import('./resource.js');
     vi.spyOn(Resource, 'exportLoroBytesForSync').mockImplementation(
       (doc: unknown) => {
         exported.push((doc as { subject: string }).subject);

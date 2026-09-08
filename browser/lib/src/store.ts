@@ -16,6 +16,7 @@ import { CommitBuilder, commitIdOf, type Commit } from './commit.js';
 import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
+  RequestCancelledError,
   ErrorType,
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
@@ -109,6 +110,8 @@ type CreateResourceOptions = {
   /** When set, the resource is minted from this cert (deterministic DID)
    *  instead of a random-nonce certificate. */
   genesisCert?: GenesisCert;
+  /** Seed a body or other state before the first save signs its genesis. */
+  deferGenesis?: boolean;
 };
 
 export interface StoreOpts {
@@ -748,7 +751,7 @@ export class Store {
     });
   }
 
-  public setClientDb(clientDb: ClientDbWorker): void {
+  public setClientDb(clientDb: ClientDbWorker | undefined): void {
     // `initClientDb` calls this three times per page load (eager,
     // post-init, post-init-error) to refresh sync status. Only the
     // first call introduces a new worker; the others just want
@@ -757,7 +760,9 @@ export class Store {
 
     // Release fetches that started before the attach and would otherwise be
     // about to fail a resource this database can answer for.
-    for (const waiter of [...this.clientDbWaiters]) waiter();
+    if (clientDb) {
+      for (const waiter of [...this.clientDbWaiters]) waiter();
+    }
 
     this.emitSyncStatus();
   }
@@ -1045,6 +1050,14 @@ export class Store {
           );
         },
       });
+
+      // Children may call syncDirtyResources themselves. Start them only after
+      // the parent's drain has completed, never from inside its drain callback.
+      for (const parent of [...this.batchedResources.keys()]) {
+        if (this.resources.get(parent)?.getLastCommitForChain()) {
+          await this.saveBatchForParent(parent);
+        }
+      }
     } finally {
       this.emitSyncStatus();
       // Re-arm for entries that remain — including ones skipped this pass
@@ -1186,7 +1199,6 @@ export class Store {
         await this.maybePushBlobForResource(resource).catch(() => undefined);
         // wasNew pipeline — first-time subscribe + save batched children
         this.subscribeWebSocket(subject);
-        await this.saveBatchForParent(subject);
         // The genesis POST IS a save — fire `ResourceSaved` so listeners
         // waiting on first persistence run. The FilePicker, for example,
         // can't upload a file until its parent resource exists on the
@@ -1771,14 +1783,26 @@ export class Store {
     if (this._gapRecoveries.has(subject)) return;
 
     this._gapRecoveries.add(subject);
-    console.warn(
+    console.info(
       `[Store] incomplete Loro import for ${subject.slice(0, 60)} ` +
         `(source: ${source ?? 'unknown'}) — missing base state, fetching a full ` +
         `snapshot to catch up.`,
     );
 
     this.fetchResourceFromServer(subject, { forceOverride: true })
-      .catch(() => undefined)
+      .catch(error => {
+        console.warn(
+          `[Store] failed to recover missing state for ${subject}:`,
+          error,
+        );
+
+        if (!this.resources.get(subject)?.get(core.properties.isA)) {
+          this.failResource(
+            subject,
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        }
+      })
       .finally(() => {
         this._gapRecoveries.delete(subject);
       });
@@ -1794,6 +1818,18 @@ export class Store {
   ): 'applied' | 'deduped' | 'invalid' {
     // Resource-direct path: caller is the authoritative producer.
     if (change.resource) {
+      if (
+        change.source === 'local-acked' &&
+        change.commitId &&
+        change.resource.error instanceof AtomicError &&
+        change.resource.error.type === ErrorType.NotFound
+      ) {
+        // A pre-genesis lookup may fail while the creation is in flight.
+        // The server acknowledgement proves that this resource now exists.
+        change.resource.error = undefined;
+        change.resource.loading = false;
+      }
+
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
       this.addResource(change.resource, {
@@ -1832,7 +1868,13 @@ export class Store {
       (existing.get(commits.properties.lastCommit) === change.commitId ||
         (!!ownSignature && existing.appliedCommitSignatures.has(ownSignature)));
 
-    if (!change.forceNotify && existing && !existing.loading && isOwnCommit) {
+    if (
+      !change.forceNotify &&
+      existing &&
+      !existing.loading &&
+      !existing.error &&
+      isOwnCommit
+    ) {
       if (!subject.startsWith('did:ad:commit:')) {
         existing.importLoroUpdate(change.loroBytes);
       }
@@ -1887,25 +1929,6 @@ export class Store {
     // resource already had usable content from a prior good import
     // (a late/partial live push shouldn't blow away a good state).
     if (!complete && !isCommitDetail) {
-      if (!resource.get(core.properties.isA)) {
-        console.warn(
-          `[Store] applyIncoming: incomplete Loro import for ${subject.slice(0, 60)} ` +
-            `(source: ${change.source}) — server sent a delta this client can't apply ` +
-            `(missing base state). Surfacing as error.`,
-        );
-        if (change.commitId) resource.setLastCommitValue(change.commitId);
-        this.failResource(
-          subject,
-          new Error(
-            'Sync error: received an incomplete update for this resource ' +
-              '(missing base state). Try reloading; if it persists, the ' +
-              "local cache may be out of sync with the server's history.",
-          ),
-        );
-
-        return 'invalid';
-      }
-
       // The resource already has usable content, so failing it would throw
       // away good state for the sake of an update we couldn't apply. The old
       // code took the other extreme and fell through to `return 'applied'`,
@@ -1929,6 +1952,9 @@ export class Store {
     }
 
     if (change.commitId) resource.setLastCommitValue(change.commitId);
+    // A successful read/update supersedes an earlier failed lookup (including
+    // a pre-genesis read that arrived after this resource was created).
+    resource.error = undefined;
     resource.loading = false;
     this.addResource(resource, { skipCommitCompare: true });
 
@@ -2107,6 +2133,7 @@ export class Store {
     noParent,
     did,
     genesisCert,
+    deferGenesis,
   }: CreateResourceOptions = {}): Promise<Resource<C>> {
     const shouldUseDid =
       did ?? this.getAgent()?.subject?.startsWith('did:ad:agent:') ?? false;
@@ -2187,7 +2214,7 @@ export class Store {
     // only `save()` does (it moves the stash into the outbox). So a
     // created-but-never-saved resource (e.g. an unfilled `TableNewRow`) is never
     // POSTed. This is the only remaining `signChanges` call site.
-    if ((shouldUseDid && !subject) || genesisCert) {
+    if (!deferGenesis && ((shouldUseDid && !subject) || genesisCert)) {
       const genesisCommit = await resource.signChanges(this.getAgent()!);
       resource.stashGenesis(genesisCommit);
     }
@@ -2237,7 +2264,12 @@ export class Store {
       const existingDid = await this.resolvePrivateDriveSubject(agent);
       const existing = this._resources.get(existingDid);
 
-      if (existing && !existing.new && !existing.error) {
+      if (
+        existing?.isReady() &&
+        !existing.new &&
+        !existing.error &&
+        existing.hasClasses(server.classes.drive)
+      ) {
         const oldPointer = await this.linkPrivateDrive(
           existing,
           agent.subject,
@@ -3120,6 +3152,11 @@ export class Store {
       // we have no other signal.
       await askOnceAttached();
 
+      // The request may predate a local creation or restore. Its initial
+      // cache miss is not evidence that the resource is still missing now.
+      const current = this.resources.get(subject);
+      if (current?.isReady() && this.hasRenderableContent(current)) return;
+
       if (!hasLocalData) {
         this.failResource(
           subject,
@@ -3325,7 +3362,7 @@ export class Store {
         ? { agent: this.agent, serverURL: this.getServerUrl() }
         : undefined;
 
-      const { resource, createdResources } =
+      const { resource, createdResources, cancelled } =
         await this.client.fetchResourceHTTP(fetchSubject, {
           from: opts.fromProxy ? this.getServerUrl() : undefined,
           method: opts.method,
@@ -3333,6 +3370,9 @@ export class Store {
           signInfo,
           serverURL: this.getServerUrl(),
         });
+
+      if (cancelled)
+        return this.resources.get(normalizedSubject) as Resource<C>;
 
       // `fetchResourceHTTP` reports failure by returning an EMPTY resource
       // carrying the error. Applying that when the server was merely
@@ -4134,6 +4174,10 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    // The current drive is an account context, not a server preference. Clear
+    // it before reauthenticating, so the next identity never subscribes or
+    // reconciles the previous identity's private workspace.
+    if (this.agent && this.agent.subject !== agent?.subject) this.setDrive('');
     this.agent = agent;
 
     // The outbox is identity-scoped: rebind to this agent's own queue so a new
@@ -4154,6 +4198,7 @@ export class Store {
 
       this.webSockets.forEach(ws => {
         ws.authenticate(true).catch(e => {
+          if (e instanceof RequestCancelledError) return;
           this.notifyError(e);
         });
       });
@@ -5304,6 +5349,40 @@ export class Store {
       return subjects;
     }
 
+    // A child's certificate binds its parent permanently. Settle the form's
+    // certificate DID first, but leave its genesis unsigned until Save so the
+    // required attachment property is included in the first server commit.
+    if (
+      parent.startsWith('_new:') &&
+      agent.subject?.startsWith('did:ad:agent:')
+    ) {
+      const parentResource = this.resources.get(parent);
+      if (!parentResource) throw new Error('Upload parent is not in the store');
+      const parentParent = parentResource.get(core.properties.parent) as
+        | string
+        | undefined;
+      const driveProperty = 'https://atomicdata.dev/properties/drive';
+      const driveSubject =
+        (parentResource.get(driveProperty) as string | undefined) ??
+        (this.resources.get(parentParent ?? '')?.get(driveProperty) as
+          | string
+          | undefined) ??
+        parentParent ??
+        this.getDrive() ??
+        '';
+      const minted = await this.mintCertDid(parentParent ?? '', driveSubject);
+      await parentResource.set(
+        'https://atomicdata.dev/properties/genesis',
+        minted.certB64,
+        false,
+      );
+      await parentResource.set(driveProperty, driveSubject, false);
+      this.resources.delete(parent);
+      parentResource.setSubject(minted.did);
+      this.addResource(parentResource, { alias: parent });
+      parent = minted.did;
+    }
+
     const createdSubjects: string[] = [];
     const useDid =
       this.getAgent()!.subject?.startsWith('did:ad:agent:') ?? false;
@@ -5437,6 +5516,7 @@ export class Store {
       try {
         return await ws.postCommit(commit);
       } catch (e) {
+        if (e instanceof RequestCancelledError) throw e;
         // Fall through to HTTP — a broken WS shouldn't block saves while
         // the reconnect timer is still backing off. The WS error already
         // surfaced in console; the HTTP path will produce its own.
@@ -5537,13 +5617,22 @@ export class Store {
 
     if (!subjects) return;
 
-    for (const resourceSubject of subjects) {
-      const resource = this._resources.get(resourceSubject);
-
-      await resource?.save();
-    }
-
+    // Claim the batch before children recursively drain their own saves.
     this.batchedResources.delete(subject);
+
+    try {
+      for (const resourceSubject of subjects) {
+        const resource = this._resources.get(resourceSubject);
+        await resource?.save();
+        subjects.delete(resourceSubject);
+      }
+    } catch (error) {
+      this.batchedResources.set(
+        subject,
+        new Set([...subjects, ...(this.batchedResources.get(subject) ?? [])]),
+      );
+      throw error;
+    }
   }
 
   public async importJsonAD(
@@ -5658,11 +5747,21 @@ export class Store {
    *  dropped by `removeResource` and by a failed write. */
   private lastPersistedStamp = new Map<string, number>();
 
+  private snapshotReadDepth = 0;
+
   public getResourceSnapshot(
     subject: string,
     opts: FetchOpts = {},
   ): { resource: Resource } {
-    const r = this.getResourceLoading(subject, opts);
+    let r: Resource;
+    this.snapshotReadDepth++;
+
+    try {
+      r = this.getResourceLoading(subject, opts);
+    } finally {
+      this.snapshotReadDepth--;
+    }
+
     const key = this.normalizeSubject(r.subject);
     let snap = this.snapshots.get(key);
 
@@ -5720,6 +5819,14 @@ export class Store {
 
   /** Lets subscribers know that a resource has been changed. */
   private async notify(resource: Resource): Promise<void> {
+    // A React snapshot read may initialize a missing resource. Other mounted
+    // readers must not receive a state update inside that render.
+    if (this.snapshotReadDepth > 0) {
+      queueMicrotask(() => void this.notify(resource));
+
+      return;
+    }
+
     // Bump snapshot tuple identity so `useSyncExternalStore` consumers
     // re-render. The Resource itself is mutated in place, but a fresh
     // outer `{resource}` object is `!== ` the previous one, which is

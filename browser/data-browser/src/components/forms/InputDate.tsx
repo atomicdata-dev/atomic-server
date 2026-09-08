@@ -46,7 +46,7 @@ export function InputDate({
       <StyledInputWrapper>
         <InputStyled
           type='date'
-          value={value}
+          value={value ?? ''}
           onChange={handleChange}
           onBlur={setTouched}
           required={required}

@@ -1,6 +1,6 @@
 import { beforeAll, describe, it, vi } from 'vitest';
 import { LoroLoader } from './loro-loader.js';
-import { Resource } from './resource.js';
+import { Resource, ResourceEvents } from './resource.js';
 import { core } from './index.js';
 
 /**
@@ -29,6 +29,21 @@ beforeAll(async () => {
 });
 
 describe('importLoroUpdate — snapshot arriving before Loro is ready', () => {
+  it('does not notify subscribers synchronously from lazy snapshot materialization', async ({
+    expect,
+  }) => {
+    const unloaded = vi.spyOn(LoroLoader, 'isLoaded').mockReturnValue(false);
+    const resource = new Resource('did:ad:lazy-read');
+    resource.importLoroUpdate(snapshotBytes);
+    unloaded.mockRestore();
+    const changed = vi.fn();
+    resource.on(ResourceEvents.LoadingChange, changed);
+    resource.getLoroDoc();
+    expect(changed).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(changed).toHaveBeenCalledWith(false);
+  });
+
   it('buffers without applying, then materializes once Loro is ready', ({
     expect,
   }) => {

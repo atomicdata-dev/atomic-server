@@ -1,3 +1,4 @@
+import { RequestCancelledError } from './error.js';
 import { describe, it, beforeEach, vi } from 'vitest';
 import {
   LocalOutbox,
@@ -113,6 +114,24 @@ describe('commit subjects never queue', () => {
 describe('LocalOutbox.drain', () => {
   beforeEach(() => {
     if (typeof localStorage !== 'undefined') localStorage.clear();
+  });
+
+  it('keeps cancelled work queued without failure backoff', async ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    outbox.markDirty(SUBJECT);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await outbox.drain({
+      sort: entries => [...entries],
+      drainSubject: async () => {
+        throw new RequestCancelledError('Disconnected');
+      },
+    });
+    expect(outbox.getEntry(SUBJECT)).toBeDefined();
+    expect(outbox.getEntry(SUBJECT)?.failures ?? 0).toBe(0);
+    expect(warning).not.toHaveBeenCalled();
+    warning.mockRestore();
   });
 
   it('drops entries on terminal error + calls onTerminalDrop', async ({

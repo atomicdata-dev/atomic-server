@@ -21,7 +21,7 @@ function DateTimeCellEdit({
   return (
     <InputBase
       type='datetime-local'
-      value={localDate}
+      value={localDate ?? ''}
       autoFocus
       onChange={handleChange}
     />

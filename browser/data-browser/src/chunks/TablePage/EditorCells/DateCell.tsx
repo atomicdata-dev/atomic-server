@@ -44,7 +44,7 @@ function DateCellEdit({
   return (
     <InputBase
       type='date'
-      value={innerValue}
+      value={innerValue ?? ''}
       autoFocus
       onChange={handleChange}
     />

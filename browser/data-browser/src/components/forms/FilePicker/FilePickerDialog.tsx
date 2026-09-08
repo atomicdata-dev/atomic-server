@@ -45,11 +45,11 @@ export function FilePickerDialog({
   const [query, setQuery] = useState('');
   const [queryIsURL, setQueryIsURL] = useState(false);
 
-  const { results } = useServerSearch(query, {
+  const { results } = useServerSearch(show ? query : '', {
     filters: {
       [core.properties.isA]: server.classes.file,
     },
-    allowEmptyQuery: true,
+    allowEmptyQuery: show,
     parents: [drive],
   });
 

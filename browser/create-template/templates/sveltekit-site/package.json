@@ -41,11 +41,5 @@
 		"@tomic/svelte": "^0.41.0-beta.5",
 		"loro-crdt": "^1.12.1",
 		"svelte-markdown": "^0.4.1"
-	},
-	"pnpm": {
-		"overrides": {
-			"@swc/core": "1.15.47",
-			"@swc/wasm": "1.15.47"
-		}
 	}
 }

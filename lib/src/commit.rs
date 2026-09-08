@@ -759,7 +759,23 @@ impl Commit {
                 // was true here proves the commit *did* contribute work to
                 // the Loro doc; we just can't observe it through the
                 // propval projection. Accept and trust Loro CRDT.
-                let all_match = if incoming_intent.is_empty() {
+                // Atom diffs only cover properties. A document or canvas
+                // merge can change another root while historical property
+                // writes lose LWW. Count that visible change as well, just as
+                // we already accept commits that change at least one atom.
+                let body_state = |doc: &crate::loro::AtomicLoroDoc| {
+                    let loro::LoroValue::Map(roots) = doc.doc().get_deep_value() else {
+                        return std::collections::BTreeMap::new();
+                    };
+                    roots
+                        .iter()
+                        .filter(|(key, _)| !matches!(key.as_str(), "properties" | "datatypes"))
+                        .map(|(key, value)| (key.to_string(), value.clone()))
+                        .collect::<std::collections::BTreeMap<_, _>>()
+                };
+                let body_changed =
+                    body_state(&applied.resource_old.build_state_doc()?) != body_state(&merged_doc);
+                let all_match = if body_changed || incoming_intent.is_empty() {
                     true
                 } else {
                     incoming_intent.iter().all(|(key, incoming_val)| {
@@ -2805,6 +2821,84 @@ mod test {
         );
     }
 
+    #[tokio::test]
+    async fn body_merge_with_restored_properties_passes_causality_guard() {
+        let (store, agent) = store_with_known_agent().await;
+        let subject = "https://localhost/body_merge_guard";
+        let opts = CommitOpts {
+            validate_schema: false,
+            validate_signature: true,
+            validate_timestamp: false,
+            validate_loro_causality: true,
+            validate_rights: false,
+            validate_for_agent: None,
+            update_index: true,
+            source_id: None,
+        };
+        let original = crate::loro::AtomicLoroDoc::new();
+        original
+            .set_property(crate::urls::NAME, &Value::String("Original".into()))
+            .unwrap();
+        original
+            .doc()
+            .get_map("doc")
+            .insert("intro", "Original body")
+            .unwrap();
+        let mut builder = CommitBuilder::new(subject.into());
+        builder.set_loro_update(original.export_snapshot());
+        let first = builder
+            .sign(&agent, &store, &Resource::new(subject.into()))
+            .await
+            .unwrap();
+        store.apply_commit(first, &opts).await.unwrap();
+        let stored = store.get_resource(&subject.into()).await.unwrap();
+        let original = stored.build_state_doc().unwrap();
+        let fork = crate::loro::AtomicLoroDoc::new();
+        fork.import_update(&original.export_snapshot()).unwrap();
+        let before = original.oplog_vv();
+        fork.set_property(crate::urls::NAME, &Value::String("Fork".into()))
+            .unwrap();
+        fork.set_property(
+            "https://atomicdata.dev/properties/originalSubject",
+            &Value::String(subject.into()),
+        )
+        .unwrap();
+        fork.doc()
+            .get_map("doc")
+            .insert("added", "Fork body edit")
+            .unwrap();
+        original.import_update(&fork.export_snapshot()).unwrap();
+        original
+            .set_property(crate::urls::NAME, &Value::String("Original".into()))
+            .unwrap();
+        original
+            .remove_property("https://atomicdata.dev/properties/originalSubject")
+            .unwrap();
+        let mut builder = CommitBuilder::new(subject.into());
+        builder.set_loro_update(original.export_updates_since(&before));
+        let merged = builder.sign(&agent, &store, &stored).await.unwrap();
+        store
+            .apply_commit(merged, &opts)
+            .await
+            .expect("body changes are not a lost property write");
+        let after = store.get_resource(&subject.into()).await.unwrap();
+        assert_eq!(
+            after.get(crate::urls::NAME).unwrap().to_string(),
+            "Original"
+        );
+        assert_eq!(
+            after
+                .build_state_doc()
+                .unwrap()
+                .doc()
+                .get_map("doc")
+                .get("added")
+                .unwrap()
+                .get_deep_value(),
+            loro::LoroValue::from("Fork body edit")
+        );
+    }
+
     /// Re-applying a commit the server has already applied must be accepted
     /// as an idempotent replay — NOT rejected as a silent LWW loss. The
     /// browser outbox relies on this when it retransmits a commit. The
@@ -2938,6 +3032,90 @@ mod test {
     /// one wins. We pin the peer IDs so docA always wins LWW: docB's writes
     /// are guaranteed to be silently dropped against the merged state, which
     /// is exactly the case the causality guard exists to catch.
+    #[tokio::test]
+    async fn body_changes_count_when_concurrent_properties_lose() {
+        let (store, agent) = store_with_known_agent().await;
+        let subject = "https://localhost/concurrent_peers";
+
+        // Commit 1: docA → name="A". Pin peer ID high so this peer wins LWW
+        // tiebreaks against docB.
+        let doc_a = crate::loro::AtomicLoroDoc::new();
+        doc_a.set_peer_id(u64::MAX - 1).unwrap();
+        doc_a
+            .set_property(crate::urls::NAME, &Value::String("A".into()))
+            .unwrap();
+        doc_a
+            .set_property(
+                crate::urls::IS_A,
+                &Value::ResourceArray(vec![crate::urls::CLASS.to_string().into()]),
+            )
+            .unwrap();
+        doc_a
+            .set_property(crate::urls::SHORTNAME, &Value::String("a".into()))
+            .unwrap();
+        doc_a
+            .set_property(crate::urls::DESCRIPTION, &Value::String("desc".into()))
+            .unwrap();
+
+        let empty = Resource::new(subject.into());
+        let mut builder = CommitBuilder::new(subject.into());
+        builder.set_loro_update(doc_a.export_snapshot());
+        let commit1 = builder.sign(&agent, &store, &empty).await.unwrap();
+        store.apply_commit(commit1, &OPTS).await.unwrap();
+
+        // Commit 2: docB = FRESH, NOT seeded from server. Pin peer ID low so
+        // this peer always loses LWW tiebreaks against docA.
+        let doc_b = crate::loro::AtomicLoroDoc::new();
+        doc_b.set_peer_id(1).unwrap();
+        doc_b
+            .set_property(crate::urls::NAME, &Value::String("B".into()))
+            .unwrap();
+        doc_b
+            .set_property(
+                crate::urls::IS_A,
+                &Value::ResourceArray(vec![crate::urls::CLASS.to_string().into()]),
+            )
+            .unwrap();
+        doc_b
+            .set_property(crate::urls::SHORTNAME, &Value::String("b".into()))
+            .unwrap();
+        doc_b
+            .set_property(crate::urls::DESCRIPTION, &Value::String("desc".into()))
+            .unwrap();
+
+        doc_b
+            .doc()
+            .get_map("doc")
+            .insert("added", "Body edit")
+            .unwrap();
+        let after_first = store.get_resource(&subject.into()).await.unwrap();
+        let mut builder2 = CommitBuilder::new(subject.into());
+        builder2.set_loro_update(doc_b.export_snapshot());
+        let commit2 = builder2.sign(&agent, &store, &after_first).await.unwrap();
+        store
+            .apply_commit(commit2, &OPTS)
+            .await
+            .expect("a body edit is a state change");
+
+        let after_second = store.get_resource(&subject.into()).await.unwrap();
+        assert_eq!(
+            after_second.get(crate::urls::NAME).unwrap().to_string(),
+            "A",
+            "stored name should still be `A` since commit 2 was rejected"
+        );
+        assert_eq!(
+            after_second
+                .build_state_doc()
+                .unwrap()
+                .doc()
+                .get_map("doc")
+                .get("added")
+                .unwrap()
+                .get_deep_value(),
+            loro::LoroValue::from("Body edit")
+        );
+    }
+
     #[tokio::test]
     async fn two_commits_with_independent_docs_both_peers_same_key() {
         let (store, agent) = store_with_known_agent().await;

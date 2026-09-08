@@ -1,3 +1,4 @@
+import { pageRequestSignal } from './page-request-signal.js';
 import type * as Loro from 'loro-crdt';
 
 /**
@@ -50,6 +51,7 @@ export class LoroLoader {
   }
 
   private static async doInitialize(): Promise<void> {
+    const signal = pageRequestSignal();
     // In a browser, import loro-crdt's `web` build and run its
     // wasm-bindgen init. The default `loro-crdt` entry resolves (via
     // its `module` field) to the `bundler` build, whose WASM↔JS
@@ -72,7 +74,7 @@ export class LoroLoader {
           // and this resolves fine at runtime (bundler + Node). Reproduces
           // with a bare `tsc --noEmit` too — not typedoc-specific.
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-expect-error TS2307 — see comment above; import path itself is correct.
+          // @ts-ignore TS2307 under NodeNext; the app uses Bundler resolution.
           ((await import('loro-crdt/web')) as unknown as typeof Loro & {
             default?: unknown;
           })
@@ -90,6 +92,10 @@ export class LoroLoader {
 
       this._Loro = mod;
     } catch (e) {
+      // Navigation can discard the WASM response while compilation is pending.
+      // The departing document no longer needs an editor; active-page failures
+      // still reject and are reported below.
+      if (signal?.aborted) return;
       console.error(
         '[LoroLoader] initializeLoro: loro-crdt import/init failed:',
         e,

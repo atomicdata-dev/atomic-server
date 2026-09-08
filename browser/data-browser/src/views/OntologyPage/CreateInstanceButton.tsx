@@ -73,7 +73,7 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
     <>
       <InstanceButton onClick={() => setClassSelectorActive(true)}>
         <FaPlus />
-        New Instance
+        <span>New Instance</span>
       </InstanceButton>
       <ClassSelectorDialog
         show={classSelectorActive}

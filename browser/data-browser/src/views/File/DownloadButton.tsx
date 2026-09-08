@@ -41,7 +41,7 @@ export function DownloadButton({
     >
       <Row gap='0.5rem'>
         <FaDownload />
-        Download
+        <span>Download</span>
       </Row>
     </StyledButton>
   );

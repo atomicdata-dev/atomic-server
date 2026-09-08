@@ -216,7 +216,7 @@ export default function InputResourceArray({
               onClick={handleClear}
             >
               <Row gap='.5rem'>
-                <FaTrash /> Clear
+                <FaTrash /> <span>Clear</span>
               </Row>
             </StyledButton>
           )}

@@ -43,7 +43,7 @@ export function InputTimestamp({
       <StyledInputWrapper $invalid={!!error}>
         <InputStyled
           type='datetime-local'
-          value={localDate}
+          value={localDate ?? ''}
           required={required}
           onChange={handleChange}
           onBlur={setTouched}

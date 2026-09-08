@@ -68,7 +68,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
               <UpdatePluginButton plugin={resource} />
               <Button alert onClick={() => setShowUninstallDialog(true)}>
                 <FaTrash />
-                Uninstall
+                <span>Uninstall</span>
               </Button>
             </Row>
           )}
@@ -86,7 +86,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
             <h3 id={configLabelId}>
               <Row gap='0.5ch' center>
                 <FaGear />
-                Config
+                <span>Config</span>
               </Row>
             </h3>
             <Button
@@ -94,7 +94,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
               onClick={() => resource.save()}
             >
               <FaFloppyDisk />
-              Save
+              <span>Save</span>
             </Button>
           </Row>
           <JSONEditor

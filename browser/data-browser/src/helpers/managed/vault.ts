@@ -131,6 +131,7 @@ export type VaultObject = {
 };
 
 type UploadUrl = {
+  already_stored?: boolean;
   object_id: string;
   object_key: string;
   url: string;
@@ -281,10 +282,12 @@ export async function enrollVault(
   driveSubject: string,
   agentSubject: string,
   metadata?: { name?: string; emoji?: string },
+  signal?: AbortSignal,
 ): Promise<VaultEnrollment> {
   const created = await api<{ enrollment: VaultEnrollment }>(
     '/cloud-vault/enroll',
     {
+      signal,
       method: 'POST',
       body: JSON.stringify({
         drive_subject: driveSubject,
@@ -320,9 +323,10 @@ export async function disableVault(drivePseudonym: string): Promise<void> {
 export async function putVaultKeyEnvelope(
   drivePseudonym: string,
   envelope: string,
-  { replace = false }: { replace?: boolean } = {},
+  { replace = false, signal }: { replace?: boolean; signal?: AbortSignal } = {},
 ): Promise<void> {
   await api(`/cloud-vault/${drivePseudonym}/key`, {
+    signal,
     method: 'PUT',
     body: JSON.stringify({ envelope, replace }),
   });
@@ -361,8 +365,11 @@ export type DriveKeyHandle = {
  */
 export async function getVaultKeyEnvelopeRecord(
   drivePseudonym: string,
+  signal?: AbortSignal,
 ): Promise<{ envelope: string; keyEpoch: number } | null> {
+  signal?.throwIfAborted();
   const response = await managedFetch(`/cloud-vault/${drivePseudonym}/key`, {
+    signal,
     credentials: 'include',
   });
 
@@ -423,10 +430,30 @@ export function nextCheckpointFor(state: VaultDriveState): number {
   );
 }
 
+/** Read enrollment eligibility without attempting to claim another account's drive. */
+export async function canEnrollVault(
+  driveSubject: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const result = await api<{ can_enroll: boolean }>(
+    '/cloud-vault/eligibility',
+    {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({ drive_subject: driveSubject }),
+    },
+  );
+
+  return result.can_enroll;
+}
+
 export async function getVaultState(
   drivePseudonym: string,
+  signal?: AbortSignal,
 ): Promise<VaultDriveState> {
-  return api<VaultDriveState>(`/cloud-vault/${drivePseudonym}/state`);
+  return api<VaultDriveState>(`/cloud-vault/${drivePseudonym}/state`, {
+    signal,
+  });
 }
 
 /**
@@ -467,6 +494,7 @@ export async function listVaultObjects(
  */
 export async function backupDrive({
   db,
+  signal,
   driveSubject,
   drivePseudonym,
   devicePubkey,
@@ -476,8 +504,11 @@ export async function backupDrive({
   checkpointN,
   driveHasCheckpoint,
   observedLanes,
+  collisionRetries = 0,
 }: {
   db: VaultCapableDb;
+  collisionRetries?: number;
+  signal?: AbortSignal;
   driveSubject: string;
   drivePseudonym: string;
   devicePubkey: string;
@@ -488,6 +519,7 @@ export async function backupDrive({
   driveHasCheckpoint: boolean;
   observedLanes: Record<string, number>;
 }): Promise<BackupOutcome> {
+  signal?.throwIfAborted();
   const sealedPack = await db.vaultExport(
     driveSubject,
     driveKey,
@@ -500,6 +532,7 @@ export async function backupDrive({
     observedLanes,
   );
 
+  signal?.throwIfAborted();
   // An untouched drive produces nothing. Since incremental cursors landed this
   // is the ordinary outcome for an idle device rather than a rare one: a pass
   // whose version vectors all match the lane cursor writes no object at all.
@@ -511,6 +544,7 @@ export async function backupDrive({
     `/cloud-vault/${drivePseudonym}/upload-urls`,
     {
       method: 'POST',
+      signal,
       body: JSON.stringify({
         objects: [
           isCheckpoint
@@ -547,6 +581,32 @@ export async function backupDrive({
     );
   }
 
+  if (upload.already_stored) {
+    // A cancelled pass may have confirmed bytes without publishing its anchor.
+    // Those bytes need not match this export. Never overwrite them, publish
+    // this export's coverage over them, or advance this export's cursor.
+    if (collisionRetries >= 8) {
+      throw new Error(
+        'Vault backup could not reserve a fresh object after 8 collisions.',
+      );
+    }
+
+    return backupDrive({
+      db,
+      signal,
+      driveSubject,
+      drivePseudonym,
+      devicePubkey,
+      driveKey,
+      keyEpoch,
+      driveHasCheckpoint,
+      observedLanes,
+      checkpointN: isCheckpoint ? checkpointN + 1 : checkpointN,
+      segment: isCheckpoint ? segment : segment + 1,
+      collisionRetries: collisionRetries + 1,
+    });
+  }
+
   // Guard the type rather than assert it. `fetch` accepts any value as `body`
   // and stringifies whatever it does not recognise, so a plain number array —
   // which is what `serde_wasm_bindgen` produces for a `Vec<u8>` unless the
@@ -561,6 +621,7 @@ export async function backupDrive({
 
   const put = await fetch(upload.url, {
     method: 'PUT',
+    signal,
     body: sealedPack.sealed as BodyInit,
     headers: Object.fromEntries(
       // Content-Length is set by the browser and cannot be assigned; passing it
@@ -577,6 +638,7 @@ export async function backupDrive({
 
   await api(`/cloud-vault/${drivePseudonym}/confirm-upload`, {
     method: 'POST',
+    signal,
     body: JSON.stringify({
       confirmations: [
         { object_id: upload.object_id, size_bytes: sealedPack.sealed.length },
@@ -595,6 +657,7 @@ export async function backupDrive({
     try {
       await api(`/cloud-vault/${drivePseudonym}/checkpoint`, {
         method: 'POST',
+        signal,
         body: JSON.stringify({
           checkpoint_n: checkpointN,
           coverage: sealedPack.coverage,
@@ -602,6 +665,7 @@ export async function backupDrive({
         }),
       });
     } catch (error) {
+      signal?.throwIfAborted();
       console.warn(
         `Vault checkpoint ${checkpointN} was not published; another device likely won the race.`,
         error,
@@ -614,6 +678,7 @@ export async function backupDrive({
   // has been backed up rather than one that assumed success. That matters more
   // than it did before cursors existed: an advanced cursor whose object never
   // landed leaves ops no later delta would ever ship again.
+  signal?.throwIfAborted();
   await db.vaultCommitSegment(drivePseudonym, devicePubkey, segment);
 
   return {
@@ -745,15 +810,28 @@ export async function setUpVaultForDrive({
   agentSubject,
   agentSecret,
   metadata,
+  signal,
 }: {
+  signal?: AbortSignal;
   metadata?: { name?: string; emoji?: string };
   keys: VaultKeyOps;
   driveSubject: string;
   agentSubject: string;
   agentSecret: Uint8Array;
 }): Promise<{ enrollment: VaultEnrollment } & DriveKeyHandle> {
-  const enrollment = await enrollVault(driveSubject, agentSubject, metadata);
-  const existing = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
+  signal?.throwIfAborted();
+  const enrollment = await enrollVault(
+    driveSubject,
+    agentSubject,
+    metadata,
+    signal,
+  );
+  const existing = await getVaultKeyEnvelopeRecord(
+    enrollment.drive_pseudonym,
+    signal,
+  );
+
+  signal?.throwIfAborted();
 
   if (existing) {
     return {
@@ -772,13 +850,18 @@ export async function setUpVaultForDrive({
     await putVaultKeyEnvelope(
       enrollment.drive_pseudonym,
       keys.vaultWrapKey(driveKey, agentSecret),
+      { signal },
     );
   } catch {
+    signal?.throwIfAborted();
     // Create-only, so this means another client won the race and stored its
     // own key between our read and our write. Theirs is authoritative: adopting
     // it is the only outcome where both clients can read each other's backups.
     // Ours has sealed nothing yet, so discarding it costs nothing.
-    const winner = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
+    const winner = await getVaultKeyEnvelopeRecord(
+      enrollment.drive_pseudonym,
+      signal,
+    );
 
     if (!winner) throw new Error('Could not store or recover a vault key.');
 
@@ -843,6 +926,7 @@ export async function recoverDriveKey({
 const inFlight = new Map<string, Promise<BackupOutcome>>();
 
 export function runVaultBackup(args: {
+  signal?: AbortSignal;
   db: VaultCapableDb;
   driveSubject: string;
   drivePseudonym: string;
@@ -868,7 +952,9 @@ export function runVaultBackup(args: {
   if (existing) return existing;
 
   const pass = (async () => {
-    const state = await getVaultState(args.drivePseudonym);
+    args.signal?.throwIfAborted();
+    const state = await getVaultState(args.drivePseudonym, args.signal);
+    args.signal?.throwIfAborted();
 
     // A suspended vault refuses uploads; asking anyway would just produce an
     // error per tick and bury anything else in the log.

@@ -11,7 +11,7 @@
  * Read the `[TABLE-PERF]` lines.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, newResource } from './test-utils';
 import { resetPerfTrace } from './perf-attach';
 

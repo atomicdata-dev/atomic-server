@@ -102,6 +102,32 @@ describe('a delta that cannot apply triggers a catch-up fetch', () => {
     return { orphaned };
   }
 
+  it('fetches the missing base for a resource first seen as a live delta', async ({
+    expect,
+  }) => {
+    const store = await makeStore();
+    const { orphaned } = withheldCommit();
+    const asked: string[] = [];
+
+    store.fetchResourceFromServer = async s => {
+      asked.push(s);
+
+      return store.resources.get(s)!;
+    };
+
+    const outcome = store.applyIncoming({
+      subject,
+      loroBytes: orphaned[0],
+      source: 'ws-sub-push',
+      commitId: 'did:ad:commit:pending-base',
+    });
+    expect(outcome).not.toBe('applied');
+    expect(asked).toEqual([subject]);
+    expect(
+      store.resources.get(subject)?.get(commits.properties.lastCommit),
+    ).not.toBe('did:ad:commit:pending-base');
+  });
+
   it('asks the server for full state instead of reporting success', async ({
     expect,
   }) => {

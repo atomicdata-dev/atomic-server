@@ -17,7 +17,7 @@
  * layer "loses" it.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, FRONTEND_URL, waitForSynced } from './test-utils';
 
 test.describe('offline create → online sync → disable localDB', () => {
@@ -139,7 +139,7 @@ test.describe('offline create → online sync → disable localDB', () => {
     await page
       .waitForFunction(
         () => {
-          if (!window.store.getSyncStatus().serverConnected) {
+          if (!window.store?.getSyncStatus().serverConnected) {
             return false;
           }
 

@@ -233,6 +233,12 @@ export class ClientDbWorker {
   private initPromise: Promise<void> | null = null;
   private seedPromise: Promise<void> | null = null;
   private _initError: Error | undefined = undefined;
+  private _unsupportedEnvironment = false;
+
+  /** Known browser capability limit, rather than an unexpected database failure. */
+  get unsupportedEnvironment(): boolean {
+    return this._unsupportedEnvironment;
+  }
   /** Resolves the leader lock's "hold forever" promise so `destroy()` can
    *  release the lock instead of leaking it until tab unload — otherwise an
    *  HMR cycle (which calls `destroy()` but keeps the page alive) leaves a
@@ -290,6 +296,7 @@ export class ClientDbWorker {
     // actionable message, exactly like the ghost-leader degraded path below.
     if (typeof navigator === 'undefined' || !navigator.locks) {
       this.role = 'failed';
+      this._unsupportedEnvironment = true;
       this._initError = new Error(
         'Local caching and offline support are disabled: this site is served ' +
           'over an insecure connection (plain HTTP on a non-localhost origin), ' +
@@ -298,7 +305,7 @@ export class ClientDbWorker {
           'server. To enable local caching and offline support, serve the app ' +
           'over HTTPS (or open it via localhost).',
       );
-      console.warn('[ClientDb]', this._initError.message);
+      console.info('[ClientDb]', this._initError.message);
 
       return;
     }

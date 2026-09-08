@@ -172,7 +172,8 @@ async function migrateLeftoverYjs(
 
   const loroDoc = resource.getLoroDoc();
   const hasVisible = !!loroDoc && loroDocHasVisibleContent(loroDoc);
-  const raw = resource.get(dataBrowser.properties.documentContent);
+  // Historical documents can contain binary Yjs data despite the current string type.
+  const raw: unknown = resource.get(dataBrowser.properties.documentContent);
 
   if (!isYjsMigrationCandidate(raw, !hasVisible)) {
     return false;
@@ -216,7 +217,9 @@ async function migrateV1(resource: Resource, store: Store): Promise<boolean> {
   resource.remove(dataBrowser.properties.elements);
   await resource.set(core.properties.isA, [dataBrowser.classes.documentV2]);
 
-  const leftover = resource.get(dataBrowser.properties.documentContent);
+  const leftover: unknown = resource.get(
+    dataBrowser.properties.documentContent,
+  );
 
   if (isSerializedYDoc(leftover) || leftover instanceof Uint8Array) {
     resource.remove(dataBrowser.properties.documentContent);

@@ -86,7 +86,7 @@ const NewPluginButton: React.FC<NewPluginButtonProps> = ({ drive }) => {
     <>
       <label>
         <Button as='div'>
-          <FaPlus aria-hidden /> Upload Plugin
+          <FaPlus aria-hidden /> <span>Upload Plugin</span>
         </Button>
         <input
           ref={fileInputRef}
@@ -143,7 +143,7 @@ const NewPluginButton: React.FC<NewPluginButtonProps> = ({ drive }) => {
           {!metadata && (
             <label>
               <Button as='div'>
-                <FaPlus aria-hidden /> Upload Plugin
+                <FaPlus aria-hidden /> <span>Upload Plugin</span>
               </Button>
               <input
                 type='file'

@@ -207,7 +207,7 @@ const ToolTitle = ({
 const FetchResourceTitle = ({ subjects }: { subjects: string[] }) => {
   return (
     <span>
-      Reading{' '}
+      <span>Reading</span>{' '}
       <InlineFormattedResourceList
         subjects={subjects}
         RenderComp={ResourceTitle}
@@ -262,14 +262,14 @@ const CreateResourceTitle = ({ jsonAD }: { jsonAD: string }) => {
   if (count !== undefined) {
     return (
       <span>
-        Creating <Name>{count} resources</Name>
+        <span>Creating</span> <Name>{count} resources</Name>
       </span>
     );
   }
 
   return (
     <span>
-      Creating <Name>{name}</Name>
+      <span>Creating</span> <Name>{name}</Name>
     </span>
   );
 };
@@ -285,7 +285,8 @@ const EditTitle = ({
 
   return (
     <span>
-      Editing {propertyResource.title} on <ResourceTitle subject={subject} />
+      <span>Editing {propertyResource.title} on</span>{' '}
+      <ResourceTitle subject={subject} />
     </span>
   );
 };
@@ -293,7 +294,7 @@ const EditTitle = ({
 const EditDocumentTitle = ({ subject }: { subject: string }) => {
   return (
     <span>
-      Editing <ResourceTitle subject={subject} />
+      <span>Editing</span> <ResourceTitle subject={subject} />
     </span>
   );
 };

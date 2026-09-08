@@ -1,3 +1,4 @@
+import { getManagedAccount } from './session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   agentVaultProof,
@@ -137,6 +138,12 @@ export function useVaultBackup({
     if (!driveSubject) return;
 
     try {
+      if (!(await getManagedAccount())) {
+        setStatus({ state: 'off' });
+
+        return;
+      }
+
       const drives = await listVaultDrives();
       const enrollment = drives.find(d => d.drive_subject === driveSubject);
 

@@ -46,7 +46,10 @@ export function FilePicker({
     if (selectedSubject) {
       setValue(selectedSubject);
     } else if (selectedFile) {
-      if (resource.new) {
+      if (resource.new && !store.getClientDb()) {
+        // Legacy multipart uploads require an existing parent. With ClientDb,
+        // uploadFiles stores the blob locally and batches the real File resource
+        // behind its unsaved parent, so no placeholder is needed.
         // We can't upload the file yet because its parent has not saved yet so we set the value to a placeholder and then schedule an upload when the resource is saved.
         setValue('https://placeholder');
         setUnsubScheduledUpload(prevUnsub => {
@@ -67,9 +70,19 @@ export function FilePicker({
           return thisUnsub;
         });
       } else {
-        upload([selectedFile]).then(([subject]) => {
-          setValue(subject);
+        setError('Preparing file…');
+        upload([selectedFile]).then(async ([subject]) => {
+          if (!subject) {
+            setError('Could not prepare file. Select it again to retry.');
+
+            return;
+          }
+
+          await setValue(subject);
+          setError(undefined);
         });
+
+        return;
       }
     } else {
       setValue(undefined);
@@ -91,7 +104,8 @@ export function FilePicker({
         <input
           tabIndex={-1}
           type='text'
-          defaultValue={value ?? ''}
+          value={value ?? ''}
+          readOnly
           required={required}
           disabled={disabled}
         />

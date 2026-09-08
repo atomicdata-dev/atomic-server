@@ -10,7 +10,13 @@ import { Resource } from './resource.js';
 import { recordServerVersionFromWsProtocol } from './serverCapabilities.js';
 import { StoreEvents, type Store, type DriveSyncState } from './store.js';
 import { reconcile, type Item, type RemoteRange } from './rbsr.js';
-import { AtomicError, ErrorType } from './error.js';
+import {
+  AtomicError,
+  ErrorType,
+  RequestCancelledError,
+  isNotFound,
+  isUnauthorized,
+} from './error.js';
 import {
   type Commit,
   parseCommitJSON,
@@ -287,8 +293,10 @@ export class WSClient {
   /** Fail every in-flight GET. Called on WS close so callers don't
    *  hang for REQUEST_TIMEOUT (10 s) when the socket dies mid-flight
    *  — the next reconnect will fetch fresh state anyway. */
-  private rejectAllPending(reason: string): void {
-    const err = new AtomicError(reason, ErrorType.Server);
+  private rejectAllPending(reason: string, cancellation = false): void {
+    const err = cancellation
+      ? new RequestCancelledError(reason)
+      : new AtomicError(reason, ErrorType.Server);
 
     // Fail any in-flight `waitForTag` calls (e.g. an AUTH_OK that
     // will never arrive because the socket died mid-handshake).
@@ -330,9 +338,10 @@ export class WSClient {
     // returning user's `setDrive` on hydration, or a deep-linked/anonymous
     // session adopting a drive once the resource resolves — so subscribing
     // only inside the connect handshake misses it. Idempotent server-side.
-    this._driveUnsub = store.on(StoreEvents.DriveChanged, () =>
-      this.subscribeToDrive(),
-    );
+    this._driveUnsub = store.on(StoreEvents.DriveChanged, () => {
+      this._pendingSyncState.clear();
+      this.subscribeToDrive();
+    });
 
     const wsURL = new URL(url);
     wsURL.protocol = wsURL.protocol === 'http:' ? 'ws' : 'wss';
@@ -347,6 +356,8 @@ export class WSClient {
 
       ws.addEventListener('message', this.handleMessage);
       ws.addEventListener('error', () => {
+        if (this._closed) return;
+
         if (!opened) {
           console.warn('[WS] Connection failed');
         }
@@ -358,6 +369,10 @@ export class WSClient {
         this.rejectAllPending('WebSocket error before response arrived');
       });
       ws.addEventListener('close', (ev: CloseEvent) => {
+        // Explicit close already tears down this client synchronously. Its
+        // later event must not overwrite a replacement socket's live state.
+        if (this._closed) return;
+
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
         // 1006=abnormal (no close frame seen — usually network drop or
@@ -510,7 +525,7 @@ export class WSClient {
     // until their own timeouts. The event handler still runs if it fires,
     // but both calls are idempotent (flag re-set to false, empty maps).
     this.reportConnected(false);
-    this.rejectAllPending('WebSocket closed by client');
+    this.rejectAllPending('WebSocket closed by client', true);
     this.stopLiveness();
 
     this.ws.close();
@@ -663,20 +678,22 @@ export class WSClient {
    *  read access at subscribe time, so subscribing pre-auth would get
    *  refused for any non-public drive. */
   public subscribePresence(drive: string): void {
-    this.authPromise
-      .catch(() => {
-        // Authentication errors are handled in authenticate()
-      })
-      .finally(() => {
-        if (this.readyState !== WebSocket.OPEN) {
-          console.warn('WebSocket is not open, cannot subscribe to presence');
-
+    // authPromise initially resolves even before authentication starts.
+    // Kick off authentication instead of treating that promise as readiness.
+    void this.authenticate()
+      .then(() => {
+        if (
+          this.readyState !== WebSocket.OPEN ||
+          !this.authenticatedWith ||
+          this.authenticatedWith !== this.store.getAgent()?.subject
+        )
           return;
-        }
-
         this.ws.send(
           'PRESENCE_SUBSCRIBE ' + JSON.stringify({ subject: drive }),
         );
+      })
+      .catch(() => {
+        // authenticate() reports the handshake failure. Never subscribe after it.
       });
   }
 
@@ -698,6 +715,14 @@ export class WSClient {
    *  connection's authenticated identity and stamps that on the way out. */
   private sendEphemeral(kind: number, subject: string, update: Uint8Array) {
     if (this.readyState !== WebSocket.OPEN) return;
+    // Ephemera are transient: sending old cursor/presence data after a
+    // handshake (or under the previous identity) is incorrect. The next
+    // live update will publish once authentication has completed.
+    if (
+      !this.authenticatedWith ||
+      this.authenticatedWith !== this.store.getAgent()?.subject
+    )
+      return;
     this.sendBinary(encodeEphemeral(kind, subject, '', update));
   }
 
@@ -954,7 +979,15 @@ export class WSClient {
           const pendingGet = this.takePending(msg.requestId);
 
           if (pendingGet) {
-            pendingGet.reject(err);
+            // Legacy GET errors carry UNKNOWN plus the typed Rust error prefix.
+            // Preserve the read result so callers can distinguish missing data
+            // from a server failure (and avoid subscribing to an absent drive).
+            const type = msg.message.startsWith('Resource not found.')
+              ? ErrorType.NotFound
+              : msg.message.startsWith('Unauthorized.')
+                ? ErrorType.Unauthorized
+                : ErrorType.Server;
+            pendingGet.reject(new AtomicError(msg.message, type, msg.code));
           } else {
             this.takePendingCommit(msg.requestId)?.reject(err);
           }
@@ -1289,6 +1322,18 @@ export class WSClient {
 
     // Local-only drives are unknown to the server — a SUB would only
     // produce an error frame (and leak the drive subject).
+    if (
+      this.store.getAgent()?.subject &&
+      this.authenticatedWith !== this.store.getAgent()?.subject
+    )
+      return;
+    const knownError = drive
+      ? this.store.resources.get(drive)?.error
+      : undefined;
+    // Onboarding can name a key-derived home whose data has not arrived yet.
+    // A prior read already established that this server cannot subscribe it.
+    if (isNotFound(knownError) || isUnauthorized(knownError)) return;
+
     if (drive && this.store.isLiveSyncedDrive(drive)) {
       this.sendBinary(encodeSub(drive));
       this._subscribedDrive = drive;
@@ -1373,7 +1418,6 @@ export class WSClient {
     // frame unread.
     this.sendBinary(encodeHello(CLIENT_HELLO_NAME, CLIENT_CAPABILITIES));
     this.startLiveness();
-    const drive = this.store.getDrive();
 
     const doSync = async () => {
       const dirtyClose = perfSpan('ws.syncDirtyResources');
@@ -1390,6 +1434,8 @@ export class WSClient {
       // the offline-stale view.
       this.store.refetchOfflineErroredResources();
 
+      const drive = this.store.getDrive();
+
       // No drive selected (e.g. anon share-link cold open, fresh
       // /app/welcome before the user picks a drive): there's
       // nothing to VV-sync. The server's `collect_drive_subjects`
@@ -1399,6 +1445,12 @@ export class WSClient {
       // `server/tests/ws_get_unauthorized_latency.rs`).
       // Local-only drives never reconcile with a server: a SYNC would
       // upload the whole local drive's version state for nothing.
+      if (
+        this.store.getAgent()?.subject &&
+        this.authenticatedWith !== this.store.getAgent()?.subject
+      )
+        return;
+
       if (drive && this.store.isLiveSyncedDrive(drive)) {
         await this.startVVSync(drive);
       }
@@ -1409,6 +1461,7 @@ export class WSClient {
       this.authenticate()
         .then(() => {
           authClose('ok');
+          if (this._closed) return;
           // Only flip `_serverConnected` AFTER AUTH_OK arrives. See the
           // comment in the `open` handler above for the race this closes.
           this.reportConnected(true);
@@ -1424,6 +1477,7 @@ export class WSClient {
         .then(doSync)
         .catch(e => {
           authClose({ err: String(e) });
+          if (this._closed || e instanceof RequestCancelledError) return;
           console.error('Auth error:', e);
           // Auth failed (timeout, server rejection, socket closed mid-
           // handshake). The socket itself may still be open — surface
@@ -1446,7 +1500,13 @@ export class WSClient {
   private async startVVSync(drive: string): Promise<void> {
     if (this.readyState !== WebSocket.OPEN) return;
 
-    this.store.startDriveSync();
+    const agent = this.store.getAgent()?.subject;
+    const selectedDrive = this.store.getDrive();
+    const authenticatedWith = this.authenticatedWith;
+    const current = () =>
+      this.store.getAgent()?.subject === agent &&
+      this.store.getDrive() === selectedDrive &&
+      this.authenticatedWith === authenticatedWith;
     const close = perfSpan('ws.computeDriveSyncState');
 
     try {
@@ -1457,6 +1517,8 @@ export class WSClient {
       // `sendReducedSyncState` reconciles from the state stashed here.
       const syncState = await this.store.computeDriveSyncState(drive);
       close({ resourceCount: Object.keys(syncState.resources).length });
+      if (!current()) return;
+      this.store.startDriveSync();
       this._pendingSyncState.set(drive, syncState);
       this.sendBinary(
         encodeSync(
@@ -1468,7 +1530,7 @@ export class WSClient {
       perfMark('ws.SYNC.probe.sent');
     } catch (e) {
       close({ err: String(e) });
-      console.warn('[WS] VV sync failed:', e);
+      if (current()) console.warn('[WS] VV sync failed:', e);
     }
   }
 
@@ -1488,24 +1550,41 @@ export class WSClient {
    *  any RBSR failure, fall back to the full VV so the drive always reconciles.
    */
   private async sendReducedSyncState(drive: string): Promise<void> {
-    if (this.readyState !== WebSocket.OPEN) return;
+    const agent = this.store.getAgent()?.subject;
+    const selectedDrive = this.store.getDrive();
+    const current = () =>
+      this.store.getAgent()?.subject === agent &&
+      this.store.getDrive() === selectedDrive &&
+      (!agent || this.authenticatedWith === agent);
+    if (this.readyState !== WebSocket.OPEN || !current()) return;
 
-    const syncState =
-      this._pendingSyncState.get(drive) ??
-      (await this.store.computeDriveSyncState(drive).catch(() => undefined));
+    // A response to a probe invalidated by a drive switch must not restart it.
+    const syncState = this._pendingSyncState.get(drive);
     this._pendingSyncState.delete(drive);
 
-    if (!syncState) return;
+    if (!syncState || !current()) return;
+
+    const requireCurrent = () => {
+      if (!current()) throw new Error('Sync identity or drive changed');
+    };
 
     try {
       const local = syncStateToItems(syncState);
       const remote: RemoteRange = {
-        fingerprint: async (lo, hi) =>
-          (await this.rbsrFingerprints(drive, [[lo, hi ?? null]]))[0],
-        items: (lo, hi) => this.rbsrItems(drive, lo, hi),
+        fingerprint: async (lo, hi) => {
+          requireCurrent();
+
+          return (await this.rbsrFingerprints(drive, [[lo, hi ?? null]]))[0];
+        },
+        items: (lo, hi) => {
+          requireCurrent();
+
+          return this.rbsrItems(drive, lo, hi);
+        },
       };
 
       const diff = await reconcile(local, remote);
+      if (!current()) return;
       // Subjects the outbox still owns are not offered for reconcile (see
       // `handleSyncDiff`): the drain delivers them signed.
       const differing = [
@@ -1536,6 +1615,8 @@ export class WSClient {
         ),
       );
     } catch (e) {
+      // Account/drive changes cancel this reconciliation, including its fallback.
+      if (!current()) return;
       // Safety net: any RBSR failure (query timeout, socket close, parse) falls
       // back to the full reconcile, which always converges. Never leave the
       // drive un-reconciled because the optimization stumbled.

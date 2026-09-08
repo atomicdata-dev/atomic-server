@@ -128,7 +128,7 @@ export function TimerToolbar({
         }}
       />
       <Button data-testid='timer-start-new' onClick={handleStart}>
-        <FaPlay /> Start
+        <FaPlay /> <span>Start</span>
       </Button>
       <Toggle title='Stop the running entry when another starts'>
         <Checkbox

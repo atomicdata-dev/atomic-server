@@ -1,4 +1,4 @@
-import test, { expect } from '@playwright/test';
+import test, { expect } from './fixtures';
 import {
   before,
   currentDriveTitle,
@@ -243,6 +243,7 @@ test.describe('Plugins', () => {
       .getByTestId('sidebar')
       .getByRole('button', { name: 'Duck' })
       .click();
-    await expect(page.getByText('No custom views found')).not.toBeVisible();
+    await expect(page.locator('#custom-view')).toHaveCount(0);
+    await expect(page.getByTestId('editable-title')).toHaveText('Duck');
   });
 });

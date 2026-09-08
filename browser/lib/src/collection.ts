@@ -584,6 +584,18 @@ export class Collection {
     const foundInPage = this._memberIndex.get(subject);
     const currentlyMember = foundInPage !== undefined;
 
+    // Computed constraints are evaluated by the query engine. Matching the
+    // stored parent/class alone must not admit a row that the computed filter
+    // excluded (especially while cold-load notifications arrive after a query).
+    if (
+      this.params.expression_filters?.length &&
+      (matches || currentlyMember)
+    ) {
+      if (this._assemblingPage || resource?.new) return 'unchanged';
+
+      return 'membership-stale';
+    }
+
     // Fast path for the overwhelming majority of events: a resource we
     // don't track had a property change that doesn't make it a member.
     // Bail before the more expensive add/remove logic below.

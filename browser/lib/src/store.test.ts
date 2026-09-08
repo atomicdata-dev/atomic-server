@@ -8,6 +8,215 @@ describe('Store', () => {
     vi.clearAllMocks();
   });
 
+  it('does not notify mounted readers while another reader takes its first snapshot', async ({
+    expect,
+  }) => {
+    const store = new Store();
+    const changed = vi.fn();
+    const subject = 'did:ad:snapshot-reader';
+    store.subscribe(subject, changed);
+    store.getResourceSnapshot(subject, { newResource: true });
+    expect(changed).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives an unsaved form a permanent subject before minting its attachment', async ({
+    expect,
+  }) => {
+    const { store, posted } = await testStore();
+    const drive = await store.createDrive('Home');
+    store.setDrive(drive.subject);
+    const parent = new Resource('_new:attachment-form', true);
+    parent.setStore(store);
+    store.addResource(parent);
+    await parent.set(
+      core.properties.isA,
+      ['https://atomicdata.dev/classes/Folder'],
+      false,
+    );
+    await parent.set(core.properties.parent, drive.subject, false);
+    (store as unknown as { clientDb: unknown }).clientDb = {
+      isReady: true,
+      blake3Hash: async () => new Uint8Array(32),
+      putBlob: async () => undefined,
+      flush: async () => undefined,
+      putResourceWithSnapshot: async () => undefined,
+    };
+    const [subject] = await store.uploadFiles(
+      [new File(['hello'], 'hello.txt')],
+      parent.subject,
+    );
+    const file = store.resources.get(subject)!;
+    expect(parent.subject).toMatch(/^did:ad:/);
+    expect(file.get(core.properties.parent)).toBe(parent.subject);
+    expect(parent.new).toBe(true);
+    expect(store.outbox.getEntry(file.subject)).toBeUndefined();
+    expect(store.outbox.getEntry(parent.subject)).toBeUndefined();
+    // The required field is filled only after the attachment has an identity.
+    await parent.set('https://example.com/required-file', subject, false);
+    await parent.save();
+    const genesis = posted.find(
+      commit => commit.subject === parent.subject && commit.isGenesis,
+    )!;
+    expect(genesis).toBeDefined();
+    const snapshot = new Resource(parent.subject);
+    snapshot.setStore(store);
+    snapshot.importLoroUpdate(genesis.loroUpdate!);
+    expect(snapshot.get('https://example.com/required-file')).toBe(subject);
+    expect(
+      posted.some(commit => commit.subject === subject && commit.isGenesis),
+    ).toBe(true);
+  });
+
+  it.each(['snapshot', 'flush'])(
+    'an acknowledged edit waits for local %s before save resolves',
+    async stage => {
+      const { expect } = await import('vitest');
+      const { store } = await testStore();
+      const drive = await store.createDrive('Home');
+      store.setDrive(drive.subject);
+      const resource = await store.newResource({
+        isA: 'https://atomicdata.dev/classes/Folder',
+        parent: drive.subject,
+        propVals: { [core.properties.name]: 'Before' },
+      });
+      await resource.save();
+      let release!: () => void;
+      const pendingWrite = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      const putResourceWithSnapshot = vi.fn(() =>
+        stage === 'snapshot' ? pendingWrite : Promise.resolve(),
+      );
+      const flush = vi.fn(() =>
+        stage === 'flush' ? pendingWrite : Promise.resolve(),
+      );
+      store.setClientDb({
+        isReady: true,
+        flush,
+        putResourceWithSnapshot,
+      } as unknown as Parameters<Store['setClientDb']>[0]);
+      await resource.set(core.properties.name, 'After', false);
+      let finished = false;
+      const saving = resource.save().then(() => {
+        finished = true;
+      });
+
+      try {
+        await vi.waitFor(() =>
+          expect(
+            stage === 'snapshot' ? putResourceWithSnapshot : flush,
+          ).toHaveBeenCalled(),
+        );
+        // The server is already mocked as acknowledged; only the local write
+        // remains blocked. Leaving now must not expose the pre-edit cache.
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(finished).toBe(false);
+      } finally {
+        release();
+        await saving;
+      }
+
+      expect(finished).toBe(true);
+    },
+  );
+
+  it('does not write to a database in unsupported server-only mode', async ({
+    expect,
+  }) => {
+    const store = new Store();
+    const putResourceWithSnapshot = vi
+      .fn()
+      .mockRejectedValue(new Error('unsupported'));
+    store.setClientDb({
+      initError: new Error('unsupported'),
+      unsupportedEnvironment: true,
+      flush: async () => undefined,
+      putResourceWithSnapshot,
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    const resource = new Resource('did:ad:server-only');
+    resource.setStore(store);
+    await resource.persistToClientDb();
+    expect(putResourceWithSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('waits for the replacement database after an identity detaches its worker', async ({
+    expect,
+  }) => {
+    const store = new Store();
+    store.expectClientDb();
+    const database = { isReady: true } as unknown as Parameters<
+      Store['setClientDb']
+    >[0];
+    store.setClientDb(database);
+    store.setClientDb(undefined);
+    expect(store.getClientDb()).toBeUndefined();
+    let attached = false;
+    const waiting = store.waitForClientDb(1000).then(value => {
+      attached = value;
+    });
+    await Promise.resolve();
+    expect(attached).toBe(false);
+    store.setClientDb(database);
+    await waiting;
+    expect(attached).toBe(true);
+  });
+
+  it('does not finish persistence before an expected database attaches', async ({
+    expect,
+  }) => {
+    const store = new Store();
+    store.expectClientDb();
+    const resource = new Resource('did:ad:waiting-for-database');
+    resource.setStore(store);
+    let finished = false;
+    const persisted = resource.persistToClientDb().then(() => {
+      finished = true;
+    });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    const putResourceWithSnapshot = vi.fn().mockResolvedValue(undefined);
+    store.setClientDb({
+      isReady: true,
+      flush: async () => undefined,
+      putResourceWithSnapshot,
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    await persisted;
+    expect(putResourceWithSnapshot).toHaveBeenCalledWith(
+      resource.subject,
+      expect.any(String),
+      undefined,
+    );
+  });
+
+  it('clears the previous identity drive before sign-out authentication changes', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    store.setDrive('did:ad:old-private-drive');
+    store.setAgent(undefined);
+    expect(store.getDrive()).toBeUndefined();
+  });
+
+  it('creates a complete personal drive when a lookup left a loading placeholder', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    const subject = await store.privateDriveSubject();
+    const placeholder = new Resource(subject);
+    placeholder.loading = true;
+    store.addResource(placeholder);
+    const drive = await store.createDrive('Real home');
+    expect(drive.get(core.properties.name)).toBe('Real home');
+    expect(drive.get(core.properties.isA)).toContain(
+      'https://atomicdata.dev/classes/Drive',
+    );
+    expect(drive.get(core.properties.read)).toContain(
+      store.getAgent()!.subject,
+    );
+  });
+
   it('renders the populate value', async ({ expect }) => {
     const store = new Store();
     const subject = 'https://atomicdata.dev/test';

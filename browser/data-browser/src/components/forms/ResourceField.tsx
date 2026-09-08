@@ -71,7 +71,7 @@ function ResourceField({
         />
         <Extra center gap='1ch'>
           <FaServer />
-          This field is calculated server-side.
+          <span>This field is calculated server-side.</span>
         </Extra>
       </Field>
     );

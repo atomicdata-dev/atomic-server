@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, createTableFromDialog } from './test-utils';
 
 test.describe('default ontology', () => {

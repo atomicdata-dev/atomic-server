@@ -140,6 +140,7 @@ export async function forkResource(
 ): Promise<Resource> {
   const fork = await store.newResource({
     parent,
+    deferGenesis: original.hasLoroBody(),
     isA: [...original.getClasses(), forks.classes.fork],
     propVals: {
       ...contentPropsOf(original),
@@ -200,6 +201,7 @@ export async function copyResource(
 
   const copy = await store.newResource({
     parent,
+    deferGenesis: source.hasLoroBody(),
     isA: contentClassesOf(source),
     propVals: {
       ...contentPropsOf(source),

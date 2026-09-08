@@ -159,12 +159,34 @@ mod tests {
     use super::*;
     use crate::{urls, Value};
 
+    #[test]
+    fn expression_filter_accepts_browser_operator_names() {
+        use crate::storelike::FilterOperator;
+        for (wire, expected) in [
+            ("eq", FilterOperator::Equal),
+            ("gt", FilterOperator::GreaterThan),
+            ("gte", FilterOperator::GreaterThanOrEqual),
+            ("lt", FilterOperator::LessThan),
+            ("lte", FilterOperator::LessThanOrEqual),
+        ] {
+            let filter: ExpressionFilter = serde_json::from_value(serde_json::json!({
+                "expression": {"kind": "difference", "from": START, "to": END},
+                "operator": wire,
+                "value": 1000
+            }))
+            .unwrap();
+            assert_eq!(filter.operator, expected);
+        }
+    }
+
     /// A row with the given values, keyed by throwaway property subjects.
     fn row(values: &[(&str, Value)]) -> Resource {
         let mut resource = Resource::new("https://example.com/row".into());
 
         for (property, value) in values {
-            resource.set_unsafe((*property).to_string(), value.clone());
+            resource
+                .set_unsafe((*property).to_string(), value.clone())
+                .unwrap();
         }
 
         resource

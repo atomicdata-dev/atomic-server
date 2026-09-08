@@ -1,3 +1,4 @@
+import { getManagedAccount } from './session';
 import { isRunningInTauri } from '../tauri';
 import { wasmBinaryUrl, wasmJsUrl } from '../wasmUrls';
 import { PRODUCT_NAME } from './product';
@@ -1158,6 +1159,7 @@ export async function saveRecoverySecret(input: RecoverySecretInput) {
 }
 
 export async function getRecoverySecret(): Promise<RecoverySecret | null> {
+  if (!(await getManagedAccount())) return null;
   // [RECOVERY-RECONSTRUCTED] body — only this function's signature survived in
   // the transcripts. Reconstructed as the GET counterpart of saveRecoverySecret
   // (PUT) above; 204/401/404 all mean "no recovery secret stored".

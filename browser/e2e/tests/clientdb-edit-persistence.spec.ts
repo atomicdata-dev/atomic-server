@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { devDrive } from './test-utils';
 
 // Regression for the ClientDb edit-persistence fix (store.ts drain re-persist):

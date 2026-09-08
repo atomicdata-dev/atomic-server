@@ -15,7 +15,7 @@ export function PrivateDriveBadge(): JSX.Element {
   return (
     <Badge title='This is your private drive. It holds your drive list, favourites, notifications and chats, and its address comes from your account — so there is only ever one, and it is not a place for a project.'>
       <FaLock />
-      Private
+      <span>Private</span>
     </Badge>
   );
 }

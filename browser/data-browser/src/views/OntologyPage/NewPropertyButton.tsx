@@ -91,7 +91,7 @@ export function NewPropertyButton({
   return (
     <>
       <DashedButton onClick={openAndReset}>
-        <FaPlus /> Add property
+        <FaPlus /> <span>Add property</span>
       </DashedButton>
       <Dialog {...dialogProps}>
         {isOpen && (

@@ -130,7 +130,7 @@ export function ForkBar({ resource }: ForkBarProps): React.JSX.Element | null {
             Discard
           </Button>
           <Button onClick={merge} disabled={!mergeable}>
-            <FaCodeMerge /> Merge
+            <FaCodeMerge /> <span>Merge</span>
           </Button>
         </Row>
       </Row>

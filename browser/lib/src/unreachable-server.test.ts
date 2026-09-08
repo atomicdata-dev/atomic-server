@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'vitest';
+import { describe, it, beforeEach, vi } from 'vitest';
 import {
   Agent,
   Store,
@@ -35,6 +35,33 @@ function hydrateAgentLocally(store: Store, subject: string, name: string) {
     }),
   );
 }
+
+describe('A delayed missing-resource response', () => {
+  it('does not overwrite a resource created while the lookup was pending', async ({
+    expect,
+  }) => {
+    const store = await freshStore();
+    store.setServerConnected(true);
+    const subject = 'did:ad:created-during-fetch';
+    let rejectFetch!: (error: Error) => void;
+    const pending = new Promise<never>((_, reject) => {
+      rejectFetch = reject;
+    });
+    const fetch = vi
+      .spyOn(store, 'fetchResourceFromServer')
+      .mockReturnValue(pending);
+    store.getResourceLoading(subject);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    hydrateAgentLocally(store, subject, 'Created locally');
+    rejectFetch(new Error('Resource not found locally'));
+    // Let the pending lookup's rejection handler finish.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(store.resources.get(subject)?.error).toBeUndefined();
+    expect(store.resources.get(subject)?.get(core.properties.name)).toBe(
+      'Created locally',
+    );
+  });
+});
 
 describe('Unreachable server', () => {
   let agentSubject: string;

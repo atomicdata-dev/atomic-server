@@ -214,7 +214,7 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
           >
             <SideBarErrorWrapper>
               <FaTriangleExclamation />
-              Resource with error
+              <span>Resource with error</span>
             </SideBarErrorWrapper>
           </TreeLoadingRow>
         </StyledLink>

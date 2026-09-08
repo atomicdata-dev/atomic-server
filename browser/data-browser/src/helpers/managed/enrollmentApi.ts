@@ -7,6 +7,7 @@
 // against the control-plane `GET /api/sync-enrollments` route.
 
 import { managedFetch } from './api';
+import { getManagedAccount } from './session';
 
 export type ManagedEnrollmentStatus = 'Active' | 'Disabled' | string;
 
@@ -34,6 +35,7 @@ export type ManagedEnrollmentSummary = {
 export async function getManagedEnrollments(): Promise<
   ManagedEnrollmentSummary[]
 > {
+  if (!(await getManagedAccount())) return [];
   const response = await managedFetch(`/sync-enrollments`, {});
 
   if (!response.ok) return [];

@@ -643,6 +643,33 @@ export async function setupAICompactMocks(page: Page) {
  * Must be called before page.goto().
  */
 export async function enableAIForTesting(page: Page) {
+  // These cases test the Atomic tools and mocked model, not a live external
+  // search service. Keep the MCP handshake deterministic too.
+  await page.route('https://mcp.exa.ai/mcp', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fulfill({ status: 204 });
+
+      return;
+    }
+
+    const request = route.request().postDataJSON();
+
+    if (request.id === undefined) {
+      await route.fulfill({ status: 202, body: '' });
+
+      return;
+    }
+
+    const result =
+      request.method === 'initialize'
+        ? {
+            protocolVersion: request.params.protocolVersion,
+            capabilities: { tools: {} },
+            serverInfo: { name: 'Test search', version: '1' },
+          }
+        : { tools: [] };
+    await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result } });
+  });
   await page.addInitScript(() => {
     localStorage.setItem('atomic.ai.enabled', JSON.stringify(true));
     localStorage.setItem(

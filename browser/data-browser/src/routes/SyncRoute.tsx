@@ -589,9 +589,6 @@ function SyncPage() {
   // known / not applicable; `false` = eligible but not enrolled (show the CTA);
   // `true` = already enrolled (hide it).
   const [cloudEnrolled, setCloudEnrolled] = useState<boolean | null>(null);
-  const [paymentRequiredDrive, setPaymentRequiredDrive] = useState<
-    string | null
-  >(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   // Resolved in an effect rather than read off a Resource during render: the
   // React Compiler memoizes on the proxy identity, so a resource that finishes
@@ -1126,7 +1123,6 @@ function SyncPage() {
     if (!drive || !agentSubject || cloudBusy) return;
 
     setCloudBusy(true);
-    setPaymentRequiredDrive(null);
 
     try {
       const args = {
@@ -1184,7 +1180,24 @@ function SyncPage() {
       );
     } catch (e) {
       if (e instanceof HostingPaymentRequiredError) {
-        setPaymentRequiredDrive(drive);
+        if (!accountPortalUrl) {
+          store.notifyError(
+            new Error(
+              `No ${PRODUCT_NAME} portal is configured for this server.`,
+            ),
+          );
+
+          return;
+        }
+
+        const billingUrl = new URL('/billing', accountPortalUrl);
+        billingUrl.searchParams.set('drive', drive);
+
+        if (isRunningInTauri()) {
+          await openExternal(billingUrl.toString());
+        } else {
+          window.location.assign(billingUrl.toString());
+        }
       } else {
         store.notifyError(e as Error);
       }
@@ -1531,21 +1544,6 @@ function SyncPage() {
                   {cloudServerBlocked && (
                     <ConnMeta>{cloudServerBlocked}</ConnMeta>
                   )}
-                  {paymentRequiredDrive !== null &&
-                    paymentRequiredDrive === status.drive &&
-                    accountPortalUrl && (
-                      <ConnMeta>
-                        Hosting needs a Server plan. After payment, return here
-                        to finish setup.
-                        <LearnMore
-                          {...externalLinkProps(
-                            `${accountPortalUrl}/billing?${new URLSearchParams({ drive: status.drive ?? '' })}`,
-                          )}
-                        >
-                          Choose Server plan
-                        </LearnMore>
-                      </ConnMeta>
-                    )}
                   <ConnActions>
                     {hostedCopyOrigin && (
                       <Button onClick={() => switchToServer(hostedCopyOrigin)}>
@@ -1931,7 +1929,7 @@ function SyncPage() {
               </AddServerForm>
             ) : (
               <AddButton onClick={() => setShowAddServer(true)}>
-                <FaPlus aria-hidden /> Connect a device
+                <FaPlus aria-hidden /> <span>Connect a device</span>
               </AddButton>
             )}
           </AddRow>
@@ -2010,13 +2008,13 @@ function SyncPage() {
                     store.setWebSocketDebug(e.target.checked);
                   }}
                 />
-                {wsDebug ? 'Logging to console' : 'Off'}
+                <span>{wsDebug ? 'Logging to console' : 'Off'}</span>
               </DetailValue>
             </DevRow>
           </DevGrid>
 
           <DevActivityTitle>
-            Recent activity
+            <span>Recent activity</span>
             {status.pendingDirtyCount > 0 && (
               <PendingCount>{status.pendingDirtyCount} unsynced</PendingCount>
             )}

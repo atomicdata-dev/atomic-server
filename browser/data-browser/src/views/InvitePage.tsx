@@ -28,7 +28,6 @@ import { Logo } from '../components/Logo';
 
 import { useId, useState, type JSX } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { getResourcesDrive } from '@helpers/getResourcesDrive';
 import { fetchPrivateDriveSubject } from '@helpers/privateDrive';
 import { saveAgentToIDB } from '@helpers/agentStorage';
 import { Dialog, useDialog } from '@components/Dialog';
@@ -173,14 +172,34 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
         // bubble to the outer catch and skip the drive `save()`.
         driveResource.push(core.properties.sharedWithMe, [destination], true);
 
-        // Drive bookmark (so the destination's drive shows in the switcher)
-        // is best-effort — walking the ancestry can fail transiently right
-        // after invite acceptance while the server propagates the rights
-        // grant. Log so we notice if it stops working entirely.
+        // A child invite grants access to that child, not its private parents.
+        // Only bookmark a drive we can already read; never fetch inaccessible
+        // ancestors just to populate the switcher. Shared with me holds the
+        // invited child regardless of whether its host drive is readable.
         try {
           await store.fetchResourceFromServer(destination);
-          const target = store.getResourceLoading(destination);
-          const hostDrive = await getResourcesDrive(target, store);
+          let target = store.resources.get(destination);
+          const visited = new Set<string>();
+          let hostDrive: string | undefined;
+
+          while (
+            target?.isReady() &&
+            !target.error &&
+            !visited.has(target.subject)
+          ) {
+            visited.add(target.subject);
+
+            if (target.hasClasses(server.classes.drive)) {
+              hostDrive = target.subject;
+              break;
+            }
+
+            const parent = target.get(core.properties.parent);
+            target =
+              typeof parent === 'string'
+                ? store.resources.get(parent)
+                : undefined;
+          }
 
           if (hostDrive && hostDrive !== privateDriveSubject) {
             hostDriveSubject = hostDrive;
@@ -434,7 +453,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
             <InputWrapper>
               <InputStyled
                 type='text'
-                value={agentName}
+                value={agentName ?? ''}
                 onChange={e => setAgentName(e.target.value)}
                 id={nameInputId}
                 spellCheck='false'

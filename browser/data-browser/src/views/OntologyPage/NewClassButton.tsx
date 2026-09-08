@@ -82,7 +82,7 @@ export function NewClassButton({ resource }: NewClassButtonProps): JSX.Element {
   return (
     <>
       <DashedButton onClick={openAndReset}>
-        <FaPlus /> Add class
+        <FaPlus /> <span>Add class</span>
       </DashedButton>
       <Dialog {...dialogProps}>
         {isOpen && (

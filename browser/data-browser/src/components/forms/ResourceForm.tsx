@@ -262,7 +262,8 @@ export function ResourceForm({
             onClick={() => setShowAdvanced(!showAdvanced)}
           >
             <Row as='strong' gap='0.4rem' center>
-              {showAdvanced ? <FaCaretDown /> : <FaCaretRight />} Advanced
+              {showAdvanced ? <FaCaretDown /> : <FaCaretRight />}
+              <span>Advanced</span>
             </Row>
           </Button>
           <StyledCollapse open={showAdvanced}>

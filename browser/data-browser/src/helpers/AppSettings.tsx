@@ -36,7 +36,7 @@ export const AppSettingsContextProvider = (
   // == SYSTEM ==
   const [agent, setAgent] = useCurrentAgent();
   const [baseURL, setBaseURL] = useServerURL();
-  const [drive, innerSetDrive] = useLocalStorage('drive', baseURL);
+  const [drive, innerSetDrive] = useLocalStorage('drive', '');
 
   // == APPEARANCE ==
   const [darkMode, setDarkMode, darkModeSetting] = useDarkMode();

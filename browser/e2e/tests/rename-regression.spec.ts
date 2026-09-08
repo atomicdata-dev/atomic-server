@@ -13,7 +13,7 @@
  * (see `lib/src/commit.rs::validate_loro_causality`) catches any remaining
  * concurrent-write commits with a clear error.
  */
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures';
 import { before, editableTitle, newDrive } from './test-utils';
 
 async function renameDrive(page: Page, text: string) {

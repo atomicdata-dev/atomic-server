@@ -11,7 +11,7 @@
  *      blob bytes are pushed, and the server returns 200 for the download.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, FRONTEND_URL } from './test-utils';
 
 const PNG_HEADER = '89504e47'; // first 4 bytes of any PNG file

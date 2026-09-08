@@ -7,9 +7,27 @@ import { useResource } from '@tomic/react';
 import { useCurrentSubject } from '@/app/context/CurrentSubjectProvider';
 import { useId, useRef, useState } from 'react';
 
-const MenuItem = ({ subject }: { subject: string }) => {
+export interface MenuItemSnapshot {
+  subject: string;
+  title: string;
+  href: string;
+  linksTo?: string;
+  subItems: MenuItemSnapshot[];
+}
+
+const MenuItem = ({
+  subject,
+  initial,
+}: {
+  subject: string;
+  initial?: MenuItemSnapshot;
+}) => {
   const menuItem = useResource<MenuItem>(subject);
   const { currentSubject } = useCurrentSubject();
+  const title = menuItem.loading ? (initial?.title ?? '') : menuItem.title;
+  const subItems = menuItem.loading
+    ? (initial?.subItems.map(item => item.subject) ?? [])
+    : (menuItem.props.subItems ?? []);
   const id = useId();
   const anchorName = cssEscape(`--menuItem-${id}`);
   const popover = useRef<HTMLDivElement>(null);
@@ -54,7 +72,7 @@ const MenuItem = ({ subject }: { subject: string }) => {
     }
   };
 
-  return menuItem.props.subItems && menuItem.props.subItems.length > 0 ? (
+  return subItems.length > 0 ? (
     <>
       <button
         className={styles.button}
@@ -64,7 +82,7 @@ const MenuItem = ({ subject }: { subject: string }) => {
         ref={button}
         style={{ '--anchor-name': anchorName } as React.CSSProperties}
       >
-        {menuItem.title}
+        {title}
       </button>
 
       <div
@@ -82,9 +100,14 @@ const MenuItem = ({ subject }: { subject: string }) => {
         }
       >
         <ul className={styles.ul}>
-          {menuItem.props.subItems?.map((subItem: string, index: number) => (
-            <li key={index}>
-              <MenuItem subject={subItem} />
+          {subItems.map((subItem: string) => (
+            <li key={subItem}>
+              <MenuItem
+                subject={subItem}
+                initial={initial?.subItems.find(
+                  item => item.subject === subItem,
+                )}
+              />
             </li>
           ))}
         </ul>
@@ -93,6 +116,7 @@ const MenuItem = ({ subject }: { subject: string }) => {
   ) : (
     <MenuItemLink
       resource={menuItem}
+      initial={initial}
       active={menuItem.props.linksTo === currentSubject}
     />
   );

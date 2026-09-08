@@ -25,7 +25,6 @@ import {
 import { styled, useTheme } from 'styled-components';
 import type { JSONSchema7 } from 'ai';
 import { addIf } from '@helpers/addIf';
-import { useOnValueChange } from '@helpers/useOnValueChange';
 
 export interface JSONEditorProps {
   labelId?: string;
@@ -75,10 +74,9 @@ const AsyncJSONEditor: React.FC<JSONEditorProps> = ({
     setReports(prev => ({ ...prev, [key]: valid }));
   }, []);
 
-  useOnValueChange(() => {
-    // We can't move this to the report event because we need the most up to date reports which are modified in that event.
+  useEffect(() => {
     onValidationChange?.(Object.values(reports).every(Boolean));
-  }, [reports]);
+  }, [reports, onValidationChange]);
 
   // We need to use callback because the compiler can't optimize the CodeMirror component.
   const handleChange = useCallback(

@@ -2,6 +2,8 @@
   "extends": "../tsconfig.build.json",
   "compilerOptions": {
     "composite": true,
+    "typeRoots": ["../node_modules/@types"],
+    "types": ["node"],
     // We overwrite this so we don't have to use `.js` extensions in imports
     "module": "ESNext",
     "moduleResolution": "bundler",

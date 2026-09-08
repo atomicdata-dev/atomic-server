@@ -146,6 +146,7 @@ const SidebarSlot = styled.div`
 
 const ListSlot = styled.div`
   grid-area: list;
+  min-width: 0;
   padding: ${p => p.theme.size()};
 `;
 
@@ -157,7 +158,7 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
     p.edit
       ? `'title title sidebar' 'list list sidebar'`
       : `'title graph sidebar' 'list graph sidebar'`};
-  grid-template-columns: 3fr 2fr minmax(auto, 13rem);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(auto, 13rem);
   grid-template-rows: 4rem auto;
   width: 100%;
   min-height: ${p => p.theme.heights.fullPage};
@@ -168,7 +169,7 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
         ? `'title sidebar' 'list sidebar' 'list sidebar'`
         : `'title sidebar' 'graph sidebar' 'list sidebar'`};
 
-    grid-template-columns: 5fr minmax(auto, 13rem);
+    grid-template-columns: minmax(0, 5fr) minmax(auto, 13rem);
     grid-template-rows: 4rem auto auto;
     --ontology-graph-position: sticky;
     --ontology-graph-ratio: 16/9;
@@ -197,6 +198,7 @@ const TitleSlot = styled.div`
 
 const GraphSlot = styled.div`
   grid-area: graph;
+  min-width: 0;
   padding: ${p => p.theme.size()};
   height: 100%;
 `;

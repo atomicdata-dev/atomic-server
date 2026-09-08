@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, it, vi } from 'vitest';
 import { Store } from './store.js';
 import { Agent } from './agent.js';
 import { JSCryptoProvider } from './CryptoProvider.js';
@@ -34,7 +34,7 @@ function seedLoadingPlaceholder(store: Store, subject: string): void {
  * case and `applyIncoming` turns it into a real error.
  */
 describe('applyIncoming — incomplete Loro import surfaces an error', () => {
-  it('errors the resource when an UPDATE delta has unsatisfiable base deps', async ({
+  it('errors the resource when missing base state cannot be recovered', async ({
     expect,
   }) => {
     const store = new Store({ serverUrl: 'https://example.com' });
@@ -66,6 +66,9 @@ describe('applyIncoming — incomplete Loro import surfaces an error', () => {
       'did:ad:incompleteImportReproAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
     seedLoadingPlaceholder(store, subject);
 
+    vi.spyOn(store, 'fetchResourceFromServer').mockRejectedValue(
+      new Error('Could not recover missing base state'),
+    );
     const result = store.applyIncoming({
       subject,
       loroBytes: delta,
@@ -81,7 +84,7 @@ describe('applyIncoming — incomplete Loro import surfaces an error', () => {
     const r = store.resources.get(subject);
     expect(r).toBeDefined();
     expect(r!.loading).toBe(false);
-    expect(r!.error).toBeDefined();
+    await vi.waitFor(() => expect(r!.error).toBeDefined());
     expect(r!.error?.message).toMatch(/incomplete update|missing base state/i);
 
     // Crucially: it did NOT silently materialize as an empty resource.

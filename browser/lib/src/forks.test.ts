@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { core } from './index.js';
+import { core, Resource } from './index.js';
 import { forks } from './ontologies/forks.js';
 import { diffFork, forkResource, isFork, mergeFork } from './forks.js';
 import { testStore } from './test-store.js';
@@ -193,7 +193,7 @@ describe('forks', () => {
   it('forks a document body and merges concurrent body edits as a CRDT', async ({
     expect,
   }) => {
-    const { store } = await testStore();
+    const { store, posted } = await testStore();
 
     const drive = await store.newResource({ isA: DRIVE, noParent: true });
     await drive.save();
@@ -213,6 +213,15 @@ describe('forks', () => {
     const fork = await forkResource(store, original, drive.subject);
     expect(fork.getLoroDoc()!.getMap('doc').get('intro')).toBe('shared intro');
     expect(fork.get(forks.properties.forkVersion)).toBeTruthy();
+    const genesis = posted.find(
+      commit => commit.subject === fork.subject && commit.isGenesis,
+    )!;
+    const firstState = new Resource(fork.subject);
+    firstState.setStore(store);
+    firstState.importLoroUpdate(genesis.loroUpdate!);
+    expect(firstState.getLoroDoc()!.getMap('doc').get('intro')).toBe(
+      'shared intro',
+    );
 
     // Concurrent body edits: the fork adds one key, the original another.
     fork.getLoroDoc()!.getMap('doc').set('fromFork', 'DRAFT');

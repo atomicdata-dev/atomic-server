@@ -7,7 +7,7 @@
  * stage of the lookup fails (OPFS returning null, hydrate returning false,
  * lookup throwing, etc.).
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before } from './test-utils';
 
 test.describe('offline reload', () => {

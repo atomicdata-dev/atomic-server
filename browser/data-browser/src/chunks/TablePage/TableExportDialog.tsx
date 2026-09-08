@@ -53,13 +53,13 @@ export function TableExportDialog({
         <DialogContent>
           <CheckboxLabel>
             <Checkbox checked={refAsSubject} onChange={setRefAsSubject} />{' '}
-            Reference resources by subject instead of name.
+            <span>Reference resources by subject instead of name.</span>
           </CheckboxLabel>
         </DialogContent>
         <DialogActions>
           <ButtonLink download href={url}>
             <FaDownload />
-            Download
+            <span>Download</span>
           </ButtonLink>
         </DialogActions>
       </Dialog>

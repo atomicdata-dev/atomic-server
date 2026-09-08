@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { before, devDrive, newDrive, signIn } from './test-utils';
 import {
   AFTER_COMPACT_USER,
@@ -224,6 +224,8 @@ async function sendChatMessage(
   // the click regardless of what is on top, so this same helper would keep
   // passing if a dialog or an overlay ever genuinely covered Send — which is a
   // real bug and one this suite should be able to catch.
+  // Hover pauses toast expiry; move away from the corner before waiting.
+  await page.mouse.move(0, 0);
   await expect(page.locator('[data-rht-toaster] > div')).toHaveCount(0, {
     timeout: 15_000,
   });

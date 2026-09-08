@@ -12,7 +12,7 @@ import { useSettings } from '../../helpers/AppSettings';
 import { Column, Row } from '../../components/Row';
 import { Main } from '../../components/Main';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
-import { createRoute } from '@tanstack/react-router';
+import { createRoute, useSearch } from '@tanstack/react-router';
 import { pathNames } from '../paths';
 import { appRoute } from '../RootRoutes';
 import { base64StringToFilter } from './searchUtils';
@@ -44,7 +44,8 @@ export const SearchRoute = createRoute({
 
 /** Full text search route */
 export function Search(): JSX.Element {
-  const { query, filters: filtersBase64 } = SearchRoute.useSearch({
+  const { query, filters: filtersBase64 } = useSearch({
+    strict: false,
     select: state => ({ query: state.query, filters: state.filters }),
   });
   const { drive } = useSettings();
