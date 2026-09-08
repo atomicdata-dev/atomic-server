@@ -197,20 +197,94 @@ pub async fn check_append(
                 // with their own `write` grant before X ever signs in.
                 return check_agent_self_creation(store, &subject, for_agent);
             }
+            if subject.starts_with("did:") {
+                // A cert-bound resource that names no parent at all is a
+                // top-level resource (a drive): anyone may mint one, and its
+                // grants are its own.
+                if resource.get(urls::PARENT).is_err() {
+                    return Ok(String::from("DID without a parent can be created"));
+                }
+                // It names a parent that is not materialized here yet (the
+                // parent-before-child race). The `drive` stamp stands in for
+                // the parent, but only when the signer may append to that
+                // drive: an attacker cannot pass this on a victim's drive,
+                // and a stamp naming a drive that does not exist here proves
+                // nothing.
+                if let Ok(drive_val) = resource.get(urls::DRIVE_PROP) {
+                    let drive_subject = crate::Subject::from(drive_val.to_string());
+                    if &drive_subject != resource.get_subject() {
+                        if let Ok(drive) = store.get_resource(&drive_subject).await {
+                            return check_rights(store, &drive, for_agent, Right::Append).await;
+                        }
+                    }
+                }
+                return Err(e);
+            }
             if resource
                 .get_classes(store)
                 .await?
                 .iter()
                 .any(|c| c.subject == urls::DRIVE)
-                || subject.starts_with("did:")
             {
-                // This string is not returned, it's just a check
-                Ok(String::from("Drive or DID without a parent can be created"))
-            } else {
-                Err(e)
+                // A parentless non-DID subject is a server path
+                // (`https://host/anything` → `internal:/anything`). Only the
+                // node itself may reserve those: setup and the CLI create the
+                // top-level drive this way, a signed-in stranger must not.
+                return check_top_level_drive_creation(store, &subject, for_agent);
             }
+            Err(e)
         }
     }
+}
+
+/// Whether `for_agent` may create the parentless, non-DID drive `subject`:
+/// the node's own agent, or Sudo.
+fn check_top_level_drive_creation(
+    store: &impl Storelike,
+    subject: &str,
+    for_agent: &ForAgent,
+) -> AtomicResult<String> {
+    if for_agent == &ForAgent::Sudo {
+        return Ok("Sudo may create top-level Drives".into());
+    }
+    if is_node_agent(store, for_agent) {
+        return Ok("The node's own agent may create top-level Drives".into());
+    }
+    Err(crate::errors::AtomicError::unauthorized(format!(
+        "Only this node's own agent may create the top-level Drive {subject}; the commit was signed by {for_agent}"
+    )))
+}
+
+/// Same key as `a` and `b`, in whatever spelling either arrives in.
+fn same_agent_key(a: &str, b: &str) -> bool {
+    let strip = |s: &str| {
+        s.strip_prefix(crate::subject::DID_AD_AGENT_PREFIX)
+            .map(|k| k.to_string())
+    };
+    match (strip(a), strip(b)) {
+        (Some(ka), Some(kb)) => crate::authentication::public_keys_match(&ka, &kb),
+        _ => a == b,
+    }
+}
+
+/// `for_agent`, translated to the store's DID spelling.
+fn normalized_agent(store: &impl Storelike, for_agent: &ForAgent) -> String {
+    store
+        .normalize_subject(
+            &crate::agents::migrate_legacy_agent_subject(&for_agent.to_string())
+                .as_str()
+                .into(),
+        )
+        .to_string()
+}
+
+/// Whether `for_agent` is the node's own (default) agent.
+fn is_node_agent(store: &impl Storelike, for_agent: &ForAgent) -> bool {
+    let Ok(server_agent) = store.get_default_agent() else {
+        return false;
+    };
+    let server = store.normalize_subject(&server_agent.subject).to_string();
+    same_agent_key(&server, &normalized_agent(store, for_agent))
 }
 
 /// Whether `for_agent` may create the parentless Agent resource `subject`
@@ -223,31 +297,11 @@ fn check_agent_self_creation(
     if for_agent == &ForAgent::Sudo {
         return Ok("Sudo may create any Agent resource".into());
     }
-    let normalized_for_agent = store
-        .normalize_subject(
-            &crate::agents::migrate_legacy_agent_subject(&for_agent.to_string())
-                .as_str()
-                .into(),
-        )
-        .to_string();
-    let same_key = |a: &str, b: &str| {
-        let strip = |s: &str| {
-            s.strip_prefix(crate::subject::DID_AD_AGENT_PREFIX)
-                .map(|k| k.to_string())
-        };
-        match (strip(a), strip(b)) {
-            (Some(ka), Some(kb)) => crate::authentication::public_keys_match(&ka, &kb),
-            _ => a == b,
-        }
-    };
-    if same_key(&normalized_for_agent, subject) {
+    if same_agent_key(&normalized_agent(store, for_agent), subject) {
         return Ok("An agent may create its own Agent resource".into());
     }
-    if let Ok(server_agent) = store.get_default_agent() {
-        let server = store.normalize_subject(&server_agent.subject).to_string();
-        if same_key(&server, &normalized_for_agent) {
-            return Ok("The node's own agent may create Agent resources".into());
-        }
+    if is_node_agent(store, for_agent) {
+        return Ok("The node's own agent may create Agent resources".into());
     }
     Err(crate::errors::AtomicError::unauthorized(format!(
         "Only {subject} itself may create its Agent resource; the commit was signed by {for_agent}"

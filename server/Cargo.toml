@@ -73,11 +73,11 @@ tracing-log = "0.2"
 ureq = "3.3.0"
 urlencoding = "2"
 ring = "0.17.14"
-wasmtime = { version = "45.0.0", optional = true, features = [
+wasmtime = { version = "47.0.4", optional = true, features = [
   "component-model",
 ] }
-wasmtime-wasi = { version = "45.0.0", optional = true, features = ["p2"] }
-wasmtime-wasi-http = { version = "45.0.0", optional = true }
+wasmtime-wasi = { version = "47.0.4", optional = true, features = ["p2"] }
+wasmtime-wasi-http = { version = "47.0.4", optional = true }
 url = "2.5.8"
 html2md = "0.2.15"
 kuchikiki = "0.8.2"

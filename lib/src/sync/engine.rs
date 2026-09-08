@@ -705,28 +705,16 @@ pub async fn ingest_commit(
     let signer = incoming_commit.signer.clone();
     let signer_pure = signer.pure_id();
 
-    // Ensure the agent exists before applying the commit.
-    // This is important because the commit might be editing the agent itself.
-    // Run unconditionally on both roles: a commit rejected later by
-    // `apply_commit` still leaves this auto-created agent resource behind —
-    // accepted hub behavior, now shared with peer ingestion.
+    // The signer's Agent resource is materialized once the commit has been
+    // ACCEPTED, never before: `apply_commit` is where the signature and the
+    // signer's rights are checked, and an unauthenticated `/commit` naming
+    // any `did:ad:agent:` signer must not leave a durable resource behind.
+    // A commit that creates the agent itself needs no help; it is excluded.
     let is_self_creating_agent =
         incoming_commit.subject.is_agent_did() && incoming_commit.subject == signer;
-
-    if signer.is_agent_did()
+    let needs_agent_resource = signer.is_agent_did()
         && !is_self_creating_agent
-        && store.get_resource(&signer).await.is_err()
-    {
-        let mut new_agent = crate::Resource::new_instance(crate::urls::AGENT, store).await?;
-        new_agent.set_subject(signer_pure.clone());
-        if let Some(pk) = signer.as_str().strip_prefix("did:ad:agent:") {
-            new_agent
-                .set_string(crate::urls::PUBLIC_KEY.into(), pk, store)
-                .await?;
-        }
-        new_agent.save_locally(store).await?;
-        tracing::info!("Auto-created agent resource for {}", signer_pure);
-    }
+        && store.get_resource(&signer).await.is_err();
 
     let commit_opts = crate::commit::CommitOpts {
         validate_schema: true,
@@ -749,7 +737,7 @@ pub async fn ingest_commit(
         source_id: opts.source_id.clone(),
     };
 
-    if opts.suppress_live_echo {
+    let response = if opts.suppress_live_echo {
         // Applying a remote peer's commit must not rebroadcast to live peers
         // (the sender included) — the same mute the peer read loop holds
         // around `persist_update`.
@@ -759,7 +747,21 @@ pub async fn ingest_commit(
         result
     } else {
         store.apply_commit(incoming_commit, &commit_opts).await
+    }?;
+
+    if needs_agent_resource {
+        let mut new_agent = crate::Resource::new_instance(crate::urls::AGENT, store).await?;
+        new_agent.set_subject(signer_pure.clone());
+        if let Some(pk) = signer.as_str().strip_prefix("did:ad:agent:") {
+            new_agent
+                .set_string(crate::urls::PUBLIC_KEY.into(), pk, store)
+                .await?;
+        }
+        new_agent.save_locally(store).await?;
+        tracing::info!("Auto-created agent resource for {}", signer_pure);
     }
+
+    Ok(response)
 }
 
 /// Apply a JSON-AD `COMMIT` received over a peer transport, returning the
@@ -2044,6 +2046,87 @@ mod bootstrap_and_sub_tests {
         assert!(err.to_string().contains("predates"), "{err}");
         assert!(db.get_resource(&subject).await.is_ok());
         assert!(!super::super::tombstones::is_tombstoned(&db, &child));
+    }
+
+    async fn signed_rename_json(
+        db: &Db,
+        agent: &crate::agents::Agent,
+        subject: &crate::Subject,
+    ) -> String {
+        let resource = db.get_resource(subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.set(
+            crate::urls::NAME.into(),
+            crate::Value::String(format!("renamed by {}", agent.subject)),
+        );
+        let commit = builder.sign(agent, db, &resource).await.unwrap();
+        commit
+            .into_resource(db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap()
+    }
+
+    /// The signer's Agent resource is materialized only for a commit that
+    /// was accepted. A refused commit from a key nobody here has seen must
+    /// not leave a durable resource behind (C7).
+    #[tokio::test]
+    async fn signer_agent_is_only_created_for_an_accepted_commit() {
+        let db = Db::init_temp("agent_after_accept").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let child = secret_child(&db, &drive).await;
+        let subject = crate::Subject::from_raw(&child, None);
+
+        let stranger = crate::agents::Agent::new(Some("Stranger")).unwrap();
+        let json = signed_rename_json(&db, &stranger, &subject).await;
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect_err("a stranger may not edit Alice's document");
+        // `Db::get_resource` synthesizes a minimal Agent for any unknown
+        // `did:ad:agent:` subject, so ask the KV, not the resolver.
+        assert!(
+            !db.has_resource_locally(&stranger.subject.pure_id()),
+            "a refused commit must not store the signer's Agent resource"
+        );
+
+        // Bob is granted write on the drive; his first accepted commit
+        // brings his Agent resource into being.
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        let drive_subject = crate::Subject::from_raw(&drive, None);
+        let mut drive_res = db.get_resource(&drive_subject).await.unwrap();
+        drive_res
+            .set_unsafe(
+                crate::urls::WRITE.into(),
+                crate::Value::ResourceArray(vec![
+                    alice.subject.to_string().into(),
+                    bob.subject.to_string().into(),
+                ]),
+            )
+            .unwrap();
+        db.add_resource_opts(&drive_res, false, true, true)
+            .await
+            .unwrap();
+        assert!(!db.has_resource_locally(&bob.subject.pure_id()));
+
+        let json = signed_rename_json(&db, &bob, &subject).await;
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect("a drive writer's commit applies");
+        let renamed = db.get_resource(&subject).await.unwrap();
+        assert!(
+            renamed
+                .get(crate::urls::NAME)
+                .unwrap()
+                .to_string()
+                .contains("Bob")
+                || renamed
+                    .get(crate::urls::NAME)
+                    .unwrap()
+                    .to_string()
+                    .contains(&bob.subject.to_string()),
+            "Bob's accepted commit lands"
+        );
     }
 
     #[tokio::test]

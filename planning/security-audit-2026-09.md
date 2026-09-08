@@ -216,6 +216,7 @@ Fixed on `claude/security-code-quality-audit-ahi0jo`:
 - **B4**: known peers now record the drives they were paired for; `/forget-peer` requires write on one of them, or the node's own agent (or the Owner-mode owner). Integration test covers both the refused stranger and the accepted drive writer.
 - **B6**: the desktop launcher and the Android options bind `127.0.0.1` unless `--ip`/`ATOMIC_IP` is given.
 - **B8**: a node-reported `portalUrl` is accepted only as an absolute `https:` URL (or `http:` on localhost); once a device token exists, the portal it was issued by is pinned and later nodes cannot move it; every navigation to a portal goes through `safePortalUrl`. Unit tests in `managed/api.test.ts`.
+- **B5**: the dialer now signs `drive#<responder node id>` (`auth_subject_for`), and the accept side verifies the node id as the connection's challenge, so a proof captured by one responder does not open another. A proof without a node id (a pre-binding dialer) is honoured only from a peer this node's owner paired with, until that peer upgrades; a proof for another node is refused. Test `iroh_auth_must_name_this_node`.
 - **C1**: `BLOB_RESPONSE` bytes must hash to the requested key.
 - **C3**: `Datatype.URI` rejects `javascript:`, `data:` and `vbscript:`; `isSafeHref` guards `AtomicLink`, `ValueComp`, `URICell` and file downloads.
 - **C4, C5**: `downloadUrl` is escaped in the meta tags; the `/plugin-ui` query string is attribute-escaped.
@@ -228,11 +229,22 @@ Fixed on `claude/security-code-quality-audit-ahi0jo`:
 - **D**: plugin RPC ignores messages not from `window.parent`; the session cookie gets `Secure` on https.
 - **F**: `ValueComp` comma-case, unawaited `resource.save()` calls, CLI agent readiness, the commented-out tool block, the duplicate `EventManager`, `SIGNER` set twice, bitwise `&` on bools, the empty `authorization` test.
 
+Fixed in the second round on the same branch:
+
+- **B2** (parentless creation): `check_append` now allows a parentless non-agent DID only when it has no `parent` at all, or when its `drive` stamp names a drive the agent may append to (the race-free parent-before-child path, which an attacker cannot pass on a victim's drive); a non-DID `isA: Drive` genesis needs the node's own agent or Sudo. Tests in `commit.rs`.
+- **C6, C19**: plugin zips and bookmark bodies are fetched through `fetch_bytes_untrusted` / a bounded `fetch_body_untrusted` (SSRF guard, 50 MiB and 10 MiB caps, `Content-Length` checked up front).
+- **C7**: the signer's Agent resource is created only after the commit is accepted.
+- **C8**: `EPHEMERAL` Loro payloads are relayed and fanned out only from a subscriber of that subject.
+- **C14**: path-only auth signatures are no longer accepted; the full-URL-without-query fallback stays.
+- **C15**: the ACME flow returns errors instead of panicking, and a daily task renews the certificate on disk and warns that a restart is needed.
+- **C17**: `did:` resources are indexed only into their own drive's watched queries.
+- **C23**: the Flutter bridge deletes the database only on a corruption error.
+- **C22**: the atomic-saas checkout no longer persists its PAT; `release.yml` has per-job minimal permissions; Apple notarization secrets go through `env:`.
+- **D**: `Agent` and `SharedConfig` redact secrets in `Debug`; genesis certs with a `parent`/`drive` must match the document; `/plugin-list` and the plugin UI files are read as the calling agent (the data-browser signs that request) and the `plugin` parameter is validated; `default_service` logs at debug; the desktop `devtools` feature is opt-in.
+- **Dependencies**: `wasmtime` 47.0.4 (sandbox escape), `h2` 0.4.19, `quinn-proto`, `rustls-webpki` 0.103.13; `@tiptap/*` 3.30, `@modelcontextprotocol/sdk` 1.30 and the transitive build tools, after which `pnpm audit --prod` reports nothing. Still open: `h2 0.3` (via actix-http 3, no patched 0.3 line) and `rustls-webpki 0.102` / `hickory-proto 0.25` (via iroh 0.35; an iroh upgrade is the only route).
+
 Not fixed here:
 
-- **B5** (Iroh AUTH bound to the drive only): needs a protocol change so the dialer signs the responder's node id; both sides ship in this repo but deployed nodes and phones would stop pairing until upgraded, so it wants a versioned rollout rather than a silent change.
-- **B7** (desktop CSP disabled, devtools in release): enabling a CSP for the data-browser needs the app tested under it; the `devtools` cargo feature cannot be made profile-dependent without restructuring the desktop crate.
-- **B2** parentless creation for non-DID subjects claiming `isA: Drive`: server setup and the CLI create top-level drives this way; restricting it needs a decision on who may mint top-level resources on a node.
-- **C2, C6, C7, C8, C14, C15, C16, C17, C18, C19, C20, C22, C23, C24** and the remaining Low items: design or infrastructure changes, listed above with the fix direction.
-- Dependencies: `wasmtime` 45 (sandbox escape), `@tiptap/core` 3.23.6 and the `@modelcontextprotocol/sdk` transitive set need version bumps that should be tested on their own.
+- **B7** (desktop CSP disabled): enabling a CSP for the data-browser under Tauri needs the app tested under it (inline theme script, styled-components, wasm workers, server origins); the `devtools` feature is now opt-in.
+- **C16** (process-global import flags), **C18** (`Durability::None`), **C24** (loopback NFS): structural changes with performance or design trade-offs, listed above with the fix direction.
 - The `stringToSlug` duplicate stays: the data-browser copy fixes a case (`Meat & fish`) the lib copy gets wrong; port the fix into lib first.

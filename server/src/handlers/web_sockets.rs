@@ -498,8 +498,11 @@ impl WebSocketConnection {
             }
 
             // Live collaboration: an edit in progress (`DOC`), cursors
-            // (`LORO`) or drive presence (`PRESENCE`), relayed without
-            // inspection. The frame's own `agent` field is ignored on the
+            // (`LORO`) or drive presence (`PRESENCE`). The payload itself is
+            // not inspected; the commit monitor only fans it out when this
+            // connection is a current subscriber of that subject (a writer,
+            // for `DOC`), which is where the access check lives. The frame's
+            // own `agent` field is ignored on the
             // way in: the broadcaster attributes it to the identity this
             // connection proved, and stamps that on the way out. Until
             // 2026-09-04 these were the text frames `LORO_SYNC_UPDATE`,

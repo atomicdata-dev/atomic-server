@@ -54,7 +54,7 @@ impl<T: Into<String>> From<T> for ForAgent {
 
 /// An Agent can be thought of as a User. Agents are used for authentication and authorization.
 /// The private key of the Agent is used to sign [crate::Commit]s.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Agent {
     /// Private key for signing commits
     pub private_key: Option<String>,
@@ -66,6 +66,24 @@ pub struct Agent {
     pub name: Option<String>,
     /// The DID of the drive that should be opened by default for this agent.
     pub initial_drive: Option<crate::Subject>,
+}
+
+/// Hand-written so the private key never reaches a log line or an error
+/// message through `{:?}`.
+impl std::fmt::Debug for Agent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Agent")
+            .field(
+                "private_key",
+                &self.private_key.as_ref().map(|_| "[redacted]"),
+            )
+            .field("public_key", &self.public_key)
+            .field("subject", &self.subject)
+            .field("created_at", &self.created_at)
+            .field("name", &self.name)
+            .field("initial_drive", &self.initial_drive)
+            .finish()
+    }
 }
 
 impl Agent {
@@ -376,6 +394,23 @@ impl<'a> From<&'a Agent> for ForAgent {
 mod test {
     #[cfg(test)]
     use super::*;
+
+    /// `{:?}` on an Agent must never print the private key: agents end up in
+    /// log lines and error messages.
+    #[test]
+    fn debug_output_redacts_the_private_key() {
+        // A fresh key rather than a fixture: a literal here is exactly what
+        // secret scanners (rightly) flag.
+        let agent = Agent::new(Some("me")).unwrap();
+        let private_key = agent
+            .private_key
+            .clone()
+            .expect("a new agent has a private key");
+        let debug = format!("{agent:?}");
+        assert!(!debug.contains(&private_key), "{debug}");
+        assert!(debug.contains("[redacted]"), "{debug}");
+        assert!(debug.contains(&agent.public_key), "{debug}");
+    }
 
     #[test]
     fn keypair() {

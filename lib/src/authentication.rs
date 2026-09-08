@@ -49,36 +49,21 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
     let result = verifying_key.verify(message.as_bytes(), &sig);
 
     if result.is_err() {
-        // In multi-tenant environments, the client might sign the full URL or just the path.
-        // If it's a full URL, try checking just the path (with and without query params) as well.
+        // The client may have signed the URL without its query string (e.g.
+        // it signed `http://host/setup` and the request is `/setup?reset=true`).
+        // That form is still bound to the host, so it is accepted.
+        //
+        // A path-only message (`"/setup <ts>"`) is NOT: such a signature is
+        // valid on every host and tenant for the whole timestamp window, and
+        // it sidesteps the WebSocket challenge binding, which relies on the
+        // full requested subject being what was signed.
         if let Ok(url) = url::Url::parse(subject) {
-            let path = url.path();
-            let query = url.query().map(|q| format!("?{}", q)).unwrap_or_default();
-
-            // Try path+query (e.g. /setup?reset=true)
-            let path_and_query = format!("{}{}", path, query);
-            if path_and_query != subject {
-                let message_path = format!("{} {}", path_and_query, &auth_header.timestamp);
-                if verifying_key.verify(message_path.as_bytes(), &sig).is_ok() {
-                    return Ok(());
-                }
-            }
-
-            // Try full URL without query params (e.g. client signed http://host/setup but URL has ?params)
             if url.query().is_some() {
                 let mut url_no_query = url.clone();
                 url_no_query.set_query(None);
                 let message_no_query = format!("{} {}", url_no_query, &auth_header.timestamp);
                 if verifying_key
                     .verify(message_no_query.as_bytes(), &sig)
-                    .is_ok()
-                {
-                    return Ok(());
-                }
-                // Also try path-only without query params
-                let message_path_no_query = format!("{} {}", path, &auth_header.timestamp);
-                if verifying_key
-                    .verify(message_path_no_query.as_bytes(), &sig)
                     .is_ok()
                 {
                     return Ok(());

@@ -19,6 +19,8 @@ If you only want to work on the _server side_ of things, you can remove `devUrl`
 
 `cargo tauri build` likewise runs `beforeBuildCommand` to produce `browser/data-browser/dist-tauri` before bundling.
 
+The web inspector (devtools) is available in `cargo tauri dev` builds. Release builds leave it out; to get one with the inspector, build with `cargo tauri build --features devtools` (the `devtools` cargo feature in `Cargo.toml`).
+
 ### Driving the app from an agent (MCP bridge)
 
 Debug builds register `tauri-plugin-mcp-bridge` on `127.0.0.1:9223`, which lets
