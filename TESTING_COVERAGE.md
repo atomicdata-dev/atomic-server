@@ -468,6 +468,7 @@ packaged WebView initialization without server-injected Sentry configuration.
 
 Automatic Vault scheduling (`vaultAutoBackup.test.ts`) covers sustained-edit
 maximum delay, queued edits across drive switches, late account availability,
-connectivity recovery, enrollment rediscovery after reload, and distinguishing
+connectivity recovery, enrollment rediscovery after reload, account expiry during
+encryption and in-flight requests, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.

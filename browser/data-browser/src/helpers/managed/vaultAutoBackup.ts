@@ -1,5 +1,6 @@
 import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
 import {
+  VaultSessionEndedError,
   agentVaultProof,
   canEnrollVault,
   getVaultState,
@@ -355,6 +356,7 @@ async function ensureVaultBackupOnce(
 
     signal.throwIfAborted();
     const held = known;
+    const agentSubject = agent.subject;
     const outcome = await deps.runVaultBackup({
       signal,
       db,
@@ -363,6 +365,18 @@ async function ensureVaultBackupOnce(
       devicePubkey: lane,
       driveKey: held.driveKey,
       driveKeyEpoch: held.keyEpoch,
+      beforeNetworkWrite: async () => {
+        signal.throwIfAborted();
+
+        if (
+          !(await deps.hasAccount()) ||
+          (deps.identityMatches && !(await deps.identityMatches(agentSubject)))
+        ) {
+          controller.abort();
+        }
+
+        signal.throwIfAborted();
+      },
       // The drive was re-keyed since this key was cached: fetch the current
       // envelope, and remember it so the next tick does not refetch.
       refreshDriveKey: async () => {
@@ -389,7 +403,7 @@ async function ensureVaultBackupOnce(
     // attempt re-derives both from the control plane.
     enrolled.delete(driveSubject);
 
-    if (signal.aborted) {
+    if (signal.aborted || error instanceof VaultSessionEndedError) {
       return {
         status: 'skipped',
         reason: 'backup cancelled by account change',

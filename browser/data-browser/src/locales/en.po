@@ -7601,3 +7601,7 @@ msgstr "Resource with error"
 #: src/views/Plugin/AssignRights.tsx
 msgid "Assign Rights"
 msgstr "Assign Rights"
+
+#: src/helpers/managed/vault.ts
+msgid "Your account session has ended. Sign in again to resume backup."
+msgstr "Your account session has ended. Sign in again to resume backup."
