@@ -184,7 +184,8 @@ impl Fetch for OAuthFetch {
         request
             .headers
             .insert("Authorization".into(), format!("Bearer {token}"));
-        let response = self.fetch.fetch(request.clone()).await?;
+        let response =
+            fetch_with_timeout(&self.fetch, request.clone(), Duration::from_secs(60)).await?;
         if response.status != 401 {
             return Ok(response);
         }
@@ -195,6 +196,45 @@ impl Fetch for OAuthFetch {
         request
             .headers
             .insert("Authorization".into(), format!("Bearer {token}"));
-        self.fetch.fetch(request).await
+        fetch_with_timeout(&self.fetch, request, Duration::from_secs(60)).await
+    }
+}
+
+// A stalled provider must not leave the whole import waiting on an unbounded
+// reqwest request. Includes reading the response body, not only connecting.
+async fn fetch_with_timeout(
+    fetch: &impl Fetch,
+    request: HttpRequest,
+    timeout: Duration,
+) -> syncables::Result<HttpResponse> {
+    tokio::time::timeout(timeout, fetch.fetch(request))
+        .await
+        .map_err(|_| syncables::Error::Http("Provider request timed out".into()))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct StalledProvider;
+    #[async_trait::async_trait]
+    impl Fetch for StalledProvider {
+        async fn fetch(&self, _: HttpRequest) -> syncables::Result<HttpResponse> {
+            std::future::pending().await
+        }
+    }
+
+    #[tokio::test]
+    async fn stalled_provider_returns_an_error() {
+        let request = HttpRequest {
+            method: "GET".into(),
+            url: "https://example.com/events".into(),
+            headers: Default::default(),
+            body: None,
+        };
+        let error = fetch_with_timeout(&StalledProvider, request, Duration::from_millis(10))
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("Provider request timed out"));
     }
 }

@@ -283,6 +283,8 @@ export class AtomicServer {
     cargoHome: string,
   ): Container {
     return container
+      // Fetch pinned Git revisions with Git itself (libgit2 can fail on the shared cache).
+      .withEnvVariable('CARGO_NET_GIT_FETCH_WITH_CLI', 'true')
       .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
         // Shared: Locked serialized every parallel CI lane behind whichever
         // job held the volume. Cargo's own flock handles concurrent writers.
@@ -1050,7 +1052,7 @@ export class AtomicServer {
         .container()
         .from(image)
         .withExec(['apt-get', 'update', '-qq'])
-        .withExec(['apt', 'install', '-y', 'nasm', 'protobuf-compiler']),
+        .withExec(['apt', 'install', '-y', 'nasm', 'protobuf-compiler', 'git']),
       CARGO_HOME_MUSL,
     )
       .withExec(['rustup', 'component', 'add', 'clippy'])
@@ -1218,7 +1220,7 @@ export class AtomicServer {
           // (nextest, clippy) fail with "Could not find `protoc`". Matches
           // `rustBuild()`'s apt list; this container split off from it later
           // and the package was missed.
-          .withExec(['apt', 'install', '-y', 'nasm', 'protobuf-compiler']),
+          .withExec(['apt', 'install', '-y', 'nasm', 'protobuf-compiler', 'git']),
         CARGO_HOME_MUSL,
       )
         .withExec(['rustup', 'component', 'add', 'clippy'])

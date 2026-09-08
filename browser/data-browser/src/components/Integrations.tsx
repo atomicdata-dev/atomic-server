@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { signRequest, useStore, type Agent } from '@tomic/react';
+import { signRequest, useStore, urls, type Agent } from '@tomic/react';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Column, Row } from './Row';
 import { AtomicLink } from './AtomicLink';
+import { fetchPrivateDriveSubject } from '../helpers/privateDrive';
 
 type Integration = {
   id: string;
@@ -30,6 +31,7 @@ export function Integrations({ server }: { server: string }) {
 }
 
 function IntegrationList({ server, agent }: { server: string; agent?: Agent }) {
+  const store = useStore();
   const [items, setItems] = useState<Integration[]>([]);
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState<string>();
@@ -53,6 +55,24 @@ function IntegrationList({ server, agent }: { server: string; agent?: Agent }) {
         const data: Integration[] = await response.json();
         if (cancelled) return;
         setItems(data);
+        const imported = data.flatMap(item =>
+          item.job?.status === 'complete' && item.job.drive
+            ? [item.job.drive]
+            : [],
+        );
+        if (imported.length) {
+          const subject = await fetchPrivateDriveSubject(store, agent);
+          if (!subject)
+            throw new Error('Set up a private drive to save imported drives.');
+          const home = await store.getResource(subject);
+          if (cancelled) return;
+          const saved = home.getArray(urls.properties.drives);
+          const missing = imported.filter(drive => !saved.includes(drive));
+          if (missing.length) {
+            await home.set(urls.properties.drives, [...saved, ...missing]);
+            await home.save();
+          }
+        }
         setError(undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -70,7 +90,7 @@ function IntegrationList({ server, agent }: { server: string; agent?: Agent }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [server, agent]);
+  }, [server, agent, store]);
 
   async function connect(integration: Integration) {
     if (!agent) return;

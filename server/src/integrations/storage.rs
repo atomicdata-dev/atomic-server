@@ -17,7 +17,10 @@ impl Storage for AgentStorage {
     async fn put(&self, record: &Record) -> Result<(), StorageError> {
         let mut record = record.clone();
         record.namespace = self.namespace(&record.namespace);
-        self.inner.put(&record).await
+        let result = self.inner.put(&record).await;
+        // Let the import deadline run during large batches of local writes.
+        tokio::task::yield_now().await;
+        result
     }
     async fn get(
         &self,

@@ -65,7 +65,10 @@ The importer refreshes an expiring token or retries a rejected token once when a
 refresh token is available. Providers do not always return refresh tokens. Tokens
 are discarded after the import; reconnecting starts OAuth again. There is no
 scheduled sync or credential persistence in this version. Pending authorization
-expires after ten minutes and an import is bounded to thirty minutes. Partial
+expires after ten minutes and an import is bounded to thirty minutes. Individual
+provider requests time out after sixty seconds. Database work runs separately
+from HTTP workers. The Sync page saves completed imports into the signed-in
+user’s private-drive list, making them available under **My drives**. Partial
 writes remain if an import fails or times out. Restarting the server clears jobs
 and pending authorization.
 
@@ -170,3 +173,13 @@ to the local crate so both sides share the same `Storelike` and database types.
 Reflector and syncables are pinned Git dependencies until upstream publishes
 compatible crates; publishing this server version to crates.io requires replacing
 those Git dependencies with published versions first.
+
+When embedding `atomic-server` from another workspace, repeat this patch in that
+workspace's root `Cargo.toml` (Cargo does not inherit dependency workspace patches):
+
+```toml
+[patch."https://github.com/ontola/atomic-server"]
+atomic_lib = { path = "../atomic-server/lib" }
+```
+
+Adjust the path to the same library checkout used by your server dependency.

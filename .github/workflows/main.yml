@@ -273,14 +273,16 @@ jobs:
         working-directory: atomic-saas
         run: |
           set -euo pipefail
-          cargo check --all-targets
-          cargo clippy --all-targets -- -D warnings
-          cargo test --all-targets
+          # Dependency workspaces do not inherit this repo's atomic_lib patch.
+          reflector_patch=(--config "patch.\"https://github.com/ontola/atomic-server\".atomic_lib.path=\"$GITHUB_WORKSPACE/atomic-server/lib\"")
+          cargo "${reflector_patch[@]}" check --all-targets
+          cargo "${reflector_patch[@]}" clippy --all-targets -- -D warnings
+          cargo "${reflector_patch[@]}" test --all-targets
           # The managed node embeds this repo's server crate and is not a
           # default workspace member, so the root build does not touch it.
           # Its own CI runs check, clippy and test; the same here.
-          cargo clippy -p atomic-managed-node --all-targets -- -D warnings
-          cargo test -p atomic-managed-node
+          cargo "${reflector_patch[@]}" clippy -p atomic-managed-node --all-targets -- -D warnings
+          cargo "${reflector_patch[@]}" test -p atomic-managed-node
           if ! git diff --quiet -- Cargo.lock; then
             git diff --stat -- Cargo.lock
             echo "::warning::atomic-saas's Cargo.lock drifted against this commit; run cargo check there and commit Cargo.lock."

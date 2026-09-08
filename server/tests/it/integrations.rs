@@ -282,6 +282,26 @@ async fn live_oauth_refresh_import_and_isolation() {
         response.status(),
         response.text().await.unwrap()
     );
+    let mut children = reqwest::Url::parse(&format!("{origin}/query")).unwrap();
+    children
+        .query_pairs_mut()
+        .append_pair("property", atomic_lib::urls::PARENT)
+        .append_pair("value", &drive)
+        .append_pair("sort_by", atomic_lib::urls::CREATED_AT);
+    let children: Value = signed(&client, reqwest::Method::GET, children.as_str(), &alice)
+        .header("Accept", "application/ad+json")
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        children[atomic_lib::urls::COLLECTION_MEMBERS]
+            .as_array()
+            .is_some_and(|members| !members.is_empty()),
+        "drive contents are visible: {children}"
+    );
     let response = signed(&client, reqwest::Method::GET, &drive, &bob)
         .header("Accept", "application/ad+json")
         .send()

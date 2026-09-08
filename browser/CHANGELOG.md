@@ -1,5 +1,7 @@
 # Changelog
 
+- Save completed OAuth imports to the private drive’s **My drives** list.
+
 - Add Integrations to the Sync page: connect GitHub or Google and follow live import progress ([#1381](https://github.com/ontola/atomic-server/issues/1381)).
 
 This changelog covers all five packages, as they are (for now) updated as a whole

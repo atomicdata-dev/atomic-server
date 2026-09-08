@@ -418,7 +418,9 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
 |---|---|
 | glue | `server/tests/it/import_oad.rs`: real CLI, local HTTP API + overlay, persistence, repeated updates, drive owner grants, origin mismatch, and API failure exit status. |
 | engine | Pagination, ontology derivation, and OAuth tests live upstream in reflector-rs / syncables-rs; not rerun by this workspace. |
-| glue / flow | `server/tests/it/integrations.rs`: real running server + mock OAuth/API provider, signed discovery/start, PKCE, browser cookie/state binding, callback replay, token refresh, immediate import, drive reads, agent isolation and denied consent. |
+| glue / flow | `server/tests/it/integrations.rs`: real running server + mock OAuth/API provider, signed discovery/start, PKCE, browser cookie/state binding, callback replay, token refresh, immediate import, drive reads and sorted children queries, agent isolation and denied consent. |
 | flow | Sync UI manually verified against a temporary server; real GitHub/Google consent requires operator-provided OAuth app credentials. |
 
 - `db::resolver_tests::resource_prefix_scan_matches_local_subjects` checks exact local subject-prefix boundaries and empty results for importer cleanup scans.
+
+- `integrations::oauth::tests::stalled_provider_returns_an_error` proves an unresponsive provider is bounded by the request deadline.

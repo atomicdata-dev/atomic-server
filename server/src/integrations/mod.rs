@@ -247,14 +247,32 @@ pub async fn callback(
         let code = query.code.clone().unwrap();
         let app = app.clone();
         actix_web::rt::spawn(async move {
-            let result =
-                tokio::time::timeout(Duration::from_secs(1800), import(&app, pending, &code))
+            // Reflector does synchronous database work between awaits. Keep it
+            // off Actix's single-threaded HTTP worker runtime.
+            let worker_app = app.clone();
+            let result = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()?;
+                runtime.block_on(async {
+                    tokio::time::timeout(
+                        Duration::from_secs(1800),
+                        import(&worker_app, pending, &code),
+                    )
                     .await
                     .unwrap_or_else(|_| {
                         Err(anyhow::anyhow!(
                             "Import timed out; partial data was retained."
                         ))
-                    });
+                    })
+                })
+            })
+            .await
+            .unwrap_or_else(|_| {
+                Err(anyhow::anyhow!(
+                    "Import stopped unexpectedly; partial data was retained."
+                ))
+            });
             finish(&app, &job_key, result);
         });
     }
