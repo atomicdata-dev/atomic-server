@@ -19,9 +19,7 @@
 use std::collections::HashMap;
 
 use actix_web::{web, HttpResponse};
-use atomic_lib::{
-    agents::ForAgent, db::app_agent::AppAgentKey, hierarchy::check_write, Storelike, Subject,
-};
+use atomic_lib::{hierarchy::check_write, Storelike, Subject};
 use serde_json::Value as Json;
 
 use crate::{
@@ -88,20 +86,20 @@ pub async fn handle_app_write(
     let agent = get_client_agent(req.headers(), &appstate, &signed_subject).await?;
     check_write(store, &app_resource, &agent).await?;
 
-    let key = AppAgentKey::new(&body.drive, &body.app);
-    let app_agent = store.get_app_agent_info(&key)?.ok_or_else(|| {
-        AtomicServerError::bad_request(
-            "This app has no key of its own, so it cannot write. Recreate it, or give it one.",
-        )
-    })?;
-
-    // Rights are the app's, not the caller's. A person who may write the whole
-    // drive does not lend that reach to an app just by opening it.
-    let mut host = StoreApplyHost {
-        store: store.clone(),
-        for_agent: ForAgent::AgentSubject(Subject::from_raw(&app_agent.agent, None)),
-        signing_as: Some(key),
-    };
+    let mut host = StoreApplyHost::for_installation(store, &body.drive, &body.app, agent)
+        .await
+        .map_err(AtomicServerError::bad_request)?;
+    // This endpoint is for a directly installed app, not for borrowing an
+    // ancestor's identity or opting into the legacy server signer.
+    if !host
+        .signing_as
+        .as_ref()
+        .is_some_and(|key| key.app == body.app)
+    {
+        return Err(AtomicServerError::bad_request(
+            "This app has no key of its own; connect an identity before writing",
+        ));
+    }
 
     let body = body.into_inner();
 

@@ -3,7 +3,7 @@
 Status: product direction agreed with the user, 2026-09-08; technical migration
 in progress. This describes the target, not guarantees already implemented. Current
 extension work is on PR #1307; Reflector integration is proposed in PR #1383.
-Workspace navigation and shared frame transport have implementation checkpoints below;
+Workspace navigation, shared view protocol and installation identity have implementation checkpoints below;
 the complete package and permission migration remains open.
 
 **An extension is a package of capabilities. Atomic owns its authority and
@@ -365,6 +365,30 @@ while retaining thin compatibility decoders for already installed packages.
 
 Exit: each connection has one execution owner, one approval model and one recovery
 history. Keep specialized sync records where they represent real semantics.
+
+### Implementation checkpoint: installation identity lifecycle (2026-09-08)
+
+- [x] Resolve existing entrypoints to their nearest installed identity and verify
+  the owning drive through one resolver. Keep existing subjects, keys, provider
+  secrets, connection mappings and receipts; no data-copy migration.
+- [x] Use the resolver for runtime binding and signer selection. Manual app writes,
+  sync application, background sync, schedules and triggers share the effect-host
+  constructor. Actor rights and installation rights both bound manual writes.
+- [x] Distinguish legacy (no stored identity), active and revoked in the existing
+  key store. Revoke atomically erases key material and persists a tombstone;
+  selecting a signer before revocation cannot fall back to the server afterward.
+- [x] Retain decoding of old key records, explicit reconnect and legacy behavior.
+- [ ] Migrate legacy packaged browser commits into installation-signed effects.
+  Their interactive grants still use the existing user-signed adapter.
+- [ ] Consolidate package activation/upgrade and common run-state transitions.
+  Release validation and action journals remain their existing shared mechanisms.
+
+The revocation tombstone prevents future fallback, including after process exit.
+A deletion made by an older version left no evidence: it cannot be distinguished
+retrospectively from a legacy installation. Such installations require explicit
+re-enrollment/revocation. Revocation cannot undo an already accepted provider write;
+existing uncertainty/recovery receipts must remain intact. This checkpoint does not
+claim the deferred GitHub live migration or all extension lifecycles are complete.
 
 ### 4. Prove declarative authoring fits
 

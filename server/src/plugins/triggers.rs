@@ -374,16 +374,13 @@ async fn run(
     let parsed: serde_json::Value =
         serde_json::from_str(&verdict).map_err(|e| format!("the verdict is not JSON: {e}"))?;
 
-    let mut apply_host = StoreApplyHost {
-        store: appstate.store.clone(),
-        for_agent: ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
-        signing_as: crate::plugins::store_host::app_signing_for(
-            &appstate.store,
-            &key.drive,
-            &key.plugin,
-        )
-        .await?,
-    };
+    let mut apply_host = StoreApplyHost::for_installation(
+        &appstate.store,
+        &key.drive,
+        &key.plugin,
+        ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
+    )
+    .await?;
 
     let plan = plan_verdict(&parsed, &mut apply_host).await;
     let journal = super::journal::Journal::new(

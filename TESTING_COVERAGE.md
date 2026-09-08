@@ -997,3 +997,20 @@ resource creation and signing still use the real local backend. This verifies th
 new asset without claiming a rebuilt Rust binary. Backend signing identities and
 per-profile operation capabilities remain distinct; this is not certification of
 a common installation authority model.
+
+
+## Installation identity lifecycle (2026-09-08)
+
+`plugins::installation::tests` resolves existing nested subjects, legacy and active
+identities, rejects a forged drive even when a key exists there, and checks revoke /
+reconnect without reparenting records. `store_host::installation_tests` reproduces
+and prevents fallback to the server signer after a selected key is removed.
+`scheduler::tests::a_revoked_installation_cannot_resume_a_granted_schedule` verifies
+that an armed run records a revocation error without creating its proposed row.
+Existing app endpoint tests cover real signed writes, caller rights and outside
+scope denial; provider fixtures cover existing release/receipt/sync behavior.
+
+`db::app_agent` tests cover legacy MessagePack decoding, idempotent revocation,
+erased key material, explicit reconnect and a subprocess that exits without
+running destructors. Reopening the database must still show a revoked identity.
+These checks do not migrate packaged UI signing or certify live provider delivery.

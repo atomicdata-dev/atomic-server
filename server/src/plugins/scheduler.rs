@@ -285,16 +285,13 @@ pub(crate) async fn auto_apply(
     let parsed: serde_json::Value =
         serde_json::from_str(verdict).map_err(|e| format!("the verdict is not JSON: {e}"))?;
 
-    let mut host = StoreApplyHost {
-        store: appstate.store.clone(),
-        for_agent: ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
-        signing_as: crate::plugins::store_host::app_signing_for(
-            &appstate.store,
-            &key.drive,
-            &key.plugin,
-        )
-        .await?,
-    };
+    let mut host = StoreApplyHost::for_installation(
+        &appstate.store,
+        &key.drive,
+        &key.plugin,
+        ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
+    )
+    .await?;
 
     let plan = plan_verdict(&parsed, &mut host).await;
     let journal = super::journal::Journal::new(
@@ -932,6 +929,33 @@ mod tests {
             children_named(&fixture, &fixture.drive.clone(), "Waited for").await,
             0,
             "nothing may be written without a grant",
+        );
+    }
+
+    #[actix_rt::test]
+    async fn a_revoked_installation_cannot_resume_a_granted_schedule() {
+        let mut fixture = fixture("revoked_schedule").await;
+        write_plugin(&mut fixture, "Must not appear").await;
+        let key = arm(&fixture, true).await;
+        fixture
+            .appstate
+            .store
+            .delete_app_agent(&atomic_lib::db::app_agent::AppAgentKey::new(
+                &fixture.drive,
+                &fixture.plugin,
+            ))
+            .unwrap();
+        assert_eq!(run_due(&fixture.appstate).await, 1);
+        let schedule = fixture
+            .appstate
+            .store
+            .get_plugin_schedule(&key)
+            .unwrap()
+            .unwrap();
+        assert!(schedule.last_error.unwrap().contains("revoked"));
+        assert_eq!(
+            children_named(&fixture, &fixture.drive, "Must not appear").await,
+            0
         );
     }
 
