@@ -237,7 +237,6 @@ Fixed in the second round on the same branch:
 - **C8**: `EPHEMERAL` Loro payloads are relayed and fanned out only from a subscriber of that subject.
 - **C14**: path-only auth signatures are no longer accepted; the full-URL-without-query fallback stays.
 - **C15**: the ACME flow returns errors instead of panicking, and a daily task renews the certificate on disk and warns that a restart is needed.
-- **C17**: `did:` resources are indexed only into their own drive's watched queries.
 - **C23**: the Flutter bridge deletes the database only on a corruption error.
 - **C22**: the atomic-saas checkout no longer persists its PAT; `release.yml` has per-job minimal permissions; Apple notarization secrets go through `env:`.
 - **D**: `Agent` and `SharedConfig` redact secrets in `Debug`; genesis certs with a `parent`/`drive` must match the document; `/plugin-list` and the plugin UI files are read as the calling agent (the data-browser signs that request) and the `plugin` parameter is validated; `default_service` logs at debug; the desktop `devtools` feature is opt-in.
@@ -245,6 +244,7 @@ Fixed in the second round on the same branch:
 
 Not fixed here:
 
+- **C17** (DID resources in other drives' watched queries): a first version compared a resource's `drive` stamp with the query's `drive`, but for a `did:` query `QueryFilter.drive` is `drive_prefix_from_subject` of the queried subject, which is that subject itself rather than the drive root, so legitimate rows were excluded and the `query_aggregates` tests failed. Reverted. A correct fix has to carry the drive root in the filter (resolve the queried subject's `drive` stamp when the filter is registered) and only then compare stamps, or keep the constraint check as the scope and rely on read rights at query time, which still apply.
 - **B7** (desktop CSP disabled): enabling a CSP for the data-browser under Tauri needs the app tested under it (inline theme script, styled-components, wasm workers, server origins); the `devtools` feature is now opt-in.
 - **C16** (process-global import flags), **C18** (`Durability::None`), **C24** (loopback NFS): structural changes with performance or design trade-offs, listed above with the fix direction.
 - The `stringToSlug` duplicate stays: the data-browser copy fixes a case (`Meat & fish`) the lib copy gets wrong; port the fix into lib first.

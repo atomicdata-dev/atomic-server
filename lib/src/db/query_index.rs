@@ -378,35 +378,12 @@ fn constraint_matches(resource: &Resource, c: &PropVal) -> bool {
     }
 }
 
-/// The drive a `did:` resource's index membership is scoped to: its `drive`
-/// stamp, or its own subject when it is a drive root. `None` for a `did:`
-/// resource that carries neither (an agent, or a child stored before the
-/// server stamped `drive`) and for URL subjects, which are routed by prefix.
-fn did_resource_drive(resource: &Resource) -> Option<Subject> {
-    if !resource.get_subject().is_did() {
-        return None;
-    }
-    resource.get_drive().filter(|d| d.is_did())
-}
-
-/// A `did:` resource stamped for drive A is not a member of drive B's query,
-/// whatever its properties say. URL subjects and unstamped `did:` resources
-/// can't be placed here and fall through to the constraint check.
-fn resource_in_filter_drive(resource: &Resource, q_filter: &QueryFilter) -> bool {
-    match did_resource_drive(resource) {
-        Some(drive) if q_filter.drive.is_did() => drive == q_filter.drive,
-        _ => true,
-    }
-}
-
-/// Whether a resource matches **all** of a QueryFilter's constraints (AND),
-/// within the filter's drive.
+/// Whether a resource matches **all** of a QueryFilter's constraints (AND).
 pub fn resource_matches_filter(resource: &Resource, q_filter: &QueryFilter) -> bool {
-    resource_in_filter_drive(resource, q_filter)
-        && q_filter
-            .filters
-            .iter()
-            .all(|c| constraint_matches(resource, c))
+    q_filter
+        .filters
+        .iter()
+        .all(|c| constraint_matches(resource, c))
 }
 
 /// Whether this atom is part of any of the filter's constraints (so a change
@@ -487,10 +464,8 @@ pub fn should_update_property<'a>(
 /// Filters are routed by `(drive, property)`: only filters that reference the
 /// changed atom's property (in a constraint or as `sort_by`), plus the
 /// drive's value-only filters, are evaluated — not every filter in the drive.
-/// DID-subject atoms can't be prefix-matched to a drive; they consult the
-/// bucket of the drive they are stamped for (or that they are the root of),
-/// and only a DID resource that carries neither — an agent, or a child stored
-/// before the server stamped `drive` — consults every drive's buckets.
+/// DID-subject atoms can't be prefix-matched to a single drive, so they
+/// consult the property buckets of every drive.
 #[tracing::instrument(level = "info", skip_all)]
 pub fn check_if_atom_matches_watched_query_filters(
     store: &Db,
@@ -503,10 +478,7 @@ pub fn check_if_atom_matches_watched_query_filters(
     let subject_str = index_atom.subject.as_str();
 
     let filters: Vec<Arc<QueryFilter>> = if subject_str.starts_with("did:") {
-        match did_resource_drive(resource) {
-            Some(drive) => store.watched_queries_for_atom(&drive.pure_id(), &index_atom.property),
-            None => store.all_watched_queries_for_property(&index_atom.property),
-        }
+        store.all_watched_queries_for_property(&index_atom.property)
     } else {
         let drive_prefix = drive_prefix_from_subject(&index_atom.subject);
         store.watched_queries_for_atom(drive_prefix.as_str(), &index_atom.property)
