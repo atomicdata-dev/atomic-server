@@ -4,6 +4,7 @@ import {
   useCollection,
   useCollectionPage,
   useDrive,
+  useResources,
   type Resource,
 } from '@tomic/react';
 import { FaCodeBranch } from 'react-icons/fa6';
@@ -27,13 +28,28 @@ export function PendingForks({
 }: PendingForksProps): React.JSX.Element | null {
   const [drive] = useDrive();
 
-  const { collection } = useCollection({
+  const { collection, ready } = useCollection({
     property: forks.properties.originalSubject,
     value: resource.subject,
     drive,
   });
 
-  const forkSubjects = useCollectionPage(collection, 0);
+  const candidates = useCollectionPage(collection, 0);
+  const resources = useResources(candidates);
+  // A cached query page is only a list of candidates. Confirm the relationship
+  // before calling anything a proposal, including while changing resources.
+  const forkSubjects = candidates.filter(subject => {
+    const fork = resources.get(subject);
+
+    return (
+      ready &&
+      !fork?.loading &&
+      !fork?.error &&
+      fork?.isFork &&
+      subject !== resource.subject &&
+      fork.get(forks.properties.originalSubject) === resource.subject
+    );
+  });
 
   // Don't show it on a fork itself, or when there is nothing pending.
   if (resource.isFork || forkSubjects.length === 0) {

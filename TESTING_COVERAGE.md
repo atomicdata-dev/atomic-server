@@ -560,3 +560,11 @@ This does not yet prove restoration of the user's private staging workspace.
 - `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
 
 Drive changes and reauthentication on an already-open WebSocket: `browser/lib/src/websockets.test.ts` verifies a fresh SYNC is sent without reconnecting, including local-only drive exclusion. This covers the Sync page remaining at Connecting after sign-in or drive switching; live staging acceptance remains separate.
+
+### Pending fork banner
+
+`PendingForks.test.tsx` rejects ordinary resources, proposals for another subject,
+and loading candidates even if a query page lists them. `forks.spec.ts` checks
+ordinary resources after reload and real proposals on their original resource.
+The reported Safari query contamination is not reproduced locally: WebKit test
+setup currently fails opening OPFS before it can create its dev drive.
