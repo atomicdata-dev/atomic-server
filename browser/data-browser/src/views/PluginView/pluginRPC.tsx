@@ -28,11 +28,15 @@ export function usePluginRPC(
     requestReadPermission,
     requestReadPermissionDialog,
     hasReadPermission,
-  ] = useRequestPermissionDialog(pluginData.plugin, 'read');
-  const [requestWritePermission, requestWritePermissionDialog] =
-    useRequestPermissionDialog(pluginData.plugin, 'write');
-  const [pickResource, resourcePickerDialog] = useResourcePicker(
+  ] = useRequestPermissionDialog(
     pluginData.plugin,
+    'read',
+    pluginData.resource,
+  );
+  const [requestWritePermission, requestWritePermissionDialog] =
+    useRequestPermissionDialog(pluginData.plugin, 'write', pluginData.resource);
+  const [pickResource, resourcePickerDialog] = useResourcePicker(
+    pluginData.resource,
   );
   const [pickFile, filePickerDialog] = useFilePicker();
 

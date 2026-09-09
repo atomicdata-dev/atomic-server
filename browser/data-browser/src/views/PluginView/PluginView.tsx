@@ -1,5 +1,6 @@
+import { grantIdentity } from './grantIdentity';
 import type { ResourcePageProps } from '../ResourcePage';
-import { useStore } from '@tomic/react';
+import { useCurrentAgent, useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
 import { usePluginRPC } from '@views/PluginView/pluginRPC';
 import styled from 'styled-components';
@@ -36,7 +37,27 @@ export interface PluginViewProps extends ResourcePageProps {
  * reset + theme CSS, so we hand it over via `postMessage` once the iframe's
  * bootstrap signals `__atomic_plugin_ready`.
  */
-export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
+export const PluginView: React.FC<PluginViewProps> = props => {
+  const [agent] = useCurrentAgent();
+  const { drive } = useSettings();
+  const store = useStore();
+  const { getUIPluginData } = useCustomViews();
+  const installation = getUIPluginData(props.plugin).resource;
+
+  return (
+    <PluginViewSession
+      key={grantIdentity(
+        store.getServerUrl(),
+        drive,
+        agent?.subject ?? '',
+        installation,
+      )}
+      {...props}
+    />
+  );
+};
+
+const PluginViewSession: React.FC<PluginViewProps> = ({ plugin }) => {
   const { drive } = useSettings();
   const store = useStore();
   const { getUIPluginData } = useCustomViews();

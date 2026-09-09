@@ -1438,3 +1438,17 @@ an actual connection binding while retaining original receipts. The background
 worker regression proves a due job stops with a stored error when activation
 settings change, rather than writing with an older grant. Existing subprocess
 recovery tests continue to exercise already-approved work across process exit.
+
+
+## Packaged consent isolation and delete authorship (2026-09-09)
+
+`grantIdentity.test.ts` checks separation by server, drive, actor and installation,
+including unambiguous tuple encoding. The packaged-plugin browser flow verifies
+picker consent is persisted under the new identity, and installation, writes and
+reload still work. View remounting prevents the key-changing local-storage hook
+from retaining a previous account's state; pending permission/picker promises are
+cancelled on teardown. Old plugin-name grants are deliberately not migrated.
+
+`store_host::destroy_identity_tests` checks the signer of the persisted destroy
+commit. It failed with the server signer before `Resource::destroy_as` was used;
+installation deletion must use the same selected identity as create/update.

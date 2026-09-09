@@ -2,7 +2,7 @@ import { Button } from '@components/Button';
 import { useDialog, Dialog } from '@components/Dialog';
 import { SearchBox } from '@components/forms/SearchBox';
 import type { PickResourceArgs } from '@tomic/plugin';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { styled } from 'styled-components';
 import { useStoredPluginGrants } from './useStoredPluginGrants';
 
@@ -18,6 +18,14 @@ export function useResourcePicker(
   );
   const resolverRef = useRef<((value: string | undefined) => void) | undefined>(
     undefined,
+  );
+
+  useEffect(
+    () => () => {
+      resolverRef.current?.(undefined);
+      resolverRef.current = undefined;
+    },
+    [],
   );
 
   const [args, setArgs] = useState<PickResourceArgs>({});

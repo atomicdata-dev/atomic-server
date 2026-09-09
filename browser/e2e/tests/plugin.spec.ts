@@ -167,6 +167,21 @@ test.describe('Plugins', () => {
       await expect(frame.getByText('My Problem')).toBeVisible();
     }
 
+    // Picker consent belongs to this account and concrete installation. Older
+    // plugin-name grants must not be copied into a different account's scope.
+    const grantKeys = await page.evaluate(() =>
+      Object.keys(localStorage).filter(key =>
+        key.startsWith('atomic.plugins.ui.v2.'),
+      ),
+    );
+    expect(grantKeys).toHaveLength(1);
+    const identity = JSON.parse(
+      grantKeys[0].slice('atomic.plugins.ui.v2.'.length),
+    );
+    expect(identity).toHaveLength(4);
+    expect(identity[2]).toMatch(/^did:ad:agent:/);
+    expect(identity[3]).toBeTruthy();
+
     // Check if the view can commit by refreshing and checking the favorite folder.
     await page.reload();
 
