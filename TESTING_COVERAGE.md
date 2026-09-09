@@ -31,7 +31,7 @@ departure, membership checks and the per-browser connection bound.
 `verify-peer-mesh.mjs` uses eight distinct Chromium agents: full mesh, ninth-member
 rejection, concurrent creations, group presence, attachment replication, creator
 departure, offline reconciliation and signed deletion. Rust regressions cover
-late snapshots after deletion and concurrent blob replies across independent edges.
+late snapshots and delayed pulls after deletion (unknown pulls still fail), and concurrent blob replies across independent edges.
 `browserPeerSync.test.ts` checks that another member can mint an invitation for
 the existing room without restarting its connection.
 `verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
