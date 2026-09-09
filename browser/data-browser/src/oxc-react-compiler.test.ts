@@ -139,5 +139,7 @@ describe('oxc-transform-react', () => {
 
     expect(fatals).toEqual([]);
     expect(compiled).toBeGreaterThan(400);
-  });
+    // This compiles the whole app in one test. Hosted CI took 7.8 seconds,
+    // exceeding Vitest's 5-second default even though every file compiled.
+  }, 30_000);
 });

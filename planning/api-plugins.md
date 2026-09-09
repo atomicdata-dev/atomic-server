@@ -58,3 +58,7 @@ OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
 - [ ] Make branch CI pass. Local JS suite, lint, typecheck, Rust handler tests
   and focused Pets E2E pass. Main run 34349742940 exposed independent Cargo
   cache locks around a shared registry; link the locks into the shared volume.
+
+Main run 34350517612 passed dependency installation with the shared locks, then
+failed the full-app compiler sweep at its 5-second default (7.8 seconds actual).
+Give only that bulk test a 30-second budget; retain all compilation assertions.
