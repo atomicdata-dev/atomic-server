@@ -1214,6 +1214,7 @@ export class AtomicServer {
     // silently makes that assertion hang until timeout. Defaults minus
     // `vector-search` (the ort/musl gap above) is enough — wasmtime builds
     // fine on this musl-cross image.
+    let wasmPluginsEnabled = false;
     if (target.includes('musl')) {
       if (e2e) {
         buildArgs.push(
@@ -1221,6 +1222,7 @@ export class AtomicServer {
           '--features',
           'https,wasm-plugins',
         );
+        wasmPluginsEnabled = true;
       } else {
         buildArgs.push('--no-default-features', '--features', 'light');
       }
@@ -1232,8 +1234,28 @@ export class AtomicServer {
         ? `/code/target/${target}/release/atomic-server`
         : `/code/target/${target}/debug/atomic-server`;
 
+    // `wasm-plugins`'s build.rs compiles `atomic-plugin-runtime` for
+    // `wasm32-wasip2` as a nested `cargo build`, separate from the rustc
+    // that's already on this image. Without the target's std lib installed,
+    // that nested build fails and build.rs treats it as "plugins are an
+    // optional degradation" — it swallows the failure and ships a server
+    // with an empty embedded runtime instead of erroring the build. Every
+    // e2e test that actually exercises server-side plugin execution
+    // (this one and `plugin.spec.ts`) then hangs until timeout on a 500
+    // from `/plugin-run`, with nothing in the build log to point at why.
+    // `rustTest()` already installs this target for the same reason —
+    // same fix, applied where the e2e server binary is actually built.
+    const containerReadyToBuild = wasmPluginsEnabled
+      ? containerWithAssets.withExec([
+          'rustup',
+          'target',
+          'add',
+          'wasm32-wasip2',
+        ])
+      : containerWithAssets;
+
     return (
-      containerWithAssets
+      containerReadyToBuild
         .withExec(buildArgs)
         // .withExec([targetPath, "--version"])
         .withExec(['cp', targetPath, '/atomic-server-binary'])
