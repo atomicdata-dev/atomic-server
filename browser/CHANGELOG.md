@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Reconcile the selected cloud drive after switching drives or signing in on an open connection, so Sync no longer waits for a page refresh to confirm its status.
+
 ## [v0.41.0-beta.6] - 2026-09-09
 
 - An older server response no longer rolls back the local cache after an edit, fixing dashboard configuration reverting on reload.

@@ -543,3 +543,5 @@ This does not yet prove restoration of the user's private staging workspace.
 - `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
 
 - `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
+
+Drive changes and reauthentication on an already-open WebSocket: `browser/lib/src/websockets.test.ts` verifies a fresh SYNC is sent without reconnecting, including local-only drive exclusion. This covers the Sync page remaining at Connecting after sign-in or drive switching; live staging acceptance remains separate.
