@@ -6698,6 +6698,7 @@ msgstr "Disconnect"
 msgid "Reconnect"
 msgstr "Reconnect"
 
+#: src/helpers/browserPeerSync.ts
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
 msgstr "Not connected"
@@ -7798,7 +7799,6 @@ msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Could not unlock with a passkey. Use your recovery code instead."
 
-
 #: src/components/BrowserPeerPanel.tsx
 msgid "Peer sync"
 msgstr "Peer sync"
@@ -7818,6 +7818,7 @@ msgstr "Create peer link"
 #: src/components/BrowserPeerPanel.tsx
 msgid "Peer link"
 msgstr "Peer link"
+
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect existing account"
 msgstr "Connect existing account"
