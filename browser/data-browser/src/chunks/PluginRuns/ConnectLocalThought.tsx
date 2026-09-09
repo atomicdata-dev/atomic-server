@@ -41,6 +41,7 @@ export function ConnectLocalThought({
   const [connection] = useState<SavedConnection | undefined>(() => {
     const raw = localStorage.getItem(connectionKey(drive, actor, platform));
     if (!raw) return;
+
     try {
       return JSON.parse(raw);
     } catch {
@@ -91,11 +92,14 @@ export function ConnectLocalThought({
       .catch(reason => {
         if (!controller.signal.aborted) setError(String(reason));
       });
+
     return () => controller.abort();
   }, [store, platform]);
+
   const connect = async () => {
     setBusy(true);
     setError('');
+
     try {
       const result = await proxyRequest<{ url: string; state: string }>(
         store,
@@ -112,10 +116,12 @@ export function ConnectLocalThought({
       setBusy(false);
     }
   };
+
   const fetchRecords = async () => {
     if (!connection || busy) return;
     setBusy(true);
     setError('');
+
     try {
       const fetched = await proxyRequest<FetchedPlatform>(store, 'fetch', {
         drive,
@@ -150,6 +156,7 @@ export function ConnectLocalThought({
       ))
         properties[term.shortname] = schema.properties[termKey(platform, term)];
       const classes = fetched.ontology.terms.filter(t => t.kind === 'class');
+
       for (const term of classes) {
         const rowClass = schema.classes[termKey(platform, term)];
         const tableName =
@@ -190,6 +197,7 @@ export function ConnectLocalThought({
         await destination.save();
         destinations[term.shortname] = { table: destination.subject, rowClass };
       }
+
       const config = { platform, destinations, properties };
       await resource.set(terms.properties['plugin-schemas'], {
         localthought: { ...config, connection: connection.connection },
@@ -221,6 +229,7 @@ export function ConnectLocalThought({
       setBusy(false);
     }
   };
+
   return (
     <Column gap='0.75rem'>
       <p>

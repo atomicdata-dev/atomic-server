@@ -43,6 +43,7 @@ export function LocalThoughtCatalog({
       .catch(reason => {
         if (!controller.signal.aborted) setError(String(reason));
       });
+
     return () => controller.abort();
   }, [store]);
   useEffect(() => {
@@ -54,6 +55,7 @@ export function LocalThoughtCatalog({
     completing.current = true;
     // Remove the single-use credential before fetching anything else or following links.
     history.replaceState(history.state, '', `${url.pathname}`);
+
     const finish = async () => {
       const raw = sessionStorage.getItem('localthought-pending');
       const pending = raw ? JSON.parse(raw) : undefined;
@@ -83,6 +85,7 @@ export function LocalThoughtCatalog({
       sessionStorage.removeItem('localthought-pending');
       setReturned(result.platform);
     };
+
     void finish().catch(reason => setError(String(reason)));
   }, [drive, store]);
   const visible = platforms?.filter(id =>
@@ -90,6 +93,7 @@ export function LocalThoughtCatalog({
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
+
   return (
     <>
       {error && <ErrMessage role='alert'>{error}</ErrMessage>}
@@ -105,6 +109,7 @@ export function LocalThoughtCatalog({
     </>
   );
 }
+
 function PlatformCard({
   platform,
   drive,
@@ -119,6 +124,7 @@ function PlatformCard({
   useEffect(() => {
     if (returned) show();
   }, [returned, show]);
+
   return (
     <Card data-integration={platform}>
       <Column gap='0.75rem'>

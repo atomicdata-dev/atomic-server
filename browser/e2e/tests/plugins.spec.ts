@@ -63,7 +63,9 @@ test.describe('plugins', () => {
     await expect(page).not.toHaveURL(/connection_code=/);
     const [preview] = await Promise.all([
       page.waitForResponse(
-        response => response.url().endsWith('/plugin-run') && response.request().method() === 'POST',
+        response =>
+          response.url().endsWith('/plugin-run') &&
+          response.request().method() === 'POST',
         { timeout: 45_000 },
       ),
       page.getByRole('button', { name: 'Fetch and preview' }).click(),

@@ -1,5 +1,6 @@
 // @wc-ignore-file
 import { signRequest, type Store } from '@tomic/react';
+
 export const platformName = (id: string) =>
   ({
     'github-issues': 'GitHub issues',
@@ -23,6 +24,7 @@ export async function proxyRequest<T>(
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(await response.text());
+
   return response.json();
 }
 export interface SavedConnection {
