@@ -149,3 +149,35 @@ it('recognizes the lowercase field names produced by the WASM ontology', () => {
   expect(notes).toContain('Recurring event');
   expect(notes).toContain('Conferencing');
 });
+
+it('projects exclusive date-only ends and never fabricates timestamps', () => {
+  const input = fixture();
+  input.records[0].values = {
+    start: { date: '2026-09-10' },
+    end: { date: '2026-09-13' },
+  };
+  const values = calendarProjection(input).records[0].values;
+  expect(values['atomic-calendar-end-day']).toBe('2026-09-13');
+  expect(values.start).toEqual({ date: '2026-09-10' });
+  expect(values.end).toEqual({ date: '2026-09-13' });
+  expect(values[fields.notes]).not.toContain('shown on start day only');
+});
+it('rejects malformed or mixed all-day intervals instead of shortening them', () => {
+  for (const end of [
+    {},
+    { date: '2026-02-30' },
+    { date: '2026-09-10' },
+    { date: '2026-09-09' },
+    { dateTime: '2026-09-11T00:00:00Z' },
+  ]) {
+    const input = fixture();
+    input.records[0].values = { start: { date: '2026-09-10' }, end };
+    expect(() => calendarProjection(input)).toThrow();
+  }
+  const input = fixture();
+  input.records[0].values.start = {
+    date: '2026-09-10',
+    dateTime: '2026-09-10T00:00:00Z',
+  };
+  expect(() => calendarProjection(input)).toThrow();
+});
