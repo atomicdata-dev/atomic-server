@@ -1,5 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch();
+
 try {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 1000 },

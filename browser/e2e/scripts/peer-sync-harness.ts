@@ -10,6 +10,7 @@ import {
 
 export async function openPeer(secret?: string) {
   await LoroLoader.initializeLoro();
+
   if (!secret) {
     const keys = await Agent.generateKeyPair();
     secret = Agent.buildSecret(
@@ -17,6 +18,7 @@ export async function openPeer(secret?: string) {
       `did:ad:agent:${keys.publicKey}`,
     );
   }
+
   const agent = await Agent.fromSecret(secret);
   const store = new Store({ serverUrl: 'http://127.0.0.1:1', agent });
   store.injectFetch(async () => {
@@ -41,6 +43,7 @@ export async function openPeer(secret?: string) {
         });
     }),
   );
+
   return { agent, store, db, secret };
 }
 
@@ -59,6 +62,7 @@ export async function createDrive(store: Store) {
   store.setDrive(drive.subject);
   await drive.save();
   await store.getClientDb()!.flush();
+
   return drive.subject;
 }
 export { BrowserPeerSync, core };

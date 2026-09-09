@@ -1,3 +1,4 @@
+/* eslint-disable no-shadow -- Playwright callbacks run in a separate browser realm. */
 // Real signaling + WebRTC + OPFS, with AtomicServer data requests disabled.
 // Run the SaaS peer_signaling example and set ATOMIC_PEER_SIGNALING_URL.
 // Requires built WASM, but deliberately starts no AtomicServer data process.
@@ -28,9 +29,11 @@ vite.middlewares.use((req, res, next) => {
 await vite.listen();
 const browser = await chromium.launch();
 const deadline = setTimeout(() => browser.close(), 180000);
+
 try {
   const pages = [];
   const errors = [];
+
   for (let i = 0; i < 8; i++) {
     const page = await browser.newPage();
     page.on('pageerror', error => {
@@ -56,6 +59,7 @@ try {
     });
     pages.push(page);
   }
+
   const identities = await Promise.all(
     pages.map(page => page.evaluate(() => window.state.agent.subject)),
   );
@@ -95,6 +99,7 @@ try {
       },
       { drive, room, signalingUrl, expectedPeer: identities[0] },
     );
+
   for (const page of pages) {
     await connect(page);
     await page.waitForFunction(
@@ -106,6 +111,7 @@ try {
       { timeout: 30000 },
     );
   }
+
   for (const page of pages)
     await page.waitForFunction(
       () => window.peerStatus === 'Connected to 7 browsers',
@@ -125,6 +131,7 @@ try {
           socket.send(
             JSON.stringify({ type: 'join', room, peer: 'f'.repeat(64) }),
           );
+
         socket.onclose = () => {
           clearTimeout(timer);
           resolve(true);
@@ -144,6 +151,7 @@ try {
             propVals: { 'https://atomicdata.dev/properties/name': `From ${i}` },
           });
           await r.save();
+
           return r.subject;
         },
         { drive, i },
@@ -198,6 +206,7 @@ try {
             .map(byte => parseInt(byte, 16)),
         );
         const bytes = await window.state.db.getBlob(hash);
+
         return bytes && new TextDecoder().decode(bytes) === 'mesh attachment';
       },
       file,
@@ -241,6 +250,7 @@ try {
     await page.waitForFunction(
       subject => {
         const r = window.state.store.resources.get(subject);
+
         return (
           r?.get('https://atomicdata.dev/properties/name') === 'Creator left' &&
           r?.get('https://atomicdata.dev/properties/description') ===

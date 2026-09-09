@@ -1,3 +1,4 @@
+/* eslint-disable no-shadow -- Playwright callbacks run in a separate browser realm. */
 // Real signaling + WebRTC + OPFS, with AtomicServer data requests disabled.
 // Run the SaaS peer_signaling example and set ATOMIC_PEER_SIGNALING_URL.
 // Requires built WASM, but deliberately starts no AtomicServer data process.
@@ -28,10 +29,12 @@ vite.middlewares.use((req, res, next) => {
 await vite.listen();
 const browser = await chromium.launch();
 const deadline = setTimeout(() => browser.close(), 90000);
+
 try {
   const errors = [];
   const a = await browser.newPage();
   const b = await browser.newPage();
+
   for (const [label, page] of [
     ['a', a],
     ['b', b],
@@ -53,11 +56,13 @@ try {
     });
     await page.goto('http://localhost:6772/');
   }
+
   const init = async (page, secret) =>
     page.evaluate(async secret => {
       window.harness =
         await import('/browser/e2e/scripts/peer-sync-harness.ts');
       window.state = await window.harness.openPeer(secret);
+
       return window.state.secret;
     }, secret);
   await init(a);
@@ -85,7 +90,7 @@ try {
   const connect = async page =>
     page.evaluate(
       ({ drive, room, expectedPeer, signalingUrl }) => {
-        const { store, agent } = window.state;
+        const { store } = window.state;
         store.registerLocalOnlyDrive(drive);
         store.setDrive(drive);
         window.link = new window.harness.BrowserPeerSync(store, {
@@ -125,6 +130,7 @@ try {
       propVals: { 'https://atomicdata.dev/properties/name': 'Shared folder' },
     });
     await resource.save();
+
     return resource.subject;
   }, drive);
   await b.waitForFunction(
@@ -151,6 +157,7 @@ try {
     await page.waitForFunction(
       ({ subject, name, description }) => {
         const r = window.state.store.resources.get(subject);
+
         return r?.get(name) === 'From A' && r?.get(description) === 'From B';
       },
       { subject, name, description },
@@ -190,6 +197,7 @@ try {
         hex.match(/../g).map(byte => parseInt(byte, 16)),
       );
       const bytes = await window.state.db.getBlob(hash);
+
       return bytes && new TextDecoder().decode(bytes) === 'peer attachment';
     },
     file,
@@ -204,6 +212,7 @@ try {
     await page.waitForFunction(
       ({ subject, name, description }) => {
         const r = window.state.store.resources.get(subject);
+
         return (
           r?.get(name) === 'Offline A' && r?.get(description) === 'Offline B'
         );
