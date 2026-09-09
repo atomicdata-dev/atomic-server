@@ -1,4 +1,16 @@
-import { forms, Resource, useResource, useString } from '@tomic/react';
+import { constructOpenURL } from '@helpers/navigation';
+import { ResourceInline } from '@views/ResourceInline/ResourceInline';
+import { AtomicLink } from '@components/AtomicLink';
+import {
+  core,
+  dataBrowser,
+  forms,
+  Resource,
+  useArray,
+  useNumber,
+  useResource,
+  useString,
+} from '@tomic/react';
 import type { JSX } from 'react';
 import { LinkableTagList } from './LinkableTagList';
 import { BoundField } from './BoundField';
@@ -8,6 +20,8 @@ import { Divider } from './Divider';
 
 interface ChoiceOptionsProps {
   field: Resource;
+  readOnly?: boolean;
+  tableSubject?: string;
   /** Whether the question takes several answers, i.e. `multi-select` or
    * `dropdown-multi`. Only those get the selection bounds. */
   multiple?: boolean;
@@ -25,9 +39,14 @@ interface ChoiceOptionsProps {
 export function ChoiceOptions({
   field,
   multiple,
+  readOnly,
+  tableSubject,
 }: ChoiceOptionsProps): JSX.Element {
   const [mapsTo] = useString(field, forms.properties.formMapsTo);
   const property = useResource(mapsTo);
+
+  const [tags] = useArray(property, core.properties.allowsOnly);
+  const [columnMax] = useNumber(property, dataBrowser.properties.max);
 
   // Only while the field's mapped Property is still loading — every saved
   // choice field has one.
@@ -37,18 +56,42 @@ export function ChoiceOptions({
 
   return (
     <>
-      <LinkableTagList
-        field={field}
-        property={property}
-        label='Options'
-        addLabel='Add option'
-        removeLabel='Remove option'
-        itemTestId='choice-option-input'
-      />
+      {readOnly ? (
+        <>
+          <div>
+            {tags.map(subject => (
+              <div key={subject}>
+                <ResourceInline subject={subject} />
+              </div>
+            ))}
+          </div>
+          <AtomicLink
+            path={
+              tableSubject
+                ? constructOpenURL(tableSubject, { editColumn: mapsTo ?? '' })
+                : undefined
+            }
+          >
+            Edit column on table
+          </AtomicLink>
+        </>
+      ) : (
+        <LinkableTagList
+          field={field}
+          property={property}
+          label='Options'
+          addLabel='Add option'
+          removeLabel='Remove option'
+          itemTestId='choice-option-input'
+        />
+      )}
       {multiple && (
         <>
           <Divider />
-          <SelectionBounds field={field} />
+          <SelectionBounds
+            field={field}
+            max={readOnly ? columnMax : undefined}
+          />
         </>
       )}
     </>
@@ -61,7 +104,13 @@ export function ChoiceOptions({
  * options bag rather than on the mapped Property, because they constrain this
  * question rather than the column its answers land in.
  */
-function SelectionBounds({ field }: { field: Resource }): JSX.Element {
+function SelectionBounds({
+  field,
+  max,
+}: {
+  field: Resource;
+  max?: number;
+}): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
 
   return (
@@ -72,6 +121,7 @@ function SelectionBounds({ field }: { field: Resource }): JSX.Element {
         options={options}
         setOptions={setOptions}
         min={1}
+        max={max}
         helper='The fewest options an answer may carry. An unanswered question still counts as unanswered rather than as too few — that is what Required is for.'
       />
       <BoundField
@@ -80,6 +130,7 @@ function SelectionBounds({ field }: { field: Resource }): JSX.Element {
         options={options}
         setOptions={setOptions}
         min={1}
+        max={max}
         helper='The most options a visitor may tick. Once they reach it the remaining options grey out.'
       />
     </FieldPair>

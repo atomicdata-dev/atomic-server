@@ -91,6 +91,8 @@ export interface OptionsSource {
  * discriminated union per type) because that is how the property is stored
  * and how both validators read it. */
 export interface FieldOptions {
+  /** Resolved from an integer table column by the definition builder. */
+  integer?: boolean;
   placeholder?: string;
   min?: number;
   max?: number;

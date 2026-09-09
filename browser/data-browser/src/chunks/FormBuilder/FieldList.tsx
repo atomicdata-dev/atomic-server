@@ -1,4 +1,7 @@
-import { forms, useArray, useResource, useStore } from '@tomic/react';
+import { useTableFormColumns } from './useTableFormColumns';
+import { useFormQuestions } from './useFormQuestions';
+import toast from 'react-hot-toast';
+import { Resource, forms, useArray, useResource, useStore } from '@tomic/react';
 import type { JSX } from 'react';
 import { styled } from 'styled-components';
 import { Column } from '@components/Row';
@@ -10,6 +13,9 @@ import { FIELD_TYPE_META, type AddableFieldType } from './fieldTypes';
 
 interface FieldListProps {
   dataClassSubject: string;
+  form: Resource;
+  ownsSchema: boolean;
+  tableSubject?: string;
   pageSubject: string;
   selectedField: string | undefined;
   onSelectField: (subject: string | undefined) => void;
@@ -17,6 +23,9 @@ interface FieldListProps {
 
 export function FieldList({
   dataClassSubject,
+  form,
+  ownsSchema,
+  tableSubject,
   pageSubject,
   selectedField,
   onSelectField,
@@ -27,15 +36,31 @@ export function FieldList({
     commit: true,
   });
 
-  const { createField, deleteField } =
-    useFormFieldPropertySync(dataClassSubject);
+  const { createField, deleteField } = useFormFieldPropertySync(
+    dataClassSubject,
+    ownsSchema,
+  );
 
-  const handleAdd = async (type: AddableFieldType) => {
-    const field = await createField(page, {
-      type,
-      label: FIELD_TYPE_META[type].label,
-    });
-    onSelectField(field.subject);
+  const { columns } = useTableFormColumns(dataClassSubject);
+  const questions = useFormQuestions(form);
+  const unused = columns.filter(
+    p => !questions.some(q => q.mapsTo === p.subject),
+  );
+
+  const handleAdd = async (
+    type: AddableFieldType,
+    existingProperty?: Resource,
+  ) => {
+    try {
+      const field = await createField(page, {
+        type,
+        existingProperty,
+        label: FIELD_TYPE_META[type].label,
+      });
+      onSelectField(field.subject);
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
   };
 
   const handleDelete = async (subject: string) => {
@@ -62,7 +87,11 @@ export function FieldList({
         )}
       />
       <MenuWrapper>
-        <AddFieldMenu onAdd={handleAdd} />
+        <AddFieldMenu
+          onAdd={handleAdd}
+          columns={ownsSchema ? undefined : unused}
+          tableSubject={tableSubject}
+        />
       </MenuWrapper>
     </Column>
   );

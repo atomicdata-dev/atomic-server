@@ -1,5 +1,12 @@
+import { FaArrowLeft } from 'react-icons/fa6';
+import { useTableFormColumns } from './useTableFormColumns';
+import { useFormQuestions } from './useFormQuestions';
+import { columnLabel } from './tableColumns';
+import { AtomicLink } from '@components/AtomicLink';
 import {
+  core,
   forms,
+  useBoolean,
   unknownSubject,
   useArray,
   useResource,
@@ -30,6 +37,19 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
     forms.properties.formDataClass,
   );
   const [tableSubject] = useString(resource, forms.properties.formTargetTable);
+  const [parentSubject] = useString(resource, core.properties.parent);
+  // Standalone forms own their results table, including older forms without
+  // form-owns-schema. Only a form parented to its target table links back.
+  const isTableForm = !!tableSubject && parentSubject === tableSubject;
+  const [ownsSchema = false] = useBoolean(
+    resource,
+    forms.properties.formOwnsSchema,
+  );
+  const { requires, columns } = useTableFormColumns(
+    dataClassSubject ?? unknownSubject,
+  );
+  const questions = useFormQuestions(resource);
+  const missing = requires.filter(s => !questions.some(q => q.mapsTo === s));
   const tableResource = useResource(tableSubject ?? unknownSubject);
 
   const [activeTab, setActiveTab] = useState<BuilderTab>('fields');
@@ -46,6 +66,11 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <Shell>
       <TitleSlot>
+        {isTableForm && (
+          <BackLink subject={tableSubject}>
+            <FaArrowLeft aria-hidden /> Back to table
+          </BackLink>
+        )}
         <HeaderRow>
           <TitleArea>
             <EditableTitle resource={resource} id={titleId} />
@@ -76,15 +101,17 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
         >
           Settings
         </TabButton>
-        <TabButton
-          role='tab'
-          type='button'
-          $active={activeTab === 'results'}
-          aria-selected={activeTab === 'results'}
-          onClick={() => setActiveTab('results')}
-        >
-          Results
-        </TabButton>
+        {!isTableForm && (
+          <TabButton
+            role='tab'
+            type='button'
+            $active={activeTab === 'results'}
+            aria-selected={activeTab === 'results'}
+            onClick={() => setActiveTab('results')}
+          >
+            Results
+          </TabButton>
+        )}
         <TabButton
           role='tab'
           type='button'
@@ -98,8 +125,21 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
       {activeTab === 'fields' ? (
         <FieldsGrid>
           <MainSlot>
+            {missing.length > 0 && (
+              <p role='alert'>
+                Required table columns are missing from this form:{' '}
+                {missing
+                  .map(s => columns.find(p => p.subject === s))
+                  .map((p, i) => (p ? columnLabel(p) : missing[i]))
+                  .join(', ')}
+                . Responses cannot be saved without them.
+              </p>
+            )}
             {activePage && dataClassSubject && (
               <FieldList
+                ownsSchema={ownsSchema}
+                tableSubject={tableSubject}
+                form={resource}
                 dataClassSubject={dataClassSubject}
                 pageSubject={activePage}
                 selectedField={selectedField}
@@ -110,6 +150,8 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
           <SettingsSlot>
             {selectedField && dataClassSubject ? (
               <FieldSettingsPanel
+                ownsSchema={ownsSchema}
+                tableSubject={tableSubject}
                 fieldSubject={selectedField}
                 dataClassSubject={dataClassSubject}
                 form={resource}
@@ -180,6 +222,14 @@ const TitleSlot = styled.div`
  * instead. No breakpoint involved: the flow reacts to the space actually
  * available, so it works the same in a side panel as in the main view.
  */
+const BackLink = styled(AtomicLink)`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+`;
+
 const HeaderRow = styled.div`
   display: flex;
   flex-wrap: wrap;

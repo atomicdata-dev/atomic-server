@@ -1,5 +1,6 @@
 import {
   CollectionBuilder,
+  Datatype,
   core,
   dataBrowser,
   forms,
@@ -51,6 +52,21 @@ export async function buildFormDefinitionClientSide(
   for (const pageSubject of pageSubjects) {
     pages.push(await buildPageDefinition(store, pageSubject));
   }
+
+  const dataClassSubject = form.get(forms.properties.formDataClass) as
+    | string
+    | undefined;
+  const required = dataClassSubject
+    ? (await store.getResource(dataClassSubject)).getSubjects(
+        core.properties.requires,
+      )
+    : [];
+
+  for (const page of pages)
+    for (const block of page.blocks) {
+      if (block.kind === 'field' && required.includes(block.mapsTo))
+        block.required = true;
+    }
 
   return {
     version: 1,
@@ -248,6 +264,21 @@ async function buildBlock(
       field.get(forms.properties.formFieldOptions) as JSONValue | undefined,
     ),
   )) as FieldOptions;
+
+  const property = await store.getResource(mapsTo);
+  if (type === 'number')
+    options.integer =
+      property.get(core.properties.datatype) === Datatype.INTEGER;
+  const max = property.get(dataBrowser.properties.max) as number | undefined;
+
+  if (
+    (type === 'multi-select' || type === 'dropdown-multi') &&
+    max !== undefined
+  ) {
+    options.maxSelected = Math.min(options.maxSelected ?? max, max);
+    if (options.minSelected !== undefined)
+      options.minSelected = Math.min(options.minSelected, max);
+  }
 
   return {
     kind: 'field',

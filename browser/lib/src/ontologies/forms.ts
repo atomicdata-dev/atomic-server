@@ -17,6 +17,7 @@ export const forms = {
     formCondition: 'https://atomicdata.dev/classes/FormCondition',
   },
   properties: {
+    formOwnsSchema: 'https://atomicdata.dev/properties/form-owns-schema',
     formDataClass: 'https://atomicdata.dev/properties/form-data-class',
     formTargetTable: 'https://atomicdata.dev/properties/form-target-table',
     formPages: 'https://atomicdata.dev/properties/form-pages',
@@ -50,6 +51,7 @@ export const forms = {
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Form']: [
+      'https://atomicdata.dev/properties/form-owns-schema',
       'https://atomicdata.dev/properties/name',
       'https://atomicdata.dev/properties/form-data-class',
       'https://atomicdata.dev/properties/form-target-table',
@@ -129,6 +131,7 @@ declare module '../index.js' {
         | typeof forms.properties.formTargetTable
         | typeof forms.properties.formPages;
       recommends:
+        | typeof forms.properties.formOwnsSchema
         | typeof forms.properties.formPublishedAt
         | typeof forms.properties.formOpenAt
         | typeof forms.properties.formCloseAt
@@ -189,6 +192,7 @@ declare module '../index.js' {
   }
 
   interface PropTypeMapping {
+    [forms.properties.formOwnsSchema]: boolean;
     [forms.properties.formDataClass]: string;
     [forms.properties.formTargetTable]: string;
     [forms.properties.formPages]: string[];
@@ -218,6 +222,7 @@ declare module '../index.js' {
   }
 
   interface PropSubjectToNameMapping {
+    [forms.properties.formOwnsSchema]: 'formOwnsSchema';
     [forms.properties.formDataClass]: 'formDataClass';
     [forms.properties.formTargetTable]: 'formTargetTable';
     [forms.properties.formPages]: 'formPages';

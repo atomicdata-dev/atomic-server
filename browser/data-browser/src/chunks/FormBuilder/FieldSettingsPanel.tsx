@@ -1,3 +1,9 @@
+import { constructOpenURL } from '@helpers/navigation';
+import { AtomicLink } from '@components/AtomicLink';
+import { ResourceInline } from '@views/ResourceInline/ResourceInline';
+import { Checkbox } from '@components/forms/Checkbox';
+import { compatibleFieldTypes } from './tableColumns';
+import { useTableFormColumns } from './useTableFormColumns';
 import {
   core,
   forms,
@@ -44,12 +50,16 @@ import { PanelHeader } from './PanelHeader';
 
 interface FieldSettingsPanelProps {
   fieldSubject: string;
+  ownsSchema: boolean;
+  tableSubject?: string;
   dataClassSubject: string;
   form: Resource;
 }
 
 export function FieldSettingsPanel({
   fieldSubject,
+  ownsSchema,
+  tableSubject,
   dataClassSubject,
   form,
 }: FieldSettingsPanelProps): JSX.Element {
@@ -57,8 +67,22 @@ export function FieldSettingsPanel({
   const descriptionProp = useProperty(core.properties.description);
   const requiredProp = useProperty(forms.properties.required);
   const [fieldType] = useString(field, forms.properties.formFieldType);
-  const { renameField, setFieldShortname } =
-    useFormFieldPropertySync(dataClassSubject);
+  const { renameField, setFieldShortname } = useFormFieldPropertySync(
+    dataClassSubject,
+    ownsSchema,
+  );
+
+  const [mapsTo] = useString(field, forms.properties.formMapsTo);
+  const property = useResource(mapsTo ?? unknownSubject);
+  const { requires } = useTableFormColumns(dataClassSubject);
+  const forcedRequired = !!mapsTo && requires.includes(mapsTo);
+  const compatible = compatibleFieldTypes(property);
+
+  useEffect(() => {
+    if (forcedRequired && field.get(forms.properties.required) !== true) {
+      void field.set(forms.properties.required, true).then(() => field.save());
+    }
+  }, [field, forcedRequired]);
 
   // Subscribed read of `isA` — see the note in `FieldRow`: `hasClasses()`
   // never re-renders when the class lands late, which would leave this panel
@@ -92,7 +116,7 @@ export function FieldSettingsPanel({
     return (
       <Panel>
         {header}
-        <Field label="Heading text" required>
+        <Field label='Heading text' required>
           <FieldLabelInput field={field} renameField={renameField} />
         </Field>
         <Divider />
@@ -124,7 +148,7 @@ export function FieldSettingsPanel({
     return (
       <Panel>
         {header}
-        <Field label="Paragraph text" required>
+        <Field label='Paragraph text' required>
           <InputSwitcher
             commit
             resource={field}
@@ -148,7 +172,7 @@ export function FieldSettingsPanel({
   return (
     <Panel>
       {header}
-      <Field label="Label" required>
+      <Field label='Label' required>
         <FieldLabelInput field={field} renameField={renameField} />
       </Field>
       {/* Keyed on the field: selecting another question remounts the row, so a
@@ -157,19 +181,73 @@ export function FieldSettingsPanel({
         key={fieldSubject}
         field={field}
         setFieldShortname={setFieldShortname}
+        readOnly={!ownsSchema}
       />
       <Divider />
-      <Field label="Helper text">
+      {!ownsSchema && (
+        <>
+          <Field label='Table column'>
+            <ResourceInline subject={mapsTo ?? unknownSubject} />
+            <AtomicLink
+              path={
+                tableSubject
+                  ? constructOpenURL(tableSubject, { editColumn: mapsTo ?? '' })
+                  : undefined
+              }
+            >
+              Edit column on table
+            </AtomicLink>
+          </Field>
+          {compatible.length > 1 && (
+            <Field label='Input type'>
+              <select
+                aria-label='Input type'
+                value={fieldType}
+                onChange={async e => {
+                  if (!compatible.includes(e.target.value as FormFieldType))
+                    return;
+                  await field.set(
+                    forms.properties.formFieldType,
+                    e.target.value,
+                  );
+                  await field.save();
+                }}
+              >
+                {compatible.map(type => (
+                  <option key={type} value={type}>
+                    {FIELD_TYPE_META[type].label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+        </>
+      )}
+      <Field label='Helper text'>
         <InputSwitcher commit resource={field} property={descriptionProp} />
       </Field>
       <Divider />
-      <Field label="Required">
-        <InputSwitcher commit resource={field} property={requiredProp} />
+      <Field label='Required'>
+        {forcedRequired ? (
+          <>
+            <Checkbox
+              aria-label='Required'
+              checked
+              disabled
+              onChange={() => {}}
+            />
+            Required by the table column
+          </>
+        ) : (
+          <InputSwitcher commit resource={field} property={requiredProp} />
+        )}
       </Field>
       {hasTypeOptions && <Divider />}
       <TypeOptions
         field={field}
         type={fieldType as FormFieldType | undefined}
+        ownsSchema={ownsSchema}
+        tableSubject={tableSubject}
       />
       <Divider />
       <ConditionsEditor
@@ -222,7 +300,7 @@ function FieldLabelInput({
   return (
     <InputWrapper>
       <InputStyled
-        data-testid="field-label-input"
+        data-testid='field-label-input'
         value={draft}
         onChange={e => setDraft(e.target.value)}
       />
@@ -231,6 +309,7 @@ function FieldLabelInput({
 }
 
 interface FieldShortnameFieldProps {
+  readOnly: boolean;
   field: Resource;
   setFieldShortname: (
     field: Resource,
@@ -250,6 +329,7 @@ interface FieldShortnameFieldProps {
  */
 function FieldShortnameField({
   field,
+  readOnly,
   setFieldShortname,
 }: FieldShortnameFieldProps): JSX.Element | null {
   const [mapsTo] = useString(field, forms.properties.formMapsTo);
@@ -306,14 +386,14 @@ function FieldShortnameField({
   // label — rather than expanding into a full labelled Field, so clicking the
   // pencil doesn't shove the rest of the panel down.
   return (
-    <div title="How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again.">
+    <div title='How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again.'>
       <ShortnameRow>
         <ShortnameLabel>Data name</ShortnameLabel>
         {editing ? (
           <ShortnameInputWrapper $invalid={!!error}>
             <InputStyled
               ref={inputRef}
-              data-testid="field-shortname-input"
+              data-testid='field-shortname-input'
               value={draft}
               placeholder={derived}
               onChange={e => setDraft(slugWhileTyping(e.target.value))}
@@ -332,18 +412,20 @@ function FieldShortnameField({
           </ShortnameInputWrapper>
         ) : (
           <>
-            <ShortnameValue data-testid="field-shortname-value">
+            <ShortnameValue data-testid='field-shortname-value'>
               {shortname ?? derived}
             </ShortnameValue>
-            <IconButton
-              type="button"
-              title="Edit data name"
-              size="0.8em"
-              data-testid="field-shortname-edit"
-              onClick={startEditing}
-            >
-              <FaPencil />
-            </IconButton>
+            {!readOnly && (
+              <IconButton
+                type='button'
+                title='Edit data name'
+                size='0.8em'
+                data-testid='field-shortname-edit'
+                onClick={startEditing}
+              >
+                <FaPencil />
+              </IconButton>
+            )}
           </>
         )}
       </ShortnameRow>
@@ -355,9 +437,13 @@ function FieldShortnameField({
 function TypeOptions({
   field,
   type,
+  ownsSchema,
+  tableSubject,
 }: {
   field: Resource;
   type: FormFieldType | undefined;
+  ownsSchema: boolean;
+  tableSubject?: string;
 }): JSX.Element | null {
   switch (type) {
     case 'short-text':
@@ -373,7 +459,7 @@ function TypeOptions({
           <Divider />
           <CountryDefaultField
             field={field}
-            helper="The country the number selector starts on. Visitors can still pick another one."
+            helper='The country the number selector starts on. Visitors can still pick another one.'
           />
         </>
       );
@@ -394,12 +480,29 @@ function TypeOptions({
       return <CurrencyOptions field={field} />;
     case 'radio':
     case 'dropdown':
-      return <ChoiceOptions field={field} />;
+      return (
+        <ChoiceOptions
+          field={field}
+          readOnly={!ownsSchema}
+          tableSubject={tableSubject}
+        />
+      );
     case 'multi-select':
     case 'dropdown-multi':
-      return <ChoiceOptions field={field} multiple />;
+      return (
+        <ChoiceOptions
+          field={field}
+          multiple
+          readOnly={!ownsSchema}
+          tableSubject={tableSubject}
+        />
+      );
     case 'picture-choice':
-      return <PictureChoiceOptions field={field} />;
+      return ownsSchema ? (
+        <PictureChoiceOptions field={field} />
+      ) : (
+        <ChoiceOptions field={field} readOnly tableSubject={tableSubject} />
+      );
     case 'likert':
       return <LikertOptions field={field} />;
     case 'rating':

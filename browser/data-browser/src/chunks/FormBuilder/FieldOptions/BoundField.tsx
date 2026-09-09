@@ -12,6 +12,7 @@ interface BoundFieldProps {
   /** Floor for the input itself — a count bound starts at 1, a value bound
    * has none. */
   min?: number;
+  max?: number;
   helper?: string;
 }
 
@@ -30,6 +31,7 @@ export function BoundField({
   options,
   setOptions,
   min,
+  max,
   helper,
 }: BoundFieldProps): JSX.Element {
   const stored = options[optionKey] as number | undefined;
@@ -40,6 +42,7 @@ export function BoundField({
         <InputStyled
           type='number'
           min={min}
+          max={max}
           data-testid={`field-option-${optionKey}`}
           value={stored ?? ''}
           onChange={e => {
@@ -48,7 +51,10 @@ export function BoundField({
             if (e.target.value.trim() === '') {
               delete next[optionKey];
             } else {
-              next[optionKey] = Number(e.target.value);
+              next[optionKey] = Math.min(
+                max ?? Infinity,
+                Number(e.target.value),
+              );
             }
 
             setOptions(next);

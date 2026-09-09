@@ -245,6 +245,7 @@ pub const PLUGIN_AUTHOR: &str = "https://atomicdata.dev/properties/pluginAuthor"
 pub const PLUGIN_AGENT: &str = "https://atomicdata.dev/properties/pluginAgent";
 pub const PLUGIN_PERMISSIONS: &str = "https://atomicdata.dev/properties/pluginPermissions";
 // ... for Forms
+pub const FORM_OWNS_SCHEMA: &str = "https://atomicdata.dev/properties/form-owns-schema";
 pub const FORM_DATA_CLASS: &str = "https://atomicdata.dev/properties/form-data-class";
 pub const FORM_TARGET_TABLE: &str = "https://atomicdata.dev/properties/form-target-table";
 pub const FORM_PAGES: &str = "https://atomicdata.dev/properties/form-pages";

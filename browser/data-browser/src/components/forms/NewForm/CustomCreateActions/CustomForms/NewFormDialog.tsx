@@ -84,6 +84,7 @@ export const NewFormDialog: FC<CustomResourceDialogProps> = ({
         [forms.properties.formDataClass]: dataClass.subject,
         [forms.properties.formTargetTable]: table.subject,
         [forms.properties.formPages]: [],
+        [forms.properties.formOwnsSchema]: true,
       },
       {
         parent,

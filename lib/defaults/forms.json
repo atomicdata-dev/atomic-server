@@ -3,7 +3,7 @@
     "@id": "https://atomicdata.dev/properties/form-data-class",
     "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-    "https://atomicdata.dev/properties/description": "The generated data Class holding one Property per question. Submission rows are instances of this class.",
+    "https://atomicdata.dev/properties/description": "The data Class of submission rows, generated for a standalone form or reused from an existing table.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
@@ -20,6 +20,16 @@
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
     "https://atomicdata.dev/properties/shortname": "form-target-table"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-owns-schema",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether this form owns its generated table schema. False or absent means existing table columns are read-only in the builder.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-owns-schema"
   },
   {
     "@id": "https://atomicdata.dev/properties/form-pages",
@@ -176,7 +186,8 @@
       "https://atomicdata.dev/properties/form-custom-css",
       "https://atomicdata.dev/properties/form-access",
       "https://atomicdata.dev/properties/cover-image",
-      "https://atomicdata.dev/properties/image-position"
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-owns-schema"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name",

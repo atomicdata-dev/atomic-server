@@ -8625,8 +8625,8 @@ msgstr "Página"
 msgid "Custom CSS"
 msgstr "CSS personalizado"
 
-#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
-#~ msgstr "Se aplica al formulario publicado y a la vista previa. Se superpone a los estilos propios del formulario, por lo que nunca necesitas{0} <0/> — una regla <1/> sencilla ya gana."
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+msgstr "Se aplica al formulario publicado y a la vista previa. Se superpone a los estilos propios del formulario, por lo que nunca necesitas{0} <0/> — una regla <1/> sencilla ya gana."
 
 #. 0: ' '
 #: src/chunks/FormBuilder/SettingsTab.tsx
@@ -8655,3 +8655,94 @@ msgstr "Este bloque nunca se cierra: todo lo que sigue es parte de él."
 #: src/chunks/CodeEditor/cssLint.ts
 msgid "Closing brace without a matching opening one."
 msgstr "Llave de cierre sin una de apertura que coincida."
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Remove from form"
+msgstr "Eliminar del formulario"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Not supported in forms"
+msgstr "No compatible en formularios"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "All columns are on this form. Add a column to the table to ask something new."
+msgstr "Todas las columnas están en este formulario. Agrega una columna a la tabla para preguntar algo nuevo."
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Add a column to the table"
+msgstr "Agregar una columna a la tabla"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Required table columns are missing from this form:"
+msgstr "Faltan las columnas de tabla obligatorias de este formulario:"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid ". Responses cannot be saved without them."
+msgstr ". Las respuestas no se pueden guardar sin ellas."
+
+msgid "Open table"
+msgstr "Abrir tabla"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Edit column on table"
+msgstr "Editar columna en tabla"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Table column"
+msgstr "Columna de tabla"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Input type"
+msgstr "Tipo de entrada"
+
+#: src/chunks/FormBuilder/DeleteFormDialog.tsx
+msgid "Also delete the results table and its responses"
+msgstr "También eliminar la tabla de resultados y sus respuestas"
+
+#. 0: collection.totalMembers
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "{0} attached forms will also be deleted, including their pages and questions."
+msgstr "Los {0} formularios adjuntos también se eliminarán, incluyendo sus páginas y preguntas."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Attached forms will also be deleted, including their pages and questions."
+msgstr "Los formularios adjuntos también se eliminarán, incluyendo sus páginas y preguntas."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Are you sure you want to delete this table?"
+msgstr "¿Está seguro de que desea eliminar esta tabla?"
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Delete table"
+msgstr "Eliminar tabla"
+
+#: src/chunks/TablePage/TableForms.tsx
+msgid "Forms"
+msgstr "Formularios"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "New form"
+msgstr "Nuevo formulario"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+#: src/components/ResourceContextMenu/index.tsx
+msgid "Create form from this table"
+msgstr "Crear formulario desde esta tabla"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Form name"
+msgstr "Nombre del formulario"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Select the columns to include. Responses will be added to this table."
+msgstr "Selecciona las columnas a incluir. Las respuestas se agregarán a esta tabla."
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Create form"
+msgstr "Crear formulario"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Back to table"
+msgstr "Volver a la tabla"

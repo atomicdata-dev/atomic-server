@@ -1,4 +1,5 @@
-import { core, forms, useStore, useString } from '@tomic/react';
+import { deleteForm, deleteTableForms } from './deleteForm';
+import { core, forms, useStore, useString, useBoolean } from '@tomic/react';
 import { CollectionBuilder } from '@tomic/lib';
 import { useState, type JSX } from 'react';
 import toast from 'react-hot-toast';
@@ -29,6 +30,10 @@ export function DeleteFormDialog({
   onDeleted,
 }: DeleteDialogProps): JSX.Element {
   const store = useStore();
+  const [ownsSchema] = useBoolean(
+    formResource,
+    forms.properties.formOwnsSchema,
+  );
   const [cascade, setCascade] = useState(false);
   const [tableSubject] = useString(
     formResource,
@@ -37,7 +42,7 @@ export function DeleteFormDialog({
 
   const onConfirm = async () => {
     try {
-      if (cascade && tableSubject) {
+      if (ownsSchema && cascade && tableSubject) {
         const table = await store.getResource(tableSubject);
         const classSubject = table.get(core.properties.classtype) as
           | string
@@ -58,13 +63,14 @@ export function DeleteFormDialog({
           await row.destroy();
         }
 
+        await deleteTableForms(store, table);
         await table.destroy();
       }
 
       const parent = formResource.get(core.properties.parent) as
         | string
         | undefined;
-      await formResource.destroy();
+      await deleteForm(store, formResource);
       onDeleted(parent);
     } catch (error) {
       toast.error((error as Error).message);
@@ -81,10 +87,12 @@ export function DeleteFormDialog({
       onConfirm={onConfirm}
     >
       <p>Are you sure you want to delete this form?</p>
-      <CheckboxLabel>
-        <Checkbox checked={cascade} onChange={setCascade} />
-        Also delete the results table and its responses
-      </CheckboxLabel>
+      {ownsSchema && (
+        <CheckboxLabel>
+          <Checkbox checked={cascade} onChange={setCascade} />
+          Also delete the results table and its responses
+        </CheckboxLabel>
+      )}
     </ConfirmationDialog>
   );
 }

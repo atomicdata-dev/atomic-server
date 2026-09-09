@@ -82,7 +82,7 @@ const waitForPropertyValue = async (
 /** A field row's delete button is a sibling, not a descendant, of its
  * testid'd select button — scope through the shared row wrapper. */
 const fieldRowDeleteButton = (page: Page, key: string) =>
-  page.getByTestId(`field-row-${key}`).locator('..').getByTitle('Delete field');
+  page.getByTestId(`field-row-${key}`).locator('..').getByTitle('Remove from form');
 
 /**
  * The option labels of a choice question. Options are not stored on the field:

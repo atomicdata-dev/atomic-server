@@ -8625,8 +8625,8 @@ msgstr "Page"
 msgid "Custom CSS"
 msgstr "CSS personnalisé"
 
-#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
-#~ msgstr "S'applique au formulaire publié et à l'aperçu. Il est superposé aux styles propres du formulaire, de sorte que vous n'avez jamais besoin{0} <0/> — une règle <1/> simple suffit."
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+msgstr "S'applique au formulaire publié et à l'aperçu. Il est superposé aux styles propres du formulaire, de sorte que vous n'avez jamais besoin{0} <0/> — une règle <1/> simple suffit."
 
 #. 0: ' '
 #: src/chunks/FormBuilder/SettingsTab.tsx
@@ -8655,3 +8655,94 @@ msgstr "Ce bloc n'est jamais fermé : tout ce qui suit en fait partie."
 #: src/chunks/CodeEditor/cssLint.ts
 msgid "Closing brace without a matching opening one."
 msgstr "Accolade fermante sans accolade ouvrante correspondante."
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Remove from form"
+msgstr "Supprimer du formulaire"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Not supported in forms"
+msgstr "Non pris en charge dans les formulaires"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "All columns are on this form. Add a column to the table to ask something new."
+msgstr "Toutes les colonnes sont sur ce formulaire. Ajoutez une colonne au tableau pour demander quelque chose de nouveau."
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Add a column to the table"
+msgstr "Ajouter une colonne au tableau"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Required table columns are missing from this form:"
+msgstr "Les colonnes de table requises manquent dans ce formulaire :"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid ". Responses cannot be saved without them."
+msgstr ". Les réponses ne peuvent pas être sauvegardées sans elles."
+
+msgid "Open table"
+msgstr "Ouvrir le tableau"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Edit column on table"
+msgstr "Modifier la colonne du tableau"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Table column"
+msgstr "Colonne du tableau"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Input type"
+msgstr "Type de saisie"
+
+#: src/chunks/FormBuilder/DeleteFormDialog.tsx
+msgid "Also delete the results table and its responses"
+msgstr "Supprimer également le tableau des résultats et ses réponses"
+
+#. 0: collection.totalMembers
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "{0} attached forms will also be deleted, including their pages and questions."
+msgstr "Les {0} formulaires joints seront également supprimés, y compris leurs pages et questions."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Attached forms will also be deleted, including their pages and questions."
+msgstr "Les formulaires joints seront également supprimés, y compris leurs pages et questions."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Are you sure you want to delete this table?"
+msgstr "Êtes-vous sûr de vouloir supprimer cette table ?"
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Delete table"
+msgstr "Supprimer la table"
+
+#: src/chunks/TablePage/TableForms.tsx
+msgid "Forms"
+msgstr "Formulaires"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "New form"
+msgstr "Nouveau formulaire"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+#: src/components/ResourceContextMenu/index.tsx
+msgid "Create form from this table"
+msgstr "Créer un formulaire à partir de ce tableau"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Form name"
+msgstr "Nom du formulaire"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Select the columns to include. Responses will be added to this table."
+msgstr "Sélectionnez les colonnes à inclure. Les réponses seront ajoutées à ce tableau."
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Create form"
+msgstr "Créer un formulaire"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Back to table"
+msgstr "Retour au tableau"

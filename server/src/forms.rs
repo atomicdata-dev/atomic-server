@@ -365,6 +365,34 @@ pub async fn build_form_definition(
         pages.push(build_page_definition(store, &page).await?);
     }
 
+    // The table remains authoritative even when its schema changes after a
+    // question was added, or the builder has not opened that question yet.
+    let required_columns = if let Ok(class_subject) = form.get(atomic_lib::urls::FORM_DATA_CLASS) {
+        store
+            .get_resource(&class_subject.to_string().into())
+            .await
+            .ok()
+            .and_then(|class| {
+                class
+                    .get(atomic_lib::urls::REQUIRES)
+                    .ok()
+                    .and_then(|v| v.to_subjects(None).ok())
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    for page in &mut pages {
+        for block in &mut page.blocks {
+            if let FormBlock::Field {
+                maps_to, required, ..
+            } = block
+            {
+                *required |= required_columns.contains(maps_to);
+            }
+        }
+    }
+
     Ok(FormDefinition {
         version: 1,
         id: String::new(),
@@ -986,6 +1014,35 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
             Ok(Value::String(s)) => serde_json::from_str(s).unwrap_or_else(|_| json!({})),
             _ => json!({}),
         };
+        if let Ok(property) = store.get_resource(&maps_to.clone().into()).await {
+            if !options.is_object() {
+                options = json!({});
+            }
+            // `number` is shared by float and integer columns. This hint is
+            // resolved from the Property, never trusted from form settings.
+            if field_type == "number" {
+                options["integer"] = json!(property
+                    .get(atomic_lib::urls::DATATYPE_PROP)
+                    .map(|v| v.to_string() == atomic_lib::urls::INTEGER)
+                    .unwrap_or(false));
+            }
+            if matches!(field_type.as_str(), "multi-select" | "dropdown-multi") {
+                if let Some(max) = property
+                    .get("https://atomicdata.dev/properties/max")
+                    .ok()
+                    .and_then(|v| v.to_string().parse::<u64>().ok())
+                {
+                    let own_max = options
+                        .get("maxSelected")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(max);
+                    options["maxSelected"] = json!(own_max.min(max));
+                    if let Some(min) = options.get("minSelected").and_then(|v| v.as_u64()) {
+                        options["minSelected"] = json!(min.min(max));
+                    }
+                }
+            }
+        }
         resolve_choice_options(store, &field_type, &maps_to, &mut options).await;
         return Ok(FormBlock::Field {
             maps_to,
@@ -1118,6 +1175,12 @@ fn coerce_value(
         "number" => {
             let f = raw.as_f64().ok_or("Expected a number")?;
             check_bounds(f, options)?;
+            if options.get("integer").and_then(|v| v.as_bool()) == Some(true) {
+                return raw
+                    .as_i64()
+                    .map(Value::Integer)
+                    .ok_or_else(|| "Expected a whole number".into());
+            }
             Ok(Value::Float(f))
         }
         "date" => {
@@ -2214,6 +2277,165 @@ mod tests {
         form.save_as_genesis(store).await.unwrap();
 
         (form, email_prop)
+    }
+
+    #[tokio::test]
+    async fn existing_table_columns_validate_without_form_owned_schema() {
+        let store = init_store().await;
+        let (mut form, email_prop) = build_test_form(&store).await;
+        let class_subject = form.get(urls::FORM_DATA_CLASS).unwrap().to_string();
+        let table_subject = form.get(urls::FORM_TARGET_TABLE).unwrap().to_string();
+        form.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(table_subject.into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+        let mut class = store
+            .get_resource(&class_subject.clone().into())
+            .await
+            .unwrap();
+        class
+            .set(
+                urls::REQUIRES.into(),
+                Value::ResourceArray(vec![email_prop.clone().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        class.save_locally(&store).await.unwrap();
+
+        let (_, choice_prop) = make_class_and_property(
+            &store,
+            "existing-choice-class",
+            "status",
+            urls::RESOURCE_ARRAY,
+        )
+        .await;
+        let tag = make_tag(&store, &choice_prop, "In progress", None).await;
+        let mut property = store
+            .get_resource(&choice_prop.clone().into())
+            .await
+            .unwrap();
+        property
+            .set(
+                urls::IS_A.into(),
+                Value::ResourceArray(vec![
+                    urls::PROPERTY.into(),
+                    "https://atomicdata.dev/classes/SelectProperty".into(),
+                ]),
+                &store,
+            )
+            .await
+            .unwrap();
+        property
+            .set(
+                urls::ALLOWS_ONLY.into(),
+                Value::ResourceArray(vec![tag.clone().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        property.save_locally(&store).await.unwrap();
+        class
+            .set(
+                urls::RECOMMENDS.into(),
+                Value::ResourceArray(vec![choice_prop.clone().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        class.save_locally(&store).await.unwrap();
+        let mut field = Resource::new_instance(urls::FORM_FIELD, &store)
+            .await
+            .unwrap();
+        field
+            .set(
+                urls::NAME.into(),
+                Value::String("Current status".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        field
+            .set(
+                urls::FORM_MAPS_TO.into(),
+                Value::AtomicUrl(choice_prop.clone().into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        field
+            .set(
+                urls::FORM_FIELD_TYPE.into(),
+                Value::String("dropdown".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        field.save_locally(&store).await.unwrap();
+        append_block(&store, &form, field.get_subject()).await;
+
+        // Required-ness is authoritative on the class, even if a field says false.
+        let page_subject = form
+            .get(urls::FORM_PAGES)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()[0]
+            .clone();
+        let page = store.get_resource(&page_subject.into()).await.unwrap();
+        let first = page
+            .get(urls::FORM_FIELDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()[0]
+            .clone();
+        let mut email = store.get_resource(&first.into()).await.unwrap();
+        email
+            .set(urls::REQUIRED.into(), Value::Boolean(false), &store)
+            .await
+            .unwrap();
+        email.save_locally(&store).await.unwrap();
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        assert!(validate_submission(&definition, &Map::new())
+            .unwrap_err()
+            .iter()
+            .any(|e| e.field == email_prop));
+        let values =
+            json!({ email_prop.clone(): "someone@example.com", choice_prop.clone(): tag.clone() });
+        let result = validate_submission(&definition, values.as_object().unwrap()).unwrap();
+        assert_eq!(result.len(), 2);
+        assert!(
+            matches!(&result[1].1, Value::ResourceArray(subjects) if subjects[0].to_string() == tag)
+        );
+        match &definition.pages[0].blocks[1] {
+            FormBlock::Field { options, .. } => {
+                assert_eq!(options[OPTIONS_KEY][0]["label"], "In progress")
+            }
+            _ => panic!("expected a field"),
+        }
+        assert!(validate_submission(
+            &definition,
+            json!({ email_prop: "someone@example.com", choice_prop: "In progress" })
+                .as_object()
+                .unwrap()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn number_presentation_preserves_integer_columns() {
+        assert!(matches!(
+            coerce_value("number", &json!({"integer": true}), false, &json!(42)).unwrap(),
+            Value::Integer(42)
+        ));
+        assert!(coerce_value("number", &json!({"integer": true}), false, &json!(4.2)).is_err());
+        assert!(matches!(
+            coerce_value("number", &json!({}), false, &json!(4.2)).unwrap(),
+            Value::Float(_)
+        ));
     }
 
     #[tokio::test]
@@ -4243,10 +4465,7 @@ mod tests {
 
     #[test]
     fn sanitize_custom_css_rejects_oversized() {
-        let huge = format!(
-            ".a {{ color: red }}{}",
-            " ".repeat(MAX_CUSTOM_CSS_BYTES)
-        );
+        let huge = format!(".a {{ color: red }}{}", " ".repeat(MAX_CUSTOM_CSS_BYTES));
 
         assert_eq!(sanitize_custom_css(&huge), None);
     }

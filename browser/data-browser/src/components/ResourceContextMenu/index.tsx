@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Client } from '@tomic/react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { Client, core, dataBrowser } from '@tomic/react';
 import { DIVIDER, DropdownMenu, isItem, DropdownItem } from '../Dropdown';
 import { AutoOpenTrigger } from '../Dropdown/AutoOpenTrigger';
 import { DropdownTriggerComponent } from '../Dropdown/DropdownTrigger';
 import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
-import { FaEllipsisVertical } from 'react-icons/fa6';
+import { FaEllipsisVertical, FaWpforms } from 'react-icons/fa6';
 import {
   ConfirmationDialog,
   ConfirmationDialogTheme,
@@ -21,6 +21,12 @@ import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
 import { getDeleteDialog } from './deleteDialogRegistry';
 import { useAfterResourceDelete } from '../../hooks/useAfterResourceDelete';
+
+const CreateTableFormDialog = lazy(() =>
+  import('../../chunks/TablePage/CreateTableFormDialog').then(module => ({
+    default: module.CreateTableFormDialog,
+  })),
+);
 
 export {
   CustomContextItemsProvider,
@@ -55,6 +61,7 @@ export const ContextMenuOptions = {
   OpenOriginal: 'openOriginal',
   SetEmoji: 'setEmoji',
   SetCover: 'setCover',
+  CreateTableForm: 'createTableForm',
 } as const;
 
 export type ContextMenuOptionsUnion =
@@ -110,6 +117,7 @@ export function ResourceContextMenu({
   const [confirmingAction, setConfirmingAction] = useState<ActionDefinition>();
   const [showCustomDeleteDialog, setShowCustomDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
+  const [showCreateTableForm, setShowCreateTableForm] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [shiftHeld, setShiftHeld] = useState(false);
   const openCodeUsageDialog = useCallback(
@@ -227,6 +235,23 @@ export function ResourceContextMenu({
     });
   }
 
+  const dataClassSubject = ctx.resource.get(core.properties.classtype) as
+    | string
+    | undefined;
+
+  if (
+    ctx.canWrite &&
+    ctx.resource.hasClasses(dataBrowser.classes.table) &&
+    dataClassSubject
+  ) {
+    items.push({
+      id: ContextMenuOptions.CreateTableForm,
+      label: 'Create form from this table',
+      icon: <FaWpforms />,
+      onClick: () => setShowCreateTableForm(true),
+    });
+  }
+
   // Add custom items from context (if any) before filtering
   const allItems = [
     ...items,
@@ -262,6 +287,16 @@ export function ResourceContextMenu({
         bindActive={handleBindActive}
         anchorPoint={anchorPoint}
       />
+      {showCreateTableForm && dataClassSubject && (
+        <Suspense fallback={null}>
+          <CreateTableFormDialog
+            key={subject}
+            table={ctx.resource}
+            dataClassSubject={dataClassSubject}
+            onClose={() => setShowCreateTableForm(false)}
+          />
+        </Suspense>
+      )}
       <ConfirmationDialog
         title={confirmation?.title(ctx) ?? ''}
         show={confirmingAction !== undefined}

@@ -262,6 +262,8 @@ export function validateFieldValue(
       const n = typeof raw === 'number' ? raw : Number(raw);
 
       if (Number.isNaN(n)) return 'Expected a number';
+      if (field.options.integer && !Number.isSafeInteger(n))
+        return 'Expected a whole number';
 
       if (field.options.min !== undefined && n < field.options.min) {
         return `Must be at least ${field.options.min}`;

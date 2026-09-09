@@ -191,6 +191,7 @@ export function FieldInput({
     case 'number':
       return (
         <input
+          step={field.options.integer ? 1 : 'any'}
           id={inputId}
           className='atomic-form-input'
           type='number'

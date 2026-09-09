@@ -357,11 +357,27 @@ mod test {
             urls::FORM_CONDITION_VALUE,
             urls::FORM_OPEN_AT,
             urls::FORM_CLOSE_AT,
+            urls::FORM_OWNS_SCHEMA,
         ] {
             store.get_resource(&url.into()).await.unwrap();
         }
         let class = store.get_class(urls::FORM_CONDITION).await.unwrap();
         assert_eq!(class.shortname, "form-condition");
+        let form = store.get_resource(&urls::FORM.into()).await.unwrap();
+        assert!(form
+            .get(urls::RECOMMENDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()
+            .contains(&urls::FORM_OWNS_SCHEMA.to_string()));
+        let ownership = store
+            .get_resource(&urls::FORM_OWNS_SCHEMA.into())
+            .await
+            .unwrap();
+        assert_eq!(
+            ownership.get(urls::DATATYPE_PROP).unwrap().to_string(),
+            urls::BOOLEAN
+        );
     }
 
     #[tokio::test]

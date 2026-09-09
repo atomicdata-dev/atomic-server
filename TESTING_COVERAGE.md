@@ -588,6 +588,11 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 
 | Flow | Where |
 |---|---|
+| Existing table → form checklist → unused-column menu → label rename preserves Property → publish → anonymous submit → original table row | `browser/e2e/tests/forms-from-tables.spec.ts` |
+| Column datatype/cardinality → compatible input types; unsupported types excluded; mapping creates only presentation and respects required columns | `browser/data-browser/src/chunks/FormBuilder/tableColumns.test.ts` |
+| Removing a form destroys pages, questions and conditions while keeping columns and Tags | `browser/data-browser/src/chunks/FormBuilder/deleteForm.test.ts` |
+| Pre-existing required column and named SelectProperty Tags validate without a form-owned schema | `server/src/forms.rs::existing_table_columns_validate_without_form_owned_schema` |
+| Number presentation preserves integer storage and rejects fractions | `server/src/forms.rs::number_presentation_preserves_integer_columns` + `browser/form-renderer/src/validation.test.ts` |
 | FormCondition evaluator (visibility + hidden-field validation skip) | Shared fixtures `testdata/form-conditions.json` loaded by `server/src/forms.rs::condition_fixtures_match_ts` **and** `browser/form-renderer/src/conditions.test.ts`. A fix to one is a fix to the other. |
 | Definition serializer inlines FormCondition resources as `{field, operator, value}` | `server/src/forms.rs::definition_inlines_field_conditions` |
 | Form ontology populate (incl. FormCondition) | `lib/src/store.rs::populate_forms_ontology` |

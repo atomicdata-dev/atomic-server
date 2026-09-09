@@ -6,6 +6,7 @@ import {
   useResource,
   useStore,
 } from '@tomic/react';
+import { createMappedField } from './tableColumns';
 import { useCallback } from 'react';
 import {
   createPropertyOnClass,
@@ -34,6 +35,7 @@ const LAYOUT_TYPE_CLASS: Record<FormLayoutType, string> = {
 interface CreateFieldOpts {
   type: AddableFieldType;
   label: string;
+  existingProperty?: Resource;
 }
 
 /** The shortname a field falls back to when its label slugifies to nothing
@@ -121,7 +123,10 @@ export function isDerivedShortname(shortname: string, label: string): boolean {
  * is exactly the identifier shown in the field settings panel. See
  * `planning/form-field-shortnames.md`.
  */
-export function useFormFieldPropertySync(dataClassSubject: string) {
+export function useFormFieldPropertySync(
+  dataClassSubject: string,
+  ownsSchema: boolean,
+) {
   const store = useStore();
   const dataClass = useResource(dataClassSubject);
 
@@ -147,7 +152,15 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
                 : { [core.properties.description]: opts.label },
         });
         await field.save();
+      } else if (opts.existingProperty) {
+        field = await createMappedField(
+          store,
+          page,
+          dataClass,
+          opts.existingProperty,
+        );
       } else {
+        if (!ownsSchema) throw new Error('Add a column on the table first');
         const shortname = uniqueShortname(
           stringToSlug(opts.label),
           await takenShortnames(store, dataClass),
@@ -198,7 +211,7 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
 
       return field;
     },
-    [store, dataClass],
+    [store, dataClass, ownsSchema],
   );
 
   const renameField = useCallback(
@@ -213,7 +226,7 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         | string
         | undefined;
 
-      if (!propertySubject) {
+      if (!ownsSchema || !propertySubject) {
         return;
       }
 
@@ -238,7 +251,7 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         await property.save();
       }
     },
-    [store, dataClass],
+    [store, dataClass, ownsSchema],
   );
 
   /**
@@ -252,7 +265,7 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         | string
         | undefined;
 
-      if (!propertySubject) {
+      if (!ownsSchema || !propertySubject) {
         return undefined;
       }
 
@@ -272,7 +285,7 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
 
       return undefined;
     },
-    [store, dataClass],
+    [store, dataClass, ownsSchema],
   );
 
   const deleteField = useCallback(

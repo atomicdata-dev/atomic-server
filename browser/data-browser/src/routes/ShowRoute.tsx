@@ -16,6 +16,7 @@ export type ShowRouteSearch = {
    * browser history. Absent = the table's default view.
    */
   view?: string;
+  editColumn?: string;
 };
 
 export const ShowRoute = createRoute({
@@ -25,6 +26,7 @@ export const ShowRoute = createRoute({
   validateSearch: (search): ShowRouteSearch => ({
     subject: (search.subject as string) ?? '',
     view: (search.view as string) || undefined,
+    editColumn: (search.editColumn as string) || undefined,
   }),
 });
 

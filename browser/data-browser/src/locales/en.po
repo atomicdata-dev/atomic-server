@@ -8615,8 +8615,8 @@ msgstr "Page"
 msgid "Custom CSS"
 msgstr "Custom CSS"
 
-#~ msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
-#~ msgstr "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+msgid "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
+msgstr "Applies to the published form and to Preview. It is layered on top of the form's own styles, so you never need{0} <0/> — a plain <1/> rule already wins."
 
 #. 0: ' '
 #: src/chunks/FormBuilder/SettingsTab.tsx
@@ -8645,3 +8645,94 @@ msgstr "This block is never closed — everything after it is part of it."
 #: src/chunks/CodeEditor/cssLint.ts
 msgid "Closing brace without a matching opening one."
 msgstr "Closing brace without a matching opening one."
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Remove from form"
+msgstr "Remove from form"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Not supported in forms"
+msgstr "Not supported in forms"
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "All columns are on this form. Add a column to the table to ask something new."
+msgstr "All columns are on this form. Add a column to the table to ask something new."
+
+#: src/chunks/FormBuilder/AddFieldMenu.tsx
+msgid "Add a column to the table"
+msgstr "Add a column to the table"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Required table columns are missing from this form:"
+msgstr "Required table columns are missing from this form:"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid ". Responses cannot be saved without them."
+msgstr ". Responses cannot be saved without them."
+
+msgid "Open table"
+msgstr "Open table"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Edit column on table"
+msgstr "Edit column on table"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Table column"
+msgstr "Table column"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Input type"
+msgstr "Input type"
+
+#: src/chunks/FormBuilder/DeleteFormDialog.tsx
+msgid "Also delete the results table and its responses"
+msgstr "Also delete the results table and its responses"
+
+#. 0: collection.totalMembers
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "{0} attached forms will also be deleted, including their pages and questions."
+msgstr "{0} attached forms will also be deleted, including their pages and questions."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Attached forms will also be deleted, including their pages and questions."
+msgstr "Attached forms will also be deleted, including their pages and questions."
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Are you sure you want to delete this table?"
+msgstr "Are you sure you want to delete this table?"
+
+#: src/chunks/TablePage/DeleteTableDialog.tsx
+msgid "Delete table"
+msgstr "Delete table"
+
+#: src/chunks/TablePage/TableForms.tsx
+msgid "Forms"
+msgstr "Forms"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "New form"
+msgstr "New form"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+#: src/components/ResourceContextMenu/index.tsx
+msgid "Create form from this table"
+msgstr "Create form from this table"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Form name"
+msgstr "Form name"
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Select the columns to include. Responses will be added to this table."
+msgstr "Select the columns to include. Responses will be added to this table."
+
+#: src/chunks/TablePage/CreateTableFormDialog.tsx
+msgid "Create form"
+msgstr "Create form"
+
+#: src/chunks/FormBuilder/FormBuilderPage.tsx
+msgid "Back to table"
+msgstr "Back to table"

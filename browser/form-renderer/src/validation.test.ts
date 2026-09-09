@@ -353,3 +353,12 @@ describe('text length bounds', () => {
     expect(validatePage(page, 0, { [over.mapsTo]: 'abc' }).errors).toEqual({});
   });
 });
+
+describe('number fields backed by integer columns', () => {
+  it('rejects fractions while ordinary number fields keep accepting them', () => {
+    const integer = { ...field('number', 'Age'), options: { integer: true } };
+    expect(validateFieldValue(integer, 36)).toBeNull();
+    expect(validateFieldValue(integer, 3.6)).toBe('Expected a whole number');
+    expect(validateFieldValue(field('number', 'Weight'), 3.6)).toBeNull();
+  });
+});

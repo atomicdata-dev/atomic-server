@@ -8,9 +8,32 @@ Agent. This page describes the underlying data model; it does not describe the
 public submission API (see the endpoints documentation once that ships).
 
 A Form's submissions are kept in a regular [Table](https://atomicdata.dev/classes/Table):
-building a Form generates a data `Class` (one `Property` per question) and a
-`Table` typed to that class, so results are just table rows — no separate
-results storage.
+creating a standalone Form generates a data `Class` and a `Table`, while
+creating a form from an existing table reuses that table's class and columns.
+Both store submissions as ordinary rows.
+
+## Forms from existing tables
+
+Choose **Create form from this table** in the table’s resource context menu, name the form, and
+select its columns. The **Forms** section below the table lists its forms
+when any exist; several forms can write to the same table. In these forms,
+**Back to table** above the title opens the table to view responses, replacing
+the standalone form's **Results** tab.
+
+The builder adds only unused table columns, plus layout blocks. Question
+labels and compatible input types can change without renaming or changing
+the underlying column. Column names and choice options are edited on the
+table, using the **Edit column on table** link. Add new columns on the table
+before adding them to the form.
+
+Columns in the row class's `requires` list remain required. The builder warns
+when a required column is absent from the form. Removing a question keeps its
+column and collected data. Deleting a table also deletes its attached forms;
+deleting a table-created form keeps the table.
+
+Standalone forms set `form-owns-schema` to `true` and can create and edit their
+generated columns. Forms created from tables leave it unset and are parented
+under the table.
 
 ## Form
 
@@ -21,8 +44,9 @@ A form or survey that can be published and shared with a link.
 Properties:
 
 - [`name`](https://atomicdata.dev/properties/name) - (required, String) the form's title.
-- [`form-data-class`](https://atomicdata.dev/properties/form-data-class) - (required, AtomicURL, Class) the generated data class, one Property per question.
+- [`form-data-class`](https://atomicdata.dev/properties/form-data-class) - (required, AtomicURL, Class) the class of submission rows, either generated or reused from an existing table.
 - [`form-target-table`](https://atomicdata.dev/properties/form-target-table) - (required, AtomicURL, Table) the table submissions are written to.
+- [`form-owns-schema`](https://atomicdata.dev/properties/form-owns-schema) - (recommended, Boolean) whether the builder owns the generated schema. False or absent makes mapped columns read-only in the builder.
 - [`form-pages`](https://atomicdata.dev/properties/form-pages) - (required, ResourceArray, FormPage) the form's pages, in order.
 - [`form-published-at`](https://atomicdata.dev/properties/form-published-at) - (recommended, Timestamp) when the form was published. Absent means unpublished; submissions are only accepted while set.
 - [`form-open-at`](https://atomicdata.dev/properties/form-open-at) - (recommended, Timestamp) when a published form starts accepting responses. Absent means it is open as soon as it is published. Before this moment visitors get a `410` with a "not open yet" message instead of the form.
@@ -81,7 +105,7 @@ of a submitted answer. Options not listed for a type are ignored.
 | `phone`           | String            | `placeholder`, `defaultCountry` | string; the renderer's country-select input submits E.164 (`+31612345678`), and the server also accepts digits with the usual separators and an optional `+` prefix |
 | `country`         | String            | `placeholder`, `defaultCountry` | ISO 3166-1 alpha-2 code (`"NL"`); the renderer shows the country's name in the visitor's own language |
 | `url`             | String            | `placeholder`        | string, must start with `http://` or `https://` |
-| `number`          | Float             | `placeholder`, `min`, `max` | number |
+| `number`          | Float or Integer  | `placeholder`, `min`, `max` | number |
 | `currency`        | Float             | `currency` (ISO code), `placeholder`, `min`, `max` | number |
 | `date`            | Date              | —                    | `"YYYY-MM-DD"` |
 | `datetime`        | Timestamp         | —                    | milliseconds since epoch |

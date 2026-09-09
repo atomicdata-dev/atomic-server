@@ -156,7 +156,7 @@ export function FieldRow({
         variant={IconButtonVariant.Simple}
         size='0.8rem'
         color='textLight'
-        title='Delete field'
+        title='Remove from form'
         type='button'
         onClick={onDelete}
       >
