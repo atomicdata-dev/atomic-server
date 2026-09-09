@@ -22,7 +22,8 @@ import {
 } from './SideBarMenuItem';
 import { submitFeedback } from '../../helpers/feedback';
 
-export function FeedbackMenuItem() {
+export function FeedbackMenuItem({ floating = false }: { floating?: boolean }) {
+  const feedbackTitle = 'Send feedback';
   const messageId = useId();
   const emailId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,28 +54,40 @@ export function FeedbackMenuItem() {
 
   return (
     <>
-      <SideBarMenuRow
-        as='button'
-        ref={triggerRef}
-        type='button'
-        onClick={() => {
-          setSent(false);
-          showDialog();
-        }}
-        style={{
-          border: 0,
-          font: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        <SideBarMenuRowIcon>
-          <FaComment />
-        </SideBarMenuRowIcon>
-        <SideBarMenuRowLabel>Feedback</SideBarMenuRowLabel>
-      </SideBarMenuRow>
-      <Dialog {...dialogProps}>
+      {floating ? (
+        <Button
+          ref={triggerRef}
+          onClick={() => {
+            setSent(false);
+            showDialog();
+          }}
+        >
+          Feedback
+        </Button>
+      ) : (
+        <SideBarMenuRow
+          as='button'
+          ref={triggerRef}
+          type='button'
+          onClick={() => {
+            setSent(false);
+            showDialog();
+          }}
+          style={{
+            border: 0,
+            font: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          <SideBarMenuRowIcon>
+            <FaComment />
+          </SideBarMenuRowIcon>
+          <SideBarMenuRowLabel>Feedback</SideBarMenuRowLabel>
+        </SideBarMenuRow>
+      )}
+      <Dialog {...dialogProps} hideOnboardingFeedback>
         <DialogTitle>
-          <h1>Send feedback</h1>
+          <h1>{feedbackTitle}</h1>
         </DialogTitle>
         <DialogContent>
           {sent ? (

@@ -7385,6 +7385,7 @@ msgstr "Local stays on your devices. Vault is encrypted backup. Server hosts a r
 #~ msgstr "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
+#: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
 msgstr "Feedback"
 
@@ -7831,3 +7832,35 @@ msgstr "Existing content stays in this drive. Hosting uses the Server plan or in
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
 msgstr "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
+
+#: src/views/InvitePage.tsx
+msgid "Creating your account…"
+msgstr "Creating your account…"
+
+#: src/views/InvitePage.tsx
+msgid "Invite accepted. Finishing setup…"
+msgstr "Invite accepted. Finishing setup…"
+
+#: src/views/getting-started/chrome.tsx
+msgid "Checking local storage…"
+msgstr "Checking local storage…"
+
+#: src/views/getting-started/chrome.tsx
+msgid "This browser could not open local storage"
+msgstr "This browser could not open local storage"
+
+#: src/views/getting-started/chrome.tsx
+msgid "Open this link in a non-private browser window and allow this site to store data. If you are already in a regular window, close other tabs for this site and try again."
+msgstr "Open this link in a non-private browser window and allow this site to store data. If you are already in a regular window, close other tabs for this site and try again."
+
+#: src/views/getting-started/chrome.tsx
+msgid "Reload and try again"
+msgstr "Reload and try again"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Choose profile picture"
+msgstr "Choose profile picture"
+
+#: src/helpers/onboardingStorage.ts
+msgid "Local storage is taking too long to initialize."
+msgstr "Local storage is taking too long to initialize."

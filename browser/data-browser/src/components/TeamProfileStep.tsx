@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   core,
   dataBrowser,
@@ -11,6 +11,7 @@ import { Column, Row } from './Row';
 import Field from './forms/Field';
 import { Input } from './forms/InputStyles';
 import { AvatarCropper } from './AvatarCropper';
+import { FaUser } from 'react-icons/fa6';
 import { ResourceGlyph } from './ResourceGlyph';
 import { ErrorLook } from './ErrorLook';
 import { styled } from 'styled-components';
@@ -39,6 +40,7 @@ export function TeamProfileStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error>();
   const id = useId();
+  const fileInput = useRef<HTMLInputElement>(null);
   const handleCropVisibility = useCallback((open: boolean) => {
     if (!open) setSource(undefined);
   }, []);
@@ -86,16 +88,24 @@ export function TeamProfileStep({
         />
       </Field>
       <Row>
-        <Avatar>
+        <Avatar
+          type='button'
+          aria-label='Choose profile picture'
+          disabled={busy}
+          onClick={() => fileInput.current?.click()}
+        >
           {preview ? (
             <img src={preview} alt='Your selected avatar' />
-          ) : (
+          ) : resource.get(dataBrowser.properties.icon) ? (
             <ResourceGlyph resource={resource} />
+          ) : (
+            <FaUser aria-hidden />
           )}
         </Avatar>
         <Column>
           <label htmlFor={`${id}-picture`}>Profile picture (optional)</label>
           <input
+            ref={fileInput}
             id={`${id}-picture`}
             type='file'
             accept='image/*'
@@ -135,7 +145,15 @@ export function TeamProfileStep({
   );
 }
 
-const Avatar = styled.div`
+const Avatar = styled.button`
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
   width: 4rem;
   height: 4rem;
   flex-shrink: 0;
