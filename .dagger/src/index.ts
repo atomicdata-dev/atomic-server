@@ -1162,7 +1162,17 @@ export class AtomicServer {
       )
       .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
       .withDirectory('/code/tools', source.directory('tools'))
-      .withMountedCache('/code/target', dag.cacheVolume('rust-target-v3'))
+      // v3 -> v4: `atomic-server`'s build.rs only declares
+      // `rerun-if-changed` on `plugin-runtime/{src,wit}` and
+      // `ATOMICSERVER_SKIP_PLUGIN_RUNTIME` — it has no way to know "the
+      // wasm32-wasip2 target just became installed". Adding the `rustup
+      // target add` step above changed the container, but every prior CI
+      // run had already fingerprinted build.rs's output (an empty embedded
+      // runtime, from before that target existed) into this cache volume,
+      // so cargo kept trusting the stale fingerprint and never re-ran
+      // build_plugin_runtime() to notice the target was now there. Bumping
+      // the volume forces one full rebuild that actually re-evaluates it.
+      .withMountedCache('/code/target', dag.cacheVolume('rust-target-v4'))
       .withExec(TOUCH_WORKSPACE_SOURCES)
       .withWorkdir('/code')
       .withExec(['cargo', 'fetch']);
