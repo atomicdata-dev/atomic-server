@@ -10,6 +10,10 @@ Status: preparation only; do not tag until the gates below pass.
 - [x] Add recovery, discovery, per-drive sync and security notes under UNRELEASED.
 - [x] Configure npm Trusted Publishing for lib, react, svelte, cli and create-template: ontola/atomic-server, release.yml, direct publishing.
 
+## Local E2E evidence
+
+Full suite and isolated reruns completed on 2026-09-09: latest result per case is 174 passed, 20 failed, 6 skipped. See [detailed results](beta6-e2e-results.md). Release remains blocked.
+
 ## Release gates
 
 - [ ] Green full CI on the final release commit, including downstream atomic-saas compatibility. Latest develop pipeline was still running when this PR was prepared.
