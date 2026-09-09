@@ -1,3 +1,4 @@
+import type { CalendarOccurrence } from '@tomic/lib';
 import { useResource, useTitle } from '@tomic/react';
 import { styled } from 'styled-components';
 import { useCallback, useRef, useState, type JSX } from 'react';
@@ -15,6 +16,7 @@ interface CalendarDayProps {
   isToday: boolean;
   /** Row subjects whose date value falls on this day. */
   eventSubjects: string[];
+  occurrences: CalendarOccurrence[];
   allDaySubjects: ReadonlySet<string>;
   readOnly: boolean;
   /** Create a row with its date preset to this day. */
@@ -30,6 +32,7 @@ export function CalendarDay({
   inMonth,
   isToday,
   eventSubjects,
+  occurrences,
   allDaySubjects,
   readOnly,
   onAddItem,
@@ -82,6 +85,15 @@ export function CalendarDay({
             onOpen={onOpenItem}
           />
         ))}
+        {occurrences.map(occurrence => (
+          <CalendarEvent
+            key={occurrence.key}
+            subject={occurrence.subject}
+            allDay={occurrence.allDay}
+            recurring={occurrence.recurring}
+            onOpen={onOpenItem}
+          />
+        ))}
         {adding && (
           <AddInput
             ref={inputRef}
@@ -110,9 +122,11 @@ function CalendarEvent({
   subject,
   onOpen,
   allDay,
+  recurring = false,
 }: {
   subject: string;
   allDay: boolean;
+  recurring?: boolean;
   onOpen: (subject: string) => void;
 }): JSX.Element {
   const resource = useResource(subject);
@@ -123,11 +137,17 @@ function CalendarEvent({
     <EventChip
       type='button'
       data-testid='calendar-event'
-      title={title || subject}
+      title={
+        recurring
+          ? `${title || subject} · Recurring meeting (opens its series or exception)`
+          : title || subject
+      }
       data-all-day={allDay || undefined}
+      data-recurring={recurring || undefined}
       onClick={() => onOpen(subject)}
       onContextMenu={e => openResourceMenu(subject, e)}
     >
+      {recurring && <span aria-label='Recurring meeting'>↻ </span>}
       {allDay && <AllDayLabel>All day</AllDayLabel>}
       {title || subject}
     </EventChip>

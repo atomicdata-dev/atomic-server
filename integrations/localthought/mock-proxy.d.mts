@@ -33,6 +33,9 @@ interface CalendarFixture {
   events: Array<{
     id: string;
     summary: string;
+    recurrence?: string[];
+    recurringEventId?: string;
+    originalStartTime?: { date?: string; dateTime?: string; timeZone?: string };
     status: string;
     start: { date?: string; dateTime?: string; timeZone?: string };
     end: { date?: string; dateTime?: string; timeZone?: string };

@@ -9987,9 +9987,23 @@ msgstr ""
 msgid "Connect GitHub tracker"
 msgstr ""
 
+#. 0: error instanceof Error ? error.message \\: String(error)
+#: src/chunks/TablePage/Calendar/CalendarView.tsx
+msgid "Could not display recurring meetings: {0}"
+msgstr ""
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "Recurring meeting"
+msgstr ""
+
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect another tracker"
 
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 msgid "All day"
+msgstr ""
+
+#. 0: title || subject
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "{0} · Recurring meeting (opens its series or exception)"
 msgstr ""

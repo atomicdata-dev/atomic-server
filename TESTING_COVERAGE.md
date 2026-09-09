@@ -1169,6 +1169,33 @@ stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
 Live-provider browser OAuth verification remains separate from this fixture test.
 
+## Google Calendar recurrence
+
+- `browser/lib/src/calendar-recurrence.test.ts`: daily/weekly/monthly rule sets,
+  COUNT/UNTIL, DST gaps and offset changes, exclusions/additions, moved/cancelled
+  instances, cross-calendar identities, provider-expanded deduplication and
+  date-only recurring spans. No real provider calls.
+- `integrations/localthought/calendarRecurrence.test.ts`: complete recurrence
+  metadata projection, normalized fields, minimal cancellation records and
+  refusal when instance identity is missing.
+- `browser/data-browser/src/chunks/TablePage/Calendar/calendarOccurrences.test.ts`:
+  imported/native property names, civil-day placement across offset boundaries,
+  recurring all-day spans clipped to the visible grid.
+- `wasm/src/calendar_import.rs` unit tests: full-series queries omit date bounds,
+  both modes request tombstones, and catalogs retain recurrence/exception fields.
+- `browser/e2e/tests/google-calendar-import.spec.mts`: real browser/OPFS/import
+  preview using a mock provider, covering bounded instances and retained series,
+  moved/cancelled slots, reimport, reload and preservation of local notes.
+
+The actionable fidelity audit is `docs/imports/google-calendar-gap-report.md`.
+Live Google equivalence for historical/exotic recurrence rules remains outside
+these fixtures; unsupported full-series rules are rejected before import.
+
+Validated 2026-09-09: library 643/643, importer 24/24, UI buckets 2/2,
+standalone compilation of Rust adapter tests 2/2, frontend/library tsc, Oxlint,
+production WASM build, and both Chromium import flows (31.5s). The browser flow
+retains the existing explicit server-unavailable network fixture; no live Google
+account or full native Rust workspace test was run.
 
 Google Calendar two-way existing-event edits: `integrations/localthought/calendar-sync.test.ts`
 checks three-way field merges, title aliases, ETag rejection, stale local reviews,
