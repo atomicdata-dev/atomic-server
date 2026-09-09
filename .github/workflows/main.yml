@@ -18,6 +18,8 @@ on:
 # Queue instead of overlap; never cancel a run that is already going.
 concurrency:
   group: main-pipeline
+  # The default keeps only one pending run and replaces it on the next push.
+  queue: max
   cancel-in-progress: false
 
 # Main prefers Mancave (self-hosted) so Dagger cache volumes stay warm.

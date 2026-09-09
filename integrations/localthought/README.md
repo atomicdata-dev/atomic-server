@@ -1,0 +1,134 @@
+# LocalThought browser integrations
+
+The LocalThought flow runs entirely in the browser: catalog discovery, tenant
+challenge signing, OAuth return handling, paginated Syncables reads, ontology
+creation, proposal review and local Store/OPFS writes. No AtomicServer HTTP
+instance is needed. LocalThought remains the remote OAuth and API proxy.
+
+Open Integrations, select a platform and paste your `TENANT_SECRET`. It is used
+in tab memory to sign the handoff and is not persisted. OAuth returns to the
+same frontend `/app/integrations` page. The short-lived return is bound to the
+agent, drive and proxy; its code is removed from the address bar immediately.
+Connection codes are stored in this browser's localStorage, outside the synced
+graph, and may be read by code running on this frontend origin. Clearing site
+data requires reconnecting. Existing server-held connections require reconnecting.
+Web Locks serialize rotating codes across tabs; a request consumes its code
+before dispatch and saves the replacement before processing data. Uncertain
+requests cannot silently replay credentials.
+
+Syncables is vendored temporarily under `syncables/` with upstream provenance in
+`UPSTREAM.md`; the matching upstream branch is `codex/browser-integrations`.
+`wasm/src/integrations.rs` exposes its in-memory engine through wasm-bindgen.
+The shipped pure import mapper reads a local snapshot and produces the existing
+reviewed intents; user-edited plugin source is not executed on this path.
+Local edits and repeated imports retain the existing reconciliation behavior.
+
+## Build and proxy requirements
+
+- Build `atomic-wasm` using `cd browser/data-browser && pnpm build:wasm`.
+- Set `VITE_INTEGRATION_PROXY_URL` at frontend build/dev time to override the
+  default `https://localthought.io`. HTTPS or loopback HTTP origins only.
+- Deploy the companion integration-proxy CORS change. It handles preflights for
+  explicit Authorization headers and exposes `X-Connection-Code`, `Link`,
+  pagination/count headers, `ETag` and `Retry-After`. Cookie credentials are not
+  enabled; login and consent use top-level navigation.
+- Native AtomicServer's `TENANT_SECRET`, `ATOMIC_INTEGRATION_PROXY_URL` and
+  `ATOMIC_INTEGRATION_FRONTEND_ORIGIN` no longer configure this flow. Its
+  `/integration-proxy/*` handlers and Syncables dependency have been removed.
+
+Limits remain 200 requests, 5,000 records, 10 MB per page/document and 120
+seconds of network work. Calendar imports require explicit UTC date bounds.
+Imports are manual; closed tabs do not run schedules. Other legacy integrations,
+server plugin execution, actions and schedules are outside this migration.
+
+## Checks
+
+```sh
+cargo check -p atomic-wasm --target wasm32-unknown-unknown
+browser/node_modules/.bin/vitest run --config integrations/localthought/vitest.config.ts
+node integrations/localthought/wasm-smoke.mjs # after building wasm/pkg
+```
+
+For the browser-only mock journey (no AtomicServer on port 19999):
+
+```sh
+MOCK_PROXY_PORT=19091 MOCK_FRONTEND_ORIGIN=http://localhost:6748 node integrations/localthought/mock-proxy.mjs
+# Separate terminal, browser/data-browser:
+VITE_INTEGRATION_PROXY_URL=http://127.0.0.1:19091 VITE_ATOMIC_SERVER_URL=http://127.0.0.1:19999 pnpm exec vite --host 127.0.0.1 --port 6748
+# Repository root:
+node integrations/localthought/browser-smoke.mjs
+```
+
+The mock is test-only. It uses synthetic credentials and data; never deploy it.
+
+## Historical server-flow verification
+
+Live verification on 2026-09-09 succeeded against proxy Heroku release v38
+(`5960ae43`): OAuth returned to AtomicServer, Syncables fetched 29 issue/PR
+records from `localthought/integration-proxy` and queried all 29 comment
+collections (empty), and the reviewed records were applied and displayed in
+the local AtomicServer table with generated platform properties.
+
+Proxy fixes [#28](https://github.com/localthought/integration-proxy/pull/28)
+and [#29](https://github.com/localthought/integration-proxy/pull/29) add the
+required GitHub User-Agent and preserve query parameters and Link headers.
+This live repository fit on one issues page; multi-page traversal is covered
+by the mock and Rust tests. Google Calendar was also live-verified against proxy v39 after
+[PR #30](https://github.com/localthought/integration-proxy/pull/30) fixed matching
+OpenAPI server base paths. OAuth returned successfully, and a UTC range from
+2026-09-09 through 2026-10-09 (exclusive) imported 22 calendar-list entries and
+32 events after review. Event contents are not included in these test notes.
+An unbounded fetch successfully traversed multiple pages but exceeded the
+5,000-record preview limit; the UI now defaults to the next 30 days. Date
+bounds and recurrence expansion are passed to Syncables as collection query
+settings. The importer remains a manual snapshot, not a background sync.
+
+## Calendar view
+
+Google event imports now install a Calendar view alongside the source table.
+The projected date uses the day in Google's supplied start offset (or the
+unchanged all-day date), so mixed all-day/timed events share one DATE column.
+The original Start and End objects retain timezones and exclusive end values.
+The month view shows each event on its start day; it does not draw duration or
+multi-day spans. Additional notes identify recurring events, attendees,
+reminders and conferencing when those fields are returned by the catalog.
+Recurring instances are expanded by the existing bounded provider fetch.
+
+Use **Fetch and preview** again to refresh, then review and apply changes.
+Existing source identities and import baselines prevent duplicates and preserve
+Atomic-only fields and local edits. Cancellation records are retained with a
+note; absence from a bounded fetch never deletes an Atomic resource. Google
+may omit cancelled events from list results, so this is not a deletion feed.
+Removed optional provider fields are not cleared by the shared snapshot importer.
+This first version deliberately remains manual and one-way. No OAuth write
+scope is requested and edits in Atomic do not update Google.
+
+`calendar.test.ts` exercises mixed dates, offset boundaries, exclusive ends,
+recurrence/attendee notes, cancellations, malformed starts, cross-calendar
+identity and repeated imports with private local fields.
+
+## Browser-only Calendar regression
+
+`browser/e2e/tests/google-calendar-import.spec.mts` starts the shared mock
+integration-proxy from #1399 with a synthetic Google Calendar. The test enters
+the public fixture tenant secret, completes consent, and exercises real browser
+credential rotation, WASM pagination, local schema installation, proposal review,
+OPFS application, and Calendar rendering. It refreshes changed provider data
+and checks that native identities and Atomic-only notes survive reload.
+AtomicServer HTTP and all WebSockets are blocked throughout; only GET requests
+are permitted for provider data. The configured LocalThought origin is forwarded
+to the isolated HTTP fixture, so no live provider credentials or data are used.
+
+Run with a dev frontend built from this branch and its matching WASM bundle:
+
+```sh
+FRONTEND_URL=http://127.0.0.1:6747 SERVER_URL=http://127.0.0.1:19999 \
+  browser/e2e/node_modules/.bin/playwright test \
+  --config browser/e2e/playwright.config.ts \
+  browser/e2e/tests/google-calendar-import.spec.mts --project chromium
+```
+
+If the frontend uses `VITE_INTEGRATION_PROXY_URL`, pass the same value to the
+test process. The test forwards that origin to its own fixture. Live Google
+OAuth on the browser path still depends on the proxy CORS deployment described
+above; this fixture test does not claim live-provider verification.

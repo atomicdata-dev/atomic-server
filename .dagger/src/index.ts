@@ -273,23 +273,49 @@ export class AtomicServer {
    * Mount shared crates.io + git dependency caches under `cargoHome`, and
    * pin `CARGO_BUILD_JOBS` so rustc doesn't spawn one job per visible host
    * CPU (containers see the full Mancave SMT count). Registry content is
-   * identical across glibc/musl images, so both share the `cargo` /
-   * `cargo-git` volumes — only the mount path differs.
+   * identical across glibc/musl images, so both share dependency volumes
+   * and Cargo cache locks — only the mount path differs.
    */
   private withCargoHomeCache(
     container: Container,
     cargoHome: string,
   ): Container {
-    return container
-      .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
-        // Shared: Locked serialized every parallel CI lane behind whichever
-        // job held the volume. Cargo's own flock handles concurrent writers.
-        sharing: CacheSharingMode.Shared,
-      })
-      .withMountedCache(`${cargoHome}/git`, dag.cacheVolume('cargo-git'), {
-        sharing: CacheSharingMode.Shared,
-      })
-      .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs);
+    return (
+      container
+        .withMountedCache(
+          `${cargoHome}/registry`,
+          dag.cacheVolume('cargo-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        .withMountedCache(
+          `${cargoHome}/git`,
+          dag.cacheVolume('cargo-git-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        // Cargo locks live in CARGO_HOME, outside registry/git. Sharing only
+        // those directories leaves every container with independent locks and
+        // lets simultaneous downloads race while unpacking the same crate.
+        // Put both lock inodes in the shared registry volume; Cargo still only
+        // serializes downloads/mutations, not the entire parallel build lane.
+        // Fresh volume names keep older jobs with private locks out of this cache.
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache',
+          `${cargoHome}/.package-cache`,
+        ])
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache-mutate',
+          `${cargoHome}/.package-cache-mutate`,
+        ])
+        .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs)
+    );
   }
 
   /**
@@ -610,6 +636,10 @@ export class AtomicServer {
           this.source.directory('plugin-runtime'),
         )
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory('/code/server', this.source.directory('server'))
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
@@ -687,6 +717,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           this.source.directory('plugin-examples'),
@@ -1101,7 +1135,9 @@ export class AtomicServer {
       // Surfaces /app/dev-drive and /app/prunetests in the production
       // build the e2e tests run against. See `devRoutesEnabled()` in
       // data-browser/src/config.ts.
-      buildContainer = buildContainer.withEnvVariable('VITE_E2E', 'true');
+      buildContainer = buildContainer
+        .withEnvVariable('VITE_E2E', 'true')
+        .withEnvVariable('VITE_INTEGRATION_PROXY_URL', 'http://127.0.0.1:19090');
     }
 
     return buildContainer.withExec(['pnpm', 'run', 'build']);
@@ -1156,6 +1192,10 @@ export class AtomicServer {
       .withDirectory('/code/cli', source.directory('cli'))
       .withDirectory('/code/desktop', source.directory('desktop'))
       .withDirectory('/code/wasm', source.directory('wasm'))
+      .withDirectory(
+        '/code/integrations/localthought/syncables',
+        source.directory('integrations/localthought/syncables'),
+      )
       .withDirectory(
         '/code/plugin-examples',
         source.directory('plugin-examples'),
@@ -1354,6 +1394,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', source.directory('cli'))
         .withDirectory('/code/desktop', source.directory('desktop'))
         .withDirectory('/code/wasm', source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           source.directory('plugin-examples'),
@@ -1641,23 +1685,43 @@ export class AtomicServer {
       e2e,
     ).file('/atomic-server-binary');
 
-    return (
-      dag
-        .container()
-        .from('alpine:latest')
-        .withFile('/atomic-server-bin', atomicServerBinary, {
-          permissions: 0o755,
-        })
-        .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
-        // First-run flag — sets up the bootstrap agent + public drive +
-        // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
-        // Without this, every test's `before()` hook times out fetching it.
-        .withEnvVariable('ATOMIC_INITIALIZE', 'true')
-        .withExposedPort(9883)
-        .withEntrypoint(['/atomic-server-bin'])
-        .asService()
-        .withHostname(ATOMIC_DOMAIN)
-    );
+    let service = dag
+      .container()
+      .from(e2e ? 'node:22-alpine' : 'alpine:latest')
+      .withFile('/atomic-server-bin', atomicServerBinary, {
+        permissions: 0o755,
+      })
+      .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
+      // First-run flag — sets up the bootstrap agent + public drive +
+      // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
+      // Without this, every test's `before()` hook times out fetching it.
+      .withEnvVariable('ATOMIC_INITIALIZE', 'true')
+      .withExposedPort(9883)
+      .withEntrypoint(['/atomic-server-bin']);
+    if (e2e)
+      service = service
+        .withDirectory(
+          '/mock-proxy',
+          this.source.directory('integrations/localthought'),
+        )
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_PROXY_URL',
+          'http://127.0.0.1:19090',
+        )
+        .withEnvVariable('TENANT_SECRET', 'bW9jay10ZW5hbnQ.mock-signature')
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_FRONTEND_ORIGIN',
+          'http://atomic.localhost:9883',
+        )
+        .withEnvVariable('MOCK_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
+        .withEnvVariable('MOCK_PROXY_HOST', '0.0.0.0')
+        .withExposedPort(19090)
+        .withEntrypoint([
+          'sh',
+          '-c',
+          'node /mock-proxy/mock-proxy.mjs & exec /atomic-server-bin',
+        ]);
+    return service.asService().withHostname(ATOMIC_DOMAIN);
   }
 
   /**
@@ -1785,6 +1849,7 @@ export class AtomicServer {
         // It sits after the service binding and the setup probe, so the build
         // layers above stay cached; only the Playwright exec is unique.
         .withEnvVariable('E2E_RUN_NONCE', this.e2eRunNonce)
+        .withEnvVariable('ATOMIC_MOCK_INTEGRATION_PROXY', '1')
         .withExec([
           '/bin/bash',
           '-c',

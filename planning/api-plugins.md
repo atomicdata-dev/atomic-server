@@ -35,13 +35,43 @@ the parts that make a provider real:
   (`browser/e2e/tests/plugins.spec.ts`)
 - certification metadata (`package.json` `atomicCertification`)
 
-## Next: discovery through the localthought proxy
+## LocalThought and Syncables follow-up
 
-Once the touch points above are proven, the next step is a real provider
-discovered rather than hand-written: querying a **localthought proxy** to find
-which APIs can be imported (an OpenAPI-shaped discovery service, playing the
-role PR #1383's `REFLECTOR_ROOT/spec` scan played), then generating the same
-shape this document just walked — ontology, mapping, plugin — from what it
-returns instead of from a person writing `integrations/<name>/*.ts` by hand.
-That discovery protocol, and how much of a discovered plugin can be generated
-versus reviewed and hand-finished, is not designed yet.
+Work continues on `codex/localthought-api-plugins`: dynamic catalog discovery,
+signed account handoff, rotating host-owned credentials, Syncables pagination,
+platform-specific typed ontologies, and a paginated Pets mock integration proxy.
+See [the integration README](../integrations/localthought/README.md) for its
+configuration, behavior and tests.
+
+- [x] Replace public demo discovery with the live platform catalog.
+- [x] Implement signed account connection and return flow using `TENANT_SECRET`.
+- [x] Use Syncables with the catalog OAD for discovery, pagination and ontology.
+- [x] Add the mock proxy and wire the updated Pets browser journey into CI.
+- [x] Verify live GitHub OAuth, fetch and reviewed import (29 issue/PR records; proxy v38).
+- [x] Verify Google Calendar OAuth/import against the live service (54 records, including 32 events; proxy v39).
+
+Calendar live follow-up: proxy PR #30 fixes catalog base paths (deployed v39).
+OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
+- [x] Add explicit UTC event date bounds and verify a scoped live import.
+
+- [x] Rebase onto `2ca03bd2c`, verified tree-identical to requested `550cc5f`.
+- [ ] Make branch CI pass. Local JS suite, lint, typecheck, Rust handler tests
+  and focused Pets E2E pass. Main run 34349742940 exposed independent Cargo
+  cache locks around a shared registry; link the locks into the shared volume.
+
+Main run 34350517612 passed dependency installation with the shared locks, then
+failed the full-app compiler sweep at its 5-second default (7.8 seconds actual).
+Give only that bulk test a 30-second budget; retain all compilation assertions.
+
+Run 34352390180 was canceled before jobs started when another branch replaced
+it in the default single pending slot. Set `queue: max` on main-pipeline so
+pending validations can wait sequentially instead of displacing one another.
+
+## Browser migration
+
+`codex/browser-integrations` moves the LocalThought flow off AtomicServer.
+Catalog parsing and pagination run in the Atomic WASM bundle; the browser owns
+the tenant handoff and rotating connection code, then maps fetched records into
+locally reviewed proposals. Companion branches in Syncables and integration-proxy
+provide WASM compatibility and CORS. See `integrations/localthought/README.md`.
+Legacy direct integrations, action infrastructure and scheduling remain separate.

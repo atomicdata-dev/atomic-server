@@ -4704,6 +4704,7 @@ msgstr ""
 msgid "Syncing…"
 msgstr ""
 
+#: src/routes/DevonianDemoRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sync now"
 msgstr ""
@@ -6287,6 +6288,7 @@ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this dev
 msgstr ""
 
 #: src/components/Vault/VaultPanel.tsx
+#: src/routes/DevonianDemoRoute.tsx
 msgid "Working…"
 msgstr ""
 
@@ -7959,25 +7961,20 @@ msgstr ""
 msgid "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "GitHub issues"
-msgstr ""
+#~ msgid "GitHub issues"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Keep GitHub issues and your kanban board in sync."
-msgstr ""
+#~ msgid "Keep GitHub issues and your kanban board in sync."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
-msgstr ""
+#~ msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Start automations when a new issue is discovered."
-msgstr ""
+#~ msgid "Start automations when a new issue is discovered."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Issues only. Comments and pull requests are not synced."
-msgstr ""
+#~ msgid "Issues only. Comments and pull requests are not synced."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Notion"
@@ -8004,6 +8001,7 @@ msgid "Supported scope"
 msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
 msgid "Set up connection"
 msgstr ""
 
@@ -9560,25 +9558,20 @@ msgstr ""
 #: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/chunks/PluginRuns/ConnectPets.tsx
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Pets"
 msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "A trivial demo collection, useful for trying plugins out."
-msgstr ""
+#~ msgid "A trivial demo collection, useful for trying plugins out."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
-msgstr ""
+#~ msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "A one-off, on-demand import. Nothing runs in the background."
-msgstr ""
+#~ msgid "A one-off, on-demand import. Nothing runs in the background."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "No external account, API key or network call. Static sample data only, not a live provider."
-msgstr ""
+#~ msgid "No external account, API key or network call. Static sample data only, not a live provider."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/ConnectPets.tsx
 msgid "Reinstall demo pets"
@@ -9594,4 +9587,199 @@ msgstr ""
 
 #: src/chunks/PluginRuns/ConnectPets.tsx
 msgid "Open Pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading LocalThought platforms…"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Connect your account through LocalThought and import records into your drive."
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Use a direct GitHub token instead"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading setup…"
+msgstr ""
+
+#~ msgid "Provider data"
+#~ msgstr ""
+
+#~ msgid "Original JSON returned by the connected platform."
+#~ msgstr ""
+
+#~ msgid "API record"
+#~ msgstr ""
+
+#~ msgid "A record imported from a connected platform."
+#~ msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Reconnect account"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Install and connect"
+msgstr ""
+
+#~ msgid "Repository (owner/repository)"
+#~ msgstr ""
+
+#~ msgid "Calendar ID"
+#~ msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetching…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetch and preview"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Connect your personal account through LocalThought, then return here to preview an import."
+msgstr ""
+
+#~ msgid "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
+#~ msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Open imported records"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events from (UTC)"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events before (UTC)"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+#: src/routes/DevonianDemoRoute.tsx
+msgid "LocalThought tenant secret"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+msgstr ""
+
+#. 0: count
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Synchronized {0} issues and comments."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Integration proxy URL"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "GitHub repository (owner/repo)"
+msgstr ""
+
+#~ msgid "Connection code"
+#~ msgstr ""
+
+#~ msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+#~ msgstr ""
+
+#~ msgid "Open live tracker"
+#~ msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect a real GitHub repository"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Devonian issue tracker demo"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Try sample data"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Open Atomic kanban"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "New issue title or comment"
+msgstr ""
+
+#~ msgid "Done"
+#~ msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add Atomic comment"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic tracker"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic issues"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add sample GitHub comment"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub tracker"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub issues"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
 msgstr ""

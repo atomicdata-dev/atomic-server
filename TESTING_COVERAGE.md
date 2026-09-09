@@ -1,5 +1,36 @@
 # Testing coverage map
 
+LocalThought browser migration: `integrations/localthought/browser.test.ts`
+covers tenant HMAC, actor/drive ownership, rotation before dispatch, pagination,
+uncertain-response refusal and cross-origin pagination refusal. The real generated
+WASM bundle is exercised by `wasm-smoke.mjs` for pagination, typed ontology,
+timestamps and provider failures. `browser-smoke.mjs` exercises the complete
+mock consent/import/review/OPFS/reload journey with AtomicServer unavailable
+(verified locally). Local installation/schema lookup tests reject missing or
+incomplete local databases rather than inferring permission to create duplicates.
+The companion Syncables branch has 142 passing native tests and a wasm32 build;
+the companion proxy branch has 39 passing tests including CORS preflight and
+exposed headers. Live OAuth on the browser path still requires deployment of
+the companion proxy CORS change and is not yet verified.
+
+`browser/e2e/tests/devonian-issue-sync.spec.mts` exercises tenant-secret entry,
+proxy consent, direct HTTP writes and local OPFS storage for two-way issue
+creation, comments, close/reopen and reload without duplicate resources. Its
+stateful HTTP mock isolates repositories and consumes/rotates connection codes;
+it does not substitute the in-page sample transport.
+
+The browser-only Devonian issue tracker demo has focused tests under
+`integrations/github-issues/devonian`: real Devonian lenses with deterministic
+connectors exercise bidirectional issue/comment creation and edits, close/reopen,
+distinct identical resources, conflicts, missing records and restart/replay.
+Transport fixtures cover pagination, label preservation, scoped comment links,
+rotating connection codes and refusal to resend uncertain writes. The native
+OPFS browser flow was manually verified for creation and comments on both sides,
+closing from Atomic, reopening from the sample GitHub side and reloading without
+duplicate issues/comments. Live proxy OAuth,
+GitHub writes and a guided uncertain-write recovery UI remain unverified/unbuilt;
+proxy v40 CORS and browser OAuth are verified, but its GitHub credential returns 404 for the private sandbox.
+
 What is tested, at which layer, and — the part that matters — **what is not**.
 
 This exists because the protocol is far better tested than the glue around it,
@@ -60,9 +91,17 @@ It edits JavaScript, saves and reviews a real proposed effect, enables execution
 returns to review mode and checks history. The trigger HTTP response regression
 `response_filters_round_trip_into_updates` ensures GET filter values can be sent
 back to POST; tagged database values previously broke the enable button.
-The Pets flow verifies the bundled card's title and setup label, installs its
-connection, approves its five proposed creates, and finds Rex, Whiskers, Tweety,
-Nibbles and Bubbles in the resulting table.
+The Pets flow now uses a real mock integration-proxy service: signed consent,
+return to the same drive, rotating connection codes, two-page Syncables fetch,
+review/apply, and five displayed records with integer/boolean/float/timestamp
+properties. Dagger starts the mock for E2E; local runs opt in with
+`ATOMIC_MOCK_INTEGRATION_PROXY=1` and the README configuration.
+`browser.test.ts` and the real WASM smoke cover actor/drive binding, tenant HMAC,
+Syncables pagination/ontology and duplicate-page refusal. The mock's Node test
+covers invalid tenant proofs and replayed/rotated codes. The mapping tests cover
+typed proposals, missing identities, repeat imports, local edits and duplicates.
+The historical server path was live-verified for GitHub and Google Calendar.
+The new browser path awaits deployment of the companion proxy CORS change.
 Run it against a production build to catch missing translation catalog entries:
 Vite dev extracts them automatically and can hide blank production labels.
 The GitHub setup flow also covers opting into assistant-led automation creation:
@@ -1044,3 +1083,16 @@ cancelled on teardown. Old plugin-name grants are deliberately not migrated.
 `store_host::destroy_identity_tests` checks the signer of the persisted destroy
 commit. It failed with the server signer before `Resource::destroy_as` was used;
 installation deletion must use the same selected identity as create/update.
+LocalThought: Rust handler tests cover connection binding, request signing, duplicate-page rejection, typed paginated previews, and Calendar UTC date-range validation. Live Calendar OAuth, bounded fetch, review/apply and event table display were verified against proxy v39 (54 records).
+
+Google Calendar one-way projection: `integrations/localthought/calendar.test.ts`
+covers all-day/timed start dates, offset boundaries, exclusive end preservation,
+feature notes (including WASM-normalized field names), cancellations without
+start data, invalid active events, namespace isolation and repeat import/local
+field preservation. `browser/e2e/tests/google-calendar-import.spec.mts` uses the
+shared HTTP mock integration-proxy with a paginated Google Calendar, tenant
+secret entry and OAuth consent. It covers browser WASM fetching, local
+schema/proposal/apply, Calendar display, provider updates, OPFS reload and
+stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
+rows in a bounded snapshot are retained, not interpreted as deletions.
+Live-provider browser OAuth verification remains separate from this fixture test.
