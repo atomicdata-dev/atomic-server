@@ -313,10 +313,11 @@ impl ApplyHost for StoreApplyHost {
             .await
             .map_err(|e| format!("{subject} could not be read: {e}"))?;
 
-        resource
-            .destroy(&self.store)
-            .await
-            .map_err(|e| format!("could not destroy {subject}: {e}"))?;
+        match self.app_agent()? {
+            Some(agent) => resource.destroy_as(&agent, &self.store).await,
+            None => resource.destroy(&self.store).await,
+        }
+        .map_err(|e| format!("could not destroy {subject}: {e}"))?;
 
         Ok(())
     }
@@ -417,6 +418,64 @@ mod installation_tests {
                 .await
                 .is_err(),
             "a future run must not treat revoked as legacy"
+        );
+    }
+}
+
+#[cfg(test)]
+mod destroy_identity_tests {
+    use super::*;
+    use atomic_lib::{agents::Agent, db::app_agent::AppAgent, storelike::Query};
+
+    #[actix_rt::test]
+    async fn destroy_uses_the_selected_installation_signer() {
+        let mut f = crate::plugins::test_fixture::fixture("destroy_signer").await;
+        crate::plugins::test_fixture::write_plugin(&mut f, "unused").await;
+        let db = &f.appstate.store;
+        let app = Agent::new(None).unwrap();
+        let key = AppAgentKey::new(&f.drive, &f.plugin);
+        db.set_app_agent(
+            &key,
+            &AppAgent::new(app.subject.to_string(), app.build_secret().unwrap(), 0),
+        )
+        .unwrap();
+        let owner = db.get_default_agent().unwrap().subject;
+        let mut root = db.get_resource(&f.plugin.as_str().into()).await.unwrap();
+        root.set_unsafe(
+            urls::WRITE.into(),
+            Value::ResourceArray(vec![app.subject.clone().into(), owner.clone().into()]),
+        )
+        .unwrap();
+        root.save(db).await.unwrap();
+        let mut host = StoreApplyHost::for_installation(
+            db,
+            &f.drive,
+            &f.plugin,
+            ForAgent::AgentSubject(owner),
+        )
+        .await
+        .unwrap();
+        let subject = host
+            .create(CreateRequest {
+                parent: f.plugin,
+                is_a: vec![],
+                prop_vals: HashMap::new(),
+            })
+            .await
+            .unwrap();
+        host.destroy(&subject).await.unwrap();
+        let commits = db
+            .query(&Query::new_prop_val(urls::SUBJECT, &subject))
+            .await
+            .unwrap();
+        let destroy = commits
+            .resources
+            .iter()
+            .find(|r| r.get(urls::DESTROY).is_ok_and(|v| v.to_string() == "true"))
+            .expect("destroy commit");
+        assert_eq!(
+            destroy.get(urls::SIGNER).unwrap().to_string(),
+            app.subject.to_string()
         );
     }
 }

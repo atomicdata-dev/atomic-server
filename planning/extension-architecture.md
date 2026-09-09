@@ -412,6 +412,24 @@ grants are browser-held. Migrating the signer requires migrating those grants an
 validating page scope server-side, not copying keys into another store or silently
 broadening plugin ACLs.
 
+### Implementation checkpoint: consent isolation and delete authorship (2026-09-09)
+
+- [x] Bind browser-held packaged-view consent to server, drive, acting account and
+  concrete installation subject. Do not import ambiguous plugin-name grants;
+  existing users review consent again instead of sharing it across accounts.
+- [x] Remount the view/session on identity changes and deny queued permission
+  requests on teardown. Resource-picker consent uses the same installation key.
+- [x] Preserve the selected installation signer for deletion as well as create /
+  update. A real persisted destroy-commit regression exposed default-server signing.
+- [ ] Migrate packaged UI grants to portable authorization before changing its
+  commit signer. Local browser consent is not proof a receiving Atomic node can
+  validate. Do not turn it into permanent ACL entries without explicit user review.
+
+Packaged UI commits remain user-signed for now. This checkpoint fixes consent
+isolation and the shared effect host; it does not claim the remaining signer
+migration is complete. An explicit reviewed Atomic grant or portable delegation is
+needed to retain authorized interactive editing across replication boundaries.
+
 ### 4. Prove declarative authoring fits
 
 - [ ] Adapt one Reflector provider, preferably its existing Google Calendar pilot,

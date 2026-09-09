@@ -359,6 +359,17 @@ impl Resource {
             .map_err(|e| format!("Failed to destroy {} : {}", self.subject, e).into())
     }
 
+    /// Destroy using an explicitly selected author, preserving the same signing
+    /// identity used for this installation's creates and updates.
+    pub async fn destroy_as(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::commit::CommitResponse> {
+        self.commit.destroy(true);
+        self.save_as(agent, store).await
+    }
+
     /// Gets the children of this resource.
     #[tracing::instrument(skip(store))]
     pub async fn get_children(&self, store: &impl Storelike) -> AtomicResult<Vec<Resource>> {

@@ -1,3 +1,6 @@
+import { useCurrentAgent, useStore } from '@tomic/react';
+import { useSettings } from '@helpers/AppSettings';
+import { grantIdentity } from './grantIdentity';
 import { useLocalStorage } from '@hooks/useLocalStorage';
 
 export interface PermissionScope {
@@ -22,8 +25,11 @@ const defaultValue = {
 };
 
 export function useStoredPluginGrants(plugin: string, type: 'read' | 'write') {
+  const store = useStore();
+  const [agent] = useCurrentAgent();
+  const { drive } = useSettings();
   const [grants, setGrantsStorage] = useLocalStorage<PluginPermissions>(
-    `atomic.plugins.ui.${plugin}`,
+    grantIdentity(store.getServerUrl(), drive, agent?.subject ?? '', plugin),
     defaultValue,
   );
 
