@@ -13,6 +13,17 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## Browser WebRTC transport (issue #1396)
+
+`browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,
+backpressure and cancellation, bounded queues, caller buffer ownership, malformed
+input and close behavior. `browser/e2e/scripts/verify-webrtc.mjs` establishes real
+WebRTC channels between isolated browser contexts in Chromium and Firefox and
+checks bidirectional 1 MiB transfers and disconnects without an AtomicServer.
+The harness is loaded through Playwright routing; ICE and data transfer are real.
+Still uncovered/unimplemented: peer authentication in the browser, drive sync and
+OPFS/UI integration, reconnect/outbox delivery, two physical devices and TURN.
+
 ## How to read this
 
 Coverage is split by *layer*, because the same flow can be well covered in one

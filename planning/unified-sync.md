@@ -74,6 +74,73 @@ is the shape around that call — see [Outbox modernization](#outbox-modernizati
 
 ## Remaining work (2026-09-04)
 
+### Browser-to-browser transport (#1396, assessed 2026-09-09)
+
+**Status: transport foundation implemented on `codex/browser-webrtc-sync`;
+not yet connected to drive sync or the application UI.**
+Issue: https://github.com/ontola/atomic-server/issues/1396.
+
+Recommend an ordered, reliable WebRTC data channel when direct browser-to-browser
+connections are the requirement. Iroh also supports browsers, but its browser
+connections currently require an encrypted relay; that is an alternative for
+hub-independent replication, not direct LAN/offline connectivity. Atomic currently
+depends on Iroh 0.35; current upstream documentation describes version 1, so browser
+build compatibility must be tested against our dependency rather than assumed.
+
+Keep Atomic v2 frames and shared engine semantics. `AtomicTransport` currently
+requires `Send` futures; browser objects need a WASM-compatible adapter boundary.
+`SyncSession::handle` is a candidate entry point, but its generic responder does
+not itself provide drive-bound authentication, subscriptions, reconnect or outbox
+draining. Those pieces must be integrated explicitly. Do not feed peer commits
+through `wasm/src/lib.rs`'s `applyCommit`: it uses `IngestPolicy::LocalCache`, which
+skips signature and rights validation.
+
+- [ ] Expose a browser peer-session boundary backed by the shared Rust engine,
+  with mutual authentication bound to the intended drive/session, read/write
+  authorization and validated peer commit ingest. Pairing information routes;
+  it does not grant access. Reuse the existing sync trust policy for snapshots
+  and signed deletion evidence; never accept unauthenticated raw Loro imports.
+- [x] Implement data-channel framing with bounded fragmentation/reassembly,
+  negotiated message-size limits, backpressure and close/error cancellation.
+  Existing SYNC_PUSH chunking alone is insufficient for a single large resource.
+- [x] Add explicit offer/answer transport pairing (`WebRtcPeer`); verified between
+  isolated contexts in Chromium and Firefox with bidirectional 1 MiB frames.
+- [ ] For product
+  pairing, provide expiring signaling sessions to exchange SDP/ICE candidates;
+  authenticate the peer independently of signaling. Configure STUN and optional
+  TURN fallback. Signaling may use a server without routing synced data through
+  it; TURN does relay data. Show direct versus relayed connection state.
+- [ ] Connect reconciliation, live signed commits and durable outbox retry to
+  the peer session. Keep pending hub delivery distinct from peer receipt, and
+  avoid duplicate fan-out loops when WS and WebRTC are both connected. Ensure
+  incoming changes reach OPFS and subscribed UI resources. Reconcile after tab
+  suspension/reconnect; background browser execution is not guaranteed.
+- [ ] Verify rejection of wrong-drive authentication, unauthorized writes,
+  forged commits/deletions and oversized frames at the cheapest test layer.
+  Read TESTING_COVERAGE.md before placing tests and update its coverage map.
+- [ ] Prove two isolated browser contexts pair, initially reconcile, concurrently
+  edit, reconnect after offline edits, propagate deletion and preserve state
+  after reload with the AtomicServer data path unavailable. Use two devices for
+  direct-LAN evidence and a separate forced-TURN run for relay evidence; cover
+  Chromium and Firefox. Record attachment/blob replication separately from graph
+  convergence before claiming full-drive sync.
+
+Transport verification: nine focused vitest cases cover fragmentation/order,
+caller-buffer ownership, send/receive budgets, backpressure, cancellation,
+malformed/oversized input, truncation and clean EOF. Run the real-browser check
+with `node browser/e2e/scripts/verify-webrtc.mjs` (requires Playwright Chromium
+and Firefox). It bundles the transport and uses intercepted HTML only for loading
+the test harness; offer/answer negotiation and data channels use real WebRTC.
+This is same-machine transport evidence, not two-device LAN, TURN, authenticated
+drive convergence, persistence or UI acceptance. No AtomicServer is involved.
+
+The branch starts from `feat/plugin-model` at `f09b0a4af` to preserve the current
+runtime context. Before opening a PR against `develop`, isolate the issue commits
+from any unrelated plugin-branch ancestry.
+
+Sources: [Iroh browser limitations](https://docs.iroh.computer/languages/wasm-browser)
+and [WebRTC data-channel behavior](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels).
+
 Every still-open sync item, from this doc and from the plans it coordinates.
 `[x] (2026-09-03)` = landed in the sync-protocol hardening PR (#1352);
 `[x] (2026-09-04)` = landed in the follow-up PR from the same branch. Items

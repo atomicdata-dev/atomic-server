@@ -97,3 +97,6 @@ export {
   type PerfSnapshot,
 } from './perf-trace.js';
 export * from './child-order.js';
+
+export { WebRtcPeer } from './webrtc-peer.js';
+export { WebRtcTransport } from './webrtc-transport.js';
