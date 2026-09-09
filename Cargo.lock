@@ -1282,7 +1282,6 @@ dependencies = [
  "sha1 0.11.0",
  "simple-server-timing-header",
  "static-files 0.3.1",
- "syncables",
  "tempfile",
  "text-splitter",
  "tokio",
@@ -1345,14 +1344,17 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "atomic-wasm"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "atomic_lib",
  "blake3",
+ "chrono",
  "console_error_panic_hook",
  "getrandom 0.3.4",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "syncables",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -13442,7 +13444,6 @@ dependencies = [
 [[package]]
 name = "syncables"
 version = "0.1.0"
-source = "git+https://github.com/localthought/syncables-rs?rev=d48e4d9bad3ed9ec826d1c2040e989171701965d#d48e4d9bad3ed9ec826d1c2040e989171701965d"
 dependencies = [
  "async-trait",
  "httpdate",
@@ -13453,7 +13454,6 @@ dependencies = [
  "serde_yaml_ng",
  "thiserror 2.0.18",
  "tokio",
- "uuid",
 ]
 
 [[package]]

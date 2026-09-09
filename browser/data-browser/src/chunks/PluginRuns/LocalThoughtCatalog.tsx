@@ -6,7 +6,12 @@ import { Button } from '@components/Button';
 import { Dialog, useDialog } from '@components/Dialog';
 import { ErrMessage } from '@components/forms/InputStyles';
 import { ConnectLocalThought } from './ConnectLocalThought';
-import { connectionKey, platformName, proxyRequest } from './localThought';
+import {
+  browserIntegrations,
+  connectionKey,
+  platformName,
+  proxyRequest,
+} from './localThought';
 
 const DirectGitHub = lazy(() =>
   import('./ConnectGitHub').then(m => ({ default: m.ConnectGitHub })),
@@ -26,20 +31,9 @@ export function LocalThoughtCatalog({
   const completing = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${store.getServerUrl()}/integration-proxy/catalog`, {
-      signal: controller.signal,
-    })
-      .then(async response => {
-        if (!response.ok)
-          throw new Error('Could not load the LocalThought catalog');
-        const data = await response.json();
-        if (
-          !Array.isArray(data.platforms) ||
-          data.platforms.some((id: unknown) => typeof id !== 'string')
-        )
-          throw new Error('Invalid integration catalog');
-        setPlatforms(data.platforms);
-      })
+    browserIntegrations()
+      .catalog(controller.signal)
+      .then(setPlatforms)
       .catch(reason => {
         if (!controller.signal.aborted) setError(String(reason));
       });

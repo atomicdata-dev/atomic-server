@@ -33,7 +33,6 @@ static-files = "0.3.1"
 walkdir = "2"
 
 [dependencies]
-syncables = { git = "https://github.com/localthought/syncables-rs", rev = "d48e4d9bad3ed9ec826d1c2040e989171701965d" }
 tempfile = "3"
 async-trait = "0.1.89"
 actix = "0.13.5"

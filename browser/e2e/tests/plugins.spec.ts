@@ -28,10 +28,9 @@ test.describe('plugins', () => {
       !process.env.ATOMIC_MOCK_INTEGRATION_PROXY,
       'Run with the documented mock integration-proxy server configuration',
     );
-    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
 
     // CI's browser and server are in different containers. Forward the mock's
-    // loopback address to the server container; the real connect/rotation logic runs there.
+    // loopback address to the server container before catalog loading starts.
     if (process.env.ATOMIC_SERVICE_URL)
       await page.route('http://127.0.0.1:19090/**', async route => {
         const target = new URL(route.request().url());
@@ -42,6 +41,7 @@ test.describe('plugins', () => {
         });
         await route.fulfill({ response });
       });
+    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
     const pets = page.locator('[data-integration=pets]');
     await expect(
       pets.getByRole('heading', { name: 'Pets', exact: true }),
@@ -53,6 +53,9 @@ test.describe('plugins', () => {
       setup.getByRole('button', { name: 'Install and connect', exact: true }),
     ).toBeVisible();
     await setup
+      .getByLabel('LocalThought tenant secret')
+      .fill('bW9jay10ZW5hbnQ.mock-signature');
+    await setup
       .getByRole('button', { name: 'Install and connect', exact: true })
       .click();
 
@@ -61,23 +64,11 @@ test.describe('plugins', () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Connect test account' }).click();
     await expect(page).not.toHaveURL(/connection_code=/);
-    const [preview] = await Promise.all([
-      page.waitForResponse(
-        response =>
-          response.url().endsWith('/plugin-run') &&
-          response.request().method() === 'POST',
-        { timeout: 45_000 },
-      ),
-      page.getByRole('button', { name: 'Fetch and preview' }).click(),
-    ]);
-    expect(preview.ok(), await preview.text()).toBe(true);
+    await page.getByRole('button', { name: 'Fetch and preview' }).click();
 
     const review = page.locator('dialog[open]');
-    // Installing walks pluginClassesFor, two ensureSchema calls, three
-    // ensureInstallationResource calls and the actual sandboxed plugin run —
-    // measured ~24s locally even on a fresh, otherwise-idle server. The
-    // default 10s expect timeout is tuned for interaction latency, not this
-    // one-time setup cost.
+    // The browser creates the local ontology, tables and reviewed proposal.
+    // Allow the one-time installation more than the interaction timeout.
     await expect(
       review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
     ).toBeEnabled({ timeout: 45_000 });

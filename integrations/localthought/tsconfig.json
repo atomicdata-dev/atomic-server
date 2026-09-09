@@ -8,5 +8,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["data.ts", "schema.ts", "plugin.ts"]
+  "include": ["calendar.ts", "schema.ts", "plugin.ts", "browser.ts"]
 }

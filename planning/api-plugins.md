@@ -66,3 +66,12 @@ Give only that bulk test a 30-second budget; retain all compilation assertions.
 Run 34352390180 was canceled before jobs started when another branch replaced
 it in the default single pending slot. Set `queue: max` on main-pipeline so
 pending validations can wait sequentially instead of displacing one another.
+
+## Browser migration
+
+`codex/browser-integrations` moves the LocalThought flow off AtomicServer.
+Catalog parsing and pagination run in the Atomic WASM bundle; the browser owns
+the tenant handoff and rotating connection code, then maps fetched records into
+locally reviewed proposals. Companion branches in Syncables and integration-proxy
+provide WASM compatibility and CORS. See `integrations/localthought/README.md`.
+Legacy direct integrations, action infrastructure and scheduling remain separate.

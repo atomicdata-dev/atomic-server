@@ -4715,6 +4715,7 @@ msgstr "{0}% used"
 msgid "Syncing…"
 msgstr "Syncing…"
 
+#: src/routes/DevonianDemoRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sync now"
 msgstr "Sync now"
@@ -6298,6 +6299,7 @@ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this dev
 msgstr "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
 
 #: src/components/Vault/VaultPanel.tsx
+#: src/routes/DevonianDemoRoute.tsx
 msgid "Working…"
 msgstr "Working…"
 
@@ -9698,3 +9700,125 @@ msgstr "Events from (UTC)"
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Events before (UTC)"
 msgstr "Events before (UTC)"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+#: src/routes/DevonianDemoRoute.tsx
+msgid "LocalThought tenant secret"
+msgstr "LocalThought tenant secret"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+msgstr "The tenant secret is used in this tab. Connection credentials stay in this browser."
+
+#. 0: count
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Synchronized {0} issues and comments."
+msgstr "Synchronized {0} issues and comments."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Integration proxy URL"
+msgstr "Integration proxy URL"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "GitHub repository (owner/repo)"
+msgstr "GitHub repository (owner/repo)"
+
+#~ msgid "Connection code"
+#~ msgstr "Connection code"
+
+#~ msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+#~ msgstr "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+
+#~ msgid "Open live tracker"
+#~ msgstr "Open live tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect a real GitHub repository"
+msgstr "Connect a real GitHub repository"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Devonian issue tracker demo"
+msgstr "Devonian issue tracker demo"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+msgstr "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Try sample data"
+msgstr "Try sample data"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+msgstr "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+msgstr "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Open Atomic kanban"
+msgstr "Open Atomic kanban"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "New issue title or comment"
+msgstr "New issue title or comment"
+
+#~ msgid "Done"
+#~ msgstr "Done"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen Atomic issue"
+msgstr "Reopen Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close Atomic issue"
+msgstr "Close Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add Atomic comment"
+msgstr "Add Atomic comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic tracker"
+msgstr "Atomic tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic issues"
+msgstr "Atomic issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen sample GitHub issue"
+msgstr "Reopen sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close sample GitHub issue"
+msgstr "Close sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add sample GitHub comment"
+msgstr "Add sample GitHub comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create sample GitHub issue"
+msgstr "Create sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create Atomic issue"
+msgstr "Create Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub tracker"
+msgstr "Sample GitHub tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub issues"
+msgstr "Sample GitHub issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+msgstr "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
+msgstr "Connect GitHub tracker"
