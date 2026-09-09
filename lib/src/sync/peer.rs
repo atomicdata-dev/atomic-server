@@ -165,7 +165,13 @@ pub async fn start(store: Db) -> anyhow::Result<(NodeId, Router)> {
 
     let bg_store = store.clone();
     let router = Router::builder(endpoint)
-        .accept(ATOMIC_ALPN, AtomicHandler { store })
+        .accept(
+            ATOMIC_ALPN,
+            AtomicHandler {
+                store,
+                my_node_id: node_id.to_string(),
+            },
+        )
         .spawn();
 
     // Keep router alive globally — dropping it stops incoming connections
@@ -272,6 +278,8 @@ async fn wait_for_relay(
 #[derive(Debug, Clone)]
 struct AtomicHandler {
     store: Db,
+    /// This endpoint's node id: what a dialer's AUTH proof must name.
+    my_node_id: String,
 }
 
 impl iroh::protocol::ProtocolHandler for AtomicHandler {
@@ -280,6 +288,7 @@ impl iroh::protocol::ProtocolHandler for AtomicHandler {
         connection: iroh::endpoint::Connection,
     ) -> futures::future::BoxFuture<'static, anyhow::Result<()>> {
         let store = self.store.clone();
+        let my_node_id = self.my_node_id.clone();
         Box::pin(async move {
             let remote = connection.remote_node_id()?;
             let remote_str = normalize_node_id(&remote.to_string());
@@ -297,7 +306,7 @@ impl iroh::protocol::ProtocolHandler for AtomicHandler {
             // Handle initial sync, then transition to live mode on the same stream
             let store_clone = store.clone();
             let remote_id = remote_str.clone();
-            match handle_stream(send, recv, store_clone, remote_id).await {
+            match handle_stream(send, recv, store_clone, remote_id, my_node_id).await {
                 Ok(imported) => {
                     push_event(&remote_str, imported, "sync");
                 }
@@ -1356,6 +1365,16 @@ pub async fn wait_for_peer_count_change(current: usize) -> usize {
     }
 }
 
+/// Inspect access and the device name without importing or pairing.
+pub async fn inspect_workspace_peer(
+    node_id: &str,
+    drive: &str,
+    store: &Db,
+) -> crate::errors::AtomicResult<super::discover::WorkspacePeer> {
+    let endpoint = ENDPOINT.get().ok_or("Iroh peer has not started")?;
+    super::discover::inspect_workspace(endpoint, node_id, drive, store).await
+}
+
 /// Sync a drive with a remote peer over the global endpoint (set by
 /// `start()`), replacing an existing live connection (QR pair / manual
 /// sync). Returns the rich [`PeerSyncOutcome`].
@@ -1497,9 +1516,12 @@ pub async fn sync_drive_with_peer_using_outcome(
 
     tracing::info!("[sync] bi stream open, sending AUTH...");
 
-    // Authenticate: send AUTH frame so the server knows who we are
+    // Authenticate: send AUTH frame so the server knows who we are. The proof
+    // names the drive AND the node we are talking to (`drive#nodeId`, in the
+    // same fragment slot the WS CHALLENGE nonce uses): a proof captured by
+    // one responder must not open another node hosting the same drive.
     let agent = store.get_default_agent()?;
-    let auth_frame = super::protocol::encode_auth(&agent, drive)?;
+    let auth_frame = super::protocol::encode_auth(&agent, &auth_subject_for(drive, &remote_key))?;
     send.write_u32(auth_frame.len() as u32)
         .await
         .map_err(io_err)?;
@@ -1648,9 +1670,9 @@ pub async fn sync_drive_with_peer_using_outcome(
                         // sidebar) shows the friendly name without needing
                         // a separate codepath. `add_known_peer` is upsert
                         // and only overwrites `name` when non-empty.
-                        if !name.is_empty() {
-                            add_known_peer(store, &remote_key, name);
-                        }
+                        // Always, name or not: the drive is what a later
+                        // `forget-peer` is authorized against.
+                        add_known_peer_for_drive(store, &remote_key, name, drive);
                     }
                 }
                 continue;
@@ -1669,16 +1691,25 @@ pub async fn sync_drive_with_peer_using_outcome(
                         diff.remove.len()
                     );
                     for subject in &diff.remove {
-                        // Dial side: we chose this peer, so a remove targeting a
-                        // drive we own is honored even when the peer relaying it
-                        // is a different agent (trust_owned=true). A signed
-                        // envelope, when present, is applied as a COMMIT instead.
+                        // Dial side: we chose this peer, so a remove targeting
+                        // THE drive we dialed it for is honored even when the
+                        // peer relaying it is a different agent (trust_owned).
+                        // That trust stops at that drive: a peer dialed for a
+                        // shared drive must not get to delete in every drive
+                        // this node owns. Anything else is judged on the peer's
+                        // own rights. A signed envelope, when present, is
+                        // applied as a COMMIT instead.
+                        let in_dialed_drive =
+                            super::ws_apply::resolve_destroy_drive(store, subject)
+                                .await
+                                .map(|d| same_drive(store, &d, drive))
+                                .unwrap_or(false);
                         let envelope = diff.remove_commits.get(subject).map(String::as_str);
                         apply_peer_remove(
                             store,
                             &remote_agent,
                             subject,
-                            true,
+                            in_dialed_drive,
                             &mut drive_cache,
                             envelope,
                         )
@@ -1720,6 +1751,26 @@ pub async fn sync_drive_with_peer_using_outcome(
                 let mut last_chunk = false;
                 if let Some(push) = super::protocol::decode_sync_push(payload) {
                     last_chunk = push.last;
+                    if !same_drive(store, &push.drive, drive) {
+                        // We asked for one drive; owner trust below is for that
+                        // drive only. A push claiming another drive is judged
+                        // as if the peer had dialed us: on its own rights.
+                        tracing::warn!(
+                            "SYNC_PUSH for {} while syncing {}: applying without owner trust",
+                            push.drive,
+                            drive
+                        );
+                        if let Ok((count, _)) =
+                            super::engine::import_sync_push(&push, store, &remote_agent, false)
+                                .await
+                        {
+                            total_imported += count;
+                        }
+                        if last_chunk {
+                            break;
+                        }
+                        continue;
+                    }
                     // Import with the identity the peer proved via auth-back,
                     // NOT Sudo — dialing a peer never established the peer's
                     // write rights. `trust_owned=true`: WE dialed this peer, so
@@ -1984,6 +2035,13 @@ pub struct KnownPeer {
     /// a live connection. A hint alongside the relay, not a requirement.
     #[serde(default)]
     pub direct_addrs: Vec<String>,
+    /// The drives this node has dialed the peer for. This is what a
+    /// `forget-peer` request is authorized against: whoever may write one of
+    /// these drives chose to sync it with that device, and may undo that.
+    /// Empty for peers recorded before this was tracked; those can only be
+    /// forgotten by the node's own agent.
+    #[serde(default)]
+    pub drives: Vec<String>,
 }
 
 /// Get all known peers from the DB.
@@ -2016,6 +2074,12 @@ pub fn get_known_peers(store: &Db) -> Vec<KnownPeer> {
 
 /// Add a peer to the known peers list. Updates name if already known.
 pub fn add_known_peer(store: &Db, node_id: &str, name: &str) {
+    add_known_peer_for_drive(store, node_id, name, "");
+}
+
+/// [`add_known_peer`], also recording `drive` (when non-empty) as one of the
+/// drives this node dialed the peer for. See [`KnownPeer::drives`].
+pub fn add_known_peer_for_drive(store: &Db, node_id: &str, name: &str, drive: &str) {
     let key = normalize_node_id(node_id);
     let mut peers = get_known_peers(store);
     if let Some(existing) = peers
@@ -2025,9 +2089,17 @@ pub fn add_known_peer(store: &Db, node_id: &str, name: &str) {
         if !name.is_empty() {
             existing.name = name.to_string();
         }
+        if !drive.is_empty() && !existing.drives.iter().any(|d| d == drive) {
+            existing.drives.push(drive.to_string());
+        }
     } else {
         peers.push(KnownPeer {
             node_id: key,
+            drives: if drive.is_empty() {
+                vec![]
+            } else {
+                vec![drive.to_string()]
+            },
             last_sent: None,
             last_received: None,
             name: name.to_string(),
@@ -2075,6 +2147,7 @@ pub fn remember_peer_addr(
             last_synced: None,
             relay_url: None,
             direct_addrs: Vec::new(),
+            drives: Vec::new(),
         });
         peers.last_mut().unwrap()
     };
@@ -2167,6 +2240,7 @@ pub fn mark_peer_synced(store: &Db, node_id: &str, sent: Option<u32>, received: 
             last_synced: Some(now),
             relay_url: None,
             direct_addrs: Vec::new(),
+            drives: Vec::new(),
         });
     }
     let _ = store.kv.insert(
@@ -2241,6 +2315,14 @@ fn auth_requested_subject(payload: &[u8]) -> Option<String> {
     Some(auth.requested_subject)
 }
 
+/// What a dialer signs in its AUTH: the drive it wants, bound to the node it
+/// is dialing. The node id rides in the fragment slot the WS CHALLENGE nonce
+/// uses (`split_challenge_fragment`), so the signed string keeps its
+/// `"{requestedSubject} {timestamp}"` shape.
+pub fn auth_subject_for(drive: &str, responder_node_id: &str) -> String {
+    format!("{drive}#{}", normalize_node_id(responder_node_id))
+}
+
 /// The drive a handshake `SYNC` / `SYNC_PUSH` names, or `None` for any other
 /// frame (and for a frame that does not decode — the engine will answer
 /// that one with its own ERROR).
@@ -2259,8 +2341,10 @@ async fn handle_stream(
     mut recv: iroh::endpoint::RecvStream,
     store: Db,
     remote_id: String,
+    my_node_id: String,
 ) -> anyhow::Result<usize> {
     let remote_key = normalize_node_id(&remote_id);
+    let my_node_key = normalize_node_id(&my_node_id);
     let mut agent = ForAgent::Public;
     // The drive the peer's AUTH was signed for. The AUTH proof is bound to
     // this (`requestedSubject` is what the signature covers), so a proof
@@ -2374,7 +2458,36 @@ async fn handle_stream(
             continue;
         }
 
-        let responses = super::engine::handle_frame(&buf, &store, &mut agent).await;
+        let responses = if tag == super::protocol::tag::AUTH {
+            // The proof must be minted for THIS node: the dialer signs
+            // `drive#nodeId` (see `auth_subject_for`). Without that binding a
+            // peer we dial could forward our AUTH to any other node hosting
+            // the drive and be served as us for the proof's lifetime. A proof
+            // without the node id is a pre-binding dialer; it is honoured only
+            // from a peer this node's owner paired with, and only until that
+            // peer upgrades.
+            let carries_node_id = auth_requested_subject(&buf[1..])
+                .map(|s| super::protocol::split_challenge_fragment(&s).1.is_some())
+                .unwrap_or(false);
+            if !carries_node_id && !is_paired_peer(&store, &remote_key) {
+                vec![super::protocol::encode_error(
+                    0,
+                    super::protocol::error_code::AUTH_FAILED,
+                    "Auth failed: the AUTH proof must name this node (requestedSubject `drive#nodeId`); upgrade the dialing peer",
+                )]
+            } else {
+                super::engine::handle_auth_frame(
+                    &buf[1..],
+                    &store,
+                    &mut agent,
+                    super::engine::AuthBinding::Unbound,
+                    super::engine::AuthChallenge::Issued(&my_node_key),
+                )
+                .await
+            }
+        } else {
+            super::engine::handle_frame(&buf, &store, &mut agent).await
+        };
 
         // Track imports from SYNC_PUSH frames. A push the engine refused
         // (answered with ERROR instead of SYNC_OK) landed nothing.
@@ -2401,8 +2514,12 @@ async fn handle_stream(
         if tag == super::protocol::tag::AUTH {
             if just_authed {
                 if bound_drive.is_none() {
-                    bound_drive = auth_requested_subject(&buf[1..])
-                        .map(|s| crate::Subject::from_raw(&s, store.get_base_domain().as_deref()));
+                    bound_drive = auth_requested_subject(&buf[1..]).map(|s| {
+                        // `drive#nodeId`: the drive is the part before the
+                        // fragment the binding check above consumed.
+                        let (drive, _) = super::protocol::split_challenge_fragment(&s);
+                        crate::Subject::from_raw(drive, store.get_base_domain().as_deref())
+                    });
                 }
             } else {
                 // A failed AUTH leaves `agent` as Public; the next frame would
@@ -3366,7 +3483,11 @@ mod accept_gate_tests {
         let (node_id, router) = start(db.clone()).await.unwrap();
 
         let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
-        let auth = protocol::encode_auth(&alice, "did:key:z6MkSomeOtherDrive").unwrap();
+        let auth = protocol::encode_auth(
+            &alice,
+            &auth_subject_for("did:key:z6MkSomeOtherDrive", &node_id.to_string()),
+        )
+        .unwrap();
         write_frame(&mut send, &auth).await;
         let reply = read_frame(&mut recv).await.expect("AUTH_OK");
         assert_eq!(reply.first(), Some(&tag::AUTH_OK), "AUTH itself is valid");
@@ -3392,7 +3513,12 @@ mod accept_gate_tests {
         let (node_id, router) = start(db.clone()).await.unwrap();
 
         let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
-        write_frame(&mut send, &protocol::encode_auth(&alice, &drive).unwrap()).await;
+        write_frame(
+            &mut send,
+            &protocol::encode_auth(&alice, &auth_subject_for(&drive, &node_id.to_string()))
+                .unwrap(),
+        )
+        .await;
         assert_eq!(
             read_frame(&mut recv).await.unwrap().first(),
             Some(&tag::AUTH_OK)
@@ -3413,6 +3539,37 @@ mod accept_gate_tests {
 
     /// Complete the handshake on a raw stream as `owner` for `drive` and
     /// drain the accept side's answer until it has transitioned to live mode
+    /// A proof that does not name this node is refused: signed for another
+    /// node it is a capture a middleman could replay; without any node id it
+    /// is a pre-binding dialer, honoured only from a peer we paired with.
+    #[tokio::test]
+    async fn iroh_auth_must_name_this_node() {
+        let db = Db::init_temp("gate_iroh_node_binding").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let (node_id, router) = start(db.clone()).await.unwrap();
+
+        // Signed for some other node: a replayed capture.
+        let other_node = "did:ad:node:".to_string() + &"ab".repeat(32);
+        let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
+        let auth = protocol::encode_auth(&alice, &auth_subject_for(&drive, &other_node)).unwrap();
+        write_frame(&mut send, &auth).await;
+        let reply = read_frame(&mut recv).await.expect("an ERROR frame");
+        let (_, code, message) = parse_error(&reply).expect("ERROR frame");
+        assert_eq!(code, error_code::AUTH_FAILED, "{message}");
+        assert!(
+            message.contains("CHALLENGE") || message.contains("nonce"),
+            "{message}"
+        );
+
+        // No node id at all, from a peer this node never paired with.
+        let (_ep2, mut send, mut recv) = raw_stream(&router, &node_id).await;
+        write_frame(&mut send, &protocol::encode_auth(&alice, &drive).unwrap()).await;
+        let reply = read_frame(&mut recv).await.expect("an ERROR frame");
+        let (_, code, message) = parse_error(&reply).expect("ERROR frame");
+        assert_eq!(code, error_code::AUTH_FAILED, "{message}");
+        assert!(message.contains("must name this node"), "{message}");
+    }
+
     /// (the client sent an empty version vector, so the server pushes
     /// everything and expects nothing back).
     async fn handshake_to_live(
@@ -3420,8 +3577,13 @@ mod accept_gate_tests {
         recv: &mut iroh::endpoint::RecvStream,
         owner: &crate::agents::Agent,
         drive: &str,
+        node_id: &str,
     ) {
-        write_frame(send, &protocol::encode_auth(owner, drive).unwrap()).await;
+        write_frame(
+            send,
+            &protocol::encode_auth(owner, &auth_subject_for(drive, node_id)).unwrap(),
+        )
+        .await;
         let reply = read_frame(recv).await.expect("AUTH_OK");
         assert_eq!(reply.first(), Some(&tag::AUTH_OK));
         assert!(
@@ -3463,7 +3625,7 @@ mod accept_gate_tests {
         let (node_id, router) = start(db.clone()).await.unwrap();
 
         let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
-        handshake_to_live(&mut send, &mut recv, &alice, &drive).await;
+        handshake_to_live(&mut send, &mut recv, &alice, &drive, &node_id.to_string()).await;
 
         write_frame(&mut send, &protocol::encode_destroy(0, &child)).await;
         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
@@ -3491,7 +3653,7 @@ mod accept_gate_tests {
         let (node_id, router) = start(db.clone()).await.unwrap();
 
         let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
-        handshake_to_live(&mut send, &mut recv, &alice, &drive).await;
+        handshake_to_live(&mut send, &mut recv, &alice, &drive, &node_id.to_string()).await;
 
         let subject = crate::Subject::from_raw(&child, None);
         let resource = db.get_resource(&subject).await.unwrap();
@@ -3542,7 +3704,7 @@ mod accept_gate_tests {
         let (node_id, router) = start(db.clone()).await.unwrap();
 
         let (_ep, mut send, mut recv) = raw_stream(&router, &node_id).await;
-        handshake_to_live(&mut send, &mut recv, &alice, &drive).await;
+        handshake_to_live(&mut send, &mut recv, &alice, &drive, &node_id.to_string()).await;
 
         let subject = crate::Subject::from_raw(&child, None);
         let resource = db.get_resource(&subject).await.unwrap();
@@ -3664,4 +3826,12 @@ mod peer_sync_volume_tests {
         assert_eq!(peer.last_sent, Some(0));
         assert_eq!(peer.last_received, Some(2));
     }
+}
+
+/// Whether two drive subjects name the same drive, ignoring spelling
+/// (routing hints, localized vs. absolute form).
+fn same_drive(store: &Db, a: &str, b: &str) -> bool {
+    let base = store.get_base_domain();
+    crate::Subject::from_raw(a, base.as_deref()).pure_id()
+        == crate::Subject::from_raw(b, base.as_deref()).pure_id()
 }

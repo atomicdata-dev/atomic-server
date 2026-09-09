@@ -33,6 +33,15 @@ pub struct VectorSearchQuery {
 }
 
 const DEFAULT_RETURN_LIMIT: usize = 30;
+/// Upper bound for a client-supplied `limit`.
+const MAX_RETURN_LIMIT: usize = 500;
+
+/// Quote `value` as a SQL string literal for the LanceDB/DataFusion filter.
+/// `parents` and `is_a` come straight from the query string; unescaped, a
+/// value like `x') OR true --` rewrites the predicate.
+fn sql_string_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "''"))
+}
 const UNAUTHORIZED_RESULTS_FACTOR: usize = 3;
 
 /// Parses a vector search query and responds with a list of resources
@@ -44,14 +53,11 @@ pub async fn vector_search_query(
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
     let store = &appstate.store;
-    let limit = if let Some(l) = params.limit {
-        if l > 0 {
-            l
-        } else {
-            DEFAULT_RETURN_LIMIT
-        }
-    } else {
-        DEFAULT_RETURN_LIMIT
+    let limit = match params.limit {
+        // Bounded: the caller is unauthenticated, and `limit` feeds
+        // multiplications and a result loop below.
+        Some(l) if l > 0 => l.min(MAX_RETURN_LIMIT),
+        _ => DEFAULT_RETURN_LIMIT,
     };
 
     let fetch_limit = if params.rerank.unwrap_or(false) {
@@ -85,7 +91,7 @@ pub async fn vector_search_query(
                 if !parents.is_empty() {
                     let parent_list = parents
                         .iter()
-                        .map(|p| format!("'{}'", p))
+                        .map(|p| sql_string_literal(p))
                         .collect::<Vec<_>>()
                         .join(", ");
                     filter_exprs.push(format!("array_has_any(hierarchy, [{}])", parent_list));
@@ -96,7 +102,7 @@ pub async fn vector_search_query(
                 if !classes.is_empty() {
                     let class_list = classes
                         .iter()
-                        .map(|c| format!("'{}'", c))
+                        .map(|c| sql_string_literal(c))
                         .collect::<Vec<_>>()
                         .join(", ");
                     filter_exprs.push(format!("array_has_any(is_a, [{}])", class_list));

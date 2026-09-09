@@ -6,6 +6,8 @@
 // `policy`, `protocol`, and `rbsr` are std-only; the rest needs the `db`
 // feature. The module itself stays ungated so `Storelike::sync_policy`
 // (always compiled) can reference `sync::policy` in a no-features build.
+#[cfg(feature = "iroh")]
+pub mod discover;
 #[cfg(feature = "db")]
 pub mod engine;
 #[cfg(all(test, feature = "iroh", feature = "db-redb"))]

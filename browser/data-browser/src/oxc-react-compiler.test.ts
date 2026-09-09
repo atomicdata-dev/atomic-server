@@ -139,7 +139,8 @@ describe('oxc-transform-react', () => {
 
     expect(fatals).toEqual([]);
     expect(compiled).toBeGreaterThan(400);
-    // This compiles the whole app, not a single unit; cold CI CPUs need
-    // more than Vitest's five-second default.
-  }, 30_000);
+    // Every TSX file in the app goes through the compiler here: about two
+    // seconds on a workstation, nine on a two-core hosted runner, so the
+    // default five-second budget is what failed, not the transform.
+  }, 60_000);
 });

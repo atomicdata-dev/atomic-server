@@ -27,29 +27,29 @@ async function collaborator(
     route.fulfill({ status: 204 }),
   );
   await devDrive(peer);
-  const peerAgent = await peer.evaluate(() => window.store.getAgent()!.subject);
-  const driveSubject = await page.evaluate(async agent => {
+  const agent = await peer.evaluate(() => window.store.getAgent()!.subject);
+  const drive = await page.evaluate(async peerAgent => {
     const store = window.store;
-    const drive = await store.getResource(store.getDrive()!);
+    const driveResource = await store.getResource(store.getDrive()!);
 
     for (const property of [
       'https://atomicdata.dev/properties/read',
       'https://atomicdata.dev/properties/write',
     ]) {
-      await drive.set(property, [
-        ...((drive.get(property) as string[]) ?? []),
-        agent,
+      await driveResource.set(property, [
+        ...((driveResource.get(property) as string[]) ?? []),
+        peerAgent,
       ]);
     }
 
-    await drive.save();
+    await driveResource.save();
 
-    return drive.subject;
-  }, peerAgent);
+    return driveResource.subject;
+  }, agent);
   await page.waitForFunction(
     () => window.store.getSyncStatus().pendingDirtyCount === 0,
   );
-  await peer.evaluate(drive => window.store.setDrive(drive), driveSubject);
+  await peer.evaluate(target => window.store.setDrive(target), drive);
   await openSubject(peer, subject);
 
   return peer;

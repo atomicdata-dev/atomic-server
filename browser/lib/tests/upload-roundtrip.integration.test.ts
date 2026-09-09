@@ -51,7 +51,11 @@ describe('upload roundtrip via unified sync path', () => {
     // Give the WS handshake a beat to authenticate.
     await delay(500);
 
-    const drive = server.initialDrive ?? `${server.serverUrl}/`;
+    // A fresh server has no resource at its root URL: the agent's home is
+    // the key-derived private drive, materialized by the client exactly as
+    // the data-browser does at sign-in. Creating a File under a parent that
+    // does not exist on the server is refused by the rights check.
+    const drive = (await store.ensurePrivateDrive()).subject;
 
     const data = new Uint8Array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
     const file = new File([data], 'hello.bin', {

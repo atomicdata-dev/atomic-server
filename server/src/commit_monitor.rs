@@ -934,11 +934,30 @@ impl Handler<LoroEphemeralUpdate> for CommitMonitor {
     type Result = ();
 
     fn handle(&mut self, msg: LoroEphemeralUpdate, _ctx: &mut Context<Self>) {
-        // Relay to peers before the local fan-out below, and only for presence
-        // that originated here (`addr` is the websocket it came from; a frame
-        // we relayed IN from a peer has none, and must not be sent back out or
-        // two nodes trade cursors forever).
-        if msg.addr.is_some() {
+        let Some(subscribers) = self.loro_subscriptions.get(&msg.subject) else {
+            return;
+        };
+
+        let sender = msg.addr.as_ref();
+
+        // Only subscribers may broadcast — subscribing (`SubscribeLoroSync`)
+        // is where the read check on the resource happens, so this is the
+        // auth gate, as for `PresenceUpdate`. Without it any signed-in
+        // socket could push cursors for any subject to everyone watching it
+        // and to every peer. A frame relayed IN from a peer has no sender;
+        // the sending node ran this check itself.
+        if let Some(sender_addr) = sender {
+            if !subscribers.iter().any(|s| s.addr == *sender_addr) {
+                tracing::debug!(
+                    "dropping LoroEphemeral update from non-subscriber for {}",
+                    msg.subject
+                );
+                return;
+            }
+
+            // Relay to peers, only for updates that originated here (a frame
+            // we relayed in must not be sent back out or two nodes trade
+            // cursors forever).
             if let Ok(agent) = self.store.get_default_agent() {
                 atomic_lib::sync::peer::broadcast_ephemeral(
                     atomic_lib::sync::protocol::ephemeral_kind::LORO,
@@ -949,12 +968,6 @@ impl Handler<LoroEphemeralUpdate> for CommitMonitor {
                 );
             }
         }
-
-        let Some(subscribers) = self.loro_subscriptions.get(&msg.subject) else {
-            return;
-        };
-
-        let sender = msg.addr.as_ref();
 
         for subscriber in subscribers {
             if let Some(sender_addr) = sender {

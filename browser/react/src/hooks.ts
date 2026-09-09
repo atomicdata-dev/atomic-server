@@ -475,7 +475,9 @@ export function useArray(
       resource.push(propertyURL, val);
 
       if (opts?.commit) {
-        resource.save();
+        resource.save().catch(err => {
+          console.error('Failed to save resource after push', err);
+        });
       }
     },
 

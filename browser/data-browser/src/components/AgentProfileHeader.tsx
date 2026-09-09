@@ -16,6 +16,7 @@ import { fetchManagedInfo } from '../helpers/managedServer';
 import {
   getManagedAccount,
   PRODUCT_NAME,
+  safePortalUrl,
   type ManagedAccount,
 } from '../helpers/managed';
 import { errorHandler } from '../handlers/errorHandler';
@@ -60,7 +61,7 @@ export function AgentProfileHeader({ subject }: { subject: string }) {
       if (cancelled) return;
 
       setAccount(session);
-      setPortalUrl(info?.portalUrl ?? null);
+      setPortalUrl(safePortalUrl(info?.portalUrl) ?? null);
     })();
 
     return () => {

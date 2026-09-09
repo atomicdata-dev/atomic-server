@@ -1,4 +1,4 @@
-import { JSONValue } from '@tomic/react';
+import { JSONValue, isSafeHref } from '@tomic/react';
 import { useCallback, type JSX } from 'react';
 import { InputBase } from './InputBase';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
@@ -31,13 +31,16 @@ function URICellDisplay({ value }: DisplayCellProps<JSONValue>): JSX.Element {
     return <></>;
   }
 
+  const uri = value as string;
+
+  // Shown but not linked when the scheme would run rather than navigate.
+  if (!isSafeHref(uri)) {
+    return <>{uri}</>;
+  }
+
   return (
-    <AtomicLink
-      href={value as string}
-      target='_blank'
-      rel='noopener noreferrer'
-    >
-      {value as string}
+    <AtomicLink href={uri} target='_blank' rel='noopener noreferrer'>
+      {uri}
     </AtomicLink>
   );
 }

@@ -1,5 +1,6 @@
 import {
   Resource,
+  isSafeHref,
   server,
   useFileObjectUrl,
   useNumber,
@@ -39,7 +40,11 @@ export function useFileInfo(resource: Resource): FileInfo {
   const downloadUrl = localUrl ?? serverDownloadUrl;
 
   const downloadFile = useCallback(() => {
-    window.open(downloadUrl);
+    // The URL is the resource's own claim; refuse anything that would run
+    // rather than download.
+    if (downloadUrl && isSafeHref(downloadUrl)) {
+      window.open(downloadUrl);
+    }
   }, [downloadUrl]);
 
   if (
