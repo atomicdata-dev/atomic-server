@@ -7864,3 +7864,7 @@ msgstr "Choose profile picture"
 #: src/helpers/onboardingStorage.ts
 msgid "Local storage is taking too long to initialize."
 msgstr "Local storage is taking too long to initialize."
+
+#: src/views/InvitePage.tsx
+msgid "Accepting your invitation…"
+msgstr "Accepting your invitation…"

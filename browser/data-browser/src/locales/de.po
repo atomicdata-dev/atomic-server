@@ -7830,3 +7830,7 @@ msgstr ""
 #: src/helpers/onboardingStorage.ts
 msgid "Local storage is taking too long to initialize."
 msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Accepting your invitation…"
+msgstr ""
