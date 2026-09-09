@@ -7770,3 +7770,24 @@ msgstr ""
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Entsperren mit einem Passkey fehlgeschlagen. Verwende stattdessen deinen Wiederherstellungscode."
+
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Peer sync"
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Create peer link"
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Peer link"
+msgstr ""

@@ -100,3 +100,5 @@ export * from './child-order.js';
 
 export { WebRtcPeer } from './webrtc-peer.js';
 export { WebRtcTransport } from './webrtc-transport.js';
+
+export { BrowserPeerSync, randomPeerToken, type BrowserPeerOptions } from './browser-peer-sync.js';

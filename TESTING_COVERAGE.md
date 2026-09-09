@@ -21,8 +21,16 @@ input and close behavior. `browser/e2e/scripts/verify-webrtc.mjs` establishes re
 WebRTC channels between isolated browser contexts in Chromium and Firefox and
 checks bidirectional 1 MiB transfers and disconnects without an AtomicServer.
 The harness is loaded through Playwright routing; ICE and data transfer are real.
-Still uncovered/unimplemented: peer authentication in the browser, drive sync and
-OPFS/UI integration, reconnect/outbox delivery, two physical devices and TURN.
+`lib/src/sync/browser_peer.rs` tests authentication, replay, drive isolation,
+unauthorized snapshot writes, forged commits and outgoing permission revocation.
+`browser/e2e/scripts/verify-peer-sync.mjs` uses distinct agents, real signaling,
+WebRTC and OPFS with HTTP data access disabled: initial sync, concurrent edits,
+presence, attachments, offline reconciliation, reload and signed deletion.
+`verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
+These scripts require locally built WASM/server artifacts; the UI script requires
+a running app at its configured test URL. They are not wired into CI yet.
+Still uncovered: two physical devices, forced TURN, full Firefox drive sync,
+public deployment, and interactive rich-text editor/cursor acceptance.
 
 ## How to read this
 

@@ -1,4 +1,11 @@
 import {
+  encodeCommit as encodePeerCommit,
+  encodeEphemeral as encodePeerEphemeral,
+  decodeEphemeral as decodePeerEphemeral,
+  EphemeralKind as PeerEphemeralKind,
+} from './ws-v2.js';
+import { serializeDeterministically as serializePeerCommit } from './commit.js';
+import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
   type HistoryAttribution,
@@ -351,7 +358,8 @@ export type ChangeSource =
   | 'local-pre-push'
   | 'local-acked'
   | 'local-post'
-  | 'offline-replay';
+  | 'offline-replay'
+  | 'peer-sync';
 
 /** One authoritative-or-local resource update. Either `loroBytes`
  * (WS paths) or `resource` (HTTP/local/offline) must be set. */
@@ -4868,6 +4876,7 @@ export class Store {
   /** Broadcast a Loro document update to all peers via WebSocket.
    *  Non-persistent real-time; persistence is via commits. */
   public broadcastLoroSyncUpdate(subject: string, update: Uint8Array): void {
+    this.publishPeerEphemeral(subject, update, PeerEphemeralKind.DOC);
     if (!this._serverConnected) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroSyncUpdate(subject, update);
@@ -4890,6 +4899,7 @@ export class Store {
     subject: string,
     update: Uint8Array,
   ): void {
+    this.publishPeerEphemeral(subject, update, PeerEphemeralKind.LORO);
     if (!this._serverConnected) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroEphemeralUpdate(
@@ -4943,6 +4953,7 @@ export class Store {
   /** Broadcast raw presence bytes (Loro EphemeralStore update) to a
    *  drive's presence subscribers. */
   public broadcastPresenceUpdate(drive: string, update: Uint8Array): void {
+    this.publishPeerEphemeral(drive, update, PeerEphemeralKind.PRESENCE);
     if (!this._serverConnected) return;
     // Local-only drives and foreign-origin HTTP drives have no live
     // peers on the home websocket.
@@ -5151,6 +5162,58 @@ export class Store {
    *  drives sign locally). Transitions the `pending`
    *  entry `logPendingCommit` created so the Sync page doesn't show it
    *  as queued forever. */
+  private peerListeners = new Set<
+    (subject: string, frame: Uint8Array) => void
+  >();
+
+  public subscribePeerFrames(
+    listener: (subject: string, frame: Uint8Array) => void,
+  ): () => void {
+    this.peerListeners.add(listener);
+
+    return () => {
+      this.peerListeners.delete(listener);
+    };
+  }
+
+  public async destroyLocalResource(commit: Commit): Promise<void> {
+    if (!this.clientDb)
+      throw new Error('Local storage is required to delete this resource');
+    await this.clientDb.applyPeerCommit(
+      serializePeerCommit({ ...commit }, true),
+    );
+    this.publishPeerCommit(commit);
+    this.removeResource(commit.subject);
+  }
+
+  public publishPeerCommit(commit: Commit): void {
+    const frame = encodePeerCommit(0, serializePeerCommit({ ...commit }, true));
+    for (const listener of this.peerListeners) listener(commit.subject, frame);
+  }
+
+  public receivePeerEphemeral(frame: Uint8Array): void {
+    const message = decodePeerEphemeral(frame.subarray(1));
+    if (!message) return;
+    const map =
+      message.kind === PeerEphemeralKind.DOC
+        ? this.loroSyncSubscribers
+        : message.kind === PeerEphemeralKind.PRESENCE
+          ? this.presenceSubscribers
+          : this.loroEphemeralSubscribers;
+    this.dispatchLoroMessage(map, message.subject, message.payload);
+  }
+
+  private publishPeerEphemeral(
+    subject: string,
+    update: Uint8Array,
+    kind: number,
+  ): void {
+    const agent = this.getAgent()?.subject;
+    if (!agent) return;
+    const frame = encodePeerEphemeral(kind, subject, agent, update);
+    for (const listener of this.peerListeners) listener(subject, frame);
+  }
+
   public logLocalOnlyCommitSettled(commit: Commit): void {
     this.pushCommitLog(this.buildCommitLogEntry(commit, 'outgoing', 'sent'));
   }

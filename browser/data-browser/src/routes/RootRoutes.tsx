@@ -1,3 +1,4 @@
+import { BrowserPeerWatcher } from '../components/BrowserPeerWatcher';
 import {
   createRootRoute,
   createRoute,
@@ -50,6 +51,7 @@ export const rootRoute = createRootRoute({
         {/* Enrols the personal drive in Cloud Vault and backs it up after
             edits (no-op without an account session). */}
         <CloudVaultWatcher />
+        <BrowserPeerWatcher />
       </PairingFlowProvider>
       {/* Uncomment to get Tanstack Router Devtools */}
       {/* <TanStackRouterDevtools position='bottom-right' /> */}

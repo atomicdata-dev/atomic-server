@@ -256,6 +256,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .to(handlers::post_resource::handle_post_resource),
     )
     .service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
+    .service(web::resource("/webrtc-signal").to(handlers::webrtc_signal::handler))
     .service(web::resource("/drive-usage").to(handlers::drive_usage::handle_drive_usage))
     .service(
         web::resource("/history-attribution")

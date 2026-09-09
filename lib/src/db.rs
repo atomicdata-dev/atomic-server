@@ -345,7 +345,7 @@ pub struct Db {
     /// peer that never responds would otherwise leak one entry per missing
     /// blob forever, so `note_pending_blob_request` also lazily prunes
     /// anything older than `PENDING_BLOB_REQUEST_TTL`.
-    pending_blob_requests: Arc<RwLock<HashMap<[u8; 32], (String, std::time::Instant)>>>,
+    pending_blob_requests: Arc<RwLock<HashMap<[u8; 32], (String, web_time::Instant)>>>,
 }
 
 /// How long an unanswered `BLOB_REQUEST` stays in `pending_blob_requests`
@@ -400,7 +400,7 @@ impl Db {
     /// accepting arbitrary blob bytes unconditionally.
     pub fn note_pending_blob_request(&self, hash: [u8; 32], drive: String) {
         if let Ok(mut guard) = self.pending_blob_requests.write() {
-            let now = std::time::Instant::now();
+            let now = web_time::Instant::now();
             guard.retain(|_, (_, requested_at)| {
                 now.duration_since(*requested_at) < PENDING_BLOB_REQUEST_TTL
             });
@@ -3903,7 +3903,7 @@ mod pending_blob_request_ttl_tests {
         let db = Db::init_temp("pending_blob_ttl_prune").await.unwrap();
 
         let stale_hash = [1u8; 32];
-        let backdated = std::time::Instant::now()
+        let backdated = web_time::Instant::now()
             .checked_sub(PENDING_BLOB_REQUEST_TTL + std::time::Duration::from_secs(1))
             .expect("test host must have been up longer than the TTL");
         db.pending_blob_requests.write().unwrap().insert(

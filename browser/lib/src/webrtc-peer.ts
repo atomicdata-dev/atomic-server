@@ -65,6 +65,55 @@ export class WebRtcPeer {
     await this.connection.setRemoteDescription(answer);
   }
 
+  /** Bind Atomic authentication to both DTLS certificates, independently of signaling. */
+  async channelBinding(): Promise<string> {
+    const fingerprints = [
+      this.connection.localDescription?.sdp,
+      this.connection.remoteDescription?.sdp,
+    ]
+      .map(sdp => {
+        const values = [...(sdp ?? '').matchAll(/^a=fingerprint:(.+)$/gm)].map(
+          match => match[1].trim(),
+        );
+        if (!values.length)
+          throw new Error('Missing WebRTC certificate fingerprint');
+
+        return [...new Set(values)].sort().join(',');
+      })
+      .sort()
+      .join('|');
+    const hash = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(fingerprints),
+    );
+
+    return Array.from(new Uint8Array(hash), byte =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+  }
+
+  async connectionPath(): Promise<'direct' | 'relayed' | 'unknown'> {
+    const stats = await this.connection.getStats();
+
+    for (const report of stats.values()) {
+      if (
+        report.type === 'candidate-pair' &&
+        report.state === 'succeeded' &&
+        report.nominated
+      ) {
+        const local = stats.get(report.localCandidateId);
+        const remote = stats.get(report.remoteCandidateId);
+
+        return local?.candidateType === 'relay' ||
+          remote?.candidateType === 'relay'
+          ? 'relayed'
+          : 'direct';
+      }
+    }
+
+    return 'unknown';
+  }
+
   close(error = new Error('WebRTC peer closed')): void {
     if (this.closed) return;
     this.closed = true;
