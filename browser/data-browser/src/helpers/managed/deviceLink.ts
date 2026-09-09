@@ -3,6 +3,7 @@ import {
   getManagedDeviceToken,
   getRememberedManagedPortalUrl,
   rememberManagedPortalUrl,
+  safePortalUrl,
   setManagedDeviceToken,
 } from './api';
 
@@ -71,6 +72,12 @@ export async function requestDeviceLink(
   portalUrl: string,
   deviceName = describeThisDevice(),
 ): Promise<LinkRequest> {
+  // The session this produces is only ever sent to `portalUrl`, so it has to
+  // be an address a bearer token may travel to at all.
+  if (!safePortalUrl(portalUrl)) {
+    throw new Error('The provider address must start with https://');
+  }
+
   const response = await fetch(`${apiBaseFor(portalUrl)}/device-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -137,7 +144,10 @@ export async function awaitDeviceLink(
     const progress = await pollDeviceLink(portalUrl, request.device_code);
 
     if (progress.state === 'approved') {
-      setManagedDeviceToken(progress.token);
+      // The token and the portal that issued it are recorded together: from
+      // here on, this is the only origin the token goes to, whatever a later
+      // connected node reports as its portal.
+      setManagedDeviceToken(progress.token, portalUrl);
       rememberProvider(portalUrl);
 
       return 'linked';

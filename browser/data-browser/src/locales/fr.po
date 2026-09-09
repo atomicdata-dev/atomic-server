@@ -1054,13 +1054,11 @@ msgstr "J'ai déjà un compte"
 msgid "Agent created!"
 msgstr "Agent créé !"
 
-#: src/views/InvitePage.tsx
-msgid "Enter a name"
-msgstr "Saisissez un nom"
+#~ msgid "Enter a name"
+#~ msgstr "Saisissez un nom"
 
-#: src/views/InvitePage.tsx
-msgid "Agent Name"
-msgstr "Nom de l'agent"
+#~ msgid "Agent Name"
+#~ msgstr "Nom de l'agent"
 
 #: src/views/InvitePage.tsx
 msgid "Agent Secret"
@@ -1280,6 +1278,7 @@ msgstr "Toile"
 msgid "Save failed: {0}"
 msgstr "Échec de l'enregistrement : {0}"
 
+#: src/components/TeamProfileStep.tsx
 #: src/chunks/PluginRuns/AutomationWorkspace.tsx
 #: src/chunks/PluginRuns/IntegrationConnection.tsx
 #: src/views/Canvas/CanvasPage.tsx
@@ -2625,9 +2624,8 @@ msgstr "Autoriser les modifications"
 msgid "Invite text (optional)"
 msgstr "Texte d'invitation (facultatif)"
 
-#: src/components/InviteForm.tsx
-msgid "Limit Usages (optional)"
-msgstr "Limiter les utilisations (facultatif)"
+#~ msgid "Limit Usages (optional)"
+#~ msgstr "Limiter les utilisations (facultatif)"
 
 #: src/components/InviteForm.tsx
 msgid "Invite created and copied to clipboard! 🚀"
@@ -5470,6 +5468,7 @@ msgid "Use a recovery code instead"
 msgstr ""
 
 #: src/components/AccountRecoveryCard.tsx
+#: src/components/AccountRecoveryCard.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Atomic account"
 msgstr ""
@@ -6762,6 +6761,7 @@ msgstr ""
 msgid "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 msgstr ""
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Add a recovery code"
 msgstr ""
@@ -7332,6 +7332,209 @@ msgstr "Ressource avec erreur"
 msgid "Assign Rights"
 msgstr "Attribuer des droits"
 
+#: src/helpers/managed/vault.ts
+msgid "Your account session has ended. Sign in again to resume backup."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Full name"
+msgstr ""
+
+#~ msgid "Profile picture (optional) <0/>"
+#~ msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Save and continue"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Picture ready to save."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "How your colleagues see you"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "You can add or change your picture later in your profile."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server subscription is active"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server trial is active"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Profile picture (optional)"
+msgstr ""
+
+#~ msgid "Your selected profile picture"
+#~ msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Your selected avatar"
+msgstr ""
+
+#~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+#~ msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama detected"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Looking for local Ollama…"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama could not be reached. Start Ollama and connect."
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Use local Ollama"
+msgstr ""
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Connect local Ollama"
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Find your workspace"
+msgstr ""
+
+#~ msgid "Looking for your workspace on your other devices…"
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We couldn’t find a reachable device with your workspace."
+msgstr ""
+
+#~ msgid "We found your workspace on {0}."
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Fetch a copy to this device so you can open it here."
+msgstr ""
+
+#~ msgid "Fetching workspace…"
+#~ msgstr ""
+
+#~ msgid "Fetch workspace"
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Look here"
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Address where your workspace lives"
+msgstr ""
+
+#~ msgid "We found your workspace on {0} ."
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "A device was found, but this account cannot read the workspace there."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We could not check your workspace. Try again or enter its address below."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Connection details"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Your secret was accepted. Preparing this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking for your workspace on this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking whether your account has a backup to restore…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Looking for a device that has your workspace…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Fetching your workspace to this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Opening your workspace"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "This may take a little while. Please keep this window open."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We found your workspace"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This device does not have this workspace yet. Fetch it from a device that has it."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not add a passkey."
+msgstr "Impossible d’ajouter une clé d’accès."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+msgstr "Saisissez votre code de récupération pour afficher votre secret ou ajouter une clé d’accès sur cet appareil. Votre code de récupération actuel restera valide."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Passkey added. Your recovery code still works."
+msgstr "Clé d’accès ajoutée. Votre code de récupération reste valide."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Add a passkey"
+msgstr "Ajouter une clé d’accès"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a passkey"
+msgstr "Se connecter pour ajouter une clé d’accès"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use recovery code"
+msgstr "Utiliser le code de récupération"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a recovery code"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not unlock with a passkey. Use your recovery code instead."
+msgstr "Impossible de déverrouiller avec une clé d’accès. Utilisez votre code de récupération."
 #~ msgid "Last Modified"
 #~ msgstr "Dernière modification"
 
@@ -9784,6 +9987,23 @@ msgstr ""
 msgid "Connect GitHub tracker"
 msgstr ""
 
+#. 0: error instanceof Error ? error.message \\: String(error)
+#: src/chunks/TablePage/Calendar/CalendarView.tsx
+msgid "Could not display recurring meetings: {0}"
+msgstr ""
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "Recurring meeting"
+msgstr ""
+
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect another tracker"
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "All day"
+msgstr ""
+
+#. 0: title || subject
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "{0} · Recurring meeting (opens its series or exception)"
 msgstr ""

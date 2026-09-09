@@ -17,6 +17,7 @@ import { managedFetch } from './api';
 import { getManagedAccount } from './session';
 import { getLocalServerOrigin, isRunningInTauri } from '../tauri';
 import { pairAndSync } from '../pairing';
+import type { Agent } from '@tomic/lib';
 
 const DEVICE_ID_KEY = 'atomic-device-id';
 const KNOWN_PEERS_KEY = 'atomic-peers';
@@ -230,11 +231,14 @@ async function seedKnownPeersFromDirectory(): Promise<string[]> {
 async function autoConnectPeers(
   nodeIds: string[],
   drive: string | undefined,
+  agent: Agent | undefined,
 ): Promise<void> {
   if (!isRunningInTauri() || !drive || nodeIds.length === 0) return;
 
   await Promise.allSettled(
-    nodeIds.map(nodeId => pairAndSync(nodeId, drive).catch(() => undefined)),
+    nodeIds.map(nodeId =>
+      pairAndSync(nodeId, drive, agent).catch(() => undefined),
+    ),
   );
 }
 
@@ -247,7 +251,10 @@ let syncedThisSession = false;
  * repeatedly — no-ops without a session so a later sign-in still gets picked up
  * by the next call.
  */
-export async function syncDeviceDirectory(drive?: string): Promise<void> {
+export async function syncDeviceDirectory(
+  drive?: string,
+  agent?: Agent,
+): Promise<void> {
   if (syncedThisSession) return;
 
   const account = await getManagedAccount().catch(() => null);
@@ -260,5 +267,5 @@ export async function syncDeviceDirectory(drive?: string): Promise<void> {
   const peerNodeIds = await seedKnownPeersFromDirectory().catch(
     () => [] as string[],
   );
-  await autoConnectPeers(peerNodeIds, drive);
+  await autoConnectPeers(peerNodeIds, drive, agent);
 }

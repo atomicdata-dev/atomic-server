@@ -89,8 +89,10 @@ Google event imports now install a Calendar view alongside the source table.
 The projected date uses the day in Google's supplied start offset (or the
 unchanged all-day date), so mixed all-day/timed events share one DATE column.
 The original Start and End objects retain timezones and exclusive end values.
-The month view shows each event on its start day; it does not draw duration or
-multi-day spans. Additional notes identify recurring events, attendees,
+All-day events display on every covered day, excluding the end date, and are
+marked All day. Their DATE projection does not shift with the viewing timezone.
+Timed events still display on their start day only. Refresh existing imports
+to install the new exclusive end-date projection. Additional notes identify recurring events, attendees,
 reminders and conferencing when those fields are returned by the catalog.
 Recurring instances are expanded by the existing bounded provider fetch.
 
@@ -100,8 +102,41 @@ Atomic-only fields and local edits. Cancellation records are retained with a
 note; absence from a bounded fetch never deletes an Atomic resource. Google
 may omit cancelled events from list results, so this is not a deletion feed.
 Removed optional provider fields are not cleared by the shared snapshot importer.
-This first version deliberately remains manual and one-way. No OAuth write
-scope is requested and edits in Atomic do not update Google.
+### Reviewed two-way event edits
+
+After importing (or fetching an existing installation), use **Preview edits for
+Google** and **Apply edits to Google**. Name/Summary, Description, Location,
+Start and End on existing imported events sync back to their original calendar
+and event ID, including individual recurring instances. Use **Fetch and preview**
+to review incoming Google changes as before.
+
+Preview compares the import baseline with a fresh Google event. Conflicts block
+preview. Apply checks local values still match the review and sends only changed
+fields with `If-Match`; a changed Google ETag blocks the write. Successful writes
+checkpoint the baseline. After a lost checkpoint, preview acknowledges matching
+Google values without another PATCH. Uncertain transport requires reconnection.
+Partial batches retain completed checkpoints and must be previewed again.
+Google guest notifications are enabled (`sendUpdates=all`).
+
+New events, deletion, recurrence rules, guests/RSVP, reminders and conferencing
+remain managed in Google. Change Start/End together for timed/all-day conversions;
+projected Calendar day/all-day columns are display fields refreshed on import.
+Atomic-only fields are preserved. This is manual two-way editing of existing
+events, not a background sync or a complete Calendar mirror.
+
+**Deployment requirement:** deploy the companion integration-proxy change in
+`calendar-proxy.patch` (based on proxy main `71115c2`). It requests
+`calendar.events` and `calendar.calendarlist.readonly` and forwards/allows
+`If-Match` through CORS. Reconnect existing Google accounts for write access.
+Calendar reconnection retains the original installation identity and imported tables.
+The companion worktree is `/private/tmp/calendar-sync-proxy`, branch
+`codex/google-calendar-two-way`. No production deployment or live account writes
+were performed as part of these checks.
+
+`calendar-sync.test.ts` covers minimal patches, conflict detection, stale local
+and remote previews, write-in-flight edits, lost checkpoints, date validation,
+identity isolation, unsupported fields and denied writes. The browser transport
+test checks conditional headers alongside rotating credentials.
 
 `calendar.test.ts` exercises mixed dates, offset boundaries, exclusive ends,
 recurrence/attendee notes, cancellations, malformed starts, cross-calendar
@@ -132,3 +167,5 @@ If the frontend uses `VITE_INTEGRATION_PROXY_URL`, pass the same value to the
 test process. The test forwards that origin to its own fixture. Live Google
 OAuth on the browser path still depends on the proxy CORS deployment described
 above; this fixture test does not claim live-provider verification.
+
+Verification: 28 LocalThought Vitest tests, frontend TypeScript check, and all 41 companion proxy tests passed. Browser UI and live Google write verification remain unperformed.

@@ -15,7 +15,7 @@ const getAgent = async (): Promise<Agent | undefined> => {
   let secret;
   const agentCommandIndex = getCommandIndex();
 
-  if (agentCommandIndex) {
+  if (agentCommandIndex !== undefined) {
     secret = process.argv[agentCommandIndex + 1];
   } else {
     secret = atomicConfig.agentSecret;
@@ -44,7 +44,12 @@ export const fetchResource = <C extends OptionalClass>(
 ): Promise<Resource<C>> =>
   store.fetchResourceFromServer<C>(subject, { noWebSocket: true });
 
-getAgent().then(agent => {
+/**
+ * Resolves once the agent (from `--agent` / `-a` or the config file) has been
+ * installed on the store. Commands await this before their first read, so a
+ * request cannot go out unsigned because the secret was still being parsed.
+ */
+export const ready: Promise<void> = getAgent().then(agent => {
   if (agent) {
     store.setAgent(agent);
   }

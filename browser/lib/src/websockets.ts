@@ -1340,10 +1340,48 @@ export class WSClient {
     }
   }
 
+  /** Agent profiles are public resources outside the reader's active drive. */
+  public subscribeAgentProfile(subject: string): void {
+    if (
+      !subject.startsWith('did:ad:agent:') ||
+      this.readyState !== WebSocket.OPEN
+    )
+      return;
+    if (this.store.isLocalOnlySubject(subject)) return;
+    if (
+      this.store.getAgent()?.subject &&
+      this.authenticatedWith !== this.store.getAgent()?.subject
+    )
+      return;
+    const resource = this.store.resources.get(subject);
+    if (
+      resource?.new ||
+      isNotFound(resource?.error) ||
+      isUnauthorized(resource?.error)
+    )
+      return;
+    this.sendBinary(encodeSub(subject));
+  }
+
+  public unsubscribeAgentProfile(subject: string): void {
+    if (
+      !subject.startsWith('did:ad:agent:') ||
+      this.readyState !== WebSocket.OPEN
+    )
+      return;
+    this.sendBinary(encodeUnsub(subject));
+  }
+
   private reSubscribeAll(): void {
     // Drive-wide live subscription. Previously sent only inside
     // `authenticate()`, so an anonymous session never subscribed at all.
     this.subscribeToDrive();
+
+    for (const subject of this.store.subscribers.keys()) {
+      if (this.store.getWebSocketForSubject(subject) === this) {
+        this.subscribeAgentProfile(subject);
+      }
+    }
 
     // Loro and presence subscriptions carry an identity (peers see who
     // is editing), so the server refuses them before AUTH with

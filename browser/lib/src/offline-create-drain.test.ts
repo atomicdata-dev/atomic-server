@@ -1,6 +1,7 @@
-import { describe, it } from 'vitest';
+import { describe, it, vi, expect as assert } from 'vitest';
 import { server } from './ontologies/server.js';
 import { testStore } from './test-store.js';
+import type { ClientDb } from './client-db.js';
 
 /**
  * Reproduces the develop full-e2e failure of
@@ -82,4 +83,32 @@ describe('offline create drain', () => {
     expect(store.outbox.getEntry(ontology)).toBeUndefined();
     expect(store.getSyncStatus().pendingDirtyCount).toBe(0);
   });
+  it.each([true, false])(
+    'only clears an unchanged offline baseline with a complete local snapshot (available: %s)',
+    async available => {
+      const { store, agentDID, postCommitSpy } = await testStore();
+      await store.createDrive('Home', { personal: true });
+      const agent = store.resources.get(agentDID)!;
+      agent.setLastCommitValue('did:ad:commit:previous');
+      const snapshot = agent.getLoroDoc()!.export({ mode: 'snapshot' });
+      agent.markLoroSavedAt(agent.getLoroDoc()!.oplogVersion());
+      const baseline = agent.getEncodedSaveCursor()!;
+      store.outbox.markDirty(agentDID);
+      store.outbox.setBaseVersion(agentDID, baseline);
+      const getResourceWithSnapshot = vi
+        .fn()
+        .mockResolvedValue({ snapshot: available ? snapshot : undefined });
+      (store as unknown as { clientDb: ClientDb }).clientDb = {
+        isReady: true,
+        getResourceWithSnapshot,
+      } as unknown as ClientDb;
+      postCommitSpy.mockClear();
+      await store.syncDirtyResources();
+      assert(getResourceWithSnapshot).toHaveBeenCalledWith(agentDID);
+      assert(store.outbox.getEntry(agentDID) === undefined).toBe(available);
+      assert(postCommitSpy).not.toHaveBeenCalled();
+      store.setServerConnected(false);
+      store.outbox.clearDirty(agentDID);
+    },
+  );
 });

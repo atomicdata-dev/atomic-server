@@ -434,6 +434,17 @@ pub async fn handle_frame_full(
                 // too, since enrollment/quota state can change between the
                 // request and this response.
                 match store.take_pending_blob_request(&resp.hash) {
+                    // Blobs are content-addressed: the bytes must hash to the
+                    // key they are stored under, or any session that answers
+                    // a pending request poisons what every later reader of
+                    // that hash gets.
+                    Some(_drive) if blake3::hash(&resp.bytes).as_bytes() != &resp.hash => {
+                        tracing::warn!(
+                            "BLOB_RESPONSE: bytes do not hash to {}, dropped",
+                            hex::encode(resp.hash)
+                        );
+                        vec![]
+                    }
                     Some(drive) if store.sync_policy().admit_drive_write(&drive) => {
                         let _ = store.kv.insert(Tree::Blobs, &resp.hash, &resp.bytes);
                         vec![]
@@ -694,28 +705,16 @@ pub async fn ingest_commit(
     let signer = incoming_commit.signer.clone();
     let signer_pure = signer.pure_id();
 
-    // Ensure the agent exists before applying the commit.
-    // This is important because the commit might be editing the agent itself.
-    // Run unconditionally on both roles: a commit rejected later by
-    // `apply_commit` still leaves this auto-created agent resource behind —
-    // accepted hub behavior, now shared with peer ingestion.
+    // The signer's Agent resource is materialized once the commit has been
+    // ACCEPTED, never before: `apply_commit` is where the signature and the
+    // signer's rights are checked, and an unauthenticated `/commit` naming
+    // any `did:ad:agent:` signer must not leave a durable resource behind.
+    // A commit that creates the agent itself needs no help; it is excluded.
     let is_self_creating_agent =
         incoming_commit.subject.is_agent_did() && incoming_commit.subject == signer;
-
-    if signer.is_agent_did()
+    let needs_agent_resource = signer.is_agent_did()
         && !is_self_creating_agent
-        && store.get_resource(&signer).await.is_err()
-    {
-        let mut new_agent = crate::Resource::new_instance(crate::urls::AGENT, store).await?;
-        new_agent.set_subject(signer_pure.clone());
-        if let Some(pk) = signer.as_str().strip_prefix("did:ad:agent:") {
-            new_agent
-                .set_string(crate::urls::PUBLIC_KEY.into(), pk, store)
-                .await?;
-        }
-        new_agent.save_locally(store).await?;
-        tracing::info!("Auto-created agent resource for {}", signer_pure);
-    }
+        && store.get_resource(&signer).await.is_err();
 
     let commit_opts = crate::commit::CommitOpts {
         validate_schema: true,
@@ -738,7 +737,7 @@ pub async fn ingest_commit(
         source_id: opts.source_id.clone(),
     };
 
-    if opts.suppress_live_echo {
+    let response = if opts.suppress_live_echo {
         // Applying a remote peer's commit must not rebroadcast to live peers
         // (the sender included) — the same mute the peer read loop holds
         // around `persist_update`.
@@ -748,7 +747,21 @@ pub async fn ingest_commit(
         result
     } else {
         store.apply_commit(incoming_commit, &commit_opts).await
+    }?;
+
+    if needs_agent_resource {
+        let mut new_agent = crate::Resource::new_instance(crate::urls::AGENT, store).await?;
+        new_agent.set_subject(signer_pure.clone());
+        if let Some(pk) = signer.as_str().strip_prefix("did:ad:agent:") {
+            new_agent
+                .set_string(crate::urls::PUBLIC_KEY.into(), pk, store)
+                .await?;
+        }
+        new_agent.save_locally(store).await?;
+        tracing::info!("Auto-created agent resource for {}", signer_pure);
     }
+
+    Ok(response)
 }
 
 /// Apply a JSON-AD `COMMIT` received over a peer transport, returning the
@@ -1437,6 +1450,10 @@ pub async fn import_sync_push(
     let mut count = 0;
     let mut blob_requests = Vec::new();
 
+    let base_domain = store.get_base_domain();
+    let normalize = |s: &str| crate::Subject::from_raw(s, base_domain.as_deref()).pure_id();
+    let admitted_drive = normalize(&push.drive);
+
     for entry in &push.entries {
         if super::tombstones::is_tombstoned(store, &entry.subject) {
             tracing::debug!(
@@ -1455,6 +1472,35 @@ pub async fn import_sync_push(
         // silently replaces the other's snapshot. Held per entry, released at
         // the end of each iteration.
         let _subject_guard = store.subject_locks.lock(&snapshot_key).await;
+
+        // Admission above was for `push.drive` as a whole. Each entry names
+        // its own subject, so an existing resource must actually live in
+        // that drive, or a peer admitted for one drive could overwrite any
+        // resource on this node (its ACLs included) by listing it here. Its
+        // stored `drive` stamp is authoritative and is read BEFORE the
+        // incoming delta is merged (mirrors `ws_apply::persist_update`).
+        let existing_resource = store
+            .get_resource(&crate::Subject::from_raw(
+                &snapshot_key,
+                base_domain.as_deref(),
+            ))
+            .await
+            .ok();
+        if let Some(existing) = &existing_resource {
+            let stored_drive = existing
+                .get(crate::urls::DRIVE_PROP)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| existing.get_subject().to_string());
+            if normalize(&stored_drive) != admitted_drive {
+                tracing::warn!(
+                    "import_sync_push: {} belongs to drive {}, not to {} this push was admitted for; skipped",
+                    entry.subject,
+                    stored_drive,
+                    push.drive
+                );
+                continue;
+            }
+        }
 
         // Load existing doc or create new
         let doc = if let Ok(Some(existing)) =
@@ -1506,6 +1552,39 @@ pub async fn import_sync_push(
             continue;
         }
 
+        // A new subject: it may only enter the drive this push was admitted
+        // for. Its parent's stored drive decides when the parent is known
+        // here; otherwise the resource must stamp itself into that drive or
+        // be the drive root itself. (A peer gains nothing by stamping a NEW
+        // resource into a drive it already has write on.)
+        if existing_resource.is_none() {
+            let mut claimed = resource
+                .get(crate::urls::DRIVE_PROP)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| resource.get_subject().to_string());
+            if let Ok(parent_val) = resource.get(crate::urls::PARENT) {
+                let parent_subject = crate::Subject::from(parent_val.to_string());
+                if let Ok(parent_res) = store.get_resource(&parent_subject).await {
+                    claimed = parent_res
+                        .get(crate::urls::DRIVE_PROP)
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|_| parent_subject.to_string());
+                }
+            }
+            if normalize(&claimed) != admitted_drive {
+                tracing::warn!(
+                    "import_sync_push: new resource {} resolves to drive {}, not to {} this push was admitted for; skipped",
+                    entry.subject,
+                    claimed,
+                    push.drive
+                );
+                continue;
+            }
+        }
+
+        // Only persist after every scope check succeeds. In particular, a
+        // rejected new subject must not leave a snapshot that a later valid
+        // import would merge. add_resource_opts stores the validated state.
         // Log what properties arrived
         let has_strokes = resource
             .get("https://atomicdata.dev/ontology/canvas/strokeData")
@@ -1670,6 +1749,64 @@ mod bootstrap_and_sub_tests {
     fn empty_push(drive: &str) -> protocol::DecodedSyncPush {
         let frame = protocol::encode_sync_push(drive, &[], true);
         protocol::decode_sync_push(&frame[1..]).unwrap()
+    }
+
+    #[tokio::test]
+    async fn rejected_sync_entry_does_not_persist_snapshot() {
+        let db = Db::init_temp("rejected_sync_snapshot").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = "did:ad:unseen-victim-resource";
+        let doc = AtomicLoroDoc::new();
+        doc.set_property(
+            crate::urls::DRIVE_PROP,
+            &crate::Value::AtomicUrl("did:ad:other-drive".into()),
+        )
+        .unwrap();
+        doc.set_property(
+            crate::urls::NAME,
+            &crate::Value::String("Rejected data".into()),
+        )
+        .unwrap();
+        let frame = protocol::encode_sync_push(&drive, &[(subject, &doc.export_snapshot())], true);
+        let push = protocol::decode_sync_push(&frame[1..]).unwrap();
+        let (count, _) = import_sync_push(&push, &db, &ForAgent::from(alice.clone()), false)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+        assert!(
+            db.kv
+                .get(Tree::LoroSnapshots, subject.as_bytes())
+                .unwrap()
+                .is_none(),
+            "rejected data must not seed a later legitimate merge"
+        );
+        assert!(db.get_resource(&subject.into()).await.is_err());
+
+        // A subsequent valid import of the same subject must start clean.
+        let valid = AtomicLoroDoc::new();
+        valid
+            .set_property(
+                crate::urls::DRIVE_PROP,
+                &crate::Value::AtomicUrl(drive.clone().into()),
+            )
+            .unwrap();
+        let frame =
+            protocol::encode_sync_push(&drive, &[(subject, &valid.export_snapshot())], true);
+        let push = protocol::decode_sync_push(&frame[1..]).unwrap();
+        let (count, _) = import_sync_push(&push, &db, &ForAgent::from(alice), false)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        let stored = db.get_resource(&subject.into()).await.unwrap();
+        assert!(
+            stored.get(crate::urls::NAME).is_err(),
+            "rejected properties must not reappear"
+        );
+        assert!(db
+            .kv
+            .get(Tree::LoroSnapshots, subject.as_bytes())
+            .unwrap()
+            .is_some());
     }
 
     #[tokio::test]
@@ -1967,6 +2104,87 @@ mod bootstrap_and_sub_tests {
         assert!(err.to_string().contains("predates"), "{err}");
         assert!(db.get_resource(&subject).await.is_ok());
         assert!(!super::super::tombstones::is_tombstoned(&db, &child));
+    }
+
+    async fn signed_rename_json(
+        db: &Db,
+        agent: &crate::agents::Agent,
+        subject: &crate::Subject,
+    ) -> String {
+        let resource = db.get_resource(subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.set(
+            crate::urls::NAME.into(),
+            crate::Value::String(format!("renamed by {}", agent.subject)),
+        );
+        let commit = builder.sign(agent, db, &resource).await.unwrap();
+        commit
+            .into_resource(db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap()
+    }
+
+    /// The signer's Agent resource is materialized only for a commit that
+    /// was accepted. A refused commit from a key nobody here has seen must
+    /// not leave a durable resource behind (C7).
+    #[tokio::test]
+    async fn signer_agent_is_only_created_for_an_accepted_commit() {
+        let db = Db::init_temp("agent_after_accept").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let child = secret_child(&db, &drive).await;
+        let subject = crate::Subject::from_raw(&child, None);
+
+        let stranger = crate::agents::Agent::new(Some("Stranger")).unwrap();
+        let json = signed_rename_json(&db, &stranger, &subject).await;
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect_err("a stranger may not edit Alice's document");
+        // `Db::get_resource` synthesizes a minimal Agent for any unknown
+        // `did:ad:agent:` subject, so ask the KV, not the resolver.
+        assert!(
+            !db.has_resource_locally(&stranger.subject.pure_id()),
+            "a refused commit must not store the signer's Agent resource"
+        );
+
+        // Bob is granted write on the drive; his first accepted commit
+        // brings his Agent resource into being.
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        let drive_subject = crate::Subject::from_raw(&drive, None);
+        let mut drive_res = db.get_resource(&drive_subject).await.unwrap();
+        drive_res
+            .set_unsafe(
+                crate::urls::WRITE.into(),
+                crate::Value::ResourceArray(vec![
+                    alice.subject.to_string().into(),
+                    bob.subject.to_string().into(),
+                ]),
+            )
+            .unwrap();
+        db.add_resource_opts(&drive_res, false, true, true)
+            .await
+            .unwrap();
+        assert!(!db.has_resource_locally(&bob.subject.pure_id()));
+
+        let json = signed_rename_json(&db, &bob, &subject).await;
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect("a drive writer's commit applies");
+        let renamed = db.get_resource(&subject).await.unwrap();
+        assert!(
+            renamed
+                .get(crate::urls::NAME)
+                .unwrap()
+                .to_string()
+                .contains("Bob")
+                || renamed
+                    .get(crate::urls::NAME)
+                    .unwrap()
+                    .to_string()
+                    .contains(&bob.subject.to_string()),
+            "Bob's accepted commit lands"
+        );
     }
 
     #[tokio::test]

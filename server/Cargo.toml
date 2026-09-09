@@ -19,7 +19,7 @@ license = "MIT"
 name = "atomic-server"
 readme = "./README.md"
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.41.0-beta.5"
+version = "0.41.0-beta.6"
 
 [[bin]]
 name = "atomic-server"
@@ -74,11 +74,11 @@ tracing-log = "0.2"
 ureq = "3.3.0"
 urlencoding = "2"
 ring = "0.17.14"
-wasmtime = { version = "45.0.0", optional = true, features = [
+wasmtime = { version = "47.0.4", optional = true, features = [
   "component-model",
 ] }
-wasmtime-wasi = { version = "45.0.0", optional = true, features = ["p2"] }
-wasmtime-wasi-http = { version = "45.0.0", optional = true }
+wasmtime-wasi = { version = "47.0.4", optional = true, features = ["p2"] }
+wasmtime-wasi-http = { version = "47.0.4", optional = true }
 ulid = "1.2.1"
 url = "2.5.8"
 html2md = "0.2.15"
@@ -170,7 +170,7 @@ version = "4.13.0"
 # present, so it adds no runtime cost for fresh installs.
 features = ["config", "db-redb", "db-sled", "rdf", "discovery", "iroh", "ring", "ws"]
 path = "../lib"
-version = "0.41.0-beta.5"
+version = "0.41.0-beta.6"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]

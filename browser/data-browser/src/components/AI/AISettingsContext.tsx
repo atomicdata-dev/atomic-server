@@ -98,7 +98,7 @@ export const AISettingsContextProvider = (
   );
   // Deliberately unset by default, even though `http://localhost:11434` is the
   // address almost every Ollama install uses — it stays as the input's
-  // placeholder in AISettings / AISetupPanel instead.
+  // placeholder; LocalOllamaDiscovery probes only inside provider setup.
   //
   // A default here is not inert: this provider is mounted app-wide and runs a
   // reachability probe against the URL (`useProviderAvailability` below), so a

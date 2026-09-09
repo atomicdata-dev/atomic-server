@@ -237,6 +237,10 @@ jobs:
           token: ${{ secrets.ATOMIC_SAAS_DISPATCH_TOKEN }}
           path: atomic-saas
           clean: false
+          # Nothing below pushes to atomic-saas, so the PAT has no business
+          # staying in atomic-saas/.git/config on the self-hosted runner
+          # (where `clean: false` keeps the checkout around between runs).
+          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.98.1

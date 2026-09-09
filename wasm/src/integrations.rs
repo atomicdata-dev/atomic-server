@@ -1,4 +1,5 @@
 //! Browser Syncables bridge: catalog parsing, typed previews, no filesystem or server.
+use crate::calendar_import::{scope_calendar, CalendarRange};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -76,16 +77,18 @@ pub async fn fetch_integration(
     range: Option<String>,
     fetch: js_sys::Function,
 ) -> std::result::Result<String, JsValue> {
-    let mut doc = document(&text).await?;
+    let mut value = syncables::openapi::load::parse_yaml(&text).map_err(js_error)?;
     if let Some(range) = range {
         if platform != "google-calendar" {
             return Err(js_error("Calendar range only applies to Google Calendar"));
         }
         let range: CalendarRange = serde_json::from_str(&range).map_err(js_error)?;
-        let mut value = serde_json::to_value(&doc).map_err(js_error)?;
         scope_calendar(&mut value, &range).map_err(js_error)?;
-        doc = serde_json::from_value(value).map_err(js_error)?;
     }
+    // Patch the raw catalog before refs are expanded into resource schemas.
+    let doc = syncables::load_open_api_document(value)
+        .await
+        .map_err(js_error)?;
     let engine = SyncClient::new(
         ClientConfig {
             document: Default::default(),
@@ -220,41 +223,4 @@ fn preview(ontology: &Ontology, records: &[Record], platform: &str) -> Result<Va
     Ok(
         json!({"platform":platform,"ontology":{"description":ontology.description,"terms":terms},"records":output}),
     )
-}
-/// UTC date boundaries; the end is exclusive, matching Calendar's timeMax.
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct CalendarRange {
-    start: String,
-    end: String,
-}
-
-fn scope_calendar(document: &mut Value, range: &CalendarRange) -> Result<()> {
-    let parse = |value: &str| {
-        chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
-            .map_err(|_| "Calendar dates must use YYYY-MM-DD")
-    };
-    let start = parse(&range.start)?;
-    let end = parse(&range.end)?;
-    if start >= end {
-        return Err("Calendar end date must be after its start date".into());
-    }
-    let collection = document
-        .pointer_mut("/components/crudResources/event/collections/events")
-        .and_then(Value::as_object_mut)
-        .ok_or("Calendar catalog has no events collection")?;
-    if collection.get("urlTemplate").and_then(Value::as_str)
-        != Some("/calendars/{calendarId}/events")
-    {
-        return Err("Calendar catalog events path has changed".into());
-    }
-    let query = collection
-        .entry("x-list-query")
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
-        .ok_or("Invalid Calendar collection query")?;
-    query.insert("timeMin".into(), json!(format!("{start}T00:00:00Z")));
-    query.insert("timeMax".into(), json!(format!("{end}T00:00:00Z")));
-    query.insert("singleEvents".into(), json!(true));
-    Ok(())
 }

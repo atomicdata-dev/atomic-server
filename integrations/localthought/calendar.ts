@@ -1,18 +1,18 @@
 // @wc-ignore-file
 import { Datatype } from '../../browser/lib/src/index.js';
 import type { JSONValue } from '../../browser/lib/src/value.js';
+import {
+  isCalendarDate as validDay,
+  calendarFields,
+} from '../../browser/lib/src/calendar-date.js';
 import type { FetchedPlatform, Term } from './schema.js';
 
-export const calendarFields = {
-  day: 'atomic-calendar-day',
-  allDay: 'atomic-calendar-all-day',
-  notes: 'atomic-calendar-notes',
-};
+export { calendarFields } from '../../browser/lib/src/calendar-date.js';
 
 /** An additional projection, never a replacement for the provider's fields.
  * One DATE column supports both all-day dates and timed events in a single view.
  * Timed events use the date in Google's supplied offset; raw start/end retain
- * the instant, zone and exclusive-end semantics for future richer rendering.
+ * the instant and zone. All-day ends are also projected for range rendering.
  */
 export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
   if (fetched.platform !== 'google-calendar') return fetched;
@@ -25,6 +25,11 @@ export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
       calendarFields.day,
       Datatype.DATE,
       "Start date in the event's supplied offset; all-day dates stay unchanged.",
+    ],
+    [
+      calendarFields.endDay,
+      Datatype.DATE,
+      'Exclusive end of an all-day event; this date is not occupied.',
     ],
     [
       calendarFields.allDay,
@@ -100,7 +105,22 @@ export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
         throw new Error(
           `Calendar event ${row.id} has no offset-qualified start time`,
         );
-      const notes = ['One-way import: edits stay in Atomic'];
+      const allDay = typeof start.date === 'string';
+      if (
+        !cancelled &&
+        ((allDay &&
+          (start.dateTime !== undefined ||
+            end.dateTime !== undefined ||
+            !validDay(end.date) ||
+            end.date <= start.date!)) ||
+          (!allDay && end.date !== undefined))
+      )
+        throw new Error(
+          `Calendar event ${row.id} has an invalid all-day interval`,
+        );
+      const notes = [
+        'Use Preview edits for Google to sync Name, Description, Location, Start and End',
+      ];
       if (cancelled) notes.push('Cancelled in Google; retained in Atomic');
       if (
         row.values['recurring-event-id'] ||
@@ -118,7 +138,7 @@ export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
         row.values.conferencedata
       )
         notes.push('Conferencing: manage in Google');
-      if (end.date || end.dateTime)
+      if (!allDay && (end.date || end.dateTime))
         notes.push('Duration retained in End; shown on start day only');
       const values: Record<string, JSONValue> = {
         ...row.values,
@@ -126,7 +146,9 @@ export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
       };
       if (typeof date === 'string' && validDay(date.slice(0, 10))) {
         values[calendarFields.day] = date.slice(0, 10);
-        values[calendarFields.allDay] = typeof start.date === 'string';
+        values[calendarFields.allDay] = allDay;
+        if (allDay && validDay(end.date))
+          values[calendarFields.endDay] = end.date;
       }
       return { ...row, values };
     }),
@@ -136,11 +158,4 @@ function object(value: JSONValue | undefined): Record<string, JSONValue> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value
     : {};
-}
-function validDay(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return (
-    Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
-  );
 }

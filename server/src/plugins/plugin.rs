@@ -21,6 +21,10 @@ use zip::ZipArchive;
 #[cfg(feature = "wasm-plugins")]
 use crate::plugins::wasm::{install_or_update_plugin, uninstall_plugin};
 
+/// Largest plugin zip we are willing to download from a `downloadURL`.
+#[cfg(feature = "wasm-plugins")]
+const PLUGIN_DOWNLOAD_MAX_BYTES: usize = 50 * 1024 * 1024;
+
 async fn get_parent_drive(resource: &Resource, store: &Db) -> AtomicResult<String> {
     // Loro materialization decodes scalar string values as `Value::String`,
     // not `Value::AtomicUrl` — there's no type marker in the stored string.
@@ -230,29 +234,19 @@ async fn do_install_plugin(
 
         info!("Downloading plugin from: {}", download_url);
 
-        // download the zip file from the download URL
-        let response = reqwest::get(download_url.as_str())
-            .await
-            .map_err(|e| AtomicError::from(format!("Failed to download plugin file: {}", e)))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            error!(
-                "Failed to download plugin file. Status: {}. Body: {}",
-                status, body
-            );
-            return Err(AtomicError::from(format!(
-                "Failed to download plugin file: Status {}",
-                status
-            )));
-        }
-
-        response
-            .bytes()
-            .await
-            .map_err(|e| AtomicError::from(format!("Failed to download plugin file: {}", e)))?
-            .to_vec()
+        // The URL comes from whoever wrote the plugin-file resource, so this
+        // goes through the SSRF guard (no loopback / private / metadata
+        // addresses — `ATOMIC_ALLOW_PRIVATE_FETCH=1` lifts that for local
+        // plugin development) and the body is capped.
+        atomic_lib::client::helpers::fetch_bytes_untrusted(
+            download_url.as_str(),
+            PLUGIN_DOWNLOAD_MAX_BYTES,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to download plugin file: {}", e);
+            AtomicError::from(format!("Failed to download plugin file: {}", e))
+        })?
     };
 
     info!("Plugin file size: {} bytes", bytes.len());

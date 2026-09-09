@@ -1,3 +1,4 @@
+import type { CalendarOccurrence } from '@tomic/lib';
 import { useResource, useTitle } from '@tomic/react';
 import { styled } from 'styled-components';
 import { useCallback, useRef, useState, type JSX } from 'react';
@@ -15,6 +16,8 @@ interface CalendarDayProps {
   isToday: boolean;
   /** Row subjects whose date value falls on this day. */
   eventSubjects: string[];
+  occurrences: CalendarOccurrence[];
+  allDaySubjects: ReadonlySet<string>;
   readOnly: boolean;
   /** Create a row with its date preset to this day. */
   onAddItem: (dayKey: string, name: string) => void | Promise<void>;
@@ -29,6 +32,8 @@ export function CalendarDay({
   inMonth,
   isToday,
   eventSubjects,
+  occurrences,
+  allDaySubjects,
   readOnly,
   onAddItem,
   onOpenItem,
@@ -73,7 +78,21 @@ export function CalendarDay({
       </CellHeader>
       <EventList>
         {eventSubjects.map(subject => (
-          <CalendarEvent key={subject} subject={subject} onOpen={onOpenItem} />
+          <CalendarEvent
+            key={subject}
+            subject={subject}
+            allDay={allDaySubjects.has(subject)}
+            onOpen={onOpenItem}
+          />
+        ))}
+        {occurrences.map(occurrence => (
+          <CalendarEvent
+            key={occurrence.key}
+            subject={occurrence.subject}
+            allDay={occurrence.allDay}
+            recurring={occurrence.recurring}
+            onOpen={onOpenItem}
+          />
         ))}
         {adding && (
           <AddInput
@@ -102,8 +121,12 @@ export function CalendarDay({
 function CalendarEvent({
   subject,
   onOpen,
+  allDay,
+  recurring = false,
 }: {
   subject: string;
+  allDay: boolean;
+  recurring?: boolean;
   onOpen: (subject: string) => void;
 }): JSX.Element {
   const resource = useResource(subject);
@@ -114,10 +137,18 @@ function CalendarEvent({
     <EventChip
       type='button'
       data-testid='calendar-event'
-      title={title || subject}
+      title={
+        recurring
+          ? `${title || subject} · Recurring meeting (opens its series or exception)`
+          : title || subject
+      }
+      data-all-day={allDay || undefined}
+      data-recurring={recurring || undefined}
       onClick={() => onOpen(subject)}
       onContextMenu={e => openResourceMenu(subject, e)}
     >
+      {recurring && <span aria-label='Recurring meeting'>↻ </span>}
+      {allDay && <AllDayLabel>All day</AllDayLabel>}
       {title || subject}
     </EventChip>
   );
@@ -202,4 +233,10 @@ const AddInput = styled(InputStyled)`
   border: 1px solid ${p => p.theme.colors.main};
   border-radius: ${p => p.theme.radius};
   background-color: ${p => p.theme.colors.bg};
+`;
+
+const AllDayLabel = styled.span`
+  font-size: 0.8em;
+  margin-inline-end: 0.4em;
+  opacity: 0.7;
 `;

@@ -21,6 +21,21 @@ const hex = (bytes: Uint8Array): string =>
   Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
 describe('deterministic personal drive', () => {
+  it('does not fetch an agent from an origin explicitly configured without a node', async ({
+    expect,
+  }) => {
+    const { store, agentDID } = await testStore();
+    store.setServerUrl(store.getServerUrl(), { connect: false });
+    const profile = store.getResourceLoading(agentDID, { newResource: true });
+    await profile.set(core.properties.name, 'Local person', false);
+    const fetch = vi.spyOn(store, 'fetchResourceFromServer');
+    await store.createDrive('Home', { personal: true });
+    expect(fetch.mock.calls.some(([subject]) => subject === agentDID)).toBe(
+      false,
+    );
+    expect(profile.get(core.properties.name)).toBe('Local person');
+  });
+
   it('createDrive({ personal: true }) uses the derived DID and cert', async ({
     expect,
   }) => {

@@ -23,6 +23,7 @@ export const calendarDocument = {
             schema: string,
           })),
           { name: 'singleEvents', in: 'query', schema: { type: 'boolean' } },
+          { name: 'showDeleted', in: 'query', schema: { type: 'boolean' } },
         ],
         'x-pagination': [{ scheme: 'pageToken' }],
         responses: {
@@ -112,6 +113,7 @@ export function calendarFixture(day = new Date().toISOString().slice(0, 10)) {
       },
       end: { dateTime: `${day}T01:30:00+02:00`, timeZone: 'Europe/Amsterdam' },
       recurringEventId: 'series',
+      originalStartTime: { dateTime: `${day}T00:30:00+02:00` },
       attendees: [
         { email: 'synthetic@example.com', responseStatus: 'accepted' },
       ],
@@ -134,16 +136,15 @@ export function calendarFixture(day = new Date().toISOString().slice(0, 10)) {
         )
       )
         return { status: 404, body: {} };
-      // Require the production adapter to send its safety bounds and recurrence expansion.
+      // Both modes must request cancellation tombstones. Retained masters need
+      // every exception, so applying date bounds in that mode is a data-loss bug.
+      const series = url.searchParams.get('singleEvents') === 'false';
       if (
-        !url.searchParams.has('timeMin') ||
-        !url.searchParams.has('timeMax') ||
-        url.searchParams.get('singleEvents') !== 'true'
-      )
-        return {
-          status: 400,
-          body: { error: 'Missing bounded recurrence query' },
-        };
+        url.searchParams.get('showDeleted') !== 'true' ||
+        (series
+          ? url.searchParams.has('timeMin') || url.searchParams.has('timeMax')
+          : !url.searchParams.has('timeMin') || !url.searchParams.has('timeMax') || url.searchParams.get('singleEvents') !== 'true')
+      ) return { status: 400, body: { error: 'Invalid recurrence query' } };
       const token = url.searchParams.get('pageToken');
       if (token && token !== 'second') return { status: 400, body: {} };
       return {

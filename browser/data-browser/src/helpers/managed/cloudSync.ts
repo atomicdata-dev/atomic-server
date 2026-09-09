@@ -1,3 +1,4 @@
+import { getRuntimeManagedPortalUrl } from './api';
 // Turning on hosted sync for a local or server-hosted drive —
 // the Cloud Server action on the /sync page. This is the bridge between
 // the open-core connection layer (connect a server, promote a local drive) and
@@ -18,6 +19,7 @@
 //      A local-only drive connects to the assigned node before promotion.
 
 import { getManagedAccount } from './session';
+import { safePortalUrl } from './api';
 import { createManagedSyncEnrollment, genesisCertOf } from './enrollment';
 import { getManagedEnrollments } from './enrollmentApi';
 import type { ManagedInfo } from '../managedServer';
@@ -33,6 +35,8 @@ import { signRequest, type Store } from '@tomic/react';
  * explicit build-time `VITE_MANAGED_PORTAL_URL` override for local dev.
  */
 export function getManagedPortalUrl(info?: ManagedInfo | null): string | null {
+  const runtime = getRuntimeManagedPortalUrl();
+  if (runtime) return runtime;
   const fromEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_MANAGED_PORTAL_URL as string | undefined)
@@ -134,10 +138,16 @@ export async function ensureManagedSession(
 ): Promise<boolean> {
   if (await getManagedAccount().catch(() => null)) return true;
 
+  // Not an address this app opens (see safePortalUrl): reported as "no
+  // session" rather than thrown, which is the caller's existing fallback.
+  const portal = safePortalUrl(portalUrl);
+
+  if (!portal) return false;
+
   // `embed=1` asks the portal for its sign-in form rather than its landing
   // page: the user came here from a "back up this drive" button, so the sales
   // pitch is a detour.
-  const win = await openAuthWindow(`${portalUrl}/?embed=1`);
+  const win = await openAuthWindow(`${portal}/?embed=1`);
   const start = Date.now();
 
   try {

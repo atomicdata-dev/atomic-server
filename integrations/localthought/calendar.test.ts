@@ -2,7 +2,8 @@ import { expect, it } from 'vitest';
 import { calendarProjection, calendarFields as fields } from './calendar';
 import { Datatype } from '../../browser/lib/src/index';
 import { run } from './plugin';
-import type { FetchedPlatform } from './schema';
+import { platformSchema, type FetchedPlatform } from './schema';
+import { matchesCalendarField } from '../../browser/lib/src/calendar-date';
 const fixture = (): FetchedPlatform => ({
   platform: 'google-calendar',
   ontology: {
@@ -148,4 +149,46 @@ it('recognizes the lowercase field names produced by the WASM ontology', () => {
   const notes = calendarProjection(input).records[0].values[fields.notes];
   expect(notes).toContain('Recurring event');
   expect(notes).toContain('Conferencing');
+});
+
+it('projects exclusive date-only ends and never fabricates timestamps', () => {
+  const input = fixture();
+  input.records[0].values = {
+    start: { date: '2026-09-10' },
+    end: { date: '2026-09-13' },
+  };
+  const values = calendarProjection(input).records[0].values;
+  expect(values['atomic-calendar-end-day']).toBe('2026-09-13');
+  expect(values.start).toEqual({ date: '2026-09-10' });
+  expect(values.end).toEqual({ date: '2026-09-13' });
+  expect(values[fields.notes]).not.toContain('shown on start day only');
+});
+it('rejects malformed or mixed all-day intervals instead of shortening them', () => {
+  for (const end of [
+    {},
+    { date: '2026-02-30' },
+    { date: '2026-09-10' },
+    { date: '2026-09-09' },
+    { dateTime: '2026-09-11T00:00:00Z' },
+  ]) {
+    const input = fixture();
+    input.records[0].values = { start: { date: '2026-09-10' }, end };
+    expect(() => calendarProjection(input)).toThrow();
+  }
+  const input = fixture();
+  input.records[0].values.start = {
+    date: '2026-09-10',
+    dateTime: '2026-09-10T00:00:00Z',
+  };
+  expect(() => calendarProjection(input)).toThrow();
+});
+
+it('the installed schema exposes all-day range fields recognized by the view', () => {
+  const projected = calendarProjection(fixture());
+  const schema = platformSchema(projected.platform, projected.ontology.terms);
+  for (const field of [fields.day, fields.allDay, fields.endDay]) {
+    expect(
+      schema.properties.filter(p => matchesCalendarField(p.shortname, field)),
+    ).toHaveLength(1);
+  }
 });

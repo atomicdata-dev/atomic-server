@@ -189,6 +189,7 @@ Two things worth knowing about the runners:
 | Iroh accept side refuses any frame before `AUTH` (ERROR + closed stream), binds `AUTH.requestedSubject` to the handshake drive | `peer.rs` (`accept_gate_tests`, raw QUIC stream) |
 | Rejected `SYNC_PUSH` answers `ERROR SYNC_REJECTED`, never `SYNC_OK` | `peer.rs` (`accept_gate_tests`), `server/tests/it/ws_auth_gate.rs` |
 | WS: writes and identity-bearing subscriptions need `AUTH`; anonymous `SUB` on a public drive still works; unreadable subscriptions answer `ERROR UNAUTHORIZED_READ` | `server/tests/it/ws_auth_gate.rs` |
+| Rejected cross-drive sync entry leaves no snapshot; later valid import cannot inherit rejected properties | `engine.rs` (`rejected_sync_entry_does_not_persist_snapshot`) |
 | Missing-drive bootstrap (OQ5): `Public` never creates a drive, Owner mode enrolls only the owner, open node admits an authenticated first-sync | `lib/src/sync/engine.rs` (`bootstrap_and_sub_tests`), `peer.rs` (`live_write_admission_tests`) |
 | Engine-owned `SUB`/`UNSUB`: granted `SUB` is a session command, unreadable `SUB` answers `ERROR UNAUTHORIZED_READ` | `lib/src/sync/engine.rs` (`bootstrap_and_sub_tests`) |
 | Signed `SYNC_DIFF.removeCommits`: envelope applies regardless of connection agent, tampered envelope does not delete, envelope only handed to drive readers, replay after re-creation refused | `lib/src/sync/peer.rs` (`initiator_trust_tests`), `engine.rs` (`bootstrap_and_sub_tests`), `tombstones.rs`, `protocol.rs` |
@@ -495,6 +496,7 @@ Not covered: leftover Yjs-era DocumentV2 bodies end-to-end (needs a stored `{ ty
 | Two stores with the same key mint the same subject | `store.personal-drive.test.ts` |
 | Extra drives are listed on the derived personal drive | `store.personal-drive.test.ts` |
 | Extra drive created offline drains on reconnect (genesis must not set a rewind baseline) | `browser/lib/src/offline-create-drain.test.ts` |
+| Idempotent offline saves clear only after a complete local snapshot matches the synced baseline | `browser/lib/src/offline-create-drain.test.ts`, `browser/e2e/tests/offline-create-then-online.spec.ts` |
 | Lists from a previous random-DID home are unioned onto the derived drive | `store.personal-drive.test.ts` |
 | `Agent.personalDriveSubject` matches the genesis helper | `agent.test.ts` |
 | `Db::setup` / `ensure_personal_drive` use the derived DID and are idempotent | `lib/src/db.rs::personal_drive_tests` |
@@ -573,6 +575,12 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `client-db.test.ts` verifies that cold worker initialization does not steal
+  its own Web Lock or emit a false ghost-leader warning.
+- `store.private-drive.test.ts` verifies that linking a private drive on a
+  nodeless origin preserves the local profile without fetching it from the SPA.
+
+
 - Client-library tests gate both the snapshot write and worker flush: an existing
   resource's save cannot resolve before either durability barrier completes.
 - WebSocket tests deliver an old connection's close event after its replacement
@@ -591,9 +599,73 @@ packaged WebView initialization without server-injected Sentry configuration.
 
 Automatic Vault scheduling (`vaultAutoBackup.test.ts`) covers sustained-edit
 maximum delay, queued edits across drive switches, late account availability,
-connectivity recovery, enrollment rediscovery after reload, and distinguishing
+connectivity recovery, enrollment rediscovery after reload, account expiry during
+encryption and in-flight requests, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
+
+## Collaboration profile onboarding
+
+The `e2e.spec.ts` authorization/invite and chatroom journeys now complete the
+full-name step for inviter and new invitee, retain the secret-backup step, and
+verify subsequent shared access. The chatroom journey also checks the named
+personal drive. Browser warnings/errors fail these tests, including localization
+render warnings. The authorization journey also covers cropped avatar upload, metadata and image
+download from the recipient account, and existing-agent acceptance. SaaS
+email-to-drive acceptance still needs dedicated flow coverage.
+`ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
+only after expanding AI settings, one-click URL acceptance and persistence after
+reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
+successfully against local Ollama on 2026-09-08. The shared setup-panel component
+is not separately covered by this probe. The existing Vite-only Wuchale/React
+key warning when expanding AI settings is explicitly expected; other console
+errors remain failures.
+
+`username-live.spec.ts` changes the owner's display name through user settings
+while a different agent reads an existing chat message. It asserts the author
+updates without a reload and verifies a second change after the reader reloads.
+`websockets.test.ts` checks targeted profile SUB frames, subscription replay,
+multiple-reader cleanup through both Store unsubscribe APIs, and retaining
+ordinary document drive-wide fan-out. Profiles no longer depend on being inside
+the reader's active drive to receive live updates.
+
+
+### Per-drive Cloud Server display
+
+`driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
+asynchronous hosting/usage results to the selected drive and server. It covers
+unenrolled/local drives and shared drives confirmed directly by their node.
+`sync-devices.spec.ts` renders a managed connection with zero data for the selected
+drive, injects another drive's completed sync, and verifies that Cloud Server
+stays off with its setup action visible.
+
+- Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
+  present only in local storage, as well as rename/emoji refresh. Manual enable
+  and automatic backup share `driveDisplayMetadata`; only name and emoji are sent.
+- FOSS logout: `helpers/managed/session.test.ts` verifies that an installation
+  with no configured control plane makes no SaaS logout request (the CI smoke
+  test exposed a 405 at `/api/logout`).
+
+## Desktop workspace discovery (2026-09-08)
+
+`sync::discover::tests::inspection_checks_access_without_importing_or_pairing`
+uses real Iroh endpoints with node-bound AUTH: an authorized identity sees a peer name without importing
+the drive or pairing; a stranger is rejected. The local Tauri debug build connected
+to staging's advertised Iroh node and received a no-readable-data response for its
+test identity. Live drive and node PKARR signatures were verified separately.
+This does not yet prove restoration of the user's private staging workspace.
+
+## Recovery-code passkey enrollment
+
+`browser/data-browser/src/helpers/managed/recovery-enrollment.test.ts` verifies code-only reveal without WebAuthn, preservation of ciphertext and existing wrappers when adding a passkey, unlocking with either passkey, and no writes on wrong-code, account-mismatch or cancelled registration. Tests use WebCrypto, Argon2id and a simulated authenticator; physical mobile PRF support remains a device acceptance check.
+
+## Plugin UI sandbox and private assets
+
+- `browser/e2e/tests/plugin.spec.ts`: private plugin assets load through signed parent requests; custom rendering and RPC still work.
+- The bootstrap test opens the shell directly and verifies its server-enforced opaque origin, independently of iframe attributes.
+- `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
+
+- `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
 ## Plugin release and recovery additions
 
 | Flow | Layer | Where |
@@ -1104,3 +1176,48 @@ schema/proposal/apply, Calendar display, provider updates, OPFS reload and
 stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
 Live-provider browser OAuth verification remains separate from this fixture test.
+
+## Google Calendar recurrence
+
+- `browser/lib/src/calendar-recurrence.test.ts`: daily/weekly/monthly rule sets,
+  COUNT/UNTIL, DST gaps and offset changes, exclusions/additions, moved/cancelled
+  instances, cross-calendar identities, provider-expanded deduplication and
+  date-only recurring spans. No real provider calls.
+- `integrations/localthought/calendarRecurrence.test.ts`: complete recurrence
+  metadata projection, normalized fields, minimal cancellation records and
+  refusal when instance identity is missing.
+- `browser/data-browser/src/chunks/TablePage/Calendar/calendarOccurrences.test.ts`:
+  imported/native property names, civil-day placement across offset boundaries,
+  recurring all-day spans clipped to the visible grid.
+- `wasm/src/calendar_import.rs` unit tests: full-series queries omit date bounds,
+  both modes request tombstones, and catalogs retain recurrence/exception fields.
+- `browser/e2e/tests/google-calendar-import.spec.mts`: real browser/OPFS/import
+  preview using a mock provider, covering bounded instances and retained series,
+  moved/cancelled slots, reimport, reload and preservation of local notes.
+
+The actionable fidelity audit is `docs/imports/google-calendar-gap-report.md`.
+Live Google equivalence for historical/exotic recurrence rules remains outside
+these fixtures; unsupported full-series rules are rejected before import.
+
+Validated 2026-09-09: library 643/643, importer 24/24, UI buckets 2/2,
+standalone compilation of Rust adapter tests 2/2, frontend/library tsc, Oxlint,
+production WASM build, and both Chromium import flows (31.5s). The browser flow
+retains the existing explicit server-unavailable network fixture; no live Google
+account or full native Rust workspace test was run.
+
+Google Calendar two-way existing-event edits: `integrations/localthought/calendar-sync.test.ts`
+checks three-way field merges, title aliases, ETag rejection, stale local reviews,
+changes during requests, idempotent recovery after a lost checkpoint, time/date
+validation, duplicate identities, unsupported fields and permission failures.
+`browser.test.ts` checks conditional-header forwarding through rotating credentials.
+The companion proxy suite checks write scopes, CORS preflight and upstream
+If-Match forwarding. New event creation/deletion, live OAuth reconsent and live
+Google writes are not covered; the existing Calendar E2E covers inbound imports.
+
+All-day ranges: `browser/lib/src/calendar-date.test.ts` covers civil-date
+validation, exclusive single/multi-day ends, leap days, DST dates and year
+boundaries; run under UTC, America/Los_Angeles and Pacific/Kiritimati. Import
+tests reject malformed/mixed/nonpositive all-day intervals and verify raw
+provider Start/End retention. The existing Google import E2E now imports a
+three-day all-day event, asserts all three occupied cells and the excluded end,
+and verifies repeated chips survive reload without duplicate resources.

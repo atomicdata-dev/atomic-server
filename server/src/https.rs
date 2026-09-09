@@ -146,7 +146,7 @@ async fn cert_init_server(
         &config.opts.domain, &challenge.token
     );
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     info!("Testing availability of {}", &well_known_url);
 
     let agent: ureq::Agent = ureq::Agent::config_builder()
@@ -193,9 +193,9 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
     };
 
     let email =
-        config.opts.email.clone().expect(
+        config.opts.email.clone().ok_or(
             "No email set - required for HTTPS certificate initialization with LetsEncrypt",
-        );
+        )?;
 
     info!("Creating LetsEncrypt account with email {}", email);
 
@@ -227,17 +227,45 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
     let mut order = account
         .new_order(&instant_acme::NewOrder::new(&identifiers))
         .await
-        .unwrap();
+        .map_err(|e| format!("Failed to create ACME order: {}", e))?;
 
-    assert!(matches!(
-        order.state().status,
-        instant_acme::OrderStatus::Pending
-    ));
+    let order_status = order.state().status;
+    if order_status != OrderStatus::Pending {
+        return Err(format!(
+            "New ACME order is in state {order_status:?}, expected it to be pending"
+        )
+        .into());
+    }
 
-    // Pick the desired challenge type and prepare the response.
-
-    // if we have H11p01 challenges, we need to start a server to handle them, and eventually turn that off again
+    // For HTTP-01 challenges a temporary server answers on port 80; it must
+    // go away again whether or not the order succeeds, since this also runs
+    // from the renewal task while the real server is up.
     let mut handle: Option<ServerHandle> = None;
+    let result = complete_order(config, &mut order, challenge_type, &mut handle).await;
+
+    if let Some(hnd) = handle {
+        match &result {
+            Ok(()) => warn!(
+                "HTTPS TLS Cert init successful! Stopping temporary HTTP server, starting HTTPS..."
+            ),
+            Err(_) => warn!("Stopping temporary HTTP server after failed certificate request"),
+        }
+        hnd.stop(true).await;
+    }
+
+    result
+}
+
+/// Answers the order's challenges, waits for it, and writes the certificate.
+/// The temporary HTTP-01 server, if one was started, is handed back through
+/// `handle` so the caller can stop it on either outcome.
+async fn complete_order(
+    config: &crate::config::Config,
+    order: &mut instant_acme::Order,
+    challenge_type: instant_acme::ChallengeType,
+    handle: &mut Option<ServerHandle>,
+) -> AtomicServerResult<()> {
+    use instant_acme::OrderStatus;
 
     {
         let mut authorizations = order.authorizations();
@@ -246,7 +274,13 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
             match authz.status {
                 instant_acme::AuthorizationStatus::Pending => {}
                 instant_acme::AuthorizationStatus::Valid => continue,
-                _ => todo!(),
+                other => {
+                    return Err(format!(
+                        "ACME authorization for {} is {other:?}; cannot request a certificate",
+                        authz.identifier()
+                    )
+                    .into());
+                }
             }
 
             let mut challenge = authz
@@ -255,7 +289,7 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
             let key_auth = challenge.key_authorization();
             match challenge_type {
                 instant_acme::ChallengeType::Http01 => {
-                    handle = Some(cert_init_server(config, &challenge, &key_auth).await?);
+                    *handle = Some(cert_init_server(config, &challenge, &key_auth).await?);
                 }
                 instant_acme::ChallengeType::Dns01 => {
                     println!("Please set the following DNS record then press any key:");
@@ -264,10 +298,13 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
                         challenge.identifier(),
                         key_auth.dns_value()
                     );
-                    std::io::stdin().read_line(&mut String::new()).unwrap();
+                    std::io::stdin()
+                        .read_line(&mut String::new())
+                        .map_err(|e| format!("Failed to read from stdin: {}", e))?;
                 }
-                instant_acme::ChallengeType::TlsAlpn01 => todo!("TLS-ALPN-01 is not supported"),
-                _ => todo!("Unsupported ACME challenge type"),
+                other => {
+                    return Err(format!("Unsupported ACME challenge type {other:?}").into());
+                }
             }
 
             info!(
@@ -275,7 +312,10 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
                 challenge.identifier(),
                 challenge.url
             );
-            challenge.set_ready().await.unwrap();
+            challenge
+                .set_ready()
+                .await
+                .map_err(|e| format!("Failed to mark ACME challenge ready: {}", e))?;
         }
     }
 
@@ -288,21 +328,17 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
         return Err(format!("unexpected ACME order status: {status:?}").into());
     }
 
-    let private_key_pem = order.finalize().await.map_err(|e| e.to_string())?;
+    let private_key_pem = order
+        .finalize()
+        .await
+        .map_err(|e| format!("Failed to finalize ACME order: {}", e))?;
     let cert_chain_pem = order
         .poll_certificate(&instant_acme::RetryPolicy::default())
         .await
         .map_err(|e| format!("Error getting certificate {}", e))?;
     info!("Certificate ready!");
 
-    write_certs(config, cert_chain_pem, private_key_pem)?;
-
-    if let Some(hnd) = handle {
-        warn!("HTTPS TLS Cert init successful! Stopping temporary HTTP server, starting HTTPS...");
-        hnd.stop(true).await;
-    }
-
-    Ok(())
+    write_certs(config, cert_chain_pem, private_key_pem)
 }
 
 fn write_certs(

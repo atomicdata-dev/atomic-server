@@ -102,3 +102,5 @@ These components help with rendering resources in different contexts.
 - `src/helpers/commonAnimations.ts` - Shared keyframes such as `fadeIn`.
 - `src/helpers/CSSVar.ts` - Helper for creating and using css variables.
 - `src/globalCssVars.ts` - Typed CSS variable helpers used by layout and global surfaces.
+
+- `src/components/TeamProfileStep.tsx` — shared collaboration profile review for senders and invitees. Saves full name and optional cropped avatar to the existing Atomic agent before continuing; requires no SaaS account.

@@ -2,6 +2,7 @@
 
 import { Client } from './client.js';
 import type { AtomicValue } from './value.js';
+import { isSafeHref } from './safeHref.js';
 
 // TODO: use strings from `./urls`, requires TS fix: https://github.com/microsoft/TypeScript/issues/40793
 export enum Datatype {
@@ -243,8 +244,21 @@ export const validateDatatype = (
     }
 
     case Datatype.URI: {
+      if (!isString(value) || value.length === 0) {
+        err = 'Not a URI: expected a non-empty string';
+        break;
+      }
+
+      // A URI is rendered as a link target. `javascript:`, `data:` and
+      // `vbscript:` parse fine as URLs but run code when clicked.
+      if (!isSafeHref(value)) {
+        err =
+          'Not a valid URI: javascript:, data: and vbscript: are not allowed';
+        break;
+      }
+
       try {
-        new URL(value as string);
+        new URL(value);
       } catch (e) {
         err = 'Not a valid URI';
       }

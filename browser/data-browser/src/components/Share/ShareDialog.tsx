@@ -189,11 +189,8 @@ export function ShareDialog({
               <BackButton onClick={() => setView('share')}>
                 <FaArrowLeft /> <span>Back</span>
               </BackButton>
-              <span>Create Invite</span>
             </Dialog.Title>
-            <Dialog.Content>
-              <InviteForm target={resource} />
-            </Dialog.Content>
+            <InviteForm target={resource} inDialog />
           </>
         )}
       </Dialog>

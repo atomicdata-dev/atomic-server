@@ -1,4 +1,13 @@
+import {
+  deriveNodeStatuses,
+  currentDriveSync,
+  currentDriveValue,
+  hasHostedDriveConnection,
+  type ScopedDriveValue,
+  type NodeStatus,
+} from '../helpers/driveSyncStatus';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
+import { DiscoverWorkspace } from '../views/getting-started/DiscoverWorkspace';
 import {
   useEffect,
   useState,
@@ -47,7 +56,11 @@ import {
   getManagedAccount,
   type ManagedAccount,
 } from '../helpers/managed/session';
-import { getRememberedManagedPortalUrl } from '../helpers/managed/api';
+import {
+  managedFetch,
+  getRememberedManagedPortalUrl,
+  safePortalUrl,
+} from '../helpers/managed/api';
 import {
   envelopeWrapperKinds,
   getRecoverySecret,
@@ -88,6 +101,7 @@ import {
   decodePairingEnvelope,
   PairingEnvelopeError,
   PAIRING_URI_PREFIX,
+  signRequest,
 } from '@tomic/lib';
 import { isClientDbEnabled, setClientDbEnabled } from '../helpers/clientDbMode';
 import { PRODUCT_NAME } from '../helpers/managed/product';
@@ -115,7 +129,6 @@ export const SyncRoute = createRoute({
   getParentRoute: () => appRoute,
 });
 
-type NodeStatus = 'synced' | 'syncing' | 'unsynced' | 'offline' | 'unknown';
 type KnownPeer = { nodeId: string; label: string; lastSync?: string };
 
 const NODE_DID_PREFIX = 'did:ad:node:';
@@ -136,38 +149,6 @@ function normalizeStoredPeer(peer: KnownPeer): KnownPeer | undefined {
   if (nodeDidToRaw(peer.nodeId)) return peer;
 
   return undefined;
-}
-
-function deriveNodeStatuses(status: StoreSyncStatus): {
-  local: NodeStatus;
-  server: NodeStatus;
-  line: NodeStatus;
-} {
-  const local: NodeStatus = 'synced';
-
-  if (!status.serverConnected) {
-    return {
-      local,
-      server: 'offline',
-      line: 'offline',
-    };
-  }
-
-  if (status.syncInProgress) {
-    return { local, server: 'syncing', line: 'syncing' };
-  }
-
-  if (status.pendingDirtyCount > 0) {
-    return { local, server: 'unsynced', line: 'unsynced' };
-  }
-
-  // Only claim "synced" if we've actually completed a drive sync.
-  // Otherwise we're connected but haven't confirmed the data matches.
-  if (!status.lastDriveSync) {
-    return { local, server: 'unknown', line: 'unknown' };
-  }
-
-  return { local, server: 'synced', line: 'synced' };
 }
 
 function StatusIcon({ status }: { status: NodeStatus }) {
@@ -218,6 +199,7 @@ type ServerCardProps = {
   server: string;
   status: StoreSyncStatus;
   managedInfo: ManagedInfo;
+  cloudHosted: boolean;
   /** Sync status of the server actually in use. */
   serverStatus: NodeStatus;
   hasWorkingLocalStore: boolean;
@@ -271,6 +253,7 @@ function ServerCard({
   server,
   status,
   managedInfo,
+  cloudHosted,
   serverStatus,
   hasWorkingLocalStore,
   nodeUsage,
@@ -280,8 +263,11 @@ function ServerCard({
   onRemove,
 }: ServerCardProps) {
   const store = useStore();
-  const isActive = sameOrigin(server, status.serverUrl);
-  const isCloud = isActive && managedInfo.managed;
+  const isActive =
+    sameOrigin(server, status.serverUrl) &&
+    !!status.drive &&
+    store.isLiveSyncedDrive(status.drive);
+  const isCloud = isActive && cloudHosted;
   const serverHostname = status.serverUrl
     ? new URL(status.serverUrl).hostname
     : undefined;
@@ -295,8 +281,9 @@ function ServerCard({
         )
       : null;
 
-  const syncedAgo = status.lastDriveSync
-    ? formatTimeAgo(new Date(status.lastDriveSync.timestamp))
+  const driveSync = isActive ? currentDriveSync(status) : undefined;
+  const syncedAgo = driveSync
+    ? formatTimeAgo(new Date(driveSync.timestamp))
     : null;
   const usedBytes = nodeUsage
     ? nodeUsage.blobBytes + nodeUsage.loroBytes
@@ -329,7 +316,7 @@ function ServerCard({
     );
   }
 
-  if (status.lastDriveSync) {
+  if (driveSync) {
     facts.push(syncedAgo ? `Synced ${syncedAgo}` : 'Synced just now');
   }
 
@@ -337,6 +324,7 @@ function ServerCard({
     <SyncCard
       active={isActive}
       provider={isCloud}
+      embedded={isCloud}
       icon={isCloud ? <FaCloud /> : <FaServer />}
       iconTone={isCloud ? 'provider' : 'neutral'}
       title={isCloud ? 'Cloud Server' : serverLabel(server)}
@@ -383,7 +371,11 @@ function ServerCard({
       facts={isActive ? facts : undefined}
       // A node id identifies this server's node, so it belongs on the server —
       // not buried in Developer.
-      nodeId={isActive && serverNodeId ? rawToNodeDid(serverNodeId) : undefined}
+      nodeId={
+        !isCloud && isActive && serverNodeId
+          ? rawToNodeDid(serverNodeId)
+          : undefined
+      }
       footer={
         isCloud && managedInfo.portalUrl ? (
           <ManagedLink
@@ -463,6 +455,7 @@ interface SyncCardProps {
   provider?: boolean;
   /** The standalone spacing "This device" uses; the list cards sit tighter. */
   spacious?: boolean;
+  embedded?: boolean;
 }
 
 function SyncCard({
@@ -480,12 +473,18 @@ function SyncCard({
   active,
   provider,
   spacious,
+  embedded,
 }: SyncCardProps): JSX.Element {
   const store = useStore();
   const shown = (facts ?? []).filter((f): f is string => !!f);
 
   return (
-    <ConnCard $active={active} $provider={provider} $spacious={spacious}>
+    <ConnCard
+      $active={active}
+      $provider={provider}
+      $spacious={spacious}
+      $embedded={embedded}
+    >
       <CardIcon $tone={iconTone}>{icon}</CardIcon>
       <ConnBody>
         <ConnTopRow>
@@ -588,7 +587,13 @@ function SyncPage() {
   // Cloud Server (SaaS) hosting state for the active drive. `null` = not yet
   // known / not applicable; `false` = eligible but not enrolled (show the CTA);
   // `true` = already enrolled (hide it).
-  const [cloudEnrolled, setCloudEnrolled] = useState<boolean | null>(null);
+  const [cloudEnrollment, setCloudEnrollment] =
+    useState<ScopedDriveValue<boolean> | null>(null);
+  const cloudEnrolled = currentDriveValue(
+    cloudEnrollment,
+    status.drive,
+    status.serverUrl,
+  );
   const [cloudBusy, setCloudBusy] = useState(false);
   // Resolved in an effect rather than read off a Resource during render: the
   // React Compiler memoizes on the proxy identity, so a resource that finishes
@@ -645,6 +650,36 @@ function SyncPage() {
   const [managedAccount, setManagedAccount] = useState<ManagedAccount | null>(
     null,
   );
+
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setSubscriptionStatus(null);
+    if (!managedAccount || !status.drive) return;
+    const drive = status.drive;
+    const controller = new AbortController();
+    managedFetch(`/billing/subscription?${new URLSearchParams({ drive })}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok || response.status === 204) return;
+        const subscription = await response.json();
+
+        if (!controller.signal.aborted) {
+          setSubscriptionStatus(
+            subscription.plan === 'server' ? subscription.status : 'free',
+          );
+        }
+      })
+      .catch(() => {
+        /* Unknown is not an unpaid subscription. */
+      });
+
+    return () => controller.abort();
+  }, [managedAccount, status.drive]);
 
   /**
    * Where this account's encrypted backup actually is.
@@ -779,7 +814,13 @@ function SyncPage() {
   // Resource count + bytes from the connected node's `/drive-usage` — generic,
   // works on any atomic-server (self-hosted included). Signed with the agent
   // because the endpoint enforces read access to the drive.
-  const [nodeUsage, setNodeUsage] = useState<NodeDriveUsage | null>(null);
+  const [nodeUsageState, setNodeUsageState] =
+    useState<ScopedDriveValue<NodeDriveUsage> | null>(null);
+  const nodeUsage = currentDriveValue(
+    nodeUsageState,
+    status.drive,
+    status.serverUrl,
+  );
 
   // Sign in with a secret on a fresh device and you get the identity but none
   // of the data. Detect that so the page can lead with "pair a device".
@@ -812,7 +853,7 @@ function SyncPage() {
 
     // A local-only drive isn't on the server — asking for its usage 500s.
     if (!drive || !serverUrl || !agent || store.isLocalOnlyDrive(drive)) {
-      setNodeUsage(null);
+      setNodeUsageState(null);
 
       return;
     }
@@ -820,10 +861,13 @@ function SyncPage() {
     let cancelled = false;
     fetchNodeDriveUsage(serverUrl, drive, agent)
       .then(usage => {
-        if (!cancelled) setNodeUsage(usage);
+        if (!cancelled)
+          setNodeUsageState(
+            usage ? { drive, server: serverUrl, value: usage } : null,
+          );
       })
       .catch(() => {
-        if (!cancelled) setNodeUsage(null);
+        if (!cancelled) setNodeUsageState(null);
       });
 
     return () => {
@@ -883,7 +927,7 @@ function SyncPage() {
     const drive = status.drive;
 
     if (!drive || !isCloudSyncAvailable(managedInfo)) {
-      setCloudEnrolled(null);
+      setCloudEnrollment(null);
 
       return;
     }
@@ -891,16 +935,18 @@ function SyncPage() {
     let cancelled = false;
     driveHasCloudEnrollment(drive)
       .then(has => {
-        if (!cancelled) setCloudEnrolled(has);
+        if (!cancelled)
+          setCloudEnrollment({ drive, server: status.serverUrl, value: has });
       })
       .catch(() => {
-        if (!cancelled) setCloudEnrolled(false);
+        if (!cancelled)
+          setCloudEnrollment({ drive, server: status.serverUrl, value: false });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [status.drive, managedInfo]);
+  }, [status.drive, status.serverUrl, managedInfo]);
 
   useEffect(() => {
     const refresh = () => setStatus(store.getSyncStatus());
@@ -958,6 +1004,8 @@ function SyncPage() {
   // other device" and call moving it to Cloud Server "a migration".
   const showServerConn =
     !!status.serverUrl &&
+    !!status.drive &&
+    store.isLiveSyncedDrive(status.drive) &&
     !embeddedActive &&
     !isOriginWithoutNode(status.serverUrl);
   const pairedPeers = isNode ? knownPeers : [];
@@ -1035,6 +1083,10 @@ function SyncPage() {
   const cloudServerBlocked = cloudServerBlocker();
 
   function summaryLine(): string {
+    if (driveMissing) {
+      return 'This device does not have this workspace yet. Fetch it from a device that has it.';
+    }
+
     if (localOnlyDrive) {
       return 'This workspace is stored only on this device — it isn’t backed up or synced anywhere.';
     }
@@ -1052,13 +1104,20 @@ function SyncPage() {
     }.`;
   }
 
+  const cloudHosted = hasHostedDriveConnection(
+    !!status.drive && store.isLiveSyncedDrive(status.drive),
+    managedInfo.managed,
+    cloudEnrolled,
+    nodeUsage?.resourceCount,
+  );
+
   /** The provider's own node, when this drive is on one. */
   const managedServer =
     connectionServers.find(server => isManagedServer(server)) ?? null;
 
   /** Is this one of ours? Mirrors `isCloud` inside the card renderer. */
   function isManagedServer(server: string): boolean {
-    return sameOrigin(server, status.serverUrl) && managedInfo.managed;
+    return sameOrigin(server, status.serverUrl) && cloudHosted;
   }
 
   /**
@@ -1097,7 +1156,9 @@ function SyncPage() {
    * never heard of a portal.
    */
   const accountPortalUrl =
-    getManagedPortalUrl(managedInfo) ?? getRememberedManagedPortalUrl();
+    safePortalUrl(
+      getManagedPortalUrl(managedInfo) ?? getRememberedManagedPortalUrl(),
+    ) ?? null;
 
   async function promoteDrive() {
     if (!status.drive || promoting) return;
@@ -1170,7 +1231,11 @@ function SyncPage() {
         }
       }
 
-      setCloudEnrolled(true);
+      setCloudEnrollment({
+        drive: status.drive!,
+        server: status.serverUrl,
+        value: true,
+      });
       if (result.replicated)
         setHostedCopy({ drive, origin: result.httpOrigin });
       toast.success(
@@ -1262,16 +1327,33 @@ function SyncPage() {
 
     const canonicalNodeDid = rawToNodeDid(rawNodeId);
 
+    // The node only dials a peer for an agent with write rights on the drive,
+    // so the request is signed — there is nothing to send without one.
+    const agent = store.getAgent();
+
+    if (!agent) {
+      setPeerSyncResult('Error: Sign in before syncing with another device');
+
+      return;
+    }
+
     setPeerSyncing(true);
     setPeerSyncResult(null);
 
     try {
-      const res = await fetch(`${getLocalServerOrigin()}/iroh-sync`, {
+      const syncUrl = `${getLocalServerOrigin()}/iroh-sync`;
+      const headers = await signRequest(syncUrl, agent, {
+        'Content-Type': 'application/json',
+      });
+      const res = await fetch(syncUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ nodeId: canonicalNodeDid, drive: status.drive }),
       });
-      const data = await res.json();
+      // A refusal (401/403) may not carry JSON; still say what happened.
+      const data = await res
+        .json()
+        .catch(() => ({ error: `${res.status} ${res.statusText}`.trim() }));
 
       if (data.error) {
         setPeerSyncResult(`Error: ${data.error}`);
@@ -1378,7 +1460,11 @@ function SyncPage() {
                 <AccountLabel>{PRODUCT_NAME}</AccountLabel>
                 <AccountEmail data-testid='provider-account'>
                   {managedAccount
-                    ? 'Your cloud services'
+                    ? subscriptionStatus === 'active'
+                      ? 'Your Cloud Server subscription is active'
+                      : subscriptionStatus === 'trialing'
+                        ? 'Your Cloud Server trial is active'
+                        : 'Your cloud services'
                     : 'Cloud services for this workspace'}
                 </AccountEmail>
               </AccountBody>
@@ -1506,6 +1592,7 @@ function SyncPage() {
                   server={managedServer}
                   status={status}
                   managedInfo={managedInfo}
+                  cloudHosted={cloudHosted}
                   serverStatus={nodes.server}
                   hasWorkingLocalStore={hasWorkingLocalStore}
                   nodeUsage={nodeUsage}
@@ -1628,21 +1715,31 @@ function SyncPage() {
             </CardIcon>
             <ConnBody>
               <ConnTitle>Your data is on another device</ConnTitle>
-              <ConnSub>
-                {/* Either code below brings it over: this device's when it is a
+              {isNode && status.drive ? (
+                <DiscoverWorkspace
+                  key={status.drive}
+                  drive={status.drive}
+                  onConnected={() => setDriveMissing(false)}
+                />
+              ) : (
+                <>
+                  <ConnSub>
+                    {/* Either code below brings it over: this device's when it is a
                     node, otherwise the server's — the other device scans it and
                     syncs the drive somewhere this one can read. */}
-                {pairNodeId
-                  ? 'You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it.'
-                  : 'You’re signed in, but this device doesn’t have your workspace yet. Connect a device that has it.'}
-              </ConnSub>
-              <ConnActions>
-                {!pairNodeId && (
-                  <Button onClick={() => setShowAddServer(true)}>
-                    Connect a device
-                  </Button>
-                )}
-              </ConnActions>
+                    {pairNodeId
+                      ? 'You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it.'
+                      : 'You’re signed in, but this device doesn’t have your workspace yet. Connect a device that has it.'}
+                  </ConnSub>
+                  <ConnActions>
+                    {!pairNodeId && (
+                      <Button onClick={() => setShowAddServer(true)}>
+                        Connect a device
+                      </Button>
+                    )}
+                  </ConnActions>
+                </>
+              )}
             </ConnBody>
           </LocalDriveNotice>
         )}
@@ -1735,16 +1832,18 @@ function SyncPage() {
           {/* About *other* devices specifically. This device and any cloud
               services are listed above, so the old "not syncing anywhere"
               wording now sat under entries proving otherwise. */}
-          {connectionCount === 0 && connectionServers.length === 0 && (
-            <EmptyConnections>
-              <p>No other devices yet — your data is safe on this one.</p>
-              <p>
-                {isNode
-                  ? 'Pair another device to sync directly, or connect an always-on one to reach your data from anywhere.'
-                  : 'Connect an always-on device to back up your data and reach it from anywhere.'}
-              </p>
-            </EmptyConnections>
-          )}
+          {!driveMissing &&
+            connectionCount === 0 &&
+            connectionServers.length === 0 && (
+              <EmptyConnections>
+                <p>No other devices yet — your data is safe on this one.</p>
+                <p>
+                  {isNode
+                    ? 'Pair another device to sync directly, or connect an always-on one to reach your data from anywhere.'
+                    : 'Connect an always-on device to back up your data and reach it from anywhere.'}
+                </p>
+              </EmptyConnections>
+            )}
 
           {/* Servers we do not own — one stable list; the active one is marked,
               not moved. A managed node is deliberately absent: it moved up into
@@ -1759,6 +1858,7 @@ function SyncPage() {
                 server={server}
                 status={status}
                 managedInfo={managedInfo}
+                cloudHosted={cloudHosted}
                 serverStatus={nodes.server}
                 hasWorkingLocalStore={hasWorkingLocalStore}
                 nodeUsage={nodeUsage}
@@ -2454,6 +2554,7 @@ const ConnCard = styled.div<{
   $active?: boolean;
   $provider?: boolean;
   $spacious?: boolean;
+  $embedded?: boolean;
 }>`
   ${cardBase}
   margin-bottom: ${p => (p.$spacious ? '1.5rem' : '0.6rem')};
@@ -2464,6 +2565,16 @@ const ConnCard = styled.div<{
         ? p.theme.colors.textLight
         : undefined};
   background: ${p => (p.$provider ? `${p.theme.colors.main}0a` : undefined)};
+  ${p =>
+    p.$embedded &&
+    css`
+      border: 0;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      box-shadow: none;
+    `}
 `;
 
 /** A call to action, but still one of the cards in this list. The button

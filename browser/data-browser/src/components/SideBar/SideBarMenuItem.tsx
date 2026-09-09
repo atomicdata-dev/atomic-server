@@ -13,6 +13,7 @@ export const SideBarMenuItemLink = styled(AtomicLink)`
 
 /** Full-width menu / shared-with-me row (hover fills sidebar). */
 export const SideBarMenuRow = styled(SideBarItem)`
+  background-color: transparent;
   width: 100%;
   min-width: 0;
 `;

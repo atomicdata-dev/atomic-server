@@ -205,7 +205,7 @@ export class BrowserIntegrations {
     id: string,
     platform: string,
     path: string,
-    init: { method?: string; body?: string } = {},
+    init: { method?: string; body?: string; ifMatch?: string } = {},
   ): Promise<{ status: number; body: string }> {
     if (!navigator.locks)
       throw new Error('This browser needs Web Locks for integrations');
@@ -234,7 +234,7 @@ export class BrowserIntegrations {
     drive: string,
     actor: string,
     path: string,
-    init: { method?: string; body?: string },
+    init: { method?: string; body?: string; ifMatch?: string },
     signal: AbortSignal,
   ) {
     const current = this.connection(id, drive, actor);
@@ -246,10 +246,12 @@ export class BrowserIntegrations {
     const response = await this.http(
       `${this.origin}/proxy/${current.platform}${path}`,
       {
-        ...init,
+        method: init.method,
+        body: init.body,
         headers: {
           Authorization: `Bearer ${code}`,
           'Content-Type': 'application/json',
+          ...(init.ifMatch ? { 'If-Match': init.ifMatch } : {}),
         },
         credentials: 'omit',
         redirect: 'error',
@@ -269,7 +271,7 @@ export class BrowserIntegrations {
     actor: string,
     id: string,
     constants: Record<string, string>,
-    range?: { start: string; end: string },
+    range?: { start: string; end: string; series?: boolean },
   ) {
     // Web Locks serialize rotating credentials across tabs as well as UI actions.
     if (!navigator.locks)

@@ -190,3 +190,21 @@ version 1 and persists account, agent and server timestamp on the enrollment.
 Existing records retain unknown consent; no consent is inferred from a drive
 being present. Browser switcher rows carry compact service state labels, with
 one Storage and hosting action for details. Unknown cloud status stays explicit.
+
+## Desktop workspace discovery (2026-09-08)
+
+A restored Tauri identity now inspects its personal drive's PKARR peer before
+asking the user to fetch. The inspection authenticates, reads only the drive
+resource to check access, and discards the snapshot. It imports no data and
+creates no remembered pairing. A successful result names the device from HELLO;
+only “Fetch workspace” starts sync, followed by a fresh local readability check.
+An address can supply a node ID when PKARR discovery fails. Device names are
+self-reported display labels, never identity or authorization evidence.
+
+Flutter already attempts PKARR through `syncConnectivityNow`; its automatic
+fetch behavior is unchanged in this desktop debugging change. The new shared
+Rust inspection is available for a future matching confirmation step there.
+
+### Account recovery after code sign-in
+
+The browser/Tauri Account recovery card offers recovery-code unlock independently of passkeys, including after a WebAuthn failure. A portal session plus the existing recovery code can add a passkey without replacing the code or older passkeys. Each passkey uses its own PRF salt. Flutter has no corresponding envelope-management card yet.

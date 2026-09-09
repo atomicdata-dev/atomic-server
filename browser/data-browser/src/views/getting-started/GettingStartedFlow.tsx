@@ -1,3 +1,4 @@
+import { WorkspaceLoading } from './WorkspaceLoading';
 import {
   PRODUCT_NAME,
   clearManagedAccountBinding,
@@ -23,6 +24,7 @@ import { Column } from '../../components/Row';
 import { NewIdentitySection } from '../../components/NewIdentitySection';
 import { getManagedAccount } from '../../helpers/managed/session';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
+import { safePortalUrl } from '../../helpers/managed/api';
 import {
   fetchManagedInfo,
   accountCreationTarget,
@@ -75,7 +77,8 @@ type Step =
   | 'create'
   | 'restore'
   | 'restore-upgraded'
-  | 'connect-device';
+  | 'connect-device'
+  | 'opening-workspace';
 
 type RestoreState =
   | { phase: 'checking' }
@@ -154,7 +157,10 @@ export function GettingStartedFlow({
       // The remembered provider covers the desktop and Android apps: their
       // embedded node names no portal, and the build may not either, but a
       // device that linked once knows exactly where its account lives.
-      setKnownPortalUrl(getManagedPortalUrl(info) ?? getRememberedProvider());
+      setKnownPortalUrl(
+        safePortalUrl(getManagedPortalUrl(info) ?? getRememberedProvider()) ??
+          null,
+      );
     });
 
     return () => {
@@ -182,6 +188,9 @@ export function GettingStartedFlow({
     fromManaged ? 'create' : nextDrive ? 'signin' : initialStep,
   );
   const [loading, setLoading] = useState(false);
+  const [workspaceStage, setWorkspaceStage] = useState<
+    'identity' | 'local' | 'backup'
+  >('identity');
   const [error, setError] = useState<Error | undefined>();
   // The drive a freshly signed-in device is missing, handed to the
   // connect-device step. Undefined when no drive resolved at all.
@@ -561,6 +570,8 @@ export function GettingStartedFlow({
 
     try {
       const newAgent = await Agent.fromSecret(secret);
+      setWorkspaceStage('identity');
+      setStep('opening-workspace');
       setAgent(newAgent);
       await saveAgentToIDB(secret);
       // However they got in — passkey, code, or secret — the device is open
@@ -589,6 +600,7 @@ export function GettingStartedFlow({
       // it lands on the connect-device step, which is the screen for a device
       // holding none of your data — including its offer to restore from the
       // vault.
+      setWorkspaceStage('local');
       const target =
         nextDrive ??
         (await withDeadline(
@@ -642,6 +654,7 @@ export function GettingStartedFlow({
       let vaultReason: string | undefined;
 
       if (!hasData && target) {
+        setWorkspaceStage('backup');
         const restored = await withDeadline(
           restoreFromVault(store, target),
           VAULT_RESTORE_TIMEOUT_MS,
@@ -715,6 +728,7 @@ export function GettingStartedFlow({
       setError(
         err instanceof Error ? err : new Error('Could not parse that secret.'),
       );
+      setStep('signin');
     } finally {
       setLoading(false);
     }
@@ -764,7 +778,15 @@ export function GettingStartedFlow({
 
   return (
     <Shell>
-      {step === 'welcome' ? (
+      {step === 'opening-workspace' ? (
+        <Swap key='opening-workspace'>
+          <OnboardingWrap>
+            <OnboardingCard>
+              <WorkspaceLoading stage={workspaceStage} />
+            </OnboardingCard>
+          </OnboardingWrap>
+        </Swap>
+      ) : step === 'welcome' ? (
         <Swap key='welcome'>
           <WelcomeStack>
             <VisuallyHiddenH1 key='heading'>AtomicServer</VisuallyHiddenH1>
@@ -795,7 +817,9 @@ export function GettingStartedFlow({
                     // Hosted build or managed node → create the account on the
                     // portal (email verification). FOSS node → local identity.
                     if (createTarget.kind === 'portal') {
-                      window.location.assign(createTarget.url);
+                      const url = safePortalUrl(createTarget.url);
+
+                      if (url) window.location.assign(url);
                     } else {
                       setStep('create');
                     }
@@ -1028,7 +1052,9 @@ export function GettingStartedFlow({
                           setError(undefined);
 
                           if (createTarget.kind === 'portal') {
-                            window.location.assign(createTarget.url);
+                            const url = safePortalUrl(createTarget.url);
+
+                            if (url) window.location.assign(url);
                           } else {
                             setStep('create');
                           }
