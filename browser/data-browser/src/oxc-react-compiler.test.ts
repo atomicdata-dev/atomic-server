@@ -119,6 +119,13 @@ describe('oxc-transform-react', () => {
     expect(result.code).toContain('react/compiler-runtime');
   });
 
+  // This compiles every TSX/JSX file under src/ one at a time — cost grows
+  // with the app itself, so vitest's 5000ms default is a budget that was
+  // always going to run out, not a bug in any one file. It just did, on a
+  // loaded CI runner. 20s gives real headroom above the current file count
+  // without hiding an actual hang.
+  const FULL_SWEEP_TIMEOUT_MS = 20_000;
+
   it(
     'transforms every app TSX/JSX file without a fatal error',
     () => {
@@ -142,11 +149,6 @@ describe('oxc-transform-react', () => {
       expect(fatals).toEqual([]);
       expect(compiled).toBeGreaterThan(400);
     },
-    // This compiles every TSX/JSX file under src/ one at a time — cost grows
-    // with the app itself, so vitest's 5000ms default is a budget that was
-    // always going to run out, not a bug in any one file. It just did, on a
-    // loaded CI runner. 20s gives real headroom above the current file count
-    // without hiding an actual hang.
-    20_000,
+    FULL_SWEEP_TIMEOUT_MS,
   );
 });
