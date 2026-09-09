@@ -840,9 +840,9 @@ export function run() { return { intents: [] }; }
     await page.getByText('Action history', { exact: true }).click();
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
     const callerSubject = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const connection = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const drive = await store.getResource(
         connection.get('https://atomicdata.dev/properties/parent'),
@@ -862,7 +862,7 @@ export function run() { return { intents: [] }; }
       const term = (n: string) =>
         terms.find(
           r => r.get('https://atomicdata.dev/properties/shortname') === n,
-        ).subject;
+        )!.subject;
       const caller = await store.newResource({
         parent: drive.subject,
         isA: [term('plugin-script')],
@@ -1162,11 +1162,11 @@ export async function run(ctx) {
     ).toBeVisible();
     await page.evaluate(
       async ({ release }) => {
-        const store = (window as any).store;
+        const store = window.store;
         if (!(await store.waitForServerConnected(10000)))
           throw new Error('Test server did not connect');
         const plugin = await store.getResource(
-          new URL(location.href).searchParams.get('subject'),
+          new URL(location.href).searchParams.get('subject')!,
         );
         const drive = await store.getResource(
           plugin.get('https://atomicdata.dev/properties/parent'),
@@ -1178,7 +1178,7 @@ export async function run(ctx) {
         );
         const properties = await Promise.all(
           ontology
-            .get('https://atomicdata.dev/properties/properties')
+            .get('https://atomicdata.dev/properties/properties')!
             .map((p: string) => store.getResource(p)),
         );
         const property = properties.find(
@@ -1186,6 +1186,7 @@ export async function run(ctx) {
             p.get('https://atomicdata.dev/properties/shortname') ===
             'plugin-connection',
         );
+        if (!property) throw new Error('Missing plugin-connection property');
         const room = await store.newResource({
           parent: drive.subject,
           isA: ['https://atomicdata.dev/classes/ChatRoom'],
@@ -1256,9 +1257,9 @@ export async function run(ctx) {
       fullPage: true,
     });
     const target = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const plugin = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
 
       return {
@@ -1292,9 +1293,9 @@ export async function run(ctx) {
     ).toBeVisible();
     const automationSubject = new URL(page.url()).searchParams.get('subject')!;
     const relationship = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const script = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const values = script.getPropVals();
 

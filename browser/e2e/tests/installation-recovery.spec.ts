@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
+import type { Resource } from '@tomic/lib';
 import { before } from './test-utils';
 test.beforeEach(before);
 test('table installation reuses saved class after a lost receipt', async ({
@@ -11,13 +12,12 @@ test('table installation reuses saved class after a lost receipt', async ({
       /* @vite-ignore */ path
     );
     const store = window.store!;
-    const drive = store.getDrive()!;
-    const driveSubject = typeof drive === 'string' ? drive : drive.subject;
+    const driveSubject = store.getDrive()!;
     const ontology = await store.getResource(
       await resolveOntologyParent(store, driveSubject),
     );
 
-    const addToOntology = async (resource: any) => {
+    const addToOntology = async (resource: Resource) => {
       await resource.save();
       await ontology.push(
         'https://atomicdata.dev/properties/classes',
@@ -121,7 +121,7 @@ test('duplicate import review links both copies and blocks apply', async ({
 
     for (const subject of copies) {
       const resource = await store.getResource(subject);
-      const doc = resource.getLoroDoc().fork();
+      const doc = resource.getLoroDoc()!.fork();
       doc
         .getMap('properties')
         .set('https://atomicdata.dev/properties/localId', 'test:offline-copy');
