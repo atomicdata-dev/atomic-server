@@ -13,6 +13,7 @@ import {
 } from '../../../../../integrations/localthought/browser';
 import { wasmJsUrl, wasmBinaryUrl } from '../../helpers/wasmUrls';
 let loaded: Promise<Engine> | undefined;
+
 async function engine(): Promise<Engine> {
   return (loaded ??= (async () => {
     const url = wasmJsUrl();
@@ -20,12 +21,14 @@ async function engine(): Promise<Engine> {
     await module.default({ module_or_path: wasmBinaryUrl() });
     if (typeof module.fetchIntegration !== 'function')
       throw new Error('Rebuild the WASM bundle and reload Atomic');
+
     return module;
   })().catch(error => {
     loaded = undefined;
     throw error;
   }));
 }
+
 export const browserIntegrations = () =>
   new BrowserIntegrations(
     localStorage,

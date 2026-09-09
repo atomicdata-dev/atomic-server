@@ -90,6 +90,7 @@ async function readLocalInstallationSubjects(
     throw new Error(
       'Local installation query failed or is incomplete; refusing to create duplicates',
     );
+
   return result.subjects;
 }
 
@@ -126,6 +127,7 @@ export function localSchemaStore(store: Store) {
         throw new Error(
           'Duplicate local schema identity; resolve before importing',
         );
+
       return matches[0];
     },
   };
