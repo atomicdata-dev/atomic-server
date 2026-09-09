@@ -27,6 +27,48 @@ async function gotoSync(page: Page) {
 test.describe('sync page devices', () => {
   test.beforeEach(before);
 
+  test('an unenrolled drive does not inherit another drive cloud status', async ({
+    page,
+  }) => {
+    let managedInfoRequests = 0;
+    await page.route('**/server', async route => {
+      const response = await route.fetch();
+      const body = await response.json();
+      managedInfoRequests += 1;
+      await route.fulfill({
+        json: {
+          ...body,
+          'https://atomicdata.dev/properties/server/managed': true,
+          'https://atomicdata.dev/properties/server/portalUrl':
+            'http://localhost:49237',
+        },
+      });
+    });
+    await page.route('**/drive-usage?**', route =>
+      route.fulfill({ json: { resourceCount: 0, blobBytes: 0, loroBytes: 0 } }),
+    );
+    await page.route('**/api/**', route => {
+      const path = new URL(route.request().url()).pathname;
+
+      return path === '/api/me'
+        ? route.fulfill({ status: 204 })
+        : route.fulfill({ json: [] });
+    });
+    await gotoSync(page);
+    await expect.poll(() => managedInfoRequests).toBeGreaterThan(0);
+    await page.evaluate(() => {
+      window.store.finishDriveSync('did:ad:other-work-drive', 28, Date.now());
+    });
+    const cloud = page.getByTestId('cloud-server-row');
+    await expect(cloud).toBeVisible();
+    await expect(cloud).not.toContainText('In sync');
+    await expect(cloud).not.toContainText('Synced');
+    await expect(cloud).not.toContainText('Cloud Server is on');
+    await expect(
+      cloud.getByRole('button', { name: 'Set up Cloud Server', exact: true }),
+    ).toBeVisible();
+  });
+
   test('the pairing code on screen is a routable envelope', async ({
     page,
   }) => {

@@ -2386,21 +2386,25 @@ export class Store {
     // the outgoing snapshot, and the edit form later errors with
     // "<class> is not a Class". HTTP (not WS): onboarding can still be
     // authenticated as a previous agent on the socket.
-    let agentResource: Resource | undefined;
+    let agentResource: Resource | undefined = prior?.isReady()
+      ? prior
+      : undefined;
 
-    try {
-      agentResource = await this.fetchResourceFromServer(agentSubject, {
-        noWebSocket: true,
-      });
+    if (this.serverUrlWithoutSocket !== this.serverUrl) {
+      try {
+        agentResource = await this.fetchResourceFromServer(agentSubject, {
+          noWebSocket: true,
+        });
 
-      if (agentResource.error) {
-        throw agentResource.error;
+        if (agentResource.error) {
+          throw agentResource.error;
+        }
+      } catch {
+        // Offline / local-only. An error stub is not usable — writing on
+        // it would mint a partial Agent Loro doc. The derived DID is
+        // identity; the pointer is only a cache for older clients.
+        agentResource = prior?.isReady() ? prior : undefined;
       }
-    } catch {
-      // Offline / local-only. An error stub is not usable — writing on
-      // it would mint a partial Agent Loro doc. The derived DID is
-      // identity; the pointer is only a cache for older clients.
-      agentResource = prior?.isReady() ? prior : undefined;
     }
 
     const oldPointer = agentResource?.isReady()

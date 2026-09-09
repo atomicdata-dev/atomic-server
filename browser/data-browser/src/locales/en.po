@@ -1031,13 +1031,11 @@ msgstr "I already have an account"
 msgid "Agent created!"
 msgstr "Agent created!"
 
-#: src/views/InvitePage.tsx
-msgid "Enter a name"
-msgstr "Enter a name"
+#~ msgid "Enter a name"
+#~ msgstr "Enter a name"
 
-#: src/views/InvitePage.tsx
-msgid "Agent Name"
-msgstr "Agent Name"
+#~ msgid "Agent Name"
+#~ msgstr "Agent Name"
 
 #: src/views/InvitePage.tsx
 msgid "Agent Secret"
@@ -1259,6 +1257,7 @@ msgstr "Canvas"
 msgid "Save failed: {0}"
 msgstr "Save failed: {0}"
 
+#: src/components/TeamProfileStep.tsx
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Saving…"
 msgstr "Saving…"
@@ -2645,9 +2644,8 @@ msgstr "Allow edits"
 msgid "Invite text (optional)"
 msgstr "Invite text (optional)"
 
-#: src/components/InviteForm.tsx
-msgid "Limit Usages (optional)"
-msgstr "Limit Usages (optional)"
+#~ msgid "Limit Usages (optional)"
+#~ msgstr "Limit Usages (optional)"
 
 #: src/components/InviteForm.tsx
 msgid "Invite created and copied to clipboard! 🚀"
@@ -4395,7 +4393,6 @@ msgstr "properties have"
 msgid "as a classtype."
 msgstr "as a classtype."
 
-#: src/components/Share/ShareDialog.tsx
 #: src/components/Share/ShareDialog.tsx
 #: src/routes/Share/ShareRoute.tsx
 msgid "Create Invite"
@@ -7604,6 +7601,63 @@ msgstr "Resource with error"
 msgid "Assign Rights"
 msgstr "Assign Rights"
 
+#: src/helpers/managed/vault.ts
+msgid "Your account session has ended. Sign in again to resume backup."
+msgstr "Your account session has ended. Sign in again to resume backup."
+
+#: src/components/TeamProfileStep.tsx
+msgid "Full name"
+msgstr "Full name"
+
+#~ msgid "Profile picture (optional) <0/>"
+#~ msgstr "Profile picture (optional) <0/>"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Save and continue"
+msgstr "Save and continue"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Picture ready to save."
+msgstr "Picture ready to save."
+
+#: src/components/TeamProfileStep.tsx
+msgid "How your colleagues see you"
+msgstr "How your colleagues see you"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+msgstr "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+
+#: src/components/TeamProfileStep.tsx
+msgid "You can add or change your picture later in your profile."
+msgstr "You can add or change your picture later in your profile."
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server subscription is active"
+msgstr "Your Cloud Server subscription is active"
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server trial is active"
+msgstr "Your Cloud Server trial is active"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Profile picture (optional)"
+msgstr "Profile picture (optional)"
+
+#~ msgid "Your selected profile picture"
+#~ msgstr "Your selected profile picture"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Your selected avatar"
+msgstr "Your selected avatar"
+
+#~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+#~ msgstr "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+
+#: src/components/InviteForm.tsx
+msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+msgstr "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
 msgstr "Local Ollama detected"
@@ -7623,6 +7677,10 @@ msgstr "Use local Ollama"
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Connect local Ollama"
 msgstr "Connect local Ollama"
+
+#: src/components/InviteForm.tsx
+msgid "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
+msgstr "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Find your workspace"

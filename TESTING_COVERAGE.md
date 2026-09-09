@@ -451,6 +451,12 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `client-db.test.ts` verifies that cold worker initialization does not steal
+  its own Web Lock or emit a false ghost-leader warning.
+- `store.private-drive.test.ts` verifies that linking a private drive on a
+  nodeless origin preserves the local profile without fetching it from the SPA.
+
+
 - Client-library tests gate both the snapshot write and worker flush: an existing
   resource's save cannot resolve before either durability barrier completes.
 - WebSocket tests deliver an old connection's close event after its replacement
@@ -469,10 +475,20 @@ packaged WebView initialization without server-injected Sentry configuration.
 
 Automatic Vault scheduling (`vaultAutoBackup.test.ts`) covers sustained-edit
 maximum delay, queued edits across drive switches, late account availability,
-connectivity recovery, enrollment rediscovery after reload, and distinguishing
+connectivity recovery, enrollment rediscovery after reload, account expiry during
+encryption and in-flight requests, and distinguishing
 Tauri embedded nodes from remote servers. Native background execution after OS
 suspension remains outside this scheduler's guarantees.
 
+## Collaboration profile onboarding
+
+The `e2e.spec.ts` authorization/invite and chatroom journeys now complete the
+full-name step for inviter and new invitee, retain the secret-backup step, and
+verify subsequent shared access. The chatroom journey also checks the named
+personal drive. Browser warnings/errors fail these tests, including localization
+render warnings. The authorization journey also covers cropped avatar upload, metadata and image
+download from the recipient account, and existing-agent acceptance. SaaS
+email-to-drive acceptance still needs dedicated flow coverage.
 `ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
 only after expanding AI settings, one-click URL acceptance and persistence after
 reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
@@ -488,6 +504,23 @@ updates without a reload and verifies a second change after the reader reloads.
 multiple-reader cleanup through both Store unsubscribe APIs, and retaining
 ordinary document drive-wide fan-out. Profiles no longer depend on being inside
 the reader's active drive to receive live updates.
+
+
+### Per-drive Cloud Server display
+
+`driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
+asynchronous hosting/usage results to the selected drive and server. It covers
+unenrolled/local drives and shared drives confirmed directly by their node.
+`sync-devices.spec.ts` renders a managed connection with zero data for the selected
+drive, injects another drive's completed sync, and verifies that Cloud Server
+stays off with its setup action visible.
+
+- Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
+  present only in local storage, as well as rename/emoji refresh. Manual enable
+  and automatic backup share `driveDisplayMetadata`; only name and emoji are sent.
+- FOSS logout: `helpers/managed/session.test.ts` verifies that an installation
+  with no configured control plane makes no SaaS logout request (the CI smoke
+  test exposed a 405 at `/api/logout`).
 
 ## Desktop workspace discovery (2026-09-08)
 

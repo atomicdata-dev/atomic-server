@@ -96,6 +96,7 @@ export function useVaultBackup({
   signer,
   proofMessage,
   devicePubkey,
+  getDisplayMetadata,
 }: {
   db: VaultCapableDb | null;
   keys: VaultKeyOps | null;
@@ -105,6 +106,7 @@ export function useVaultBackup({
   signer: VaultProofSigner | null;
   proofMessage: Uint8Array | null;
   devicePubkey: string | null;
+  getDisplayMetadata?: () => Promise<{ name?: string; emoji?: string }>;
 }): UseVaultBackup {
   const [status, setStatus] = useState<VaultStatus>({ state: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -256,6 +258,7 @@ export function useVaultBackup({
         driveKey: key,
         keyEpoch,
       } = await setUpVaultForDrive({
+        metadata: await getDisplayMetadata?.(),
         keys: keys!,
         driveSubject: driveSubject!,
         agentSubject: agentSubject!,
@@ -279,6 +282,7 @@ export function useVaultBackup({
       await refresh();
     });
   }, [
+    getDisplayMetadata,
     run,
     refreshKey,
     keys,

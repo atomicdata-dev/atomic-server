@@ -134,6 +134,13 @@ describe('rememberManagedPortalUrl', () => {
 });
 
 describe('a linked device', () => {
+  it('keeps the token bound when runtime configuration names another portal', async () => {
+    const api = await freshApi();
+    api.setManagedDeviceToken('sess', PORTAL);
+    vi.stubGlobal('window', { __ATOMIC_MANAGED__: { portalUrl: OTHER } });
+    expect(api.getManagedApiBase()).toBe(`${PORTAL}/api`);
+  });
+
   /**
    * The bug this guards: a node's self-reported `portalUrl` used to become the
    * API base, and the bearer token went with it. Connecting the app to a

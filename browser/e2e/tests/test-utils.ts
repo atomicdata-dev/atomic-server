@@ -2035,6 +2035,13 @@ export async function acceptInvite(page: Page) {
   await expect(acceptBtn).toBeVisible({ timeout: 15000 });
   await acceptBtn.click();
 
+  await page
+    .getByLabel('Full name', { exact: true })
+    .fill(`Test User ${timestamp()}`);
+  await page
+    .getByRole('button', { name: 'Save and continue', exact: true })
+    .click();
+
   // Unlike most dialogs (one round trip), the click above kicks off TWO
   // sequential server round trips before the dialog opens: InvitePage's
   // handleNew() saves the new agent's genesis commit, then handleAccept()
@@ -2047,7 +2054,7 @@ export async function acceptInvite(page: Page) {
       await expect(
         dialog.getByRole('heading', { name: 'Agent created!' }),
       ).toBeVisible();
-      await dialog.getByLabel('Agent Name').fill(`Test User ${timestamp()}`);
+      await expect(dialog.getByLabel('Agent Name')).toHaveCount(0);
       await dialog.getByRole('button', { name: 'Copy to clipboard' }).click();
       await closeDialog('Continue');
     },
