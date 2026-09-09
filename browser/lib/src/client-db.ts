@@ -345,13 +345,18 @@ export class ClientDbWorker {
       // resolved.
       if (this.destroyed) return;
 
-      // Forcibly take the lock from the ghost leader. The previous
-      // callback gets aborted by the browser; we run `becomeLeader` from
-      // this new callback.
-      console.warn(
-        `[ClientDb] no leader-announce in ${LEADER_ELECTION_WAIT_MS}ms; stealing OPFS lock from suspected ghost leader`,
-      );
-      this.requestLeaderLock(baseUrl, true);
+      // A worker exists only after we acquire the lock. Cold WASM startup
+      // can exceed the election window; wait for our worker instead of
+      // stealing our own lock and reporting a false ghost leader.
+      if (!this.worker) {
+        // Forcibly take the lock from the ghost leader. The previous
+        // callback gets aborted by the browser; we run `becomeLeader` from
+        // this new callback.
+        console.warn(
+          `[ClientDb] no leader-announce in ${LEADER_ELECTION_WAIT_MS}ms; stealing OPFS lock from suspected ghost leader`,
+        );
+        this.requestLeaderLock(baseUrl, true);
+      }
 
       // Wait for the steal callback to run `becomeLeader` TO COMPLETION —
       // `leadershipGained` only resolves after the worker's wasm import and
