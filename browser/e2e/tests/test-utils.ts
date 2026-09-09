@@ -2037,6 +2037,15 @@ export async function acceptInvite(page: Page) {
     name: 'Create account and accept',
   });
   await expect(acceptBtn).toBeVisible({ timeout: 15000 });
+  // Record even a transient duplicate acceptance CTA during agent creation.
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[data-test="accept-existing"]')) {
+        document.documentElement.dataset.duplicateInviteAcceptance = 'true';
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
   await acceptBtn.click();
 
   await page
@@ -2059,6 +2068,20 @@ export async function acceptInvite(page: Page) {
         dialog.getByRole('heading', { name: 'Agent created!' }),
       ).toBeVisible();
       await expect(dialog.getByLabel('Agent Name')).toHaveCount(0);
+      await dialog
+        .getByRole('button', { name: 'Feedback', exact: true })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: 'Send feedback' }),
+      ).toBeVisible();
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Agent created!' }),
+      ).toBeVisible();
+      await expect(page.locator('html')).not.toHaveAttribute(
+        'data-duplicate-invite-acceptance',
+        'true',
+      );
       await dialog.getByRole('button', { name: 'Copy to clipboard' }).click();
       await closeDialog('Continue');
     },

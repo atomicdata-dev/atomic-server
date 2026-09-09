@@ -128,9 +128,10 @@ test.describe('data-browser', async () => {
       // Create invite
       await page.click('button:has-text("Create Invite")');
       await page.getByLabel('Full name', { exact: true }).fill('Drive Owner');
-      await page
-        .getByLabel('Profile picture (optional)', { exact: true })
-        .setInputFiles({
+      const pickerOpened = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Choose profile picture' }).click();
+      const picker = await pickerOpened;
+      await picker.setFiles({
           name: 'profile.svg',
           mimeType: 'image/svg+xml',
           buffer: Buffer.from(

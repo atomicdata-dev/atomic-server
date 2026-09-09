@@ -7351,6 +7351,7 @@ msgstr ""
 #~ msgstr ""
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
+#: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
 msgstr ""
 
@@ -7796,4 +7797,36 @@ msgstr ""
 #. 0: providerName(portalUrl)
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
+msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Creating your account…"
+msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Invite accepted. Finishing setup…"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Checking local storage…"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "This browser could not open local storage"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Open this link in a non-private browser window and allow this site to store data. If you are already in a regular window, close other tabs for this site and try again."
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Reload and try again"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Choose profile picture"
+msgstr ""
+
+#: src/helpers/onboardingStorage.ts
+msgid "Local storage is taking too long to initialize."
 msgstr ""

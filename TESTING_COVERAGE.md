@@ -490,6 +490,13 @@ personal drive. Browser warnings/errors fail these tests, including localization
 render warnings. The authorization journey also covers cropped avatar upload, metadata and image
 download from the recipient account, and existing-agent acceptance. SaaS
 email-to-drive acceptance still needs dedicated flow coverage.
+The invite journey also rejects transient duplicate acceptance buttons, opens the
+avatar file picker from the person button, and checks Feedback in the secret
+backup dialog. `onboarding-storage.spec.ts` injects a failed ClientDb initialization
+and verifies that signup controls stay hidden while recovery advice and Feedback
+remain available. `onboardingStorage.test.ts` covers initialization readiness,
+failure, missing attachment, and timeout. Actual private-window storage policies
+across browsers remain outside the injected-failure test.
 `ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
 only after expanding AI settings, one-click URL acceptance and persistence after
 reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran

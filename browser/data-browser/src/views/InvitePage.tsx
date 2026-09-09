@@ -267,7 +267,13 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   });
 
   // When the Invite is accepted, a new Agent might be created client-side.
+  const [creating, setCreating] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+
   async function handleNew() {
+    if (creating) return;
+    setCreating(true);
+
     try {
       const keypair = await generateKeyPair();
 
@@ -309,6 +315,8 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       setReviewProfile(true);
     } catch (error) {
       store.notifyError(error);
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -320,9 +328,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
     const redirect = await store.postToServer<Server.Redirect>(inviteURL.href);
 
     if (redirect.error) {
-      store.notifyError(redirect.error);
-
-      return;
+      throw redirect.error;
     }
 
     const destination = await getRedirectDestination(redirect);
@@ -371,6 +377,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       setAgent(newAgent);
       setIsNewAgent(true);
     } else {
+      setAccepted(true);
       setIsNewAgent(false);
       setRedirectURL(destination);
 
@@ -386,6 +393,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       return;
     }
 
+    setAccepted(true);
     // New agent: back up the secret, then persist and redirect.
     setRedirectURL(destination);
     show();
@@ -410,12 +418,15 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
             You've been invited to {write ? 'edit' : 'view'}
             {resourceName ? ` "${resourceName}"` : ''}
           </CardTitle>
-          {reviewProfile && agentSubject ? (
+          {creating ? (
+            <p role='status'>Creating your account…</p>
+          ) : accepted ? (
+            <p role='status'>Invite accepted. Finishing setup…</p>
+          ) : reviewProfile && agentSubject ? (
             <TeamProfileStep
               subject={agentSubject}
               onContinue={async () => {
                 await handleAccept(pendingKeys);
-                setReviewProfile(false);
               }}
             />
           ) : usagesLeft === 0 ? (
@@ -430,7 +441,9 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
                   disabled={!agentResource.isReady()}
                   onClick={() => {
                     if (agentResource.get(dataBrowser.properties.icon)) {
-                      void handleAccept();
+                      void handleAccept().catch(error =>
+                        store.notifyError(error),
+                      );
                     } else {
                       setReviewProfile(true);
                     }
