@@ -1,4 +1,5 @@
 /** Local-only integration-proxy fixture. Never deploy this service. */
+import { calendarDocument, calendarFixture } from './mock-calendar.mjs';
 import { githubTracker } from './mock-github.mjs';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -26,6 +27,7 @@ export function mockProxy({
   frontendOrigin = process.env.MOCK_FRONTEND_ORIGIN ?? 'http://localhost:6747',
 } = {}) {
   const github = githubTracker();
+  const calendar = calendarFixture();
   const codes = new Map();
   const challenges = new Set();
   const issueCode = platform => {
@@ -62,6 +64,8 @@ export function mockProxy({
         readFileSync(new URL('./mock-document.json', import.meta.url)),
       );
     }
+    if (url.pathname === '/catalog/google-calendar.yaml')
+      return json(200, calendarDocument);
     if (url.pathname === '/session') {
       const challenge = randomBytes(32).toString('base64url');
       challenges.add(challenge);
@@ -128,6 +132,10 @@ export function mockProxy({
           return json(400, { error: 'Invalid request body' }, headers);
         }
       }
+      if (platform === 'google-calendar') {
+        const result = calendar.request(req.method, url);
+        return json(result.status, result.body, headers);
+      }
       if (req.method !== 'GET') return json(403, {}, headers);
       const data =
         platform === 'pets'
@@ -145,6 +153,7 @@ export function mockProxy({
     json(404, {});
   });
   server.github = github;
+  server.calendar = calendar;
   return server;
 }
 if (

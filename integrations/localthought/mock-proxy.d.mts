@@ -29,7 +29,21 @@ interface GitHubTracker {
     input: { body: string },
   ): Comment | undefined;
 }
+interface CalendarFixture {
+  events: Array<{
+    id: string;
+    summary: string;
+    status: string;
+    start: { date?: string; dateTime?: string; timeZone?: string };
+    end: { date?: string; dateTime?: string; timeZone?: string };
+  }>;
+  requests: Array<{
+    method: string;
+    path: string;
+    query: Record<string, string>;
+  }>;
+}
 export const tenantSecret: string;
 export function mockProxy(options?: {
   frontendOrigin?: string;
-}): Server & { github: GitHubTracker };
+}): Server & { github: GitHubTracker; calendar: CalendarFixture };

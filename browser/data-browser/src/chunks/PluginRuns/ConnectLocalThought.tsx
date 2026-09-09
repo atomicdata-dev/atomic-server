@@ -32,6 +32,10 @@ import {
 import type { Config } from '../../../../../integrations/localthought/plugin';
 import { localImportVerdict } from './localImportVerdict';
 import source from '../../../../../integrations/localthought/plugin.js?raw';
+import {
+  calendarProjection,
+  calendarFields,
+} from '../../../../../integrations/localthought/calendar';
 
 export function ConnectLocalThought({
   drive,
@@ -130,12 +134,13 @@ export function ConnectLocalThought({
     setError('');
 
     try {
-      const fetched = await proxyRequest<FetchedPlatform>(store, 'fetch', {
+      const response = await proxyRequest<FetchedPlatform>(store, 'fetch', {
         drive,
         connection: connection.connection,
         constants,
         ...(platform === 'google-calendar' ? { calendarRange } : {}),
       });
+      const fetched = calendarProjection(response);
       if (fetched.platform !== platform)
         throw new Error('Imported platform did not match this connection');
       const schemaStore = localSchemaStore(store);
@@ -195,13 +200,47 @@ export function ConnectLocalThought({
             [dataBrowser.properties.viewColumns]: columns,
           },
         });
+        const calendar =
+          platform === 'google-calendar' && term.shortname === 'event'
+            ? await ensureInstallationResource(store, drive, {
+                parent: destination.subject,
+                localId: `${identity}:calendar:${term.shortname}`,
+                isA: [dataBrowser.classes.view],
+                propVals: {
+                  [core.properties.name]: tableName,
+                  [dataBrowser.properties.viewKind]: 'calendar',
+                  [dataBrowser.properties.viewGroupBy]:
+                    properties[calendarFields.day],
+                  [dataBrowser.properties.viewColumns]: columns,
+                },
+              })
+            : undefined;
+        const existingViews = destination.get(
+          dataBrowser.properties.tableViews,
+        ) as string[] | undefined;
         await destination.set(dataBrowser.properties.tableViews, [
-          view.subject,
+          ...new Set([
+            ...(existingViews ?? []),
+            view.subject,
+            ...(calendar ? [calendar.subject] : []),
+          ]),
         ]);
-        await destination.set(
+        const currentDefault = destination.get(
           dataBrowser.properties.tableDefaultView,
-          view.subject,
         );
+
+        if (
+          !currentDefault ||
+          (calendar &&
+            !existingViews?.includes(calendar.subject) &&
+            currentDefault === view.subject)
+        ) {
+          await destination.set(
+            dataBrowser.properties.tableDefaultView,
+            calendar?.subject ?? view.subject,
+          );
+        }
+
         await destination.save();
         destinations[term.shortname] = { table: destination.subject, rowClass };
       }
