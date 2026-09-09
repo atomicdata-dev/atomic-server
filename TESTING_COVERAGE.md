@@ -1084,3 +1084,9 @@ cancelled on teardown. Old plugin-name grants are deliberately not migrated.
 commit. It failed with the server signer before `Resource::destroy_as` was used;
 installation deletion must use the same selected identity as create/update.
 LocalThought: Rust handler tests cover connection binding, request signing, duplicate-page rejection, typed paginated previews, and Calendar UTC date-range validation. Live Calendar OAuth, bounded fetch, review/apply and event table display were verified against proxy v39 (54 records).
+
+Google Calendar one-way projection: `integrations/localthought/calendar.test.ts`
+covers all-day/timed start dates, offset boundaries, exclusive end preservation,
+feature notes, cancellations without start data, invalid active events,
+namespace isolation and repeat import/local-field preservation. `browser/e2e/tests/google-calendar-import.spec.ts` covers synthetic provider responses through real schema installation, sandbox review/apply and Calendar rendering, including feature notes. Local verification passed with the React compiler disabled to bypass a dependency-loader problem; live-provider verification of the new view remains outstanding. Missing rows in a bounded snapshot
+are retained, not interpreted as deletions.
