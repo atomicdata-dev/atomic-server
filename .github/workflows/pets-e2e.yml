@@ -2,7 +2,7 @@ name: LocalThought API plugins E2E
 
 on:
   push:
-    branches: [feat/api-plugins, codex/localthought-api-plugins]
+    branches: [feat/api-plugins, codex/localthought-api-plugins, codex/browser-integrations]
 
 permissions:
   contents: read
