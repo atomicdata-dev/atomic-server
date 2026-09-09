@@ -47,6 +47,12 @@ directories = "6"
 dotenv = "0.15"
 futures = "0.3.32"
 percent-encoding = "2.3.2"
+# Iroh's stun-rs 0.1.11 imports precis-core 0.1's Profile trait. The
+# precis-profiles 0.1.14 release switched to precis-core 0.2 and breaks that
+# build after cargo update (including during crate publication, #1404).
+# Keep this in the published manifest so fresh installs are protected too;
+# remove when the Iroh dependency graph uses a compatible stun-rs release.
+precis-profiles = "=0.1.13"
 regex = "1.12.3"
 rio_api = "0.8.6"
 rio_turtle = "0.8.6"

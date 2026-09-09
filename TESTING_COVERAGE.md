@@ -47,6 +47,13 @@ templates, and offline variants stay in the full suite. Policy:
 
 ## Where the suites live
 
+Release dependency regression (#1404): `cargo update -p precis-profiles` followed
+by `cargo check --locked -p stun-rs` checks the server's compatibility constraint
+against fresh registry resolution. Reproduced locally with `stun-rs 0.1.11` and
+`precis-profiles 0.1.14` (12 E0599 errors); the server pins `0.1.13`, which passes.
+This targeted check is manual; the release workflow still lacks a complete
+pre-publication verification of all crates before its first upload.
+
 | Suite | Command | CI job |
 |---|---|---|
 | `atomic_lib` unit + integration | `cargo nextest run -p atomic_lib --features db-redb,iroh,ws` | `rustTest` |
