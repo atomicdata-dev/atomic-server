@@ -12,6 +12,7 @@ import {
   useDialog,
 } from '@components/Dialog';
 import Field from '@components/forms/Field';
+import { FormServerWarning } from '@components/forms/FormServerWarning';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Checkbox, CheckboxLabel } from '@components/forms/Checkbox';
 import { useTableFormColumns } from '../FormBuilder/useTableFormColumns';
@@ -103,6 +104,7 @@ export function CreateTableFormDialog({
         </DialogTitle>
         <DialogContent>
           <Column>
+            <FormServerWarning />
             <Field label='Form name' fieldId={nameId} required>
               <InputWrapper>
                 <InputStyled

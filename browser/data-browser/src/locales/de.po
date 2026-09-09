@@ -8771,3 +8771,15 @@ msgstr "Formular erstellen"
 #: src/chunks/FormBuilder/FormBuilderPage.tsx
 msgid "Back to table"
 msgstr "Zurück zur Tabelle"
+
+#: src/components/forms/FormServerWarning.tsx
+msgid "No server connected"
+msgstr "Kein Server verbunden"
+
+#: src/components/forms/FormServerWarning.tsx
+msgid "You can create and edit this form, but you need to connect to a server before you can publish it and receive responses."
+msgstr "Sie können dieses Formular erstellen und bearbeiten, müssen jedoch eine Verbindung zu einem Server herstellen, bevor Sie es veröffentlichen und Antworten erhalten können."
+
+#: src/chunks/FormBuilder/PublishToggle.tsx
+msgid "Connect to a server to publish or unpublish this form."
+msgstr "Verbinde dich mit einem Server, um dieses Formular zu veröffentlichen oder die Veröffentlichung rückgängig zu machen."

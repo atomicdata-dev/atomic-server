@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 import { styled } from 'styled-components';
 import { Row } from '@components/Row';
 import { Button } from '@components/Button';
+import { useServerConnected } from '../../hooks/useServerConnected';
 import { formatScheduleMoment, getFormAvailability } from './formSchedule';
 
 interface PublishToggleProps {
@@ -19,6 +20,7 @@ interface PublishToggleProps {
  * visitor can currently open.
  */
 export function PublishToggle({ resource }: PublishToggleProps): JSX.Element {
+  const serverConnected = useServerConnected();
   const [publishedAt, setPublishedAt] = useNumber(
     resource,
     forms.properties.formPublishedAt,
@@ -31,7 +33,7 @@ export function PublishToggle({ resource }: PublishToggleProps): JSX.Element {
   const availability = getFormAvailability({ publishedAt, openAt, closeAt });
 
   return (
-    <Row gap="0.5rem" center>
+    <Row gap='0.5rem' center>
       {availability.state === 'not-yet-open' && (
         <Badge title={`Opens ${formatScheduleMoment(availability.opensAt)}`}>
           Scheduled
@@ -43,8 +45,14 @@ export function PublishToggle({ resource }: PublishToggleProps): JSX.Element {
         </Badge>
       )}
       <Button
-        type="button"
+        type='button'
         subtle
+        disabled={!serverConnected}
+        title={
+          serverConnected
+            ? undefined
+            : 'Connect to a server to publish or unpublish this form.'
+        }
         onClick={() => setPublishedAt(isPublished ? undefined : Date.now())}
       >
         {isPublished ? 'Unpublish' : 'Publish'}

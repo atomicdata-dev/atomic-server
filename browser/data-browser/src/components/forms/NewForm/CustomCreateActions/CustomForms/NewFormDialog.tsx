@@ -2,6 +2,7 @@ import { core, forms, dataBrowser, useStore } from '@tomic/react';
 import { useState, useCallback, useEffect, useRef, FormEvent, FC } from 'react';
 import { useSettings } from '../../../../../helpers/AppSettings';
 import { BetaBadge } from '../../../../BetaBadge';
+import { FormServerWarning } from '../../../FormServerWarning';
 import { Button } from '../../../../Button';
 import {
   useDialog,
@@ -151,6 +152,7 @@ export const NewFormDialog: FC<CustomResourceDialogProps> = ({
             <BetaBadge />
           </RelativeDialogTitle>
           <DialogContent>
+            <FormServerWarning />
             <form
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
