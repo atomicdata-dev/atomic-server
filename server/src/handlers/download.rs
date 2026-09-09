@@ -229,6 +229,8 @@ fn serve_processed_image(
 ) -> AtomicServerResult<HttpResponse> {
     use crate::handlers::image::{is_image_bytes, process_image_bytes};
 
+    let quantized = quantize_params(params);
+    let params = &quantized;
     let format = get_format(params)?;
     let cache_key = processed_cache_key(source_hash, &format, params);
 
@@ -275,6 +277,35 @@ fn processed_cache_key(source_hash: &[u8], format: &str, params: &DownloadParams
         params.w.map(|w| w.to_string()).unwrap_or_default(),
     );
     *blake3::hash(canonical.as_bytes()).as_bytes()
+}
+
+/// Largest width a rendition is produced at; wider requests are clamped.
+#[cfg(feature = "img")]
+const MAX_RENDITION_WIDTH: u32 = 4096;
+/// Widths are rounded up to a multiple of this, qualities to whole numbers.
+#[cfg(feature = "img")]
+const RENDITION_WIDTH_STEP: u32 = 64;
+
+/// Snap the rendition parameters onto a small grid before they reach either
+/// the encoder or the cache key. Renditions are persisted per distinct
+/// parameter set and nothing evicts them, so with `q` an `f32` and `w` any
+/// number, a reader of one public image could grow the store without bound by
+/// varying them. On the grid there are at most 100 x 64 renditions per format.
+#[cfg(feature = "img")]
+fn quantize_params(params: &DownloadParams) -> DownloadParams {
+    let q = params.q.map(|q| {
+        let q = if q.is_finite() { q } else { 80.0 };
+        q.round().clamp(1.0, 100.0)
+    });
+    let w = params.w.map(|w| {
+        let w = w.clamp(1, MAX_RENDITION_WIDTH);
+        w.div_ceil(RENDITION_WIDTH_STEP) * RENDITION_WIDTH_STEP
+    });
+    DownloadParams {
+        q,
+        w,
+        f: params.f.clone(),
+    }
 }
 
 fn mimetype_for(format: &str) -> &'static str {

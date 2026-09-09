@@ -1,7 +1,7 @@
 {
   "author": "Ontola, Polle Pas",
   "name": "@tomic/svelte",
-  "version": "0.41.0-beta.5",
+  "version": "0.41.0-beta.6",
   "license": "MIT",
   "homepage": "https://docs.atomicdata.dev/svelte",
   "repository": {

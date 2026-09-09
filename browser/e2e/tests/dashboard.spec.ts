@@ -6,6 +6,7 @@ import {
   newResource,
   pickFromMenu,
   waitForRowsMaterialized,
+  waitForSynced,
   smoke,
 } from './test-utils';
 
@@ -451,11 +452,8 @@ test.describe('dashboards', () => {
       timeout: 15_000,
     });
 
-    await page.waitForFunction(
-      () => window.store?.getSyncStatus().pendingDirtyCount === 0,
-      undefined,
-      { timeout: 30_000 },
-    );
+    await waitForSynced(page);
+
     await page.reload({ waitUntil: 'domcontentloaded' });
 
     await expect(block(page, 'Average spend')).toContainText('236.63', {

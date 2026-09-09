@@ -57,17 +57,19 @@ pub fn get_auth_headers(
     }
 }
 
-fn origin(url: &str) -> String {
+/// The `scheme://authority` part of `url`, or `None` when it has no scheme or
+/// authority. The input is attacker-influenced (it is built from the request
+/// `Host` / forwarded headers and the path), so this must never panic.
+fn origin(url: &str) -> Option<String> {
     if url.starts_with("internal:/") {
-        return url.to_string();
+        return Some(url.to_string());
     }
-    let parsed = Uri::from_str(url).unwrap();
-
-    format!(
+    let parsed = Uri::from_str(url).ok()?;
+    Some(format!(
         "{}://{}",
-        parsed.scheme_str().unwrap(),
-        parsed.authority().unwrap()
-    )
+        parsed.scheme_str()?,
+        parsed.authority()?
+    ))
 }
 
 pub fn get_auth_from_cookie(
@@ -134,7 +136,9 @@ fn get_auth_from_base64(base64: &str, requested_subject: &str) -> AtomicServerRe
             error_resource: None,
         })?;
     let subject_invalid = auth_values.requested_subject.ne(requested_subject)
-        && auth_values.requested_subject.ne(&origin(requested_subject));
+        && origin(requested_subject)
+            .map(|o| auth_values.requested_subject.ne(&o))
+            .unwrap_or(true);
     if subject_invalid {
         // if the subject is invalid, there are two things that could be going on.
         // 1. The requested resource is wrong

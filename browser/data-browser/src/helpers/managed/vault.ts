@@ -253,6 +253,13 @@ export type VaultCapableDb = {
   ): Promise<void> | void;
 };
 
+export class VaultSessionEndedError extends Error {
+  constructor() {
+    super('Your account session has ended. Sign in again to resume backup.');
+    this.name = /* @wc-ignore */ 'VaultSessionEndedError';
+  }
+}
+
 async function api<T>(
   path: string,
   init?: RequestInit & { body?: string },
@@ -263,6 +270,8 @@ async function api<T>(
       ? { 'Content-Type': 'application/json', ...(init?.headers ?? {}) }
       : init?.headers,
   });
+
+  if (response.status === 401) throw new VaultSessionEndedError();
 
   if (!response.ok) {
     // The control plane answers 402 when a plan does not cover this, and the
@@ -505,9 +514,11 @@ export async function backupDrive({
   driveHasCheckpoint,
   observedLanes,
   collisionRetries = 0,
+  beforeNetworkWrite,
 }: {
   db: VaultCapableDb;
   collisionRetries?: number;
+  beforeNetworkWrite?: () => Promise<void>;
   signal?: AbortSignal;
   driveSubject: string;
   drivePseudonym: string;
@@ -540,6 +551,8 @@ export async function backupDrive({
 
   const isCheckpoint = sealedPack.kind === 'checkpoint';
 
+  await beforeNetworkWrite?.();
+  signal?.throwIfAborted();
   const { uploads } = await api<{ uploads: UploadUrl[] }>(
     `/cloud-vault/${drivePseudonym}/upload-urls`,
     {
@@ -604,6 +617,7 @@ export async function backupDrive({
       checkpointN: isCheckpoint ? checkpointN + 1 : checkpointN,
       segment: isCheckpoint ? segment : segment + 1,
       collisionRetries: collisionRetries + 1,
+      beforeNetworkWrite,
     });
   }
 
@@ -636,6 +650,8 @@ export async function backupDrive({
     throw new Error(`Vault upload failed (${put.status})`);
   }
 
+  await beforeNetworkWrite?.();
+  signal?.throwIfAborted();
   await api(`/cloud-vault/${drivePseudonym}/confirm-upload`, {
     method: 'POST',
     signal,
@@ -655,6 +671,8 @@ export async function backupDrive({
   // the next one picks the next number.
   if (isCheckpoint) {
     try {
+      await beforeNetworkWrite?.();
+      signal?.throwIfAborted();
       await api(`/cloud-vault/${drivePseudonym}/checkpoint`, {
         method: 'POST',
         signal,
@@ -665,6 +683,7 @@ export async function backupDrive({
         }),
       });
     } catch (error) {
+      if (error instanceof VaultSessionEndedError) throw error;
       signal?.throwIfAborted();
       console.warn(
         `Vault checkpoint ${checkpointN} was not published; another device likely won the race.`,
@@ -926,6 +945,8 @@ export async function recoverDriveKey({
 const inFlight = new Map<string, Promise<BackupOutcome>>();
 
 export function runVaultBackup(args: {
+  /** Revalidate the account after encryption or storage I/O. */
+  beforeNetworkWrite?: () => Promise<void>;
   signal?: AbortSignal;
   db: VaultCapableDb;
   driveSubject: string;
@@ -953,6 +974,7 @@ export function runVaultBackup(args: {
 
   const pass = (async () => {
     args.signal?.throwIfAborted();
+    await args.beforeNetworkWrite?.();
     const state = await getVaultState(args.drivePseudonym, args.signal);
     args.signal?.throwIfAborted();
 

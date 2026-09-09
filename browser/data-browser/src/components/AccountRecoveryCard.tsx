@@ -12,9 +12,13 @@ import { getManagedAccount, PRODUCT_NAME } from '../helpers/managed';
 import { useSettings } from '../helpers/AppSettings';
 import { fetchManagedInfo } from '../helpers/managedServer';
 import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
-import { getRememberedManagedPortalUrl } from '../helpers/managed/api';
+import {
+  getRememberedManagedPortalUrl,
+  safePortalUrl,
+} from '../helpers/managed/api';
 import {
   addRecoveryCodeWrapper,
+  addPasskeyWrapper,
   buildEnvelopeV2,
   buildEnvelopeWithPasskeyAndCode,
   envelopeWrapperKinds,
@@ -65,6 +69,7 @@ export function AccountRecoveryCard({
   const [newCode, setNewCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
+  const [passkeyAdded, setPasskeyAdded] = useState(false);
   /**
    * The secret being enrolled, typed by the user.
    *
@@ -115,7 +120,9 @@ export function AccountRecoveryCard({
       // still told the reader to sign in, because it keys off `hasSession`
       // alone: instructions to do something with no way to do it.
       setPortalUrl(
-        getManagedPortalUrl(info) ?? getRememberedManagedPortalUrl(),
+        safePortalUrl(
+          getManagedPortalUrl(info) ?? getRememberedManagedPortalUrl(),
+        ) ?? null,
       );
     })();
 
@@ -188,6 +195,8 @@ export function AccountRecoveryCard({
   }, [agentSubject, hasSession]);
 
   async function handleReveal() {
+    if (needsCode && !codeInput.trim()) return;
+
     setLoading(true);
     setError(undefined);
 
@@ -207,17 +216,28 @@ export function AccountRecoveryCard({
       }
 
       setSecret(revealed);
+      setCodeInput('');
       setNeedsCode(false);
     } catch (e) {
       const message =
         e instanceof Error ? e.message : 'Could not show your secret.';
 
       // The helper asks for a code when that's the only way in.
-      if (message.toLowerCase().includes('enter your recovery')) {
+      if (
+        message.toLowerCase().includes('enter your recovery') ||
+        (backup.phase === 'ready' &&
+          envelopeWrapperKinds(backup.secret).hasCode)
+      ) {
         setNeedsCode(true);
       }
 
-      setError(message);
+      setError(
+        !needsCode &&
+          backup.phase === 'ready' &&
+          envelopeWrapperKinds(backup.secret).hasCode
+          ? 'Could not unlock with a passkey. Use your recovery code instead.'
+          : message,
+      );
     } finally {
       setLoading(false);
     }
@@ -379,6 +399,37 @@ export function AccountRecoveryCard({
     }
   }
 
+  async function handleAddPasskey() {
+    if (!needsCode || !codeInput.trim()) {
+      setNeedsCode(true);
+      setError(undefined);
+
+      return;
+    }
+
+    if (!agentSubject) return;
+
+    setLoading(true);
+    setError(undefined);
+    setPasskeyAdded(false);
+
+    try {
+      const saved = await addPasskeyWrapper(
+        codeInput.trim(),
+        agentSubject,
+        accountEmail ?? 'Atomic account',
+      );
+      setBackup({ phase: 'ready', secret: saved, onServer: true });
+      setCodeInput('');
+      setNeedsCode(false);
+      setPasskeyAdded(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add a passkey.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (backup.phase === 'loading') return null;
 
   if (backup.phase === 'none') {
@@ -481,6 +532,61 @@ export function AccountRecoveryCard({
         </Column>
       ) : null}
 
+      {needsCode ? (
+        <InputWrapper hasPrefix>
+          <FaKey />
+          <InputStyled
+            value={codeInput}
+            onChange={e => setCodeInput(e.target.value)}
+            type='password'
+            placeholder='Recovery code'
+            aria-label='Recovery code'
+          />
+        </InputWrapper>
+      ) : null}
+      {hasCode ? (
+        <Column gap='0.5rem'>
+          <Row gap='1rem' wrapItems>
+            <Button
+              subtle
+              disabled={loading}
+              onClick={() => {
+                setNeedsCode(true);
+                setError(undefined);
+              }}
+            >
+              Use recovery code
+            </Button>
+            {hasSession === true ? (
+              <Button
+                subtle
+                disabled={loading || !agentSubject}
+                onClick={handleAddPasskey}
+                data-test='add-passkey'
+              >
+                Add a passkey
+              </Button>
+            ) : portalUrl ? (
+              <Button
+                subtle
+                onClick={() => window.open(`${portalUrl}/dashboard`, '_blank')}
+              >
+                Sign in to add a passkey
+              </Button>
+            ) : null}
+          </Row>
+          {needsCode ? (
+            <Hint>
+              Enter your recovery code to show your secret or add a passkey on
+              this device. Your existing recovery code will keep working.
+            </Hint>
+          ) : null}
+          {passkeyAdded ? (
+            <p>Passkey added. Your recovery code still works.</p>
+          ) : null}
+        </Column>
+      ) : null}
+
       {secret ? (
         <Column gap='0.5rem'>
           <p>
@@ -498,23 +604,11 @@ export function AccountRecoveryCard({
         </Column>
       ) : (
         <Column gap='0.5rem'>
-          {needsCode ? (
-            <InputWrapper hasPrefix>
-              <FaKey />
-              <InputStyled
-                value={codeInput}
-                onChange={e => setCodeInput(e.target.value)}
-                type='password'
-                placeholder='Recovery code'
-                aria-label='Recovery code'
-              />
-            </InputWrapper>
-          ) : null}
           <Row gap='1rem' wrapItems>
             <Button
               subtle
               onClick={handleReveal}
-              disabled={loading}
+              disabled={loading || (needsCode && !codeInput.trim())}
               data-test='reveal-secret'
             >
               {loading ? 'Unlocking…' : 'Show my agent secret'}

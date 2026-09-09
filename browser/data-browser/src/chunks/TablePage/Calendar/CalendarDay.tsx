@@ -15,6 +15,7 @@ interface CalendarDayProps {
   isToday: boolean;
   /** Row subjects whose date value falls on this day. */
   eventSubjects: string[];
+  allDaySubjects: ReadonlySet<string>;
   readOnly: boolean;
   /** Create a row with its date preset to this day. */
   onAddItem: (dayKey: string, name: string) => void | Promise<void>;
@@ -29,6 +30,7 @@ export function CalendarDay({
   inMonth,
   isToday,
   eventSubjects,
+  allDaySubjects,
   readOnly,
   onAddItem,
   onOpenItem,
@@ -73,7 +75,12 @@ export function CalendarDay({
       </CellHeader>
       <EventList>
         {eventSubjects.map(subject => (
-          <CalendarEvent key={subject} subject={subject} onOpen={onOpenItem} />
+          <CalendarEvent
+            key={subject}
+            subject={subject}
+            allDay={allDaySubjects.has(subject)}
+            onOpen={onOpenItem}
+          />
         ))}
         {adding && (
           <AddInput
@@ -102,8 +109,10 @@ export function CalendarDay({
 function CalendarEvent({
   subject,
   onOpen,
+  allDay,
 }: {
   subject: string;
+  allDay: boolean;
   onOpen: (subject: string) => void;
 }): JSX.Element {
   const resource = useResource(subject);
@@ -115,9 +124,11 @@ function CalendarEvent({
       type='button'
       data-testid='calendar-event'
       title={title || subject}
+      data-all-day={allDay || undefined}
       onClick={() => onOpen(subject)}
       onContextMenu={e => openResourceMenu(subject, e)}
     >
+      {allDay && <AllDayLabel>All day</AllDayLabel>}
       {title || subject}
     </EventChip>
   );
@@ -202,4 +213,10 @@ const AddInput = styled(InputStyled)`
   border: 1px solid ${p => p.theme.colors.main};
   border-radius: ${p => p.theme.radius};
   background-color: ${p => p.theme.colors.bg};
+`;
+
+const AllDayLabel = styled.span`
+  font-size: 0.8em;
+  margin-inline-end: 0.4em;
+  opacity: 0.7;
 `;

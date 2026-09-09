@@ -40,5 +40,9 @@ scratchpad
 .bin/
 .fastembed_cache
 
+# Local editor/agent configs and package-manager caches must never be committed.
+.pnpm-store/
+**/zed backup settings.json
+node_modules/
 # Generated integration certification evidence
 /artifacts/integration-certification/

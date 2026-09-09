@@ -10,7 +10,7 @@ name = "atomic-server-tauri"
 # crates.io forbids — see the note on `publish` in ../wasm/Cargo.toml.
 publish = false
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.41.0-beta.5"
+version = "0.41.0-beta.6"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -23,7 +23,10 @@ actix-rt = "2.6.0"
 base64 = "0.22"
 clap = "4"
 serde_json = "1.0"
-tauri = { version = "2", features = ["tray-icon", "image-png", "devtools"] }
+# `devtools` is not in this list on purpose: debug builds get the inspector
+# from tauri regardless, and a release bundle should not ship it. Opt in with
+# the `devtools` feature below when a release build needs one.
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-deep-link = "2"
 tauri-plugin-process = "2"
 # Opening a URL in the system browser: the tray menu, and what an <a
@@ -79,7 +82,7 @@ path = "../server"
 
 [dependencies.atomic_lib]
 path = "../lib"
-features = ["db-redb", "iroh"]
+features = ["db-redb", "iroh", "discovery"]
 
 [dependencies.serde]
 features = ["derive"]
@@ -106,3 +109,6 @@ path = "src/main.rs"
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 default = ["custom-protocol"]
+# Web inspector in a release build: `cargo tauri build --features devtools`.
+# Debug builds (`cargo tauri dev`) have it without this.
+devtools = ["tauri/devtools"]

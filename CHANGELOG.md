@@ -5,6 +5,31 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## UNRELEASED
+
+## [v0.41.0-beta.6] - 2026-09-09
+
+- Desktop restore discovers reachable workspace sources and supports an explicit server address when automatic discovery does not find one.
+
+- **Security audit fixes** (`planning/security-audit-2026-09.md`, #1384).
+  `POST /iroh-sync` requires a signed agent with write on the drive and only
+  answers POST; `SYNC_PUSH` entries are checked against the admitted drive;
+  `https://host/agents/{key}` subjects bind the path key to the signing key
+  and are never fetched from other hosts; a genesis can no longer append to
+  a parent through its own `write` array, squat another agent's
+  `did:ad:agent:` resource, or reserve top-level server paths; the request
+  origin used for token binding honours `Host`/`X-Forwarded-*` only for the
+  configured domain, its tenants and loopback; Iroh `AUTH` proofs name the
+  responder node (`drive#nodeId`, unbound proofs accepted only from paired
+  peers); `/forget-peer` needs write on a drive the peer was paired for;
+  path-only auth signatures are refused; plugin zips and bookmark bodies go
+  through the SSRF guard with size caps; blob responses are hash-checked;
+  ephemeral relays require a subscriber; ACME errors instead of panicking
+  and certificates are renewed daily on disk (restart to serve); the
+  desktop and Android builds bind `127.0.0.1`; `config.toml` is written
+  0600; wasmtime 47. API change: `/plugin-list` and the plugin UI files are
+  read as the calling agent, so clients must sign that request (the
+  data-browser does) or carry the session cookie.
 - Fix: live collaboration stopped for the author of a document after a peer
   edited it. The server stamps `lastCommit` under its own Loro peer after
   applying a commit; the fan-out only forwarded the author's own bytes and

@@ -7,7 +7,12 @@
 // the dialed node still has to prove it holds the same agent key over AUTH
 // before a single resource crosses. See planning/device-pairing.md.
 
-import { decodePairingEnvelope, PairingEnvelopeError } from '@tomic/lib';
+import {
+  decodePairingEnvelope,
+  PairingEnvelopeError,
+  signRequest,
+  type Agent,
+} from '@tomic/lib';
 import { upsertKnownPeer } from './knownPeers';
 import { getLocalServerOrigin } from './tauri';
 
@@ -26,11 +31,16 @@ export type PeerSyncOutcome = {
  * Returns `undefined` when there is no drive to sync yet — the peer is still
  * recorded, so a later sync (Sync page, auto-connect) can use it.
  *
+ * `agent` signs the request: the node only dials a peer on behalf of an agent
+ * with write rights on the drive. Without one the request goes out unsigned
+ * and the node's refusal is what the caller sees.
+ *
  * Throws with a message fit to show the user.
  */
 export async function pairAndSync(
   nodeDid: string,
   drive: string | undefined,
+  agent: Agent | undefined,
 ): Promise<PeerSyncOutcome | undefined> {
   upsertKnownPeer(nodeDid);
 
@@ -40,12 +50,21 @@ export async function pairAndSync(
 
   // Absolute origin: a bare path hits `tauri.localhost`, not the embedded
   // server, inside the desktop/mobile webview.
-  const response = await fetch(`${getLocalServerOrigin()}/iroh-sync`, {
+  const url = `${getLocalServerOrigin()}/iroh-sync`;
+  const baseHeaders = { 'Content-Type': 'application/json' };
+  const headers = agent
+    ? await signRequest(url, agent, baseHeaders)
+    : baseHeaders;
+
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ nodeId: nodeDid, drive }),
   });
-  const data = await response.json();
+  // A refusal (401/403) may not carry JSON; still say what happened.
+  const data = await response.json().catch(() => ({
+    error: `${response.status} ${response.statusText}`.trim(),
+  }));
 
   if (data.error) {
     throw new Error(String(data.error));
@@ -80,6 +99,7 @@ export type PairingRunResult =
 export async function runPairing(
   code: string,
   drive: string | undefined,
+  agent: Agent | undefined,
 ): Promise<PairingRunResult> {
   let node: string;
 
@@ -96,7 +116,7 @@ export async function runPairing(
   }
 
   try {
-    return { ok: true, outcome: await pairAndSync(node, drive) };
+    return { ok: true, outcome: await pairAndSync(node, drive, agent) };
   } catch (e) {
     return {
       ok: false,

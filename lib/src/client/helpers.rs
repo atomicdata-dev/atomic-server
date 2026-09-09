@@ -304,26 +304,30 @@ pub async fn fetch_body(
         .build()
         .map_err(|e| format!("Could not build HTTP client: {}", e))?;
 
-    fetch_body_with_client(&client, url, content_type, client_agent).await
+    fetch_body_with_client(&client, url, content_type, client_agent, None).await
 }
+
+/// Largest body `fetch_body_untrusted` will read: a caller-supplied URL
+/// must not be able to make the server buffer an arbitrarily large response.
+pub const UNTRUSTED_BODY_MAX_BYTES: usize = 10 * 1024 * 1024;
 
 /// Fetches a URL that was supplied by an unauthenticated, external caller
 /// (currently: the `/bookmark` and `/import` endpoints' `url` parameter).
-/// Guards against SSRF — see the `ssrf_guard` module docs above.
+/// Guards against SSRF — see the `ssrf_guard` module docs above — and refuses
+/// bodies over [`UNTRUSTED_BODY_MAX_BYTES`].
 #[tracing::instrument(skip_all)]
 pub async fn fetch_body_untrusted(url: &str, content_type: &str) -> AtomicResult<String> {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL '{url}': {e}"))?;
-        if let Err(e) = ssrf_guard::check_url(&parsed) {
-            return Err(e.into());
-        }
-
-        let client = untrusted_http_client_builder()
-            .build()
-            .map_err(|e| format!("Could not build HTTP client: {}", e))?;
-
-        fetch_body_with_client(&client, url, content_type, None).await
+        let client = untrusted_client_for(url)?;
+        fetch_body_with_client(
+            &client,
+            url,
+            content_type,
+            None,
+            Some(UNTRUSTED_BODY_MAX_BYTES),
+        )
+        .await
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -333,11 +337,112 @@ pub async fn fetch_body_untrusted(url: &str, content_type: &str) -> AtomicResult
     }
 }
 
+/// Downloads raw bytes from a URL that was supplied by a caller (a plugin's
+/// `downloadURL`, say). Same SSRF guard as `fetch_body_untrusted`; the body is
+/// read as a stream and the fetch fails as soon as it passes `max_bytes`, so a
+/// hostile or mis-set `Content-Length` cannot get around the cap either.
+#[tracing::instrument(skip_all)]
+pub async fn fetch_bytes_untrusted(url: &str, max_bytes: usize) -> AtomicResult<Vec<u8>> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let client = untrusted_client_for(url)?;
+    #[cfg(target_arch = "wasm32")]
+    let client = http_client_builder()
+        .build()
+        .map_err(|e| format!("Could not build HTTP client: {}", e))?;
+
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
+    let status = resp.status().as_u16();
+    if status != 200 {
+        return Err(format!("Could not fetch url '{}'. Status: {}", url, status).into());
+    }
+    let body = read_body_bounded(resp, url, max_bytes).await?;
+    crate::metrics::external_fetch();
+    Ok(body)
+}
+
+/// Runs the pre-flight part of the SSRF guard on `url` and returns a client
+/// whose resolver and redirect policy enforce the rest.
+#[cfg(not(target_arch = "wasm32"))]
+fn untrusted_client_for(url: &str) -> AtomicResult<reqwest::Client> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL '{url}': {e}"))?;
+    if let Err(e) = ssrf_guard::check_url(&parsed) {
+        return Err(e.into());
+    }
+
+    untrusted_http_client_builder()
+        .build()
+        .map_err(|e| format!("Could not build HTTP client: {}", e).into())
+}
+
+/// Reads a response body into memory, refusing anything over `max_bytes`:
+/// first by the declared `Content-Length`, then — since that header can be
+/// absent or wrong — by counting the bytes as they stream in.
+async fn read_body_bounded(
+    resp: reqwest::Response,
+    url: &str,
+    max_bytes: usize,
+) -> AtomicResult<Vec<u8>> {
+    if let Some(len) = resp.content_length() {
+        if len > max_bytes as u64 {
+            return Err(format!(
+                "Response from '{}' is too large: {} bytes declared, limit is {} bytes",
+                url, len, max_bytes
+            )
+            .into());
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut resp = resp;
+        let mut body = Vec::new();
+        while let Some(chunk) = resp
+            .chunk()
+            .await
+            .map_err(|e| format!("Error reading response body of {}: {}", url, e))?
+        {
+            if body.len() + chunk.len() > max_bytes {
+                return Err(format!(
+                    "Response from '{}' is too large: exceeds the limit of {} bytes",
+                    url, max_bytes
+                )
+                .into());
+            }
+            body.extend_from_slice(&chunk);
+        }
+        Ok(body)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        // The browser's fetch buffers for us; there is no `chunk()` here.
+        let body = resp
+            .bytes()
+            .await
+            .map_err(|e| format!("Error reading response body of {}: {}", url, e))?;
+        if body.len() > max_bytes {
+            return Err(format!(
+                "Response from '{}' is too large: exceeds the limit of {} bytes",
+                url, max_bytes
+            )
+            .into());
+        }
+        Ok(body.to_vec())
+    }
+}
+
+/// `max_bytes`: cap on the body size, for URLs that came from a caller.
+/// `None` reads the whole body, for URLs the system itself determined.
 async fn fetch_body_with_client(
     client: &reqwest::Client,
     url: &str,
     content_type: &str,
     client_agent: Option<&Agent>,
+    max_bytes: Option<usize>,
 ) -> AtomicResult<String> {
     let mut req = client.get(url).header("Accept", content_type);
     if let Some(agent) = client_agent {
@@ -360,10 +465,17 @@ async fn fetch_body_with_client(
         .await
         .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
     let status = resp.status().as_u16();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Could not parse HTTP response for {}: {}", url, e))?;
+    // Without reqwest's `charset` feature `text()` is exactly this lossy
+    // UTF-8 decode, so the bounded path decodes the same way.
+    let body = match max_bytes {
+        Some(max) => {
+            String::from_utf8_lossy(&read_body_bounded(resp, url, max).await?).into_owned()
+        }
+        None => resp
+            .text()
+            .await
+            .map_err(|e| format!("Could not parse HTTP response for {}: {}", url, e))?,
+    };
     if status != 200 {
         return Err(format!(
             "Could not fetch url '{}'. Status: {}. Body: {}",
@@ -591,5 +703,80 @@ mod ssrf_guard_tests {
     async fn fetch_body_untrusted_blocks_bad_scheme() {
         let result = super::fetch_body_untrusted("file:///etc/passwd", "text/html").await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn fetch_bytes_untrusted_blocks_localhost_and_bad_scheme() {
+        assert!(super::fetch_bytes_untrusted("http://127.0.0.1:1/", 1024)
+            .await
+            .is_err());
+        assert!(super::fetch_bytes_untrusted("file:///etc/passwd", 1024)
+            .await
+            .is_err());
+    }
+}
+
+/// The body cap. These talk to a one-shot loopback server through the plain
+/// (guard-less) client, since the guard refuses loopback and its escape hatch
+/// is process-global; `read_body_bounded` is the same function either way.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bounded_body_tests {
+    use std::io::{Read, Write};
+
+    /// Serves one raw HTTP response on a loopback port, returns its URL.
+    fn one_shot_server(response: Vec<u8>) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            // Read the request head; we do not care what it says.
+            let mut buf = [0u8; 4096];
+            let _ = stream.read(&mut buf);
+            let _ = stream.write_all(&response);
+            let _ = stream.flush();
+        });
+        format!("http://127.0.0.1:{port}/")
+    }
+
+    async fn fetch(url: &str, max_bytes: usize) -> crate::errors::AtomicResult<Vec<u8>> {
+        let client = super::http_client_builder().build().unwrap();
+        let resp = client.get(url).send().await.unwrap();
+        super::read_body_bounded(resp, url, max_bytes).await
+    }
+
+    #[tokio::test]
+    async fn declared_content_length_over_cap_is_refused() {
+        let url = one_shot_server(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n".to_vec(),
+        );
+        let err = fetch(&url, 1024).await.unwrap_err();
+        assert!(err.to_string().contains("too large"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn streamed_body_over_cap_is_refused() {
+        // Chunked, so there is no Content-Length to check up front and the
+        // stream counter has to catch it.
+        let mut response =
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n".to_vec();
+        for _ in 0..4 {
+            response.extend_from_slice(b"400\r\n");
+            response.extend_from_slice(&[b'x'; 0x400]);
+            response.extend_from_slice(b"\r\n");
+        }
+        response.extend_from_slice(b"0\r\n\r\n");
+        let url = one_shot_server(response);
+        let err = fetch(&url, 1024).await.unwrap_err();
+        assert!(err.to_string().contains("too large"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn body_within_cap_is_read_in_full() {
+        let mut response =
+            b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\nConnection: close\r\n\r\n".to_vec();
+        response.extend_from_slice(&[b'y'; 1024]);
+        let url = one_shot_server(response);
+        let body = fetch(&url, 1024).await.unwrap();
+        assert_eq!(body.len(), 1024);
     }
 }

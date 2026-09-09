@@ -96,35 +96,84 @@ fn node_id_from_did(node_did: &str) -> Result<&str, &'static str> {
 
 /// POST /iroh-sync { "nodeId": "did:ad:node:<node-id>", "drive": "..." }
 /// Triggers an Iroh peer sync from the server to the given Node DID.
+///
+/// Requires a signed agent with write rights on `drive`. The dial path applies
+/// what the remote sends with `trust_owned` (we chose to dial it, so a relayed
+/// write to a drive this node owns is accepted), which is exactly why nobody
+/// but a writer of that drive may make this node dial a node of their choosing:
+/// an unauthenticated caller could otherwise point it at a hostile peer that
+/// answers with overwrites and removals for every drive the node owns, and get
+/// that peer recorded as a known, auto-reconnecting device.
 async fn iroh_sync_handler(
     body: web::Json<serde_json::Value>,
     appstate: web::Data<crate::appstate::AppState>,
-) -> actix_web::HttpResponse {
+    req: HttpRequest,
+) -> crate::errors::AtomicServerResult<actix_web::HttpResponse> {
     let node_id = match body.get("nodeId").and_then(|v| v.as_str()) {
         Some(id) => match node_id_from_did(id) {
             Ok(node_id) => node_id,
             Err(error) => {
-                return actix_web::HttpResponse::BadRequest()
-                    .json(serde_json::json!({"error": error}));
+                return Ok(
+                    actix_web::HttpResponse::BadRequest().json(serde_json::json!({"error": error}))
+                );
             }
         },
         None => {
-            return actix_web::HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "Missing nodeId"}));
+            return Ok(actix_web::HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "Missing nodeId"})));
         }
     };
     let drive = match body.get("drive").and_then(|v| v.as_str()) {
         Some(d) => d,
         None => {
-            return actix_web::HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "Missing drive"}));
+            return Ok(actix_web::HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "Missing drive"})));
         }
     };
 
-    match atomic_lib::sync::peer::sync_drive_with_peer_outcome(node_id, drive, &appstate.store)
+    use atomic_lib::Storelike;
+    // The client signs the full request URL; rebuild it exactly.
+    let origin = crate::context::RequestContext::new(&req, &appstate).origin;
+    let full_url = format!("{}{}", origin, req.uri());
+    let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, &full_url).await?;
+    if matches!(for_agent, atomic_lib::agents::ForAgent::Public) {
+        return Err(atomic_lib::errors::AtomicError::unauthorized(
+            "Syncing with a peer requires a signed-in agent with write rights on the drive".into(),
+        )
+        .into());
+    }
+    // A drive this node already holds: the caller must be able to write it.
+    // A drive it has never seen is a bootstrap pull, which is a new drive
+    // arriving here; the sync policy decides who may do that (any signed-in
+    // agent on an open node, only the owner in Owner mode).
+    match appstate
+        .store
+        .get_resource(&atomic_lib::Subject::from(drive))
         .await
     {
-        Ok(outcome) => actix_web::HttpResponse::Ok().json(serde_json::json!({
+        Ok(drive_resource) => {
+            atomic_lib::hierarchy::check_write(&appstate.store, &drive_resource, &for_agent)
+                .await?;
+        }
+        Err(_) => {
+            if !appstate
+                .store
+                .sync_policy()
+                .may_enroll_drive(drive, &for_agent)
+            {
+                return Err(atomic_lib::errors::AtomicError::unauthorized(format!(
+                    "{for_agent} may not bring drive {drive} onto this node"
+                ))
+                .into());
+            }
+        }
+    }
+
+    Ok(
+        match atomic_lib::sync::peer::sync_drive_with_peer_outcome(node_id, drive, &appstate.store)
+            .await
+        {
+            Ok(outcome) => actix_web::HttpResponse::Ok().json(serde_json::json!({
             "count": outcome.count,
             // Both directions. Reporting only `count` (what we pulled) made a
             // pass that pushed 49 resources and pulled 1 read as
@@ -134,12 +183,13 @@ async fn iroh_sync_handler(
             // `peerName` is the remote's self-reported `HELLO` label.
             // Older peers that don't speak HELLO yet send `null`; the UI
             // falls back to a truncated Node DID in that case.
-            "peerName": outcome.peer_name,
-            "status": "ok",
-        })),
-        Err(e) => actix_web::HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": e.to_string()})),
-    }
+                "peerName": outcome.peer_name,
+                "status": "ok",
+            })),
+            Err(e) => actix_web::HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()})),
+        },
+    )
 }
 
 #[cfg(test)]
@@ -216,7 +266,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .guard(guard::Method(Method::POST))
             .to(handlers::forget_peer::handle_forget_peer),
     )
-    .service(web::resource("/iroh-sync").to(iroh_sync_handler))
+    .service(web::resource("/iroh-sync").route(web::post().to(iroh_sync_handler)))
     .service(web::resource("/export").to(handlers::export::handle_export))
     .service(web::resource("/plugin-ui").to(handlers::plugin_ui::handle_plugin_ui))
     .service(

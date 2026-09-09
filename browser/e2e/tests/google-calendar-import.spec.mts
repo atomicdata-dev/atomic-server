@@ -14,6 +14,9 @@ test('Calendar imports, refreshes and persists through the browser with AtomicSe
 }) => {
   test.setTimeout(180_000);
   const proxy = mockProxy({ frontendOrigin: new URL(FRONTEND_URL).origin });
+  const month = new Date().toISOString().slice(0, 7);
+  proxy.calendar.events[0].start = { date: `${month}-10` };
+  proxy.calendar.events[0].end = { date: `${month}-13` };
   await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
   const port = (proxy.address() as { port: number }).port;
   const proxyOrigin = `http://127.0.0.1:${port}`;
@@ -100,7 +103,15 @@ test('Calendar imports, refreshes and persists through the browser with AtomicSe
     };
 
     await apply(2);
-    await expect(page.getByTestId('calendar-event')).toHaveCount(2);
+    for (const day of ['10', '11', '12']) {
+      await expect(
+        page.locator(`[data-date="${month}-${day}"] [data-all-day="true"]`),
+      ).toHaveText('All dayCalendar all-day fixture');
+    }
+    await expect(
+      page.locator(`[data-date="${month}-13"] [data-all-day="true"]`),
+    ).toHaveCount(0);
+    await expect(page.getByTestId('calendar-event')).toHaveCount(4);
     await page.getByText('Calendar timed fixture', { exact: true }).click();
     await expect(page.getByRole('dialog').last()).toContainText(
       'Recurring event',
@@ -130,14 +141,14 @@ test('Calendar imports, refreshes and persists through the browser with AtomicSe
       return { subjects, table, annotated: row.subject };
     });
     await page.reload();
-    await expect(page.getByTestId('calendar-event')).toHaveCount(2);
+    await expect(page.getByTestId('calendar-event')).toHaveCount(4);
     proxy.calendar.events[1].summary = 'Calendar refreshed fixture';
     await setup();
     await apply(1);
     await expect(
       page.getByText('Calendar refreshed fixture', { exact: true }),
     ).toBeVisible();
-    await expect(page.getByTestId('calendar-event')).toHaveCount(2);
+    await expect(page.getByTestId('calendar-event')).toHaveCount(4);
     const restored = await page.evaluate(async saved => {
       const store = window.store!;
       const result = await store.queryLocalDb({

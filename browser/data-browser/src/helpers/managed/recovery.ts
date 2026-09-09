@@ -505,14 +505,6 @@ async function evaluatePrf(
   return results;
 }
 
-async function derivePrfKey(
-  credentialId: Uint8Array,
-  salt: Uint8Array,
-  usages: KeyUsage[],
-): Promise<CryptoKey> {
-  return importPrfKey(await evaluatePrf(credentialId, salt), usages);
-}
-
 /**
  * Whether the new credential is a *synced* passkey (iCloud Keychain, Google
  * Password Manager) or bound to this one device.
@@ -861,28 +853,65 @@ async function openWithDekKey(
   return new TextDecoder().decode(plaintext);
 }
 
-/** Unlock a v2 backup with its registered passkey (one biometric prompt). */
-export async function decryptEnvelopeWithPasskey(
-  recovery: RecoverySecret,
-): Promise<string> {
-  const wrapper = recovery.wrappers.find(
+/** Let the authenticator choose any registered passkey, including one added later. */
+async function unlockPasskeyWrapper(recovery: RecoverySecret) {
+  const wrappers = recovery.wrappers.filter(
     w => w.wrapper_type === 'webauthn-prf' && w.credential_id,
   );
 
-  if (!wrapper?.credential_id) {
-    throw new Error('This backup has no passkey.');
-  }
+  if (!wrappers.length) throw new Error('This backup has no passkey.');
 
-  const wrapKey = await derivePrfKey(
-    base64ToBytes(wrapper.credential_id),
-    base64ToBytes(wrapper.salt),
-    ['decrypt'],
-  );
+  const assertion = (await navigator.credentials.get({
+    publicKey: {
+      challenge: randomBytes(32),
+      rpId: passkeyRpId(),
+      allowCredentials: wrappers.map(w => ({
+        type: 'public-key',
+        id: base64ToBytes(w.credential_id!),
+      })),
+      userVerification: 'required',
+      timeout: WEBAUTHN_TIMEOUT_MS,
+      extensions: {
+        prf: {
+          evalByCredential: Object.fromEntries(
+            wrappers.map(w => [
+              w
+                .credential_id!.replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, ''),
+              { first: base64ToBytes(w.salt) },
+            ]),
+          ),
+        },
+      },
+    },
+  } as CredentialRequestOptions)) as PublicKeyCredential | null;
+  const wrapper =
+    assertion &&
+    wrappers.find(
+      w => w.credential_id === bytesToBase64(new Uint8Array(assertion.rawId)),
+    );
+  const output =
+    assertion &&
+    (assertion.getClientExtensionResults() as PrfExtensionOutputs).prf?.results
+      ?.first;
+
+  if (!wrapper || !output)
+    throw new PrfUnsupportedError('No usable passkey was provided.');
+
+  return { wrapper, key: await importPrfKey(output, ['decrypt']) };
+}
+
+/** Unlock a v2 backup with any of its registered passkeys. */
+export async function decryptEnvelopeWithPasskey(
+  recovery: RecoverySecret,
+): Promise<string> {
+  const { wrapper, key } = await unlockPasskeyWrapper(recovery);
 
   return openWithDekKey(
     recovery,
     wrapper,
-    wrapKey,
+    key,
     'That passkey could not unlock this backup.',
   );
 }
@@ -980,21 +1009,8 @@ export async function addRecoveryCodeWrapper(agentSubject?: string): Promise<{
     throw new Error('There is no backup to add a recovery code to.');
   }
 
-  const passkeyWrapper = recovery.wrappers.find(
-    w => w.wrapper_type === 'webauthn-prf' && w.credential_id,
-  );
-
-  if (!passkeyWrapper?.credential_id) {
-    throw new Error('Adding a recovery code needs an existing passkey.');
-  }
-
-  // Unwrap the DEK itself (not the secret) so every existing wrapper keeps
-  // opening the same ciphertext.
-  const prfKey = await derivePrfKey(
-    base64ToBytes(passkeyWrapper.credential_id),
-    base64ToBytes(passkeyWrapper.salt),
-    ['decrypt'],
-  );
+  const { wrapper: passkeyWrapper, key: prfKey } =
+    await unlockPasskeyWrapper(recovery);
 
   let dek: ArrayBuffer;
 
@@ -1027,6 +1043,67 @@ export async function addRecoveryCodeWrapper(agentSubject?: string): Promise<{
   });
 
   return { recoveryCode, saved };
+}
+
+/** Add a passkey without replacing the recovery code or existing passkeys. */
+export async function addPasskeyWrapper(
+  recoveryCode: string,
+  agentSubject: string,
+  userName: string,
+): Promise<RecoverySecret> {
+  // This is a write: require the current server copy and an account session,
+  // rather than overwriting a newer envelope with a cached version.
+  const recovery = await getRecoverySecret();
+
+  if (!recovery || recovery.agent_subject !== agentSubject) {
+    throw new Error(
+      'Sign in to the account holding this backup before adding a passkey.',
+    );
+  }
+
+  const codeWrapper = recovery.wrappers.find(
+    w => w.wrapper_type === 'recovery-code',
+  );
+
+  if (recovery.format_version < 2 || !codeWrapper) {
+    throw new Error('Adding a passkey needs a recovery code for this backup.');
+  }
+
+  const key = await deriveKeyFromRecoveryCode(
+    normalizeRecoveryCodeInput(recoveryCode),
+    base64ToBytes(codeWrapper.salt),
+    ['decrypt'],
+    codeWrapper.kdf_params,
+  );
+  let dek: ArrayBuffer;
+
+  try {
+    dek = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(codeWrapper.wrap_nonce) },
+      key,
+      base64ToBytes(codeWrapper.wrapped_dek),
+    );
+  } catch {
+    throw new Error('Wrong recovery code');
+  }
+
+  const { wrapper } = await wrapDekWithPasskey(new Uint8Array(dek), {
+    userName,
+    userDisplayName: userName,
+  });
+
+  return saveRecoverySecret({
+    agent_subject: recovery.agent_subject,
+    drive_subject: recovery.drive_subject,
+    encrypted_secret: recovery.encrypted_secret,
+    encryption_algorithm: recovery.encryption_algorithm,
+    nonce: recovery.nonce,
+    format_version: recovery.format_version,
+    wrappers: [
+      ...recovery.wrappers.map(({ created_at: _created, ...rest }) => rest),
+      wrapper,
+    ],
+  });
 }
 
 /**

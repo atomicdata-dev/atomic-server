@@ -302,13 +302,20 @@ jobs:
         if: matrix.os == 'macos-latest' && needs.preflight.outputs.sign_apple != 'true'
         run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
 
+      # The secrets reach the script through `env:`, not `${{ }}` inside
+      # `run:`: an expression is substituted into the script text before the
+      # shell sees it, so a value with a quote or `$` would become shell code.
       - name: Enable notarization
         if: matrix.os == 'macos-latest' && needs.preflight.outputs.notarize == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           {
-            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
-            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
-            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+            echo "APPLE_ID=$APPLE_ID"
+            echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
           } >> "$GITHUB_ENV"
 
       - name: Build and bundle

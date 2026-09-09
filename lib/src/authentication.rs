@@ -49,36 +49,21 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
     let result = verifying_key.verify(message.as_bytes(), &sig);
 
     if result.is_err() {
-        // In multi-tenant environments, the client might sign the full URL or just the path.
-        // If it's a full URL, try checking just the path (with and without query params) as well.
+        // The client may have signed the URL without its query string (e.g.
+        // it signed `http://host/setup` and the request is `/setup?reset=true`).
+        // That form is still bound to the host, so it is accepted.
+        //
+        // A path-only message (`"/setup <ts>"`) is NOT: such a signature is
+        // valid on every host and tenant for the whole timestamp window, and
+        // it sidesteps the WebSocket challenge binding, which relies on the
+        // full requested subject being what was signed.
         if let Ok(url) = url::Url::parse(subject) {
-            let path = url.path();
-            let query = url.query().map(|q| format!("?{}", q)).unwrap_or_default();
-
-            // Try path+query (e.g. /setup?reset=true)
-            let path_and_query = format!("{}{}", path, query);
-            if path_and_query != subject {
-                let message_path = format!("{} {}", path_and_query, &auth_header.timestamp);
-                if verifying_key.verify(message_path.as_bytes(), &sig).is_ok() {
-                    return Ok(());
-                }
-            }
-
-            // Try full URL without query params (e.g. client signed http://host/setup but URL has ?params)
             if url.query().is_some() {
                 let mut url_no_query = url.clone();
                 url_no_query.set_query(None);
                 let message_no_query = format!("{} {}", url_no_query, &auth_header.timestamp);
                 if verifying_key
                     .verify(message_no_query.as_bytes(), &sig)
-                    .is_ok()
-                {
-                    return Ok(());
-                }
-                // Also try path-only without query params
-                let message_path_no_query = format!("{} {}", path, &auth_header.timestamp);
-                if verifying_key
-                    .verify(message_path_no_query.as_bytes(), &sig)
                     .is_ok()
                 {
                     return Ok(());
@@ -158,7 +143,37 @@ pub async fn get_agent_from_auth_values_and_check(
             }
         }
 
-        let agent_resource = store.get_resource(&agent_subject).await?;
+        // Legacy `https://host/agents/{pubkey}` subjects are treated as
+        // `did:ad:agent:{pubkey}` by every rights check, so the key in the
+        // path is the identity being claimed: bind it to the signing key.
+        // Looking the key up in a resource at that URL instead would let
+        // anyone host `https://theirs/agents/<victim key>` carrying their own
+        // key and be authorized as the victim (including as the server's own
+        // root agent, whose key is public).
+        if let Some(path_key) = crate::agents::legacy_agent_pubkey(agent_subject.as_str()) {
+            if public_keys_match(&path_key, public_key_trimmed) {
+                return Ok(ForAgent::AgentSubject(agent_subject));
+            }
+            return Err(format!(
+                "The public key in the auth headers '{}' does not match the agent subject '{}'",
+                public_key_trimmed, auth_vals.agent_subject
+            )
+            .into());
+        }
+
+        // Any other agent subject must be a resource this store already
+        // holds. Never fetch it over the network during authentication: that
+        // is an unauthenticated SSRF, and the fetched body would be written
+        // into the store as a trusted resource.
+        let normalized_agent = store.normalize_subject(&agent_subject);
+        if !normalized_agent.is_local() {
+            return Err(format!(
+                "Agent subject '{}' is hosted elsewhere and cannot be used to authenticate here; sign in with a did:ad:agent identity",
+                auth_vals.agent_subject
+            )
+            .into());
+        }
+        let agent_resource = store.get_resource(&normalized_agent).await?;
         let found_public_key = agent_resource.get(urls::PUBLIC_KEY)?;
         if !public_keys_match(found_public_key.to_string().trim(), public_key_trimmed) {
             Err(
@@ -179,7 +194,7 @@ pub async fn get_agent_from_auth_values_and_check(
 /// legacy standard alphabet with `+` `/` `=`), so an agent whose DID or stored
 /// key was minted with one alphabet still authenticates against an auth header
 /// using the other. Falls back to `false` if either string can't be decoded.
-fn public_keys_match(a: &str, b: &str) -> bool {
+pub fn public_keys_match(a: &str, b: &str) -> bool {
     if a == b {
         return true;
     }

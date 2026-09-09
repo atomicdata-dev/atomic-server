@@ -89,8 +89,10 @@ Google event imports now install a Calendar view alongside the source table.
 The projected date uses the day in Google's supplied start offset (or the
 unchanged all-day date), so mixed all-day/timed events share one DATE column.
 The original Start and End objects retain timezones and exclusive end values.
-The month view shows each event on its start day; it does not draw duration or
-multi-day spans. Additional notes identify recurring events, attendees,
+All-day events display on every covered day, excluding the end date, and are
+marked All day. Their DATE projection does not shift with the viewing timezone.
+Timed events still display on their start day only. Refresh existing imports
+to install the new exclusive end-date projection. Additional notes identify recurring events, attendees,
 reminders and conferencing when those fields are returned by the catalog.
 Recurring instances are expanded by the existing bounded provider fetch.
 
