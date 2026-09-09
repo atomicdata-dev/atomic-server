@@ -104,9 +104,8 @@ expiry. Use `web_time::Instant` so shared blob handling also works in WASM.
 Browser caches can be partial: successful peer reconciliation is not proof of
 complete replication of a remote hosted drive. Frames remain capped at 16 MiB.
 
-The branch starts from `feat/plugin-model` at `f09b0a4af` to preserve the current
-runtime context. Before opening a PR against `develop`, isolate the issue commits
-from any unrelated plugin-branch ancestry.
+The issue commits were rebased onto `develop` for the PR; the original plugin-based
+implementation is preserved on `codex/browser-webrtc-plugin-base`.
 
 Sources: [Iroh browser limitations](https://docs.iroh.computer/languages/wasm-browser)
 and [WebRTC data-channel behavior](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels).

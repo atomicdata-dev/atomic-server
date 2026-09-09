@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Add two-browser peer links on the Sync page with WebRTC collaboration, OPFS reconciliation and attachment sync without a Cloud subscription. Export `BrowserPeerSync`, `WebRtcPeer` and `WebRtcTransport` from `@tomic/lib` ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
+
 ## [v0.41.0-beta.6] - 2026-09-09
 
 - An older server response no longer rolls back the local cache after an edit, fixing dashboard configuration reverting on reload.
