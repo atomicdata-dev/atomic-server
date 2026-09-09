@@ -1,11 +1,5 @@
 import { test, expect } from './fixtures';
-import {
-  before,
-  getDevDriveSecret,
-  signIn,
-  FRONTEND_URL,
-  smoke,
-} from './test-utils';
+import { before, getDevDriveSecret, FRONTEND_URL, smoke } from './test-utils';
 
 /**
  * A second device (or a fresh/cleared OPFS) must load an existing drive's
@@ -61,10 +55,17 @@ test(
 
     const ctx2 = await browser.newContext(); // brand-new context ⇒ empty OPFS
     const p2 = await ctx2.newPage();
-    await p2.goto(FRONTEND_URL);
-    await signIn(p2, secret);
+    // Enter the drive's sign-in screen directly. The bare root redirects
+    // asynchronously, so its transient sidebar is not a sign-in readiness
+    // signal. Let sign-in finish navigating before inspecting the drive; a
+    // forced page.goto here can interrupt identity/ClientDb initialization.
     await p2.goto(
+      `${FRONTEND_URL}/app/welcome?next=${encodeURIComponent(drive)}`,
+    );
+    await p2.getByLabel('Agent secret').fill(secret);
+    await expect(p2).toHaveURL(
       `${FRONTEND_URL}/app/show?subject=${encodeURIComponent(drive)}`,
+      { timeout: 30_000 },
     );
 
     await expect(p2.getByText('SecondDeviceChild').first()).toBeVisible({

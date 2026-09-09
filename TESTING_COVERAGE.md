@@ -162,7 +162,7 @@ Not covered: table `contains`; Playwright search overlay on the KV path; Flutter
 | Add-a-device form validation | `sync-devices.spec.ts` |
 | Sync page status renders | `browser/e2e/tests/sync.spec.ts` |
 | Offline edits persist and sync on reconnect | `sync.spec.ts` |
-| Second device cold-loads a drive from the server | `second-device-load.spec.ts` |
+| Second device cold-loads a drive from the server after explicit secret sign-in and completed navigation | `second-device-load.spec.ts` |
 
 ---
 
