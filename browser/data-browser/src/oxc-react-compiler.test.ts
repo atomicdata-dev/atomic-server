@@ -119,25 +119,34 @@ describe('oxc-transform-react', () => {
     expect(result.code).toContain('react/compiler-runtime');
   });
 
-  it('transforms every app TSX/JSX file without a fatal error', () => {
-    const fatals: string[] = [];
-    let compiled = 0;
+  it(
+    'transforms every app TSX/JSX file without a fatal error',
+    () => {
+      const fatals: string[] = [];
+      let compiled = 0;
 
-    for (const file of walkTsx(srcDir)) {
-      const result = compile(file, readFileSync(file, 'utf8'));
+      for (const file of walkTsx(srcDir)) {
+        const result = compile(file, readFileSync(file, 'utf8'));
 
-      if (result.fatal) {
-        fatals.push(
-          `${file}: ${result.errors.map(error => error.message).join('; ')}`,
-        );
+        if (result.fatal) {
+          fatals.push(
+            `${file}: ${result.errors.map(error => error.message).join('; ')}`,
+          );
+        }
+
+        if (result.code.includes('react/compiler-runtime')) {
+          compiled += 1;
+        }
       }
 
-      if (result.code.includes('react/compiler-runtime')) {
-        compiled += 1;
-      }
-    }
-
-    expect(fatals).toEqual([]);
-    expect(compiled).toBeGreaterThan(400);
-  });
+      expect(fatals).toEqual([]);
+      expect(compiled).toBeGreaterThan(400);
+    },
+    // This compiles every TSX/JSX file under src/ one at a time — cost grows
+    // with the app itself, so vitest's 5000ms default is a budget that was
+    // always going to run out, not a bug in any one file. It just did, on a
+    // loaded CI runner. 20s gives real headroom above the current file count
+    // without hiding an actual hang.
+    20_000,
+  );
 });
