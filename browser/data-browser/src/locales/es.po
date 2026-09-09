@@ -6824,7 +6824,7 @@ msgstr "Un dispositivo siempre encendido tiene una dirección. Uno que llevas co
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. Type it here."
-msgstr ""
+msgstr "Un dispositivo siempre encendido tiene una dirección. Escríbela aquí."
 
 #. 0: detail
 #: src/actions/resourceActions.tsx
@@ -6896,256 +6896,256 @@ msgstr "¿Estás seguro de que quieres eliminar este formulario?"
 
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This workspace has an encrypted backup in Cloud Vault."
-msgstr ""
+msgstr "Este espacio de trabajo tiene una copia de seguridad cifrada en Cloud Vault."
 
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "Restore from Cloud Vault"
-msgstr ""
+msgstr "Restaurar desde Cloud Vault"
 
 #~ msgid "Continue without an account"
 #~ msgstr ""
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Only your passkey opens this account. If it isn't on this device, unlock on the one where you set it up and add a recovery code under Settings — that gets you in anywhere."
-msgstr ""
+msgstr "Solo tu clave de acceso abre esta cuenta. Si no está en este dispositivo, desbloquéala en el que la configuraste y añade un código de recuperación en Ajustes; eso te permitirá acceder desde cualquier lugar."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
-msgstr ""
+msgstr "{0}. Mantenemos tu llave sellada, pero solo tu clave de acceso la abre. Un navegador al que tu clave de acceso no se haya sincronizado no puede recuperarte — un código de recuperación sí."
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Add a recovery code"
-msgstr ""
+msgstr "Añadir un código de recuperación"
 
 #: src/components/IdentityReconcileGate.tsx
 msgid "Signing out…"
-msgstr ""
+msgstr "Cerrando sesión…"
 
 #: src/components/IdentityReconcileGate.tsx
 msgid "Keep this one"
-msgstr ""
+msgstr "Conservar este"
 
 #: src/components/IdentityReconcileGate.tsx
 msgid "This email already has an identity"
-msgstr ""
+msgstr "Este correo electrónico ya tiene una identidad"
 
 #. 0: conflict.managedAccountEmail
 #: src/components/IdentityReconcileGate.tsx
 msgid "{0} is backed up with an identity that is not the one this browser is using. An account has one identity — which one should this be?"
-msgstr ""
+msgstr "{0} está respaldado con una identidad que no es la que este navegador está usando. Una cuenta tiene una identidad: ¿cuál debería ser esta?"
 
 #: src/components/IdentityReconcileGate.tsx
 msgid "Switch to my account's identity"
-msgstr ""
+msgstr "Cambiar a la identidad de mi cuenta"
 
 #: src/components/IdentityReconcileGate.tsx
 msgid "Restores it here. The identity you made in this browser stays reachable only with its agent secret."
-msgstr ""
+msgstr "Lo restaura aquí. La identidad que creaste en este navegador sigue siendo accesible solo con su secreto de agente."
 
 #. 0: PRODUCT_NAME
 #: src/components/IdentityReconcileGate.tsx
 msgid "Signs this browser out of {0}. Nothing here is backed up until it has an account of its own."
-msgstr ""
+msgstr "Cierra la sesión de este navegador en {0}. Nada aquí está respaldado hasta que tenga una cuenta propia."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Your passkey opens this account on this device and wherever it syncs to. This code opens it on every other device — a phone, a different browser, a new computer."
-msgstr ""
+msgstr "Tu clave de acceso abre esta cuenta en este dispositivo y en cualquier lugar donde se sincronice. Este código la abre en cualquier otro dispositivo — un teléfono, un navegador diferente, una computadora nueva."
 
 #~ msgid "{0} Keep it somewhere safe. You'll need it — plus your email — to get back in. We can't show it again, but you can generate a new one from Settings whenever you like."
 #~ msgstr ""
 
 #: src/components/NewIdentitySection.tsx
 msgid "Use your fingerprint, face, or screen lock — the same one that unlocks this device. You'll also get a recovery code for devices your passkey doesn't sync to."
-msgstr ""
+msgstr "Usa tu huella digital, rostro o bloqueo de pantalla — el mismo que desbloquea este dispositivo. También obtendrás un código de recuperación para dispositivos a los que tu clave de acceso no se sincronice."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Keep it somewhere safe. You'll need it — plus your email — to get back in. We can't show it again, but you can generate a new one from Settings whenever you like."
-msgstr ""
+msgstr "Guárdalo en un lugar seguro. Lo necesitarás — junto con tu correo electrónico — para volver a entrar. No podemos mostrarlo de nuevo, pero puedes generar uno nuevo desde Configuración cuando quieras."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Cloud Vault had nothing for this workspace:"
-msgstr ""
+msgstr "Cloud Vault no tenía nada para este espacio de trabajo:"
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Forgot it? Restore from {0}"
-msgstr ""
+msgstr "¿Lo olvidaste? Restáuralo desde {0}"
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Your backup is kept by your {0} account. Connect this device to it to restore."
-msgstr ""
+msgstr "Tu copia de seguridad la mantiene tu cuenta de {0}. Conecta este dispositivo a ella para restaurar."
 
 #. 0: action.label(ctx)
 #: src/actions/deriveTools.ts
 msgid "Cannot {0} this resource."
-msgstr ""
+msgstr "No se puede {0} este recurso."
 
 #. 0: action.label(ctx)
 #: src/actions/deriveTools.ts
 msgid "{0} succeeded."
-msgstr ""
+msgstr "{0} se ha completado correctamente."
 
 #. 0: action.toolName ?? action.id; 1: subject; 2: error
 #: src/actions/deriveTools.ts
 msgid "Error running {0} on {1}: {2}"
-msgstr ""
+msgstr "Error al ejecutar {0} en {1}: {2}"
 
 #: src/actions/deriveTools.ts
 msgid "The subject (URL or #ref) of the resource"
-msgstr ""
+msgstr "El sujeto (URL o #ref) del recurso"
 
 #. 0: ctx.resource.title || ctx.subject
 #: src/actions/resourceActions.tsx
 msgid "Are you sure you want to delete {0}?"
-msgstr ""
+msgstr "¿Está seguro de que desea eliminar {0}?"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Deleting resource"
-msgstr ""
+msgstr "Eliminando recurso"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Toggling favorite"
-msgstr ""
+msgstr "Alternando favorito"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Opening share settings"
-msgstr ""
+msgstr "Abriendo configuración de uso compartido"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Opening history"
-msgstr ""
+msgstr "Abriendo historial"
 
 #: src/actions/appActions.ts
 msgid "Open the command palette to find resources and run actions."
-msgstr ""
+msgstr "Abre la paleta de comandos para encontrar recursos y ejecutar acciones."
 
 #: src/actions/appActions.ts
 msgid "Open the list of keyboard shortcuts."
-msgstr ""
+msgstr "Abre la lista de atajos de teclado."
 
 #: src/actions/appActions.ts
 msgid "Open the home page."
-msgstr ""
+msgstr "Abre la página de inicio."
 
 #: src/actions/appActions.ts
 msgid "Create a new resource."
-msgstr ""
+msgstr "Crea un nuevo recurso."
 
 #: src/actions/appActions.ts
 msgid "Open the actions menu for the current resource."
-msgstr ""
+msgstr "Abre el menú de acciones para el recurso actual."
 
 #: src/actions/appActions.ts
 msgid "Open your agent / user settings."
-msgstr ""
+msgstr "Abre la configuración de tu agente/usuario."
 
 #: src/actions/appActions.ts
 msgid "Open appearance and theme settings."
-msgstr ""
+msgstr "Abre la configuración de apariencia y tema."
 
 #: src/actions/appActions.ts
 msgid "Lock or unlock the sidebar."
-msgstr ""
+msgstr "Bloquea o desbloquea la barra lateral."
 
 #: src/components/OverlayContainer.tsx
 msgid "Actions"
-msgstr ""
+msgstr "Acciones"
 
 #: src/components/OverlayContainer.tsx
 msgid "<0/> open / run"
-msgstr ""
+msgstr "<0/> abrir / ejecutar"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Open <0>Sync</0> there and scan or paste its code here."
-msgstr ""
+msgstr "Abre <0>Sincronizar</0> allí y escanea o pega su código aquí."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "…or let it scan this one"
-msgstr ""
+msgstr "…o deja que escanee este"
 
 #. 0: serverLabel(baseURL)
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "It syncs your workspace to {0}, which this browser reads from."
-msgstr ""
+msgstr "Sincroniza tu espacio de trabajo con {0}, desde donde este navegador lee."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Connect a server that has it"
-msgstr ""
+msgstr "Conectar un servidor que lo tenga"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Restore your workspace"
-msgstr ""
+msgstr "Restaurar tu espacio de trabajo"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Bring your data back"
-msgstr ""
+msgstr "Recupera tus datos"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "There’s an encrypted backup, sealed so only you can open it."
-msgstr ""
+msgstr "Hay una copia de seguridad cifrada, sellada para que solo tú puedas abrirla."
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Your backup is kept by your {0} account. Sign in to it and it comes back here."
-msgstr ""
+msgstr "Tu copia de seguridad se guarda en tu cuenta de {0}. Inicia sesión y volverá aquí."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Signing in restores who you are. Your workspace still lives on the device you made it with."
-msgstr ""
+msgstr "Iniciar sesión restaura quién eres. Tu espacio de trabajo aún vive en el dispositivo con el que lo creaste."
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Sign in to {0}"
-msgstr ""
+msgstr "Inicia sesión en {0}"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "I’ve signed in — check again"
-msgstr ""
+msgstr "He iniciado sesión — compruébalo de nuevo"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "…or bring it over from another device"
-msgstr ""
+msgstr "…o tráelo desde otro dispositivo"
 
 #. 0: providerName(portalUrl)
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Couldn’t reach {0}. Check your connection and try again."
-msgstr ""
+msgstr "No se pudo contactar con {0}. Verifica tu conexión e inténtalo de nuevo."
 
 #. 0: providerName(portalUrl)
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect to {0}"
-msgstr ""
+msgstr "Conectar con {0}"
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
-msgstr ""
+msgstr "Esta aplicación no puede iniciar sesión por sí sola, así que apruebala desde donde ya estés. Luego puede mantener una copia cifrada de tus espacios de trabajo — sellada aquí, así que"
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "stores it without being able to read it."
-msgstr ""
+msgstr "la almacena sin poder leerla."
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Verified"
-msgstr ""
+msgstr "Verificado"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Unverified"
-msgstr ""
+msgstr "No verificado"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Signature checked against the signer's key"
-msgstr ""
+msgstr "Firma comprobada contra la clave del firmante"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Envelope present, but its signature did not verify"
-msgstr ""
+msgstr "Sobre presente, pero su firma no se pudo verificar"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "No signed envelope covers this change on this node"
-msgstr ""
+msgstr "Ningún sobre firmado cubre este cambio en este nodo"
 
 #~ msgid "Edited <0/>{0} {1} {2}"
 #~ msgstr ""
@@ -7158,131 +7158,131 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
-msgstr ""
+msgstr "Esta unidad usa una dirección de servidor heredada. Cloud Server requiere una unidad DID portátil."
 
 #: src/routes/SyncRoute.tsx
 msgid "Sign-in wasn’t completed — hosting setup was cancelled."
-msgstr ""
+msgstr "El inicio de sesión no se completó — la configuración de alojamiento fue cancelada."
 
 #: src/routes/SyncRoute.tsx
 msgid "Could not set up Cloud Server."
-msgstr ""
+msgstr "No se pudo configurar Cloud Server."
 
 #: src/routes/SyncRoute.tsx
 msgid "Cloud Server received this workspace. Your source server is still connected."
-msgstr ""
+msgstr "Cloud Server recibió este espacio de trabajo. Tu servidor de origen aún está conectado."
 
 #: src/routes/SyncRoute.tsx
 msgid "Connected to Cloud Server. Syncing this workspace…"
-msgstr ""
+msgstr "Conectado a Cloud Server. Sincronizando este espacio de trabajo…"
 
 #: src/routes/SyncRoute.tsx
 msgid "Keep this workspace available when your devices are offline, with shareable links, search, and API access."
-msgstr ""
+msgstr "Mantén este espacio de trabajo disponible cuando tus dispositivos estén fuera de línea, con enlaces compartibles, búsqueda y acceso a la API."
 
 #~ msgid "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
 #~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Cloud Server is on"
-msgstr ""
+msgstr "Cloud Server está encendido"
 
 #: src/routes/SyncRoute.tsx
 msgid "Sync again"
-msgstr ""
+msgstr "Sincronizar de nuevo"
 
 #: src/routes/SyncRoute.tsx
 msgid "Finish Cloud Server setup"
-msgstr ""
+msgstr "Finalizar la configuración de Cloud Server"
 
 #: src/routes/SyncRoute.tsx
 msgid "This workspace has been copied to Cloud Server. You’re still using the source server."
-msgstr ""
+msgstr "Este espacio de trabajo ha sido copiado a Cloud Server. Aún estás usando el servidor de origen."
 
 #: src/routes/SyncRoute.tsx
 msgid "Use Cloud Server"
-msgstr ""
+msgstr "Usar Cloud Server"
 
 #: src/routes/SyncRoute.tsx
 msgid "See plans"
-msgstr ""
+msgstr "Ver planes"
 
 #: src/routes/SyncRoute.tsx
 msgid "<0>Local:</0> data stays on your devices unless you connect a service or share it."
-msgstr ""
+msgstr "<0>Local:</0> los datos permanecen en tus dispositivos a menos que conectes un servicio o los compartas."
 
 #: src/routes/SyncRoute.tsx
 msgid "<0>Cloud Vault:</0> an encrypted backup that the provider cannot read. It does not host your workspace."
-msgstr ""
+msgstr "<0>Cloud Vault:</0> una copia de seguridad cifrada que el proveedor no puede leer. No aloja tu espacio de trabajo."
 
 #: src/routes/SyncRoute.tsx
 msgid "<0>Cloud Server:</0> you agree to us storing and processing a readable copy of this drive to provide hosting. Your sharing permissions still control other users’ access."
-msgstr ""
+msgstr "<0>Cloud Server:</0> aceptas que almacenemos y procesemos una copia legible de esta unidad para proporcionar alojamiento. Tus permisos de uso compartido aún controlan el acceso de otros usuarios."
 
 #: src/routes/SyncRoute.tsx
 msgid "Agree and enable Cloud Server"
-msgstr ""
+msgstr "Aceptar y habilitar Cloud Server"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to your personal drive."
-msgstr ""
+msgstr "Cambiar a su unidad personal."
 
 #: src/hooks/useDriveHostingStates.ts
 msgid "Cloud unknown"
-msgstr ""
+msgstr "Nube desconocida"
 
 #: src/hooks/useDriveHostingStates.ts
 msgid "Checking cloud…"
-msgstr ""
+msgstr "Comprobando nube…"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Server"
-msgstr ""
+msgstr "Servidor"
 
 #: src/helpers/managed/driveHostingState.ts
 #: src/helpers/managed/driveHostingState.ts
 msgid "Server setup"
-msgstr ""
+msgstr "Configuración del servidor"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Server paused"
-msgstr ""
+msgstr "Servidor pausado"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Server error"
-msgstr ""
+msgstr "Error del servidor"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Server unknown"
-msgstr ""
+msgstr "Servidor desconocido"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Local"
-msgstr ""
+msgstr "Local"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Remote"
-msgstr ""
+msgstr "Remoto"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Vault"
-msgstr ""
+msgstr "Cofre"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Vault setup"
-msgstr ""
+msgstr "Configuración del cofre"
 
 #: src/helpers/managed/driveHostingState.ts
 msgid "Vault paused"
-msgstr ""
+msgstr "Cofre pausado"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Storage and hosting"
-msgstr ""
+msgstr "Almacenamiento y alojamiento"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
-msgstr ""
+msgstr "Local permanece en sus dispositivos. Vault es una copia de seguridad cifrada. Servidor aloja una copia legible. Remoto es otro servidor conectado."
 
 #~ msgid "Hosting needs a Server plan. After payment, return here to finish setup."
 #~ msgstr ""
@@ -7292,48 +7292,48 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
-msgstr ""
+msgstr "El contenido existente permanece en esta unidad. El alojamiento requiere un plan Server o una invitación para esta unidad."
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
-msgstr ""
+msgstr "Comentarios"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Send feedback"
-msgstr ""
+msgstr "Enviar comentarios"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Sending feedback"
-msgstr ""
+msgstr "Enviando comentarios"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Thank you. Your feedback has been received."
-msgstr ""
+msgstr "Gracias. Su comentario ha sido recibido."
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback could not be sent. Your text is still here. Try again or email"
-msgstr ""
+msgstr "No se pudo enviar el comentario. Su texto aún está aquí. Intente de nuevo o envíe un correo electrónico"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
-msgstr ""
+msgstr "Reporte un error o sugiera una mejora. Su mensaje y correo electrónico opcional se envían al equipo de Atomic a través de Sentry. Deje fuera el contenido del espacio de trabajo privado."
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback <0/>"
-msgstr ""
+msgstr "Comentarios <0/>"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Email for a reply (optional) <0/>"
-msgstr ""
+msgstr "Correo electrónico para una respuesta (opcional) <0/>"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback reporting is unavailable on this installation. Email"
-msgstr ""
+msgstr "El informe de comentarios no está disponible en esta instalación. Correo electrónico"
 
 #: src/components/Drives/PrivateDriveBadge.tsx
 msgid "Private"
-msgstr ""
+msgstr "Privado"
 
 #: src/components/Share/ShareDialog.tsx
 msgid "Copy link"
@@ -7345,19 +7345,19 @@ msgstr "Avanzado"
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "under"
-msgstr ""
+msgstr "debajo"
 
 #: src/routes/Share/ShareRoute.tsx
 msgid "Read more about permissions in the"
-msgstr ""
+msgstr "Leer más sobre permisos en el"
 
 #: src/routes/Share/ShareRoute.tsx
 msgid "Atomic Data Docs"
-msgstr ""
+msgstr "Documentos de Atomic Data"
 
 #: src/components/ResourceContextMenu/index.tsx
 msgid "Are you sure you want to delete"
-msgstr ""
+msgstr "¿Estás seguro de que quieres eliminar"
 
 #: src/chunks/TablePage/TableExportDialog.tsx
 #: src/views/File/DownloadButton.tsx
@@ -7370,24 +7370,24 @@ msgstr "Agregar clase"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Edited"
-msgstr ""
+msgstr "Editado"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "by"
-msgstr ""
+msgstr "por"
 
 #. 0: shortPeer
 #: src/routes/History/VersionTitle.tsx
 msgid "by peer {0}"
-msgstr ""
+msgstr "por peer {0}"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Unattributed"
-msgstr ""
+msgstr "Sin atribuir"
 
 #: src/chunks/TablePage/TableExportDialog.tsx
 msgid "Reference resources by subject instead of name."
-msgstr "Referenciar recursos por sujeto en lugar de nombre."
+msgstr "Referencia los recursos por tema en lugar de por nombre."
 
 #: src/components/forms/FilePicker/FilePicker.tsx
 msgid "Preparing file…"
@@ -7399,7 +7399,7 @@ msgstr ""
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Restore"
-msgstr ""
+msgstr "Restaurar"
 
 #: src/views/OntologyPage/NewPropertyButton.tsx
 msgid "Add property"
@@ -7429,7 +7429,7 @@ msgstr "Editando"
 
 #: src/components/ForkBar.tsx
 msgid "Merge"
-msgstr ""
+msgstr "Fusionar"
 
 #: src/components/forms/ResourceField.tsx
 msgid "This field is calculated server-side."
@@ -7445,15 +7445,15 @@ msgstr "Typescript"
 
 #: src/routes/AppSettings.tsx
 msgid "Colorful mode"
-msgstr ""
+msgstr "Modo colorido"
 
 #: src/routes/AppSettings.tsx
 msgid "Enable Ontology panel"
-msgstr "Activar panel de Ontología"
+msgstr "Habilitar panel de ontología"
 
 #: src/routes/AppSettings.tsx
 msgid "Enable AIChats panel"
-msgstr "Habilitar el panel de AIChats"
+msgstr "Habilitar panel de chats de IA"
 
 #: src/routes/AppSettings.tsx
 msgid "Hide templates on new resource page"
@@ -7461,11 +7461,11 @@ msgstr "Ocultar plantillas en la página de nuevo recurso"
 
 #: src/routes/AppSettings.tsx
 msgid "Disable page transition animations"
-msgstr "Desactivar animaciones de transición de página"
+msgstr "Deshabilitar animaciones de transición de página"
 
 #: src/routes/AppSettings.tsx
 msgid "Enable keyboard drag & drop in sidebar"
-msgstr "Activar arrastrar y soltar con el teclado en la barra lateral"
+msgstr "Habilitar arrastrar y soltar con teclado en la barra lateral"
 
 #: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx
@@ -7478,7 +7478,7 @@ msgstr "Leyendo"
 
 #: src/views/Plugin/PluginPage.tsx
 msgid "Config"
-msgstr "Configuración"
+msgstr "Config"
 
 #: src/chunks/Plugins/UpdatePluginButton.tsx
 msgid "Update"
@@ -7490,11 +7490,11 @@ msgstr "Contexto compactado"
 
 #: src/routes/SyncRoute.tsx
 msgid "unsynced"
-msgstr ""
+msgstr "no sincronizado"
 
 #: src/routes/SyncRoute.tsx
 msgid "Recent activity"
-msgstr ""
+msgstr "Actividad reciente"
 
 #: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
 msgid "Resource with error"
@@ -7506,102 +7506,102 @@ msgstr "Asignar derechos"
 
 #: src/helpers/managed/vault.ts
 msgid "Your account session has ended. Sign in again to resume backup."
-msgstr ""
+msgstr "La sesión de tu cuenta ha finalizado. Inicia sesión de nuevo para reanudar la copia de seguridad."
 
 #: src/components/TeamProfileStep.tsx
 msgid "Full name"
-msgstr ""
+msgstr "Nombre completo"
 
 #~ msgid "Profile picture (optional) <0/>"
 #~ msgstr ""
 
 #: src/components/TeamProfileStep.tsx
 msgid "Save and continue"
-msgstr ""
+msgstr "Guardar y continuar"
 
 #: src/components/TeamProfileStep.tsx
 msgid "Picture ready to save."
-msgstr ""
+msgstr "Imagen lista para guardar."
 
 #: src/components/TeamProfileStep.tsx
 msgid "How your colleagues see you"
-msgstr ""
+msgstr "Cómo te ven tus colegas"
 
 #: src/components/TeamProfileStep.tsx
 msgid "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
-msgstr ""
+msgstr "Usa tu nombre completo y una foto para que la gente te reconozca. Esto actualiza tu perfil de Atomic dondequiera que colabores."
 
 #: src/components/TeamProfileStep.tsx
 msgid "You can add or change your picture later in your profile."
-msgstr ""
+msgstr "Puedes añadir o cambiar tu foto más tarde en tu perfil."
 
 #: src/routes/SyncRoute.tsx
 msgid "Your Cloud Server subscription is active"
-msgstr ""
+msgstr "Tu suscripción a Cloud Server está activa"
 
 #: src/routes/SyncRoute.tsx
 msgid "Your Cloud Server trial is active"
-msgstr ""
+msgstr "Tu prueba de Cloud Server está activa"
 
 #: src/components/TeamProfileStep.tsx
 msgid "Profile picture (optional)"
-msgstr ""
+msgstr "Foto de perfil (opcional)"
 
 #~ msgid "Your selected profile picture"
 #~ msgstr ""
 
 #: src/components/TeamProfileStep.tsx
 msgid "Your selected avatar"
-msgstr ""
+msgstr "Tu avatar seleccionado"
 
 #~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
 #~ msgstr ""
 
 #: src/components/InviteForm.tsx
 msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
-msgstr ""
+msgstr "Los espectadores son gratuitos. Permitir ediciones requiere un asiento de editor de equipo para Cloud Server."
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
-msgstr ""
+msgstr "Ollama local detectado"
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Looking for local Ollama…"
-msgstr ""
+msgstr "Buscando Ollama local…"
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama could not be reached. Start Ollama and connect."
-msgstr ""
+msgstr "No se pudo alcanzar Ollama local. Inicie Ollama y conéctese."
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Use local Ollama"
-msgstr ""
+msgstr "Usar Ollama local"
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Connect local Ollama"
-msgstr ""
+msgstr "Conectar Ollama local"
 
 #: src/components/InviteForm.tsx
 msgid "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
-msgstr ""
+msgstr "Cloud Server: cada editor usa un asiento en esta unidad. Un editor existente en esta unidad cuenta una vez. Los espectadores son gratuitos."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Find your workspace"
-msgstr ""
+msgstr "Encuentra tu espacio de trabajo"
 
 #~ msgid "Looking for your workspace on your other devices…"
 #~ msgstr ""
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "We couldn’t find a reachable device with your workspace."
-msgstr ""
+msgstr "No pudimos encontrar un dispositivo accesible con tu espacio de trabajo."
 
 #~ msgid "We found your workspace on {0}."
 #~ msgstr ""
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "Fetch a copy to this device so you can open it here."
-msgstr ""
+msgstr "Obtén una copia en este dispositivo para poder abrirlo aquí."
 
 #~ msgid "Fetching workspace…"
 #~ msgstr ""
@@ -7611,62 +7611,62 @@ msgstr ""
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "Look here"
-msgstr ""
+msgstr "Mira aquí"
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "Address where your workspace lives"
-msgstr ""
+msgstr "Dirección donde reside tu espacio de trabajo"
 
 #~ msgid "We found your workspace on {0} ."
 #~ msgstr ""
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "A device was found, but this account cannot read the workspace there."
-msgstr ""
+msgstr "Se encontró un dispositivo, pero esta cuenta no puede leer el espacio de trabajo allí."
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "We could not check your workspace. Try again or enter its address below."
-msgstr ""
+msgstr "No pudimos verificar tu espacio de trabajo. Inténtalo de nuevo o ingresa su dirección a continuación."
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "Connection details"
-msgstr ""
+msgstr "Detalles de conexión"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Your secret was accepted. Preparing this device…"
-msgstr ""
+msgstr "Tu secreto fue aceptado. Preparando este dispositivo…"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Checking for your workspace on this device…"
-msgstr ""
+msgstr "Buscando tu espacio de trabajo en este dispositivo…"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Checking whether your account has a backup to restore…"
-msgstr ""
+msgstr "Verificando si tu cuenta tiene una copia de seguridad para restaurar…"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Looking for a device that has your workspace…"
-msgstr ""
+msgstr "Buscando un dispositivo que tenga tu espacio de trabajo…"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Fetching your workspace to this device…"
-msgstr ""
+msgstr "Obteniendo tu espacio de trabajo en este dispositivo…"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "Opening your workspace"
-msgstr ""
+msgstr "Abriendo tu espacio de trabajo"
 
 #: src/views/getting-started/WorkspaceLoading.tsx
 msgid "This may take a little while. Please keep this window open."
-msgstr ""
+msgstr "Esto puede tomar un momento. Por favor, mantén esta ventana abierta."
 
 #: src/views/getting-started/DiscoverWorkspace.tsx
 msgid "We found your workspace"
-msgstr ""
+msgstr "Encontramos tu espacio de trabajo"
 
 #: src/routes/SyncRoute.tsx
 msgid "This device does not have this workspace yet. Fetch it from a device that has it."
-msgstr ""
+msgstr "Este dispositivo no tiene este espacio de trabajo aún. Obtenlo de un dispositivo que lo tenga."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not add a passkey."
@@ -7682,7 +7682,7 @@ msgstr "Clave de acceso añadida. Tu código de recuperación sigue funcionando.
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
-msgstr ""
+msgstr "Un código de recuperación es una llave de repuesto para cuando tu clave de acceso no esté disponible. Necesitarás tu correo electrónico para usarlo, por lo que es seguro mantenerlo en papel."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Add a passkey"
@@ -7698,11 +7698,11 @@ msgstr "Usar código de recuperación"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Sign in to add a recovery code"
-msgstr ""
+msgstr "Inicia sesión para agregar un código de recuperación"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
-msgstr ""
+msgstr "<0>Guarda este código de recuperación.</0> Te permite volver a acceder en un nuevo dispositivo, y necesitarás tu correo electrónico con él. No podemos mostrarlo de nuevo, pero puedes generar uno nuevo aquí en cualquier momento, lo que retira este."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
@@ -8677,4 +8677,4 @@ msgstr "Conéctate a un servidor para publicar o despublicar este formulario."
 
 #: src/routes/SyncRoute.tsx
 msgid "Error: Sign in before syncing with another device"
-msgstr ""
+msgstr "Error: Inicia sesión antes de sincronizar con otro dispositivo"
