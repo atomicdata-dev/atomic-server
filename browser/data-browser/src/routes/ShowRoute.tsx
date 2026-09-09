@@ -11,6 +11,8 @@ import { isOriginWithoutNode } from '../helpers/originNode';
 
 export type ShowRouteSearch = {
   subject: string;
+  /** Explicit workspace selection, as used by the portal Open action. */
+  drive?: string;
   /**
    * The active View of a Table, so switching tabs is linkable and lands in
    * browser history. Absent = the table's default view.
@@ -24,6 +26,10 @@ export const ShowRoute = createRoute({
   getParentRoute: () => appRoute,
   validateSearch: (search): ShowRouteSearch => ({
     subject: (search.subject as string) ?? '',
+    drive:
+      typeof search.drive === 'string' && Client.isValidSubject(search.drive)
+        ? search.drive
+        : undefined,
     view: (search.view as string) || undefined,
   }),
 });
@@ -32,7 +38,9 @@ export const ShowRoute = createRoute({
 export const ShowComponent: React.FunctionComponent = () => {
   // Value shown in navbar, after Submitting
   const subject = ShowRoute.useSearch({ select: state => state.subject });
-  const { agent } = useSettings();
+  const requestedDrive = ShowRoute.useSearch({ select: state => state.drive });
+  const view = ShowRoute.useSearch({ select: state => state.view });
+  const { agent, drive, setDrive } = useSettings();
   const store = useStore();
   const navigate = useNavigate();
 
@@ -46,6 +54,13 @@ export const ShowComponent: React.FunctionComponent = () => {
     !agent &&
     Client.isValidSubject(subject) &&
     isOriginWithoutNode(store.getServerUrl());
+
+  React.useEffect(() => {
+    if (signInFirst || !requestedDrive || requestedDrive !== subject) return;
+    if (drive !== requestedDrive) setDrive(requestedDrive);
+    // Consume the instruction so a later manual drive switch is not undone.
+    navigate({ to: paths.show, search: { subject, view }, replace: true });
+  }, [signInFirst, requestedDrive, subject, view, drive, setDrive, navigate]);
 
   React.useEffect(() => {
     if (!signInFirst) return;
