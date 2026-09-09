@@ -158,6 +158,21 @@ function portalFromEnv(): string | null {
   return fromEnv ? trimTrailingSlashes(fromEnv) : null;
 }
 
+/**
+ * Whether this install knows of a control plane at all. A FOSS or self-hosted
+ * node has no SaaS session to end, and its origin answers `/api/logout` with a
+ * 405 that the browser logs as an error. Ported from #1386.
+ */
+export function hasManagedApi(): boolean {
+  return Boolean(
+    getLinkedPortalOrigin() ||
+    (typeof import.meta !== 'undefined' &&
+      import.meta.env?.VITE_MANAGED_API_BASE) ||
+    getRememberedManagedPortalUrl() ||
+    portalFromEnv(),
+  );
+}
+
 /** Base URL of the control-plane API (includes the `/api` prefix). */
 export function getManagedApiBase(): string {
   // A linked device talks to the portal that issued its token and nothing
