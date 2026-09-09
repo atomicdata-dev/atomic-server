@@ -418,7 +418,7 @@ Everything else is open to an anonymous socket and gated per subject by
 | `3` | `UNAUTHORIZED_WRITE` | The signer has no write right on the target or its parents. Blocking, not terminal. |
 | `4` | `MISSING_CLASS` | The commit names a class this node does not hold, so validation cannot run. Blocking, not terminal: the class may still arrive. |
 | `5` | `AUTH_REQUIRED` | The frame needs an authenticated session. `request_id = 0`. |
-| `6` | `SYNC_REJECTED` | A `SYNC_PUSH` was refused as a whole and nothing from it landed. `request_id = 0`. Message: `SYNC_PUSH rejected for drive <drive>: <reason>`. |
+| `6` | `SYNC_REJECTED` | A commit was refused by node enrollment/quota policy, or a `SYNC_PUSH` was refused as a whole. Keep local edits; stop unbounded retries. Commits carry their request ID; `SYNC_PUSH` uses `request_id = 0` and message `SYNC_PUSH rejected for drive <drive>: <reason>`. |
 | `7` | `UNAUTHORIZED_READ` | A subscription or a read-side reconcile frame was refused. `request_id = 0`. Message: `<FRAME> refused for <subject>: <reason>`. |
 | `8` | `AUTH_FAILED` | An `AUTH` frame was refused. `request_id = 0`. |
 | `9` | `INVALID_SIGNATURE` | A `COMMIT` whose signature does not verify against its signer's key, or that has none. Terminal for that envelope: sign again. |

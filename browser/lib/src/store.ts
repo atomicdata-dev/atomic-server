@@ -5544,6 +5544,18 @@ export class Store {
         return await ws.postCommit(commit);
       } catch (e) {
         if (e instanceof RequestCancelledError) throw e;
+        // A server refusal is an answer, not a broken transport. Retrying the
+        // same rejected commit over HTTP only duplicates the failed write.
+        const message = e instanceof Error ? e.message : String(e);
+        const code = e instanceof AtomicError ? e.code : undefined;
+
+        if (
+          isUnrecoverableCommitError(message, code) ||
+          isTerminalCommitError(message, code)
+        ) {
+          throw e;
+        }
+
         // Fall through to HTTP — a broken WS shouldn't block saves while
         // the reconnect timer is still backing off. The WS error already
         // surfaced in console; the HTTP path will produce its own.

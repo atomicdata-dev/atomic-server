@@ -1,5 +1,5 @@
 import { RequestCancelledError } from './error.js';
-import { describe, it, beforeEach, vi } from 'vitest';
+import { describe, it, beforeEach, vi, expect as assert } from 'vitest';
 import {
   LocalOutbox,
   isTerminalCommitErrorMessage,
@@ -587,6 +587,44 @@ describe('LocalOutbox blocking', () => {
       vi.setSystemTime(now);
     }
   }
+
+  it.each([
+    'Drive did:ad:private is not enrolled for sync on this node.',
+    'Drive did:ad:private has reached its storage quota on this node.',
+  ])(
+    'parks managed-node refusals without dropping edits: %s',
+    async message => {
+      vi.useFakeTimers();
+
+      try {
+        const outbox = new LocalOutbox();
+        outbox.markDirty(SUBJECT);
+        const drainSubject = vi.fn(async () => {
+          throw new Error(message);
+        });
+        const ctx = blockingCtx(drainSubject);
+        await drainUntilBlocked(outbox, ctx);
+        assert(outbox.getEntry(SUBJECT)?.blocked).toBe(true);
+        assert(outbox.size).toBe(1);
+        assert(outbox.nextDueAt()).toBeUndefined();
+        assert(isTerminalCommitError(message)).toBe(false);
+        assert(
+          isUnrecoverableCommitError(
+            'localized refusal',
+            ErrorCode.SYNC_REJECTED,
+          ),
+        ).toBe(true);
+        vi.setSystemTime(1_000_000);
+        await outbox.drain(ctx);
+        assert(drainSubject).toHaveBeenCalledTimes(BLOCK_AFTER_FAILURES);
+        // A new edit after enrollment re-arms the preserved write.
+        outbox.markDirty(SUBJECT);
+        assert(outbox.getEntry(SUBJECT)?.blocked).toBeFalsy();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it('retries a blocking error first, then parks after sustained failures', async ({
     expect,
