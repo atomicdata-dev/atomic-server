@@ -1096,3 +1096,13 @@ schema/proposal/apply, Calendar display, provider updates, OPFS reload and
 stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
 Live-provider browser OAuth verification remains separate from this fixture test.
+
+
+Google Calendar two-way existing-event edits: `integrations/localthought/calendar-sync.test.ts`
+checks three-way field merges, title aliases, ETag rejection, stale local reviews,
+changes during requests, idempotent recovery after a lost checkpoint, time/date
+validation, duplicate identities, unsupported fields and permission failures.
+`browser.test.ts` checks conditional-header forwarding through rotating credentials.
+The companion proxy suite checks write scopes, CORS preflight and upstream
+If-Match forwarding. New event creation/deletion, live OAuth reconsent and live
+Google writes are not covered; the existing Calendar E2E covers inbound imports.

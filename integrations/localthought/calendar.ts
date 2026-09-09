@@ -100,7 +100,7 @@ export function calendarProjection(fetched: FetchedPlatform): FetchedPlatform {
         throw new Error(
           `Calendar event ${row.id} has no offset-qualified start time`,
         );
-      const notes = ['One-way import: edits stay in Atomic'];
+      const notes = ['Use Preview edits for Google to sync Name, Description, Location, Start and End'];
       if (cancelled) notes.push('Cancelled in Google; retained in Atomic');
       if (
         row.values['recurring-event-id'] ||

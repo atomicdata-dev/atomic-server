@@ -158,3 +158,23 @@ it('supports the demo callback and write credentials without using the import en
   ).toEqual({ status: 201, body: '{"id":1}' });
   expect(JSON.parse([...values.values()][0]).code).toBe('next');
 });
+it('forwards the conditional event version while keeping authorization host-owned', async () => {
+  const { client, start, http } = setup();
+  const { state } = await start();
+  client.finish('drive', 'actor', state, 'first');
+  http.mockImplementation(async (_url, init) => {
+    expect(init?.headers).toEqual({
+      Authorization: 'Bearer first',
+      'Content-Type': 'application/json',
+      'If-Match': '"version"',
+    });
+    expect(init?.method).toBe('PATCH');
+    expect(init?.body).toBe('{"summary":"Updated"}');
+    return new Response('{}', { headers: { 'x-connection-code': 'next' } });
+  });
+  await client.request('drive', 'actor', state, 'pets', '/events/id', {
+    method: 'PATCH',
+    body: '{"summary":"Updated"}',
+    ifMatch: '"version"',
+  });
+});
