@@ -4730,6 +4730,7 @@ msgstr ""
 msgid "Could not copy — select and copy the code manually."
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/ConnectServerDialog.tsx
 #: src/components/ConnectToDeviceForm.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
@@ -6656,6 +6657,7 @@ msgstr ""
 msgid "Cloud Vault is not available here: {0}."
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
 msgstr ""
@@ -7392,6 +7394,7 @@ msgstr ""
 msgid "Private"
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/Share/ShareDialog.tsx
 msgid "Copy link"
 msgstr "Copiar enlace"

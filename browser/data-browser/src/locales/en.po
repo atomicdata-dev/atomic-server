@@ -4764,6 +4764,7 @@ msgstr "Pairing code copied."
 msgid "Could not copy — select and copy the code manually."
 msgstr "Could not copy — select and copy the code manually."
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/ConnectServerDialog.tsx
 #: src/components/ConnectToDeviceForm.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
@@ -6690,6 +6691,7 @@ msgstr "A hosted workspace on {0}: shareable links, search across everything, AP
 msgid "Cloud Vault is not available here: {0}."
 msgstr "Cloud Vault is not available here: {0}."
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
 msgstr "Disconnect"
@@ -7426,6 +7428,7 @@ msgstr "Feedback reporting is unavailable on this installation. Email"
 msgid "Private"
 msgstr "Private"
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/Share/ShareDialog.tsx
 msgid "Copy link"
 msgstr "Copy link"
