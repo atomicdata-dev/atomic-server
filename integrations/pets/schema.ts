@@ -1,5 +1,5 @@
 // @wc-ignore-file
-import { Datatype, type SchemaSpec } from '../../browser/lib/src/index.js';
+import { core, Datatype, type SchemaSpec } from '../../browser/lib/src/index.js';
 
 /**
  * Code-first ontology for the trivial demo Pets collection. Shared within a
@@ -20,12 +20,21 @@ export function petsSchema(): SchemaSpec {
     ],
   ];
   return {
-    properties: fields.map(([shortname, name, description, datatype]) => ({
-      shortname,
-      name,
-      description,
-      datatype,
-    })),
+    properties: [
+      {
+        subject: core.properties.name,
+        shortname: 'name',
+        name: 'Name',
+        description: 'The name of the pet.',
+        datatype: Datatype.STRING,
+      },
+      ...fields.map(([shortname, name, description, datatype]) => ({
+        shortname,
+        name,
+        description,
+        datatype,
+      })),
+    ],
     classes: [
       {
         shortname: 'pet',
@@ -33,7 +42,7 @@ export function petsSchema(): SchemaSpec {
         description:
           'A demo companion animal. Static sample data, not a live provider.',
         requires: ['pet-species', 'pet-source-id'],
-        recommends: ['pet-breed', 'pet-age', 'pet-mood'],
+        recommends: ['name', 'pet-breed', 'pet-age', 'pet-mood'],
       },
     ],
   };

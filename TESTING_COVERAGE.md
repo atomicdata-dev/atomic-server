@@ -63,6 +63,8 @@ back to POST; tagged database values previously broke the enable button.
 The Pets flow verifies the bundled card's title and setup label, installs its
 connection, approves its five proposed creates, and finds Rex, Whiskers, Tweety,
 Nibbles and Bubbles in the resulting table.
+Run it against a production build to catch missing translation catalog entries:
+Vite dev extracts them automatically and can hide blank production labels.
 The GitHub setup flow also covers opting into assistant-led automation creation:
 request and integration context survive a model-setup handoff, and source editing
 stays collapsed. A unit test checks draft/context binding. The advanced path still

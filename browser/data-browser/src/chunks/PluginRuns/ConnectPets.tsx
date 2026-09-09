@@ -76,11 +76,11 @@ export function ConnectPets({ drive }: { drive: string }) {
           [core.properties.name]: 'Pets',
           [dataBrowser.properties.viewKind]: 'table',
           [dataBrowser.properties.viewColumns]: [
-            'pet-species',
-            'pet-breed',
-            'pet-age',
-            'pet-mood',
-          ].map(key => terms.properties[key]),
+            core.properties.name,
+            ...['pet-species', 'pet-breed', 'pet-age', 'pet-mood'].map(
+              key => terms.properties[key],
+            ),
+          ],
         },
       });
       await view.save();
@@ -104,7 +104,11 @@ export function ConnectPets({ drive }: { drive: string }) {
         source,
         input: {
           config,
-          trigger: { kind: 'manual', at: Date.now(), subject: resource.subject },
+          trigger: {
+            kind: 'manual',
+            at: Date.now(),
+            subject: resource.subject,
+          },
         },
       });
       if (result.error || !result.verdict)
@@ -120,8 +124,8 @@ export function ConnectPets({ drive }: { drive: string }) {
   return (
     <Column gap='0.75rem'>
       <p>
-        Installs five trivial demo pets into a Pets table. No external
-        account, API key or network call is used.
+        Installs five trivial demo pets into a Pets table. No external account,
+        API key or network call is used.
       </p>
       <Button disabled={busy} onClick={install}>
         {busy
