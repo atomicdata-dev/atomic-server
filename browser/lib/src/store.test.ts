@@ -74,7 +74,6 @@ describe('Store', () => {
   }) => {
     const { store } = await testStore();
     const resource = await store.newResource({
-      isA: core.classes.resource,
       propVals: { [core.properties.name]: 'Before' },
     });
     await resource.save();
