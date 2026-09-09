@@ -497,3 +497,7 @@ the drive or pairing; a stranger is rejected. The local Tauri debug build connec
 to staging's advertised Iroh node and received a no-readable-data response for its
 test identity. Live drive and node PKARR signatures were verified separately.
 This does not yet prove restoration of the user's private staging workspace.
+
+## Recovery-code passkey enrollment
+
+`browser/data-browser/src/helpers/managed/recovery-enrollment.test.ts` verifies code-only reveal without WebAuthn, preservation of ciphertext and existing wrappers when adding a passkey, unlocking with either passkey, and no writes on wrong-code, account-mismatch or cancelled registration. Tests use WebCrypto, Argon2id and a simulated authenticator; physical mobile PRF support remains a device acceptance check.

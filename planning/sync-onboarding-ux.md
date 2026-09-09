@@ -204,3 +204,7 @@ self-reported display labels, never identity or authorization evidence.
 Flutter already attempts PKARR through `syncConnectivityNow`; its automatic
 fetch behavior is unchanged in this desktop debugging change. The new shared
 Rust inspection is available for a future matching confirmation step there.
+
+### Account recovery after code sign-in
+
+The browser/Tauri Account recovery card offers recovery-code unlock independently of passkeys, including after a WebAuthn failure. A portal session plus the existing recovery code can add a passkey without replacing the code or older passkeys. Each passkey uses its own PRF salt. Flutter has no corresponding envelope-management card yet.

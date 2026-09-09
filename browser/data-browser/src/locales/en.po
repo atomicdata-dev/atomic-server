@@ -5663,6 +5663,7 @@ msgid "Use a recovery code instead"
 msgstr "Use a recovery code instead"
 
 #: src/components/AccountRecoveryCard.tsx
+#: src/components/AccountRecoveryCard.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Atomic account"
 msgstr "Atomic account"
@@ -7013,6 +7014,7 @@ msgstr "Only your passkey opens this account. If it isn't on this device, unlock
 msgid "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 msgstr "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Add a recovery code"
 msgstr "Add a recovery code"
@@ -7704,3 +7706,43 @@ msgstr "We found your workspace"
 #: src/routes/SyncRoute.tsx
 msgid "This device does not have this workspace yet. Fetch it from a device that has it."
 msgstr "This device does not have this workspace yet. Fetch it from a device that has it."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not add a passkey."
+msgstr "Could not add a passkey."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+msgstr "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Passkey added. Your recovery code still works."
+msgstr "Passkey added. Your recovery code still works."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+msgstr "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Add a passkey"
+msgstr "Add a passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a passkey"
+msgstr "Sign in to add a passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use recovery code"
+msgstr "Use recovery code"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a recovery code"
+msgstr "Sign in to add a recovery code"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not unlock with a passkey. Use your recovery code instead."
+msgstr "Could not unlock with a passkey. Use your recovery code instead."
