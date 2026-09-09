@@ -1046,6 +1046,9 @@ export class AtomicServer {
     // (it overwrites OS /lib). Mount alongside browser and resolve via alias in vite.config.
     const sourceContainer = workspaceContainer
       .withDirectory('/app', browser)
+      // Integration sources live at the repository root. The browser mounts at
+      // /app, and its raw imports resolve these paths from /integrations.
+      .withDirectory('/integrations', this.source.directory('integrations'))
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
       // Provide the prebuilt WASM artifacts so data-browser's `build` can skip
       // wasm-pack when `SKIP_WASM_BUILD=1` (`wasm-pack` isn't available in this
