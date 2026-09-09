@@ -9659,3 +9659,11 @@ msgstr ""
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Events before (UTC)"
 msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "LocalThought tenant secret"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+msgstr ""

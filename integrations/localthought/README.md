@@ -1,40 +1,67 @@
-# LocalThought API plugins
+# LocalThought browser integrations
 
-AtomicServer reads `/catalog` from `https://localthought.io` and offers one
-connection card per advertised platform. It loads `/catalog/{platform}.yaml`
-for collection discovery, required scope parameters, pagination and ontology.
+The LocalThought flow runs entirely in the browser: catalog discovery, tenant
+challenge signing, OAuth return handling, paginated Syncables reads, ontology
+creation, proposal review and local Store/OPFS writes. No AtomicServer HTTP
+instance is needed. LocalThought remains the remote OAuth and API proxy.
 
-`syncables-rs` is pinned in `server/Cargo.toml`. Its `SyncClient` receives the
-catalog's overlaid OpenAPI document and a host-owned transport that forwards
-GET requests through `/proxy/{platform}/{path}`, preserving query parameters
-and pagination headers. Rotating connection codes are held in AtomicServer's
-secret store, scoped to a connection, drive and authenticated agent. The
-browser carries a one-time OAuth return code to signed completion and removes
-it from the address bar. Tenant secrets and provider tokens never enter graph
-resources, plugin source or browser storage.
+Open Integrations, select a platform and paste your `TENANT_SECRET`. It is used
+in tab memory to sign the handoff and is not persisted. OAuth returns to the
+same frontend `/app/integrations` page. The short-lived return is bound to the
+agent, drive and proxy; its code is removed from the address bar immediately.
+Connection codes are stored in this browser's localStorage, outside the synced
+graph, and may be read by code running on this frontend origin. Clearing site
+data requires reconnecting. Existing server-held connections require reconnecting.
+Web Locks serialize rotating codes across tabs; a request consumes its code
+before dispatch and saves the replacement before processing data. Uncertain
+requests cannot silently replay credentials.
 
-Each platform gets drive-local classes and properties derived by Syncables.
-The platform ID prefixes every generated schema identity. Scalars retain their
-datatypes; RFC3339 timestamps become milliseconds; arrays and nested objects
-use Atomic JSON properties. API-required fields are recommended in Atomic
-because nullable/partial API representations may omit them. Each resource type
-gets a table and view. The shared sandbox importer proposes changes for review,
-uses provider/resource/namespace/ID for reconciliation, and preserves local edits.
-A failed collection aborts the preview instead of applying a partial snapshot.
+Syncables is vendored temporarily under `syncables/` with upstream provenance in
+`UPSTREAM.md`; the matching upstream branch is `codex/browser-integrations`.
+`wasm/src/integrations.rs` exposes its in-memory engine through wasm-bindgen.
+The shipped pure import mapper reads a local snapshot and produces the existing
+reviewed intents; user-edited plugin source is not executed on this path.
+Local edits and repeated imports retain the existing reconciliation behavior.
 
-This is a manual read/import flow, with limits of 200 requests, 5,000 records,
-10 MB per page/document and 120 seconds per import. No provider writes or
-background syncing are enabled. The existing direct GitHub token workflow
-remains available explicitly in the GitHub connection dialog.
+## Build and proxy requirements
 
-## Server configuration
+- Build `atomic-wasm` using `cd browser/data-browser && pnpm build:wasm`.
+- Set `VITE_INTEGRATION_PROXY_URL` at frontend build/dev time to override the
+  default `https://localthought.io`. HTTPS or loopback HTTP origins only.
+- Deploy the companion integration-proxy CORS change. It handles preflights for
+  explicit Authorization headers and exposes `X-Connection-Code`, `Link`,
+  pagination/count headers, `ETag` and `Retry-After`. Cookie credentials are not
+  enabled; login and consent use top-level navigation.
+- Native AtomicServer's `TENANT_SECRET`, `ATOMIC_INTEGRATION_PROXY_URL` and
+  `ATOMIC_INTEGRATION_FRONTEND_ORIGIN` no longer configure this flow. Its
+  `/integration-proxy/*` handlers and Syncables dependency have been removed.
 
-- `TENANT_SECRET`: the LocalThought tenant secret, stored only on AtomicServer.
-- `ATOMIC_INTEGRATION_FRONTEND_ORIGIN`: exact frontend origin, e.g.
-  `https://your-atomic-app.example` (no trailing slash). Returns must use its
-  `/app/integrations` path.
-- `ATOMIC_INTEGRATION_PROXY_URL`: optional; defaults to `https://localthought.io`.
-  Loopback HTTP is accepted for development.
+Limits remain 200 requests, 5,000 records, 10 MB per page/document and 120
+seconds of network work. Calendar imports require explicit UTC date bounds.
+Imports are manual; closed tabs do not run schedules. Other legacy integrations,
+server plugin execution, actions and schedules are outside this migration.
+
+## Checks
+
+```sh
+cargo check -p atomic-wasm --target wasm32-unknown-unknown
+browser/node_modules/.bin/vitest run --config integrations/localthought/vitest.config.ts
+node integrations/localthought/wasm-smoke.mjs # after building wasm/pkg
+```
+
+For the browser-only mock journey (no AtomicServer on port 19999):
+
+```sh
+MOCK_PROXY_PORT=19091 MOCK_FRONTEND_ORIGIN=http://localhost:6748 node integrations/localthought/mock-proxy.mjs
+# Separate terminal, browser/data-browser:
+VITE_INTEGRATION_PROXY_URL=http://127.0.0.1:19091 VITE_ATOMIC_SERVER_URL=http://127.0.0.1:19999 pnpm exec vite --host 127.0.0.1 --port 6748
+# Repository root:
+node integrations/localthought/browser-smoke.mjs
+```
+
+The mock is test-only. It uses synthetic credentials and data; never deploy it.
+
+## Historical server-flow verification
 
 Live verification on 2026-09-09 succeeded against proxy Heroku release v38
 (`5960ae43`): OAuth returned to AtomicServer, Syncables fetched 29 issue/PR
@@ -55,44 +82,3 @@ An unbounded fetch successfully traversed multiple pages but exceeded the
 5,000-record preview limit; the UI now defaults to the next 30 days. Date
 bounds and recurrence expansion are passed to Syncables as collection query
 settings. The importer remains a manual snapshot, not a background sync.
-
-## Local mock and tests
-
-The mock is test-only, with a synthetic tenant, consent screen, expiring-by-use
-challenges, rotating single-use codes, and an OpenAPI document serving five
-Pets over two pages. Never deploy it as a real credential service.
-
-```sh
-node integrations/localthought/mock-proxy.mjs
-```
-
-Start AtomicServer with:
-
-```sh
-TENANT_SECRET=bW9jay10ZW5hbnQ.mock-signature \
-ATOMIC_INTEGRATION_PROXY_URL=http://127.0.0.1:19090 \
-ATOMIC_INTEGRATION_FRONTEND_ORIGIN=http://localhost:6747 \
-ATOMICSERVER_SKIP_JS_BUILD=true \
-cargo run -p atomic-server --features light,wasm-plugins -- --port 9883
-```
-
-Run one Vite server with `VITE_ATOMIC_SERVER_URL=http://localhost:9883`, then:
-
-```sh
-cd browser/e2e
-ATOMIC_MOCK_INTEGRATION_PROXY=1 pnpm exec playwright test tests/plugins.spec.ts \
-  --project chromium --grep 'Pets imports'
-```
-
-Additional checks from the repository root:
-
-```sh
-node --test integrations/localthought/mock-proxy.test.mjs
-browser/node_modules/.bin/vitest run --config integrations/localthought/vitest.config.ts
-browser/node_modules/.bin/tsc -p integrations/localthought/tsconfig.json
-ATOMICSERVER_SKIP_JS_BUILD=true cargo test -p atomic-server --lib \
-  --features light,wasm-plugins integration_proxy
-```
-
-Dagger's E2E server starts the mock alongside AtomicServer, and the focused
-GitHub Actions workflow runs the typed Pets journey on the API-plugin branches.

@@ -3,7 +3,7 @@ import {
   core,
   dataBrowser,
   ensureSchema,
-  executeServerPlugin,
+  pluginSchema,
   useStore,
   type Resource,
 } from '@tomic/react';
@@ -12,10 +12,13 @@ import { Column } from '@components/Row';
 import Field from '@components/forms/Field';
 import { Input, ErrMessage } from '@components/forms/InputStyles';
 import { AtomicLink } from '@components/AtomicLink';
-import { pluginClassesFor } from './runScript';
-import { ensureInstallationResource } from './installationResources';
+import {
+  localSchemaStore,
+  ensureLocalInstallationResource as ensureInstallationResource,
+} from './installationResources';
 import { RunPluginDialog } from './RunPluginDialog';
 import {
+  browserIntegrations,
   connectionKey,
   platformName,
   proxyRequest,
@@ -27,6 +30,7 @@ import {
   type FetchedPlatform,
 } from '../../../../../integrations/localthought/schema';
 import type { Config } from '../../../../../integrations/localthought/plugin';
+import { localImportVerdict } from './localImportVerdict';
 import source from '../../../../../integrations/localthought/plugin.js?raw';
 
 export function ConnectLocalThought({
@@ -55,6 +59,7 @@ export function ConnectLocalThought({
     start: new Date().toISOString().slice(0, 10),
     end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
   }));
+  const [tenantSecret, setTenantSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<{
@@ -65,13 +70,10 @@ export function ConnectLocalThought({
   const [tables, setTables] = useState<string[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(
-      `${store.getServerUrl()}/integration-proxy/platform?platform=${encodeURIComponent(platform)}`,
-      { signal: controller.signal },
-    )
-      .then(async response => {
-        if (!response.ok) throw new Error(await response.text());
-        const data = await response.json();
+    browserIntegrations()
+      .describe(platform)
+      .then(data => {
+        if (controller.signal.aborted) return;
         setParameters(data.parameters);
         setCollections(data.collections);
         setConstants(
@@ -104,7 +106,12 @@ export function ConnectLocalThought({
       const result = await proxyRequest<{ url: string; state: string }>(
         store,
         'start',
-        { drive, platform, returnUrl: `${location.origin}/app/integrations` },
+        {
+          drive,
+          platform,
+          tenantSecret,
+          returnUrl: `${location.origin}/app/integrations`,
+        },
       );
       sessionStorage.setItem(
         'localthought-pending',
@@ -131,7 +138,8 @@ export function ConnectLocalThought({
       });
       if (fetched.platform !== platform)
         throw new Error('Imported platform did not match this connection');
-      const terms = await pluginClassesFor(store, drive);
+      const schemaStore = localSchemaStore(store);
+      const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
       const identity = `localthought:${connection.connection}:${JSON.stringify(Object.entries(constants).sort())}`;
       const resource = await ensureInstallationResource(store, drive, {
@@ -145,7 +153,7 @@ export function ConnectLocalThought({
         },
       });
       const schema = await ensureSchema(
-        store,
+        schemaStore,
         drive,
         platformSchema(platform, fetched.ontology.terms),
       );
@@ -203,24 +211,13 @@ export function ConnectLocalThought({
         localthought: { ...config, connection: connection.connection },
       });
       await resource.save();
-      const result = await executeServerPlugin(store, {
-        drive,
-        plugin: resource.subject,
-        source,
-        input: {
-          config: { ...config, records: fetched.records },
-          trigger: {
-            kind: 'manual',
-            at: Date.now(),
-            subject: resource.subject,
-          },
-        },
+      const verdict = await localImportVerdict(store, drive, {
+        ...config,
+        records: fetched.records,
       });
-      if (result.error || !result.verdict)
-        throw new Error(result.error ?? 'Import returned no preview');
       setPreview({
         resource,
-        verdict: result.verdict,
+        verdict,
         tables: Object.values(destinations).map(d => d.table),
       });
     } catch (reason) {
@@ -236,7 +233,21 @@ export function ConnectLocalThought({
         Connect your personal account through LocalThought, then return here to
         preview an import.
       </p>
-      <Button disabled={busy} onClick={connect}>
+      <Field fieldId='tenant-secret' label='LocalThought tenant secret'>
+        <Input
+          id='tenant-secret'
+          type='password'
+          autoComplete='off'
+          value={tenantSecret}
+          onChange={e => setTenantSecret(e.target.value)}
+          disabled={busy}
+        />
+      </Field>
+      <p>
+        The tenant secret is used in this tab. Connection credentials stay in
+        this browser.
+      </p>
+      <Button disabled={busy || !tenantSecret} onClick={connect}>
         {connection ? 'Reconnect account' : 'Install and connect'}
       </Button>
       {connection && (

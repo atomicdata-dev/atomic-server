@@ -1,5 +1,18 @@
 # Testing coverage map
 
+LocalThought browser migration: `integrations/localthought/browser.test.ts`
+covers tenant HMAC, actor/drive ownership, rotation before dispatch, pagination,
+uncertain-response refusal and cross-origin pagination refusal. The real generated
+WASM bundle is exercised by `wasm-smoke.mjs` for pagination, typed ontology,
+timestamps and provider failures. `browser-smoke.mjs` exercises the complete
+mock consent/import/review/OPFS/reload journey with AtomicServer unavailable
+(verified locally). Local installation/schema lookup tests reject missing or
+incomplete local databases rather than inferring permission to create duplicates.
+The companion Syncables branch has 142 passing native tests and a wasm32 build;
+the companion proxy branch has 39 passing tests including CORS preflight and
+exposed headers. Live OAuth on the browser path still requires deployment of
+the companion proxy CORS change and is not yet verified.
+
 What is tested, at which layer, and — the part that matters — **what is not**.
 
 This exists because the protocol is far better tested than the glue around it,
@@ -65,12 +78,12 @@ return to the same drive, rotating connection codes, two-page Syncables fetch,
 review/apply, and five displayed records with integer/boolean/float/timestamp
 properties. Dagger starts the mock for E2E; local runs opt in with
 `ATOMIC_MOCK_INTEGRATION_PROXY=1` and the README configuration.
-`integration_proxy` Rust tests cover actor/drive binding, tenant HMAC,
+`browser.test.ts` and the real WASM smoke cover actor/drive binding, tenant HMAC,
 Syncables pagination/ontology and duplicate-page refusal. The mock's Node test
 covers invalid tenant proofs and replayed/rotated codes. The mapping tests cover
 typed proposals, missing identities, repeat imports, local edits and duplicates.
-Live catalog OAD endpoints currently return 404 (integration-proxy #25), so live
-OAuth and GitHub data fetching are not yet certified.
+The historical server path was live-verified for GitHub and Google Calendar.
+The new browser path awaits deployment of the companion proxy CORS change.
 Run it against a production build to catch missing translation catalog entries:
 Vite dev extracts them automatically and can hide blank production labels.
 The GitHub setup flow also covers opting into assistant-led automation creation:

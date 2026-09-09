@@ -62,3 +62,12 @@ OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
 Main run 34350517612 passed dependency installation with the shared locks, then
 failed the full-app compiler sweep at its 5-second default (7.8 seconds actual).
 Give only that bulk test a 30-second budget; retain all compilation assertions.
+
+## Browser migration
+
+`codex/browser-integrations` moves the LocalThought flow off AtomicServer.
+Catalog parsing and pagination run in the Atomic WASM bundle; the browser owns
+the tenant handoff and rotating connection code, then maps fetched records into
+locally reviewed proposals. Companion branches in Syncables and integration-proxy
+provide WASM compatibility and CORS. See `integrations/localthought/README.md`.
+Legacy direct integrations, action infrastructure and scheduling remain separate.

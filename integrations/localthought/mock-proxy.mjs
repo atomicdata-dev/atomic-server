@@ -12,6 +12,12 @@ export function mockProxy() {
   const challenges = new Set();
   const issueCode = platform => { const code = randomBytes(32).toString('base64url'); codes.set(code, platform); return code; };
   return createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Connection-Code, Link');
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+
     const url = new URL(req.url, 'http://localhost');
     const json = (status, value, headers = {}) => { res.writeHead(status, { 'Content-Type': 'application/json', ...headers }); res.end(JSON.stringify(value)); };
     if (url.pathname === '/catalog') return json(200, ['github-issues', 'google-calendar', 'pets']);

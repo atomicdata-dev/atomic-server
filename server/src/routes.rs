@@ -370,26 +370,6 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .route(web::delete().to(handlers::plugin_secret::handle_delete_secret)),
     )
     .service(
-        web::resource("/integration-proxy/platform")
-            .route(web::get().to(handlers::integration_proxy::platform)),
-    )
-    .service(
-        web::resource("/integration-proxy/catalog")
-            .route(web::get().to(handlers::integration_proxy::catalog)),
-    )
-    .service(
-        web::resource("/integration-proxy/start")
-            .route(web::post().to(handlers::integration_proxy::start)),
-    )
-    .service(
-        web::resource("/integration-proxy/finish")
-            .route(web::post().to(handlers::integration_proxy::finish)),
-    )
-    .service(
-        web::resource("/integration-proxy/fetch")
-            .route(web::post().to(handlers::integration_proxy::fetch_records)),
-    )
-    .service(
         web::resource("/integration-oauth/notion/list")
             .route(web::post().to(handlers::integration_oauth::list)),
     )

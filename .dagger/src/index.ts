@@ -636,6 +636,10 @@ export class AtomicServer {
           this.source.directory('plugin-runtime'),
         )
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory('/code/server', this.source.directory('server'))
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
@@ -713,6 +717,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           this.source.directory('plugin-examples'),
@@ -1127,7 +1135,9 @@ export class AtomicServer {
       // Surfaces /app/dev-drive and /app/prunetests in the production
       // build the e2e tests run against. See `devRoutesEnabled()` in
       // data-browser/src/config.ts.
-      buildContainer = buildContainer.withEnvVariable('VITE_E2E', 'true');
+      buildContainer = buildContainer
+        .withEnvVariable('VITE_E2E', 'true')
+        .withEnvVariable('VITE_INTEGRATION_PROXY_URL', 'http://127.0.0.1:19090');
     }
 
     return buildContainer.withExec(['pnpm', 'run', 'build']);
@@ -1182,6 +1192,10 @@ export class AtomicServer {
       .withDirectory('/code/cli', source.directory('cli'))
       .withDirectory('/code/desktop', source.directory('desktop'))
       .withDirectory('/code/wasm', source.directory('wasm'))
+      .withDirectory(
+        '/code/integrations/localthought/syncables',
+        source.directory('integrations/localthought/syncables'),
+      )
       .withDirectory(
         '/code/plugin-examples',
         source.directory('plugin-examples'),
@@ -1380,6 +1394,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', source.directory('cli'))
         .withDirectory('/code/desktop', source.directory('desktop'))
         .withDirectory('/code/wasm', source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           source.directory('plugin-examples'),

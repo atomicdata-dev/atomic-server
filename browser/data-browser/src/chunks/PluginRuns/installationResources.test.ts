@@ -47,3 +47,37 @@ it('never interprets a failed identity query as permission to create', async () 
   ).rejects.toThrow('offline');
   expect(store.newResource).not.toHaveBeenCalled();
 });
+
+it('uses complete local identities without a server and refuses a missing local DB', async () => {
+  const { ensureLocalInstallationResource } =
+    await import('./installationResources');
+  const resource = {
+    get: (p: string) => ({ parent: 'parent', isA: ['class'] })[p],
+  };
+  const queryLocalDb = vi
+    .fn()
+    .mockResolvedValue({ subjects: ['saved'], count: 1 });
+  const store = {
+    queryLocalDb,
+    getResource: async () => resource,
+    newResource: vi.fn(),
+  };
+  const options = {
+    parent: 'parent',
+    localId: 'step',
+    isA: ['class'],
+    propVals: {},
+  };
+  expect(
+    await ensureLocalInstallationResource(store as never, 'drive', options),
+  ).toBe(resource);
+  queryLocalDb.mockResolvedValue(null);
+  await expect(
+    ensureLocalInstallationResource(store as never, 'drive', options),
+  ).rejects.toThrow('Local installation query');
+  queryLocalDb.mockResolvedValue({ subjects: [], count: 1 });
+  await expect(
+    ensureLocalInstallationResource(store as never, 'drive', options),
+  ).rejects.toThrow('Local installation query');
+  expect(store.newResource).not.toHaveBeenCalled();
+});
