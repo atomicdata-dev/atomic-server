@@ -34,11 +34,23 @@ app's origin and GET/POST/PATCH/DELETE with Authorization and Content-Type,
 expose `X-Connection-Code`, preserve query parameters, and allow issue/comment
 and label operations in its catalog. CORS headers must cover error responses too.
 
-**Live dependency:** on 2026-09-09, `https://localthought.io` answered the browser
-preflight with 401 and no CORS headers. The companion proxy CORS change described in #1401 must be deployed before
-that instance can power this direct browser demo.
-Live OAuth/provider writes have not been verified for this demo. Sample mode is
-explicitly a browser fixture, not evidence of a successful live connection.
+**Live verification (2026-09-09):** Heroku release v40 (`bc02f13f`) now
+answers browser preflights and exposes `X-Connection-Code`. Tenant challenge,
+GitHub OAuth and return to the browser demo succeeded with AtomicServer
+unavailable. The first authenticated issue-list request for the private
+`ontola/atomic-github-sync-sandbox` returned 404, although the independent
+GitHub CLI credential can access it. Repository access for the proxy credential
+must be resolved before live two-way writes can be verified. The disposable
+CLI-created issue #17 was closed; no issue/comment writes occurred through the proxy.
+
+On consolidated branch `feat/api-plugins` (#1387), a fresh browser connection to
+`localthought/integration-proxy` successfully imported 12 issues. A subsequent
+browser-origin create returned 403. No matching issue was created remotely.
+The CLI-created disposable issue #32 and its test comment were left together
+with #32 closed. Live two-way writes remain blocked pending diagnosis of the
+proxy credential’s GitHub permissions. **Connect another tracker** returns to
+the connection form without clearing existing local trackers.
+
 
 ## Mapping
 

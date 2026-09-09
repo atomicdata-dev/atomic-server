@@ -156,6 +156,17 @@ function DevonianDemo() {
                 <Button disabled={busy} onClick={sync}>
                   {busy ? 'Working…' : 'Sync now'}
                 </Button>
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    setDemo(undefined);
+                    setRows([]);
+                    setError('');
+                    setStatus('');
+                  }}
+                >
+                  Connect another tracker
+                </Button>
                 <AtomicLink subject={demo.state.config.connection.table}>
                   Open Atomic kanban
                 </AtomicLink>

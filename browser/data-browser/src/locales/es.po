@@ -9996,6 +9996,9 @@ msgstr ""
 msgid "Recurring meeting"
 msgstr ""
 
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 msgid "All day"
 msgstr ""

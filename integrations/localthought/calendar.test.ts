@@ -2,7 +2,8 @@ import { expect, it } from 'vitest';
 import { calendarProjection, calendarFields as fields } from './calendar';
 import { Datatype } from '../../browser/lib/src/index';
 import { run } from './plugin';
-import type { FetchedPlatform } from './schema';
+import { platformSchema, type FetchedPlatform } from './schema';
+import { matchesCalendarField } from '../../browser/lib/src/calendar-date';
 const fixture = (): FetchedPlatform => ({
   platform: 'google-calendar',
   ontology: {
@@ -180,4 +181,14 @@ it('rejects malformed or mixed all-day intervals instead of shortening them', ()
     dateTime: '2026-09-10T00:00:00Z',
   };
   expect(() => calendarProjection(input)).toThrow();
+});
+
+it('the installed schema exposes all-day range fields recognized by the view', () => {
+  const projected = calendarProjection(fixture());
+  const schema = platformSchema(projected.platform, projected.ontology.terms);
+  for (const field of [fields.day, fields.allDay, fields.endDay]) {
+    expect(
+      schema.properties.filter(p => matchesCalendarField(p.shortname, field)),
+    ).toHaveLength(1);
+  }
 });

@@ -10035,6 +10035,10 @@ msgstr "Could not display recurring meetings: {0}"
 msgid "Recurring meeting"
 msgstr "Recurring meeting"
 
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr "Connect another tracker"
+
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 msgid "All day"
 msgstr "All day"

@@ -29,7 +29,7 @@ OPFS browser flow was manually verified for creation and comments on both sides,
 closing from Atomic, reopening from the sample GitHub side and reloading without
 duplicate issues/comments. Live proxy OAuth,
 GitHub writes and a guided uncertain-write recovery UI remain unverified/unbuilt;
-the current deployed integration-proxy lacks browser CORS support.
+proxy v40 CORS and browser OAuth are verified, but its GitHub credential returns 404 for the private sandbox.
 
 What is tested, at which layer, and — the part that matters — **what is not**.
 
@@ -1196,3 +1196,11 @@ standalone compilation of Rust adapter tests 2/2, frontend/library tsc, Oxlint,
 production WASM build, and both Chromium import flows (31.5s). The browser flow
 retains the existing explicit server-unavailable network fixture; no live Google
 account or full native Rust workspace test was run.
+
+All-day ranges: `browser/lib/src/calendar-date.test.ts` covers civil-date
+validation, exclusive single/multi-day ends, leap days, DST dates and year
+boundaries; run under UTC, America/Los_Angeles and Pacific/Kiritimati. Import
+tests reject malformed/mixed/nonpositive all-day intervals and verify raw
+provider Start/End retention. The existing Google import E2E now imports a
+three-day all-day event, asserts all three occupied cells and the excluded end,
+and verifies repeated chips survive reload without duplicate resources.

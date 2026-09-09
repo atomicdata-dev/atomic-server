@@ -151,6 +151,19 @@ next release reintroduces the bug.
 - If e2e tests fail, try walking through the steps 1 by 1 either with the playwright debugger, or by simply reproducing the steps in your browser of choice.
 - Feature-branch CI runs Playwright **light** (`@smoke`). `develop` and `v*` tags run the **full** suite. Opt in to full on a branch with a `full-e2e` PR label, `[full-e2e]` in the commit message, or `workflow_dispatch` `e2e_mode=full`. See `planning/e2e-light-heavy.md`.
 
+Feature-specific browser journeys belong in `browser/e2e/tests/` and run through
+the shared CI pipeline. For a focused run with CI's service setup, use Dagger
+from the repository root (with `NETLIFY_TOKEN` set):
+
+```sh
+dagger call end-to-end --netlify-auth-token env://NETLIFY_TOKEN \
+  --playwright-mode full --playwright-grep 'Pets'
+```
+
+Replace the grep expression with any test title or regular expression; a focused
+run uses one shard. Use this for feature iteration instead of adding a
+branch-specific workflow under `.github/workflows/`.
+
 ```sh
 # Make sure nextest is installed
 cargo install cargo-nextest
