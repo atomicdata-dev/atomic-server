@@ -36,6 +36,9 @@ pub struct AppState {
     /// manifest endpoint so the welcome screen can route account creation to the
     /// dashboard.
     pub managed_dashboard_url: Arc<std::sync::RwLock<Option<String>>>,
+    /// Short-lived capabilities that let a null-origin plugin iframe read the
+    /// one plugin's source it was opened for. See `plugins::view_token`.
+    pub view_tokens: Arc<crate::plugins::view_token::ViewTokens>,
 }
 
 impl AppState {
@@ -59,6 +62,18 @@ impl AppState {
             &config.uploads_path,
         )
         .await?;
+
+        // Before anything reads or writes a secret, so nothing is stored in
+        // the clear during startup and then silently left that way.
+        store.set_node_key(crate::node_key::load_or_create(&config.config_dir)?);
+
+        // `config.toml` holds this server's agent secret and was created
+        // world-readable by every version before this one. Narrowed on every
+        // boot rather than at setup, so an existing installation is fixed by
+        // upgrading rather than by someone reading a release note.
+        if let Err(e) = crate::node_key::restrict(&config.config_file_path) {
+            tracing::warn!("could not restrict the config file: {e}");
+        }
 
         // Drop the persisted watched-query registry on startup. Every
         // entry was registered by a now-dead WS connection; live
@@ -219,6 +234,7 @@ impl AppState {
             index_status_broadcast,
             managed: server_info.managed,
             managed_dashboard_url: server_info.managed_dashboard_url,
+            view_tokens: Arc::new(Default::default()),
         })
     }
 

@@ -256,6 +256,9 @@ export function useCollection(
     // Lazy resource materialization can emit an update while another component
     // renders. Apply collection updates after that render, never from inside it.
     const applyChange = (subject: string, resource?: Resource) => {
+      // Capture hydration provenance now. By the microtask, the query has
+      // finished assembling and later-page members look like new arrivals.
+      if (collectionRef.current?.isAssemblingPage) return;
       queueMicrotask(() => {
         const col = collectionRef.current;
         if (disposed || !col) return;

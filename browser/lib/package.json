@@ -61,7 +61,8 @@
       },
       "require": "./dist/ontologies/*.cjs"
     },
-    "./client-db.worker.js": "./dist/client-db.worker.js"
+    "./client-db.worker.js": "./dist/client-db.worker.js",
+    "./plugin-run.worker.js": "./dist/plugin-run.worker.js"
   },
   "main-dev": "src/index.ts",
   "publishConfig": {

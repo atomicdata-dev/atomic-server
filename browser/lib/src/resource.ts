@@ -14,7 +14,7 @@ import type { Agent } from './agent.js';
 import { Client } from './client.js';
 import type { Collection } from './collection.js';
 import { CollectionBuilder } from './collectionBuilder.js';
-import { CommitBuilder, Commit } from './commit.js';
+import { CommitBuilder, isCommitSubject, Commit } from './commit.js';
 import { perfSpan } from './perf-trace.js';
 import { validateDatatype, datatypeTag, Datatype } from './datatypes.js';
 import { isUnauthorized } from './error.js';
@@ -38,7 +38,6 @@ import {
   type MergeForkOptions,
 } from './forks.js';
 import { GENESIS, properties, instances } from './urls.js';
-import { isCommitSubject } from './local-outbox.js';
 import {
   valToArray,
   type JSONValue,
@@ -563,9 +562,10 @@ export class Resource<C extends OptionalClass = any> {
       // calls get through.
       //
       // Skip subjects we don't own:
-      // - `did:ad:commit:*` are commit-detail resources materialized
-      //   locally for the Sync page; the server creates them on apply
-      //   and there's nothing to POST.
+      // - Commit subjects (`did:ad:commit:*`, or the `<server>/commits/*`
+      //   URLs imported resources still carry) are commit-detail resources
+      //   materialized locally for the Sync page; the server creates them on
+      //   apply and there's nothing to POST.
       // - External HTTP subjects (atomicdata.dev/* etc.) belong to
       //   another domain. POSTing them returns "Subject of commit
       //   should be sent to other domain."
@@ -1119,6 +1119,9 @@ export class Resource<C extends OptionalClass = any> {
     isFirstCommit: boolean,
     commitMessage?: string,
   ): { bytes: Uint8Array; versionAfterExport: VersionVector } | undefined {
+    // Incremental saves bypass signChanges; they still need datatype tags for
+    // newly added JSON/reference fields before capturing the signed delta.
+    this.writeDatatypeTags();
     const bytes = this.exportLoroDeltaInternal(isFirstCommit, commitMessage);
     if (!bytes) return undefined;
     if (!this._loroDoc) return undefined;

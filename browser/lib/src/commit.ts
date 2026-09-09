@@ -58,6 +58,33 @@ export function commitIdOf(commit: Commit): string | undefined {
   );
 }
 
+/**
+ * True for subjects that identify a Commit rather than an editable resource.
+ *
+ * Two shapes exist: the `did:ad:commit:<sig>` URI this client mints, and the
+ * `<server>/commits/<sig>` URL older servers used — still carried by every
+ * resource imported from one. Commits are immutable, so a Commit subject must
+ * never reach the outbox: the server rejects the write on every attempt and
+ * the entry retries forever.
+ *
+ * The URL form is matched on the reserved `/commits/` route specifically, not
+ * anywhere in the string, so a user's own resource that happens to live under
+ * a folder named "commits" is not mistaken for one.
+ */
+export function isCommitSubject(subject: string): boolean {
+  if (subject.startsWith('did:ad:commit:')) return true;
+
+  if (!subject.startsWith('http://') && !subject.startsWith('https://')) {
+    return false;
+  }
+
+  try {
+    return new URL(subject).pathname.startsWith('/commits/');
+  } catch {
+    return false;
+  }
+}
+
 export function getTimestampNow(): number {
   return Math.round(new Date().getTime());
 }

@@ -1107,6 +1107,39 @@ impl Commit {
                 .import_update_with_diff(loro_update_bytes, &resource.get_subject().to_string())?;
             imported_new_ops = loro_doc.oplog_vv_map() != vv_map_before;
 
+            // Validate the author's state as well as the merged state. Concurrent
+            // LWW decisions may retain our baseline while accepting a stale value.
+            // Reconstruct the incoming causal frontier so that losing metadata
+            // cannot turn an import into an unchecked ordinary edit.
+            if imported_new_ops
+                && (resource_unedited.get(urls::IMPORT_BASELINE).is_ok()
+                    || resource_unedited.get(urls::IMPORT_REFERENCE_REVIEW).is_ok()
+                    || diff
+                        .add_atoms
+                        .iter()
+                        .any(|atom| atom.property == urls::IMPORT_REFERENCE_REVIEW))
+            {
+                let meta = loro::LoroDoc::decode_import_blob_meta(loro_update_bytes, true)
+                    .map_err(|e| format!("Invalid import update metadata: {e}"))?;
+                let mut ends = loro::Frontiers::new();
+                for (peer, counter) in meta.partial_end_vv.iter() {
+                    if *counter > 0 {
+                        ends.push(loro::ID::new(*peer, *counter - 1));
+                    }
+                }
+                if !ends.is_empty() {
+                    let intended_doc =
+                        loro_doc.fork_at(&crate::loro::VersionID::from_frontiers(&ends))?;
+                    let mut intended = resource_unedited.clone();
+                    intended.apply_state_doc(intended_doc)?;
+                    crate::import_identity::validate_baseline(Some(&resource_unedited), &intended)?;
+                    crate::import_identity::validate_reference_review(
+                        Some(&resource_unedited),
+                        &intended,
+                    )?;
+                }
+            }
+
             // Track which properties changed
             for atom in &diff.add_atoms {
                 changed_props.insert(atom.property.clone());

@@ -39,6 +39,20 @@ pub struct PluginManifest {
     pub permissions: Option<Vec<PermissionEntry>>,
     pub default_config: Option<HashMap<String, serde_json::Value>>,
     pub config_schema: Option<HashMap<String, serde_json::Value>>,
+    /// Origins this plugin may reach through the host's `fetch`.
+    ///
+    /// Separate from the `network` permission, which only governs the guest's
+    /// own sockets. Shown at install: "this plugin can talk to api.notion.com"
+    /// is a sentence someone can judge; "this plugin has network access" is not.
+    pub network: Option<NetworkPermission>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkPermission {
+    /// Exact origins, e.g. `https://api.notion.com`. No wildcards.
+    #[serde(default)]
+    pub origins: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +73,13 @@ pub enum PermissionType {
 }
 
 impl PluginManifest {
+    /// Whether this plugin declared the origin it is trying to reach.
+    pub fn allows_origin(&self, origin: &str) -> bool {
+        self.network
+            .as_ref()
+            .is_some_and(|n| n.origins.iter().any(|o| o == origin))
+    }
+
     pub fn from_string(string: &str) -> Result<Self, AtomicError> {
         let manifest: Self = serde_json::from_str(string)
             .map_err(|e| AtomicError::from(format!("Failed to parse plugin manifest: {}", e)))?;

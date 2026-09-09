@@ -4,11 +4,16 @@
 # own.
 #
 # Which port? Whatever the data-browser is configured to talk to —
-# `VITE_ATOMIC_SERVER_URL` in `browser/data-browser/.env.development`, overridden
-# by `.env.development.local` if present. This is easy to get wrong: the suite's
+# `VITE_ATOMIC_SERVER_URL`, which defaults to 9883 in
+# `browser/data-browser/vite.config.ts` and is overridden by
+# `.env.development.local` if present. This is easy to get wrong: the suite's
 # own `SERVER_URL` (default 9883) only points the test *helpers*, while the app
 # the tests drive uses the vite env. Start a server on 9883 while the SPA is
 # pointed at 9885 and every test fails on a connection refused that names neither.
+#
+# A shell export of `VITE_ATOMIC_SERVER_URL` is not visible here (it belongs to
+# whoever started vite, not to this script), so pass `ATOMIC_E2E_SERVER_URL`
+# when the app was started that way.
 #
 # Why a separate store: sharing yours means every run adds drives, tables and
 # rows to the store you actually work in, and a store with a few hundred runs'
@@ -34,28 +39,33 @@ STORE="${ATOMIC_E2E_STORE:-$REPO_ROOT/.e2e-store}"
 BINARY="${ATOMIC_E2E_BINARY:-$REPO_ROOT/target/debug/atomic-server}"
 ENV_DIR="$REPO_ROOT/browser/data-browser"
 
-# The last definition wins, and `.env.development.local` overrides the committed
-# default — the same precedence vite applies.
+# The same files vite loads, in the same order it loads them: a developer's own
+# `.env.development.local` wins, then the committed `.env.development`, then
+# the default compiled into `vite.config.ts`.
+#
+# Reading only the `.local` file was wrong once `.env.development` was
+# committed pointing somewhere else: the suite started a server on one port
+# while the app it drives talked to another, and every test failed on a
+# connection refused that named neither. The point of reading anything here is
+# that the suite follows the app rather than guessing at it.
+DEFAULT_SERVER_URL='http://localhost:9883'
+
 read_server_url() {
-  local url=''
+  local found=''
   local file
-  for file in "$ENV_DIR/.env.development" "$ENV_DIR/.env.development.local"; do
-    if [[ -f "$file" ]]; then
-      local found
-      found=$(grep -E '^\s*VITE_ATOMIC_SERVER_URL=' "$file" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | xargs || true)
-      [[ -n "$found" ]] && url="$found"
-    fi
+
+  for file in "$ENV_DIR/.env.development.local" "$ENV_DIR/.env.development"; do
+    [[ -f "$file" ]] || continue
+
+    found=$(grep -E '^\s*VITE_ATOMIC_SERVER_URL=' "$file" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | xargs || true)
+
+    [[ -n "$found" ]] && break
   done
-  echo "$url"
+
+  echo "${found:-$DEFAULT_SERVER_URL}"
 }
 
 SERVER_URL="${ATOMIC_E2E_SERVER_URL:-$(read_server_url)}"
-
-if [[ -z "$SERVER_URL" ]]; then
-  echo "Could not read VITE_ATOMIC_SERVER_URL from $ENV_DIR/.env.development*" >&2
-  echo "Set ATOMIC_E2E_SERVER_URL=http://localhost:PORT and retry." >&2
-  exit 1
-fi
 
 PORT="${SERVER_URL##*:}"
 PORT="${PORT%%/*}"
@@ -163,7 +173,7 @@ fi
 if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Something is already listening on $PORT." >&2
   echo "If that is your dev server, stop it first — the suite needs that port," >&2
-  echo "because it is what $ENV_DIR/.env.development points the app at." >&2
+  echo "because it is the port the app is pointed at." >&2
   exit 1
 fi
 

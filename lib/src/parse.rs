@@ -432,15 +432,7 @@ async fn find_existing_by_local_id(
     parent: &crate::Subject,
     local_id: &str,
 ) -> AtomicResult<Option<String>> {
-    let mut query = crate::storelike::Query::new_prop_val(urls::LOCAL_ID, local_id);
-    query.for_agent = crate::agents::ForAgent::Sudo;
-    let result = store.query(&query).await?;
-    for resource in result.resources {
-        if resource.has_parent(store, parent.as_str()).await {
-            return Ok(Some(resource.get_subject().to_string()));
-        }
-    }
-    Ok(None)
+    crate::import_identity::find_in_scope(store, parent, local_id, true).await
 }
 
 fn parse_anonymous_resource<'a>(

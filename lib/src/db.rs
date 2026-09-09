@@ -1,6 +1,7 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
+pub mod app_agent;
 pub mod btreemap_store;
 mod encoding;
 #[cfg(feature = "db-redb")]
@@ -11,11 +12,17 @@ mod migrations;
 #[cfg(all(feature = "db-redb", target_arch = "wasm32"))]
 pub mod opfs_backend;
 pub mod plugin_meta;
+pub mod plugin_release;
+pub mod plugin_schedule;
+pub mod plugin_secret;
+pub mod plugin_trigger;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
 #[cfg(feature = "db-redb")]
 pub mod redb_store;
-pub use query_index::{drive_prefix_from_subject, query_id, QueryFilter};
+// `PropVal` is half of `QueryFilter`'s public surface: without it a caller
+// outside this crate can read `filters` but cannot build one.
+pub use query_index::{drive_prefix_from_subject, query_id, PropVal, QueryFilter};
 #[cfg(feature = "db-sled")]
 pub mod sled_store;
 #[cfg(test)]
@@ -41,8 +48,12 @@ use crate::{
     },
     commit::{CommitOpts, CommitResponse},
     db::{
+        app_agent::{AppAgent, AppAgentInfo, AppAgentKey, AppAgentState},
         encoding::{decode_propvals, encode_propvals},
         plugin_meta::{PluginMeta, PluginMetaKey},
+        plugin_schedule::{PluginSchedule, PluginScheduleKey},
+        plugin_secret::{PluginSecret, PluginSecretInfo, PluginSecretKey},
+        plugin_trigger::{PluginTrigger, PluginTriggerKey},
         query_index::requires_query_index,
         val_prop_sub_index::find_in_val_prop_sub_index,
     },
@@ -289,6 +300,13 @@ pub struct Db {
     /// backends (sled, BTreeMap, etc.) can be used interchangeably.
     pub kv: Arc<dyn KvStore>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+    /// The key this node wraps stored secrets with, set once at startup.
+    ///
+    /// Held here rather than passed to each call so it cannot be forgotten at
+    /// one of them: a secret written in the clear because a caller did not
+    /// know about encryption is indistinguishable, on disk, from one nobody
+    /// meant to protect.
+    node_key: Arc<std::sync::OnceLock<[u8; crate::vault::keys::KEK_LEN]>>,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// List of class extenders.
@@ -318,6 +336,7 @@ pub struct Db {
     /// a commit and a sync apply cannot replace each other's snapshot. Per
     /// store, not global — see [`crate::subject_lock`].
     pub(crate) subject_locks: crate::subject_lock::SubjectLocks,
+    plugin_locks: crate::subject_lock::SubjectLocks,
     /// Where the DB is stored on disk.
     #[allow(dead_code)]
     path: std::path::PathBuf,
@@ -361,6 +380,143 @@ fn default_sync_policy() -> Arc<RwLock<Arc<dyn crate::sync::policy::SyncPolicy>>
 }
 
 impl Db {
+    /// Persist already-admitted replica state, including independently created
+    /// duplicate import identities. Keep both subjects available for review;
+    /// authoring paths must still enforce identity uniqueness.
+    pub async fn persist_replicated_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        // Review validation holds this same identity lock while reading all
+        // copies. Replica changes must not land halfway through that review.
+        let _identity_guard = if let Some((parent, id)) = crate::import_identity::identity(resource)
+        {
+            Some(
+                self.subject_locks
+                    .lock(&format!(
+                        "import-identity:{}",
+                        serde_json::to_string(&(parent.pure_id(), &id))?
+                    ))
+                    .await,
+            )
+        } else {
+            None
+        };
+        self.persist_resource_projection(resource, false, true, true)
+            .await
+    }
+
+    async fn persist_resource_projection(
+        &self,
+        resource: &Resource,
+        check_required_props: bool,
+        update_index: bool,
+        overwrite_existing: bool,
+    ) -> AtomicResult<()> {
+        // This only works if no external functions rely on using add_resource for atom-like operations!
+        // However, add_atom uses set_propvals, which skips the validation.
+        let subject = self.normalize_subject(resource.get_subject());
+        let subject_str = subject.pure_id();
+        let existing = self.get_propvals(&subject_str).ok();
+        if !overwrite_existing && existing.is_some() {
+            return Err(format!(
+                "Failed to add: '{}', already exists, should not be overwritten.",
+                resource.get_subject()
+            )
+            .into());
+        }
+        if check_required_props {
+            resource.check_required_props(self).await?;
+        }
+        // Build a single transaction for index updates + resource persistence
+        let mut transaction = Transaction::new();
+
+        if update_index {
+            // Persist DID routing hint if available
+            if let Subject::Did {
+                drive_hint: Some(hint),
+                ..
+            } = &subject
+            {
+                transaction.push(Operation {
+                    tree: Tree::DidMapping,
+                    method: Method::Insert,
+                    key: subject_str.as_bytes().to_vec(),
+                    val: Some(hint.as_bytes().to_vec()),
+                });
+            }
+
+            if let Some(pv) = existing {
+                let subject = resource.get_subject();
+                // Evict against the state that is going away, not the one
+                // replacing it. Whether an entry belongs in a watched query's
+                // member list — and under which sort key it was filed — are
+                // facts about the old values. Handing over the new resource
+                // asks instead whether the *new* values still match, and a row
+                // edited out of a filtered view answers no, so the entry that
+                // needs deleting is the one deletion is skipped for. The row
+                // then stays listed in that view until the index is rebuilt.
+                let old = Resource::from_propvals(pv.clone(), subject.clone());
+                for (prop, val) in pv.iter() {
+                    let remove_atom = crate::Atom::new(subject.clone(), prop.into(), val.clone());
+                    self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
+                        .map_err(|e| {
+                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
+                        })?;
+                }
+            }
+            for a in resource.to_atoms() {
+                self.add_atom_to_index(&a, resource, &mut transaction)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
+            }
+            crate::search::index_resource(self, resource, &mut transaction)?;
+        }
+        // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
+        // state. Derive and
+        // persist it here UNCONDITIONALLY for every CRDT resource — in the
+        // same transaction as the `Tree::Resources` write — so the invariant
+        // holds that every resource blob is paired with a current snapshot.
+        // (The old code only wrote the snapshot when the propvals lacked a
+        // `loroUpdate`, so any resource that had been through `apply_state_doc`
+        // — i.e. every sync import — had its snapshot write silently skipped.)
+        // The `loroUpdate` propval is stripped from the `Tree::Resources`
+        // blob: that blob is a pure derived projection, not a second home for
+        // the CRDT state. Commits are native (immutable, not CRDT) — they get
+        // no snapshot and keep their `loroUpdate` payload in the blob.
+        let mut propvals = resource.get_propvals().clone();
+        if !subject.is_commit_did() {
+            let snapshot = resource.build_state_doc()?.export_snapshot();
+            propvals.remove(crate::urls::LORO_UPDATE);
+            transaction.push(Operation {
+                tree: Tree::LoroSnapshots,
+                method: Method::Insert,
+                key: subject_str.as_bytes().to_vec(),
+                val: Some(snapshot),
+            });
+        }
+
+        // Persist the resource data in the same transaction
+        let resource_bin = encode_propvals(&propvals)?;
+        transaction.push(Operation {
+            tree: Tree::Resources,
+            method: Method::Insert,
+            key: subject_str.as_bytes().to_vec(),
+            val: Some(resource_bin),
+        });
+        self.apply_transaction(&mut transaction)?;
+        if crate::import_identity::identity(resource).is_some() {
+            self.flush()?;
+        }
+        let _ = self.db_events.send(DbEvent::Changed {
+            subject: resource.get_subject().without_params(),
+            delta: None,
+            // Attributed here, while the importing write is still on the stack:
+            // the live push loop uses it to avoid sending an update straight
+            // back to the peer it came from.
+            source_id: crate::sync::ws_apply::current_import_source(),
+            is_new: false,
+            from_commit: false,
+        });
+        Ok(())
+    }
+
     /// Install a sync admission/quota policy (managed nodes). The default is
     /// [`crate::sync::policy::OpenPolicy`] (allow everything, no quotas).
     pub fn set_sync_policy(&self, policy: Arc<dyn crate::sync::policy::SyncPolicy>) {
@@ -442,6 +598,7 @@ impl Db {
             path: path.into(),
             kv: Arc::new(sled_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -450,6 +607,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -481,6 +639,7 @@ impl Db {
             path: std::path::PathBuf::new(),
             kv: Arc::new(btreemap_store::BTreeMapStore::new()),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -489,6 +648,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -516,6 +676,7 @@ impl Db {
             path: std::path::PathBuf::new(),
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -524,6 +685,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -612,6 +774,7 @@ impl Db {
             path: path.to_path_buf(),
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -620,6 +783,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -764,6 +928,7 @@ impl Db {
             path: std::path::PathBuf::new(),
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -772,6 +937,7 @@ impl Db {
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
+            plugin_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -2023,6 +2189,402 @@ impl Db {
         Ok(())
     }
 
+    /// Stores a secret, replacing any of the same name.
+    ///
+    /// There is deliberately no `get_plugin_secret` returning a value. The only
+    /// reader is [`Db::use_plugin_secret`], which hands the value to a closure
+    /// and never out of it, so no endpoint can serve one by accident.
+    /// Sets the key stored secrets are wrapped with. Once per process.
+    ///
+    /// Silently ignored if already set: a second call would mean two parts of
+    /// the process disagree about which key opens the store, and the loser
+    /// would write secrets the winner cannot read.
+    pub fn set_node_key(&self, key: [u8; crate::vault::keys::KEK_LEN]) {
+        let _ = self.node_key.set(key);
+    }
+
+    /// Wraps a secret for storage, or passes it through when no key is set.
+    ///
+    /// Passing through is what lets a store predating the node key still be
+    /// read and written. It is not a fallback anyone should rely on, which is
+    /// why `has_node_key` exists for callers that must know.
+    fn wrap_secret(&self, value: &str) -> AtomicResult<String> {
+        let Some(key) = self.node_key.get() else {
+            return Ok(value.to_string());
+        };
+
+        crate::vault::secret_envelope::SecretEnvelope::create(
+            value.as_bytes(),
+            &[crate::vault::secret_envelope::NewWrapper::NodeKey { kek: *key }],
+        )?
+        .to_json()
+    }
+
+    /// Opens a stored secret, tolerating one written before there was a key.
+    fn unwrap_secret(&self, stored: &str) -> AtomicResult<String> {
+        let Ok(envelope) = crate::vault::secret_envelope::SecretEnvelope::from_json(stored) else {
+            // Written before this node had a key. Readable, and rewritten
+            // wrapped the next time it is set.
+            return Ok(stored.to_string());
+        };
+
+        let Some(key) = self.node_key.get() else {
+            return Err("this secret is wrapped, but this node has no key to open it".into());
+        };
+
+        let opened = envelope.unwrap_secret(&crate::vault::secret_envelope::Unlock::Kek(*key))?;
+
+        String::from_utf8(opened).map_err(|_| "a stored secret was not text".into())
+    }
+
+    /// Whether stored secrets are wrapped at all.
+    pub fn has_node_key(&self) -> bool {
+        self.node_key.get().is_some()
+    }
+
+    pub fn set_plugin_secret(
+        &self,
+        key: &PluginSecretKey,
+        secret: &PluginSecret,
+    ) -> AtomicResult<()> {
+        PluginSecretKey::validate_name(&key.name)?;
+
+        let mut stored = secret.clone();
+        stored.value = self.wrap_secret(&secret.value)?;
+
+        self.kv
+            .insert(Tree::PluginSecret, &key.encode()?, &stored.encode()?)?;
+        Ok(())
+    }
+
+    /// Runs `f` with the secret's value if it exists and allows `origin`.
+    ///
+    /// Records the use before returning, so "used 0 times in 90 days" is a
+    /// question the UI can answer when someone is deciding whether to revoke.
+    pub fn use_plugin_secret<T>(
+        &self,
+        key: &PluginSecretKey,
+        origin: &str,
+        at: i64,
+        f: impl FnOnce(&str) -> T,
+    ) -> AtomicResult<Option<T>> {
+        let encoded_key = key.encode()?;
+
+        let Some(bin) = self.kv.get(Tree::PluginSecret, &encoded_key)? else {
+            return Ok(None);
+        };
+
+        let mut secret = PluginSecret::from_bytes(&bin)?;
+
+        if !secret.allows(origin) {
+            return Ok(None);
+        }
+
+        // References are one hop, same drive, and restricted by BOTH origin lists.
+        // Rotating/revoking the connection affects every bound plugin immediately.
+        let resolved = if let Some(target) = &secret.connection {
+            if target.drive != key.drive {
+                return Err("cross-drive credential reference".into());
+            }
+            let Some(bytes) = self.kv.get(Tree::PluginSecret, &target.encode()?)? else {
+                return Ok(None);
+            };
+            let shared = PluginSecret::from_bytes(&bytes)?;
+            if shared.connection.is_some() || !shared.allows(origin) {
+                return Ok(None);
+            }
+            self.unwrap_secret(&shared.value)?
+        } else {
+            self.unwrap_secret(&secret.value)?
+        };
+        let out = f(&resolved);
+
+        secret.record_use(at);
+        self.kv
+            .insert(Tree::PluginSecret, &encoded_key, &secret.encode()?)?;
+
+        Ok(Some(out))
+    }
+
+    /// What may be said about a secret: never its value.
+    pub fn get_plugin_secret_info(
+        &self,
+        key: &PluginSecretKey,
+    ) -> AtomicResult<Option<PluginSecretInfo>> {
+        let Some(bin) = self.kv.get(Tree::PluginSecret, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginSecretInfo::of(
+            &key.name,
+            &PluginSecret::from_bytes(&bin)?,
+        )))
+    }
+
+    /// Describes every secret a plugin has. Never their values.
+    /// Records the key an app signs with, wrapped like every other secret.
+    pub fn set_app_agent(&self, key: &AppAgentKey, agent: &AppAgent) -> AtomicResult<()> {
+        let mut stored = agent.clone();
+        stored.secret = self.wrap_secret(&agent.secret)?;
+        stored.revoked = false;
+
+        self.kv
+            .insert(Tree::AppAgent, &key.encode()?, &stored.encode()?)?;
+        Ok(())
+    }
+
+    /// Which DID an app writes as, without opening its key.
+    pub fn get_app_agent_info(&self, key: &AppAgentKey) -> AtomicResult<Option<AppAgentInfo>> {
+        Ok(match self.get_app_agent_state(key)? {
+            AppAgentState::Active(info) => Some(info),
+            _ => None,
+        })
+    }
+
+    /// Read identity and lifecycle atomically, so revocation cannot look legacy
+    /// between separate existence and status probes.
+    pub fn get_app_agent_state(&self, key: &AppAgentKey) -> AtomicResult<AppAgentState> {
+        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
+            return Ok(AppAgentState::Legacy);
+        };
+        let stored = AppAgent::from_bytes(&bin)?;
+        Ok(if stored.revoked {
+            AppAgentState::Revoked
+        } else {
+            AppAgentState::Active(stored.info())
+        })
+    }
+
+    /// Runs `f` with the app's signing agent.
+    ///
+    /// A closure rather than a return value, for the same reason
+    /// `use_plugin_secret` is one: nothing that hands a private key back to a
+    /// caller can promise where it goes next.
+    pub fn with_app_agent<T>(
+        &self,
+        key: &AppAgentKey,
+        f: impl FnOnce(&crate::agents::Agent) -> T,
+    ) -> AtomicResult<Option<T>> {
+        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        let stored = AppAgent::from_bytes(&bin)?;
+        if stored.revoked {
+            return Ok(None);
+        }
+        let secret = self.unwrap_secret(&stored.secret)?;
+        let agent = crate::agents::Agent::from_secret(&secret)?;
+
+        Ok(Some(f(&agent)))
+    }
+
+    pub fn delete_app_agent(&self, key: &AppAgentKey) -> AtomicResult<()> {
+        // Replace the encrypted key and state in one KV write. Keep no secret,
+        // but remember that this installation must not use the legacy signer.
+        let mut tombstone = AppAgent::new(String::new(), String::new(), 0);
+        tombstone.revoked = true;
+        self.kv
+            .insert(Tree::AppAgent, &key.encode()?, &tombstone.encode()?)?;
+        self.flush()?;
+        Ok(())
+    }
+
+    pub fn app_agent_was_revoked(&self, key: &AppAgentKey) -> AtomicResult<bool> {
+        Ok(matches!(
+            self.get_app_agent_state(key)?,
+            AppAgentState::Revoked
+        ))
+    }
+
+    /// Secrets this node could not open with nobody present.
+    ///
+    /// A secret wrapped only by a user's credential has no unattended path —
+    /// that is the trade for the server not being able to read it, not a gap.
+    /// So arming a schedule or a trigger has to ask this first, while the
+    /// person is there to be told, rather than discovering it at 3am and
+    /// leaving an error nobody reads until the week is out.
+    pub fn plugin_secrets_needing_a_person(
+        &self,
+        drive: &str,
+        plugin: &str,
+    ) -> AtomicResult<Vec<String>> {
+        let prefix = PluginSecretKey::plugin_prefix(drive, plugin);
+        let mut blocked = Vec::new();
+
+        for entry in self.kv.scan_prefix(Tree::PluginSecret, &prefix) {
+            let (key, value) = entry?;
+            let stored = PluginSecret::from_bytes(&value)?;
+
+            // Anything this node can already open is fine, wrapped or not:
+            // a secret from before there was a key reads as plaintext.
+            if self.unwrap_secret(&stored.value).is_err() {
+                blocked.push(PluginSecretKey::name_from_key(&key)?);
+            }
+        }
+
+        blocked.sort();
+
+        Ok(blocked)
+    }
+
+    pub fn list_plugin_secrets(
+        &self,
+        drive: &str,
+        plugin: &str,
+    ) -> AtomicResult<Vec<PluginSecretInfo>> {
+        let prefix = PluginSecretKey::plugin_prefix(drive, plugin);
+        let mut out = Vec::new();
+
+        for entry in self.kv.scan_prefix(Tree::PluginSecret, &prefix) {
+            let (key, value) = entry?;
+            let name = PluginSecretKey::name_from_key(&key)?;
+            out.push(PluginSecretInfo::of(
+                &name,
+                &PluginSecret::from_bytes(&value)?,
+            ));
+        }
+
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Ok(out)
+    }
+
+    pub fn delete_plugin_secret(&self, key: &PluginSecretKey) -> AtomicResult<()> {
+        self.kv.remove(Tree::PluginSecret, &key.encode()?)?;
+        Ok(())
+    }
+
+    pub fn set_plugin_schedule(
+        &self,
+        key: &PluginScheduleKey,
+        schedule: &PluginSchedule,
+    ) -> AtomicResult<()> {
+        self.kv
+            .insert(Tree::PluginSchedule, &key.encode()?, &schedule.encode()?)?;
+        Ok(())
+    }
+
+    pub fn get_plugin_schedule(
+        &self,
+        key: &PluginScheduleKey,
+    ) -> AtomicResult<Option<PluginSchedule>> {
+        let Some(bin) = self.kv.get(Tree::PluginSchedule, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginSchedule::from_bytes(&bin)?))
+    }
+
+    pub fn delete_plugin_schedule(&self, key: &PluginScheduleKey) -> AtomicResult<()> {
+        self.kv.remove(Tree::PluginSchedule, &key.encode()?)?;
+        Ok(())
+    }
+
+    /// Every schedule due at `now`.
+    ///
+    /// A whole-tree scan on purpose: one entry per scheduled plugin is a very
+    /// small set, and an index keyed by due-time would have to be rewritten on
+    /// every run for no gain at this size.
+    pub fn due_plugin_schedules(
+        &self,
+        now: i64,
+    ) -> AtomicResult<Vec<(PluginScheduleKey, PluginSchedule)>> {
+        let mut due = Vec::new();
+
+        for entry in self.kv.iter_tree(Tree::PluginSchedule) {
+            let (key, value) = entry?;
+            let schedule = PluginSchedule::from_bytes(&value)?;
+
+            if schedule.is_due(now) {
+                due.push((PluginScheduleKey::from_bytes(&key)?, schedule));
+            }
+        }
+
+        Ok(due)
+    }
+
+    /// Exclusion scoped to this database and plugin operation namespace.
+    pub async fn lock_plugin(&self, key: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        self.plugin_locks.lock(key).await
+    }
+
+    pub fn set_plugin_trigger(
+        &self,
+        key: &PluginTriggerKey,
+        trigger: &PluginTrigger,
+    ) -> AtomicResult<()> {
+        // The store only fires membership events for queries it watches, so
+        // registering the filter is part of storing the trigger rather than a
+        // separate step someone can forget — a trigger that was never watched
+        // would sit there looking armed and never fire.
+        trigger.query.watch(self)?;
+
+        self.kv
+            .insert(Tree::PluginTrigger, &key.encode()?, &trigger.encode()?)?;
+        Ok(())
+    }
+
+    pub fn get_plugin_trigger(
+        &self,
+        key: &PluginTriggerKey,
+    ) -> AtomicResult<Option<PluginTrigger>> {
+        let Some(bin) = self.kv.get(Tree::PluginTrigger, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginTrigger::from_bytes(&bin)?))
+    }
+
+    pub fn delete_plugin_trigger(&self, key: &PluginTriggerKey) -> AtomicResult<()> {
+        // The watched query stays. Another plugin — or a live `SUBSCRIBE_QUERY`
+        // — may be watching the same filter, and unwatching one that is still
+        // in use would silently stop delivering to it.
+        self.kv.remove(Tree::PluginTrigger, &key.encode()?)?;
+        Ok(())
+    }
+
+    /// Every trigger whose query is the one that just changed.
+    ///
+    /// A whole-tree scan, for the same reason `due_plugin_schedules` is one:
+    /// there is one entry per triggered plugin, which is a very small set. An
+    /// index keyed by query id would be another thing to keep in step for no
+    /// gain at this size.
+    pub fn plugin_triggers_for_query(
+        &self,
+        query_id: &[u8],
+    ) -> AtomicResult<Vec<(PluginTriggerKey, PluginTrigger)>> {
+        let mut found = Vec::new();
+
+        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
+            let (key, value) = entry?;
+            let trigger = PluginTrigger::from_bytes(&value)?;
+
+            if crate::db::query_index::query_id(&trigger.query)?.as_slice() == query_id {
+                found.push((PluginTriggerKey::from_bytes(&key)?, trigger));
+            }
+        }
+
+        Ok(found)
+    }
+
+    /// Re-registers every stored trigger's query as watched.
+    ///
+    /// Called at startup: watched queries live in the store, but a trigger
+    /// written by a version that did not watch — or one whose watch entry was
+    /// lost — would otherwise never fire again, and nothing would say so.
+    pub fn watch_plugin_trigger_queries(&self) -> AtomicResult<usize> {
+        let mut watched = 0;
+
+        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
+            let (_, value) = entry?;
+            PluginTrigger::from_bytes(&value)?.query.watch(self)?;
+            watched += 1;
+        }
+
+        Ok(watched)
+    }
+
     fn get_index_iterator_for_query(&self, q: &Query) -> IndexIterator {
         match (&q.property, q.value.as_ref()) {
             (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),
@@ -2202,6 +2764,55 @@ impl Db {
         transaction: &mut Transaction,
         source_id: Option<&str>,
     ) -> AtomicResult<()> {
+        // Persist delivery before publishing the wake-up. A crashed or lagging
+        // subscriber can replay the queue; it is never the owner of the event.
+        // A sorted member moving positions has a delete and insert in this
+        // batch, which is not a membership edge.
+        let mut edges = std::collections::BTreeMap::new();
+        for op in transaction
+            .iter()
+            .filter(|op| op.tree == Tree::QueryMembers)
+        {
+            if let Some((query, subject)) = query_index::parse_members_key_id_subject(&op.key) {
+                let delta = edges.entry((query, subject)).or_insert(0i32);
+                *delta += if matches!(op.method, Method::Insert) {
+                    1
+                } else {
+                    -1
+                };
+            }
+        }
+        for ((query, subject), delta) in edges {
+            if delta == 0 {
+                continue;
+            }
+            let edge = plugin_trigger::Edge::of(delta > 0);
+            for (key, trigger) in self.plugin_triggers_for_query(&query)? {
+                if !trigger.wants(edge) {
+                    continue;
+                }
+                let event = plugin_trigger::QueuedEvent {
+                    id: format!(
+                        "{:020}-{}",
+                        crate::utils::now(),
+                        crate::utils::random_string(24)
+                    ),
+                    key,
+                    subject: subject.clone(),
+                    edge,
+                    at: crate::utils::now(),
+                    verdict: None,
+                    waiting_for_review: false,
+                    authorization: None,
+                };
+                transaction.push(Operation {
+                    tree: Tree::PluginMeta,
+                    method: Method::Insert,
+                    key: format!("plugin-event/v1/{}", event.id).into_bytes(),
+                    val: Some(serde_json::to_vec(&event)?),
+                });
+            }
+        }
         self.kv.apply_batch(transaction)?;
 
         for op in transaction.iter() {
@@ -2960,108 +3571,30 @@ impl Storelike for Db {
         update_index: bool,
         overwrite_existing: bool,
     ) -> AtomicResult<()> {
-        // This only works if no external functions rely on using add_resource for atom-like operations!
-        // However, add_atom uses set_propvals, which skips the validation.
-        let subject = self.normalize_subject(resource.get_subject());
-        let subject_str = subject.pure_id();
-        let existing = self.get_propvals(&subject_str).ok();
-        if !overwrite_existing && existing.is_some() {
-            return Err(format!(
-                "Failed to add: '{}', already exists, should not be overwritten.",
-                resource.get_subject()
-            )
-            .into());
-        }
-        if check_required_props {
-            resource.check_required_props(self).await?;
-        }
-        // Build a single transaction for index updates + resource persistence
-        let mut transaction = Transaction::new();
-
-        if update_index {
-            // Persist DID routing hint if available
-            if let Subject::Did {
-                drive_hint: Some(hint),
-                ..
-            } = &subject
-            {
-                transaction.push(Operation {
-                    tree: Tree::DidMapping,
-                    method: Method::Insert,
-                    key: subject_str.as_bytes().to_vec(),
-                    val: Some(hint.as_bytes().to_vec()),
-                });
-            }
-
-            if let Some(pv) = existing {
-                let subject = resource.get_subject();
-                // Evict against the state that is going away, not the one
-                // replacing it. Whether an entry belongs in a watched query's
-                // member list — and under which sort key it was filed — are
-                // facts about the old values. Handing over the new resource
-                // asks instead whether the *new* values still match, and a row
-                // edited out of a filtered view answers no, so the entry that
-                // needs deleting is the one deletion is skipped for. The row
-                // then stays listed in that view until the index is rebuilt.
-                let old = Resource::from_propvals(pv.clone(), subject.clone());
-                for (prop, val) in pv.iter() {
-                    let remove_atom = crate::Atom::new(subject.clone(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
-                        .map_err(|e| {
-                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
-                        })?;
+        let _import_guard = if let Some((parent, id)) = crate::import_identity::identity(resource) {
+            let guard = self
+                .subject_locks
+                .lock(&format!(
+                    "import-identity:{}",
+                    serde_json::to_string(&(parent.pure_id(), &id))?
+                ))
+                .await;
+            if let Some(found) = crate::import_identity::find_existing(self, &parent, &id).await? {
+                if Subject::from(found).pure_id() != resource.get_subject().pure_id() {
+                    return Err("Import identity already exists; preview again instead of creating a duplicate".into());
                 }
             }
-            for a in resource.to_atoms() {
-                self.add_atom_to_index(&a, resource, &mut transaction)
-                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
-            }
-            crate::search::index_resource(self, resource, &mut transaction)?;
-        }
-        // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
-        // state. Derive and
-        // persist it here UNCONDITIONALLY for every CRDT resource — in the
-        // same transaction as the `Tree::Resources` write — so the invariant
-        // holds that every resource blob is paired with a current snapshot.
-        // (The old code only wrote the snapshot when the propvals lacked a
-        // `loroUpdate`, so any resource that had been through `apply_state_doc`
-        // — i.e. every sync import — had its snapshot write silently skipped.)
-        // The `loroUpdate` propval is stripped from the `Tree::Resources`
-        // blob: that blob is a pure derived projection, not a second home for
-        // the CRDT state. Commits are native (immutable, not CRDT) — they get
-        // no snapshot and keep their `loroUpdate` payload in the blob.
-        let mut propvals = resource.get_propvals().clone();
-        if !subject.is_commit_did() {
-            let snapshot = resource.build_state_doc()?.export_snapshot();
-            propvals.remove(crate::urls::LORO_UPDATE);
-            transaction.push(Operation {
-                tree: Tree::LoroSnapshots,
-                method: Method::Insert,
-                key: subject_str.as_bytes().to_vec(),
-                val: Some(snapshot),
-            });
-        }
-
-        // Persist the resource data in the same transaction
-        let resource_bin = encode_propvals(&propvals)?;
-        transaction.push(Operation {
-            tree: Tree::Resources,
-            method: Method::Insert,
-            key: subject_str.as_bytes().to_vec(),
-            val: Some(resource_bin),
-        });
-        self.apply_transaction(&mut transaction)?;
-        let _ = self.db_events.send(DbEvent::Changed {
-            subject: resource.get_subject().without_params(),
-            delta: None,
-            // Attributed here, while the importing write is still on the stack:
-            // the live push loop uses it to avoid sending an update straight
-            // back to the peer it came from.
-            source_id: crate::sync::ws_apply::current_import_source(),
-            is_new: false,
-            from_commit: false,
-        });
-        Ok(())
+            Some(guard)
+        } else {
+            None
+        };
+        self.persist_resource_projection(
+            resource,
+            check_required_props,
+            update_index,
+            overwrite_existing,
+        )
+        .await
     }
 
     /// Apply a single signed Commit to the Db.
@@ -3106,6 +3639,50 @@ impl Storelike for Db {
 
         let commit_response = commit.validate_and_build_response(opts, store).await?;
 
+        if let Some(old) = &commit_response.resource_old {
+            if old.get(crate::urls::IMPORT_RESOLUTION).is_ok() {
+                let same_identity = commit_response.resource_new.as_ref().is_some_and(|new| {
+                    crate::import_identity::identity(old) == crate::import_identity::identity(new)
+                });
+                if !same_identity {
+                    return Err(
+                        "A reviewed primary record must retain its identity and history".into(),
+                    );
+                }
+            }
+        }
+        let import_guard = if let Some(new) = &commit_response.resource_new {
+            crate::import_identity::validate_baseline(commit_response.resource_old.as_ref(), new)?;
+            crate::import_identity::validate_reference_review(
+                commit_response.resource_old.as_ref(),
+                new,
+            )?;
+            if let Some((parent, id)) = crate::import_identity::identity(new) {
+                let guard = self
+                    .subject_locks
+                    .lock(&format!(
+                        "import-identity:{}",
+                        serde_json::to_string(&(parent.pure_id(), &id))?
+                    ))
+                    .await;
+                if let Some(found) = crate::import_identity::validate_candidate(
+                    self,
+                    commit_response.resource_old.as_ref(),
+                    new,
+                )
+                .await?
+                {
+                    if Subject::from(found).pure_id() != new.get_subject().pure_id() {
+                        return Err("Import identity already exists; preview again instead of creating a duplicate".into());
+                    }
+                }
+                Some(guard)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let mut transaction = Transaction::new();
 
         let mut root_subject: Option<String> = None;
@@ -3258,6 +3835,19 @@ impl Storelike for Db {
             commit_response.source_id.as_deref(),
         )?;
 
+        // An import receipt may be the only evidence available when retrying
+        // after a process kill. Persist identity, snapshot and index before ACK.
+        if [&commit_response.resource_new, &commit_response.resource_old]
+            .into_iter()
+            .filter_map(|r| r.as_ref())
+            .any(|r| {
+                crate::import_identity::identity(r).is_some()
+                    || r.get(crate::urls::IMPORT_REFERENCE_REVIEW).is_ok()
+            })
+        {
+            store.flush()?;
+        }
+
         // Notify subscribers
         let subject = commit_response.commit.subject.without_params();
         let is_destroy = commit_response.commit.destroy.unwrap_or(false);
@@ -3300,6 +3890,7 @@ impl Storelike for Db {
         // exact self-reentrancy `subject_lock` warns against and deadlocks the
         // request forever, since nothing else can ever release a lock this
         // task already holds.
+        drop(import_guard);
         drop(subject_guard);
 
         // AFTER APPLY COMMIT HANDLERS

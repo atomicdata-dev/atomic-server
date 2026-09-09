@@ -12,7 +12,7 @@ import {
 import { Column } from '../Row';
 import { useCallback, useEffect, useState } from 'react';
 import Markdown from '../datatypes/Markdown';
-import { core, useStore } from '@tomic/react';
+import { useStore } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { InlineErrMessage } from '../forms/InputStyles';
 import { useSettings } from '../../helpers/AppSettings';
@@ -22,12 +22,14 @@ import type { Template } from './template';
 
 interface ApplyTemplateDialogProps {
   template?: Template;
+  parent?: string;
   open: boolean;
   bindOpen: (open: boolean) => void;
 }
 
 export function ApplyTemplateDialog({
   template,
+  parent,
   bindOpen,
   open = false,
 }: ApplyTemplateDialogProps): React.JSX.Element {
@@ -35,6 +37,7 @@ export function ApplyTemplateDialog({
   const navigate = useNavigateWithTransition();
   const [dialogProps, show, close, isOpen] = useDialog({ bindShow: bindOpen });
   const { drive } = useSettings();
+  const destination = parent ?? drive;
   const [error, setError] = useState<string>();
   const [applying, setApplying] = useState(false);
   const [existingRootSubject, setExistingRootSubject] = useState<string>();
@@ -48,15 +51,10 @@ export function ApplyTemplateDialog({
 
     if (!rootLocalId) return undefined;
 
-    const [subject] = await store.search('', {
-      parents: drive,
-      filters: { [core.properties.localId]: rootLocalId },
-      include: true,
-      limit: 1,
-    });
+    const resource = await store.findByLocalId(drive, destination, rootLocalId);
 
-    return subject;
-  }, [drive, store, template]);
+    return resource?.subject;
+  }, [drive, destination, store, template]);
 
   const alreadyApplied = existingRootSubject !== undefined;
 
@@ -69,7 +67,7 @@ export function ApplyTemplateDialog({
       // The imported resources set `parent`; children are resolved via the
       // `parent=` query, so no explicit child list needs maintaining.
       await store.importJsonAD(JSON.stringify(template.resources), {
-        parent: drive,
+        parent: destination,
       });
       const rootSubject = await findRootSubject();
 
@@ -90,7 +88,11 @@ export function ApplyTemplateDialog({
     if (open) {
       show();
       setExistingRootSubject(undefined);
-      void findRootSubject().then(setExistingRootSubject);
+      setError(undefined);
+      setApplying(false);
+      void findRootSubject()
+        .then(setExistingRootSubject)
+        .catch(e => setError(String(e)));
     }
   }, [findRootSubject, open, show]);
 
@@ -113,7 +115,7 @@ export function ApplyTemplateDialog({
             {error && <InlineErrMessage>{error}</InlineErrMessage>}
             {alreadyApplied && (
               <InlineErrMessage>
-                This template has already been applied to this drive
+                This template has already been applied here
               </InlineErrMessage>
             )}
             <Button

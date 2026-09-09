@@ -35,7 +35,15 @@ Remaining work, not "this file exists."
 
 | Document | Status |
 | --- | --- |
+| [`extension-architecture.md`](./extension-architecture.md) | **Migration in progress.** Shared view protocol, scope policy and installation identity resolution are implemented; package activation and legacy UI signing remain. Apps contain data/views, connections synchronize sources, automations act; one extension lifecycle and host API, with phased convergence of packaged views, source-as-data apps, JS integrations and Reflector, retaining a separate privileged server-extension boundary. |
 | [`sentry-feedback-readiness.md`](./sentry-feedback-readiness.md) | **Active.** Sidebar feedback and React error capture implemented and locally verified against Sentry. Staging rollout, email receipt and private source-map upload remain release gates. |
+| [`mt940.md`](./mt940.md) | **Pilot implemented.** Sandboxed MT940 import, exact amounts, balance checks, nested table and repeat detection; real bunq sample validation remains. |
+| [`notion-sync.md`](./notion-sync.md) | **Pilot implemented.** Sandboxed Notion rows, property renames and table/board view mappings; OAuth and named database selection implemented; live OAuth verification and broader parity remain. |
+| [`github-issues-pilot.md`](./github-issues-pilot.md) | **In progress.** Sandboxed GitHub issues ↔ kanban, background sync and code-first automations; live Ontola sandbox flow verified; generated-query snapshot bug fixed. |
+| [`plugin-model-review.md`](./plugin-model-review.md) | **In progress.** Implemented authority/manifest checks, immutable releases, recovery journals and store UI; remaining connection lifecycle and provider certification. |
+| [`connector-scale.md`](./connector-scale.md) | **Active.** GitHub/Notion sync, searchable discovery, optional assistant-led automations, offline evidence and compatible upgrade coverage are implemented; Notion OAuth picker implemented. Shared FOSS authorization transport and host retrieval implemented; SaaS deployment, live OAuth/canaries, migrations and third-party evidence remain open. |
+| [`clockify.md`](./clockify.md) | **Import pilot implemented; live validation pending.** Personal completed entries into Time Tracker through the sandbox; shared per-drive time/project/person schema, reviewed proposals, then two-way sync. |
+| [`schema-catalog.md`](./schema-catalog.md) | **Pilot in progress; catalog proposed.** Shared task properties in templates and GitHub table selection; schema discovery, contribution and evolution; connects frozen releases, templates, import mappings, and JSON Schema compatibility. |
 | [`unified-sync.md`](./unified-sync.md) | **Active.** One sync API over WS or Iroh. Carries the single **Remaining work (2026-09-03)** checklist for every open sync item across these plans. The 2026-07 audit history is in [`completed/unified-sync-audit-2026-07.md`](./completed/unified-sync-audit-2026-07.md). |
 | [`serverless-p2p.md`](./serverless-p2p.md) | **Planned.** Device sync without a hub (written same-agent-first; admission is rights-based since 2026-07-17). AUTH-before-SYNC and the `AUTH.requestedSubject`↔drive binding landed 2026-09-01 (Iroh). Live-link destroys travel as signed `COMMIT` frames since 2026-09-03. P0 remaining: require envelopes on every `remove[]` once `Tree::Envelopes` exists. `AtomicTransport` / `SyncSession::serve` first slice landed 2026-09-05; outbox port and the remaining `sync_drive_with_peer*` collapse are open. |
 | [`foss-public-host-mode.md`](./foss-public-host-mode.md) | **Partial.** Phase 1–2 built; OQ5 library path closed 2026-09-05 (`admit_unknown_drive`: Public never creates, Owner enrolls only the owner). Phase 3 (rate limits, Iroh stream refusal) is untouched. |
@@ -67,6 +75,7 @@ Remaining work, not "this file exists."
 | [`json-schema-code-first.md`](./json-schema-code-first.md) | **Proposal**; `defineSchema` + frozen `did:ad:` schemas in flight in PR #1262 (not on `develop`). Code-first JSON Schema → local DID-backed Class/Property resources. |
 | [`SDK-API-design.md`](./SDK-API-design.md) | SDK / agent DX direction. |
 | [`plugins.md`](./plugins.md) | **Partial, off `develop`** — one plugin model (`run` end to end, per-app agents, unattended runs). The code lives on `feat/plugin-model` (PR #1307), not `develop`. Absorbed `llm-wasm-gui-plugins.md`, `importers.md`, `habits-app.md` (2026-09-01); the habits RPC-`query` blocker is a line in it. |
+| [`api-plugins.md`](./api-plugins.md) | **Exploratory, off `develop`** — rebuilding PR #1383 (OpenAPI/OAuth imports) on the plugin model. LocalThought catalog/connect and Syncables typed imports are implemented on `codex/localthought-api-plugins`; live verification awaits proxy #25. |
 | [`personal-information-suite.md`](./personal-information-suite.md) | **Exploration.** Contacts, calendar, email. Nothing built. |
 | [`social-apps.md`](./social-apps.md) | Requirements for social-network-shaped apps. Companion to `zones.md`. |
 | [`android-data-reuse.md`](./android-data-reuse.md) | **Draft.** One store/agent/Iroh node per Android device. Supersedes `on-device-atomic-daemon.md` (deleted 2026-09-01; desktop remainder is a note in `virtual-drive.md`). |
@@ -134,3 +143,11 @@ Before architectural work, read:
 
 Keep `planning/` concise. Avoid session transcripts, stale estimates, and
 postmortems that duplicate current plans.
+
+- [Plugin runtime v1](plugin-runtime-v1.md) — implemented authoring/approval contract and remaining release gates.
+
+Shared integration actions now have a first GitHub pilot; grants, event/cron continuation,
+MCP stdio, recovery, indexed history pagination and cleanup of abandoned and settled manual action payloads plus durable completion acknowledgement and tracked automation receipt cleanup with explicit abandonment are implemented; scaling work is tracked in [connector scale](connector-scale.md)
+and the [action contract](../integrations/ACTIONS.md).
+
+- [Shared import identity](import-identity.md) — native localId reuse, source baselines and remaining cross-node/recovery work.

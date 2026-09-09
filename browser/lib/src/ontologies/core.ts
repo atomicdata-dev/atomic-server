@@ -36,6 +36,10 @@ export const core = {
     classes: 'https://atomicdata.dev/properties/classes',
     isLocked: 'https://atomicdata.dev/properties/isLocked',
     localId: 'https://atomicdata.dev/properties/localId',
+    importReferenceReview:
+      'https://atomicdata.dev/properties/importReferenceReview',
+    importResolution: 'https://atomicdata.dev/properties/importResolution',
+    importBaseline: 'https://atomicdata.dev/properties/importBaseline',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Class']: [

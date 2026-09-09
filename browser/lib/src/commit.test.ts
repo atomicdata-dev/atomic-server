@@ -1,5 +1,10 @@
 import { describe, it, vi } from 'vitest';
-import { Commit, commitToJsonADObject, parseAndApplyCommit } from './commit.js';
+import {
+  Commit,
+  commitToJsonADObject,
+  isCommitSubject,
+  parseAndApplyCommit,
+} from './commit.js';
 import { Store } from './store.js';
 import { Resource } from './resource.js';
 import { core } from './index.js';
@@ -10,6 +15,26 @@ import { testStore } from './test-store.js';
 // canary: every test below goes through `store.newResource()` → `set()`
 // → `save()` and never touches `CommitBuilder` / `markNextCommitAsGenesis`
 // / `_new:` / `syncDirtyResources`.
+
+describe('isCommitSubject', () => {
+  it('recognizes both the DID and the legacy URL form', ({ expect }) => {
+    expect(isCommitSubject('did:ad:commit:abc123')).toBe(true);
+    expect(
+      isCommitSubject('https://staging.atomicdata.dev/commits//Ybe1N6Cu+xy=='),
+    ).toBe(true);
+  });
+
+  it('leaves ordinary resources alone', ({ expect }) => {
+    expect(isCommitSubject('did:ad:resource:abc123')).toBe(false);
+    expect(isCommitSubject('https://example.com/01jd9n5hc9dpwm8ygf2v')).toBe(
+      false,
+    );
+    // A folder the user named "commits" is not the reserved route.
+    expect(isCommitSubject('https://example.com/my/commits/child')).toBe(false);
+    expect(isCommitSubject('_new:something')).toBe(false);
+    expect(isCommitSubject('not a url at all')).toBe(false);
+  });
+});
 
 /**
  * The application-facing flow: create a resource, edit it, save it.

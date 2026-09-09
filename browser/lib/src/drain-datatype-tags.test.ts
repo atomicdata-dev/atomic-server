@@ -1,0 +1,26 @@
+import { it, expect } from 'vitest';
+import { Store } from './store.js';
+import { Resource } from './resource.js';
+import { enableLoro } from './loro-loader.js';
+import { core } from './ontologies/core.js';
+import { Datatype } from './datatypes.js';
+import { IMPORT_RESOLUTION } from './import-resolution.js';
+it('incremental drain tags a newly added JSON field so it survives materialization', async () => {
+  await enableLoro();
+  const store = new Store();
+  const property = new Resource(IMPORT_RESOLUTION);
+  store.addResource(property);
+  await property.set(core.properties.datatype, Datatype.JSON, false);
+  const row = new Resource('did:ad:row');
+  store.addResource(row);
+  await row.set(core.properties.name, 'Original', false);
+  const initial = row.exportLoroDeltaForDrain(true)!;
+  row.markLoroSavedAt(initial.versionAfterExport);
+  const value = { version: 1, canonical: 'did:ad:row', members: {} };
+  await row.set(IMPORT_RESOLUTION, value, false);
+  const update = row.exportLoroDeltaForDrain(false)!;
+  const received = new Resource('did:ad:row');
+  received.importLoroUpdate(initial.bytes, true);
+  received.importLoroUpdate(update.bytes);
+  expect(received.get(IMPORT_RESOLUTION)).toEqual(value);
+});

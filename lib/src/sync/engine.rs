@@ -1596,13 +1596,13 @@ pub async fn import_sync_push(
             has_strokes,
         );
 
-        if store
-            .add_resource_opts(&resource, false, true, true)
+        store
+            .persist_replicated_resource(&resource)
             .await
-            .is_err()
-        {
-            continue;
-        }
+            .map_err(|error| SyncPushRejected {
+                drive: push.drive.clone(),
+                reason: format!("Failed to persist {}: {error}", entry.subject),
+            })?;
         count += 1;
 
         // Check for missing blobs

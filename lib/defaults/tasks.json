@@ -1,0 +1,132 @@
+[
+  {
+    "@id": "https://atomicdata.dev/task/v1/status",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property",
+      "https://atomicdata.dev/classes/SelectProperty"
+    ],
+    "https://atomicdata.dev/properties/name": "Status",
+    "https://atomicdata.dev/properties/shortname": "status",
+    "https://atomicdata.dev/properties/description": "Workflow state of a task. Blocked is distinct from Doing.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Tag",
+    "https://atomicdata.dev/properties/allowsOnly": [
+      "https://atomicdata.dev/task/v1/todo",
+      "https://atomicdata.dev/task/v1/doing",
+      "https://atomicdata.dev/task/v1/blocked",
+      "https://atomicdata.dev/task/v1/done"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/body",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Description",
+    "https://atomicdata.dev/properties/shortname": "body",
+    "https://atomicdata.dev/properties/description": "Task details in Markdown.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/assignee",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Assignee",
+    "https://atomicdata.dev/properties/shortname": "assignee",
+    "https://atomicdata.dev/properties/description": "Free-text assignee label. Not an identity or person relation.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/due-date",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Due date",
+    "https://atomicdata.dev/properties/shortname": "due-date",
+    "https://atomicdata.dev/properties/description": "Calendar date on which the task is due.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/date",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/todo",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Tag"
+    ],
+    "https://atomicdata.dev/properties/name": "Todo",
+    "https://atomicdata.dev/properties/shortname": "todo",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1/status",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/doing",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Tag"
+    ],
+    "https://atomicdata.dev/properties/name": "Doing",
+    "https://atomicdata.dev/properties/shortname": "doing",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1/status",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/blocked",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Tag"
+    ],
+    "https://atomicdata.dev/properties/name": "Blocked",
+    "https://atomicdata.dev/properties/shortname": "blocked",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1/status",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1/done",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Tag"
+    ],
+    "https://atomicdata.dev/properties/name": "Done",
+    "https://atomicdata.dev/properties/shortname": "done",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/task/v1/status",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/task/v1",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/name": "Task vocabulary v1",
+    "https://atomicdata.dev/properties/shortname": "task-v1",
+    "https://atomicdata.dev/properties/description": "Experimental shared task properties. No external standard conformance is claimed.",
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/task/v1/status",
+      "https://atomicdata.dev/task/v1/body",
+      "https://atomicdata.dev/task/v1/assignee",
+      "https://atomicdata.dev/task/v1/due-date"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  }
+]

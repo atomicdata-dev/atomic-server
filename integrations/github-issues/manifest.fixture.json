@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "actions": [
+    {
+      "name": "get_issue",
+      "title": "Get an issue",
+      "description": "Read one issue from this connected repository.",
+      "operation": "get",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "Positive issue number"
+          }
+        },
+        "required": [
+          "number"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_issue",
+      "title": "Create an issue",
+      "description": "Prepare a new issue in this repository for review. Nothing is posted until approved.",
+      "operation": "create",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "body": {
+            "type": "string",
+            "description": "Markdown description"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "secrets": [
+    {
+      "name": "github",
+      "origin": "https://api.github.com",
+      "description": "GitHub token with Issues read/write access to this repository"
+    }
+  ],
+  "operations": [
+    {
+      "id": "list",
+      "method": "GET",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues",
+      "effect": "read"
+    },
+    {
+      "id": "get",
+      "method": "GET",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues/{number}",
+      "effect": "read"
+    },
+    {
+      "id": "create",
+      "method": "POST",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues",
+      "effect": "write"
+    },
+    {
+      "id": "update",
+      "method": "PATCH",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues/{number}",
+      "effect": "write"
+    },
+    {
+      "id": "doing-add",
+      "method": "POST",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues/{number}/labels",
+      "effect": "write"
+    },
+    {
+      "id": "doing-remove",
+      "method": "DELETE",
+      "url": "https://api.github.com/repos/atomic-fixtures/issues/issues/{number}/labels/atomic%3Adoing",
+      "effect": "write"
+    }
+  ]
+}

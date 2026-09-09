@@ -1,0 +1,13 @@
+{
+  "name": "@atomic-integrations/mt940",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "atomicCertification": {
+    "owner": "Ontola",
+    "support": "experimental",
+    "apiVersion": "MT940 subset",
+    "capabilities": ["bank-statements:import"],
+    "sandboxTests": ["plugins::bank_statement_tests::bank_statement_proposes_exact_nested_transactions"]
+  }
+}

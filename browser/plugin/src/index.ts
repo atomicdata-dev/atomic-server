@@ -8,3 +8,31 @@ export { dataBrowser } from '@tomic/lib/ontologies/dataBrowser.js';
 export { ai } from '@tomic/lib/ontologies/ai.js';
 export { collections } from '@tomic/lib/ontologies/collections.js';
 export { commits } from '@tomic/lib/ontologies/commits.js';
+// The run contract lives in @tomic/lib (the host needs it too); re-exported
+// here so plugin authors import everything from one package.
+export {
+  hasBlockingProblems,
+  LOCAL_REF_PREFIX,
+  parseVerdict,
+} from '@tomic/lib';
+export type {
+  CreateIntent,
+  DestroyIntent,
+  Intent,
+  Problem,
+  ProblemSeverity,
+  RemoveIntent,
+  SetIntent,
+  Verdict,
+} from '@tomic/lib';
+export {
+  VIEW_PROTOCOL_VERSION,
+  isViewRequest,
+  viewRequest,
+  packagedViewOperations,
+} from './viewProtocol.js';
+export type {
+  ViewOperation,
+  ViewRequest,
+  ViewResponse,
+} from './viewProtocol.js';

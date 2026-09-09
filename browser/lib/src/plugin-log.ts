@@ -1,0 +1,272 @@
+import { Datatype } from './datatypes.js';
+import { core } from './ontologies/core.js';
+import {
+  ensureSchema,
+  type SchemaSpec,
+  type SchemaStore,
+} from './plugin-schema.js';
+import type { ApplyReport } from './plugin-apply.js';
+import type { RunPlan } from './plugin-plan.js';
+import type { RunTrigger } from './plugin-sandbox.js';
+import type { JSONValue } from './value.js';
+
+/**
+ * The record a run leaves behind.
+ *
+ * This is what makes an LLM-written plugin trustworthy to someone who did not
+ * write it: not a description of what the code was supposed to do, but what it
+ * actually did, every time it ran. It is also the only way to answer "why does
+ * this resource say that" a week later.
+ */
+
+/**
+ * Code-first, so it can move while triggers and preview are still being built.
+ *
+ * A function rather than a const on purpose: `index.ts` sits in an import cycle
+ * with `parse.ts`, so a module-level `Datatype.STRING` is read before
+ * `datatypes.js` has finished initializing and comes out undefined. Building
+ * the spec on call sidesteps initialization order entirely.
+ */
+export function pluginSchema(): SchemaSpec {
+  return {
+    properties: [
+      {
+        shortname: 'plugin-workspace',
+        name: 'Workspace',
+        description:
+          'Workspace using this connection. This relationship grants no access and does not change containment.',
+        datatype: Datatype.ATOMIC_URL,
+      },
+      {
+        shortname: 'automation-integrations',
+        name: 'Used integrations',
+        description:
+          'Integrations this automation uses for events or connected data.',
+        datatype: Datatype.RESOURCEARRAY,
+      },
+      {
+        shortname: 'automation-trigger',
+        name: 'Automation trigger',
+        description:
+          'Integration and declared event that start this independent automation.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'plugin-connection',
+        name: 'Integration connection',
+        description:
+          'Pinned sync release, configuration and available automation events.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'plugin-schemas',
+        name: 'Schema bindings',
+        description:
+          'Explicit schema identities used by this plugin instance and run.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'plugin-source',
+        name: 'Source',
+        description:
+          'The TypeScript the plugin runs. Compiled to a module before it reaches the sandbox.',
+        datatype: Datatype.MARKDOWN,
+      },
+      {
+        shortname: 'trigger',
+        name: 'Trigger',
+        description:
+          'What started the run: manual, cron, a query edge, a webhook.',
+        datatype: Datatype.STRING,
+      },
+      {
+        shortname: 'started-at',
+        name: 'Started at',
+        description: 'When the host began the run.',
+        datatype: Datatype.TIMESTAMP,
+      },
+      {
+        shortname: 'run-status',
+        name: 'Status',
+        description: 'blocked, applied, partial or failed.',
+        datatype: Datatype.STRING,
+      },
+      {
+        shortname: 'run-problems',
+        name: 'Problems',
+        description: 'Everything the run and the planner reported.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'run-outcomes',
+        name: 'Outcomes',
+        description:
+          'What happened to every planned change, including the ones never attempted.',
+        datatype: Datatype.JSON,
+      },
+      {
+        shortname: 'run-cursor',
+        name: 'Cursor',
+        description:
+          'Resume token the run returned, so the next one is incremental.',
+        datatype: Datatype.STRING,
+      },
+      {
+        shortname: 'app-identities',
+        name: 'App identities',
+        description:
+          'The folder holding the agents apps on this drive write as. Kept as a pointer rather than found by name, so renaming the folder does not orphan it.',
+        datatype: Datatype.ATOMIC_URL,
+      },
+      {
+        shortname: 'entrypoint',
+        name: 'Entry point',
+        description:
+          'The plugin whose view() opens when someone opens this app.',
+        datatype: Datatype.ATOMIC_URL,
+      },
+      {
+        shortname: 'renders',
+        name: 'Renders',
+        description:
+          'The row classes this app knows how to show. A table offers an app as a view only when its rows are one of these — an app written against its own schema would otherwise be offered for every table on the drive and break on most of them.',
+        datatype: Datatype.RESOURCEARRAY,
+      },
+      {
+        shortname: 'app-data',
+        name: 'Data',
+        description:
+          "The table this app's rows live in. A table rather than a folder so the rows are sortable, filterable and editable without the app implementing any of that — and so they can be opened directly when the app is not what someone wants.",
+        datatype: Datatype.ATOMIC_URL,
+      },
+    ],
+    classes: [
+      {
+        shortname: 'plugin-script',
+        name: 'Plugin',
+        description:
+          'A plugin that proposes changes. Its run export returns intents the host reviews before writing anything.',
+        requires: ['plugin-source'],
+        recommends: ['trigger'],
+      },
+      {
+        shortname: 'plugin-run',
+        name: 'Plugin run',
+        description:
+          'One execution of a plugin: what triggered it, what it proposed, and what was written.',
+        requires: ['trigger', 'started-at', 'run-status'],
+        recommends: ['run-problems', 'run-outcomes', 'run-cursor'],
+      },
+      {
+        shortname: 'app',
+        name: 'App',
+        description:
+          'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
+        // Nothing is required. An app's parts are its children, so they can
+        // only be made once the app has a subject — a property that cannot be
+        // set at creation time must not be required, or creating one is
+        // impossible.
+        recommends: ['entrypoint', 'app-data', 'renders'],
+      },
+    ],
+  };
+}
+
+export type RunStatus = 'blocked' | 'applied' | 'partial' | 'failed';
+
+export interface RecordRunOptions {
+  /** Where the run record lives. Usually the plugin resource. */
+  parent: string;
+  /** Drive whose ontology holds the plugin classes. */
+  drive: string;
+  trigger: RunTrigger;
+  plan: RunPlan;
+  /** Absent when the plan was blocked and never applied. */
+  report?: ApplyReport;
+  name?: string;
+  /** Exact executed source; never reread the mutable draft when logging. */
+  source?: string;
+  schemas?: Record<string, string>;
+}
+
+/**
+ * Writes one run record and returns its subject.
+ *
+ * A blocked plan is recorded too. A run that refused to write is exactly the
+ * kind of thing someone needs to find later, and leaving it unlogged would make
+ * "it silently did nothing" indistinguishable from "it never ran".
+ */
+export async function recordRun(
+  store: SchemaStore,
+  options: RecordRunOptions,
+): Promise<string> {
+  const schema = await ensureSchema(store, options.drive, pluginSchema());
+  const status = runStatus(options.plan, options.report);
+
+  const propVals: Record<string, JSONValue> = {
+    [core.properties.name]:
+      options.name ?? defaultName(options.trigger, status),
+    [schema.properties.trigger]: options.trigger.kind,
+    [schema.properties['started-at']]: options.trigger.at,
+    [schema.properties['run-status']]: status,
+    [schema.properties['run-problems']]: problemsOf(options.plan),
+    [schema.properties['run-outcomes']]: (options.report?.outcomes ??
+      []) as unknown as JSONValue,
+  };
+
+  if (options.source !== undefined) {
+    propVals[schema.properties['plugin-source']] = options.source;
+  }
+
+  if (options.schemas !== undefined)
+    propVals[schema.properties['plugin-schemas']] = options.schemas;
+
+  // An empty page can complete successfully; a partially applied page cannot.
+  if (
+    !options.plan.blocked &&
+    options.report &&
+    options.report.failed === 0 &&
+    !options.report.stoppedEarly &&
+    options.plan.cursor !== undefined
+  ) {
+    propVals[schema.properties['run-cursor']] = options.plan.cursor;
+  }
+
+  const record = await store.newResource({
+    parent: options.parent,
+    isA: [schema.classes['plugin-run']],
+    propVals,
+  });
+  await record.save();
+
+  return record.subject;
+}
+
+export function runStatus(plan: RunPlan, report?: ApplyReport): RunStatus {
+  if (plan.blocked || !report) return 'blocked';
+
+  if (report.failed === 0) return 'applied';
+
+  return report.applied > 0 ? 'partial' : 'failed';
+}
+
+/**
+ * Problems worth keeping: everything the plan carried, plus everything attached
+ * to a change, each tagged with the subject it concerns so the log reads
+ * without the plan beside it.
+ */
+function problemsOf(plan: RunPlan): JSONValue {
+  return [
+    ...plan.problems,
+    ...plan.changes.flatMap(change =>
+      change.problems.map(problem => ({
+        ...problem,
+        subject: problem.subject ?? change.subject,
+      })),
+    ),
+  ] as unknown as JSONValue;
+}
+
+function defaultName(trigger: RunTrigger, status: RunStatus): string {
+  return `${trigger.kind} run — ${status}`;
+}

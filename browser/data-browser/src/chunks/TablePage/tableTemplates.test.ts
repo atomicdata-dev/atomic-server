@@ -364,3 +364,15 @@ describe('table templates', () => {
     },
   );
 });
+
+it('task templates reuse the same semantic properties rather than generating copies', () => {
+  const issues = TABLE_TEMPLATES.find(t => t.id === 'issue-tracker')!.spec!;
+  const tasks = TABLE_TEMPLATES.find(t => t.id === 'project-tasks')!.spec!;
+
+  for (const name of ['Status', 'Assignee', 'Description']) {
+    const issue = issues.columns.find(c => c.name === name)!;
+    const task = tasks.columns.find(c => c.name === name)!;
+    expect(issue.propertySubject).toBeTruthy();
+    expect(issue.propertySubject).toEqual(task.propertySubject);
+  }
+});

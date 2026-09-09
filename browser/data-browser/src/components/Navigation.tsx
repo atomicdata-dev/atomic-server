@@ -6,6 +6,7 @@ import { SideBar } from './SideBar';
 import { OverlayContainer } from './OverlayContainer';
 import { CalculatedPageHeight } from '../globalCssVars';
 import { AISidebarContextProvider } from './AI/AISidebarContext';
+import { AppVerifierProvider } from '@chunks/AppPage/AppVerifierContext';
 import { AISidebarContainer } from './AI/AISidebarContainer';
 import { RightPanelProvider } from './RightPanel/RightPanelContext';
 import { CommentsPanelContainer } from './CommentsPanel/CommentsPanelContainer';
@@ -77,26 +78,33 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
   return (
     <RightPanelProvider>
       <AISidebarContextProvider>
-        {/* The single app-wide resource context menu (right-click). Mounted here
-         * so its actions have the AI-sidebar, dialog, and router contexts. */}
-        <ResourceContextMenuHost />
-        {/* Toasts new meeting messages when the meeting panel isn't open. */}
-        {!hideGlobalChrome && <MeetingMessageToaster />}
-        {!hideGlobalChrome && (
-          <TopBar subject={contextualSubject} top={navbarTop} />
-        )}
-        <SideBarWrapper top={navbarTop} fullViewportContent={hideGlobalChrome}>
-          {!hideGlobalChrome && <SideBar />}
-          <Content>{children}</Content>
+        {/* Owns the off-screen frame an app is checked in. Inside the AI
+         * providers, because the tools that ask for a check live there. */}
+        <AppVerifierProvider>
+          {/* The single app-wide resource context menu (right-click). Mounted here
+           * so its actions have the AI-sidebar, dialog, and router contexts. */}
+          <ResourceContextMenuHost />
+          {/* Toasts new meeting messages when the meeting panel isn't open. */}
+          {!hideGlobalChrome && <MeetingMessageToaster />}
           {!hideGlobalChrome && (
-            <HideInPrint>
-              <CommentsPanelMemo />
-              <FollowSessionPanelMemo />
-              <AISidebarMemo />
-            </HideInPrint>
+            <TopBar subject={contextualSubject} top={navbarTop} />
           )}
-        </SideBarWrapper>
-        <OverlayContainer />
+          <SideBarWrapper
+            top={navbarTop}
+            fullViewportContent={hideGlobalChrome}
+          >
+            {!hideGlobalChrome && <SideBar />}
+            <Content>{children}</Content>
+            {!hideGlobalChrome && (
+              <HideInPrint>
+                <CommentsPanelMemo />
+                <FollowSessionPanelMemo />
+                <AISidebarMemo />
+              </HideInPrint>
+            )}
+          </SideBarWrapper>
+          <OverlayContainer />
+        </AppVerifierProvider>
       </AISidebarContextProvider>
     </RightPanelProvider>
   );

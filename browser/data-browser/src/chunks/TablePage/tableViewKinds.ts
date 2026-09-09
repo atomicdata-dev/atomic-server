@@ -25,6 +25,24 @@ export function normalizeViewKind(kind: string | undefined): ViewKind {
     : DEFAULT_VIEW_KIND;
 }
 
+/**
+ * The app rendering this view, when the stored kind names one.
+ *
+ * A view kind is either one of the built-ins above or the subject of an app,
+ * told apart by shape — the same tell `/plugin-ui` uses. Kept out of
+ * `ViewKind` deliberately: the built-ins are a closed set with labels and
+ * icons compiled in, and apps are open-ended data. Folding them together
+ * would mean every exhaustive match over kinds had a case that cannot be
+ * written.
+ *
+ * A table always keeps its own Table tab, and an app is never made the
+ * default view. Adding an app is adding a way to look at the rows, never
+ * taking one away.
+ */
+export function appViewOf(kind: string | undefined): string | undefined {
+  return kind?.includes(':') ? kind : undefined;
+}
+
 export const VIEW_KIND_LABELS: Record<ViewKind, string> = {
   table: 'Table',
   kanban: 'Kanban',

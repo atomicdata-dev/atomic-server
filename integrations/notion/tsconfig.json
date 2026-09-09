@@ -1,0 +1,1 @@
+{ "extends": "../github-issues/tsconfig.json", "include": ["model.ts", "plugin.ts", "atomic.ts"] }

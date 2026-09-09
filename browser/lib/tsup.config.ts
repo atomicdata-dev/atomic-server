@@ -13,6 +13,10 @@ export default defineConfig(options => ({
     // hand-written `public/wasm/client-db-worker.js` that drifted out of
     // sync with the TS source whenever message types changed.
     'client-db.worker': 'src/client-db.worker.ts',
+    // The DedicatedWorker that executes a plugin's `run` export. Same
+    // reasoning as above: its own entry so hosts can point a `new Worker(...)`
+    // at it without hand-maintaining a parallel copy.
+    'plugin-run.worker': 'src/plugin-run.worker.ts',
     'ontologies/core': 'src/ontologies/core.ts',
     'ontologies/server': 'src/ontologies/server.ts',
     'ontologies/dataBrowser': 'src/ontologies/dataBrowser.ts',

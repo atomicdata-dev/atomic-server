@@ -36,6 +36,18 @@ pub trait KvStore: Send + Sync {
     /// If `reverse` is true, iterate in reverse lexicographic order.
     fn range(&self, tree: Tree, start: Vec<u8>, end: Vec<u8>, reverse: bool) -> KvIter;
 
+    /// Bounded range read. Backends with eager iterators should override this so
+    /// the limit is applied before copying values into memory.
+    fn range_page(
+        &self,
+        tree: Tree,
+        start: Vec<u8>,
+        end: Vec<u8>,
+        limit: usize,
+    ) -> AtomicResult<Vec<KvPair>> {
+        self.range(tree, start, end, false).take(limit).collect()
+    }
+
     /// Iterate over all entries in a tree, ordered by key.
     fn iter_tree(&self, tree: Tree) -> KvIter;
 

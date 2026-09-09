@@ -33,6 +33,7 @@ static-files = "0.3.1"
 walkdir = "2"
 
 [dependencies]
+tempfile = "3"
 async-trait = "0.1.89"
 actix = "0.13.5"
 actix-cors = "0.7.1"
@@ -78,6 +79,7 @@ wasmtime = { version = "47.0.4", optional = true, features = [
 ] }
 wasmtime-wasi = { version = "47.0.4", optional = true, features = ["p2"] }
 wasmtime-wasi-http = { version = "47.0.4", optional = true }
+ulid = "1.2.1"
 url = "2.5.8"
 html2md = "0.2.15"
 kuchikiki = "0.8.2"

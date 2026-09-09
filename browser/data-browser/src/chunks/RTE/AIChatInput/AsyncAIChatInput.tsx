@@ -91,6 +91,8 @@ const SkillMention = Mention.extend({
 });
 
 interface AsyncAIChatInputProps {
+  /** A one-time handoff draft; later typing and clearing remain user-owned. */
+  prefill?: string;
   hasFiles: boolean;
   disabled?: boolean;
   disableSubmit?: boolean;
@@ -124,11 +126,13 @@ const AsyncAIChatInput: React.FC<
   onFileAdded,
   rightAlignedChildren,
   focusSignal,
+  prefill,
 }) => {
   const store = useStore();
   const { drive } = useSettings();
   const { mcpServers } = useAISettings();
   const [markdown, setMarkdown] = useState('');
+  const prefilled = useRef<string | undefined>(undefined);
   const markdownRef = useRef(markdown);
   const onSubmitRef = useRef(onSubmit);
   const onCompactRef = useRef(onCompact);
@@ -236,6 +240,7 @@ const AsyncAIChatInput: React.FC<
         ),
       ],
       autofocus: true,
+      content: markdownRef.current,
       contentType: 'markdown',
       editable: !disabled,
       editorProps: {
@@ -258,6 +263,18 @@ const AsyncAIChatInput: React.FC<
     },
     [serversWithResources, searchResourcesOfServer, disabled],
   );
+
+  useEffect(() => {
+    if (!prefill || !editor || prefilled.current === prefill) return;
+    prefilled.current = prefill;
+
+    if (editor.isEmpty) {
+      editor.commands.setContent(prefill, { contentType: 'markdown' });
+      markdownRef.current = prefill;
+      setMarkdown(prefill);
+      onChange(prefill);
+    }
+  }, [prefill, editor, onChange]);
 
   // Lets the parent move focus into the editor on demand (e.g. right after the
   // user picks a model) by bumping `focusSignal`.

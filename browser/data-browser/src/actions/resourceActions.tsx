@@ -12,12 +12,14 @@ import {
   FaMagnifyingGlass,
   FaMessage,
   FaPencil,
+  FaPlay,
   FaPlus,
   FaRegStar,
   FaShare,
   FaStar,
   FaTrash,
   FaTurnUp,
+  FaWindowMaximize,
 } from 'react-icons/fa6';
 import { atomicArgu } from '../ontologies/atomic-argu';
 import { getOrCreateForksFolder } from '../helpers/forksFolder';
@@ -31,6 +33,10 @@ import {
 } from '../helpers/navigation';
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
+import { createPlugin } from '@chunks/PluginRuns/runScript';
+import { createApp } from '@tomic/lib';
+import { handOverAppKey } from '@chunks/AppPage/appAgent';
+import { STARTER_APP_SOURCE } from '@chunks/AppPage/starter';
 import type { ActionContext, ActionDefinition } from './types';
 
 const getParent = (ctx: ActionContext): string | undefined =>
@@ -63,6 +69,81 @@ export const resourceActions: ActionDefinition[] = [
     shortcutLabel: () => 'Show data view',
     disabled: ctx => ctx.pathname.startsWith(paths.data),
     run: ctx => ctx.navigate(dataURL(ctx.subject)),
+  },
+  {
+    id: 'new-plugin',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'New plugin',
+    helper: () =>
+      'Create a plugin here. It proposes changes that you review before anything is written.',
+    keywords: ['automation', 'script', 'import', 'plugin'],
+    icon: () => <FaPlay />,
+    searchOnly: true,
+    available: ctx => ctx.canWrite && ctx.drive !== undefined,
+    run: async ctx => {
+      const subject = await createPlugin(ctx.store, {
+        parent: ctx.subject,
+        drive: ctx.drive!,
+      });
+
+      ctx.navigate(constructOpenURL(subject));
+    },
+  },
+  {
+    id: 'new-app',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'New app',
+    helper: () =>
+      'Create an app here: a screen you open, backed by its own data.',
+    keywords: ['app', 'view', 'screen', 'plugin'],
+    icon: () => <FaWindowMaximize />,
+    searchOnly: true,
+    available: ctx => ctx.canWrite && ctx.drive !== undefined,
+    run: async ctx => {
+      const created = await createApp(ctx.store, {
+        drive: ctx.drive!,
+        name: 'New app',
+        // Every app carries a glyph, so a sidebar of them stays scannable.
+        // A placeholder here because nobody has said yet what this one is;
+        // an app built from a description picks its own.
+        emoji: '🧩',
+        source: STARTER_APP_SOURCE,
+      });
+
+      // The node needs the key to write as this app when nobody is present.
+      // Reported rather than thrown: the app exists and works while you are
+      // here either way, it just cannot act on its own yet.
+      try {
+        await handOverAppKey(ctx.store, {
+          drive: ctx.drive!,
+          app: created.app,
+          secret: created.secret,
+        });
+      } catch (e) {
+        toast.error(
+          `This app cannot write on its own: ${(e as Error).message}`,
+        );
+      }
+
+      ctx.navigate(constructOpenURL(created.app));
+    },
+  },
+  {
+    id: 'run-plugin',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Run',
+    helper: () =>
+      'Run this plugin and review what it proposes before anything is written.',
+    keywords: ['plugin', 'execute', 'automation', 'import'],
+    icon: () => <FaPlay />,
+    available: ctx =>
+      ctx.openPluginRun !== undefined &&
+      ctx.pluginClass !== undefined &&
+      ctx.resource.hasClasses(ctx.pluginClass),
+    run: ctx => ctx.openPluginRun?.(),
   },
   {
     id: 'favorite',

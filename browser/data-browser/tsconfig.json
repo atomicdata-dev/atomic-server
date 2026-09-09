@@ -1,12 +1,13 @@
 {
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
+    "rootDir": "../..",
     "typeRoots": ["../node_modules/@types"],
     "types": ["node"],
     "composite": false,
     // Resolve workspace packages from source so the IDE does not depend on
     // dist/*.d.ts while tsup watch rebuilds @tomic/lib and @tomic/react.
-    "rootDir": "..",
+
     "paths": {
       "@tomic/react": ["../react/src/index.ts"],
       "@tomic/lib": ["../lib/src/index.ts"],

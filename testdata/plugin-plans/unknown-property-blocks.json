@@ -1,0 +1,22 @@
+{
+  "name": "a value whose property does not exist blocks the whole plan",
+  "schema": {},
+  "resources": {},
+  "verdict": {
+    "intents": [
+      {
+        "op": "create",
+        "localId": "a",
+        "parent": "https://x/drive",
+        "isA": ["https://x/Note"],
+        "set": { "https://x/not-a-property": "value" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": true,
+    "problems": ["nowhere to go"],
+    "changes": [{ "op": "create", "localId": "a", "properties": [] }]
+  }
+}

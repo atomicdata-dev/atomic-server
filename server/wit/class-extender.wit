@@ -1,15 +1,34 @@
 package atomic:class-extender@0.1.0;
 
 interface host {
-  use types.{resource-json, atomic-agent};
+  use types.{resource-json, atomic-agent, http-request, http-response};
 
   get-resource: func(subject: string, agent: option<string>) -> result<resource-json, string>;
   query: func(property: string, value: string, agent: option<string>) -> result<list<resource-json>, string>;
   get-config: func() -> string;
   commit: func(commit: string) -> result<_, string>;
+  fetch: func(request: http-request) -> result<http-response, string>;
 }
 
 interface types {
+
+  record http-header {
+    name: string,
+    value: string,
+  }
+
+  record http-request {
+    method: string,
+    url: string,
+    headers: list<http-header>,
+    body: option<string>,
+  }
+
+  record http-response {
+    status: u16,
+    headers: list<http-header>,
+    body: string,
+  }
   record atomic-agent {
     subject: string,
   }

@@ -1,8 +1,21 @@
 # Plugins: One Model for Views, Automations, and Importers
 
+**Consolidation proposal (2026-09-08):** [Atomic extension architecture](extension-architecture.md)
+defines the target boundaries and phased retirement of overlapping models. This
+document retains earlier design and implementation history; its “one model” title
+does not mean the existing UI bridges and lifecycles have already converged.
+
 > **Status:** Partial, off `develop`. Track A built 2026-08-21 (`run` end to end: sandbox, planner, applier, secrets, server placement, scheduled and query-triggered runs, auto-apply); Track B revised 2026-08-22 onto that substrate. The code lives on `feat/plugin-model` (PR #1307). Absorbed `llm-wasm-gui-plugins.md`, `importers.md` and `habits-app.md` on 2026-09-01.
 
 ## Status
+
+**Strategy review (2026-09-05):** see [plugin-model-review.md](plugin-model-review.md).
+Static review of `feat/plugin-model` at `ccfbb1e14` found gaps between the intended
+capability/review guarantees and the server host implementation. The review also
+proposes immutable releases and connection instances for the integration store.
+The user authorized implementation. The review checklist is authoritative for
+implemented guarantees and remaining store/sync work; older “built” descriptions
+below must not be read as proving those lifecycle guarantees.
 
 Track A built (2026-08-21): `run` works end to end — sandbox, planner, applier,
 secrets, server placement, scheduled and query-triggered runs, auto-apply.
@@ -953,6 +966,10 @@ much smaller thing to replace.
 - Which pinned dependency catalog is acceptable for the browser builder?
 
 ## Relationship to Other Plans
+
+- [`connector-scale.md`](./connector-scale.md) — proposed bidirectional connector
+  ecosystem on this plugin substrate. Adds the missing durable remote-operation
+  and reconciliation contract; does not introduce a second executable plugin model.
 
 - [`actions.md`](./actions.md) — `manual` triggers project into the action
   registry; a plugin action is an `ActionDefinition` like any other.

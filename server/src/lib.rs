@@ -18,6 +18,7 @@ mod https;
 pub mod invite_token;
 mod jsonerrors;
 mod metrics;
+pub mod node_key;
 pub mod plugins;
 pub mod routes;
 pub mod serve;
@@ -28,3 +29,5 @@ pub mod iroh_transport;
 mod tests;
 mod trace;
 // Force rebuild for blake3
+
+pub mod oauth;

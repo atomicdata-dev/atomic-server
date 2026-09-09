@@ -1,0 +1,27 @@
+{
+  "name": "a value of the wrong datatype blocks the whole plan",
+  "schema": {
+    "https://x/age": {
+      "datatype": "https://atomicdata.dev/datatypes/integer",
+      "shortname": "age"
+    }
+  },
+  "resources": {},
+  "verdict": {
+    "intents": [
+      {
+        "op": "create",
+        "localId": "a",
+        "parent": "https://x/drive",
+        "isA": ["https://x/Person"],
+        "set": { "https://x/age": "forty" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": true,
+    "problems": ["age"],
+    "changes": [{ "op": "create", "localId": "a", "properties": [] }]
+  }
+}

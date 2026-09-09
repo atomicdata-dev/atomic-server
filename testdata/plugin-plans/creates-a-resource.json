@@ -1,0 +1,35 @@
+{
+  "name": "a create becomes one change with its values",
+  "schema": {
+    "https://atomicdata.dev/properties/name": {
+      "datatype": "https://atomicdata.dev/datatypes/string",
+      "shortname": "name"
+    }
+  },
+  "resources": {},
+  "verdict": {
+    "intents": [
+      {
+        "op": "create",
+        "localId": "note",
+        "parent": "https://x/drive",
+        "isA": ["https://x/Note"],
+        "set": { "https://atomicdata.dev/properties/name": "Hello" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": false,
+    "problems": [],
+    "changes": [
+      {
+        "op": "create",
+        "localId": "note",
+        "properties": [
+          { "property": "https://atomicdata.dev/properties/name", "to": "Hello" }
+        ]
+      }
+    ]
+  }
+}

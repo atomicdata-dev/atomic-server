@@ -97,3 +97,156 @@ export {
   type PerfSnapshot,
 } from './perf-trace.js';
 export * from './child-order.js';
+export {
+  hasBlockingProblems,
+  LOCAL_REF_PREFIX,
+  parseVerdict,
+  type CreateIntent,
+  type DestroyIntent,
+  type Intent,
+  type ParseVerdictOptions,
+  type Problem,
+  type ProblemSeverity,
+  type RemoveIntent,
+  type SetIntent,
+  type Verdict,
+} from './plugin-run.js';
+export {
+  applyDeterministicGlobals,
+  denyAmbientGlobals,
+  invokeRun,
+  DENIED_GLOBALS,
+  type InvokeOptions,
+  type InvokeResult,
+  type PluginModule,
+  type RunInput,
+  type RunTrigger,
+  type TriggerKind,
+} from './plugin-sandbox.js';
+export {
+  runPlugin,
+  type PluginRunOutcome,
+  type PluginRunRequest,
+  type PluginRunResponse,
+  type PluginWorkerFactory,
+  type PluginWorkerLike,
+  type RunPluginOptions,
+} from './plugin-runner.js';
+export {
+  planVerdict,
+  planHostFromStore,
+  type PlanHost,
+  type PlanStore,
+  type PlannedChange,
+  type PlannedProperty,
+  type RunPlan,
+} from './plugin-plan.js';
+export {
+  applyPlan,
+  applyHostFromStore,
+  type ApplyStore,
+  type ApplyHost,
+  type ApplyOptions,
+  type ApplyReport,
+  type ChangeOutcome,
+  type ChangeStatus,
+  type CreateRequest,
+} from './plugin-apply.js';
+export {
+  ensureSchema,
+  findSchema,
+  type ClassSpec,
+  type EnsuredSchema,
+  type PropertySpec,
+  type SchemaSpec,
+  type SchemaStore,
+} from './plugin-schema.js';
+export {
+  recordRun,
+  runStatus,
+  pluginSchema,
+  type RecordRunOptions,
+  type RunStatus,
+} from './plugin-log.js';
+export * from './issue-access-agent.js';
+export {
+  createApp,
+  describeApp,
+  updateApp,
+  type AppDescription,
+  type CreateAppOptions,
+  type CreatedApp,
+} from './plugin-app.js';
+export {
+  parseManifest,
+  validateManifest,
+  type DeclaredOperation,
+  secretsMentionedIn,
+  originsMentionedIn,
+  type DeclaredSecret,
+  type PluginManifest,
+} from './plugin-manifest.js';
+export { describePlugin } from './plugin-runner.js';
+
+export {
+  reconcileRecord,
+  acknowledgedBaseline,
+  type SyncRecord,
+  type SyncValue,
+  type SyncConflict,
+  type SyncDecision,
+} from './plugin-reconcile.js';
+
+export {
+  publishPluginRelease,
+  pinPluginRelease,
+  readExternalOperation,
+  approveExternalIntent,
+  readConnectionState,
+  readConnectionSubjects,
+  checkpointConnection,
+  type ConnectionState,
+  type ConnectionCheckpoint,
+  inspectExternalOperation,
+  confirmExternalOperation,
+  type ExternalOperation,
+  type ExternalOperationStatus,
+  type PluginRelease,
+  type ExternalIntent,
+  type ExternalReceipt,
+  type PluginTarget,
+  previewPluginSync,
+  applyPluginSync,
+  getPluginSync,
+  type PluginSyncSession,
+} from './plugin-connection.js';
+
+export {
+  pluginSyncSchedule,
+  type PluginSyncSchedule,
+} from './plugin-connection.js';
+export * from './integration-actions.js';
+
+export { taskSchema } from './task-schema.js';
+
+export { timeTrackingSchema } from './time-tracking-schema.js';
+
+export { executeServerPlugin } from './plugin-server.js';
+export {
+  importRecords,
+  resolveImportConflict,
+  claimImportIdentity,
+  IMPORT_BASELINE,
+  IMPORT_LOCAL_ID,
+  type ImportRecord,
+  type ImportHost,
+} from './import-records.js';
+
+export { resumableInstallation } from './resumable-installation.js';
+
+export * from './import-resolution.js';
+
+export * from './import-reference-review.js';
+
+export { pluginWorkspace, workspaceConnections } from './plugin-workspace.js';
+export type { WorkspaceConnection } from './plugin-workspace.js';

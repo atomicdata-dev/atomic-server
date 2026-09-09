@@ -1,3 +1,4 @@
+import { taskSchema } from './task-schema.js';
 import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
@@ -12,7 +13,12 @@ import {
   signRequest,
 } from './authentication.js';
 import { Client, type FileOrFileLike } from './client.js';
-import { CommitBuilder, commitIdOf, type Commit } from './commit.js';
+import {
+  CommitBuilder,
+  commitIdOf,
+  isCommitSubject,
+  type Commit,
+} from './commit.js';
 import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
@@ -1004,10 +1010,14 @@ export class Store {
           const isRedundantGenesis = msg.includes(
             'is_genesis: true, but the resource already exists',
           );
+          // Same reasoning for a Commit that was queued as an editable
+          // resource: no user write is lost (a Commit is immutable), so the
+          // drop is bookkeeping, not a recovery the user needs to know about.
+          const isCommitWrite = msg.includes('Commits cannot be edited');
 
-          if (isRedundantGenesis) {
+          if (isRedundantGenesis || isCommitWrite) {
             console.debug(
-              `Dropped redundant genesis commit for ${entry.subject} (already on server)`,
+              `Dropped unsyncable commit for ${entry.subject}: ${msg}`,
             );
           } else {
             this.notifyError(
@@ -1024,10 +1034,15 @@ export class Store {
           // response would reset `Resource.new`, re-arming the local-change
           // subscriber's dirty-tracking for the next edit and looping this
           // exact drop (see the `_new:` guard in `resource.ts`'s Loro
-          // subscription).
+          // subscription). Commit subjects are skipped for the same reason in
+          // reverse: the Commit on the server is already what it will always
+          // be, so there is nothing to align, and the legacy `/commits/<sig>`
+          // form carries unescaped signature characters that only produce a
+          // failed fetch.
           if (
             !entry.subject.startsWith('_new:') &&
-            !entry.subject.startsWith('_local:')
+            !entry.subject.startsWith('_local:') &&
+            !isCommitSubject(entry.subject)
           ) {
             this.fetchResourceFromServer(entry.subject).catch(() => undefined);
           }
@@ -2594,6 +2609,45 @@ export class Store {
     return ontology;
   }
 
+  /** Authoritative import/setup identity lookup; never infer absence from an incomplete cache. */
+  public async findByLocalId(
+    drive: string,
+    parent: string,
+    localId: string,
+  ): Promise<Resource | undefined> {
+    const { readConnectionSubjects } = await import('./plugin-connection.js');
+    const subjects = await readConnectionSubjects(
+      this,
+      drive,
+      core.properties.localId,
+      localId,
+    );
+    const matches: Resource[] = [];
+
+    for (const subject of subjects) {
+      const resource = await this.fetchResourceFromServer(subject, {
+        noWebSocket: true,
+      });
+      if (resource.error) throw resource.error;
+      const actualParent = resource.get(core.properties.parent);
+      if (
+        typeof actualParent === 'string' &&
+        actualParent.split('?')[0] === parent.split('?')[0]
+      )
+        matches.push(resource);
+    }
+
+    if (!matches.length) return undefined;
+    const { resolvedImportSubject } = await import('./import-resolution.js');
+    const chosen = resolvedImportSubject(
+      Object.fromEntries(matches.map(r => [r.subject, r.getPropVals()])),
+    );
+    if (!chosen)
+      throw new Error('Ambiguous destination/localId; review all copies again');
+
+    return matches.find(r => r.subject === chosen);
+  }
+
   public async search(query: string, opts: SearchOpts = {}): Promise<string[]> {
     const parentScope = Array.isArray(opts.parents)
       ? opts.parents[0]
@@ -3256,6 +3310,21 @@ export class Store {
   /**
    * Always fetches the resource from the server then adds it to the store.
    */
+  /** Read authoritative server values without merging optimistic local edits.
+   * Use when confirming a reviewed operation, not for ordinary cached reads. */
+  public async readServerSnapshot(
+    subject: string,
+  ): Promise<Readonly<ReturnType<Resource['getPropVals']>>> {
+    const agent = this.getAgent();
+    const { resource } = await this.client.fetchResourceHTTP(subject, {
+      signInfo: agent ? { agent, serverURL: this.getServerUrl() } : undefined,
+      serverURL: this.getServerUrl(),
+    });
+    if (resource.error) throw resource.error;
+
+    return resource.getPropVals();
+  }
+
   public async fetchResourceFromServer<C extends OptionalClass = UnknownClass>(
     /** The resource URL to be fetched */
     subject: string,
@@ -3277,6 +3346,21 @@ export class Store {
       forceOverride?: boolean;
     } = {},
   ): Promise<Resource<C>> {
+    // Embedded pilot vocabulary must resolve through the installed host, not
+    // depend on a public catalog deployment being available.
+    if (
+      [
+        ...Object.values(taskSchema.properties),
+        ...Object.values(taskSchema.tags),
+        'https://atomicdata.dev/task/v1',
+        core.properties.importBaseline,
+        core.properties.importResolution,
+        core.properties.importReferenceReview,
+      ].includes(subject)
+    ) {
+      opts = { ...opts, fromProxy: true, noWebSocket: true };
+    }
+
     const normalizedSubject = this.normalizeSubject(subject);
 
     // In-flight dedup. SideBarDrive and DrivePage both call
@@ -3438,7 +3522,7 @@ export class Store {
       });
     }
 
-    return this.resources.get(normalizedSubject)!;
+    return this.resources.get(this.resolveSubject(subject))!;
   }
 
   public getAllSubjects(): string[] {
