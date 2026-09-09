@@ -7,6 +7,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+## [v0.41.0-beta.6] - 2026-09-09
+
 - Desktop restore discovers reachable workspace sources and supports an explicit server address when automatic discovery does not find one.
 
 - **Security audit fixes** (`planning/security-audit-2026-09.md`, #1384).

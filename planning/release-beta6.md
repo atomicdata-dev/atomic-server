@@ -1,6 +1,6 @@
 # Prepare 0.41.0-beta.6
 
-Status: preparation only; do not tag until the gates below pass.
+Status: user authorized beta.6 publication after the passing full local E2E run on 2026-09-09. Publish the desktop/server beta using the existing workflow; npm automation in #1355 remains separate unfinished work.
 
 ## Prepared
 
@@ -12,9 +12,9 @@ Status: preparation only; do not tag until the gates below pass.
 
 ## Local E2E evidence
 
-The full 201-case Playwright run passed: **195 passed, 6 existing skips, zero failures**. Library tests passed (392 tests), as did frontend typecheck, production frontend build and native server build. See [detailed results](beta6-e2e-results.md) for fixes, artifacts and scope. Release remains draft pending the release gates below.
+The full 201-case Playwright run passed: **195 passed, 6 existing skips, zero failures**. Library tests passed (392 tests), as did frontend typecheck, production frontend build and native server build. See [detailed results](beta6-e2e-results.md) for fixes, artifacts and scope. The user approved release on this local E2E evidence. CI and device acceptance below remain explicitly unverified.
 
-## Release gates
+## Follow-up validation and publishing work
 
 - [ ] Green full CI on the final release commit, including downstream atomic-saas compatibility. Latest develop pipeline was still running when this PR was prepared.
 - [ ] Finish and merge #1355; plugin and edit-mode still need their first npm publication and Trusted Publisher setup. Do not assume OIDC can publish an unconfigured package.
@@ -24,7 +24,7 @@ The full 201-case Playwright run passed: **195 passed, 6 existing skips, zero fa
 - [ ] Test waiting for an offline source, then turning that source on with the discovery screen open.
 - [ ] Confirm staging runs compatible SaaS #54/#55 and server code; merging is not deployment evidence.
 - [ ] Review security compatibility: signed plugin-list/UI requests, node-bound Iroh auth and loopback binding for desktop/Android.
-- [ ] Move UNRELEASED notes to a dated beta.6 section only when ready to tag.
+- [x] Move UNRELEASED notes to a dated beta.6 section after release approval.
 - [ ] After approval, tag the reviewed commit; verify desktop artifacts, crate and npm beta versions, and updater metadata.
 
 ## Draft release highlights
@@ -33,4 +33,4 @@ Beta.6 focuses on restoring an existing workspace onto another device, clearer p
 
 Known limits: #1357 remains excluded at the user's request. First-publish npm setup is incomplete for plugin and edit-mode. Signed history envelopes do not yet travel through bulk sync or Cloud Vault.
 
-No tag, package publication, or deployment is part of this preparation PR.
+The user subsequently authorized tagging and publishing beta.6. Pre-release tags do not deploy production.
