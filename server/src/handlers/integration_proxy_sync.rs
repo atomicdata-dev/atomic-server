@@ -4,7 +4,7 @@ use crate::errors::AtomicServerResult as Result;
 use atomic_lib::{db::plugin_secret::PluginSecret, Db};
 use serde_json::{json, Value};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     io::Write,
     sync::{Arc, Mutex},
 };
@@ -228,11 +228,50 @@ fn preview(ontology: &Ontology, records: &[Record], platform: &str) -> Result<Va
         json!({"platform":platform,"ontology":{"description":ontology.description,"terms":terms},"records":output}),
     )
 }
+/// UTC date boundaries; the end is exclusive, matching Calendar's timeMax.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CalendarRange {
+    start: String,
+    end: String,
+}
+
+fn scope_calendar(document: &mut Value, range: &CalendarRange) -> Result<()> {
+    let parse = |value: &str| {
+        chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            .map_err(|_| "Calendar dates must use YYYY-MM-DD")
+    };
+    let start = parse(&range.start)?;
+    let end = parse(&range.end)?;
+    if start >= end {
+        return Err("Calendar end date must be after its start date".into());
+    }
+    let collection = document
+        .pointer_mut("/components/crudResources/event/collections/events")
+        .and_then(Value::as_object_mut)
+        .ok_or("Calendar catalog has no events collection")?;
+    if collection.get("urlTemplate").and_then(Value::as_str)
+        != Some("/calendars/{calendarId}/events")
+    {
+        return Err("Calendar catalog events path has changed".into());
+    }
+    let query = collection
+        .entry("x-list-query")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or("Invalid Calendar collection query")?;
+    query.insert("timeMin".into(), json!(format!("{start}T00:00:00Z")));
+    query.insert("timeMax".into(), json!(format!("{end}T00:00:00Z")));
+    query.insert("singleEvents".into(), json!(true));
+    Ok(())
+}
+
 pub(super) async fn sync(
     db: Db,
     c: Connection,
     id: String,
     constants: BTreeMap<String, String>,
+    calendar_range: Option<&CalendarRange>,
 ) -> Result<Value> {
     let file = load_document(&c.origin, &c.platform).await?;
     let document = syncables::load_open_api_document(file.path())
@@ -242,6 +281,15 @@ pub(super) async fn sync(
         syncables::base_url(&document).ok_or("OpenAPI document has no API server")?,
     )
     .map_err(|_| "Invalid OpenAPI server URL")?;
+    let mut scoped_file = tempfile::NamedTempFile::new()?;
+    if let Some(range) = calendar_range {
+        if c.platform != "google-calendar" {
+            return Err("Calendar date range only applies to Google Calendar".into());
+        }
+        let mut scoped = serde_json::to_value(&document).map_err(|e| e.to_string())?;
+        scope_calendar(&mut scoped, range)?;
+        serde_json::to_writer(&mut scoped_file, &scoped).map_err(|e| e.to_string())?;
+    }
     let platform = c.platform.clone();
     let fetch = ProxyTransport {
         db,
@@ -252,7 +300,12 @@ pub(super) async fn sync(
     };
     let engine = SyncClient::new(
         ClientConfig {
-            document: file.path().into(),
+            document: if calendar_range.is_some() {
+                scoped_file.path()
+            } else {
+                file.path()
+            }
+            .into(),
             overlays: vec![],
             credentials: Credentials::Anonymous,
             constants,
@@ -269,7 +322,14 @@ pub(super) async fn sync(
     if !report.errors.is_empty() {
         return Err(format!(
             "Import incomplete; no changes proposed: {}",
-            report.errors.join("; ")
+            report
+                .errors
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join("; ")
         )
         .into());
     }
@@ -336,6 +396,40 @@ pub(super) async fn describe(base: &str, platform: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn calendar_range_preserves_catalog_query_and_rejects_invalid_bounds() {
+        let mut doc = json!({"components":{"crudResources":{"event":{"collections":{"events":{
+            "urlTemplate":"/calendars/{calendarId}/events", "x-list-query":{"maxResults":2}
+        }}}}}});
+        scope_calendar(
+            &mut doc,
+            &CalendarRange {
+                start: "2026-09-09".into(),
+                end: "2026-10-09".into(),
+            },
+        )
+        .unwrap();
+        let query =
+            &doc["components"]["crudResources"]["event"]["collections"]["events"]["x-list-query"];
+        assert_eq!(query["timeMin"], "2026-09-09T00:00:00Z");
+        assert_eq!(query["timeMax"], "2026-10-09T00:00:00Z");
+        assert_eq!(query["singleEvents"], true);
+        assert_eq!(query["maxResults"], 2);
+        for (start, end) in [
+            ("2026-09-09", "2026-09-09"),
+            ("2026-09-10", "2026-09-09"),
+            ("2026-02-30", "2026-10-09"),
+        ] {
+            assert!(scope_calendar(
+                &mut doc,
+                &CalendarRange {
+                    start: start.into(),
+                    end: end.into()
+                }
+            )
+            .is_err());
+        }
+    }
     struct Pages(Mutex<Vec<String>>);
     #[async_trait::async_trait]
     impl Fetch for Pages {

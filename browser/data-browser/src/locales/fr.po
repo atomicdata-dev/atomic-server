@@ -9651,3 +9651,11 @@ msgstr ""
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events from (UTC)"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events before (UTC)"
+msgstr ""

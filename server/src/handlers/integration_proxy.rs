@@ -249,6 +249,7 @@ pub struct Fetch {
     drive: String,
     connection: String,
     constants: std::collections::BTreeMap<String, String>,
+    calendar_range: Option<super::integration_proxy_sync::CalendarRange>,
 }
 pub async fn fetch_records(
     app: web::Data<AppState>,
@@ -270,6 +271,7 @@ pub async fn fetch_records(
         c,
         body.connection.clone(),
         body.constants.clone(),
+        body.calendar_range.as_ref(),
     )
     .await?;
     Ok(HttpResponse::Ok().json(data))

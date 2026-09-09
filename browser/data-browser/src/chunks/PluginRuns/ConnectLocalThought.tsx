@@ -50,6 +50,10 @@ export function ConnectLocalThought({
   const [parameters, setParameters] = useState<string[]>([]);
   const [constants, setConstants] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<string[]>([]);
+  const [calendarRange, setCalendarRange] = useState(() => ({
+    start: new Date().toISOString().slice(0, 10),
+    end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+  }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<{
@@ -117,6 +121,7 @@ export function ConnectLocalThought({
         drive,
         connection: connection.connection,
         constants,
+        ...(platform === 'google-calendar' ? { calendarRange } : {}),
       });
       if (fetched.platform !== platform)
         throw new Error('Imported platform did not match this connection');
@@ -243,6 +248,35 @@ export function ConnectLocalThought({
               />
             </Field>
           ))}
+          {platform === 'google-calendar' && (
+            <>
+              <Field fieldId='calendar-start' label='Events from (UTC)'>
+                <Input
+                  id='calendar-start'
+                  type='date'
+                  value={calendarRange.start}
+                  disabled={busy}
+                  onChange={e =>
+                    setCalendarRange({
+                      ...calendarRange,
+                      start: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <Field fieldId='calendar-end' label='Events before (UTC)'>
+                <Input
+                  id='calendar-end'
+                  type='date'
+                  value={calendarRange.end}
+                  disabled={busy}
+                  onChange={e =>
+                    setCalendarRange({ ...calendarRange, end: e.target.value })
+                  }
+                />
+              </Field>
+            </>
+          )}
           <p>{collections.join(', ')}</p>
           <ImportScopeHelp />
           <Button
@@ -281,8 +315,12 @@ export function ConnectLocalThought({
   );
 }
 
-function ImportScopeHelp() { return (<p>
-            Imports the collections described by the platform, following
-            pagination. Review changes before applying them. No background sync
-            or provider writes.
-          </p>); }
+function ImportScopeHelp() {
+  return (
+    <p>
+      Imports the collections described by the platform, following pagination.
+      Review changes before applying them. No background sync or provider
+      writes.
+    </p>
+  );
+}

@@ -9690,3 +9690,11 @@ msgstr "Open imported records"
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events from (UTC)"
+msgstr "Events from (UTC)"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events before (UTC)"
+msgstr "Events before (UTC)"
