@@ -1076,10 +1076,19 @@ export class AtomicServer {
       )
       // data-browser/src/helpers/pairing.test.ts reads a repo-root testdata
       // fixture the same way (`../../../../testdata/pairing-request.json`
-      // from /app/data-browser/src/helpers) — mount just this one file.
+      // from /app/data-browser/src/helpers). `/testdata` isn't an OS path
+      // (unlike `/lib` above), so mount the whole directory rather than
+      // picking files one at a time — lib/plugin-plan.fixtures.test.ts also
+      // needs to `readdirSync` the `plugin-plans/` subdirectory, which a
+      // single-file mount can't provide.
+      .withDirectory('/testdata', this.source.directory('testdata'))
+      // lib/src/task-schema.test.ts reads repo-root `lib/defaults/tasks.json`
+      // the same plain-`readFileSync` way as genesis_test_vectors.json above
+      // (`../../../lib/defaults/tasks.json` from /app/lib/src). Mount just
+      // this file, under the same /lib collision caution as above.
       .withFile(
-        '/testdata/pairing-request.json',
-        this.source.file('testdata/pairing-request.json'),
+        '/lib/defaults/tasks.json',
+        this.source.file('lib/defaults/tasks.json'),
       );
 
     // Build all packages since they may depend on each other's built artifacts
