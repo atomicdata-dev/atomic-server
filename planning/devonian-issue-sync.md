@@ -6,14 +6,14 @@
 - [x] Build a browser demo using Devonian, local-only Atomic storage and direct integration-proxy requests.
 - [x] Verify 13 focused tests, 7 existing integration tests and frontend typecheck; document setup/limits and update coverage.
 - [x] Verify native browser creation/comments both ways, close/reopen and reload without duplicates.
-- [ ] Live connection: integration-proxy must support browser CORS preflight and expose X-Connection-Code. The deployed instance returned 401 without CORS on 2026-09-09.
-- [ ] Verify live sync against a user-selected repository and proxy connection after that dependency is available.
+- [x] Verify deployed v40 CORS preflight/exposed headers and browser GitHub OAuth.
+- [ ] Verify live two-way writes: proxy credential returns 404 for the private sandbox; resolve repository access first.
 
 Use Devonian HTTP subjects for the intermediate graph and scoped external mappings
 for Atomic DIDs. Persist graph, mappings and request receipts in IndexedDB. Serialize
 rotating connection codes; refuse to retry uncertain writes. Tenant authentication and rotating credentials use #1401’s shared BrowserIntegrations client.
 No Node runtime, AtomicServer plugin endpoint, tenant secret on AtomicServer, or server scheduler.
-Live proxy currently lacks CORS; browser fixture verification remains independent.
+Live proxy CORS and OAuth now work; private-sandbox access is the remaining live blocker.
 Missing records are conflicts, not deletion requests.
 
 - [x] Rebase onto #1401 and reuse browser tenant challenge, callback and rotating transport.

@@ -29,7 +29,7 @@ OPFS browser flow was manually verified for creation and comments on both sides,
 closing from Atomic, reopening from the sample GitHub side and reloading without
 duplicate issues/comments. Live proxy OAuth,
 GitHub writes and a guided uncertain-write recovery UI remain unverified/unbuilt;
-the current deployed integration-proxy lacks browser CORS support.
+proxy v40 CORS and browser OAuth are verified, but its GitHub credential returns 404 for the private sandbox.
 
 What is tested, at which layer, and — the part that matters — **what is not**.
 
