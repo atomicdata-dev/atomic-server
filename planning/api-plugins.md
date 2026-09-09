@@ -48,8 +48,10 @@ configuration, behavior and tests.
 - [x] Use Syncables with the catalog OAD for discovery, pagination and ontology.
 - [x] Add the mock proxy and wire the updated Pets browser journey into CI.
 - [x] Verify live GitHub OAuth, fetch and reviewed import (29 issue/PR records; proxy v38).
-- [ ] Verify Google Calendar OAuth/import against the live service.
+- [x] Verify Google Calendar OAuth/import against the live service (54 records, including 32 events; proxy v39).
 
 Calendar live follow-up: proxy PR #30 fixes catalog base paths (deployed v39).
 OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
-- [ ] Add explicit UTC event date bounds and verify a scoped live import.
+- [x] Add explicit UTC event date bounds and verify a scoped live import.
+
+- [ ] Rebase onto the latest `feat/api-plugins` CI fixes and make branch CI pass.

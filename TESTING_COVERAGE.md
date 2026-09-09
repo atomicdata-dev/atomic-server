@@ -1052,4 +1052,4 @@ cancelled on teardown. Old plugin-name grants are deliberately not migrated.
 `store_host::destroy_identity_tests` checks the signer of the persisted destroy
 commit. It failed with the server signer before `Resource::destroy_as` was used;
 installation deletion must use the same selected identity as create/update.
-LocalThought: Rust handler tests cover connection binding, request signing, duplicate-page rejection, typed paginated previews, and Calendar UTC date-range validation. The Calendar live import review remains pending.
+LocalThought: Rust handler tests cover connection binding, request signing, duplicate-page rejection, typed paginated previews, and Calendar UTC date-range validation. Live Calendar OAuth, bounded fetch, review/apply and event table display were verified against proxy v39 (54 records).

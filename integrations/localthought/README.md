@@ -46,7 +46,15 @@ Proxy fixes [#28](https://github.com/localthought/integration-proxy/pull/28)
 and [#29](https://github.com/localthought/integration-proxy/pull/29) add the
 required GitHub User-Agent and preserve query parameters and Link headers.
 This live repository fit on one issues page; multi-page traversal is covered
-by the mock and Rust tests. Google Calendar OAuth/import is not live-verified.
+by the mock and Rust tests. Google Calendar was also live-verified against proxy v39 after
+[PR #30](https://github.com/localthought/integration-proxy/pull/30) fixed matching
+OpenAPI server base paths. OAuth returned successfully, and a UTC range from
+2026-09-09 through 2026-10-09 (exclusive) imported 22 calendar-list entries and
+32 events after review. Event contents are not included in these test notes.
+An unbounded fetch successfully traversed multiple pages but exceeded the
+5,000-record preview limit; the UI now defaults to the next 30 days. Date
+bounds and recurrence expansion are passed to Syncables as collection query
+settings. The importer remains a manual snapshot, not a background sync.
 
 ## Local mock and tests
 
