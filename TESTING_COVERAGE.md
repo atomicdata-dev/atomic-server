@@ -487,3 +487,12 @@ updates without a reload and verifies a second change after the reader reloads.
 multiple-reader cleanup through both Store unsubscribe APIs, and retaining
 ordinary document drive-wide fan-out. Profiles no longer depend on being inside
 the reader's active drive to receive live updates.
+
+## Desktop workspace discovery (2026-09-08)
+
+`sync::discover::tests::inspection_checks_access_without_importing_or_pairing`
+uses real Iroh endpoints: an authorized identity sees a peer name without importing
+the drive or pairing; a stranger is rejected. The local Tauri debug build connected
+to staging's advertised Iroh node and received a no-readable-data response for its
+test identity. Live drive and node PKARR signatures were verified separately.
+This does not yet prove restoration of the user's private staging workspace.

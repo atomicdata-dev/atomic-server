@@ -1,3 +1,4 @@
+import { WorkspaceLoading } from './WorkspaceLoading';
 import {
   PRODUCT_NAME,
   clearManagedAccountBinding,
@@ -76,7 +77,8 @@ type Step =
   | 'create'
   | 'restore'
   | 'restore-upgraded'
-  | 'connect-device';
+  | 'connect-device'
+  | 'opening-workspace';
 
 type RestoreState =
   | { phase: 'checking' }
@@ -186,6 +188,9 @@ export function GettingStartedFlow({
     fromManaged ? 'create' : nextDrive ? 'signin' : initialStep,
   );
   const [loading, setLoading] = useState(false);
+  const [workspaceStage, setWorkspaceStage] = useState<
+    'identity' | 'local' | 'backup'
+  >('identity');
   const [error, setError] = useState<Error | undefined>();
   // The drive a freshly signed-in device is missing, handed to the
   // connect-device step. Undefined when no drive resolved at all.
@@ -565,6 +570,8 @@ export function GettingStartedFlow({
 
     try {
       const newAgent = await Agent.fromSecret(secret);
+      setWorkspaceStage('identity');
+      setStep('opening-workspace');
       setAgent(newAgent);
       await saveAgentToIDB(secret);
       // However they got in — passkey, code, or secret — the device is open
@@ -593,6 +600,7 @@ export function GettingStartedFlow({
       // it lands on the connect-device step, which is the screen for a device
       // holding none of your data — including its offer to restore from the
       // vault.
+      setWorkspaceStage('local');
       const target =
         nextDrive ??
         (await withDeadline(
@@ -646,6 +654,7 @@ export function GettingStartedFlow({
       let vaultReason: string | undefined;
 
       if (!hasData && target) {
+        setWorkspaceStage('backup');
         const restored = await withDeadline(
           restoreFromVault(store, target),
           VAULT_RESTORE_TIMEOUT_MS,
@@ -719,6 +728,7 @@ export function GettingStartedFlow({
       setError(
         err instanceof Error ? err : new Error('Could not parse that secret.'),
       );
+      setStep('signin');
     } finally {
       setLoading(false);
     }
@@ -768,7 +778,15 @@ export function GettingStartedFlow({
 
   return (
     <Shell>
-      {step === 'welcome' ? (
+      {step === 'opening-workspace' ? (
+        <Swap key='opening-workspace'>
+          <OnboardingWrap>
+            <OnboardingCard>
+              <WorkspaceLoading stage={workspaceStage} />
+            </OnboardingCard>
+          </OnboardingWrap>
+        </Swap>
+      ) : step === 'welcome' ? (
         <Swap key='welcome'>
           <WelcomeStack>
             <VisuallyHiddenH1 key='heading'>AtomicServer</VisuallyHiddenH1>

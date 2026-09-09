@@ -1,3 +1,4 @@
+import { DiscoverWorkspace } from './DiscoverWorkspace';
 import React, { useEffect, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaMobileScreenButton, FaLock } from 'react-icons/fa6';
@@ -457,8 +458,13 @@ export function ConnectDeviceStep({
               <FaLock aria-hidden />
             )}
           </Badge>
-          <CardTitle>{title}</CardTitle>
-          <CardSubtitle>{subtitle}</CardSubtitle>
+          <CardTitle>
+            {isNode && drive ? 'Find your workspace' : title}
+          </CardTitle>
+          {!(isNode && drive) && <CardSubtitle>{subtitle}</CardSubtitle>}
+          {isNode && drive && (
+            <DiscoverWorkspace drive={drive} onConnected={onConnected} />
+          )}
 
           {/* The vault's own account of why there is nothing to restore. Five
               situations answer "no backup" — never enrolled, enrolled but

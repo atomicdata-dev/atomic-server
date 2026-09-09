@@ -1365,6 +1365,16 @@ pub async fn wait_for_peer_count_change(current: usize) -> usize {
     }
 }
 
+/// Inspect access and the device name without importing or pairing.
+pub async fn inspect_workspace_peer(
+    node_id: &str,
+    drive: &str,
+    store: &Db,
+) -> crate::errors::AtomicResult<super::discover::WorkspacePeer> {
+    let endpoint = ENDPOINT.get().ok_or("Iroh peer has not started")?;
+    super::discover::inspect_workspace(endpoint, node_id, drive, store).await
+}
+
 /// Sync a drive with a remote peer over the global endpoint (set by
 /// `start()`), replacing an existing live connection (QR pair / manual
 /// sync). Returns the rich [`PeerSyncOutcome`].

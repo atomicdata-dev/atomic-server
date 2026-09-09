@@ -80,7 +80,7 @@ path = "../server"
 
 [dependencies.atomic_lib]
 path = "../lib"
-features = ["db-redb", "iroh"]
+features = ["db-redb", "iroh", "discovery"]
 
 [dependencies.serde]
 features = ["derive"]
