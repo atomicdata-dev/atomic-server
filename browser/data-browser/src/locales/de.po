@@ -1730,9 +1730,8 @@ msgstr ""
 msgid "This device"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Manage account & plan →"
-msgstr ""
+#~ msgid "Manage account & plan →"
+#~ msgstr ""
 
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
@@ -7833,4 +7832,12 @@ msgstr ""
 
 #: src/views/InvitePage.tsx
 msgid "Accepting your invitation…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This status describes data synchronization. View this drive’s subscription and price in billing."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Manage this drive’s plan →"
 msgstr ""

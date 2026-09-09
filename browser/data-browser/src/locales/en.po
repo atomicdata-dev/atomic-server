@@ -1730,9 +1730,8 @@ msgstr "Error: Expected {0}<node-id>"
 msgid "This device"
 msgstr "This device"
 
-#: src/routes/SyncRoute.tsx
-msgid "Manage account & plan →"
-msgstr "Manage account & plan →"
+#~ msgid "Manage account & plan →"
+#~ msgstr "Manage account & plan →"
 
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
@@ -7868,3 +7867,11 @@ msgstr "Local storage is taking too long to initialize."
 #: src/views/InvitePage.tsx
 msgid "Accepting your invitation…"
 msgstr "Accepting your invitation…"
+
+#: src/routes/SyncRoute.tsx
+msgid "This status describes data synchronization. View this drive’s subscription and price in billing."
+msgstr "This status describes data synchronization. View this drive’s subscription and price in billing."
+
+#: src/routes/SyncRoute.tsx
+msgid "Manage this drive’s plan →"
+msgstr "Manage this drive’s plan →"

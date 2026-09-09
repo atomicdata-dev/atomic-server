@@ -392,8 +392,14 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   and failed connection without local-drive promotion.
 - `data-browser/src/helpers/managed/reconcile.test.ts`: pending/empty placements
   do not switch the app away from its source.
-- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup opens the selected
-  existing drive, never creates a content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup checks the selected
+  drive's subscription before opening hosting in the app; it never creates a
+  content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/drive-billing-ux.spec.ts`: billing has no fake
+  account-wide free plan, named drives survive selection/reload/Back, and a
+  paid drive's price and quota do not leak into an unsubscribed drive.
+- `data-browser/src/helpers/driveBillingUrl.test.ts`: Sync links preserve the
+  exact drive and portal, or open the picker when no drive is selected.
 - Paired `atomic-saas/portal/e2e/server-hosting-live.spec.ts`: opt-in real sign-in,
   grant, signed enrollment, setup UI, source replication and destination HTTP
   read. Requires two isolated nodes and dev magic links (`ATOMIC_HOSTING_LIVE=1`).

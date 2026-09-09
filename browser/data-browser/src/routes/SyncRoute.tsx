@@ -1,3 +1,4 @@
+import { driveBillingUrl } from '../helpers/driveBillingUrl';
 import {
   deriveNodeStatuses,
   currentDriveSync,
@@ -379,15 +380,11 @@ function ServerCard({
       footer={
         isCloud && managedInfo.portalUrl ? (
           <ManagedLink
-            // The dashboard, not the portal root: signed-in visitors get the
-            // marketing page at `/`, so the link landed on a sales pitch
-            // rather than the account it promises to manage.
-            //
-            // `externalLinkProps` rather than a raw target/rel: in the desktop
-            // app the plain form opens nothing at all.
-            {...externalLinkProps(`${managedInfo.portalUrl}/dashboard`)}
+            {...externalLinkProps(
+              driveBillingUrl(managedInfo.portalUrl, status.drive),
+            )}
           >
-            {'Manage account & plan →'}
+            {'Manage this drive’s plan →'}
           </ManagedLink>
         ) : !isActive ? (
           // Removing the server you're using would strand the app.
@@ -397,6 +394,12 @@ function ServerCard({
         ) : undefined
       }
     >
+      {isCloud && (
+        <ConnMeta>
+          This status describes data synchronization. View this drive’s
+          subscription and price in billing.
+        </ConnMeta>
+      )}
       {/* Status details belong to the server actually in use. */}
       {isActive && !status.serverConnected && status.serverConnectionError && (
         <ConnError role='alert'>
