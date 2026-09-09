@@ -13,7 +13,7 @@ use std::{
 };
 
 const MAX_ROOMS: usize = 512;
-const MAX_PEERS: usize = 2;
+const MAX_PEERS: usize = 8;
 const MAX_MESSAGE: usize = 64 * 1024;
 type Rooms = HashMap<String, HashMap<String, Addr<SignalSocket>>>;
 static CONNECTIONS: AtomicUsize = AtomicUsize::new(0);

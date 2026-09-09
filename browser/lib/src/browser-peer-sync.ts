@@ -10,6 +10,7 @@ export interface BrowserPeerOptions {
   drive: string;
   room: string;
   signalingUrl: string;
+  /** Trusted agent for bootstrapping an unknown drive; stored drive ACLs govern subsequent peers. */
   expectedPeer?: string;
   iceServers?: RTCIceServer[];
   onStatus?: (status: string) => void;
@@ -21,19 +22,16 @@ export function randomPeerToken(): string {
   ).join('');
 }
 
-/** One explicitly enabled drive link. Signaling only exchanges SDP. The WASM
- * node authenticates and authorizes all data before it reaches the JS store. */
+/** A bounded full mesh: each remote browser has its own authenticated session.
+ * Received frames are never rebroadcast; reconciliation catches up persisted state. */
 export class BrowserPeerSync {
   private socket?: WebSocket;
-  private peer?: WebRtcPeer;
-  private pipe?: WebRtcTransport;
-  private session?: number;
+  private readonly connections = new Map<string, BrowserPeerConnection>();
+  private readonly members = new Set<string>();
+  private readonly retries = new Map<string, ReturnType<typeof setTimeout>>();
   private reconnect?: ReturnType<typeof setTimeout>;
-  private reconcileTimer?: ReturnType<typeof setInterval>;
-  private unsubscribe?: () => void;
   private stopped = false;
   private iceServers: RTCIceServer[] = [];
-  private generation = 0;
   private readonly peerId = randomPeerToken();
   private readonly agent: Agent;
   private readonly db: ClientDbWorker;
@@ -51,39 +49,46 @@ export class BrowserPeerSync {
     if (!/^[a-f0-9]{64}$/.test(options.room))
       throw new Error('Invalid peer invitation');
     const url = new URL(options.signalingUrl);
-
     if (
       url.protocol !== 'wss:' &&
       !(
         url.protocol === 'ws:' &&
         ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
       )
-    ) {
+    )
       throw new Error('Peer discovery requires a secure WebSocket URL');
-    }
-
     this.connect();
   }
 
   close(): void {
     this.stopped = true;
     clearTimeout(this.reconnect);
-    this.resetPeer();
+    for (const timer of this.retries.values()) clearTimeout(timer);
+    this.retries.clear();
+    for (const connection of this.connections.values()) connection.close();
+    this.connections.clear();
     this.socket?.close();
     this.options.onStatus?.('Disconnected');
   }
 
-  private resetPeer(): void {
-    this.generation++;
-    clearInterval(this.reconcileTimer);
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
-    this.pipe = undefined;
-    this.peer?.close();
-    this.peer = undefined;
-    if (this.session !== undefined)
-      void this.db!.closePeerSession(this.session).catch(() => {});
-    this.session = undefined;
+  private status(): void {
+    const ready = [...this.connections.values()].filter(
+      connection => connection.ready,
+    );
+    const relayed = ready.filter(
+      connection => connection.path === 'relayed',
+    ).length;
+    this.options.onStatus?.(
+      ready.length
+        ? `Connected to ${ready.length} ${ready.length === 1 ? 'browser' : 'browsers'}${relayed ? ` (${relayed} relayed)` : ''}`
+        : 'Waiting for a peer',
+    );
+  }
+
+  private send(message: object): void {
+    if (this.socket?.readyState !== WebSocket.OPEN)
+      throw new Error('Discovery unavailable');
+    this.socket.send(JSON.stringify(message));
   }
 
   private connect(): void {
@@ -97,98 +102,202 @@ export class BrowserPeerSync {
       return;
     }
 
-    this.options.onStatus?.('Waiting for a peer');
+    this.status();
     const socket = new WebSocket(this.options.signalingUrl);
     this.socket = socket;
     socket.addEventListener('open', () =>
-      socket.send(
-        JSON.stringify({
-          type: 'join',
-          room: this.options.room,
-          peer: this.peerId,
-        }),
-      ),
+      this.send({ type: 'join', room: this.options.room, peer: this.peerId }),
     );
-    let queue = Promise.resolve();
     socket.addEventListener('message', event => {
-      queue = queue
-        .then(async () => {
-          if (typeof event.data !== 'string' || event.data.length > 64 * 1024)
-            throw new Error('Invalid signaling response');
-          const message = JSON.parse(event.data);
-          if (message.type === 'joined')
-            this.iceServers =
-              this.options.iceServers ?? message.iceServers ?? [];
+      if (this.socket !== socket || this.stopped) return;
 
-          if (
-            message.type === 'joined' &&
-            Array.isArray(message.peers) &&
-            message.peers.length === 1
-          ) {
-            const peer = this.newPeer();
-            const offer = await peer.createOffer();
-            socket.send(
-              JSON.stringify({
-                type: 'offer',
-                to: message.peers[0],
-                sdp: offer.sdp,
-              }),
-            );
-          } else if (message.type === 'offer') {
-            const peer = this.newPeer();
-            const answer = await peer.acceptOffer({
-              type: 'offer',
-              sdp: message.sdp,
-            });
-            socket.send(
-              JSON.stringify({
-                type: 'answer',
-                to: message.from,
-                sdp: answer.sdp,
-              }),
-            );
-          } else if (message.type === 'answer' && this.peer) {
-            await this.peer.acceptAnswer({ type: 'answer', sdp: message.sdp });
-          } else if (message.type === 'left' && !this.pipe) {
-            this.resetPeer();
-          }
-        })
-        .catch(error => this.fail(error));
+      try {
+        if (typeof event.data !== 'string' || event.data.length > 64 * 1024)
+          throw new Error('Invalid signaling response');
+        const message = JSON.parse(event.data);
+
+        if (message.type === 'joined') {
+          if (!Array.isArray(message.peers) || message.peers.length > 7)
+            throw new Error('Invalid peer list');
+          this.iceServers = this.options.iceServers ?? message.iceServers ?? [];
+          this.members.clear();
+          for (const id of message.peers) this.addMember(id);
+        } else if (message.type === 'peer') {
+          this.addMember(message.peer);
+        } else if (message.type === 'left') {
+          this.members.delete(message.peer);
+          clearTimeout(this.retries.get(message.peer));
+          this.retries.delete(message.peer);
+          // A live data channel can outlast its signaling socket.
+          const connection = this.connections.get(message.peer);
+          if (connection && !connection.ready)
+            this.remove(message.peer, connection);
+        } else if (
+          message.type === 'offer' &&
+          this.members.has(message.from) &&
+          message.from < this.peerId
+        ) {
+          const existing = this.connections.get(message.from);
+          if (existing) this.remove(message.from, existing);
+          const connection = this.createConnection(message.from);
+          void connection.peer
+            .acceptOffer({ type: 'offer', sdp: message.sdp })
+            .then(answer => {
+              if (this.connections.get(message.from) === connection)
+                this.send({
+                  type: 'answer',
+                  to: message.from,
+                  sdp: answer.sdp,
+                });
+            })
+            .catch(error => this.failed(message.from, connection, error));
+        } else if (message.type === 'answer') {
+          const connection = this.connections.get(message.from);
+          if (connection && message.from > this.peerId)
+            void connection.peer
+              .acceptAnswer({ type: 'answer', sdp: message.sdp })
+              .catch(error => this.failed(message.from, connection, error));
+        }
+      } catch (error) {
+        this.options.onStatus?.(String(error));
+        socket.close();
+      }
     });
     socket.addEventListener('close', () => {
-      if (this.stopped) return;
-      // The established data channel survives a signaling restart.
-      this.reconnect = setTimeout(() => {
-        if (!this.pipe) this.resetPeer();
-        this.connect();
-      }, 3000);
+      if (!this.stopped && this.socket === socket)
+        this.reconnect = setTimeout(() => this.connect(), 3000);
     });
     socket.addEventListener('error', () =>
       this.options.onStatus?.('Discovery unavailable; retrying'),
     );
   }
 
-  private newPeer(): WebRtcPeer {
-    this.resetPeer();
-    const peer = new WebRtcPeer({ iceServers: this.iceServers });
-    this.peer = peer;
-    const generation = this.generation;
-    void peer.transport
-      .then(pipe => this.run(peer, pipe, generation))
-      .catch(error => {
-        if (generation === this.generation) this.fail(error);
-      });
-
-    return peer;
+  private addMember(id: string): void {
+    if (
+      typeof id !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(id) ||
+      id === this.peerId
+    )
+      throw new Error('Invalid peer identity');
+    if (!this.members.has(id) && this.members.size >= 7)
+      throw new Error('Peer room is full');
+    this.members.add(id);
+    this.dial(id);
   }
 
-  private async run(
-    peer: WebRtcPeer,
-    pipe: WebRtcTransport,
-    generation: number,
-  ): Promise<void> {
+  private dial(id: string): void {
+    // A deterministic initiator avoids simultaneous offers and retry glare.
+    if (
+      this.stopped ||
+      id < this.peerId ||
+      this.connections.has(id) ||
+      !this.members.has(id) ||
+      this.socket?.readyState !== WebSocket.OPEN
+    )
+      return;
+    const connection = this.createConnection(id);
+    void connection.peer
+      .createOffer()
+      .then(offer => {
+        if (this.connections.get(id) === connection)
+          this.send({ type: 'offer', to: id, sdp: offer.sdp });
+      })
+      .catch(error => this.failed(id, connection, error));
+  }
+
+  private createConnection(id: string): BrowserPeerConnection {
+    if (this.connections.size >= 7) {
+      const stale = [...this.connections].find(
+        ([peerId]) => !this.members.has(peerId),
+      );
+      if (stale) this.remove(...stale);
+      else throw new Error('Peer connection limit reached');
+    }
+
+    const connection = new BrowserPeerConnection(
+      this.store,
+      this.agent,
+      this.db,
+      { ...this.options, onStatus: undefined, iceServers: this.iceServers },
+      () => this.status(),
+      error => this.failed(id, connection, error),
+    );
+    this.connections.set(id, connection);
+
+    return connection;
+  }
+
+  private remove(id: string, connection: BrowserPeerConnection): void {
+    if (this.connections.get(id) !== connection) return;
+    this.connections.delete(id);
+    connection.close();
+    this.status();
+  }
+
+  private failed(
+    id: string,
+    connection: BrowserPeerConnection,
+    error: unknown,
+  ): void {
+    if (this.stopped || this.connections.get(id) !== connection) return;
+    this.remove(id, connection);
+    this.options.onStatus?.(
+      error instanceof Error ? error.message : String(error),
+    );
+
+    if (this.members.has(id) && id > this.peerId && !this.retries.has(id)) {
+      this.retries.set(
+        id,
+        setTimeout(() => {
+          this.retries.delete(id);
+          this.dial(id);
+        }, 3000),
+      );
+    }
+  }
+}
+
+class BrowserPeerConnection {
+  readonly peer: WebRtcPeer;
+  ready = false;
+  path = 'unknown';
+  private session?: number;
+  private reconcileTimer?: ReturnType<typeof setInterval>;
+  private unsubscribe?: () => void;
+  private stopped = false;
+
+  constructor(
+    private readonly store: Store,
+    private readonly agent: Agent,
+    private readonly db: ClientDbWorker,
+    private readonly options: BrowserPeerOptions,
+    private readonly changed: () => void,
+    private readonly failure: (error: unknown) => void,
+  ) {
+    this.peer = new WebRtcPeer({ iceServers: options.iceServers });
+    void this.peer.transport
+      .then(pipe => this.run(this.peer, pipe))
+      .catch(error => this.fail(error));
+  }
+
+  private onReady(path: string): void {
+    this.ready = true;
+    this.path = path;
+    this.changed();
+  }
+
+  close(): void {
+    this.stopped = true;
+    this.ready = false;
+    clearInterval(this.reconcileTimer);
+    this.unsubscribe?.();
+    this.peer.close();
+    if (this.session !== undefined)
+      void this.db.closePeerSession(this.session).catch(() => {});
+  }
+
+  private async run(peer: WebRtcPeer, pipe: WebRtcTransport): Promise<void> {
     const current = () =>
-      generation === this.generation &&
       !this.stopped &&
       this.store.getAgent() === this.agent &&
       this.store.getClientDb() === this.db;
@@ -196,7 +305,9 @@ export class BrowserPeerSync {
     const challenge = `${binding}:${randomPeerToken()}`;
     const session = await this.db!.createPeerSession(
       this.options.drive,
-      this.options.expectedPeer,
+      (await this.db.getResourceWithSnapshot(this.options.drive)).snapshot
+        ? undefined
+        : this.options.expectedPeer,
       challenge,
     );
 
@@ -265,15 +376,8 @@ export class BrowserPeerSync {
         if (authenticated && accepted && !started) {
           started = true;
           clearTimeout(timeout);
-          this.pipe = pipe;
           const path = await peer.connectionPath();
-          this.options.onStatus?.(
-            path === 'relayed'
-              ? 'Connected through relay'
-              : path === 'direct'
-                ? 'Connected directly'
-                : 'Connected',
-          );
+          this.onReady(path);
           let syncing = false;
 
           const reconcile = async () => {
@@ -363,11 +467,6 @@ export class BrowserPeerSync {
   }
 
   private fail(error: unknown): void {
-    if (this.stopped) return;
-    this.options.onStatus?.(
-      error instanceof Error ? error.message : String(error),
-    );
-    this.resetPeer();
-    this.socket?.close();
+    if (!this.stopped) this.failure(error);
   }
 }

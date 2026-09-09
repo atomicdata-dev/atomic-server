@@ -37,6 +37,12 @@ export function peerLinkStatus(drive: string): string {
 }
 
 export function savePeerLink(store: Store, link: SavedPeerLink): void {
+  if (
+    savedPeerLinks(store).some(
+      existing => JSON.stringify(existing) === JSON.stringify(link),
+    )
+  )
+    return;
   const links = savedPeerLinks(store).filter(
     existing => existing.drive !== link.drive,
   );
@@ -105,7 +111,9 @@ export function createPeerLink(
   );
   if (endpoint.protocol === 'https:') endpoint.protocol = 'wss:';
   if (endpoint.protocol === 'http:') endpoint.protocol = 'ws:';
-  const link = {
+  const link = savedPeerLinks(store).find(
+    existing => existing.drive === drive,
+  ) ?? {
     drive,
     room: randomPeerToken(),
     signalingUrl: endpoint.toString(),

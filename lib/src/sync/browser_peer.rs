@@ -146,6 +146,36 @@ impl BrowserPeerSession {
                 // peer's independent SYNC response will bootstrap it.
                 if db.get_resource(&self.drive.as_str().into()).await.is_ok() {
                     out.frames = engine::handle_frame(frame, db, &mut self.agent).await;
+                    // A mesh neighbor may have the graph before the blob.
+                    // Ask every authorized edge again while bytes are missing.
+                    let mut requested = 0;
+                    for subject in
+                        engine::collect_drive_subjects(db, &self.drive.as_str().into()).await
+                    {
+                        let resource = db.get_resource(&subject.as_str().into()).await?;
+                        if crate::hierarchy::check_read(db, &resource, &self.agent)
+                            .await
+                            .is_err()
+                        {
+                            continue;
+                        }
+                        if let Ok(blob) = resource.get(crate::urls::BLOB) {
+                            if let Some(hash) = Subject::from(blob.to_string())
+                                .blob_hash_hex()
+                                .and_then(|hex| hex::decode(hex).ok())
+                                .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+                            {
+                                if db.kv.get(Tree::Blobs, &hash)?.is_none() {
+                                    self.pending_blobs.insert(hash);
+                                    out.frames.push(protocol::encode_blob_request(&hash));
+                                    requested += 1;
+                                    if requested >= 32 {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             protocol::tag::SYNC_PUSH => {
@@ -155,6 +185,12 @@ impl BrowserPeerSession {
                 }
                 // Preflight the entire batch before the shared importer writes.
                 for entry in &push.entries {
+                    // Other mesh edges may still be sending a delta when a
+                    // signed deletion lands. The shared importer ignores it;
+                    // do not reconstruct that delta without its deleted base.
+                    if super::tombstones::is_tombstoned(db, &entry.subject) {
+                        continue;
+                    }
                     let candidate = self
                         .candidate(db, &entry.subject, &entry.loro_bytes)
                         .await?;
@@ -247,17 +283,32 @@ impl BrowserPeerSession {
                 if !permitted {
                     return Err("Blob is not readable in this drive".into());
                 }
-                out.frames = engine::handle_frame(frame, db, &mut self.agent).await;
+                // A partial replica may not have the bytes yet. The requester
+                // retries other edges without tearing down healthy connections.
+                if let Some(bytes) = db.kv.get(Tree::Blobs, &hash)? {
+                    out.frames
+                        .push(protocol::encode_blob_response(&hash, &bytes));
+                }
             }
             protocol::tag::BLOB_RESPONSE => {
                 let response =
                     protocol::decode_blob_response(payload).ok_or("Invalid blob response")?;
-                if !self.pending_blobs.remove(&response.hash)
-                    || blake3::hash(&response.bytes).as_bytes() != &response.hash
-                {
-                    return Err("Unsolicited or corrupt blob response".into());
+                if blake3::hash(&response.bytes).as_bytes() != &response.hash {
+                    return Err("Corrupt blob response".into());
                 }
-                out.frames = engine::handle_frame(frame, db, &mut self.agent).await;
+                let requested = self.pending_blobs.remove(&response.hash);
+                // Concurrent edges can answer the same content-addressed request.
+                if db.kv.get(Tree::Blobs, &response.hash)?.is_some() {
+                    return Ok(out);
+                }
+                if !requested {
+                    return Err("Unsolicited blob response".into());
+                }
+                if !db.sync_policy().admit_drive_write(&self.drive) {
+                    return Err("Drive not admitted for sync".into());
+                }
+                db.take_pending_blob_request(&response.hash);
+                db.kv.insert(Tree::Blobs, &response.hash, &response.bytes)?;
             }
             protocol::tag::EPHEMERAL => {
                 let message = protocol::decode_ephemeral(payload).ok_or("Invalid EPHEMERAL")?;
@@ -415,7 +466,7 @@ mod tests {
                 ]),
             )
             .unwrap();
-        db.persist_replicated_resource(&resource).await.unwrap();
+        db.add_resource(&resource).await.unwrap();
         authenticate(&db, &reader, &mut session).await;
         let bytes = db
             .kv
@@ -474,7 +525,7 @@ mod tests {
                 crate::Value::ResourceArray(vec![reader.subject.to_string().into()]),
             )
             .unwrap();
-        db.persist_replicated_resource(&resource).await.unwrap();
+        db.add_resource(&resource).await.unwrap();
         authenticate(&db, &reader, &mut session).await;
         assert!(session.can_send(&db, &drive).await);
         resource
@@ -483,7 +534,43 @@ mod tests {
                 crate::Value::ResourceArray(vec![owner.subject.to_string().into()]),
             )
             .unwrap();
-        db.persist_replicated_resource(&resource).await.unwrap();
+        db.add_resource(&resource).await.unwrap();
         assert!(!session.can_send(&db, &drive).await);
+    }
+    #[tokio::test]
+    async fn delayed_mesh_snapshot_does_not_resurrect_a_tombstone() {
+        let (db, agent, drive, mut session) = fixture().await;
+        authenticate(&db, &agent, &mut session).await;
+        let subject = "did:ad:deleted-mesh-child";
+        super::super::tombstones::record_tombstone(&db, subject);
+        let bytes = db
+            .kv
+            .get(Tree::LoroSnapshots, drive.as_bytes())
+            .unwrap()
+            .unwrap();
+        let frames = protocol::encode_sync_push_chunks(&drive, &[(subject, bytes.as_slice())]);
+        session.handle(&db, &frames[0]).await.unwrap();
+        assert!(db
+            .kv
+            .get(Tree::LoroSnapshots, subject.as_bytes())
+            .unwrap()
+            .is_none());
+        assert!(session.can_send(&db, &drive).await);
+    }
+
+    #[tokio::test]
+    async fn independent_edges_can_complete_the_same_blob_request() {
+        let (db, agent, drive, mut first) = fixture().await;
+        let mut second = BrowserPeerSession::new(drive, None, "b".repeat(64)).unwrap();
+        authenticate(&db, &agent, &mut first).await;
+        authenticate(&db, &agent, &mut second).await;
+        let bytes = b"mesh blob";
+        let hash = *blake3::hash(bytes).as_bytes();
+        first.pending_blobs.insert(hash);
+        second.pending_blobs.insert(hash);
+        let frame = protocol::encode_blob_response(&hash, bytes);
+        assert!(first.handle(&db, &frame).await.unwrap().frames.is_empty());
+        assert!(second.handle(&db, &frame).await.unwrap().frames.is_empty());
+        assert_eq!(db.kv.get(Tree::Blobs, &hash).unwrap().unwrap(), bytes);
     }
 }

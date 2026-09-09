@@ -26,6 +26,14 @@ unauthorized snapshot writes, forged commits and outgoing permission revocation.
 `browser/e2e/scripts/verify-peer-sync.mjs` uses distinct agents, real signaling,
 WebRTC and OPFS with HTTP data access disabled: initial sync, concurrent edits,
 presence, attachments, offline reconciliation, reload and signed deletion.
+`browser-peer-sync.test.ts` covers parallel negotiation, isolated retries,
+departure, membership checks and the per-browser connection bound.
+`verify-peer-mesh.mjs` uses eight distinct Chromium agents: full mesh, ninth-member
+rejection, concurrent creations, group presence, attachment replication, creator
+departure, offline reconciliation and signed deletion. Rust regressions cover
+late snapshots after deletion and concurrent blob replies across independent edges.
+`browserPeerSync.test.ts` checks that another member can mint an invitation for
+the existing room without restarting its connection.
 `verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
 These scripts require locally built WASM/server artifacts; the UI script requires
 a running app at its configured test URL. They are not wired into CI yet.

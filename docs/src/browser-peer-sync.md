@@ -1,12 +1,12 @@
 # Browser peer sync
 
-The Sync page can pair two browsers without an Atomic Cloud Server subscription.
+The Sync page can connect up to eight browsers without an Atomic Cloud Server subscription.
 Create a peer link in the source drive's Sync page, share it with the other person,
 and connect from that link. Give a different agent access through Share first;
 a peer link introduces devices but does not grant read or write permission.
 Local browser storage is enabled when connecting so edits survive reloads.
 
-Both browsers must be open to exchange changes. Signed edits, presence, document
+Browsers must be open to exchange changes. Signed edits, presence, document
 updates and attachment blobs use an encrypted WebRTC data channel. Offline edits
 remain in local storage and reconcile when the browsers meet again. Closing every
 replica makes the data unavailable to other people until a replica returns. A
@@ -17,8 +17,19 @@ Cloud Server can provide an always-online replica independently of peer pairing.
 A random 256-bit room secret in the invitation identifies a rendezvous room at
 `/webrtc-signal`. The secret is sent in the WebSocket join message, not its URL.
 The signaling server exchanges offers and answers and keeps no drive data. There
-is no Pkarr lookup. Each room currently supports two browsers; the app remembers
+is no Pkarr lookup. Each room supports up to eight browsers in a full mesh; the app remembers
 one link per drive and agent. Disconnect removes that browser's saved link.
+Each browser maintains up to seven independent authenticated connections. Local
+edits and presence go directly to each connected peer; incoming frames are not
+rebroadcast. Reconciliation carries persisted state across reconnects. A failed
+connection only retries that peer, and the group continues when the invitation
+creator leaves. Larger groups and rotating connections are not implemented.
+
+For a device with no local drive state, the invitation creator must be reachable
+for the initial trusted download. Once initialized, the drive's stored permissions
+authorize other peers independently. Any initialized member can create an invite
+for the existing room, naming themselves as that initial trusted peer; this does
+not create a separate group or change anyone's permissions.
 
 Peers authenticate using Atomic agent signatures over a fresh challenge bound to
 the drive and both WebRTC certificate fingerprints. The local Rust node validates
@@ -51,7 +62,7 @@ ICE configuration for development. TURN bandwidth and public service operation
 remain the operator's responsibility; subscription-free access is a deployment
 policy, not a guarantee of free infrastructure.
 
-Signaling limits rooms to two peers, 512 concurrent rooms and 2048 sockets. It
+Signaling limits rooms to eight peers, 512 concurrent rooms and 2048 sockets. It
 limits message sizes and message rates, removes empty rooms and renews sockets
 after 30 minutes. Public operators should also apply network-level abuse limits.
 
@@ -62,9 +73,10 @@ larger attachments need additional application-level chunking. Sync sends the
 resources available in the browser's local database. A partial cache of a hosted
 drive is not proof that the browser holds the entire drive.
 
-Local acceptance uses separate Chromium contexts, real WebRTC and OPFS, distinct
+Group acceptance uses eight separate Chromium contexts, real WebRTC and OPFS, distinct
 agents, and no AtomicServer data requests. It exercises initial replication,
-concurrent edits, presence, attachments, offline reconciliation, reload and
-signed deletion. The Sync page controls are separately exercised in Chromium.
+concurrent creations, group presence, attachments, creator departure, offline
+reconciliation and signed deletion. A ninth room member is rejected. The separate
+two-browser acceptance also checks reload persistence. The Sync page controls are separately exercised in Chromium.
 The lower-level transport also runs in Firefox. Two physical devices, full
 Firefox drive sync, forced TURN, and a deployed public service remain unverified.
