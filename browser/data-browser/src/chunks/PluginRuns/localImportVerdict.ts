@@ -6,7 +6,7 @@ import {
 } from '../../../../../integrations/localthought/plugin';
 
 /** The shipped pure mapper gets a local read snapshot, never network or credentials. */
-export async function localImportVerdict(
+export async function localImportRows(
   store: Store,
   drive: string,
   config: Config,
@@ -32,6 +32,15 @@ export async function localImportVerdict(
         throw new Error('Local import snapshot is incomplete');
     }
   }
+  return rows;
+}
+
+export async function localImportVerdict(
+  store: Store,
+  drive: string,
+  config: Config,
+) {
+  const rows = await localImportRows(store, drive, config);
   return JSON.stringify(
     run({
       config,
