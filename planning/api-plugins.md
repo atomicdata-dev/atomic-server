@@ -47,4 +47,5 @@ configuration, behavior and tests.
 - [x] Implement signed account connection and return flow using `TENANT_SECRET`.
 - [x] Use Syncables with the catalog OAD for discovery, pagination and ontology.
 - [x] Add the mock proxy and wire the updated Pets browser journey into CI.
-- [ ] Verify live provider OAuth and GitHub import after proxy issue #25 is fixed.
+- [x] Verify live GitHub OAuth, fetch and reviewed import (29 issue/PR records; proxy v38).
+- [ ] Verify Google Calendar OAuth/import against the live service.

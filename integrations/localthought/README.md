@@ -36,12 +36,17 @@ remains available explicitly in the GitHub connection dialog.
 - `ATOMIC_INTEGRATION_PROXY_URL`: optional; defaults to `https://localthought.io`.
   Loopback HTTP is accepted for development.
 
-On 2026-09-09 the live catalog advertises `github-issues` and `google-calendar`,
-but its documented YAML endpoints return 404. Tracked in
-[localthought/integration-proxy#25](https://github.com/localthought/integration-proxy/issues/25).
-The proxy must forward query parameters and pagination headers for Syncables
-to traverse pages. A repeated record identity is an error, not a successful
-import. Live OAuth/fetch verification remains dependent on the proxy service.
+Live verification on 2026-09-09 succeeded against proxy Heroku release v38
+(`5960ae43`): OAuth returned to AtomicServer, Syncables fetched 29 issue/PR
+records from `localthought/integration-proxy` and queried all 29 comment
+collections (empty), and the reviewed records were applied and displayed in
+the local AtomicServer table with generated platform properties.
+
+Proxy fixes [#28](https://github.com/localthought/integration-proxy/pull/28)
+and [#29](https://github.com/localthought/integration-proxy/pull/29) add the
+required GitHub User-Agent and preserve query parameters and Link headers.
+This live repository fit on one issues page; multi-page traversal is covered
+by the mock and Rust tests. Google Calendar OAuth/import is not live-verified.
 
 ## Local mock and tests
 
