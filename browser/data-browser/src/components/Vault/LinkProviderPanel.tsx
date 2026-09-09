@@ -97,6 +97,7 @@ export function LinkProviderPanel({
     }
   }
 
+  const explanation = `Connect this app to your existing ${providerName(portalUrl)} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace.`;
   const body = request ? (
     <>
       <Sub>
@@ -115,14 +116,7 @@ export function LinkProviderPanel({
     </>
   ) : (
     <>
-      {!compact && (
-        <Sub>
-          This app cannot sign in on its own, so approve it from somewhere you
-          already are. Then it can keep an encrypted copy of your workspaces —
-          sealed here, so {providerName(portalUrl)} stores it without being able
-          to read it.
-        </Sub>
-      )}
+      {!compact && <Sub>{explanation}</Sub>}
       {error && <ErrorText data-testid='link-error'>{error}</ErrorText>}
       <Actions $compact={compact}>
         <Button
@@ -134,7 +128,7 @@ export function LinkProviderPanel({
             ? 'Getting a code…'
             : compact
               ? `Connect to ${providerName(portalUrl)}`
-              : 'Connect this device'}
+              : 'Connect existing account'}
         </Button>
       </Actions>
     </>

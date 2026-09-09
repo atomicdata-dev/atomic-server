@@ -6562,9 +6562,8 @@ msgstr "Waiting for you to approve it…"
 msgid "Getting a code…"
 msgstr "Getting a code…"
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "Connect this device"
-msgstr "Connect this device"
+#~ msgid "Connect this device"
+#~ msgstr "Connect this device"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Android"
@@ -6813,10 +6812,8 @@ msgstr "{0} failed: {1}"
 msgid "Sign in →"
 msgstr "Sign in →"
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
-msgstr "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
+#~ msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
+#~ msgstr "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
@@ -6828,7 +6825,6 @@ msgstr "{0}. We hold your key sealed, so this email gets you back in on a new de
 msgid "{0}. No recovery backup stored, so losing every device loses this workspace."
 msgstr "{0}. No recovery backup stored, so losing every device loses this workspace."
 
-#: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Set up email recovery"
 msgstr "Set up email recovery"
@@ -7216,13 +7212,11 @@ msgstr "Couldn’t reach {0}. Check your connection and try again."
 msgid "Connect to {0}"
 msgstr "Connect to {0}"
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
-msgstr "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
+#~ msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
+#~ msgstr "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "stores it without being able to read it."
-msgstr "stores it without being able to read it."
+#~ msgid "stores it without being able to read it."
+#~ msgstr "stores it without being able to read it."
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Verified"
@@ -7387,9 +7381,8 @@ msgstr "Local stays on your devices. Vault is encrypted backup. Server hosts a r
 #~ msgid "Choose Server plan"
 #~ msgstr "Choose Server plan"
 
-#: src/routes/SyncRoute.tsx
-msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
-msgstr "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+#~ msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+#~ msgstr "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
@@ -7804,3 +7797,37 @@ msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Could not unlock with a passkey. Use your recovery code instead."
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect existing account"
+msgstr "Connect existing account"
+
+#: src/routes/SyncRoute.tsx
+msgid "Error: Sign in before syncing with another device"
+msgstr "Error: Sign in before syncing with another device"
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
+msgstr "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
+
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to check recovery"
+msgstr "Sign in to check recovery"
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again."
+msgstr "This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again."
+
+#: src/routes/SyncRoute.tsx
+msgid "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
+msgstr "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
+
+#: src/routes/SyncRoute.tsx
+msgid "Existing content stays in this drive. Hosting uses the Server plan or invitation for this drive. If a purchase is needed, you will see the price at checkout before paying."
+msgstr "Existing content stays in this drive. Hosting uses the Server plan or invitation for this drive. If a purchase is needed, you will see the price at checkout before paying."
+
+#. 0: providerName(portalUrl)
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
+msgstr "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."

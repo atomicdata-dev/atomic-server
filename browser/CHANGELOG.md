@@ -4,6 +4,10 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Portal Open links select their workspace; ordinary resource links keep the current drive.
+- Sync distinguishes remote node data from Cloud Server enrollment, explains drive-specific plans, and refreshes account/recovery status after portal sign-in.
+- Account linking explains its purpose without implying another purchase or workspace transfer.
+
 - Reconcile the selected cloud drive after switching drives or signing in on an open connection, so Sync no longer waits for a page refresh to confirm its status.
 
 ## [v0.41.0-beta.6] - 2026-09-09

@@ -511,10 +511,13 @@ the reader's active drive to receive live updates.
 
 `driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
 asynchronous hosting/usage results to the selected drive and server. It covers
-unenrolled/local drives and shared drives confirmed directly by their node.
-`sync-devices.spec.ts` renders a managed connection with zero data for the selected
-drive, injects another drive's completed sync, and verifies that Cloud Server
-stays off with its setup action visible.
+unenrolled/local drives, unknown enrollment, and the requirement for both enrollment and remote data before claiming hosted service. Node synchronization remains a separate status.
+`sync-devices.spec.ts` renders a managed connection with data but no enrollment,
+injects another drive's completed sync, and verifies that Cloud Server does not
+claim hosting. It checks unknown recovery wording, account refresh on window focus,
+and missing translation markers. `saved-drives.spec.ts` checks that a portal Open
+link selects the requested drive, consumes the drive parameter, and preserves
+current-drive behavior for ordinary resource links.
 
 - Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
   present only in local storage, as well as rename/emoji refresh. Manual enable

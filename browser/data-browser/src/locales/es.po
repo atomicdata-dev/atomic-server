@@ -6528,9 +6528,8 @@ msgstr ""
 msgid "Getting a code…"
 msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "Connect this device"
-msgstr ""
+#~ msgid "Connect this device"
+#~ msgstr ""
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Android"
@@ -6779,10 +6778,8 @@ msgstr ""
 msgid "Sign in →"
 msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
-msgstr ""
+#~ msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
+#~ msgstr ""
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
@@ -6794,7 +6791,6 @@ msgstr ""
 msgid "{0}. No recovery backup stored, so losing every device loses this workspace."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Set up email recovery"
 msgstr ""
@@ -7182,13 +7178,11 @@ msgstr ""
 msgid "Connect to {0}"
 msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
-msgstr ""
+#~ msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
+#~ msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "stores it without being able to read it."
-msgstr ""
+#~ msgid "stores it without being able to read it."
+#~ msgstr ""
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Verified"
@@ -7353,9 +7347,8 @@ msgstr ""
 #~ msgid "Choose Server plan"
 #~ msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
-msgstr ""
+#~ msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+#~ msgstr ""
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
@@ -7770,3 +7763,37 @@ msgstr ""
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "No se pudo desbloquear con una clave de acceso. Usa tu código de recuperación."
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect existing account"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Error: Sign in before syncing with another device"
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to check recovery"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Existing content stays in this drive. Hosting uses the Server plan or invitation for this drive. If a purchase is needed, you will see the price at checkout before paying."
+msgstr ""
+
+#. 0: providerName(portalUrl)
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
+msgstr ""

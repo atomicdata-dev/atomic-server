@@ -31,6 +31,7 @@ test.describe('sync page devices', () => {
     page,
   }) => {
     let managedInfoRequests = 0;
+    let accountConnected = false;
     await page.route('**/server', async route => {
       const response = await route.fetch();
       const body = await response.json();
@@ -45,13 +46,15 @@ test.describe('sync page devices', () => {
       });
     });
     await page.route('**/drive-usage?**', route =>
-      route.fulfill({ json: { resourceCount: 0, blobBytes: 0, loroBytes: 0 } }),
+      route.fulfill({ json: { resourceCount: 3, blobBytes: 0, loroBytes: 7800 } }),
     );
     await page.route('**/api/**', route => {
       const path = new URL(route.request().url()).pathname;
 
       return path === '/api/me'
-        ? route.fulfill({ status: 204 })
+        ? accountConnected
+          ? route.fulfill({ json: { email: 'sync-account@example.com' } })
+          : route.fulfill({ status: 204 })
         : route.fulfill({ json: [] });
     });
     await gotoSync(page);
@@ -64,9 +67,17 @@ test.describe('sync page devices', () => {
     await expect(cloud).not.toContainText('In sync');
     await expect(cloud).not.toContainText('Synced');
     await expect(cloud).not.toContainText('Cloud Server is on');
+    const recovery = page.getByTestId('recovery-row');
+    await expect(recovery).toContainText('Sign in to your');
+    await expect(recovery).not.toContainText('Not set up');
+    await expect(page.locator('body')).not.toContainText('[i18n-404:');
     await expect(
       cloud.getByRole('button', { name: 'Set up Cloud Server', exact: true }),
     ).toBeVisible();
+    accountConnected = true;
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(recovery).toContainText('sync-account@example.com');
+    await expect(page.getByTestId('link-provider-panel')).not.toBeVisible();
   });
 
   test('the pairing code on screen is a routable envelope', async ({
