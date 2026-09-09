@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import {
   Datatype,
+  isSafeHref,
   valToDate,
   valToString,
   valToArray,
@@ -51,7 +52,8 @@ function renderValue(value: AtomicValue, datatype: Datatype): JSX.Element {
       return <Nestedresource resource={resource} />;
     }
 
-    case (Datatype.DATE, Datatype.TIMESTAMP):
+    case Datatype.DATE:
+    case Datatype.TIMESTAMP:
       return <DateTime date={valToDate(value)} />;
     case Datatype.MARKDOWN:
       return <Markdown text={valToString(value)} />;
@@ -65,8 +67,17 @@ function renderValue(value: AtomicValue, datatype: Datatype): JSX.Element {
     case Datatype.LOCALIZEDTEXT:
       return <LocalizedTextValue value={value as LocalizedText} />;
 
-    case Datatype.URI:
-      return <AtomicLink href={value as string}>{value as string}</AtomicLink>;
+    case Datatype.URI: {
+      const uri = value as string;
+
+      // Shown but not linked when the scheme would run rather than navigate.
+      if (!isSafeHref(uri)) {
+        return <div>{uri}</div>;
+      }
+
+      return <AtomicLink href={uri}>{uri}</AtomicLink>;
+    }
+
     default:
       return <div>{valToString(value)}</div>;
   }

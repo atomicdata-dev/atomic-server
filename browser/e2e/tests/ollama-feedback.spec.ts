@@ -29,12 +29,14 @@ test('settings detects local Ollama and accepts it with one click', async ({
   if (!process.env.TEST_REAL_OLLAMA)
     await page.route('http://localhost:11434/api/tags', route => {
       probes++;
+
       return route.fulfill({
         json: { models: [{ name: 'qwen:test', model: 'qwen:test' }] },
       });
     });
   await page.goto(`${FRONTEND_URL}/app/settings`);
   expect(probes).toBe(0);
+
   if (await page.locator('script[src*="/@vite/client"]').count()) {
     browserDiagnostics.expect(
       'error',
@@ -43,6 +45,7 @@ test('settings detects local Ollama and accepts it with one click', async ({
       1,
     );
   }
+
   await page.getByText('AI', { exact: true }).click();
   await expect(
     page.getByText('Local Ollama detected', { exact: true }),
@@ -58,6 +61,7 @@ test('settings detects local Ollama and accepts it with one click', async ({
     'http://localhost:11434',
   );
   await page.reload();
+
   if (await page.locator('script[src*="/@vite/client"]').count()) {
     browserDiagnostics.expect(
       'error',
@@ -66,6 +70,7 @@ test('settings detects local Ollama and accepts it with one click', async ({
       1,
     );
   }
+
   await page.getByText('AI', { exact: true }).click();
   await expect(page.locator('#ollama-url')).toHaveValue(
     'http://localhost:11434',

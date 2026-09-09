@@ -123,10 +123,16 @@ impl Resource {
     /// the DID against the self-verifying certificate. Returns `None` for legacy
     /// resources minted before the certificate (DID == commit signature).
     pub fn genesis_cert_b64_from_loro_update(update: &[u8]) -> Option<String> {
+        let propvals = Self::propvals_from_loro_update(update)?;
+        propvals.get(urls::GENESIS).map(|v| v.to_string())
+    }
+
+    /// The propvals a Loro update materializes to, or `None` when it does not
+    /// import.
+    pub(crate) fn propvals_from_loro_update(update: &[u8]) -> Option<PropVals> {
         let doc = crate::loro::AtomicLoroDoc::new();
         doc.import_update(update).ok()?;
-        let propvals = Self::materialize_propvals_from_loro_doc(&doc);
-        propvals.get(urls::GENESIS).map(|v| v.to_string())
+        Some(Self::materialize_propvals_from_loro_doc(&doc))
     }
 
     /// The resource's creator, proven by its inline self-verifying genesis

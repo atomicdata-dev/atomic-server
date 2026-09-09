@@ -62,7 +62,7 @@ export function FilePicker({
                 thisUnsub();
                 const [subject] = await upload([selectedFile]);
                 await setValue(subject);
-                resource.save();
+                await resource.save();
               }
             },
           );

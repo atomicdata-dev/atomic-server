@@ -88,7 +88,8 @@ describe('upload offline → reconnect → server has blob', () => {
     // not on the WS being open.
     await delay(500);
 
-    const drive = server.initialDrive ?? `${server.serverUrl}/`;
+    // See upload-roundtrip: the home drive is the key-derived one.
+    const drive = (await store.ensurePrivateDrive()).subject;
 
     // ---- 1. Go "offline" by failing every fetch ----
     const realFetch = globalThis.fetch.bind(globalThis);

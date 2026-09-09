@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
 use actix_web::{http::header, web, HttpResponse};
-use atomic_lib::{agents::ForAgent, db::plugin_meta::PluginMetaKey, urls, Storelike, Value};
+use atomic_lib::{db::plugin_meta::PluginMetaKey, urls, Storelike, Subject, Value};
 use base64::{engine::general_purpose, Engine as _};
 
-use crate::{appstate::AppState, errors::AtomicServerResult};
+use crate::{
+    appstate::AppState, context::RequestContext, errors::AtomicServerResult,
+    helpers::get_client_agent,
+};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct PluginUiQuery {
@@ -32,12 +35,24 @@ pub struct UIPluginListItem {
     pub resource: String,
 }
 
+/// The `plugin` query parameter is `namespace.name`, both identifiers being
+/// `[A-Za-z0-9_-]` (see `validate_plugin_identifiers`). Anything else could
+/// steer the file lookup below out of the plugin directory.
+fn split_plugin_name(plugin: &str) -> AtomicServerResult<(&str, &str)> {
+    let (namespace, name) = plugin
+        .split_once('.')
+        .ok_or("Invalid plugin name, expected `namespace.name`")?;
+    atomic_lib::db::plugin_meta::validate_plugin_identifiers(namespace, name)?;
+    Ok((namespace, name))
+}
+
 pub fn get_plugin_file_path(
     appstate: &AppState,
     drive_subject: &str,
     plugin_name: &str,
     format: &str,
 ) -> AtomicServerResult<PathBuf> {
+    split_plugin_name(plugin_name)?;
     let encoded_drive = general_purpose::URL_SAFE.encode(drive_subject);
 
     let plugin_dir = appstate
@@ -78,6 +93,11 @@ fn plugin_nonce() -> String {
 /// server. The plugin script is locked to a fresh per-response nonce; the host
 /// SPA hands over theme CSS via `postMessage` (see PluginView.tsx).
 fn render_plugin_ui_html(query_string: &str, css_exists: bool, nonce: &str) -> String {
+    // The query string is reflected into attributes of a same-origin page,
+    // so it must be attribute-escaped; a stray `"` would otherwise close the
+    // attribute and inject markup (a `<meta http-equiv=refresh>` is enough
+    // to redirect every visitor, CSP or not).
+    let query_string = super::single_page_app::escape_html(query_string);
     let js_url = format!(
         "/plugin-ui?{}",
         query_string.replace("format=html", "format=js")
@@ -130,6 +150,11 @@ pub async fn handle_plugin_ui(
     let plugin_name = &query.plugin;
     let format = &query.format;
 
+    let (namespace, name) = match split_plugin_name(plugin_name) {
+        Ok(parts) => parts,
+        Err(e) => return Ok(HttpResponse::BadRequest().body(e.message)),
+    };
+
     // `html` is generated (not a file on disk): serve the iframe host document
     // with its own CSP so the plugin script isn't blocked by the parent CSP.
     if format == "html" {
@@ -148,11 +173,28 @@ pub async fn handle_plugin_ui(
             .body(body));
     }
 
+    // The JS/CSS is served to whoever may read the plugin resource itself,
+    // as the same agent that fetches the page — signed headers or the
+    // session cookie, like any other handler.
+    let store = &appstate.store;
+    let origin = RequestContext::new(&req, &appstate).origin;
+    let full_url = format!("{}{}", origin, req.uri());
+    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+    let Some(meta) = store.get_plugin_meta(&PluginMetaKey::new(drive_subject, namespace, name))?
+    else {
+        return Ok(HttpResponse::NotFound().body("Plugin UI file not found"));
+    };
+    let plugin_resource = store
+        .get_resource(&Subject::from(meta.subject.as_str()))
+        .await?;
+    atomic_lib::hierarchy::check_read(store, &plugin_resource, &for_agent).await?;
+
     let file_path = get_plugin_file_path(&appstate, drive_subject, plugin_name, format)?;
 
     if !file_path.exists() {
-        return Ok(HttpResponse::NotFound()
-            .body(format!("Plugin UI file not found: {}", file_path.display())));
+        // No path in the body: the plugin directory layout is not the
+        // caller's business.
+        return Ok(HttpResponse::NotFound().body("Plugin UI file not found"));
     }
 
     let content = std::fs::read_to_string(&file_path)
@@ -170,14 +212,21 @@ pub async fn handle_plugin_ui(
         .body(content))
 }
 
+/// Lists the UI plugins on a drive that the requesting agent may read. The
+/// list used to be built as `Sudo`, which showed every plugin on the drive
+/// to anyone who asked.
 pub async fn handle_plugin_list(
     _path: Option<web::Path<String>>,
     appstate: web::Data<AppState>,
     query: web::Query<UIPluginListQuery>,
-    _req: actix_web::HttpRequest,
+    req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
     let drive_subject = &query.drive;
+
+    let origin = RequestContext::new(&req, &appstate).origin;
+    let full_url = format!("{}{}", origin, req.uri());
+    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
 
     let plugins = store.get_class_extenders_on_drive(drive_subject);
     let mut plugin_list: Vec<UIPluginListItem> = vec![];
@@ -187,10 +236,16 @@ pub async fn handle_plugin_list(
             continue;
         };
 
-        let resource = store
-            .get_resource_extended(&subject.into(), true, &ForAgent::Sudo)
-            .await?
-            .to_single();
+        let resource = match store
+            .get_resource_extended(&subject.into(), true, &for_agent)
+            .await
+        {
+            Ok(response) => response.to_single(),
+            Err(e) => {
+                tracing::debug!("plugin-list: skipping plugin {}: {}", for_agent, e);
+                continue;
+            }
+        };
 
         let Ok(Value::String(name)) = resource.get(urls::NAME) else {
             continue;

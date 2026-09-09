@@ -12,7 +12,10 @@ import { getManagedAccount, PRODUCT_NAME } from '../helpers/managed';
 import { useSettings } from '../helpers/AppSettings';
 import { fetchManagedInfo } from '../helpers/managedServer';
 import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
-import { getRememberedManagedPortalUrl } from '../helpers/managed/api';
+import {
+  getRememberedManagedPortalUrl,
+  safePortalUrl,
+} from '../helpers/managed/api';
 import {
   addRecoveryCodeWrapper,
   addPasskeyWrapper,
@@ -117,7 +120,9 @@ export function AccountRecoveryCard({
       // still told the reader to sign in, because it keys off `hasSession`
       // alone: instructions to do something with no way to do it.
       setPortalUrl(
-        getManagedPortalUrl(info) ?? getRememberedManagedPortalUrl(),
+        safePortalUrl(
+          getManagedPortalUrl(info) ?? getRememberedManagedPortalUrl(),
+        ) ?? null,
       );
     })();
 

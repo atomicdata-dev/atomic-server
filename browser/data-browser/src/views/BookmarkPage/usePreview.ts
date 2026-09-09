@@ -70,7 +70,7 @@ const debouncedFetch = debounce(
 
           setError(undefined);
           setLoading(false);
-          resource.save();
+          await resource.save();
         })
         .catch(err => {
           console.error(err);

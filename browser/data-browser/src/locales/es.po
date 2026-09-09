@@ -7590,6 +7590,89 @@ msgstr ""
 msgid "Connect local Ollama"
 msgstr ""
 
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Find your workspace"
+msgstr ""
+
+#~ msgid "Looking for your workspace on your other devices…"
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We couldn’t find a reachable device with your workspace."
+msgstr ""
+
+#~ msgid "We found your workspace on {0}."
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Fetch a copy to this device so you can open it here."
+msgstr ""
+
+#~ msgid "Fetching workspace…"
+#~ msgstr ""
+
+#~ msgid "Fetch workspace"
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Look here"
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Address where your workspace lives"
+msgstr ""
+
+#~ msgid "We found your workspace on {0} ."
+#~ msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "A device was found, but this account cannot read the workspace there."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We could not check your workspace. Try again or enter its address below."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Connection details"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Your secret was accepted. Preparing this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking for your workspace on this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking whether your account has a backup to restore…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Looking for a device that has your workspace…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Fetching your workspace to this device…"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Opening your workspace"
+msgstr ""
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "This may take a little while. Please keep this window open."
+msgstr ""
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We found your workspace"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This device does not have this workspace yet. Fetch it from a device that has it."
+msgstr ""
+
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not add a passkey."
 msgstr "No se pudo añadir una clave de acceso."

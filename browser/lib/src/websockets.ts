@@ -1376,6 +1376,7 @@ export class WSClient {
     // Drive-wide live subscription. Previously sent only inside
     // `authenticate()`, so an anonymous session never subscribed at all.
     this.subscribeToDrive();
+
     for (const subject of this.store.subscribers.keys()) {
       if (this.store.getWebSocketForSubject(subject) === this) {
         this.subscribeAgentProfile(subject);

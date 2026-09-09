@@ -18,6 +18,7 @@
 //      A local-only drive connects to the assigned node before promotion.
 
 import { getManagedAccount } from './session';
+import { safePortalUrl } from './api';
 import { createManagedSyncEnrollment, genesisCertOf } from './enrollment';
 import { getManagedEnrollments } from './enrollmentApi';
 import type { ManagedInfo } from '../managedServer';
@@ -134,10 +135,16 @@ export async function ensureManagedSession(
 ): Promise<boolean> {
   if (await getManagedAccount().catch(() => null)) return true;
 
+  // Not an address this app opens (see safePortalUrl): reported as "no
+  // session" rather than thrown, which is the caller's existing fallback.
+  const portal = safePortalUrl(portalUrl);
+
+  if (!portal) return false;
+
   // `embed=1` asks the portal for its sign-in form rather than its landing
   // page: the user came here from a "back up this drive" button, so the sales
   // pitch is a detour.
-  const win = await openAuthWindow(`${portalUrl}/?embed=1`);
+  const win = await openAuthWindow(`${portal}/?embed=1`);
   const start = Date.now();
 
   try {

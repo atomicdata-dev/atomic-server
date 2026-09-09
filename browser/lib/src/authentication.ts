@@ -105,8 +105,16 @@ const setCookieExpires = (
   const expiry = new Date(Date.now() + expires_in_ms).toUTCString();
   const encodedValue = encodeURIComponent(value);
 
+  // `Secure` whenever the page is served over TLS, so the session never rides
+  // along on a plain-http request to the same host. Omitted on http (local
+  // dev), where a Secure cookie would simply never be stored.
+  const secure =
+    typeof window !== 'undefined' && window.location?.protocol === 'https:'
+      ? ';Secure'
+      : '';
+
   // No `Domain=`: host-only. See the note above.
-  const cookieString = `${name}=${encodedValue};Expires=${expiry};SameSite=Lax;path=/`;
+  const cookieString = `${name}=${encodedValue};Expires=${expiry};SameSite=Lax;path=/${secure}`;
   document.cookie = cookieString;
 };
 

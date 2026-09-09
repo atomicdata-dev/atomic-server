@@ -21,6 +21,7 @@ export function LocalOllamaDiscovery() {
       .then(async response => {
         if (!response.ok) throw new Error('Ollama discovery failed');
         const data = await response.json();
+
         if (active) {
           setStatus(Array.isArray(data?.models) ? 'found' : 'unavailable');
         }

@@ -86,6 +86,7 @@ Two things worth knowing about the runners:
 | Iroh accept side refuses any frame before `AUTH` (ERROR + closed stream), binds `AUTH.requestedSubject` to the handshake drive | `peer.rs` (`accept_gate_tests`, raw QUIC stream) |
 | Rejected `SYNC_PUSH` answers `ERROR SYNC_REJECTED`, never `SYNC_OK` | `peer.rs` (`accept_gate_tests`), `server/tests/it/ws_auth_gate.rs` |
 | WS: writes and identity-bearing subscriptions need `AUTH`; anonymous `SUB` on a public drive still works; unreadable subscriptions answer `ERROR UNAUTHORIZED_READ` | `server/tests/it/ws_auth_gate.rs` |
+| Rejected cross-drive sync entry leaves no snapshot; later valid import cannot inherit rejected properties | `engine.rs` (`rejected_sync_entry_does_not_persist_snapshot`) |
 | Missing-drive bootstrap (OQ5): `Public` never creates a drive, Owner mode enrolls only the owner, open node admits an authenticated first-sync | `lib/src/sync/engine.rs` (`bootstrap_and_sub_tests`), `peer.rs` (`live_write_admission_tests`) |
 | Engine-owned `SUB`/`UNSUB`: granted `SUB` is a session command, unreadable `SUB` answers `ERROR UNAUTHORIZED_READ` | `lib/src/sync/engine.rs` (`bootstrap_and_sub_tests`) |
 | Signed `SYNC_DIFF.removeCommits`: envelope applies regardless of connection agent, tampered envelope does not delete, envelope only handed to drive readers, replay after re-creation refused | `lib/src/sync/peer.rs` (`initiator_trust_tests`), `engine.rs` (`bootstrap_and_sub_tests`), `tombstones.rs`, `protocol.rs` |
@@ -487,6 +488,15 @@ updates without a reload and verifies a second change after the reader reloads.
 multiple-reader cleanup through both Store unsubscribe APIs, and retaining
 ordinary document drive-wide fan-out. Profiles no longer depend on being inside
 the reader's active drive to receive live updates.
+
+## Desktop workspace discovery (2026-09-08)
+
+`sync::discover::tests::inspection_checks_access_without_importing_or_pairing`
+uses real Iroh endpoints with node-bound AUTH: an authorized identity sees a peer name without importing
+the drive or pairing; a stranger is rejected. The local Tauri debug build connected
+to staging's advertised Iroh node and received a no-readable-data response for its
+test identity. Live drive and node PKARR signatures were verified separately.
+This does not yet prove restoration of the user's private staging workspace.
 
 ## Recovery-code passkey enrollment
 

@@ -28,7 +28,9 @@ export function EditPropertyDialog({
   const category = getCategoryFromResource(resource);
 
   const onSuccess = useCallback(() => {
-    resource.save();
+    resource.save().catch(err => {
+      console.error('Failed to save property', err);
+    });
   }, [resource]);
 
   const [dialogProps, show, hide, visible] = useDialog({ bindShow, onSuccess });
