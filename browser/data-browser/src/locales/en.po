@@ -10025,3 +10025,7 @@ msgstr "Connect through LocalThought. The tenant secret is used in this tab to s
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect GitHub tracker"
 msgstr "Connect GitHub tracker"
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "All day"
+msgstr "All day"

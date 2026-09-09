@@ -1168,3 +1168,11 @@ schema/proposal/apply, Calendar display, provider updates, OPFS reload and
 stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
 Live-provider browser OAuth verification remains separate from this fixture test.
+
+All-day ranges: `browser/lib/src/calendar-date.test.ts` covers civil-date
+validation, exclusive single/multi-day ends, leap days, DST dates and year
+boundaries; run under UTC, America/Los_Angeles and Pacific/Kiritimati. Import
+tests reject malformed/mixed/nonpositive all-day intervals and verify raw
+provider Start/End retention. The existing Google import E2E now imports a
+three-day all-day event, asserts all three occupied cells and the excluded end,
+and verifies repeated chips survive reload without duplicate resources.

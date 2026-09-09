@@ -9986,3 +9986,7 @@ msgstr ""
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect GitHub tracker"
 msgstr ""
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "All day"
+msgstr ""
