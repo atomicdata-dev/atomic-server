@@ -4877,6 +4877,7 @@ msgstr "Your workspace hasn’t opened here yet. It may still be settling — re
 msgid "No {0} portal is configured for this server."
 msgstr "No {0} portal is configured for this server."
 
+#: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultPanel.tsx
@@ -9536,6 +9537,9 @@ msgstr "Applying sync…"
 msgid "Checking for changes. This may take a moment."
 msgstr "Checking for changes. This may take a moment."
 
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Pets"
 msgstr "Pets"
@@ -9555,3 +9559,19 @@ msgstr "A one-off, on-demand import. Nothing runs in the background."
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "No external account, API key or network call. Static sample data only, not a live provider."
 msgstr "No external account, API key or network call. Static sample data only, not a live provider."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Reinstall demo pets"
+msgstr "Reinstall demo pets"
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Install demo pets"
+msgstr "Install demo pets"
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Installs five trivial demo pets into a Pets table. No external account, API key or network call is used."
+msgstr "Installs five trivial demo pets into a Pets table. No external account, API key or network call is used."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Open Pets"
+msgstr "Open Pets"

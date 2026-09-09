@@ -4866,6 +4866,7 @@ msgstr ""
 msgid "No {0} portal is configured for this server."
 msgstr ""
 
+#: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultPanel.tsx
@@ -9497,6 +9498,9 @@ msgstr ""
 msgid "Checking for changes. This may take a moment."
 msgstr ""
 
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Pets"
 msgstr ""
@@ -9515,4 +9519,20 @@ msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "No external account, API key or network call. Static sample data only, not a live provider."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Reinstall demo pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Install demo pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Installs five trivial demo pets into a Pets table. No external account, API key or network call is used."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Open Pets"
 msgstr ""
