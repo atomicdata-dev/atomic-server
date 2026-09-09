@@ -63,11 +63,9 @@ export function hasHostedDriveConnection(
   enrolled: boolean | null,
   resourceCount: number | undefined,
 ): boolean {
-  // A colleague can verify the shared drive directly on its node without
-  // access to the owner's billing account. A global connection is not proof.
+  // Node synchronization is shown independently in Devices. Data on a managed
+  // node alone does not prove this account has hosting enabled for this drive.
   return (
-    liveSyncedDrive &&
-    managed &&
-    (enrolled === true || (resourceCount ?? 0) > 0)
+    liveSyncedDrive && managed && enrolled === true && (resourceCount ?? 0) > 0
   );
 }
