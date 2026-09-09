@@ -62,3 +62,7 @@ OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
 Main run 34350517612 passed dependency installation with the shared locks, then
 failed the full-app compiler sweep at its 5-second default (7.8 seconds actual).
 Give only that bulk test a 30-second budget; retain all compilation assertions.
+
+Run 34352390180 was canceled before jobs started when another branch replaced
+it in the default single pending slot. Set `queue: max` on main-pipeline so
+pending validations can wait sequentially instead of displacing one another.
