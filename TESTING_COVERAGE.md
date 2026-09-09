@@ -568,3 +568,20 @@ and loading candidates even if a query page lists them. `forks.spec.ts` checks
 ordinary resources after reload and real proposals on their original resource.
 The reported Safari query contamination is not reproduced locally: WebKit test
 setup currently fails opening OPFS before it can create its dev drive.
+
+### Managed admission retries and content-addressed image downloads
+
+- `local-outbox.test.ts`: enrollment/quota refusals stop after bounded retries,
+  retain dirty edits, and can be re-armed by a new edit; legacy messages and
+  structured `SYNC_REJECTED` classification are covered.
+- `store-commit-fallback.test.ts`: a WebSocket enrollment refusal is not
+  duplicated over HTTP; a transport failure still falls back.
+- Server `errors::admission_error_tests`: enrollment/quota refusals carry a
+  blocking code and HTTP 403 rather than an internal-error response.
+- Server `tests::content_addressed_image_download`: raw, WebP and AVIF downloads
+  work for a blob with no File resource at its hash URL; missing hashes return
+  404, and attachment/nosniff headers are retained for renditions.
+
+Staging triage verified that the two reported hashes still returned HTTP 200
+without resize parameters. Deployment acceptance must recheck their resized
+URLs and confirm the rejected-write rate falls after clients update.

@@ -223,8 +223,9 @@ pub mod error_code {
     /// authenticate first — retrying the same frame without an `AUTH`
     /// changes nothing.
     pub const AUTH_REQUIRED: u16 = 5;
-    /// A `SYNC_PUSH` was refused as a whole — the agent may not write the
-    /// drive, or this node's sync policy does not admit it — and **nothing**
+    /// A commit was refused by node admission policy, or a `SYNC_PUSH` was
+    /// refused as a whole — the agent may not write the drive, or this node's
+    /// sync policy does not admit it — and **nothing**
     /// from it landed. Replaces the old behaviour of silently dropping the
     /// import and still answering `SYNC_OK`, which made the ack meaningless.
     /// The message names the drive. Blocking, not terminal: keep the local
@@ -279,6 +280,14 @@ pub struct DecodedError {
 /// `isTerminalCommitErrorMessage` / `isUnrecoverableCommitErrorMessage`
 /// patterns — update both sides together if you add a case.
 pub fn classify_commit_error(message: &str) -> u16 {
+    // Admission refusals are not transport failures. They can recover after
+    // enrollment/quota changes, so keep the write but stop unlimited retries.
+    if message.contains("is not enrolled for sync on this node")
+        || message.contains("has reached its storage quota on this node")
+    {
+        return error_code::SYNC_REJECTED;
+    }
+
     if message.contains("is_genesis: true, but the resource already exists") {
         return error_code::GENESIS_COLLISION;
     }
@@ -1507,6 +1516,16 @@ mod tests {
         let code = u16::from_be_bytes([encoded[3], encoded[4]]);
         assert_eq!(code, error_code::UNAUTHORIZED_WRITE);
         assert_eq!(&encoded[5..], b"Not found");
+    }
+
+    #[test]
+    fn managed_commit_refusals_are_blocking() {
+        for message in [
+            "Drive did:ad:private is not enrolled for sync on this node.",
+            "Drive did:ad:private has reached its storage quota on this node.",
+        ] {
+            assert_eq!(classify_commit_error(message), error_code::SYNC_REJECTED);
+        }
     }
 
     #[test]
