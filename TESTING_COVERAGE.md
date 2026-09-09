@@ -420,8 +420,14 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   and failed connection without local-drive promotion.
 - `data-browser/src/helpers/managed/reconcile.test.ts`: pending/empty placements
   do not switch the app away from its source.
-- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup opens the selected
-  existing drive, never creates a content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup checks the selected
+  drive's subscription before opening hosting in the app; it never creates a
+  content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/drive-billing-ux.spec.ts`: billing has no fake
+  account-wide free plan, named drives survive selection/reload/Back, and a
+  paid drive's price and quota do not leak into an unsubscribed drive.
+- `data-browser/src/helpers/driveBillingUrl.test.ts`: Sync links preserve the
+  exact drive and portal, or open the picker when no drive is selected.
 - Paired `atomic-saas/portal/e2e/server-hosting-live.spec.ts`: opt-in real sign-in,
   grant, signed enrollment, setup UI, source replication and destination HTTP
   read. Requires two isolated nodes and dev magic links (`ATOMIC_HOSTING_LIVE=1`).
@@ -517,7 +523,19 @@ verify subsequent shared access. The chatroom journey also checks the named
 personal drive. Browser warnings/errors fail these tests, including localization
 render warnings. The authorization journey also covers cropped avatar upload, metadata and image
 download from the recipient account, and existing-agent acceptance. SaaS
-email-to-drive acceptance still needs dedicated flow coverage.
+`portal/e2e/invite-signup.spec.ts` covers a real invitation through email signup,
+recovery-code backup, automatic acceptance, and workspace reload. It also restores
+the existing identity in a second browser before accepting the invitation again.
+The test injects the standalone node's managed/portal metadata and declines
+automatic workspace-vault enrollment (no S3 service). Invitation, email login,
+encrypted identity recovery, and workspace operations use real local services.
+The invite journey also rejects transient duplicate acceptance buttons, opens the
+avatar file picker from the person button, and checks Feedback in the secret
+backup dialog. `onboarding-storage.spec.ts` injects a failed ClientDb initialization
+and verifies that signup controls stay hidden while recovery advice and Feedback
+remain available. `onboardingStorage.test.ts` covers initialization readiness,
+failure, missing attachment, and timeout. Actual private-window storage policies
+across browsers remain outside the injected-failure test.
 `ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
 only after expanding AI settings, one-click URL acceptance and persistence after
 reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
@@ -539,10 +557,13 @@ the reader's active drive to receive live updates.
 
 `driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
 asynchronous hosting/usage results to the selected drive and server. It covers
-unenrolled/local drives and shared drives confirmed directly by their node.
-`sync-devices.spec.ts` renders a managed connection with zero data for the selected
-drive, injects another drive's completed sync, and verifies that Cloud Server
-stays off with its setup action visible.
+unenrolled/local drives, unknown enrollment, and the requirement for both enrollment and remote data before claiming hosted service. Node synchronization remains a separate status.
+`sync-devices.spec.ts` renders a managed connection with data but no enrollment,
+injects another drive's completed sync, and verifies that Cloud Server does not
+claim hosting. It checks unknown recovery wording, account refresh on window focus,
+and missing translation markers. `saved-drives.spec.ts` checks that a portal Open
+link selects the requested drive, consumes the drive parameter, and preserves
+current-drive behavior for ordinary resource links.
 
 - Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
   present only in local storage, as well as rename/emoji refresh. Manual enable
@@ -571,3 +592,30 @@ This does not yet prove restoration of the user's private staging workspace.
 - `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
 
 - `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
+
+Drive changes and reauthentication on an already-open WebSocket: `browser/lib/src/websockets.test.ts` verifies a fresh SYNC is sent without reconnecting, including local-only drive exclusion. This covers the Sync page remaining at Connecting after sign-in or drive switching; live staging acceptance remains separate.
+
+### Pending fork banner
+
+`PendingForks.test.tsx` rejects ordinary resources, proposals for another subject,
+and loading candidates even if a query page lists them. `forks.spec.ts` checks
+ordinary resources after reload and real proposals on their original resource.
+The reported Safari query contamination is not reproduced locally: WebKit test
+setup currently fails opening OPFS before it can create its dev drive.
+
+### Managed admission retries and content-addressed image downloads
+
+- `local-outbox.test.ts`: enrollment/quota refusals stop after bounded retries,
+  retain dirty edits, and can be re-armed by a new edit; legacy messages and
+  structured `SYNC_REJECTED` classification are covered.
+- `store-commit-fallback.test.ts`: a WebSocket enrollment refusal is not
+  duplicated over HTTP; a transport failure still falls back.
+- Server `errors::admission_error_tests`: enrollment/quota refusals carry a
+  blocking code and HTTP 403 rather than an internal-error response.
+- Server `tests::content_addressed_image_download`: raw, WebP and AVIF downloads
+  work for a blob with no File resource at its hash URL; missing hashes return
+  404, and attachment/nosniff headers are retained for renditions.
+
+Staging triage verified that the two reported hashes still returned HTTP 200
+without resize parameters. Deployment acceptance must recheck their resized
+URLs and confirm the rejected-write rate falls after clients update.

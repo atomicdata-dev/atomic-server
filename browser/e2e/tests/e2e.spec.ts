@@ -128,19 +128,22 @@ test.describe('data-browser', async () => {
       // Create invite
       await page.click('button:has-text("Create Invite")');
       await page.getByLabel('Full name', { exact: true }).fill('Drive Owner');
+      const pickerOpened = page.waitForEvent('filechooser');
       await page
-        .getByLabel('Profile picture (optional)', { exact: true })
-        .setInputFiles({
-          name: 'profile.svg',
-          mimeType: 'image/svg+xml',
-          buffer: Buffer.from(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#${Math.floor(
-              Math.random() * 0xffffff,
-            )
-              .toString(16)
-              .padStart(6, '0')}"/></svg>`,
-          ),
-        });
+        .getByRole('button', { name: 'Choose profile picture' })
+        .click();
+      const picker = await pickerOpened;
+      await picker.setFiles({
+        name: 'profile.svg',
+        mimeType: 'image/svg+xml',
+        buffer: Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#${Math.floor(
+            Math.random() * 0xffffff,
+          )
+            .toString(16)
+            .padStart(6, '0')}"/></svg>`,
+        ),
+      });
       await page
         .getByRole('dialog')
         .filter({ has: page.getByRole('heading', { name: 'Adjust image' }) })

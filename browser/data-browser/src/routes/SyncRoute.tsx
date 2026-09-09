@@ -1,3 +1,4 @@
+import { driveBillingUrl } from '../helpers/driveBillingUrl';
 import {
   deriveNodeStatuses,
   currentDriveSync,
@@ -380,15 +381,11 @@ function ServerCard({
       footer={
         isCloud && managedInfo.portalUrl ? (
           <ManagedLink
-            // The dashboard, not the portal root: signed-in visitors get the
-            // marketing page at `/`, so the link landed on a sales pitch
-            // rather than the account it promises to manage.
-            //
-            // `externalLinkProps` rather than a raw target/rel: in the desktop
-            // app the plain form opens nothing at all.
-            {...externalLinkProps(`${managedInfo.portalUrl}/dashboard`)}
+            {...externalLinkProps(
+              driveBillingUrl(managedInfo.portalUrl, status.drive),
+            )}
           >
-            {'Manage account & plan →'}
+            {'Manage this drive’s plan →'}
           </ManagedLink>
         ) : !isActive ? (
           // Removing the server you're using would strand the app.
@@ -398,6 +395,12 @@ function ServerCard({
         ) : undefined
       }
     >
+      {isCloud && (
+        <ConnMeta>
+          This status describes data synchronization. View this drive’s
+          subscription and price in billing.
+        </ConnMeta>
+      )}
       {/* Status details belong to the server actually in use. */}
       {isActive && !status.serverConnected && status.serverConnectionError && (
         <ConnError role='alert'>
@@ -704,12 +707,21 @@ function SyncPage() {
    * none", and telling someone their recovery is missing when the control
    * plane was merely unreachable is the one wrong answer this row can give.
    */
-  const [recoveryBackup, setRecoveryBackup] = useState<
-    'stored' | 'passkey-only' | 'device-only' | 'none' | null
-  >(null);
+  const [recoveryState, setRecoveryState] = useState<{
+    account: ManagedAccount;
+    value: 'stored' | 'passkey-only' | 'device-only' | 'none' | null;
+  } | null>(null);
+  const recoveryBackup =
+    recoveryState?.account === managedAccount
+      ? (recoveryState?.value ?? null)
+      : null;
 
   useEffect(() => {
     if (!managedAccount) return;
+
+    const setRecoveryBackup = (
+      value: NonNullable<typeof recoveryState>['value'],
+    ) => setRecoveryState({ account: managedAccount, value });
 
     let cancelled = false;
 
@@ -751,7 +763,10 @@ function SyncPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void (async () => {
+    let generation = 0;
+
+    const refreshAccount = async () => {
+      const requestGeneration = ++generation;
       // Asked even when this device is already linked. The link only settles
       // *how* this client authenticates; it says nothing about who, and the
       // portal link needs the account itself.
@@ -760,7 +775,7 @@ function SyncPage() {
       try {
         const account = await getManagedAccount();
 
-        if (cancelled) return;
+        if (cancelled || requestGeneration !== generation) return;
 
         setManagedAccount(account);
         setNeedsProviderLink(!linked && account === null);
@@ -768,14 +783,25 @@ function SyncPage() {
         // Unreachable control plane. Offering to link is the useful answer —
         // the alternative is a Sync page that silently omits backup with no
         // way to ask for it.
-        if (!cancelled) setNeedsProviderLink(!linked);
+        if (!cancelled && requestGeneration === generation) {
+          setManagedAccount(null);
+          setNeedsProviderLink(!linked);
+        }
       }
-    })();
+    };
+
+    const onFocus = () => void refreshAccount();
+
+    void refreshAccount();
+    window.addEventListener('focus', onFocus);
+    const unsubscribe = store.on(StoreEvents.AgentChanged, onFocus);
 
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.removeEventListener('focus', onFocus);
     };
-  }, []);
+  }, [status.drive, store]);
 
   useEffect(() => {
     const serverUrl = status.serverUrl;
@@ -874,7 +900,7 @@ function SyncPage() {
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, store]);
+  }, [status.drive, status.serverUrl, status.lastDriveSync?.timestamp, store]);
 
   // Plan quota — managed nodes only, from the control plane. Billing stays a
   // managed concern; the usage numbers above are generic to every node.
@@ -940,14 +966,13 @@ function SyncPage() {
           setCloudEnrollment({ drive, server: status.serverUrl, value: has });
       })
       .catch(() => {
-        if (!cancelled)
-          setCloudEnrollment({ drive, server: status.serverUrl, value: false });
+        if (!cancelled) setCloudEnrollment(null);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, managedInfo]);
+  }, [status.drive, status.serverUrl, managedInfo, managedAccount]);
 
   useEffect(() => {
     const refresh = () => setStatus(store.getSyncStatus());
@@ -1518,7 +1543,7 @@ function SyncPage() {
                 <ConnTitle>Email recovery</ConnTitle>
                 <ConnSub>
                   {!managedAccount
-                    ? `Not set up. With an account on ${PRODUCT_NAME} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace.`
+                    ? `Sign in to your ${PRODUCT_NAME} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account.`
                     : recoveryBackup === null
                       ? `Signed in as ${managedAccount.email}.`
                       : recoveryBackup === 'stored'
@@ -1548,7 +1573,7 @@ function SyncPage() {
                     <LearnMore
                       {...externalLinkProps(`${accountPortalUrl}/signin`)}
                     >
-                      Set up email recovery
+                      Sign in to check recovery
                     </LearnMore>
                   </ConnActions>
                 ) : recoveryBackup === 'none' ||
@@ -1624,6 +1649,12 @@ function SyncPage() {
                     another device to be awake. Unlike Cloud Vault, our servers
                     process what you put here.
                   </ConnSub>
+                  <ConnMeta>
+                    {subscriptionStatus === 'active' ||
+                    subscriptionStatus === 'trialing'
+                      ? 'This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again.'
+                      : 'Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free.'}
+                  </ConnMeta>
                   {hostedCopyOrigin && (
                     <ConnMeta>
                       This workspace has been copied to Cloud Server. You’re
@@ -1701,8 +1732,9 @@ function SyncPage() {
             sharing permissions still control other users’ access.
           </p>
           <p>
-            Existing content stays in this drive. Hosting requires a Server plan
-            or an invitation for this drive.
+            Existing content stays in this drive. Hosting uses the Server plan
+            or invitation for this drive. If a purchase is needed, you will see
+            the price at checkout before paying.
           </p>
         </ConfirmationDialog>
 

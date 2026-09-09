@@ -468,6 +468,77 @@ describe('WSClient drive subscription', () => {
     client.close();
   });
 
+  it('reconciles drives selected after authentication without reopening the socket', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('late-drive'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    vi.mocked(store.getDrive).mockRestore();
+    vi.spyOn(store, 'isLiveSyncedDrive').mockImplementation(
+      drive => drive !== 'did:ad:local',
+    );
+    vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+      drive: 'did:ad:a',
+      driveHash: 'hash',
+      resources: {},
+      peers: [],
+    });
+
+    for (const drive of ['did:ad:a', 'did:ad:b']) {
+      const before = framesWithTag(socket, Tag.SYNC).length;
+      store.setDrive(drive);
+      await vi.waitFor(() =>
+        expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(before + 1),
+      );
+    }
+
+    const before = framesWithTag(socket, Tag.SYNC).length;
+    store.setDrive('did:ad:local');
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(before);
+    client.close();
+  });
+
+  it('reconciles the selected drive after reauthentication on an open socket', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('signin-drive'));
+    const initial = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await initial;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    socket.sent.length = 0;
+    vi.mocked(store.getDrive).mockReturnValue('did:ad:a');
+    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+    vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+      drive: 'did:ad:a',
+      driveHash: 'hash',
+      resources: {},
+      peers: [],
+    });
+    const auth = client.authenticate(true);
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.SYNC).length).toBeGreaterThan(0),
+    );
+    client.close();
+  });
+
   it('UNSUBs the previous drive when the store switches drives', async ({
     expect,
   }) => {

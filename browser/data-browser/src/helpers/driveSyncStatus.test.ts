@@ -26,10 +26,12 @@ describe('Cloud Server requires evidence for the selected drive', () => {
     expect(hasHostedDriveConnection(false, true, true, 28)).toBe(false);
   });
 
-  it('recognizes an enrolled drive and a colleague with node-confirmed data', () => {
-    expect(hasHostedDriveConnection(true, true, true, undefined)).toBe(true);
-    expect(hasHostedDriveConnection(true, true, false, 28)).toBe(true);
+  it('requires enrollment and a populated remote copy to claim hosting', () => {
+    expect(hasHostedDriveConnection(true, true, true, undefined)).toBe(false);
+    expect(hasHostedDriveConnection(true, true, false, 28)).toBe(false);
     expect(hasHostedDriveConnection(true, false, true, 28)).toBe(false);
+    expect(hasHostedDriveConnection(true, true, null, 28)).toBe(false);
+    expect(hasHostedDriveConnection(true, true, true, 28)).toBe(true);
   });
 
   it('discards usage or enrollment from another drive or server immediately', () => {

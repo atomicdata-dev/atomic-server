@@ -21,6 +21,38 @@ import {
 test.describe('forks', () => {
   test.beforeEach(before);
 
+  test('ordinary resources do not become proposals after refresh', async ({
+    page,
+  }) => {
+    await newResource('folder', page);
+    await editTitle('Ordinary folder', page);
+    const subject = await getCurrentSubject(page);
+    const remoteMembers = await page.evaluate(async targetSubject => {
+      const store = window.store!;
+      const query = new URL('/query', store.getServerUrl());
+      query.searchParams.set(
+        'property',
+        'https://atomicdata.dev/properties/originalSubject',
+      );
+      query.searchParams.set('value', targetSubject);
+      query.searchParams.set('drive', store.getDrive()!);
+      const result = await store.fetchResourceFromServer(query.toString());
+
+      return result.get('https://atomicdata.dev/properties/collection/members');
+    }, subject);
+    expect(remoteMembers).toEqual([]);
+    await page.reload();
+    await expect(editableTitle(page)).toHaveText('Ordinary folder');
+    await expect(
+      page.getByText(/forks? propose(s)? (a change|changes) to this/),
+    ).toBeHidden();
+    await openSubject(page, subject);
+    await expect(editableTitle(page)).toHaveText('Ordinary folder');
+    await expect(
+      page.getByText(/forks? propose(s)? (a change|changes) to this/),
+    ).toBeHidden();
+  });
+
   test('edit as fork, then merge, applies the change to the original', async ({
     page,
   }) => {

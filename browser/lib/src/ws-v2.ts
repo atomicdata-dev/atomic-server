@@ -97,7 +97,8 @@ export const ErrorCode = {
    *  LORO_SYNC_SUBSCRIBE, ...) arrived before AUTH. Connection-level (`requestId`
    *  0); the socket stays open and the frame is simply not processed. */
   AUTH_REQUIRED: 5,
-  /** The server refused a SYNC_PUSH as a whole (no write right on the
+  /** Node policy refused a commit (enrollment/quota), or the server refused
+   *  a SYNC_PUSH as a whole (no write right on the
    *  drive, quota, not enrolled). Nothing from the push landed, and no
    *  SYNC_OK follows for it. The message names the drive. */
   SYNC_REJECTED: 6,

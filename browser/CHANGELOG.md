@@ -5,6 +5,11 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 ## UNRELEASED
 
 - Add peer rooms for up to eight simultaneous browsers on the Sync page with WebRTC collaboration, OPFS reconciliation and attachment sync without a Cloud subscription. Discovery defaults to shared Atomic SaaS signaling, independent of the drive’s data node. Export `BrowserPeerSync`, `WebRtcPeer` and `WebRtcTransport` from `@tomic/lib` ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
+- Portal Open links select their workspace; ordinary resource links keep the current drive.
+- Sync distinguishes remote node data from Cloud Server enrollment, explains drive-specific plans, and refreshes account/recovery status after portal sign-in.
+- Account linking explains its purpose without implying another purchase or workspace transfer.
+
+- Reconcile the selected cloud drive after switching drives or signing in on an open connection, so Sync no longer waits for a page refresh to confirm its status.
 
 ## [v0.41.0-beta.6] - 2026-09-09
 

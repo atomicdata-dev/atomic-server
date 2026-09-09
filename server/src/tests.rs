@@ -539,6 +539,100 @@ fn get_body(resp: ServiceResponse) -> String {
     String::from_utf8(bytes.as_ref().into()).unwrap()
 }
 
+/// Content-addressed image URLs need no resource at `/files/<hash>`.
+#[cfg(feature = "img")]
+#[actix_rt::test]
+async fn content_addressed_image_download() {
+    use clap::Parser;
+    let dir = std::path::PathBuf::from(format!("./.temp/{}", atomic_lib::utils::random_string(10)));
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        dir.join("db").to_str().unwrap(),
+        "--config-dir",
+        dir.join("config").to_str().unwrap(),
+    ]);
+    let mut config = config::build_config(opts).unwrap();
+    config.search_index_path = dir.join("search");
+    config.vector_search_index_path = dir.join("vectors");
+    let appstate = AppState::init(config).await.unwrap();
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+        2,
+        2,
+        image::Rgba([40, 80, 120, 255]),
+    ))
+    .write_to(&mut png, image::ImageFormat::Png)
+    .unwrap();
+    let bytes = png.into_inner();
+    let hash = blake3::hash(&bytes);
+    appstate
+        .store
+        .kv
+        .insert(atomic_lib::db::trees::Tree::Blobs, hash.as_bytes(), &bytes)
+        .unwrap();
+    let app = test::init_service(
+        App::new()
+            .app_data(Data::new(appstate))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+    let path = format!("/download/files/{}", hash.to_hex());
+    let raw = test::call_service(&app, TestRequest::get().uri(&path).to_request()).await;
+    assert_eq!(raw.status(), 200);
+    assert_eq!(test::read_body(raw).await.as_ref(), bytes.as_slice());
+    for (format, expected_format) in [
+        ("webp", image::ImageFormat::WebP),
+        ("avif", image::ImageFormat::Avif),
+    ] {
+        let resized = test::call_service(
+            &app,
+            TestRequest::get()
+                .uri(&format!("{path}?f={format}&w=64&q=60"))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(
+            resized.status(),
+            200,
+            "resizing must use the existing blob, not a nonexistent File URL"
+        );
+        assert_eq!(
+            resized.headers().get("content-type").unwrap(),
+            format!("image/{format}").as_str()
+        );
+        assert_eq!(
+            resized.headers().get("x-content-type-options").unwrap(),
+            "nosniff"
+        );
+        assert!(resized
+            .headers()
+            .get("content-disposition")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("attachment"));
+        let rendered = test::read_body(resized).await;
+        assert_eq!(image::guess_format(&rendered).unwrap(), expected_format);
+    }
+    let missing = "0".repeat(64);
+    for suffix in ["", "?f=webp&w=64&q=60"] {
+        let response = test::call_service(
+            &app,
+            TestRequest::get()
+                .uri(&format!("/download/files/{missing}{suffix}"))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            404,
+            "missing blobs must not become HTTP 500"
+        );
+    }
+}
+
 #[actix_rt::test]
 async fn upload_download_test() {
     let unique_string = atomic_lib::utils::random_string(10);

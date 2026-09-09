@@ -135,7 +135,9 @@ export async function fetchManagedInfo(
     // this device holds a token for a different one.
     const portalUrl =
       safePortalUrl(
-        rawPortalUrl && onLocalhost ? 'http://localhost:49237' : rawPortalUrl,
+        rawPortalUrl && onLocalhost
+          ? (managedPortalOverride() ?? 'http://localhost:49237')
+          : rawPortalUrl,
       ) ?? null;
 
     // The desktop app learns where the control plane lives ONLY from here —

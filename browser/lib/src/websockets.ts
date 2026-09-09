@@ -341,6 +341,7 @@ export class WSClient {
     this._driveUnsub = store.on(StoreEvents.DriveChanged, () => {
       this._pendingSyncState.clear();
       this.subscribeToDrive();
+      void this.reconcileSubscribedDrive();
     });
 
     const wsURL = new URL(url);
@@ -589,6 +590,8 @@ export class WSClient {
 
         // Refetch resources that had 401 errors
         if (fetchAll) {
+          await this.reconcileSubscribedDrive();
+
           for (const resource of this.store.resources.values()) {
             if (resource.isUnauthorized()) {
               this.fetch(resource.subject).catch(() => {});
@@ -1338,6 +1341,26 @@ export class WSClient {
       this.sendBinary(encodeSub(drive));
       this._subscribedDrive = drive;
     }
+  }
+
+  /** A SUB only enables future updates; it does not reconcile existing data.
+   * Drive selection and sign-in can happen on an already-open socket, without
+   * running handleOpen's initial sync. Reconcile only a drive we could subscribe
+   * under the current identity; never upload local-only or inaccessible drives. */
+  private async reconcileSubscribedDrive(): Promise<void> {
+    const drive = this.store.getDrive();
+    if (
+      this._closed ||
+      this.readyState !== WebSocket.OPEN ||
+      !drive ||
+      this._subscribedDrive !== drive ||
+      !this.store.isLiveSyncedDrive(drive) ||
+      (this.store.getAgent()?.subject &&
+        this.authenticatedWith !== this.store.getAgent()?.subject)
+    )
+      return;
+
+    await this.startVVSync(drive);
   }
 
   /** Agent profiles are public resources outside the reader's active drive. */
