@@ -53,7 +53,5 @@ async fn demo_pets_are_proposed_in_the_real_sandbox() {
         )
         .await
         .unwrap();
-    assert!(result
-        .unwrap_err()
-        .contains("Configure the connection"));
+    assert!(result.unwrap_err().contains("Configure the connection"));
 }
