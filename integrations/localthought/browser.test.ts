@@ -124,3 +124,37 @@ it('calls the browser fetch function without binding it to the client', async ()
   const client = new BrowserIntegrations(storage, async () => engine, origin);
   expect(await client.catalog()).toEqual(['pets']);
 });
+
+it('supports the demo callback and write credentials without using the import engine', async () => {
+  const { client, http, values } = setup();
+  const { state } = await client.start(
+    'drive',
+    'actor',
+    'pets',
+    'https://atomic.example/app/devonian-demo',
+    secret,
+  );
+  client.finish('drive', 'actor', state, 'first');
+  http.mockImplementation(async (_url, init) => {
+    expect(JSON.parse([...values.values()][0]).code).toBeUndefined();
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe('{"title":"new"}');
+    return new Response('{"id":1}', {
+      status: 201,
+      headers: { 'X-Connection-Code': 'next' },
+    });
+  });
+  await expect(
+    client.request('drive', 'actor', state, 'github-issues', '/issues'),
+  ).rejects.toThrow('another platform');
+  await expect(
+    client.request('drive', 'actor', state, 'pets', '//evil.example'),
+  ).rejects.toThrow('Invalid proxy path');
+  expect(
+    await client.request('drive', 'actor', state, 'pets', '/issues', {
+      method: 'POST',
+      body: '{"title":"new"}',
+    }),
+  ).toEqual({ status: 201, body: '{"id":1}' });
+  expect(JSON.parse([...values.values()][0]).code).toBe('next');
+});

@@ -3,6 +3,7 @@ import { preview, project, manifest, type Issue } from './adapter.js';
 import { validateManifest } from '../../browser/lib/src/plugin-manifest.js';
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 const issue = (number: number): Issue => ({
   number,
   title: `Issue ${number}`,
@@ -18,7 +19,9 @@ describe('GitHub package', () => {
   });
   it('ships exactly the artifact tested by the sandbox', async () => {
     const built = execFileSync(
-      './browser/node_modules/.bin/esbuild',
+      existsSync('./browser/node_modules/.bin/esbuild')
+        ? './browser/node_modules/.bin/esbuild'
+        : './browser/node_modules/.pnpm/node_modules/.bin/esbuild',
       [
         'integrations/github-issues/plugin.ts',
         '--bundle',

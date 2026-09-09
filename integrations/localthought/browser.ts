@@ -142,7 +142,9 @@ export class BrowserIntegrations {
     const callback = new URL(returnUrl);
     if (
       callback.origin !== location.origin ||
-      callback.pathname !== '/app/integrations' ||
+      !['/app/integrations', '/app/devonian-demo'].includes(
+        callback.pathname,
+      ) ||
       callback.search ||
       callback.hash
     )
@@ -196,6 +198,72 @@ export class BrowserIntegrations {
     );
     return { connection: state, platform: c.platform };
   }
+  /** Shared rotating-code transport for browser-owned writes as well as reads. */
+  async request(
+    drive: string,
+    actor: string,
+    id: string,
+    platform: string,
+    path: string,
+    init: { method?: string; body?: string } = {},
+  ): Promise<{ status: number; body: string }> {
+    if (!navigator.locks)
+      throw new Error('This browser needs Web Locks for integrations');
+    if (!path.startsWith('/') || path.startsWith('//') || /[\\\\#]/.test(path))
+      throw new Error('Invalid proxy path');
+    const destination = new URL(`/proxy/${platform}${path}`, this.origin);
+    if (!destination.pathname.startsWith(`/proxy/${platform}/`))
+      throw new Error('Invalid proxy path');
+    return navigator.locks.request(key + id, async () => {
+      const c = this.connection(id, drive, actor);
+      if (c.platform !== platform)
+        throw new Error('Connection belongs to another platform');
+      const response = await this.send(
+        id,
+        drive,
+        actor,
+        path,
+        init,
+        AbortSignal.timeout(30000),
+      );
+      return { status: response.status, body: await limitedText(response) };
+    });
+  }
+  private async send(
+    id: string,
+    drive: string,
+    actor: string,
+    path: string,
+    init: { method?: string; body?: string },
+    signal: AbortSignal,
+  ) {
+    const current = this.connection(id, drive, actor);
+    if (!current.ready || !current.code)
+      throw new Error('Reconnect before retrying an uncertain request');
+    const code = current.code;
+    delete current.code;
+    this.storage.setItem(key + id, JSON.stringify(current));
+    const response = await this.http(
+      `${this.origin}/proxy/${current.platform}${path}`,
+      {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${code}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',
+        redirect: 'error',
+        signal,
+      },
+    );
+    const next = response.headers.get('x-connection-code');
+    if (!next)
+      throw new Error(
+        'Proxy did not expose a rotated code; reconnect and check CORS',
+      );
+    this.storage.setItem(key + id, JSON.stringify({ ...current, code: next }));
+    return response;
+  }
   async fetchRecords(
     drive: string,
     actor: string,
@@ -227,32 +295,14 @@ export class BrowserIntegrations {
           throw new Error('Pagination left the catalog API origin');
         if (++requests > 200)
           throw new Error('Import exceeds 200 requests; narrow its scope');
-        const current = this.connection(id, drive, actor);
-        if (!current.code)
-          throw new Error('Reconnect before retrying an uncertain request');
-        const code = current.code;
-        delete current.code;
-        // Consume durably BEFORE dispatch; a lost response must never replay a code.
-        this.storage.setItem(key + id, JSON.stringify(current));
-        const response = await this.http(
-          `${this.origin}/proxy/${c.platform}${target.pathname}${target.search}`,
-          {
-            headers: { Authorization: `Bearer ${code}` },
-            credentials: 'omit',
-            redirect: 'error',
-            signal,
-          },
+        const response = await this.send(
+          id,
+          drive,
+          actor,
+          `${target.pathname}${target.search}`,
+          {},
+          signal,
         );
-        const next = response.headers.get('x-connection-code');
-        if (next)
-          this.storage.setItem(
-            key + id,
-            JSON.stringify({ ...current, code: next }),
-          );
-        else
-          throw new Error(
-            'Proxy did not expose a rotated code; reconnect and check CORS',
-          );
         const headers = Object.fromEntries(
           [...response.headers].filter(
             ([name]) => name !== 'x-connection-code',
