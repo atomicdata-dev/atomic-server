@@ -31,6 +31,8 @@ the parts that make a provider real:
 - registration as a bundled integration (`IntegrationDiscovery.tsx`)
 - an installable connection resource + table + view (`ConnectPets.tsx`)
 - a server-side sandbox test (`server/src/plugins/pets_tests.rs`)
+- [x] a browser flow that installs, reviews, applies and displays all five pets
+  (`browser/e2e/tests/plugins.spec.ts`)
 - certification metadata (`package.json` `atomicCertification`)
 
 ## Next: discovery through the localthought proxy

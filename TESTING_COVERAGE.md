@@ -60,6 +60,9 @@ It edits JavaScript, saves and reviews a real proposed effect, enables execution
 returns to review mode and checks history. The trigger HTTP response regression
 `response_filters_round_trip_into_updates` ensures GET filter values can be sent
 back to POST; tagged database values previously broke the enable button.
+The Pets flow verifies the bundled card's title and setup label, installs its
+connection, approves its five proposed creates, and finds Rex, Whiskers, Tweety,
+Nibbles and Bubbles in the resulting table.
 The GitHub setup flow also covers opting into assistant-led automation creation:
 request and integration context survive a model-setup handoff, and source editing
 stays collapsed. A unit test checks draft/context binding. The advanced path still

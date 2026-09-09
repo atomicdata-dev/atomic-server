@@ -21,6 +21,42 @@ import {
 test.describe('plugins', () => {
   test.beforeEach(before);
 
+  test('Pets installs its demo table after the reviewed import is applied', async ({
+    page,
+  }) => {
+    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+
+    const pets = page.locator('[data-integration=pets]');
+    await expect(
+      pets.getByRole('heading', { name: 'Pets', exact: true }),
+    ).toBeVisible();
+    await pets.getByRole('button', { name: 'Set up connection' }).click();
+
+    const setup = page.locator('dialog[open]');
+    await expect(
+      setup.getByRole('button', { name: 'Install demo pets', exact: true }),
+    ).toBeVisible();
+    await setup
+      .getByRole('button', { name: 'Install demo pets', exact: true })
+      .click();
+
+    const review = page.locator('dialog[open]');
+    await expect(
+      review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
+    ).toBeEnabled();
+    await review
+      .getByRole('button', { name: 'Apply 5 changes', exact: true })
+      .click();
+
+    await page.getByRole('link', { name: 'Open Pets', exact: true }).click();
+    const main = page.getByRole('main');
+    await expect(
+      main.getByRole('heading', { name: 'Pets', exact: true }),
+    ).toBeVisible();
+    for (const name of ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'])
+      await expect(main.getByText(name, { exact: true })).toBeVisible();
+  });
+
   test('a published release is discoverable and creates an independent draft', async ({
     page,
   }) => {
