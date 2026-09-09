@@ -36,9 +36,18 @@ test.describe('plugins', () => {
     await expect(
       setup.getByRole('button', { name: 'Install demo pets', exact: true }),
     ).toBeVisible();
-    await setup
-      .getByRole('button', { name: 'Install demo pets', exact: true })
-      .click();
+    const [preview] = await Promise.all([
+      page.waitForResponse(
+        response =>
+          response.url().endsWith('/plugin-run') &&
+          response.request().method() === 'POST',
+        { timeout: 45_000 },
+      ),
+      setup
+        .getByRole('button', { name: 'Install demo pets', exact: true })
+        .click(),
+    ]);
+    expect(preview.ok(), await preview.text()).toBe(true);
 
     const review = page.locator('dialog[open]');
     // Installing walks pluginClassesFor, two ensureSchema calls, three

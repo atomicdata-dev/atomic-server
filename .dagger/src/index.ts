@@ -1265,12 +1265,9 @@ export class AtomicServer {
     // `rustTest()` already installs this target for the same reason —
     // same fix, applied where the e2e server binary is actually built.
     const containerReadyToBuild = wasmPluginsEnabled
-      ? containerWithAssets.withExec([
-          'rustup',
-          'target',
-          'add',
-          'wasm32-wasip2',
-        ])
+      ? containerWithAssets
+          .withExec(['rustup', 'target', 'add', 'wasm32-wasip2'])
+          .withEnvVariable('ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME', 'true')
       : containerWithAssets;
 
     return (
@@ -1388,6 +1385,7 @@ export class AtomicServer {
     return (
       this.rustChecksContainer()
         .withExec(['rustup', 'target', 'add', 'wasm32-wasip2'])
+        .withEnvVariable('ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME', 'true')
         // Persist nextest in the shared cargo-bin volume. Previously the
         // curl install sat *after* the source mount, so every Rust source
         // change re-downloaded it. The `linux-musl` URL is required: the
