@@ -5629,6 +5629,7 @@ msgid "Use a recovery code instead"
 msgstr ""
 
 #: src/components/AccountRecoveryCard.tsx
+#: src/components/AccountRecoveryCard.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Atomic account"
 msgstr ""
@@ -6979,6 +6980,7 @@ msgstr ""
 msgid "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 msgstr ""
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Add a recovery code"
 msgstr ""
@@ -7587,3 +7589,43 @@ msgstr ""
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Connect local Ollama"
 msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not add a passkey."
+msgstr "No se pudo añadir una clave de acceso."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+msgstr "Introduce tu código de recuperación para mostrar tu secreto o añadir una clave de acceso en este dispositivo. Tu código de recuperación actual seguirá funcionando."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Passkey added. Your recovery code still works."
+msgstr "Clave de acceso añadida. Tu código de recuperación sigue funcionando."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Add a passkey"
+msgstr "Añadir una clave de acceso"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a passkey"
+msgstr "Iniciar sesión para añadir una clave de acceso"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use recovery code"
+msgstr "Usar código de recuperación"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a recovery code"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not unlock with a passkey. Use your recovery code instead."
+msgstr "No se pudo desbloquear con una clave de acceso. Usa tu código de recuperación."

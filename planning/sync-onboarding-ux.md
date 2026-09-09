@@ -190,3 +190,7 @@ version 1 and persists account, agent and server timestamp on the enrollment.
 Existing records retain unknown consent; no consent is inferred from a drive
 being present. Browser switcher rows carry compact service state labels, with
 one Storage and hosting action for details. Unknown cloud status stays explicit.
+
+### Account recovery after code sign-in
+
+The browser/Tauri Account recovery card offers recovery-code unlock independently of passkeys, including after a WebAuthn failure. A portal session plus the existing recovery code can add a passkey without replacing the code or older passkeys. Each passkey uses its own PRF salt. Flutter has no corresponding envelope-management card yet.
