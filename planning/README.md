@@ -35,6 +35,7 @@ Remaining work, not "this file exists."
 
 | Document | Status |
 | --- | --- |
+| [`vault-reliability.md`](./vault-reliability.md) | **Active.** Restore batching, durability and key-epoch regressions; fresh-device attachment/history, bounded memory, retention and operational acceptance remain. |
 | [`sentry-feedback-readiness.md`](./sentry-feedback-readiness.md) | **Active.** Sidebar feedback and React error capture implemented and locally verified against Sentry. Staging rollout, email receipt and private source-map upload remain release gates. |
 | [`unified-sync.md`](./unified-sync.md) | **Active.** One sync API over WS or Iroh. Carries the single **Remaining work (2026-09-03)** checklist for every open sync item across these plans. The 2026-07 audit history is in [`completed/unified-sync-audit-2026-07.md`](./completed/unified-sync-audit-2026-07.md). |
 | [`serverless-p2p.md`](./serverless-p2p.md) | **Planned.** Device sync without a hub (written same-agent-first; admission is rights-based since 2026-07-17). AUTH-before-SYNC and the `AUTH.requestedSubject`↔drive binding landed 2026-09-01 (Iroh). Live-link destroys travel as signed `COMMIT` frames since 2026-09-03. P0 remaining: require envelopes on every `remove[]` once `Tree::Envelopes` exists. `AtomicTransport` / `SyncSession::serve` first slice landed 2026-09-05; outbox port and the remaining `sync_drive_with_peer*` collapse are open. |

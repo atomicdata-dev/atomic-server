@@ -492,6 +492,7 @@ export async function restoreFromVault(
       drivePseudonym: enrollment.drive_pseudonym,
       devicePubkey: lane,
       driveKey,
+      keyEpoch,
     });
 
     // The device now holds the drive and the key; later edits here should go

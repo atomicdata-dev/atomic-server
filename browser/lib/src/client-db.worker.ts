@@ -417,9 +417,10 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
       try {
         db!.flush();
       } catch (e) {
-        // Fall back to the tick rather than failing a restore that did land.
+        // Retry in the background, but do not acknowledge durability: the
+        // caller may reload immediately after a successful response.
         dirty = true;
-        console.error('[ClientDb] flush after vault import failed:', e);
+        throw e;
       }
 
       return summary;

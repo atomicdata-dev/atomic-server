@@ -619,3 +619,22 @@ setup currently fails opening OPFS before it can create its dev drive.
 Staging triage verified that the two reported hashes still returned HTTP 200
 without resize parameters. Deployment acceptance must recheck their resized
 URLs and confirm the rejected-write rate falls after clients update.
+
+
+### Vault reliability branch (2026-09-09)
+
+| Layer | Scenario | Test |
+| --- | --- | --- |
+| Worker glue | Restore flush failure returns error; next flush retries; import failure never acknowledges success | `browser/lib/src/client-db.worker.vault.test.ts` |
+| HTTP glue | 64/65/130-object restores use batches of at most 64; URLs requested just before each batch; listing order and total progress preserved | `vault.test.ts` |
+| HTTP glue | Failed object download does not import a partial list | `vault.test.ts` |
+| Import glue | Unreadable-object count raises incomplete restore instead of success navigation | `vault.test.ts` |
+| Recovery glue | Restored drive key epoch is passed to import rather than defaulting to epoch one | `vaultAutoBackup.test.ts` |
+
+These are controlled adapter tests, not proof of deployed bucket durability,
+attachment byte recovery, real OPFS exhaustion, or a whole-service disaster
+restore. The active gaps and paired SaaS work are in
+[`planning/vault-reliability.md`](planning/vault-reliability.md). In particular,
+network batching still accumulates all ciphertext before import; bounded-memory
+restore remains unimplemented. Browser historical-version coverage and attachment
+bytes must be validated with Cloud Server unreachable.

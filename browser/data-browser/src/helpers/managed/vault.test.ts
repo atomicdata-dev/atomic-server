@@ -742,6 +742,155 @@ describe('restoreDrive', () => {
   });
 });
 
+describe('restore download batches', () => {
+  for (const count of [64, 65, 130]) {
+    it(`restores ${count} objects within the control-plane limit`, async () => {
+      const objects = Array.from({ length: count }, (_, i) => ({
+        object_id: String(i),
+        object_key: `pack-${i}`,
+      }));
+      const order: string[] = [];
+      const batches: string[][] = [];
+      const db: VaultCapableDb = {
+        vaultExport: vi.fn(),
+        vaultCommitSegment: vi.fn(),
+        vaultImport: vi.fn(async () => ({
+          packsRead: count,
+          resourcesRestored: count,
+          tombstonesApplied: 0,
+          objectsSkipped: 0,
+          objectsUnreadable: 0,
+        })),
+      };
+      mockFetch((url, init) => {
+        if (url.endsWith('/objects'))
+          return new Response(JSON.stringify(objects));
+
+        if (url.endsWith('/download-urls')) {
+          const ids = JSON.parse(String(init?.body)).object_ids as string[];
+          batches.push(ids);
+          order.push('sign');
+          if (ids.length > 64)
+            return new Response(
+              JSON.stringify({
+                error: 'at most 64 objects per download-urls request',
+              }),
+              { status: 400 },
+            );
+
+          return new Response(
+            JSON.stringify({
+              downloads: ids
+                .toReversed()
+                .map(id => ({
+                  object_id: id,
+                  object_key: `pack-${id}`,
+                  url: `https://s3.test/${id}`,
+                })),
+            }),
+          );
+        }
+
+        order.push('download');
+
+        return new Response(new Uint8Array([1]));
+      });
+      const progress = vi.fn();
+      await restoreDrive({
+        db,
+        drivePseudonym: PSEUDONYM,
+        devicePubkey: DEVICE,
+        driveKey: KEY,
+        onProgress: progress,
+      });
+      expect(batches.flat()).toEqual(objects.map(o => o.object_id));
+      expect(batches.every(batch => batch.length <= 64)).toBe(true);
+      if (count > 64) expect(order[65]).toBe('sign'); // Finish the first batch before obtaining more expiring URLs.
+      expect(db.vaultImport).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(db.vaultImport).mock.calls[0][4].map(o => o.objectKey),
+      ).toEqual(objects.map(o => o.object_key));
+      expect(progress).toHaveBeenLastCalledWith(count, count);
+    });
+  }
+
+  it('does not import a partial download after storage fails', async () => {
+    const db: VaultCapableDb = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn(),
+    };
+    mockFetch(url => {
+      if (url.endsWith('/objects'))
+        return new Response(
+          JSON.stringify([
+            { object_id: '1', object_key: 'k1' },
+            { object_id: '2', object_key: 'k2' },
+          ]),
+        );
+      if (url.endsWith('/download-urls'))
+        return new Response(
+          JSON.stringify({
+            downloads: [
+              { object_key: 'k1', url: 'https://s3.test/1' },
+              { object_key: 'k2', url: 'https://s3.test/2' },
+            ],
+          }),
+        );
+
+      return url.endsWith('/1')
+        ? new Response(new Uint8Array([1]))
+        : new Response(null, { status: 503 });
+    });
+    await expect(
+      restoreDrive({
+        db,
+        drivePseudonym: PSEUDONYM,
+        devicePubkey: DEVICE,
+        driveKey: KEY,
+      }),
+    ).rejects.toThrow('503');
+    expect(db.vaultImport).not.toHaveBeenCalled();
+  });
+});
+
+it('reports partial recovery as incomplete instead of a clean restore', async () => {
+  const db: VaultCapableDb = {
+    vaultExport: vi.fn(),
+    vaultCommitSegment: vi.fn(),
+    vaultImport: vi.fn(async () => ({
+      packsRead: 1,
+      resourcesRestored: 3,
+      tombstonesApplied: 0,
+      objectsSkipped: 0,
+      objectsUnreadable: 1,
+    })),
+  };
+  mockFetch(url => {
+    if (url.endsWith('/objects'))
+      return new Response(
+        JSON.stringify([{ object_id: '1', object_key: 'k1' }]),
+      );
+    if (url.endsWith('/download-urls'))
+      return new Response(
+        JSON.stringify({
+          downloads: [{ object_key: 'k1', url: 'https://s3.test/1' }],
+        }),
+      );
+
+    return new Response(new Uint8Array([1]));
+  });
+  await expect(
+    restoreDrive({
+      db,
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+    }),
+  ).rejects.toThrow(/incomplete/);
+  expect(db.vaultImport).toHaveBeenCalledTimes(1);
+});
+
 describe('key management', () => {
   /** A stand-in for the WASM key ops: wrapping is reversible and keyed. */
   function fakeKeys(): VaultKeyOps {
