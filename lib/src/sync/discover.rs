@@ -27,7 +27,10 @@ pub async fn inspect_workspace(
             .map_err(|e| e.to_string())?;
         let result = async {
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
-            let auth = protocol::encode_auth(&store.get_default_agent()?, drive)?;
+            let auth = protocol::encode_auth(
+                &store.get_default_agent()?,
+                &peer::auth_subject_for(drive, &remote.to_string()),
+            )?;
             send.write_u32(auth.len() as u32)
                 .await
                 .map_err(|e| e.to_string())?;

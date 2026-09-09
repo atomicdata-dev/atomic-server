@@ -1543,15 +1543,6 @@ pub async fn import_sync_push(
             }
         };
 
-        let snapshot = doc.export_snapshot();
-        if store
-            .kv
-            .insert(Tree::LoroSnapshots, snapshot_key.as_bytes(), &snapshot)
-            .is_err()
-        {
-            continue;
-        }
-
         // No `get_resource` — `apply_state_doc` rebuilds propvals from the
         // merged doc, so the read would be discarded. Sync builds directly.
         let subject = crate::Subject::from_raw(&snapshot_key, store.get_base_domain().as_deref());
@@ -1591,6 +1582,9 @@ pub async fn import_sync_push(
             }
         }
 
+        // Only persist after every scope check succeeds. In particular, a
+        // rejected new subject must not leave a snapshot that a later valid
+        // import would merge. add_resource_opts stores the validated state.
         // Log what properties arrived
         let has_strokes = resource
             .get("https://atomicdata.dev/ontology/canvas/strokeData")
@@ -1602,7 +1596,13 @@ pub async fn import_sync_push(
             has_strokes,
         );
 
-        let _ = store.add_resource_opts(&resource, false, true, true).await;
+        if store
+            .add_resource_opts(&resource, false, true, true)
+            .await
+            .is_err()
+        {
+            continue;
+        }
         count += 1;
 
         // Check for missing blobs
@@ -1749,6 +1749,64 @@ mod bootstrap_and_sub_tests {
     fn empty_push(drive: &str) -> protocol::DecodedSyncPush {
         let frame = protocol::encode_sync_push(drive, &[], true);
         protocol::decode_sync_push(&frame[1..]).unwrap()
+    }
+
+    #[tokio::test]
+    async fn rejected_sync_entry_does_not_persist_snapshot() {
+        let db = Db::init_temp("rejected_sync_snapshot").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = "did:ad:unseen-victim-resource";
+        let doc = AtomicLoroDoc::new();
+        doc.set_property(
+            crate::urls::DRIVE_PROP,
+            &crate::Value::AtomicUrl("did:ad:other-drive".into()),
+        )
+        .unwrap();
+        doc.set_property(
+            crate::urls::NAME,
+            &crate::Value::String("Rejected data".into()),
+        )
+        .unwrap();
+        let frame = protocol::encode_sync_push(&drive, &[(subject, &doc.export_snapshot())], true);
+        let push = protocol::decode_sync_push(&frame[1..]).unwrap();
+        let (count, _) = import_sync_push(&push, &db, &ForAgent::from(alice.clone()), false)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+        assert!(
+            db.kv
+                .get(Tree::LoroSnapshots, subject.as_bytes())
+                .unwrap()
+                .is_none(),
+            "rejected data must not seed a later legitimate merge"
+        );
+        assert!(db.get_resource(&subject.into()).await.is_err());
+
+        // A subsequent valid import of the same subject must start clean.
+        let valid = AtomicLoroDoc::new();
+        valid
+            .set_property(
+                crate::urls::DRIVE_PROP,
+                &crate::Value::AtomicUrl(drive.clone().into()),
+            )
+            .unwrap();
+        let frame =
+            protocol::encode_sync_push(&drive, &[(subject, &valid.export_snapshot())], true);
+        let push = protocol::decode_sync_push(&frame[1..]).unwrap();
+        let (count, _) = import_sync_push(&push, &db, &ForAgent::from(alice), false)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        let stored = db.get_resource(&subject.into()).await.unwrap();
+        assert!(
+            stored.get(crate::urls::NAME).is_err(),
+            "rejected properties must not reappear"
+        );
+        assert!(db
+            .kv
+            .get(Tree::LoroSnapshots, subject.as_bytes())
+            .unwrap()
+            .is_some());
     }
 
     #[tokio::test]
