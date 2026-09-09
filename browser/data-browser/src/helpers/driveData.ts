@@ -56,7 +56,14 @@ export async function deviceHasDriveData(
 ): Promise<boolean> {
   try {
     if (options?.refresh) {
-      await store.fetchResourceFromServer(drive);
+      if (
+        isOriginWithoutNode(store.getServerUrl()) ||
+        store.isLocalOnlyDrive(drive)
+      ) {
+        await store.reloadResource(drive);
+      } else {
+        await store.fetchResourceFromServer(drive);
+      }
 
       return !store.getResourceLoading(drive).error;
     }

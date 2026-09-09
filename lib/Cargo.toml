@@ -10,6 +10,7 @@ version = "0.41.0-beta.6"
 
 
 [dependencies]
+web-time = "1"
 # Argon2id KDF for envelope-v2 recovery wrappers (planning/BACKUP_SECURITY.md
 # in atomic-saas) — deriving a KEK from a recovery code/password. Pure Rust,
 # no OS RNG dependency in the low-level `hash_password_into` API used here,

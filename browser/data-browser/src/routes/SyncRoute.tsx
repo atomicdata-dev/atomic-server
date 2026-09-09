@@ -7,6 +7,7 @@ import {
   type ScopedDriveValue,
   type NodeStatus,
 } from '../helpers/driveSyncStatus';
+import { BrowserPeerPanel } from '../components/BrowserPeerPanel';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import { DiscoverWorkspace } from '../views/getting-started/DiscoverWorkspace';
 import {
@@ -1459,6 +1460,7 @@ function SyncPage() {
       <ContainerNarrow>
         <h1>Sync</h1>
         <Lead>{summaryLine()}</Lead>
+        <BrowserPeerPanel drive={status.drive ?? undefined} />
 
         {/* Everything our paid services own, in one card.
 

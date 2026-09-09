@@ -4730,6 +4730,7 @@ msgstr ""
 msgid "Could not copy — select and copy the code manually."
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/ConnectServerDialog.tsx
 #: src/components/ConnectToDeviceForm.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
@@ -6656,6 +6657,7 @@ msgstr ""
 msgid "Cloud Vault is not available here: {0}."
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
 msgstr ""
@@ -6664,6 +6666,7 @@ msgstr ""
 msgid "Reconnect"
 msgstr ""
 
+#: src/helpers/browserPeerSync.ts
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
 msgstr ""
@@ -7391,6 +7394,7 @@ msgstr ""
 msgid "Private"
 msgstr ""
 
+#: src/components/BrowserPeerPanel.tsx
 #: src/components/Share/ShareDialog.tsx
 msgid "Copy link"
 msgstr "Copiar enlace"
@@ -7763,6 +7767,26 @@ msgstr ""
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "No se pudo desbloquear con una clave de acceso. Usa tu código de recuperación."
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Peer sync"
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Create peer link"
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Peer link"
+msgstr ""
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect existing account"

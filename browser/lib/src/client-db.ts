@@ -668,6 +668,46 @@ export class ClientDbWorker {
     await this.send({ type: 'putResources', jsonAds });
   }
 
+  async createPeerSession(
+    drive: string,
+    expectedPeer: string | undefined,
+    challenge: string,
+  ): Promise<number> {
+    return this.send({
+      type: 'createPeerSession',
+      drive,
+      expectedPeer,
+      challenge,
+    }) as Promise<number>;
+  }
+
+  async handlePeerFrame(
+    session: number,
+    frame: Uint8Array,
+  ): Promise<{ frames: number[][]; changed: string[]; ephemeral?: number[] }> {
+    return this.send({ type: 'handlePeerFrame', session, frame }) as Promise<{
+      frames: number[][];
+      changed: string[];
+      ephemeral?: number[];
+    }>;
+  }
+
+  async canSendPeerFrame(session: number, subject: string): Promise<boolean> {
+    return this.send({
+      type: 'canSendPeerFrame',
+      session,
+      subject,
+    }) as Promise<boolean>;
+  }
+
+  async closePeerSession(session: number): Promise<void> {
+    await this.send({ type: 'closePeerSession', session });
+  }
+
+  async applyPeerCommit(commitJsonAd: string): Promise<void> {
+    await this.send({ type: 'applyPeerCommit', commitJsonAd });
+  }
+
   async applyCommit(commitJsonAd: string): Promise<void> {
     await this.send({ type: 'applyCommit', commitJsonAd });
   }

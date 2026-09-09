@@ -97,7 +97,11 @@ const codeInput = (page: Page) =>
 
 async function pasteCode(page: Page, code: string) {
   await codeInput(page).fill(code);
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await page
+    .locator('form')
+    .filter({ has: codeInput(page) })
+    .getByRole('button', { name: 'Connect', exact: true })
+    .click();
 }
 
 test.describe('pairing by pasting a code', () => {
@@ -114,7 +118,10 @@ test.describe('pairing by pasting a code', () => {
     await gotoSync(page);
     await expect(codeInput(page)).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Connect', exact: true }),
+      page
+        .locator('form')
+        .filter({ has: codeInput(page) })
+        .getByRole('button', { name: 'Connect', exact: true }),
     ).toBeVisible();
   });
 

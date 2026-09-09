@@ -13,6 +13,34 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## Browser WebRTC transport (issue #1396)
+
+`browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,
+backpressure and cancellation, bounded queues, caller buffer ownership, malformed
+input and close behavior. `browser/e2e/scripts/verify-webrtc.mjs` establishes real
+WebRTC channels between isolated browser contexts in Chromium and Firefox and
+checks bidirectional 1 MiB transfers and disconnects without an AtomicServer.
+The harness is loaded through Playwright routing; ICE and data transfer are real.
+`lib/src/sync/browser_peer.rs` tests authentication, replay, drive isolation,
+unauthorized snapshot writes, forged commits and outgoing permission revocation.
+`browser/e2e/scripts/verify-peer-sync.mjs` uses distinct agents, real signaling,
+WebRTC and OPFS with HTTP data access disabled: initial sync, concurrent edits,
+presence, attachments, offline reconciliation, reload and signed deletion.
+`browser-peer-sync.test.ts` covers parallel negotiation, isolated retries,
+departure, membership checks and the per-browser connection bound.
+`verify-peer-mesh.mjs` uses eight distinct Chromium agents: full mesh, ninth-member
+rejection, concurrent creations, group presence, attachment replication, creator
+departure, offline reconciliation and signed deletion. Rust regressions cover
+late snapshots after deletion and concurrent blob replies across independent edges.
+`browserPeerSync.test.ts` checks that another member can mint an invitation for
+the existing room without restarting its connection.
+`verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
+These scripts require built WASM and `ATOMIC_PEER_SIGNALING_URL` pointing to the
+SaaS signaling handler; neither starts an AtomicServer data process. The UI script requires
+a running app at its configured test URL. They are not wired into CI yet.
+Still uncovered: two physical devices, forced TURN, full Firefox drive sync,
+public deployment, and interactive rich-text editor/cursor acceptance.
+
 ## How to read this
 
 Coverage is split by *layer*, because the same flow can be well covered in one

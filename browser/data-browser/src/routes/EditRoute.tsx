@@ -47,7 +47,7 @@ function Edit(): JSX.Element {
 
   useEffect(
     () => () => {
-      resource.refresh();
+      if (resource.hasUnsavedChanges()) void resource.refresh();
     },
     [],
   );

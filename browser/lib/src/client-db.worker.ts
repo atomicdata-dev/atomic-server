@@ -16,6 +16,16 @@ let initPromise: Promise<ClientDbInitTimings> | null = null;
 
 /** Message types sent from main thread to worker */
 export type WorkerRequest =
+  | { id: number; type: 'canSendPeerFrame'; session: number; subject: string }
+  | {
+      id: number;
+      type: 'createPeerSession';
+      drive: string;
+      expectedPeer?: string;
+      challenge: string;
+    }
+  | { id: number; type: 'handlePeerFrame'; session: number; frame: Uint8Array }
+  | { id: number; type: 'closePeerSession'; session: number }
   | {
       id: number;
       type: 'init';
@@ -41,6 +51,7 @@ export type WorkerRequest =
       snapshot?: Uint8Array;
     }
   | { id: number; type: 'applyCommit'; commitJsonAd: string }
+  | { id: number; type: 'applyPeerCommit'; commitJsonAd: string }
   | { id: number; type: 'removeResource'; subject: string }
   | {
       id: number;
@@ -121,6 +132,23 @@ export type WorkerResponse =
 
 async function handleMessage(msg: WorkerRequest): Promise<unknown> {
   switch (msg.type) {
+    case 'canSendPeerFrame':
+      await ensureInit();
+
+      return db!.canSendPeerFrame(msg.session, msg.subject);
+    case 'createPeerSession':
+      await ensureInit();
+
+      return db!.createPeerSession(msg.drive, msg.expectedPeer, msg.challenge);
+    case 'handlePeerFrame':
+      await ensureInit();
+
+      return db!.handlePeerFrame(msg.session, msg.frame);
+    case 'closePeerSession':
+      await ensureInit();
+
+      return db!.closePeerSession(msg.session);
+
     case 'init': {
       // Return the per-phase init timings so the main thread can fold the
       // worker-side WASM/OPFS boot into its perf trace.
@@ -220,6 +248,11 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
 
       return;
     }
+
+    case 'applyPeerCommit':
+      await ensureInit();
+
+      return db!.applyPeerCommit(msg.commitJsonAd);
 
     case 'applyCommit': {
       await ensureInit();

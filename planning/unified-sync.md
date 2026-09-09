@@ -74,6 +74,46 @@ is the shape around that call — see [Outbox modernization](#outbox-modernizati
 
 ## Remaining work (2026-09-04)
 
+### Browser-to-browser transport (#1396, assessed 2026-09-09)
+
+**Status: application integration implemented on `codex/browser-webrtc-sync`.**
+Issue: https://github.com/ontola/atomic-server/issues/1396.
+
+The product requirement is sync and collaboration without a Cloud subscription.
+The Sync page creates an eight-browser room invitation. The subscription-independent Atomic SaaS signaling
+endpoint introduces peers; WebRTC carries drive data directly or through optional
+TURN. Operator setup and product limits are in `docs/src/browser-peer-sync.md`.
+
+- [x] Bounded ordered data-channel framing; Chromium and Firefox transport checks.
+- [x] WASM peer sessions with drive/certificate-bound mutual authentication,
+  permission checks and validated signed commit ingress.
+- [x] Ephemeral signaling rooms, STUN configuration, optional short-lived coturn
+  credentials, and direct/relayed status.
+- [x] OPFS reconciliation, live signed edits, presence/document ephemera, attachment
+  requests, signed deletion and reconnect. Cloud delivery is independent.
+- [x] Sync page invitation controls and identity-scoped saved links.
+- [x] Native rejection tests for pre-auth input, replay, identity mismatch,
+  cross-drive writes, reader writes, forged commits and outgoing revocation.
+- [x] Chromium acceptance: distinct agents, initial sync, concurrent edits,
+  presence, blobs, offline reconnect, OPFS reload and signed deletion.
+- [x] Move rendezvous from AtomicServer to SaaS and default discovery to the app’s SaaS environment.
+- [x] Expand room capacity to eight browsers with independent authenticated connections.
+- [x] Verify eight-agent mesh convergence, presence, attachments, creator departure,
+  offline reconnect, signed deletion and ninth-member rejection.
+- [ ] Verify full drive sync in Firefox and between two physical devices.
+- [ ] Deploy a public signaling service and verify forced TURN with real credentials.
+
+The browser attachment test exposed a native-only clock in pending blob request
+expiry. Use `web_time::Instant` so shared blob handling also works in WASM.
+Browser caches can be partial: successful peer reconciliation is not proof of
+complete replication of a remote hosted drive. Frames remain capped at 16 MiB.
+
+The issue commits were rebased onto `develop` for the PR; the original plugin-based
+implementation is preserved on `codex/browser-webrtc-plugin-base`.
+
+Sources: [Iroh browser limitations](https://docs.iroh.computer/languages/wasm-browser)
+and [WebRTC data-channel behavior](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels).
+
 Every still-open sync item, from this doc and from the plans it coordinates.
 `[x] (2026-09-03)` = landed in the sync-protocol hardening PR (#1352);
 `[x] (2026-09-04)` = landed in the follow-up PR from the same branch. Items
