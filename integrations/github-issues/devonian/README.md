@@ -34,23 +34,25 @@ app's origin and GET/POST/PATCH/DELETE with Authorization and Content-Type,
 expose `X-Connection-Code`, preserve query parameters, and allow issue/comment
 and label operations in its catalog. CORS headers must cover error responses too.
 
-**Live verification (2026-09-09):** Heroku release v40 (`bc02f13f`) now
-answers browser preflights and exposes `X-Connection-Code`. Tenant challenge,
-GitHub OAuth and return to the browser demo succeeded with AtomicServer
-unavailable. The first authenticated issue-list request for the private
-`ontola/atomic-github-sync-sandbox` returned 404, although the independent
-GitHub CLI credential can access it. Repository access for the proxy credential
-must be resolved before live two-way writes can be verified. The disposable
-CLI-created issue #17 was closed; no issue/comment writes occurred through the proxy.
+**Live verification (2026-09-09):** Browser-only sync against
+`localthought/integration-proxy` succeeded with AtomicServer unavailable, using
+Heroku proxy release v40 (`bc02f13f`). The Atomic Server GitHub App requires
+Issues read/write and installation on the target repository; OAuth authorization
+alone previously allowed public reads but returned 403 on creation. The private
+`ontola/atomic-github-sync-sandbox` returned 404 and remains outside the installed
+repository access.
 
-On consolidated branch `feat/api-plugins` (#1387), a fresh browser connection to
-`localthought/integration-proxy` successfully imported 12 issues. A subsequent
-browser-origin create returned 403. No matching issue was created remotely.
-The CLI-created disposable issue #32 and its test comment were left together
-with #32 closed. Live two-way writes remain blocked pending diagnosis of the
-proxy credential’s GitHub permissions. **Connect another tracker** returns to
-the connection form without clearing existing local trackers.
+Disposable issue #34 was created from Atomic, received an Atomic-origin comment,
+and was closed through browser sync. Reopening it and adding a comment on GitHub
+synced back to Atomic, as did GitHub-created issue #35. Both issues were closed
+through browser sync afterward. Independent GitHub CLI checks confirmed these
+results and unchanged titles/states for existing issues.
 
+The earlier failed write remains protected by the uncertain-write journal. Live
+verification used separate browser storage at `http://localhost:6769`; the old
+tracker at `http://127.0.0.1:6769` was preserved. Reconnecting does not clear an
+uncertain write. **Connect another tracker** returns to the connection form
+without clearing existing local trackers.
 
 ## Mapping
 

@@ -74,7 +74,12 @@ export function LocalThoughtCatalog({
         );
       localStorage.setItem(
         connectionKey(drive, actor!, result.platform),
-        JSON.stringify({ ...result, drive, actor }),
+        JSON.stringify({
+          ...result,
+          drive,
+          actor,
+          installationConnection: pending.installationConnection,
+        }),
       );
       sessionStorage.removeItem('localthought-pending');
       setReturned(result.platform);

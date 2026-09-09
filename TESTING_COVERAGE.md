@@ -1197,6 +1197,15 @@ production WASM build, and both Chromium import flows (31.5s). The browser flow
 retains the existing explicit server-unavailable network fixture; no live Google
 account or full native Rust workspace test was run.
 
+Google Calendar two-way existing-event edits: `integrations/localthought/calendar-sync.test.ts`
+checks three-way field merges, title aliases, ETag rejection, stale local reviews,
+changes during requests, idempotent recovery after a lost checkpoint, time/date
+validation, duplicate identities, unsupported fields and permission failures.
+`browser.test.ts` checks conditional-header forwarding through rotating credentials.
+The companion proxy suite checks write scopes, CORS preflight and upstream
+If-Match forwarding. New event creation/deletion, live OAuth reconsent and live
+Google writes are not covered; the existing Calendar E2E covers inbound imports.
+
 All-day ranges: `browser/lib/src/calendar-date.test.ts` covers civil-date
 validation, exclusive single/multi-day ends, leap days, DST dates and year
 boundaries; run under UTC, America/Los_Angeles and Pacific/Kiritimati. Import

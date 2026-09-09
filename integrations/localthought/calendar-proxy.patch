@@ -1,0 +1,111 @@
+diff --git a/src/main.rs b/src/main.rs
+index fd4fa87..54c2e01 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -136,7 +136,11 @@ fn browser_cors() -> tower_http::cors::CorsLayer {
+             Method::DELETE,
+             Method::OPTIONS,
+         ])
+-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
++        .allow_headers([
++            header::AUTHORIZATION,
++            header::CONTENT_TYPE,
++            header::IF_MATCH,
++        ])
+         .expose_headers([
+             HeaderName::from_static("x-connection-code"),
+             header::LINK,
+@@ -223,8 +227,11 @@ mod browser_tests {
+                     .method("OPTIONS")
+                     .uri("/proxy/pets")
+                     .header("origin", "https://atomic.example")
+-                    .header("access-control-request-method", "GET")
+-                    .header("access-control-request-headers", "authorization")
++                    .header("access-control-request-method", "PATCH")
++                    .header(
++                        "access-control-request-headers",
++                        "authorization,content-type,if-match",
++                    )
+                     .body(Body::empty())
+                     .unwrap(),
+             )
+@@ -236,6 +243,10 @@ mod browser_tests {
+             .to_str()
+             .unwrap()
+             .contains("authorization"));
++        assert!(response.headers()["access-control-allow-headers"]
++            .to_str()
++            .unwrap()
++            .contains("if-match"));
+         assert!(!response
+             .headers()
+             .contains_key("access-control-allow-credentials"));
+diff --git a/src/providers.rs b/src/providers.rs
+index 2aed2cb..dd624cf 100644
+--- a/src/providers.rs
++++ b/src/providers.rs
+@@ -39,7 +39,10 @@ pub fn known(name: &str) -> Option<Provider> {
+             name: "google-calendar",
+             authorization_url: "https://accounts.google.com/o/oauth2/v2/auth",
+             token_url: "https://oauth2.googleapis.com/token",
+-            scopes: &["https://www.googleapis.com/auth/calendar.readonly"],
++            scopes: &[
++                "https://www.googleapis.com/auth/calendar.events",
++                "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
++            ],
+         }),
+         "github-issues" => Some(Provider {
+             name: "github-issues",
+@@ -63,7 +66,10 @@ mod tests {
+         );
+         assert_eq!(
+             google.scopes,
+-            ["https://www.googleapis.com/auth/calendar.readonly"]
++            [
++                "https://www.googleapis.com/auth/calendar.events",
++                "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
++            ]
+         );
+         assert!(known("https://attacker.example").is_none());
+     }
+diff --git a/src/proxy.rs b/src/proxy.rs
+index 39f18a3..9017a63 100644
+--- a/src/proxy.rs
++++ b/src/proxy.rs
+@@ -411,6 +411,9 @@ fn upstream_request(
+     if let Some(content_type) = headers.get(header::CONTENT_TYPE) {
+         request = request.header(header::CONTENT_TYPE, content_type);
+     }
++    if let Some(etag) = headers.get(header::IF_MATCH) {
++        request = request.header(header::IF_MATCH, etag);
++    }
+     request.body(body)
+ }
+ 
+@@ -482,6 +485,7 @@ mod tests {
+                     "user_agent": headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()),
+                     "authorization": headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()),
+                     "content_type": headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
++                    "if_match": headers.get(header::IF_MATCH).and_then(|v| v.to_str().ok()),
+                     "body": String::from_utf8(body.to_vec()).unwrap(),
+                 }))
+             }),
+@@ -494,6 +498,10 @@ mod tests {
+                 header::CONTENT_TYPE,
+                 HeaderValue::from_static("application/json"),
+             );
++            headers.insert(
++                header::IF_MATCH,
++                HeaderValue::from_static("\"event-version\""),
++            );
+             if let Some(value) = caller_user_agent {
+                 headers.insert(header::USER_AGENT, HeaderValue::from_static(value));
+             }
+@@ -522,6 +530,7 @@ mod tests {
+             assert_eq!(response["authorization"], "Bearer test-provider-token");
+             assert_eq!(response["content_type"], "application/json");
+             assert_eq!(response["body"], "{}");
++            assert_eq!(response["if_match"], "\"event-version\"");
+         }
+         server.abort();
+     }

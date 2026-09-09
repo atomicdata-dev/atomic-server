@@ -32,6 +32,7 @@ import {
 } from '../../../../../integrations/localthought/schema';
 import type { Config } from '../../../../../integrations/localthought/plugin';
 import { localImportVerdict } from './localImportVerdict';
+import { CalendarSync } from './CalendarSync';
 import source from '../../../../../integrations/localthought/plugin.js?raw';
 import {
   calendarProjection,
@@ -73,6 +74,7 @@ export function ConnectLocalThought({
     verdict: string;
     tables: string[];
   }>();
+  const [syncConfig, setSyncConfig] = useState<Config>();
   const [tables, setTables] = useState<string[]>([]);
   useEffect(() => {
     const controller = new AbortController();
@@ -121,7 +123,16 @@ export function ConnectLocalThought({
       );
       sessionStorage.setItem(
         'localthought-pending',
-        JSON.stringify({ state: result.state, drive, actor, platform }),
+        JSON.stringify({
+          state: result.state,
+          drive,
+          actor,
+          platform,
+          installationConnection:
+            platform === 'google-calendar'
+              ? (connection?.installationConnection ?? connection?.connection)
+              : undefined,
+        }),
       );
       location.assign(result.url);
     } catch (reason) {
@@ -152,7 +163,7 @@ export function ConnectLocalThought({
       const schemaStore = localSchemaStore(store);
       const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
-      const identity = `localthought:${connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${platform === 'google-calendar' && keepSeries ? ':series' : ''}`;
+      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${platform === 'google-calendar' && keepSeries ? ':series' : ''}`;
       const resource = await ensureInstallationResource(store, drive, {
         parent: drive,
         localId: identity,
@@ -252,6 +263,7 @@ export function ConnectLocalThought({
       }
 
       const config = { platform, destinations, properties };
+      setSyncConfig(config);
       await resource.set(terms.properties['plugin-schemas'], {
         localthought: { ...config, connection: connection.connection },
       });
@@ -359,7 +371,7 @@ export function ConnectLocalThought({
             </>
           )}
           <p>{collections.join(', ')}</p>
-          <ImportScopeHelp />
+          <ImportScopeHelp calendar={platform === 'google-calendar'} />
           <Button
             disabled={
               busy || !collections.length || parameters.some(p => !constants[p])
@@ -369,6 +381,14 @@ export function ConnectLocalThought({
             {busy ? 'Fetching…' : 'Fetch and preview'}
           </Button>
         </>
+      )}
+      {platform === 'google-calendar' && connection && syncConfig && (
+        <CalendarSync
+          drive={drive}
+          connection={connection.connection}
+          config={syncConfig}
+          disabled={busy || !!preview}
+        />
       )}
       {error && <ErrMessage role='alert'>{error}</ErrMessage>}
       {tables.map(table => (
@@ -396,12 +416,14 @@ export function ConnectLocalThought({
   );
 }
 
-function ImportScopeHelp() {
+function ImportScopeHelp({ calendar }: { calendar: boolean }) {
   return (
     <p>
       Imports the collections described by the platform, following pagination.
-      Review changes before applying them. No background sync or provider
-      writes.
+      Review changes before applying them. No background sync.
+      {calendar
+        ? ' After importing, preview edits to send changes back to Google Calendar.'
+        : ' No provider writes.'}
     </p>
   );
 }
