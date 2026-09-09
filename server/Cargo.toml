@@ -91,7 +91,6 @@ reqwest = { version = "0.13.3", default-features = false, features = [
 ] }
 mainline = "6.2.0"
 sha1 = "0.11"
-hmac = "0.13"
 blake3 = "1.8.5"
 hex = "0.4"
 local-ip-address = "0.6.13"

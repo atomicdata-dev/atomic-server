@@ -35,7 +35,8 @@ late snapshots after deletion and concurrent blob replies across independent edg
 `browserPeerSync.test.ts` checks that another member can mint an invitation for
 the existing room without restarting its connection.
 `verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
-These scripts require locally built WASM/server artifacts; the UI script requires
+These scripts require built WASM and `ATOMIC_PEER_SIGNALING_URL` pointing to the
+SaaS signaling handler; neither starts an AtomicServer data process. The UI script requires
 a running app at its configured test URL. They are not wired into CI yet.
 Still uncovered: two physical devices, forced TURN, full Firefox drive sync,
 public deployment, and interactive rich-text editor/cursor acceptance.

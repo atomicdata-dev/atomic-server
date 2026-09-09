@@ -24,5 +24,3 @@ pub mod upload;
 pub mod vector_search;
 pub mod web_sockets;
 pub mod ws_v2;
-
-pub mod webrtc_signal;

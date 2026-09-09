@@ -15,7 +15,7 @@ Cloud Server can provide an always-online replica independently of peer pairing.
 ## Discovery and transport
 
 A random 256-bit room secret in the invitation identifies a rendezvous room at
-`/webrtc-signal`. The secret is sent in the WebSocket join message, not its URL.
+Atomic SaaS's `/webrtc-signal`. The secret is sent in the WebSocket join message, not its URL.
 The signaling server exchanges offers and answers and keeps no drive data. There
 is no Pkarr lookup. Each room supports up to eight browsers in a full mesh; the app remembers
 one link per drive and agent. Disconnect removes that browser's saved link.
@@ -45,16 +45,25 @@ storage replica. Browser execution can be suspended in background tabs.
 
 ## Operator configuration
 
-Serve the signaling endpoint over HTTPS/WSS. The app defaults to its configured
-AtomicServer's `/webrtc-signal`; set `VITE_ATOMIC_SIGNALING_URL` at frontend build
-time to use a separate shared service. No subscription check is made by this
-endpoint. Local development permits unencrypted WebSocket signaling on loopback.
+The signaling endpoint is served by **Atomic SaaS**, not an AtomicServer data
+node. It requires no SaaS login, drive enrollment or Cloud Server subscription.
+The browser uses `VITE_MANAGED_PORTAL_URL` for its SaaS environment, defaulting to
+`https://atomicserver.eu` (or the staging SaaS origin for the staging app). Users
+do not select a data node to discover peers.
+
+`VITE_ATOMIC_SIGNALING_URL` overrides discovery for self-hosted/community
+services. Use WSS outside loopback development. Local portal Vite proxies
+`/webrtc-signal` to `ATOMIC_SAAS_API_ORIGIN` with WebSocket support.
+
+Invitations preserve their chosen endpoint. Experimental links from earlier
+versions of this PR that point at a data node must be disconnected and recreated
+against SaaS; explicit custom endpoints are not silently rewritten.
 
 The endpoint supplies Cloudflare's public STUN address. For coturn REST
 credentials, configure the signaling process with:
 
-- `ATOMICSERVER_WEBRTC_TURN_URLS`: comma-separated `turn:` / `turns:` URLs.
-- `ATOMICSERVER_WEBRTC_TURN_SECRET`: coturn's shared authentication secret.
+- `ATOMIC_SAAS_WEBRTC_TURN_URLS`: comma-separated `turn:` / `turns:` URLs.
+- `ATOMIC_SAAS_WEBRTC_TURN_SECRET`: coturn's shared authentication secret.
 
 Only one-hour credentials are sent to clients. Never put the shared secret in a
 frontend environment variable. `VITE_ATOMIC_ICE_SERVERS` can override the supplied
@@ -80,3 +89,23 @@ reconciliation and signed deletion. A ninth room member is rejected. The separat
 two-browser acceptance also checks reload persistence. The Sync page controls are separately exercised in Chromium.
 The lower-level transport also runs in Firefox. Two physical devices, full
 Firefox drive sync, forced TURN, and a deployed public service remain unverified.
+
+## Local acceptance without a data server
+
+In the matching `atomic-saas` checkout:
+
+```sh
+cargo run --example peer_signaling
+```
+
+This fixture runs the same SaaS handler on loopback port 6791 without account,
+billing or node provisioning dependencies. In `atomic-server`:
+
+```sh
+ATOMIC_PEER_SIGNALING_URL=ws://127.0.0.1:6791/webrtc-signal node browser/e2e/scripts/verify-peer-mesh.mjs
+ATOMIC_PEER_SIGNALING_URL=ws://127.0.0.1:6791/webrtc-signal node browser/e2e/scripts/verify-peer-sync.mjs
+```
+
+Neither script starts an AtomicServer process. They use real WASM/OPFS and reject
+HTTP data requests. Public SaaS deployment and forced-TURN verification remain
+separate release checks.

@@ -101,22 +101,34 @@ export function stopPeerLinks(store: Store): void {
   statuses.clear();
 }
 
+/** Discovery belongs to the app's SaaS environment, never its data node.
+ * Works before signing into SaaS and for entirely local-only drives. */
+export function defaultPeerSignalingUrl(): string {
+  const portal =
+    import.meta.env.VITE_MANAGED_PORTAL_URL ||
+    (window.location.hostname === 'app.staging.atomicserver.eu'
+      ? 'https://staging.atomicserver.eu'
+      : 'https://atomicserver.eu');
+  const endpoint = new URL(
+    import.meta.env.VITE_ATOMIC_SIGNALING_URL || '/webrtc-signal',
+    portal,
+  );
+  if (endpoint.protocol === 'https:') endpoint.protocol = 'wss:';
+  if (endpoint.protocol === 'http:') endpoint.protocol = 'ws:';
+
+  return endpoint.toString();
+}
+
 export function createPeerLink(
   store: Store,
   drive: string,
 ): { link: SavedPeerLink; invitation: string } {
-  const endpoint = new URL(
-    import.meta.env.VITE_ATOMIC_SIGNALING_URL || '/webrtc-signal',
-    store.getServerUrl(),
-  );
-  if (endpoint.protocol === 'https:') endpoint.protocol = 'wss:';
-  if (endpoint.protocol === 'http:') endpoint.protocol = 'ws:';
   const link = savedPeerLinks(store).find(
     existing => existing.drive === drive,
   ) ?? {
     drive,
     room: randomPeerToken(),
-    signalingUrl: endpoint.toString(),
+    signalingUrl: defaultPeerSignalingUrl(),
   };
   const invite = { ...link, expectedPeer: store.getAgent()?.subject };
   const url = new URL('/app/sync', window.location.origin);

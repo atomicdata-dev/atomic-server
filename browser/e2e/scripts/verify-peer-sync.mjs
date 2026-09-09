@@ -1,30 +1,18 @@
 // Real signaling + WebRTC + OPFS, with AtomicServer data requests disabled.
-// Prerequisites: cargo build -p atomic-server; wasm-pack build wasm --target web.
+// Run the SaaS peer_signaling example and set ATOMIC_PEER_SIGNALING_URL.
+// Requires built WASM, but deliberately starts no AtomicServer data process.
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const dir = await mkdtemp(join(tmpdir(), 'atomic-peer-'));
-const backend = spawn(
-  join(root, 'target/debug/atomic-server'),
-  [
-    '--port',
-    '6791',
-    '--data-dir',
-    join(dir, 'data'),
-    '--config-dir',
-    join(dir, 'config'),
-    '--cache-dir',
-    join(dir, 'cache'),
-  ],
-  { cwd: root, stdio: 'ignore' },
-);
+const signalingUrl = process.env.ATOMIC_PEER_SIGNALING_URL;
+if (!signalingUrl)
+  throw new Error(
+    'Set ATOMIC_PEER_SIGNALING_URL to the running SaaS signaling endpoint',
+  );
 const vite = await createServer({
   configFile: false,
   root,
@@ -41,16 +29,6 @@ await vite.listen();
 const browser = await chromium.launch();
 const deadline = setTimeout(() => browser.close(), 90000);
 try {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await fetch('http://localhost:6791/');
-      break;
-    } catch {
-      if (attempt > 100 || backend.exitCode !== null)
-        throw new Error('Signaling server did not start');
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-  }
   const errors = [];
   const a = await browser.newPage();
   const b = await browser.newPage();
@@ -106,14 +84,14 @@ try {
   const room = randomBytes(32).toString('hex');
   const connect = async page =>
     page.evaluate(
-      ({ drive, room, expectedPeer }) => {
+      ({ drive, room, expectedPeer, signalingUrl }) => {
         const { store, agent } = window.state;
         store.registerLocalOnlyDrive(drive);
         store.setDrive(drive);
         window.link = new window.harness.BrowserPeerSync(store, {
           drive,
           room,
-          signalingUrl: 'ws://localhost:6791/webrtc-signal',
+          signalingUrl,
           expectedPeer,
           iceServers: [],
           onStatus: status => {
@@ -122,7 +100,12 @@ try {
           },
         });
       },
-      { drive, room, expectedPeer: page === a ? identities[1] : identities[0] },
+      {
+        drive,
+        room,
+        signalingUrl,
+        expectedPeer: page === a ? identities[1] : identities[0],
+      },
     );
   await connect(a);
   await connect(b);
@@ -266,5 +249,4 @@ try {
   clearTimeout(deadline);
   await browser.close();
   await vite.close();
-  backend.kill('SIGTERM');
 }

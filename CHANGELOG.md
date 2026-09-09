@@ -7,7 +7,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
-- Add account-independent `/webrtc-signal` rendezvous, optional temporary TURN credentials, and drive-scoped authenticated browser peer sessions ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
+- Add drive-scoped authenticated browser peer sessions; subscription-independent signaling and optional temporary TURN credentials are provided by Atomic SaaS ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
 
 ## [v0.41.0-beta.6] - 2026-09-09
 

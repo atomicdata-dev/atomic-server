@@ -1238,7 +1238,6 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "hmac 0.13.0",
  "html2md",
  "image",
  "indexmap 2.14.0",

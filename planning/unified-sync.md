@@ -80,7 +80,7 @@ is the shape around that call — see [Outbox modernization](#outbox-modernizati
 Issue: https://github.com/ontola/atomic-server/issues/1396.
 
 The product requirement is sync and collaboration without a Cloud subscription.
-The Sync page creates an eight-browser room invitation. An account-independent signaling
+The Sync page creates an eight-browser room invitation. The subscription-independent Atomic SaaS signaling
 endpoint introduces peers; WebRTC carries drive data directly or through optional
 TURN. Operator setup and product limits are in `docs/src/browser-peer-sync.md`.
 
@@ -96,6 +96,7 @@ TURN. Operator setup and product limits are in `docs/src/browser-peer-sync.md`.
   cross-drive writes, reader writes, forged commits and outgoing revocation.
 - [x] Chromium acceptance: distinct agents, initial sync, concurrent edits,
   presence, blobs, offline reconnect, OPFS reload and signed deletion.
+- [x] Move rendezvous from AtomicServer to SaaS and default discovery to the app’s SaaS environment.
 - [x] Expand room capacity to eight browsers with independent authenticated connections.
 - [x] Verify eight-agent mesh convergence, presence, attachments, creator departure,
   offline reconnect, signed deletion and ninth-member rejection.
