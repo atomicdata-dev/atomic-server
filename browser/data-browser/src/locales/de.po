@@ -9783,3 +9783,7 @@ msgstr ""
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect GitHub tracker"
 msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr ""

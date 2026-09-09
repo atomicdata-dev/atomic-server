@@ -9822,3 +9822,7 @@ msgstr "Connect through LocalThought. The tenant secret is used in this tab to s
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect GitHub tracker"
 msgstr "Connect GitHub tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr "Connect another tracker"

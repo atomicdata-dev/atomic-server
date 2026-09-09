@@ -43,6 +43,15 @@ GitHub CLI credential can access it. Repository access for the proxy credential
 must be resolved before live two-way writes can be verified. The disposable
 CLI-created issue #17 was closed; no issue/comment writes occurred through the proxy.
 
+On consolidated branch `feat/api-plugins` (#1387), a fresh browser connection to
+`localthought/integration-proxy` successfully imported 12 issues. A subsequent
+browser-origin create returned 403. No matching issue was created remotely.
+The CLI-created disposable issue #32 and its test comment were left together
+with #32 closed. Live two-way writes remain blocked pending diagnosis of the
+proxy credential’s GitHub permissions. **Connect another tracker** returns to
+the connection form without clearing existing local trackers.
+
+
 ## Mapping
 
 `GitHubPort` reuses `github-issues/adapter.ts`'s projection and request builder.
