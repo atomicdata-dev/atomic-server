@@ -1,4 +1,6 @@
 // @wc-ignore-file
+import { BrowserIntegrations } from '../../../../../integrations/localthought/browser';
+import { endpoint } from '../../../../../integrations/github-issues/adapter';
 import { get, set } from 'idb-keyval';
 import { core, server, dataBrowser, Datatype, enableLoro } from '@tomic/lib';
 import * as devonian from './devonian.js';
@@ -22,6 +24,7 @@ export async function openDemo(store, options) {
   if (!db || !(await db.waitForReady()))
     throw new Error('Enable the browser database on the Sync page first.');
   const repository = options.sample ? 'demo/issues' : options.repository;
+  endpoint(repository);
   const key = `devonian-demo:${JSON.stringify([store.getAgent().subject, repository, options.sample ? 'sample' : new URL(options.proxy).origin])}`;
   return navigator.locks.request(key, async () => {
     let state = await get(key);
@@ -117,7 +120,6 @@ export async function openDemo(store, options) {
     }
     store.registerLocalOnlyDrive(state.config.connection.drive);
     store.setDrive(state.config.connection.drive);
-    if (options.code) sessionStorage.setItem(`${key}:code`, options.code);
     return { key, state };
   });
 }
@@ -133,11 +135,15 @@ export async function syncDemo(store, demo) {
           repository: state.options.repository,
           journal: state.journal,
           save,
-          getCode: () => sessionStorage.getItem(`${demo.key}:code`),
-          setCode: code =>
-            code
-              ? sessionStorage.setItem(`${demo.key}:code`, code)
-              : sessionStorage.removeItem(`${demo.key}:code`),
+          dispatch: (path, init) =>
+            client(state.options.proxy).request(
+              state.config.connection.drive,
+              store.getAgent().subject,
+              state.connection,
+              'github-issues',
+              path,
+              init,
+            ),
         });
     const bridge = new Bridge({
       devonian,
@@ -218,4 +224,74 @@ export async function editFixture(demo, command, number, text) {
     }
     demo.state = state;
   });
+}
+
+const handoffKey = 'devonian-browser-handoff';
+const resumeKey = 'devonian-browser-resume';
+const client = origin =>
+  new BrowserIntegrations(
+    localStorage,
+    async () => {
+      throw new Error('Devonian uses its own resource lenses');
+    },
+    origin,
+  );
+export async function connectDemo(store, options, secret) {
+  const demo = await openDemo(store, { ...options, sample: false });
+  const result = await client(options.proxy).start(
+    demo.state.config.connection.drive,
+    store.getAgent().subject,
+    'github-issues',
+    `${location.origin}/app/devonian-demo`,
+    secret,
+  );
+  sessionStorage.setItem(
+    handoffKey,
+    JSON.stringify({ key: demo.key, state: result.state }),
+  );
+  location.assign(result.url);
+}
+export async function resumeDemo(store) {
+  const url = new URL(location.href);
+  const callbackCode = url.searchParams.get('connection_code');
+  const callbackState = url.searchParams.get('integration_state');
+  const handoff = JSON.parse(sessionStorage.getItem(handoffKey) ?? 'null');
+  // Save the validated handoff before removing credentials from the URL, so a
+  // reload while OPFS opens cannot abandon the completed proxy consent.
+  if (callbackCode || callbackState) {
+    history.replaceState(null, '', url.pathname);
+    if (!handoff || callbackState !== handoff.state || !callbackCode)
+      throw new Error('Invalid connection callback state');
+    handoff.code = callbackCode;
+    sessionStorage.setItem(handoffKey, JSON.stringify(handoff));
+  }
+  const code = handoff?.code;
+  const stateId = handoff?.state;
+  const key = code ? handoff.key : sessionStorage.getItem(resumeKey);
+  if (!key) {
+    if (callbackCode || callbackState)
+      throw new Error('Missing browser connection handoff');
+    return;
+  }
+  const saved = await get(key);
+  if (!saved) throw new Error('Missing local tracker');
+  const demo = await openDemo(store, saved.options);
+  if (demo.key !== key) throw new Error('Connection belongs to another agent');
+  if (code) {
+    if (!handoff.finished) {
+      client(saved.options.proxy).finish(
+        saved.config.connection.drive,
+        store.getAgent().subject,
+        stateId,
+        code,
+      );
+      handoff.finished = true;
+      sessionStorage.setItem(handoffKey, JSON.stringify(handoff));
+    }
+    demo.state.connection = stateId;
+    await set(key, demo.state);
+    sessionStorage.removeItem(handoffKey);
+    sessionStorage.setItem(resumeKey, key);
+  }
+  return demo;
 }

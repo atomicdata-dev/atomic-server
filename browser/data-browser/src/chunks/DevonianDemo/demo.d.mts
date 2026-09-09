@@ -21,7 +21,6 @@ export function openDemo(
     sample: boolean;
     repository: string;
     proxy: string;
-    code?: string;
   },
 ): Promise<Demo>;
 export function syncDemo(store: Store, demo: Demo): Promise<number>;
@@ -39,3 +38,10 @@ export function editFixture(
   number?: number,
   text?: string,
 ): Promise<void>;
+
+export function connectDemo(
+  store: Store,
+  options: { repository: string; proxy: string },
+  secret: string,
+): Promise<void>;
+export function resumeDemo(store: Store): Promise<Demo | undefined>;

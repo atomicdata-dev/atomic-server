@@ -13,7 +13,13 @@ the companion proxy branch has 39 passing tests including CORS preflight and
 exposed headers. Live OAuth on the browser path still requires deployment of
 the companion proxy CORS change and is not yet verified.
 
-The browser-only Devonian issue tracker demo has 13 focused tests under
+`browser/e2e/tests/devonian-issue-sync.spec.mts` exercises tenant-secret entry,
+proxy consent, direct HTTP writes and local OPFS storage for two-way issue
+creation, comments, close/reopen and reload without duplicate resources. Its
+stateful HTTP mock isolates repositories and consumes/rotates connection codes;
+it does not substitute the in-page sample transport.
+
+The browser-only Devonian issue tracker demo has focused tests under
 `integrations/github-issues/devonian`: real Devonian lenses with deterministic
 connectors exercise bidirectional issue/comment creation and edits, close/reopen,
 distinct identical resources, conflicts, missing records and restart/replay.

@@ -1,5 +1,5 @@
 import { createLazyRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@tomic/react';
 import { Main } from '@components/Main';
 import { ContainerWide } from '@components/Containers';
@@ -11,6 +11,8 @@ import Field from '@components/forms/Field';
 import { Input, ErrMessage } from '@components/forms/InputStyles';
 import {
   openDemo,
+  connectDemo,
+  resumeDemo,
   syncDemo,
   demoRows,
   editAtomic,
@@ -25,7 +27,7 @@ function DevonianDemo() {
   const [rows, setRows] = useState<Row[]>([]);
   const [proxy, setProxy] = useState('https://localthought.io');
   const [repository, setRepository] = useState('');
-  const [code, setCode] = useState('');
+  const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -45,10 +47,21 @@ function DevonianDemo() {
       setBusy(false);
     }
   };
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    resumed.current = true;
+    void run(() => resumeDemo(store));
+  }, [store]);
   const start = (sample: boolean) =>
     run(async () => {
-      const opened = await openDemo(store, { sample, repository, proxy, code });
-      setCode('');
+      if (!sample) {
+        const credential = secret;
+        setSecret('');
+        await connectDemo(store, { repository, proxy }, credential);
+        return;
+      }
+      const opened = await openDemo(store, { sample, repository, proxy });
       if (sample) await syncDemo(store, opened);
       return opened;
     });
@@ -90,9 +103,8 @@ function DevonianDemo() {
                 <summary>Connect a real GitHub repository</summary>
                 <Column gap='0.75rem'>
                   <p>
-                    The proxy must allow this app’s origin through CORS and
-                    expose X-Connection-Code. Use a fresh GitHub connection code
-                    from the proxy’s OAuth flow.
+                    Connect through LocalThought. The tenant secret is used in
+                    this tab to start the connection and is never saved.
                   </p>
                   <Field fieldId='devonian-proxy' label='Integration proxy URL'>
                     <Input
@@ -111,20 +123,23 @@ function DevonianDemo() {
                       onChange={e => setRepository(e.target.value)}
                     />
                   </Field>
-                  <Field fieldId='devonian-code' label='Connection code'>
+                  <Field
+                    fieldId='devonian-secret'
+                    label='LocalThought tenant secret'
+                  >
                     <Input
-                      id='devonian-code'
+                      id='devonian-secret'
                       type='password'
                       autoComplete='off'
-                      value={code}
-                      onChange={e => setCode(e.target.value)}
+                      value={secret}
+                      onChange={e => setSecret(e.target.value)}
                     />
                   </Field>
                   <Button
-                    disabled={busy || !repository || !code}
+                    disabled={busy || !repository || !secret}
                     onClick={() => start(false)}
                   >
-                    Open live tracker
+                    Connect GitHub tracker
                   </Button>
                 </Column>
               </details>
@@ -172,7 +187,7 @@ function DevonianDemo() {
                 <h2>Atomic tracker</h2>
                 <Column gap='0.75rem'>
                   {rows.map(row => (
-                    <Card key={row.id}>
+                    <Card key={row.id} data-testid='atomic-issue'>
                       <Column>
                         <AtomicLink subject={row.id}>
                           {row.value.title}

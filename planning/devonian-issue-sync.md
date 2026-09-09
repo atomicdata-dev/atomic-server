@@ -11,11 +11,11 @@
 
 Use Devonian HTTP subjects for the intermediate graph and scoped external mappings
 for Atomic DIDs. Persist graph, mappings and request receipts in IndexedDB. Serialize
-rotating connection codes; refuse to retry uncertain writes. No Node runtime,
-AtomicServer plugin endpoint, tenant secret on AtomicServer, or server scheduler.
+rotating connection codes; refuse to retry uncertain writes. Tenant authentication and rotating credentials use #1401’s shared BrowserIntegrations client.
+No Node runtime, AtomicServer plugin endpoint, tenant secret on AtomicServer, or server scheduler.
 Live proxy currently lacks CORS; browser fixture verification remains independent.
 Missing records are conflicts, not deletion requests.
 
-- [ ] Rebase onto #1401 and reuse browser tenant challenge, callback and rotating transport.
-- [ ] Expand HTTP mock for stateful GitHub issues/comments and add Playwright two-way sync coverage.
-- [ ] Run focused tests, browser E2E and typecheck; update PR.
+- [x] Rebase onto #1401 and reuse browser tenant challenge, callback and rotating transport.
+- [x] Expand HTTP mock for stateful GitHub issues/comments and add Playwright two-way sync coverage.
+- [x] Run 13 sync tests, 11 LocalThought browser tests, 7 existing GitHub integration tests, browser E2E and typechecks.

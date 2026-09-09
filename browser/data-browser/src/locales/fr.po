@@ -9663,11 +9663,13 @@ msgid "Events before (UTC)"
 msgstr ""
 
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
+#: src/routes/DevonianDemoRoute.tsx
 msgid "LocalThought tenant secret"
 msgstr ""
 
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+msgstr ""
 
 #. 0: count
 #: src/routes/DevonianDemoRoute.tsx
@@ -9682,17 +9684,14 @@ msgstr ""
 msgid "GitHub repository (owner/repo)"
 msgstr ""
 
-#: src/routes/DevonianDemoRoute.tsx
-msgid "Connection code"
-msgstr ""
+#~ msgid "Connection code"
+#~ msgstr ""
 
-#: src/routes/DevonianDemoRoute.tsx
-msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
-msgstr ""
+#~ msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+#~ msgstr ""
 
-#: src/routes/DevonianDemoRoute.tsx
-msgid "Open live tracker"
-msgstr ""
+#~ msgid "Open live tracker"
+#~ msgstr ""
 
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Connect a real GitHub repository"
@@ -9775,4 +9774,12 @@ msgstr ""
 
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Sample GitHub issues"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
 msgstr ""

@@ -16,13 +16,17 @@ the browser database if it has been disabled.
 ## Live GitHub
 
 Expand **Connect a real GitHub repository**, enter the integration-proxy origin,
-`owner/repo`, and a fresh GitHub `connection_code` from that proxy's OAuth flow.
-**Open live tracker** creates the local workspace; **Sync now** authorizes the
-two-way writes. Codes rotate after each request and stay in this tab's session
-storage, separate from graph/state data. This UI accepts a code; it does not
-implement the proxy's tenant challenge/OAuth initiation flow. After a code
-failure, reload and reopen the same tracker with a fresh code. Do not enter a
-shared tenant secret or a GitHub access token in the connection-code field.
+`owner/repo`, and your **LocalThought tenant secret**, then choose **Connect GitHub
+tracker**. The demo uses #1401's shared `BrowserIntegrations` client to sign the
+tenant challenge in the browser, navigate to proxy consent, and bind the return
+to this agent and local drive. The secret is cleared from the form and never
+persisted. The callback code is removed from the address bar immediately.
+
+After consent, **Sync now** authorizes two-way writes. The shared transport
+serializes requests with Web Locks, consumes each code before dispatch, and
+persists rotated credentials in browser localStorage, outside the Atomic graph.
+Reloading the tab resumes the local tracker and connection. Use a dedicated
+demo repository; writes use the connected GitHub account.
 
 The browser calls `/proxy/github-issues/repos/{owner}/{repo}/issues...` directly.
 The proxy instance must answer unauthenticated OPTIONS preflights, allow the
@@ -31,9 +35,8 @@ expose `X-Connection-Code`, preserve query parameters, and allow issue/comment
 and label operations in its catalog. CORS headers must cover error responses too.
 
 **Live dependency:** on 2026-09-09, `https://localthought.io` answered the browser
-preflight with 401 and no CORS headers. Its main router has no CORS layer.
-That deployed instance cannot yet power this direct browser demo. PR #1394's
-server-to-proxy flow avoids this restriction, but this demo does not use it.
+preflight with 401 and no CORS headers. The companion proxy CORS change described in #1401 must be deployed before
+that instance can power this direct browser demo.
 Live OAuth/provider writes have not been verified for this demo. Sample mode is
 explicitly a browser fixture, not evidence of a successful live connection.
 
@@ -100,3 +103,24 @@ pagination, scoped URLs and serialized code rotation. The browser sample flow
 was manually verified with native OPFS resources, issue creation on both sides,
 comments both ways, closing from Atomic and reopening from the GitHub fixture,
 then reloading and resuming the same three issues and two comments without duplication.
+
+## Playwright two-way regression
+
+`browser/e2e/tests/devonian-issue-sync.spec.mts` starts an isolated HTTP integration
+proxy with stateful, repository-scoped GitHub issue/comment endpoints. It fills
+the tenant-secret form with the **public mock secret** (no real credentials),
+completes consent, and exercises the live transport mode rather than sample mode.
+It verifies creation and comments in both directions, close/reopen in both
+directions, matching parent issues, and reload without duplicate resources or
+provider writes. Legacy server integration endpoints, commit POSTs and all WebSockets are blocked.
+The local run uses an unavailable AtomicServer port to verify browser-only storage.
+
+With Vite and the built browser/WASM packages available:
+
+```sh
+cd browser/e2e
+FRONTEND_URL=http://localhost:6747 playwright test tests/devonian-issue-sync.spec.mts --project chromium
+```
+
+The test is in the full E2E suite, without a smoke tag. The mock is local test
+infrastructure only; the runtime demo uses the real integration-proxy protocol.

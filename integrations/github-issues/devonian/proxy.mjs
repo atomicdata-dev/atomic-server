@@ -10,6 +10,7 @@ export function proxyTransport({
   journal,
   save,
   fetcher = fetch,
+  dispatch,
 }) {
   const origin = new URL(url);
   if (
@@ -56,24 +57,34 @@ export function proxyTransport({
           `Uncertain GitHub write (${action}). Inspect its outcome before retrying; it will not be resent.`,
         );
       }
-      const code = getCode();
-      if (!code)
-        throw new Error(
-          'Connect to the proxy or supply a fresh connection code',
-        );
       if (writes) {
         journal[id] = { signature };
         await save();
       }
-      // A connection code is single-use, even if the request loses its response.
-      setCode('');
-      const destination = new URL(
-        `/proxy/github-issues${new URL(intent.url).pathname}${new URL(intent.url).search}`,
-        origin,
-      );
-      let response;
-      try {
-        response = await fetcher(destination.href, {
+      const target = new URL(intent.url);
+      let receipt;
+      let next = true;
+      if (dispatch) {
+        receipt = await dispatch(`${target.pathname}${target.search}`, {
+          method: intent.method,
+          ...(intent.body ? { body: intent.body } : {}),
+        }).catch(() => {
+          throw new Error(
+            'Proxy request failed. Check CORS and reconnect; an uncertain write will not be resent.',
+          );
+        });
+      } else {
+        const code = getCode();
+        if (!code)
+          throw new Error(
+            'Connect to the proxy or supply a fresh connection code',
+          );
+        setCode('');
+        const destination = new URL(
+          `/proxy/github-issues${target.pathname}${target.search}`,
+          origin,
+        );
+        const response = await fetcher(destination.href, {
           method: intent.method,
           redirect: 'error',
           credentials: 'omit',
@@ -83,16 +94,16 @@ export function proxyTransport({
             'Content-Type': 'application/json',
           },
           ...(intent.body ? { body: intent.body } : {}),
+        }).catch(() => {
+          throw new Error(
+            'Proxy request failed. Check CORS and reconnect; an uncertain write will not be resent.',
+          );
         });
-      } catch {
-        throw new Error(
-          'Proxy request failed. Check CORS and reconnect; an uncertain write will not be resent.',
-        );
+        next = response.headers.get('X-Connection-Code');
+        if (next) setCode(next);
+        receipt = { status: response.status, body: await response.text() };
       }
-      const next = response.headers.get('X-Connection-Code');
-      if (next) setCode(next);
-      const receipt = { status: response.status, body: await response.text() };
-      if (writes && response.ok) {
+      if (writes && receipt.status >= 200 && receipt.status < 300) {
         journal[id].receipt = receipt;
         await save();
       }
