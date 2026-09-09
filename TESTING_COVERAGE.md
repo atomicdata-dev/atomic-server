@@ -13,6 +13,18 @@ the companion proxy branch has 39 passing tests including CORS preflight and
 exposed headers. Live OAuth on the browser path still requires deployment of
 the companion proxy CORS change and is not yet verified.
 
+The browser-only Devonian issue tracker demo has 13 focused tests under
+`integrations/github-issues/devonian`: real Devonian lenses with deterministic
+connectors exercise bidirectional issue/comment creation and edits, close/reopen,
+distinct identical resources, conflicts, missing records and restart/replay.
+Transport fixtures cover pagination, label preservation, scoped comment links,
+rotating connection codes and refusal to resend uncertain writes. The native
+OPFS browser flow was manually verified for creation and comments on both sides,
+closing from Atomic, reopening from the sample GitHub side and reloading without
+duplicate issues/comments. Live proxy OAuth,
+GitHub writes and a guided uncertain-write recovery UI remain unverified/unbuilt;
+the current deployed integration-proxy lacks browser CORS support.
+
 What is tested, at which layer, and — the part that matters — **what is not**.
 
 This exists because the protocol is far better tested than the glue around it,
