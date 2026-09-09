@@ -41,9 +41,14 @@ test.describe('plugins', () => {
       .click();
 
     const review = page.locator('dialog[open]');
+    // Installing walks pluginClassesFor, two ensureSchema calls, three
+    // ensureInstallationResource calls and the actual sandboxed plugin run —
+    // measured ~24s locally even on a fresh, otherwise-idle server. The
+    // default 10s expect timeout is tuned for interaction latency, not this
+    // one-time setup cost.
     await expect(
       review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
-    ).toBeEnabled();
+    ).toBeEnabled({ timeout: 45_000 });
     await review
       .getByRole('button', { name: 'Apply 5 changes', exact: true })
       .click();
