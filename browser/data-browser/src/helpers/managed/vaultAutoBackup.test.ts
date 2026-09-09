@@ -405,6 +405,19 @@ describe('restoreFromVault', () => {
     );
   });
 
+  it('restores with the recovered key epoch rather than assuming epoch one', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      recoverDriveKey: vi.fn(async () => ({ driveKey: KEY, keyEpoch: 7 })),
+    });
+    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
+      'restored',
+    );
+    expect(deps.restoreDrive).toHaveBeenCalledWith(
+      expect.objectContaining({ keyEpoch: 7 }),
+    );
+  });
+
   /** The device now holds the key: later edits back up without re-enrolling. */
   it('remembers the key so the next backup skips enrollment', async () => {
     const store = await signedInStore();
