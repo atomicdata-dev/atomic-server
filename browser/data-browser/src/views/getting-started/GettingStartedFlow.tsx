@@ -1,3 +1,4 @@
+import { resumeInviteUrl } from '../../helpers/inviteSignup';
 import { WorkspaceLoading } from './WorkspaceLoading';
 import {
   PRODUCT_NAME,
@@ -182,10 +183,17 @@ export function GettingStartedFlow({
   // A sign-in guard (clicking a drive you're not signed in for) sends the user
   // here with `next` carrying that drive's subject, so we open straight to the
   // sign-in step and return them to that drive afterwards (not their home).
+  const inviteToken = new URLSearchParams(window.location.search).get('invite');
   const nextDrive =
     new URLSearchParams(window.location.search).get('next') || undefined;
   const [step, setStep] = useState<Step>(
-    fromManaged ? 'create' : nextDrive ? 'signin' : initialStep,
+    fromManaged
+      ? 'create'
+      : inviteToken
+        ? 'restore'
+        : nextDrive
+          ? 'signin'
+          : initialStep,
   );
   const [loading, setLoading] = useState(false);
   const [workspaceStage, setWorkspaceStage] = useState<
@@ -584,6 +592,12 @@ export function GettingStartedFlow({
           SIGN_IN_LOOKUP_TIMEOUT_MS,
           undefined,
         );
+      }
+
+      if (inviteToken) {
+        navigate(resumeInviteUrl(inviteToken));
+
+        return;
       }
 
       // Where this sign-in wants to end up: the drive it came from, or the
@@ -1335,6 +1349,7 @@ export function GettingStartedFlow({
                 ) : (
                   <NewIdentitySection
                     autoStart
+                    navigateToDrive={!inviteToken}
                     verifySecret
                     stepIndicatorPortal={stepDotsSlotRef.current}
                     defaultProfileName={managedUsername}
@@ -1347,7 +1362,7 @@ export function GettingStartedFlow({
                       fromManaged ? enableEncryptedBackup : undefined
                     }
                     onDone={() => {
-                      // After verify, NewIdentitySection navigates to privateDrive / home
+                      if (inviteToken) navigate(resumeInviteUrl(inviteToken));
                     }}
                   />
                 )}

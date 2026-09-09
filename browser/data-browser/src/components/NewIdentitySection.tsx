@@ -35,6 +35,8 @@ type Step =
 interface NewIdentitySectionProps {
   /** Called after the drive is created (or skipped). */
   onDone: () => void;
+  /** Invite onboarding resumes acceptance instead of opening the personal drive. */
+  navigateToDrive?: boolean;
   /** Called after the agent and drive are created. Use this for any extra server-side steps (e.g. /setup). */
   onAfterCreate?: (driveSubject: string) => Promise<void>;
   /** If true, start creation immediately on mount without showing the button. */
@@ -85,6 +87,7 @@ interface IdentityData {
  */
 export function NewIdentitySection({
   onDone,
+  navigateToDrive = true,
   onAfterCreate,
   autoStart = false,
   verifySecret = false,
@@ -289,7 +292,7 @@ export function NewIdentitySection({
       // An earlier lookup can have cached "not found" before creation.
       // Read the now-persisted drive and profile before opening the workspace.
       await reopenRestoredDrive(store, identity.driveSubject);
-      navigate(constructOpenURL(identity.driveSubject));
+      if (navigateToDrive) navigate(constructOpenURL(identity.driveSubject));
     }
 
     onDone();
@@ -385,7 +388,7 @@ export function NewIdentitySection({
 
       if (home) {
         setDrive(home);
-        navigate(constructOpenURL(home));
+        if (navigateToDrive) navigate(constructOpenURL(home));
       }
 
       onDone();

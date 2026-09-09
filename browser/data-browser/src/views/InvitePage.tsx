@@ -1,3 +1,5 @@
+import { fetchManagedInfo } from '../helpers/managedServer';
+import { inviteSignupUrl } from '../helpers/inviteSignup';
 import { TeamProfileStep } from '../components/TeamProfileStep';
 import {
   useBoolean,
@@ -28,7 +30,7 @@ import { useWelcomeLayoutEffect } from '../hooks/useWelcomeLayoutEffect';
 import { Shell, Card, CardTitle, CtaButton } from './getting-started/chrome';
 import { Logo } from '../components/Logo';
 
-import { useState, type JSX } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type JSX } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { fetchPrivateDriveSubject } from '@helpers/privateDrive';
 import { saveAgentToIDB } from '@helpers/agentStorage';
@@ -40,6 +42,19 @@ import Field from '@components/forms/Field';
 /** A View that opens an invite */
 function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   const store = useStore();
+  const [signupTarget, setSignupTarget] = useState<string | null>();
+  useEffect(() => {
+    let active = true;
+    void fetchManagedInfo(store.getServerUrl()).then(info => {
+      const token = new URL(resource.subject).searchParams.get('token');
+      if (active)
+        setSignupTarget(token ? (inviteSignupUrl(info, token) ?? null) : null);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [store, resource.subject]);
   const [usagesLeft] = useNumber(resource, server.properties.usagesLeft);
   const [write] = useBoolean(resource, server.properties.write);
   const [description] = useString(resource, core.properties.description);
@@ -271,7 +286,14 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   const [accepted, setAccepted] = useState(false);
 
   async function handleNew() {
-    if (creating) return;
+    if (creating || signupTarget === undefined) return;
+
+    if (signupTarget) {
+      window.location.assign(signupTarget);
+
+      return;
+    }
+
     setCreating(true);
 
     try {
@@ -401,6 +423,24 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
 
   const agentSubject = agent?.subject;
 
+  const resumeAcceptance =
+    new URLSearchParams(window.location.search).get('accept') === 'true';
+  const resumed = useRef(false);
+  const [resumeError, setResumeError] = useState(false);
+  const agentReady = agentResource.isReady();
+  const acceptAfterSignup = useEffectEvent(() => {
+    void handleAccept().catch(error => {
+      setResumeError(true);
+      store.notifyError(error);
+    });
+  });
+  useEffect(() => {
+    if (!resumeAcceptance || !agentSubject || !agentReady || resumed.current)
+      return;
+    resumed.current = true;
+    acceptAfterSignup();
+  }, [resumeAcceptance, agentSubject, agentReady]);
+
   useWelcomeLayoutEffect();
 
   // Extract the resource name from the server-generated description
@@ -422,6 +462,8 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
             <p role='status'>Creating your account…</p>
           ) : accepted ? (
             <p role='status'>Invite accepted. Finishing setup…</p>
+          ) : resumeAcceptance && agentSubject && !resumeError ? (
+            <p role='status'>Accepting your invitation…</p>
           ) : reviewProfile && agentSubject ? (
             <TeamProfileStep
               subject={agentSubject}
@@ -453,12 +495,20 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
                 </CtaButton>
               ) : (
                 <>
-                  <CtaButton data-test='accept-new' onClick={handleNew}>
+                  <CtaButton
+                    data-test='accept-new'
+                    disabled={signupTarget === undefined}
+                    onClick={handleNew}
+                  >
                     Create account and accept
                   </CtaButton>
                   <CtaButton
                     data-test='accept-sign-in'
-                    onClick={() => navigate(paths.agentSettings)}
+                    disabled={signupTarget === undefined}
+                    onClick={() => {
+                      if (signupTarget) window.location.assign(signupTarget);
+                      else navigate(paths.agentSettings);
+                    }}
                     subtle
                   >
                     I already have an account

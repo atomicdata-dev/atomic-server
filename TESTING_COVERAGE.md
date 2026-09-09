@@ -489,7 +489,12 @@ verify subsequent shared access. The chatroom journey also checks the named
 personal drive. Browser warnings/errors fail these tests, including localization
 render warnings. The authorization journey also covers cropped avatar upload, metadata and image
 download from the recipient account, and existing-agent acceptance. SaaS
-email-to-drive acceptance still needs dedicated flow coverage.
+`portal/e2e/invite-signup.spec.ts` covers a real invitation through email signup,
+recovery-code backup, automatic acceptance, and workspace reload. It also restores
+the existing identity in a second browser before accepting the invitation again.
+The test injects the standalone node's managed/portal metadata and declines
+automatic workspace-vault enrollment (no S3 service). Invitation, email login,
+encrypted identity recovery, and workspace operations use real local services.
 The invite journey also rejects transient duplicate acceptance buttons, opens the
 avatar file picker from the person button, and checks Feedback in the secret
 backup dialog. `onboarding-storage.spec.ts` injects a failed ClientDb initialization
