@@ -35,13 +35,16 @@ the parts that make a provider real:
   (`browser/e2e/tests/plugins.spec.ts`)
 - certification metadata (`package.json` `atomicCertification`)
 
-## Next: discovery through the localthought proxy
+## LocalThought and Syncables follow-up
 
-Once the touch points above are proven, the next step is a real provider
-discovered rather than hand-written: querying a **localthought proxy** to find
-which APIs can be imported (an OpenAPI-shaped discovery service, playing the
-role PR #1383's `REFLECTOR_ROOT/spec` scan played), then generating the same
-shape this document just walked — ontology, mapping, plugin — from what it
-returns instead of from a person writing `integrations/<name>/*.ts` by hand.
-That discovery protocol, and how much of a discovered plugin can be generated
-versus reviewed and hand-finished, is not designed yet.
+Work continues on `codex/localthought-api-plugins`: dynamic catalog discovery,
+signed account handoff, rotating host-owned credentials, Syncables pagination,
+platform-specific typed ontologies, and a paginated Pets mock integration proxy.
+See [the integration README](../integrations/localthought/README.md) for its
+configuration, behavior and tests.
+
+- [x] Replace public demo discovery with the live platform catalog.
+- [x] Implement signed account connection and return flow using `TENANT_SECRET`.
+- [x] Use Syncables with the catalog OAD for discovery, pagination and ontology.
+- [x] Add the mock proxy and wire the updated Pets browser journey into CI.
+- [ ] Verify live provider OAuth and GitHub import after proxy issue #25 is fixed.

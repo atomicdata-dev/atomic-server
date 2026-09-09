@@ -5,9 +5,6 @@ import { Button } from '@components/Button';
 import { Dialog, useDialog } from '@components/Dialog';
 import { IntegrationEvidence } from './IntegrationEvidence';
 
-const GitHubSetup = lazy(() =>
-  import('./ConnectGitHub').then(m => ({ default: m.ConnectGitHub })),
-);
 const NotionSetup = lazy(() =>
   import('./ConnectNotion').then(m => ({ default: m.ConnectNotion })),
 );
@@ -20,24 +17,8 @@ const MT940Setup = lazy(() =>
   import('./ImportMT940').then(m => ({ default: m.ImportMT940 })),
 );
 
-const PetsSetup = lazy(() =>
-  import('./ConnectPets').then(m => ({ default: m.ConnectPets })),
-);
-
 export function bundledIntegrations() {
   return [
-    {
-      id: 'pets' as const,
-      name: 'Pets',
-      icon: '🐾',
-      description: 'A trivial demo collection, useful for trying plugins out.',
-      capabilities:
-        'Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood).',
-      events: 'A one-off, on-demand import. Nothing runs in the background.',
-      limitation:
-        'No external account, API key or network call. Static sample data only, not a live provider.',
-      keywords: 'pets demo example sample ontology test touch points',
-    },
     {
       id: 'mt940' as const,
       name: 'Bank statements',
@@ -64,17 +45,6 @@ export function bundledIntegrations() {
       limitation:
         'Your entries only; up to 31 days. No active timers, updates, deletions, tags, task links, rates or custom fields.',
       keywords: 'clockify time tracking timesheet projects billable import',
-    },
-    {
-      id: 'github-issues' as const,
-      name: 'GitHub issues',
-      icon: '🐙',
-      description: 'Keep GitHub issues and your kanban board in sync.',
-      capabilities:
-        'Sync titles, descriptions and status in both directions. Create issues from either app.',
-      events: 'Start automations when a new issue is discovered.',
-      limitation: 'Issues only. Comments and pull requests are not synced.',
-      keywords: 'github issues kanban development engineering tasks automation',
     },
     {
       id: 'notion' as const,
@@ -137,14 +107,10 @@ export function IntegrationDiscovery({
           <Suspense fallback={<p>Loading setup…</p>}>
             {isOpen &&
               drive &&
-              (entry.id === 'pets' ? (
-                <PetsSetup drive={drive} />
-              ) : entry.id === 'mt940' ? (
+              (entry.id === 'mt940' ? (
                 <MT940Setup drive={drive} />
               ) : entry.id === 'clockify' ? (
                 <ClockifySetup drive={drive} workspace={workspace} />
-              ) : entry.id === 'github-issues' ? (
-                <GitHubSetup drive={drive} workspace={workspace} />
               ) : (
                 <NotionSetup drive={drive} />
               ))}

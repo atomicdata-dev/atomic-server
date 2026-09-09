@@ -21,11 +21,27 @@ import {
 test.describe('plugins', () => {
   test.beforeEach(before);
 
-  test('Pets installs its demo table after the reviewed import is applied', async ({
+  test('Pets imports from the mock integration proxy after account connection and review', async ({
     page,
   }) => {
+    test.skip(
+      !process.env.ATOMIC_MOCK_INTEGRATION_PROXY,
+      'Run with the documented mock integration-proxy server configuration',
+    );
     await page.getByRole('link', { name: 'Integrations', exact: true }).click();
 
+    // CI's browser and server are in different containers. Forward the mock's
+    // loopback address to the server container; the real connect/rotation logic runs there.
+    if (process.env.ATOMIC_SERVICE_URL)
+      await page.route('http://127.0.0.1:19090/**', async route => {
+        const target = new URL(route.request().url());
+        target.hostname = new URL(process.env.ATOMIC_SERVICE_URL!).hostname;
+        const response = await route.fetch({
+          url: target.href,
+          maxRedirects: 0,
+        });
+        await route.fulfill({ response });
+      });
     const pets = page.locator('[data-integration=pets]');
     await expect(
       pets.getByRole('heading', { name: 'Pets', exact: true }),
@@ -34,18 +50,23 @@ test.describe('plugins', () => {
 
     const setup = page.locator('dialog[open]');
     await expect(
-      setup.getByRole('button', { name: 'Install demo pets', exact: true }),
+      setup.getByRole('button', { name: 'Install and connect', exact: true }),
     ).toBeVisible();
+    await setup
+      .getByRole('button', { name: 'Install and connect', exact: true })
+      .click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Mock integration proxy' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Connect test account' }).click();
+    await expect(page).not.toHaveURL(/connection_code=/);
     const [preview] = await Promise.all([
       page.waitForResponse(
-        response =>
-          response.url().endsWith('/plugin-run') &&
-          response.request().method() === 'POST',
+        response => response.url().endsWith('/plugin-run') && response.request().method() === 'POST',
         { timeout: 45_000 },
       ),
-      setup
-        .getByRole('button', { name: 'Install demo pets', exact: true })
-        .click(),
+      page.getByRole('button', { name: 'Fetch and preview' }).click(),
     ]);
     expect(preview.ok(), await preview.text()).toBe(true);
 
@@ -62,13 +83,44 @@ test.describe('plugins', () => {
       .getByRole('button', { name: 'Apply 5 changes', exact: true })
       .click();
 
-    await page.getByRole('link', { name: 'Open Pets', exact: true }).click();
+    await page
+      .getByRole('link', { name: 'Open imported records', exact: true })
+      .click();
     const main = page.getByRole('main');
     await expect(
       main.getByRole('heading', { name: 'Pets', exact: true }),
     ).toBeVisible();
     for (const name of ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'])
-      await expect(main.getByText(name, { exact: true })).toBeVisible();
+      await expect(main.getByText(name, { exact: true }).first()).toBeVisible();
+    // Numeric and boolean properties must retain their Atomic datatype, not become JSON blobs.
+    const datatypes = await page.evaluate(async () => {
+      const store = window.store!;
+      const table = await store.getResource(
+        new URL(location.href).searchParams.get('subject')!,
+      );
+      const klass = await store.getResource(
+        table.get('https://atomicdata.dev/properties/classtype') as string,
+      );
+      const fields = klass.get(
+        'https://atomicdata.dev/properties/recommends',
+      ) as string[];
+      const properties = await Promise.all(
+        fields.map(s => store.getResource(s)),
+      );
+
+      return Object.fromEntries(
+        properties.map(p => [
+          p.get('https://atomicdata.dev/properties/name'),
+          p.get('https://atomicdata.dev/properties/datatype'),
+        ]),
+      );
+    });
+    expect(datatypes).toMatchObject({
+      age: 'https://atomicdata.dev/datatypes/integer',
+      vaccinated: 'https://atomicdata.dev/datatypes/boolean',
+      weight: 'https://atomicdata.dev/datatypes/float',
+      'updated at': 'https://atomicdata.dev/datatypes/timestamp',
+    });
   });
 
   test('a published release is discoverable and creates an independent draft', async ({
@@ -302,10 +354,10 @@ export function run() { return { intents: [] }; }
 
     await expect(
       page.getByText('Offline checks passed:', { exact: false }),
-    ).toHaveCount(4);
+    ).toHaveCount(3);
     await expect(
       page.getByText('Live provider checks are not included in these results.'),
-    ).toHaveCount(4);
+    ).toHaveCount(3);
     await page
       .locator('details')
       .filter({ hasText: 'Repository test results' })
@@ -733,6 +785,9 @@ export function run() { return { intents: [] }; }
       .locator('[data-integration=github-issues]')
       .getByRole('button', { name: 'Set up connection' })
       .click();
+    await page
+      .getByRole('button', { name: 'Use a direct GitHub token instead' })
+      .click();
     await expect(page.getByLabel('Sync into')).toContainText(
       'Shared project tasks',
     );
@@ -772,6 +827,9 @@ export function run() { return { intents: [] }; }
     await page
       .locator('[data-integration=github-issues]')
       .getByRole('button', { name: 'Set up connection' })
+      .click();
+    await page
+      .getByRole('button', { name: 'Use a direct GitHub token instead' })
       .click();
     await page
       .getByLabel('Repository', { exact: true })

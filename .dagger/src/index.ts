@@ -1635,29 +1635,34 @@ export class AtomicServer {
     // `--release` was reverted once for 15-30 min of cold compile; the `e2e`
     // profile drops LTO and the single codegen unit, which is where that time
     // went. Deploy still goes through `rustBuildRelease` (release=true).
-    const atomicServerBinary = this.rustBuild(
-      !e2e,
-      'x86_64-unknown-linux-musl',
-      e2e,
-    ).file('/atomic-server-binary');
-
-    return (
-      dag
-        .container()
-        .from('alpine:latest')
-        .withFile('/atomic-server-bin', atomicServerBinary, {
-          permissions: 0o755,
-        })
-        .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
-        // First-run flag — sets up the bootstrap agent + public drive +
-        // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
-        // Without this, every test's `before()` hook times out fetching it.
-        .withEnvVariable('ATOMIC_INITIALIZE', 'true')
-        .withExposedPort(9883)
-        .withEntrypoint(['/atomic-server-bin'])
-        .asService()
-        .withHostname(ATOMIC_DOMAIN)
+    const atomicServerBinary = this.rustBuild(!e2e, 'x86_64-unknown-linux-musl', e2e).file(
+      '/atomic-server-binary',
     );
+
+    let service = dag
+      .container()
+      .from(e2e ? 'node:22-alpine' : 'alpine:latest')
+      .withFile('/atomic-server-bin', atomicServerBinary, {
+        permissions: 0o755,
+      })
+      .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
+      // First-run flag — sets up the bootstrap agent + public drive +
+      // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
+      // Without this, every test's `before()` hook times out fetching it.
+      .withEnvVariable('ATOMIC_INITIALIZE', 'true')
+      .withExposedPort(9883)
+      .withEntrypoint(['/atomic-server-bin']);
+    if (e2e)
+      service = service
+        .withDirectory('/mock-proxy', this.source.directory('integrations/localthought'))
+        .withEnvVariable('ATOMIC_INTEGRATION_PROXY_URL', 'http://127.0.0.1:19090')
+        .withEnvVariable('TENANT_SECRET', 'bW9jay10ZW5hbnQ.mock-signature')
+        .withEnvVariable('ATOMIC_INTEGRATION_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
+        .withEnvVariable('MOCK_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
+        .withEnvVariable('MOCK_PROXY_HOST', '0.0.0.0')
+        .withExposedPort(19090)
+        .withEntrypoint(['sh', '-c', 'node /mock-proxy/mock-proxy.mjs & exec /atomic-server-bin']);
+    return service.asService().withHostname(ATOMIC_DOMAIN);
   }
 
   /**
@@ -1785,6 +1790,7 @@ export class AtomicServer {
         // It sits after the service binding and the setup probe, so the build
         // layers above stay cached; only the Playwright exec is unique.
         .withEnvVariable('E2E_RUN_NONCE', this.e2eRunNonce)
+        .withEnvVariable('ATOMIC_MOCK_INTEGRATION_PROXY', '1')
         .withExec([
           '/bin/bash',
           '-c',

@@ -60,9 +60,17 @@ It edits JavaScript, saves and reviews a real proposed effect, enables execution
 returns to review mode and checks history. The trigger HTTP response regression
 `response_filters_round_trip_into_updates` ensures GET filter values can be sent
 back to POST; tagged database values previously broke the enable button.
-The Pets flow verifies the bundled card's title and setup label, installs its
-connection, approves its five proposed creates, and finds Rex, Whiskers, Tweety,
-Nibbles and Bubbles in the resulting table.
+The Pets flow now uses a real mock integration-proxy service: signed consent,
+return to the same drive, rotating connection codes, two-page Syncables fetch,
+review/apply, and five displayed records with integer/boolean/float/timestamp
+properties. Dagger starts the mock for E2E; local runs opt in with
+`ATOMIC_MOCK_INTEGRATION_PROXY=1` and the README configuration.
+`integration_proxy` Rust tests cover actor/drive binding, tenant HMAC,
+Syncables pagination/ontology and duplicate-page refusal. The mock's Node test
+covers invalid tenant proofs and replayed/rotated codes. The mapping tests cover
+typed proposals, missing identities, repeat imports, local edits and duplicates.
+Live catalog OAD endpoints currently return 404 (integration-proxy #25), so live
+OAuth and GitHub data fetching are not yet certified.
 Run it against a production build to catch missing translation catalog entries:
 Vite dev extracts them automatically and can hide blank production labels.
 The GitHub setup flow also covers opting into assistant-led automation creation:

@@ -1,15 +1,15 @@
-name: Pets E2E
+name: LocalThought API plugins E2E
 
 on:
   push:
-    branches: [feat/api-plugins]
+    branches: [feat/api-plugins, codex/localthought-api-plugins]
 
 permissions:
   contents: read
 
 jobs:
   pets:
-    name: Install and display demo pets
+    name: Connect, paginate and display typed Pets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +22,6 @@ jobs:
           args: >-
             end-to-end --netlify-auth-token env://NETLIFY_TOKEN
             --playwright-mode full
-            --playwright-grep "Pets installs its demo table after the reviewed import is applied"
+            --playwright-grep "Pets imports from the mock integration proxy after account connection and review"
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}

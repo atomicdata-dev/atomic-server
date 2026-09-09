@@ -44,3 +44,7 @@ pub mod plugin_sync;
 pub mod integration_action;
 
 pub mod integration_oauth;
+
+pub mod integration_proxy;
+
+mod integration_proxy_sync;
