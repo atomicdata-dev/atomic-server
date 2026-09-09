@@ -487,3 +487,7 @@ updates without a reload and verifies a second change after the reader reloads.
 multiple-reader cleanup through both Store unsubscribe APIs, and retaining
 ordinary document drive-wide fan-out. Profiles no longer depend on being inside
 the reader's active drive to receive live updates.
+
+## Recovery-code passkey enrollment
+
+`browser/data-browser/src/helpers/managed/recovery-enrollment.test.ts` verifies code-only reveal without WebAuthn, preservation of ciphertext and existing wrappers when adding a passkey, unlocking with either passkey, and no writes on wrong-code, account-mismatch or cancelled registration. Tests use WebCrypto, Argon2id and a simulated authenticator; physical mobile PRF support remains a device acceptance check.
