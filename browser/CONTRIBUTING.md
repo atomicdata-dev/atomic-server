@@ -10,22 +10,28 @@ Talk with other devs on our [Discord][discord-url]!
 
 ## Publishing
 
+CI publishes `@tomic/*` to npm when a `v*` tag is pushed (`release.yml` `npm`
+job). Use the steps below only when that job failed or you are publishing
+from a machine that is not CI.
+
 - `pnpm lint-fix`
 - commit any changes (if they are there)
 - `pnpm build` to build typescript files (don't skip this!)
 - make sure `atomic-server` is running on `localhost`.
 - `pnpm test`
 - `pnpm test-e2e`
-- Update the `package.json` files for all published `@tomic/*` packages with the same version number as the Rust release. This includes beta versions such as `0.41.0-beta.0`.
-- Update starter template dependencies that point to `@tomic/*`.
+- Bump versions with `node scripts/bump-version.mjs` from the repo root — do
+  not edit `package.json` files by hand. Versions must match the Rust release,
+  including beta versions such as `0.41.0-beta.0`.
+- Update starter template dependencies that point to `@tomic/*` (the bump
+  script does this).
 - Run `pnpm install --lockfile-only` from `/browser` after version changes.
 - Check the [changelog](changelog.md), make sure the headers are correct
 - Now do the rust libraries
-- Commit any changes, name it `vX.XX.XX`
-- `pnpm publish -r`
-  - Choose a new version. Versions should match `atomic-data-rs`.
-  - This updates the `package.json` files, creates a commit, tags it, pushes it to github, and publishes the builds to npm.
-  - If this fails, try `pnpm version patch` and `pnpm publish`
+- Commit any changes, name it `vX.XX.XX`, tag and push. CI publishes to npm.
+- If you must publish by hand: `pnpm publish -r --no-git-checks --access public --tag <latest|beta>`
+  - Pre-releases must use `--tag beta` (or `rc`, …). The default is `latest`,
+    which would replace the stable install.
   - DONT run `pnpm npm publish`, as it will not resolve workspace dependencies correctly.
 
 ## Understanding vite and pnpm workspaces

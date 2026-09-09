@@ -228,6 +228,11 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
     OS-assigned port when `portpicker` finds none (hosts without IPv6).
 - Tauri Android: ship `arm64-v8a` only. The sideloadable universal APK was ~369 MB because it bundled four copies of `libatomic_server_tauri.so` (armeabi-v7a / x86 / x86_64 as well). Phones and tablets we install on are arm64; override with `cargo tauri android build --target …` for an Intel emulator.
 
+- CI: tag releases publish `@tomic/*` to npm. They previously only published
+  crates.io and GitHub assets, which is why npm `latest` stayed on 0.40.0 and
+  `beta` on 0.41.0-beta.0 through v0.41.0-beta.4. Pre-releases use the `beta`
+  (or `rc`, …) dist-tag, not `latest`.
+
 ## [v0.41.0-beta.4] - 2026-09-03
 
 - Fix: with `ATOMIC_HOME_DRIVE` set, `GET /server` answered 500 for plain JSON and JSON-LD (`Accept: application/json`): the `homeDrive` property the endpoint sets was never defined in the default store, so rendering tried to fetch it from atomicdata.dev. JSON-AD (what the data-browser asks for) was unaffected. The property is now part of the defaults.

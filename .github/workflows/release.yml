@@ -1,4 +1,4 @@
-name: Release (github, dockerhub, crates.io)
+name: Release (github, dockerhub, crates.io, npm)
 
 # Least privilege per job below; nothing here needs more than `contents`.
 # Creating the release and attaching assets need `contents: write`; the
@@ -153,6 +153,146 @@ jobs:
           # stays invisible until a release partially completes and gets re-run
           # -- which is exactly when you least want a new failure mode.
           check-repo: false
+
+  # npm was the missing half of a tag release. crates.io has been automated
+  # here for a while; `@tomic/*` was still `pnpm publish -r` on someone's
+  # laptop (browser/CONTRIBUTING.md). That is why npm latest is 0.40.0 and
+  # the `beta` tag is stuck on 0.41.0-beta.0 (published 2025-06-23) while
+  # v0.41.0-beta.1 through beta.4 went out to crates.io and GitHub and never
+  # reached the registry. A tag that publishes one ecosystem and forgets the
+  # other is a broken release — consumers of `@tomic/lib` cannot install the
+  # version the changelog describes.
+  #
+  # Its own job, not a step on `crates`, for the same reason tauri-release
+  # is a separate workflow: a 401 from npmjs.org must not re-attempt a
+  # crates.io publish that already succeeded (crates.io only yanks), and a
+  # re-run here must be safe against versions that already landed. `pnpm
+  # publish -r` skips any package+version that is already on the registry,
+  # so a partial publish can be retried without `--force`.
+  npm:
+    name: Publish packages to npm
+    # Deliberately NOT CI_RUNNER — same reason as `crates`.
+    runs-on: ubuntu-latest
+    # `id-token: write` lets this job use npm Trusted Publishing (OIDC)
+    # once each `@tomic/*` package is configured on npmjs.com to accept
+    # this workflow. `contents: read` is the minimum for checkout; the
+    # workflow-level `write-all` already covers both, but being explicit
+    # here documents the OIDC requirement.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # Writes a root `.npmrc` with
+          # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`. Required
+          # for both a classic/granular token and for Trusted Publishing
+          # (the latter ignores an empty token and uses the OIDC exchange).
+          registry-url: https://registry.npmjs.org
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          # Latest 10.x. Trusted Publishing support landed in 10.16; the
+          # repo pin is 10.15.1, which is why this is not read from
+          # browser/package.json. `version: 10` already matches the crates
+          # job, and there is no root package.json for the action to
+          # consult.
+          version: 10
+          run_install: false
+
+      # Do NOT run the workspace `pnpm run build`. That filter-walks into
+      # `@tomic/data-browser`, which shells out to wasm-pack. The npm
+      # packages do not embed that frontend, and pulling a Rust/wasm
+      # toolchain into this job is how the crates job ended up needing
+      # one. Each publishable package has its own `prepublishOnly` (or
+      # we build the two that don't, below).
+      - name: Install the JS workspace
+        run: |
+          set -euo pipefail
+          cd browser
+          pnpm install --frozen-lockfile
+
+      # Same check as the crates job, same reason: npm is append-only for
+      # a given version. A tag whose browser/lib/package.json still says
+      # the previous number publishes a stale `@tomic/lib` that can never
+      # be replaced, and the 15 version sites share no single source of
+      # truth. Cheap, and it has already caught a missed bump. Dist-tag
+      # cases run here too so a broken tag mapping fails before upload.
+      - name: Version sites must match the tag
+        run: |
+          set -euo pipefail
+          node scripts/bump-version.mjs --check "${GITHUB_REF_NAME#v}"
+          node scripts/npm-dist-tag.mjs --check
+
+      # Build before publish so a prepublishOnly failure still leaves a
+      # tree we can inspect, and `--ignore-scripts` remains a safe
+      # escape hatch. Skips `@tomic/data-browser` (wasm-pack).
+      - name: Build publishable packages
+        run: |
+          set -euo pipefail
+          cd browser
+          # lib first: cli / react / svelte / plugin / edit-mode / create-template
+          # all import `@tomic/lib` types. A single `--filter` list runs them
+          # concurrently, and tsc then fails with TS2307 on a fresh checkout
+          # — the same order the workspace `pnpm run build` already uses.
+          # data-browser is not in this list (wasm-pack).
+          pnpm --filter "@tomic/lib" run build
+          pnpm --filter "@tomic/react" \
+               --filter "@tomic/cli" \
+               --filter "@tomic/svelte" \
+               --filter "@tomic/create-template" \
+               --filter "@tomic/plugin" \
+               --filter "@tomic/edit-mode" \
+               run build
+
+      - name: Publish to npm
+        env:
+          # Granular automation token with write to the `@tomic` org.
+          # Leave unset to use Trusted Publishing instead (configure
+          # each package on npmjs.com: repo `ontola/atomic-server`,
+          # workflow `release.yml`). An empty token does not break
+          # OIDC — npm falls through to the id-token exchange.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Dist-tag must NOT default to `latest` for a pre-release.
+          # `pnpm publish` (and npm) tag `latest` unless told otherwise,
+          # which would make `npm i @tomic/lib` install a beta and move
+          # the 0.40.0 stable off `latest`. The existing tags on npm are
+          # `latest` = 0.40.0 and `beta` = 0.41.0-beta.0 — keep that
+          # split. Logic lives in scripts/npm-dist-tag.mjs (has --check).
+          version="${GITHUB_REF_NAME#v}"
+          dist_tag=$(node scripts/npm-dist-tag.mjs "$version")
+          echo "Publishing ${version} with dist-tag ${dist_tag}"
+
+          cd browser
+          # `--no-git-checks`: this job runs on a detached tag HEAD, and
+          # `pnpm publish` otherwise requires a clean publish-branch
+          # (main/master — neither of which this repo uses for releases).
+          # `--access public`: scoped packages default to restricted, and
+          # `@tomic/plugin` / `@tomic/edit-mode` have never been published
+          # so they have no registry-side access flag yet.
+          # `--ignore-scripts`: skip prepublishOnly. We already built
+          # above, and `@tomic/lib`'s `lint-package` → `attw` currently
+          # crashes (`Cannot read properties of undefined (reading
+          # 'filename')`), which would fail every release. Lint and
+          # packaging checks belong in the main pipeline. The
+          # `workspace:*` rewrite is done by `pnpm publish` itself, not
+          # by those scripts.
+          # Recursive publish skips `private: true` (@tomic/root,
+          # data-browser, e2e) and any version already on the registry.
+          # DONT use `pnpm npm publish` — that skips the workspace:*
+          # rewrite and would publish a package that cannot resolve
+          # `@tomic/lib` (browser/CONTRIBUTING.md).
+          pnpm publish -r --no-git-checks --ignore-scripts --access public --tag "$dist_tag" --report-summary
+
+          if [ -f pnpm-publish-summary.json ]; then
+            echo "Publish summary:"
+            cat pnpm-publish-summary.json
+          fi
 
   # I'd like to skip this one, as the publish-tauri action already creates a release
   create-release:

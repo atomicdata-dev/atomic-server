@@ -37,6 +37,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
   - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
     - [Building and publishing binaries](#building-and-publishing-binaries)
     - [Publishing to Cargo](#publishing-to-cargo)
+    - [Publishing to npm](#publishing-to-npm)
     - [Publishing server to Docker](#publishing-server-to-docker)
     - [Deploying to atomicdata.dev](#deploying-to-atomicdatadev)
     - [Publishing atomic-cli to WAPM](#publishing-atomic-cli-to-wapm)
@@ -277,12 +278,14 @@ We believe AI can be useful for improving software while also recognizing that i
    for a version you are actually about to tag — a section for a release that
    never shipped is worse than no section, see the `[v0.40.2]` entry for how
    confusing that gets.
-1. Publish to cargo: `cargo publish`. First `lib`, then `cli` and `server`.
-1. Publish to `npm` (see `browser/CONTRIBUTING.md`)
+1. Tag `v<version>` and push it. CI publishes crates.io, npm, GitHub release
+   assets, and (on a stable tag) production. Do not publish crates or npm by
+   hand unless CI failed — see [Publishing manually](#publishing-manually---doing-the-cis-work).
 
 The following should be triggered automatically:
 
 - Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
+- The same tag publishes Rust crates to crates.io and `@tomic/*` packages to npm (`latest` for a stable tag, the pre-release identifier — `beta`, `rc`, … — otherwise).
 - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 
 Note:
@@ -293,7 +296,7 @@ Note:
 ### CI/CD pipeline
 
 - Github Action for `push`: builds + tests + docker (using `dagger`, see `.dagger` and the `.github` folders)
-- Github Action for `tag`: create release + publish binaries
+- Github Action for `tag`: create release + publish binaries + crates.io + npm
 - Docker tags should include immutable release tags such as `0.41.0-beta.0`. `latest` is useful as a convenience tag, but downstream consumers such as Home Assistant add-ons need a changing version tag to reliably detect updates.
 
 ### Deployments
@@ -382,7 +385,7 @@ environment is already declared, so no workflow change is needed.
 
 ### Publishing manually - doing the CI's work
 
-If the CI scripts for some reason do not do their job (buildin releases, docker file, publishing to cargo), you can follow these instructions:
+If the CI scripts for some reason do not do their job (building releases, docker file, publishing to cargo or npm), you can follow these instructions:
 
 #### Building and publishing binaries
 
@@ -397,6 +400,21 @@ If the CI scripts for some reason do not do their job (buildin releases, docker 
 OR
 
 1. Install `cargo install cargo-release` and run `cargo release patch`
+
+#### Publishing to npm
+
+CI does this on a `v*` tag (`release.yml` `npm` job). Auth is the `NPM_TOKEN`
+repo secret (granular automation token, write to `@tomic`) or npm Trusted
+Publishing pointed at this workflow. Pre-releases go to the `beta` / `rc`
+dist-tag, not `latest`.
+
+1. `cd browser && pnpm install --frozen-lockfile`
+1. `pnpm --filter @tomic/lib --filter @tomic/react --filter @tomic/cli --filter @tomic/svelte --filter @tomic/create-template --filter @tomic/plugin --filter @tomic/edit-mode run build`
+1. `pnpm publish -r --no-git-checks --ignore-scripts --access public --tag <latest|beta>`
+   - `--ignore-scripts` skips `prepublishOnly`. Build first (step 2);
+     `@tomic/lib`'s `attw` currently crashes and would fail the publish.
+   - DONT run `pnpm npm publish`: it skips the `workspace:*` rewrite and
+     publishes a package that cannot resolve `@tomic/lib`.
 
 #### Publishing server to Docker
 
