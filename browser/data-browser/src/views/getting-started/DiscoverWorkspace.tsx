@@ -54,6 +54,7 @@ export function DiscoverWorkspace({
           setPhase('ready');
         }
       });
+
     return () => {
       cancelled = true;
     };
@@ -65,6 +66,7 @@ export function DiscoverWorkspace({
     setPhase('searching');
     setPeer(undefined);
     setError('');
+
     try {
       const info = await fetchManagedInfo(url);
       if (!info.nodeId)
@@ -78,6 +80,7 @@ export function DiscoverWorkspace({
     } catch (e) {
       setError(String(e));
     }
+
     setPhase('ready');
   }
 
@@ -85,13 +88,16 @@ export function DiscoverWorkspace({
     if (!peer) return;
     setPhase('fetching');
     setError('');
+
     try {
       await invoke('fetch_workspace', { drive, nodeId: peer.nodeId });
+
       if (!(await deviceHasDriveData(store, drive, { refresh: true }))) {
         throw new Error(
           'The connection finished, but your workspace is not available here yet.',
         );
       }
+
       await reopenRestoredDrive(store, drive);
       onConnected(drive);
     } catch (e) {

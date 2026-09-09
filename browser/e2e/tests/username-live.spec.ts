@@ -15,6 +15,7 @@ test.beforeEach(async ({ page }) => {
   );
 });
 test.beforeEach(before);
+
 async function collaborator(
   page: import('@playwright/test').Page,
   browser: import('@playwright/test').Browser,
@@ -26,10 +27,11 @@ async function collaborator(
     route.fulfill({ status: 204 }),
   );
   await devDrive(peer);
-  const agent = await peer.evaluate(() => window.store.getAgent()!.subject);
-  const drive = await page.evaluate(async agent => {
+  const peerAgent = await peer.evaluate(() => window.store.getAgent()!.subject);
+  const sharedDrive = await page.evaluate(async agent => {
     const store = window.store;
     const drive = await store.getResource(store.getDrive()!);
+
     for (const property of [
       'https://atomicdata.dev/properties/read',
       'https://atomicdata.dev/properties/write',
@@ -39,16 +41,20 @@ async function collaborator(
         agent,
       ]);
     }
+
     await drive.save();
+
     return drive.subject;
-  }, agent);
+  }, peerAgent);
   await page.waitForFunction(
     () => window.store.getSyncStatus().pendingDirtyCount === 0,
   );
-  await peer.evaluate(drive => window.store.setDrive(drive), drive);
+  await peer.evaluate(drive => window.store.setDrive(drive), sharedDrive);
   await openSubject(peer, subject);
+
   return peer;
 }
+
 test('remote username change updates existing chat author', async ({
   page,
   browser,
