@@ -235,6 +235,12 @@ impl BrowserPeerSession {
                 }
                 let mut entries = Vec::new();
                 for subject in &diff.pull {
+                    // Another mesh edge can delete a resource after its version
+                    // vector was advertised. The next reconcile sends the
+                    // signed tombstone; a stale pull must not close this edge.
+                    if super::tombstones::is_tombstoned(db, subject) {
+                        continue;
+                    }
                     let resource = db.get_resource(&subject.as_str().into()).await?;
                     if !self.in_drive(&resource) {
                         return Err("Peer requested another drive".into());
@@ -556,6 +562,37 @@ mod tests {
             .unwrap()
             .is_none());
         assert!(session.can_send(&db, &drive).await);
+    }
+
+    #[tokio::test]
+    async fn delayed_mesh_pull_skips_deleted_resources_but_rejects_unknown_ones() {
+        let (db, agent, drive, mut session) = fixture().await;
+        authenticate(&db, &agent, &mut session).await;
+        let deleted = "did:ad:deleted-before-pull".to_string();
+        super::super::tombstones::record_tombstone(&db, &deleted);
+        let frame = protocol::encode_sync_diff(
+            &drive,
+            &[deleted, drive.clone()],
+            &[],
+            &[],
+            &Default::default(),
+            &Default::default(),
+        );
+        let output = session.handle(&db, &frame).await.unwrap();
+        let push = protocol::decode_sync_push(&output.frames[0][1..]).unwrap();
+        assert_eq!(push.entries.len(), 1);
+        assert_eq!(push.entries[0].subject, drive);
+        assert!(session.can_send(&db, &drive).await);
+
+        let unknown = protocol::encode_sync_diff(
+            &drive,
+            &["did:ad:never-existed".into()],
+            &[],
+            &[],
+            &Default::default(),
+            &Default::default(),
+        );
+        assert!(session.handle(&db, &unknown).await.is_err());
     }
 
     #[tokio::test]
