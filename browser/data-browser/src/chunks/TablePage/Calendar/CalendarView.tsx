@@ -19,7 +19,12 @@ import { Button } from '@components/Button';
 import { ExpandedRowDialog } from '../ExpandedRowDialog';
 import { useCalendarDateProp } from './useCalendarDateProp';
 import { CalendarDay } from './CalendarDay';
-import { calendarFields, isAllDayOnDate, nextCalendarDate } from '@tomic/lib';
+import {
+  calendarFields,
+  matchesCalendarField,
+  isAllDayOnDate,
+  nextCalendarDate,
+} from '@tomic/lib';
 
 interface CalendarViewProps {
   /** The Table resource; new items are created as its children. */
@@ -150,12 +155,15 @@ export function CalendarView({
   }, [cursor]);
 
   // Imported ranges are opt-in: unrelated table date columns stay single-day.
-  const calendarDate = dateProp?.shortname === calendarFields.day;
-  const allDayProp = allColumns.find(
-    p => p.shortname === calendarFields.allDay,
+  const calendarDate = matchesCalendarField(
+    dateProp?.shortname,
+    calendarFields.day,
   );
-  const endDayProp = allColumns.find(
-    p => p.shortname === calendarFields.endDay,
+  const allDayProp = allColumns.find(p =>
+    matchesCalendarField(p.shortname, calendarFields.allDay),
+  );
+  const endDayProp = allColumns.find(p =>
+    matchesCalendarField(p.shortname, calendarFields.endDay),
   );
   const allDaySubjects = new Set(
     memberSubjects.filter(
@@ -185,6 +193,7 @@ export function CalendarView({
         allDayProp &&
         resource?.get(allDayProp.subject) === true;
       const end = endDayProp && resource?.get(endDayProp.subject);
+
       for (const day of gridDays) {
         if (
           isAllDay && end !== undefined

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isCalendarDate,
+  matchesCalendarField,
   isAllDayOnDate,
   nextCalendarDate,
 } from './calendar-date';
@@ -46,4 +47,20 @@ it('creates exclusive one-day ends across leap days and years', () => {
   expect(nextCalendarDate('2024-02-29')).toBe('2024-03-01');
   expect(nextCalendarDate('2026-12-31')).toBe('2027-01-01');
   expect(() => nextCalendarDate('2026-02-30')).toThrow();
+});
+
+it('matches installed Google property shortnames without adopting unrelated fields', () => {
+  expect(
+    matchesCalendarField('atomic-calendar-day', 'atomic-calendar-day'),
+  ).toBe(true);
+  expect(
+    matchesCalendarField(
+      'lt-google-calendar-property-atomic-calendar-day',
+      'atomic-calendar-day',
+    ),
+  ).toBe(true);
+  expect(
+    matchesCalendarField('custom-atomic-calendar-day', 'atomic-calendar-day'),
+  ).toBe(false);
+  expect(matchesCalendarField(undefined, 'atomic-calendar-day')).toBe(false);
 });

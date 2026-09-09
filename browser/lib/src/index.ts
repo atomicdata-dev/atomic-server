@@ -253,6 +253,7 @@ export type { WorkspaceConnection } from './plugin-workspace.js';
 
 export {
   calendarFields,
+  matchesCalendarField,
   isCalendarDate,
   isAllDayOnDate,
   nextCalendarDate,
