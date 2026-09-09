@@ -1,3 +1,4 @@
+import { viewRequest, packagedViewOperations } from './viewProtocol';
 import {
   MessageType,
   type Commit,
@@ -18,7 +19,25 @@ export class RPCClient {
   private subscriptions: Map<string, ResourceCallback[]> = new Map();
 
   constructor() {
-    window.addEventListener('message', (e: MessageEvent<ServerMessage>) => {
+    window.addEventListener('message', (event: MessageEvent) => {
+      if (
+        event.source !== window.parent ||
+        !event.data ||
+        typeof event.data !== 'object'
+      )
+        return;
+      const wire = event.data;
+      const data =
+        wire.type === 'atomic.view.response' && wire.version === 1
+          ? wire.error !== undefined
+            ? { type: 'error', requestId: wire.id, error: wire.error }
+            : { type: 'response', requestId: wire.id, data: wire.result }
+          : wire.type === 'atomic.view.change' && wire.version === 1
+            ? { type: 'resource-notification', resource: wire.resource }
+            : wire;
+      const e = { data: data as ServerMessage };
+      if (e.data.type === 'resource-notification' && !e.data.resource) return;
+
       if (e.data.type === 'resource-notification') {
         const callbacks = this.subscriptions.get(e.data.resource.subject) ?? [];
 
@@ -167,11 +186,11 @@ export class RPCClient {
       ]);
 
       window.parent.postMessage(
-        {
-          type: messageType,
-          args,
+        viewRequest(
           requestId,
-        },
+          packagedViewOperations[messageType],
+          (args ?? {}) as Record<string, unknown>,
+        ),
         '*',
       );
     });

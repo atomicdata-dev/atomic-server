@@ -36,7 +36,7 @@ export function ConnectNotionManual({ drive }: { drive: string }) {
         token.trim(),
       );
       setToken('');
-      navigate(constructOpenURL(connection.plugin));
+      navigate(constructOpenURL(connection.table));
     } catch (e) {
       setError(String(e));
     } finally {

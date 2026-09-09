@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type JSX } from 'react';
+import { useId, useMemo, useState, lazy, Suspense, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { ContainerFull } from '@components/Containers';
 import { EditableTitle } from '@components/EditableTitle';
@@ -10,6 +10,12 @@ import { TableExportDialog } from './TableExportDialog';
 import { TableResource } from './TableResource';
 import { useCustomContextItems } from '@components/ResourceContextMenu/CustomContextItemsContext';
 import { DIVIDER } from '@components/Dropdown';
+
+const WorkspaceControls = lazy(() =>
+  import('../PluginRuns/WorkspaceControls').then(m => ({
+    default: m.WorkspaceControls,
+  })),
+);
 
 export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   const titleId = useId();
@@ -60,6 +66,9 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
               withDecorations
             />
           </FlexRow>
+          <Suspense fallback={null}>
+            <WorkspaceControls workspace={resource.subject} />
+          </Suspense>
           <TableResource resource={resource} />
         </Column>
         <TableExportDialog

@@ -1,5 +1,11 @@
 # Plugin runtime v1: implementation contract
 
+For the proposed convergence of this runtime with packaged UI plugins, Apps and
+Reflector, see [Atomic extension architecture](extension-architecture.md). That
+proposal does not claim the migration is already implemented. Dated remaining-work
+notes below describe their implementation pass; consult the provider plans and
+delivery audit for subsequent progress.
+
 Status: implemented subset on `feat/plugin-model`, 2026-09-05. Follow
 [plugin-model-review.md](plugin-model-review.md) for the remaining release and
 bidirectional-sync work. A minimal public package/catalog format exists; compatibility certification and

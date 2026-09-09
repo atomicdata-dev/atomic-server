@@ -245,3 +245,6 @@ export { resumableInstallation } from './resumable-installation.js';
 export * from './import-resolution.js';
 
 export * from './import-reference-review.js';
+
+export { pluginWorkspace, workspaceConnections } from './plugin-workspace.js';
+export type { WorkspaceConnection } from './plugin-workspace.js';

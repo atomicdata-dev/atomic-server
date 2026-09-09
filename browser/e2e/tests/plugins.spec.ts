@@ -248,7 +248,7 @@ export function run() { return { intents: [] }; }
       await expect(
         page
           .getByRole('main')
-          .getByRole('heading', { name: /Notion data source/, level: 1 }),
+          .getByRole('heading', { name: /Notion rows/, level: 1 }),
       ).toBeVisible();
       expect(credentialBindings).toBe(1);
     });
@@ -734,11 +734,7 @@ export function run() { return { intents: [] }; }
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
       .click();
-    await expect(
-      page.getByRole('heading', {
-        name: /GitHub issues: atomic-fixtures\/shared-tasks/,
-      }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(tableUrl);
     await page.goto(tableUrl);
     await expect(
       page.getByRole('heading', { name: 'Shared project tasks', exact: true }),
@@ -771,6 +767,12 @@ export function run() { return { intents: [] }; }
       .fill('local-install-test-token');
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'Connections', exact: true })
+      .click();
+    await page
+      .getByRole('link', { name: 'Connection settings', exact: true })
       .click();
     await expect(
       page.getByRole('heading', {

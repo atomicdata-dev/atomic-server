@@ -327,6 +327,24 @@ describe('Store', () => {
     expect(resource.props.parent).toBe('https://myserver.dev/');
   });
 
+  it('returns the canonical resource when an HTTP query responds with an alias', async ({
+    expect,
+  }) => {
+    const store = new Store();
+    const canonical = new Resource('https://atomicdata.dev/query?canonical=1');
+    await canonical.set(core.properties.name, 'Query result', false);
+    vi.spyOn(store.client, 'fetchResourceHTTP').mockResolvedValue({
+      resource: canonical,
+      createdResources: [],
+    });
+    const result = await store.fetchResourceFromServer(
+      'https://atomicdata.dev/query?requested=1',
+      { noWebSocket: true },
+    );
+    expect(result).toBe(canonical);
+    expect(result.title).toBe('Query result');
+  });
+
   it('resolves aliases correctly', async ({ expect }) => {
     const store = new Store();
     const alias = 'https://atomicdata.dev/alias';

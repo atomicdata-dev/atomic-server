@@ -31,6 +31,13 @@ export function pluginSchema(): SchemaSpec {
   return {
     properties: [
       {
+        shortname: 'plugin-workspace',
+        name: 'Workspace',
+        description:
+          'Workspace using this connection. This relationship grants no access and does not change containment.',
+        datatype: Datatype.ATOMIC_URL,
+      },
+      {
         shortname: 'automation-integrations',
         name: 'Used integrations',
         description:

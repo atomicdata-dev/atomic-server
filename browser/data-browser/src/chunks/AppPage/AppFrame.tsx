@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { isViewRequest } from '@tomic/plugin';
+import { viewSession } from '@helpers/extensions/viewSession';
+import { useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
 import { findSchema, pluginSchema } from '@tomic/lib';
+import { FrameBridge } from '@helpers/extensions/FrameBridge';
 import { handleRequest, isHostRequest, type HostReply } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
 import { Button } from '@components/Button';
@@ -11,6 +14,16 @@ import type { AIAtomicResourceMessageContext } from '@chunks/AI/types';
 
 import resetCss from '../../reset.css?raw';
 import { useCreateThemeVars } from '@views/PluginView/useCreateThemeVars';
+
+/** Changing installation or destination must discard source tokens and pending replies. */
+export function AppFrame(props: Parameters<typeof AppFrameSession>[0]) {
+  return (
+    <AppFrameSession
+      key={JSON.stringify([props.app, props.drive, props.table])}
+      {...props}
+    />
+  );
+}
 
 /**
  * Renders an app's view, which lives in the drive rather than on the server's
@@ -22,7 +35,7 @@ import { useCreateThemeVars } from '@views/PluginView/useCreateThemeVars';
  * reason it does for installed plugins: a `srcdoc`, `blob:` or `data:` frame
  * inherits this page's CSP and the app's script would be blocked.
  */
-export function AppFrame({
+function AppFrameSession({
   app,
   drive,
   table,
@@ -63,7 +76,7 @@ export function AppFrame({
   onOutcomeRef.current = onOutcome;
   // Subject to the store's unsubscribe, so a view that re-renders does not
   // accumulate a listener per render and get told about one change N times.
-  const watching = useRef(new Map<string, () => void>());
+  const bridgeRef = useRef<FrameBridge | undefined>(undefined);
   const stylesheet = useCreateThemeVars();
 
   // Which plugin renders it. Resolved here rather than by each caller: a
@@ -123,100 +136,74 @@ export function AppFrame({
     };
   }, [store, drive, entrypoint, app]);
 
-  // The frame is null-origin, so its DOM is unreachable from here; hand the
-  // theme over the same way the plugin view does.
-  const sendStyle = useCallback(() => {
-    frameRef.current?.contentWindow?.postMessage(
-      { type: '__atomic_style', css: `${resetCss}\n${stylesheet}` },
-      '*',
-    );
-  }, [stylesheet]);
-
   useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.data?.type === '__atomic_plugin_ready') {
-        sendStyle();
+    const frame = frameRef.current;
+    if (!frame) return;
+    const bridge = new FrameBridge(frame, (wire, originalSession) => {
+      const canonical = isViewRequest(wire);
+      const data = canonical
+        ? { ...wire.args, __atomic: true, id: wire.id, op: wire.op }
+        : wire;
+      const session = canonical
+        ? viewSession(originalSession, wire.id)
+        : originalSession;
+      const message = data as Record<string, unknown>;
 
-        return;
-      }
-
-      if (e.data?.type === '__atomic_plugin_error') {
-        // Only from the frame this component owns, same as every other message
-        // here: any window on this origin can post, and an error attributed to
-        // the wrong app sends its author to fix code that is not broken.
-        if (e.source !== frameRef.current?.contentWindow) return;
-
+      if (message.type === '__atomic_plugin_error') {
         const failure: AppError = {
-          message: String(e.data.message ?? 'Something went wrong.'),
-          stack: typeof e.data.stack === 'string' ? e.data.stack : undefined,
-          phase: e.data.phase === 'load' ? 'load' : 'runtime',
+          message: String(message.message ?? 'Something went wrong.'),
+          stack: typeof message.stack === 'string' ? message.stack : undefined,
+          phase: message.phase === 'load' ? 'load' : 'runtime',
         };
-
         setAppError(failure);
         onOutcomeRef.current?.({ ok: false, ...failure });
 
         return;
       }
 
-      if (e.data?.type === '__atomic_plugin_rendered') {
-        if (e.source !== frameRef.current?.contentWindow) return;
-
+      if (message.type === '__atomic_plugin_rendered') {
         onOutcomeRef.current?.({
           ok: true,
-          children: typeof e.data.children === 'number' ? e.data.children : 0,
+          children: typeof message.children === 'number' ? message.children : 0,
         });
 
         return;
       }
 
-      if (!isHostRequest(e.data)) return;
+      if (!isHostRequest(data)) return;
 
-      // Only from the frame this component owns. A page can host more than
-      // one, and every other window on the origin can post here too.
-      if (e.source !== frameRef.current?.contentWindow) return;
-
-      const post = (message: unknown) =>
-        frameRef.current?.contentWindow?.postMessage(message, '*');
-
-      // Subscriptions are wired here rather than in `handleRequest`, because
-      // this is what owns the frame that has to be posted back to.
-      if (e.data.op === 'subscribe' && e.data.subject) {
-        const subject = e.data.subject;
-
-        if (!watching.current.has(subject)) {
-          watching.current.set(
-            subject,
-            store.subscribe(subject, () => post({ __atomicChanged: subject })),
-          );
-        }
-
-        post({ id: e.data.id, result: true });
+      if (data.op === 'subscribe' && typeof data.subject === 'string') {
+        const subject = data.subject;
+        session.watch(subject, () =>
+          store.subscribe(subject, () =>
+            session.post({ __atomicChanged: subject }),
+          ),
+        );
+        session.post({ id: data.id, result: true });
 
         return;
       }
 
-      if (e.data.op === 'unsubscribe' && e.data.subject) {
-        watching.current.get(e.data.subject)?.();
-        watching.current.delete(e.data.subject);
-        post({ id: e.data.id, result: true });
+      if (data.op === 'unsubscribe' && typeof data.subject === 'string') {
+        session.unwatch(data.subject);
+        session.post({ id: data.id, result: true });
 
         return;
       }
 
-      void answer(store, app, drive, table, e.data, post);
-    };
-
-    window.addEventListener('message', onMessage);
-    const released = watching.current;
+      void answer(store, app, drive, table, data, session.post);
+    });
+    bridgeRef.current = bridge;
 
     return () => {
-      window.removeEventListener('message', onMessage);
-      // Navigating away must not leave the store notifying a frame that is
-      // gone — those callbacks would keep the whole component tree alive.
-      released.forEach(unsubscribe => unsubscribe());
-      released.clear();
+      bridge.close();
+      bridgeRef.current = undefined;
     };
-  }, [sendStyle, store, app, drive, table]);
+  }, [store, app, drive, table, src]);
+
+  useEffect(() => {
+    bridgeRef.current?.setStyle(`${resetCss}\n${stylesheet}`);
+  }, [stylesheet, src]);
 
   // The app never got as far as running: no token, no entry point, no source.
   // Reported as a failure like any other, so a caller waiting on an outcome
@@ -290,7 +277,6 @@ export function AppFrame({
       <Frame
         ref={frameRef}
         src={src}
-        onLoad={sendStyle}
         // `allow-modals` because confirm() and alert() are the first things
         // an app reaches for to guard a delete, and without it they return
         // false silently — the button does nothing and nothing says why. Still

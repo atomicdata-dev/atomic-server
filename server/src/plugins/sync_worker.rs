@@ -1,10 +1,5 @@
 //! Persisted polling grants reuse the same sandbox session and effect journals.
-use super::{
-    js_runtime::StoreHost,
-    manifest::Manifest,
-    store_host::{app_signing_for, StoreApplyHost},
-    sync_session,
-};
+use super::{js_runtime::StoreHost, manifest::Manifest, store_host::StoreApplyHost, sync_session};
 use atomic_lib::{agents::ForAgent, db::trees::Tree, Db};
 use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -16,6 +11,8 @@ pub struct Schedule {
     pub plugin: String,
     pub release: String,
     pub config: Value,
+    #[serde(default)]
+    pub binding_required: bool,
     pub actor: String,
     pub interval_seconds: u64,
     pub next_at: i64,
@@ -69,11 +66,21 @@ pub async fn configure(
     {
         return Err("background sync requires your completed, reviewed run".into());
     }
+    let binding_required = super::release_binding::require_current(
+        db,
+        drive,
+        plugin,
+        &session.release,
+        &session.config,
+        session.binding_required,
+    )
+    .await?;
     let schedule = Schedule {
         drive: drive.into(),
         plugin: plugin.into(),
         release: session.release,
         config: session.config,
+        binding_required,
         actor: actor.into(),
         interval_seconds: interval,
         next_at: atomic_lib::utils::now() + interval as i64 * 1000,
@@ -107,6 +114,26 @@ async fn execute(db: &Db, drive: &str, plugin: &str) -> Result<(), String> {
     }
     if !continuing && session.as_ref().is_some_and(|s| s.status != "complete") {
         return Ok(());
+    }
+    if !continuing {
+        let s = schedule.as_mut().unwrap();
+        match super::release_binding::require_current(
+            db,
+            drive,
+            plugin,
+            &s.release,
+            &s.config,
+            s.binding_required,
+        )
+        .await
+        {
+            Ok(required) => s.binding_required = required,
+            Err(error) => {
+                s.error = Some(error.clone());
+                save(db, s)?;
+                return Err(error);
+            }
+        }
     }
     let (actor, release) = if continuing {
         let s = session.as_ref().unwrap();
@@ -143,11 +170,8 @@ async fn execute(db: &Db, drive: &str, plugin: &str) -> Result<(), String> {
             }
         }
     }
-    let mut atomic = StoreApplyHost {
-        store: db.clone(),
-        for_agent: host.for_agent.clone(),
-        signing_as: app_signing_for(db, drive, plugin).await?,
-    };
+    let mut atomic =
+        StoreApplyHost::for_installation(db, drive, plugin, host.for_agent.clone()).await?;
     let current = session.unwrap();
     let result =
         sync_session::advance(db, drive, plugin, &current.run, &actor, host, &mut atomic).await;
@@ -399,6 +423,29 @@ export async function run(ctx) {{
         assert_eq!(children_named(&f, &f.drive, "Background message").await, 2);
         tick(db).await.unwrap();
         assert_eq!(children_named(&f, &f.drive, "Background message").await, 2);
+        // Activating changed settings must not silently reuse the previous grant.
+        let mut connection = db.get_resource(&f.plugin.as_str().into()).await.unwrap();
+        connection
+            .set_unsafe(
+                f.terms.property("plugin-connection").unwrap().into(),
+                atomic_lib::Value::Json(json!({"release":release,"config":{"changed":true}})),
+            )
+            .unwrap();
+        connection.save(db).await.unwrap();
+        let mut due = read(db, &f.drive, &f.plugin).unwrap().unwrap();
+        due.next_at = 0;
+        save(db, &due).unwrap();
+        tick(db).await.unwrap();
+        assert_eq!(
+            children_named(&f, &f.drive, "Background message").await,
+            2,
+            "changed installation settings require a fresh review"
+        );
+        assert!(read(db, &f.drive, &f.plugin)
+            .unwrap()
+            .unwrap()
+            .error
+            .is_some());
         assert!(
             configure(db, &f.drive, &f.plugin, &done.run, "someone-else", 60)
                 .await

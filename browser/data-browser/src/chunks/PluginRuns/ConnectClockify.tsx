@@ -36,7 +36,13 @@ import {
 } from '../../../../../integrations/clockify/model';
 import source from '../../../../../integrations/clockify/plugin.js?raw';
 
-export function ConnectClockify({ drive }: { drive: string }) {
+export function ConnectClockify({
+  drive,
+  workspace: initialWorkspace,
+}: {
+  drive: string;
+  workspace?: string;
+}) {
   const store = useStore();
   const addToOntology = useAddToOntology();
   const [tables, setTables] = useState<TimeTableTarget[]>([]);
@@ -48,7 +54,14 @@ export function ConnectClockify({ drive }: { drive: string }) {
     let active = true;
     void timeTrackerTables(store, drive)
       .then(items => {
-        if (active) setTables(items);
+        if (active) {
+          setTables(items);
+          if (
+            initialWorkspace &&
+            items.some(item => item.tableSubject === initialWorkspace)
+          )
+            setTarget(initialWorkspace);
+        }
       })
       .catch(e => {
         if (active) setError(String(e));
@@ -57,7 +70,7 @@ export function ConnectClockify({ drive }: { drive: string }) {
     return () => {
       active = false;
     };
-  }, [store, drive]);
+  }, [store, drive, initialWorkspace]);
   const [key, setKey] = useState('');
   const [plugin, setPlugin] = useState<string>();
   const draftId = `installation:clockify:draft:${store.getAgent()?.subject}`;
@@ -234,6 +247,10 @@ export function ConnectClockify({ drive }: { drive: string }) {
       );
       await resource.set('https://atomicdata.dev/properties/emoji', '⏱️');
       const schema = await ensureSchema(store, drive, pluginSchema());
+      await resource.set(
+        schema.properties['plugin-workspace'],
+        targetTable.tableSubject,
+      );
       await resource.set(schema.properties['plugin-schemas'], {
         table: targetTable.tableSubject,
       });

@@ -931,11 +931,11 @@ needs connecting; it does not send a live model request. The blank-table setup
 regression also passes. `creationCatalog.test.ts` covers catalog completeness,
 multiword search and the assistant parent context. Frontend typecheck passes.
 
-## Integration workspace tabs (2026-09-08)
+## Workspace and connection navigation (2026-09-08)
 
 `browser/e2e/tests/integration-workspace.spec.ts` installs a GitHub connection
-without provider credentials and verifies its kanban opens by default, source and
-secrets are hidden until their tabs are selected, automation creation is available,
+without provider credentials and verifies the native kanban workspace opens,
+connection settings keep source and secrets behind their tabs, automation creation is available,
 and a changed opening-view setting survives reload. Uses the existing table view
 renderer and table-default-view property. Typecheck passes. No live provider sync
 or standalone custom AppFrame behavior is exercised by this test.
@@ -957,3 +957,88 @@ and reconciling optimistic additions already represented in that query. The othe
 collection sorting, drive-scope and empty-result regressions are run alongside it.
 Verified in the user's Zen integration table: total is 90, final rows render, and
 the phantom loading rows are gone. No source issue records were edited.
+
+Workspace separation coverage: `plugin-workspace.test.ts` checks explicit and
+legacy destinations, malformed configuration, authorization failure propagation,
+and exclusion of automations (including empty connection lists). The workspace
+browser spec removes the new relationship to exercise old GitHub installs, opens
+native kanban then connection settings, preserves the opening view, checks sync
+preview errors, and starts assistant chat without a connection. It also creates
+an on-demand script through the authoring helper and finds it from its workspace.
+`plugins.spec.ts` covers reuse of an existing task template with its views intact.
+These checks do not prove live AI generation, provider sync, multi-repository row
+ownership, disconnect revocation, or consolidation of the other UI runtimes.
+`store.test.ts` reproduces and fixes an HTTP fetch returning undefined when its
+response has a canonical subject different from the requested query URL.
+
+## Shared iframe bridge (2026-09-08)
+
+`FrameBridge.test.ts` covers both wire envelopes, wrong-frame requests and ready
+messages, theme updates, subscription deduplication, initial load versus document
+replacement, and teardown dropping late replies/subscriptions. `pluginRPC.test.ts`
+exercises the actual legacy adapter: permitted edits, denied outside writes,
+protection of plugin resources, notification grant revocation, host navigation,
+and permission responses arriving after unmount. Existing `hostStore.test.ts`
+keeps the generated app identity/subtree write checks exercised.
+
+The generated-app and packaged-plugin browser suites exercise the shared bridge
+through their real entry points. Packaged installation uses the bundled fixture
+and real server; its unrelated SaaS `/api/me` probe is explicitly stubbed to the
+supported 204 no-account response.
+
+`viewPolicy.test.ts` covers host-selected scopes, inherited public/agent grants,
+deep packaged ancestry, bounded app writes, cycles and unavailable ancestors.
+`viewSession.test.ts` checks canonical resource/error replies. The actual packaged
+and generated SDK clients share conformance tests in
+`browser/plugin/src/viewProtocol.test.ts`, including ignoring foreign-window replies.
+The packaged adapter additionally tests canonical requests, caller-supplied policy
+spoofing, subscription acknowledgements and unsupported operations.
+
+`apps.spec.ts` runs the first write scenario with both the served SDK and this
+checkout's v1 JS asset. The latter explicitly intercepts only `format=client`;
+resource creation and signing still use the real local backend. This verifies the
+new asset without claiming a rebuilt Rust binary. Backend signing identities and
+per-profile operation capabilities remain distinct; this is not certification of
+a common installation authority model.
+
+
+## Installation identity lifecycle (2026-09-08)
+
+`plugins::installation::tests` resolves existing nested subjects, legacy and active
+identities, rejects a forged drive even when a key exists there, and checks revoke /
+reconnect without reparenting records. `store_host::installation_tests` reproduces
+and prevents fallback to the server signer after a selected key is removed.
+`scheduler::tests::a_revoked_installation_cannot_resume_a_granted_schedule` verifies
+that an armed run records a revocation error without creating its proposed row.
+Existing app endpoint tests cover real signed writes, caller rights and outside
+scope denial; provider fixtures cover existing release/receipt/sync behavior.
+
+`db::app_agent` tests cover legacy MessagePack decoding, idempotent revocation,
+erased key material, explicit reconnect and a subprocess that exits without
+running destructors. Reopening the database must still show a revoked identity.
+These checks do not migrate packaged UI signing or certify live provider delivery.
+
+
+## Activation and upgrades (2026-09-08)
+
+`release_binding::tests` covers release/configuration comparison, absent/removed
+bindings and unchanged parent links. `sync_session_tests` rejects stale unapproved
+previews without provider writes and exercises compatible upgrades/rollback with
+an actual connection binding while retaining original receipts. The background
+worker regression proves a due job stops with a stored error when activation
+settings change, rather than writing with an older grant. Existing subprocess
+recovery tests continue to exercise already-approved work across process exit.
+
+
+## Packaged consent isolation and delete authorship (2026-09-09)
+
+`grantIdentity.test.ts` checks separation by server, drive, actor and installation,
+including unambiguous tuple encoding. The packaged-plugin browser flow verifies
+picker consent is persisted under the new identity, and installation, writes and
+reload still work. View remounting prevents the key-changing local-storage hook
+from retaining a previous account's state; pending permission/picker promises are
+cancelled on teardown. Old plugin-name grants are deliberately not migrated.
+
+`store_host::destroy_identity_tests` checks the signer of the persisted destroy
+commit. It failed with the server signer before `Resource::destroy_as` was used;
+installation deletion must use the same selected identity as create/update.

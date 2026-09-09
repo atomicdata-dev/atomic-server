@@ -268,6 +268,7 @@ export async function install(
   await table.set(dataBrowser.properties.tableViews, views);
   await table.set(dataBrowser.properties.tableDefaultView, views[0]);
   await table.save();
+  await plugin.set(schema.properties['plugin-workspace'], table.subject);
   await plugin.set(schema.properties['plugin-connection'], {
     release: pinned.id,
     config: c as unknown as JSONValue,

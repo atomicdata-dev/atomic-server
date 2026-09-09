@@ -16,7 +16,12 @@ const BIRD =
   'https://atomicdata.dev/01k10mtpp8fkkmsd6tkm9qrqyw/defaultontology/class/bird';
 
 test.describe('Plugins', () => {
-  test.beforeEach(before);
+  test.beforeEach(async ({ page }, testInfo) => {
+    // This is a self-hosted plugin test, independent of a developer's SaaS session.
+    // 204 is the supported no-account response; do not contact localhost:3030.
+    await page.route('**/api/me', route => route.fulfill({ status: 204 }));
+    await before({ page }, testInfo);
+  });
 
   test('install a plugin', async ({ page }) => {
     // Two upload + commit + plugin-install chains, a full bird-creation
@@ -163,6 +168,21 @@ test.describe('Plugins', () => {
 
       await expect(frame.getByText('My Problem')).toBeVisible();
     }
+
+    // Picker consent belongs to this account and concrete installation. Older
+    // plugin-name grants must not be copied into a different account's scope.
+    const grantKeys = await page.evaluate(() =>
+      Object.keys(localStorage).filter(key =>
+        key.startsWith('atomic.plugins.ui.v2.'),
+      ),
+    );
+    expect(grantKeys).toHaveLength(1);
+    const identity = JSON.parse(
+      grantKeys[0].slice('atomic.plugins.ui.v2.'.length),
+    );
+    expect(identity).toHaveLength(4);
+    expect(identity[2]).toMatch(/^did:ad:agent:/);
+    expect(identity[3]).toBeTruthy();
 
     // Check if the view can commit by refreshing and checking the favorite folder.
     await page.reload();

@@ -1,9 +1,9 @@
+import { grantIdentity } from './grantIdentity';
 import type { ResourcePageProps } from '../ResourcePage';
-import { useStore } from '@tomic/react';
+import { useCurrentAgent, useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
 import { usePluginRPC } from '@views/PluginView/pluginRPC';
 import styled from 'styled-components';
-import { useEffect, useRef } from 'react';
 
 import resetCss from '../../reset.css?raw';
 import { useCreateThemeVars } from './useCreateThemeVars';
@@ -34,48 +34,38 @@ export interface PluginViewProps extends ResourcePageProps {
  * reset + theme CSS, so we hand it over via `postMessage` once the iframe's
  * bootstrap signals `__atomic_plugin_ready`.
  */
-export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
+export const PluginView: React.FC<PluginViewProps> = props => {
+  const [agent] = useCurrentAgent();
+  const { drive } = useSettings();
+  const store = useStore();
+  const { getUIPluginData } = useCustomViews();
+  const installation = getUIPluginData(props.plugin).resource;
+
+  return (
+    <PluginViewSession
+      key={grantIdentity(
+        store.getServerUrl(),
+        drive,
+        agent?.subject ?? '',
+        installation,
+      )}
+      {...props}
+    />
+  );
+};
+
+const PluginViewSession: React.FC<PluginViewProps> = ({ plugin }) => {
   const { drive } = useSettings();
   const store = useStore();
   const { getUIPluginData } = useCustomViews();
   const pluginData = getUIPluginData(plugin);
-  const [frameRef, resourcePickerDialog] = usePluginRPC(pluginData);
   const stylesheet = useCreateThemeVars();
+  const [frameRef, resourcePickerDialog] = usePluginRPC(
+    pluginData,
+    `${resetCss}\n${stylesheet}`,
+  );
   const pluginUrl = `${store.getServerUrl()}/plugin-ui?drive=${encodeURIComponent(drive)}&plugin=${encodeURIComponent(plugin)}`;
   const src = `${pluginUrl}&format=html`;
-
-  // Hand the reset + theme CSS to the null-origin iframe via postMessage. The
-  // iframe applies it to its `<style id="__atomic_theme">`. We (re)send on the
-  // iframe's ready signal and whenever the theme changes.
-  const readyRef = useRef(false);
-
-  useEffect(() => {
-    const css = `${resetCss}\n${stylesheet}`;
-
-    const post = () =>
-      frameRef.current?.contentWindow?.postMessage(
-        { type: '__atomic_style', css },
-        '*',
-      );
-
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== frameRef.current?.contentWindow) return;
-
-      if ((e.data as { type?: string })?.type === '__atomic_plugin_ready') {
-        readyRef.current = true;
-        post();
-      }
-    };
-
-    window.addEventListener('message', onMessage);
-
-    // Theme changed after the iframe was already up → push the update.
-    if (readyRef.current) {
-      post();
-    }
-
-    return () => window.removeEventListener('message', onMessage);
-  }, [stylesheet, frameRef]);
 
   return (
     <>

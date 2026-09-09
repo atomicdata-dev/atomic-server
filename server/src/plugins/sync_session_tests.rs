@@ -244,6 +244,17 @@ impl Test {
         )
         .await
     }
+    async fn activate(&self) {
+        let terms = super::scheduler::drive_terms(&self.db, &self.drive)
+            .await
+            .unwrap();
+        self.edit(
+            &self.plugin,
+            terms.property("plugin-connection").unwrap(),
+            AtomicValue::Json(json!({"release":self.release,"config":self.config})),
+        )
+        .await;
+    }
     async fn apply(&mut self, run: &str) -> Session {
         for _ in 0..100 {
             let s = advance(
@@ -367,6 +378,7 @@ async fn sandbox_create_uncertain_response_is_not_repeated() {
 #[actix_web::test]
 async fn compatible_release_upgrade_preserves_bindings_and_pending_release() {
     let mut t = Test::new().await;
+    t.activate().await;
     t.host.provider.lock().unwrap().issues.insert(1, issue(1));
     t.sync().await;
     let before = connection_state::read(&t.db, &t.drive, &t.plugin).unwrap();
@@ -377,6 +389,7 @@ async fn compatible_release_upgrade_preserves_bindings_and_pending_release() {
         .push_str("\n// compatible maintenance release\n");
     t.release = t.db.publish_plugin_release(&package).unwrap();
     assert_ne!(t.release, old_release);
+    t.activate().await;
     let writes = t.host.provider.lock().unwrap().writes;
     t.sync().await;
     let after = connection_state::read(&t.db, &t.drive, &t.plugin).unwrap();
@@ -392,6 +405,7 @@ async fn compatible_release_upgrade_preserves_bindings_and_pending_release() {
     let pinned = pending.release.clone();
     // Neither upgrade nor rollback may replace an approved unresolved effect.
     t.release = old_release;
+    t.activate().await;
     assert!(t
         .preview()
         .await
@@ -763,4 +777,41 @@ async fn discovery_events_exclude_backfill_and_locally_created_issues() {
     assert_eq!(discoveries.len(), 1);
     assert_ne!(discoveries[0], initial);
     assert_ne!(discoveries[0], local);
+}
+
+#[actix_web::test]
+async fn activation_change_invalidates_an_unapproved_preview() {
+    let mut t = Test::new().await;
+    let terms = super::scheduler::drive_terms(&t.db, &t.drive)
+        .await
+        .unwrap();
+    let property = terms.property("plugin-connection").unwrap();
+    t.edit(
+        &t.plugin,
+        property,
+        AtomicValue::Json(json!({"release":t.release,"config":t.config})),
+    )
+    .await;
+    let preview = t.preview().await.unwrap();
+    assert!(preview.binding_required);
+    t.edit(
+        &t.plugin,
+        property,
+        AtomicValue::Json(json!({"release":t.release,"config":{"changed":true}})),
+    )
+    .await;
+    let result = advance(
+        &t.db,
+        &t.drive,
+        &t.plugin,
+        &preview.run,
+        "test",
+        t.host.clone(),
+        &mut t.atomic,
+    )
+    .await;
+    assert!(result.err().unwrap().contains("settings changed"));
+    let saved = read(&t.db, &t.drive, &t.plugin).unwrap().unwrap();
+    assert!(saved.approved_by.is_none());
+    assert_eq!(t.host.provider.lock().unwrap().writes, 0);
 }

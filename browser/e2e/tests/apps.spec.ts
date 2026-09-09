@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { before } from './test-utils';
 
@@ -16,48 +18,81 @@ import { before } from './test-utils';
 test.describe('apps', () => {
   test.beforeEach(before);
 
-  test('an app renders in its frame and writes its own data', async ({
-    page,
-  }) => {
-    const main = page.getByRole('main');
+  for (const client of ['served', 'v1 fixture'] as const) {
+    test(`an app renders in its frame and writes its own data (${client})`, async ({
+      page,
+    }) => {
+      let fixtureServed = false;
 
-    // `New app` is search-only: it creates the drive's plugin schema on first
-    // use, so it stays out of the default listing.
-    await page.getByRole('button', { name: 'More' }).click();
-    await page.getByPlaceholder(/filter/i).fill('app');
-    await page.locator('[data-testid="menu-item-new-app"]').click();
+      if (client === 'v1 fixture') {
+        // Exercise this checkout's embedded SDK even when the dev server binary
+        // predates it. Only the JS asset is replaced; all writes use the server.
+        const body = readFileSync(
+          resolve(
+            __dirname,
+            '../../../server/src/plugins/assets/view-client.js',
+          ),
+          'utf8',
+        );
+        await page.route(
+          url =>
+            url.pathname === '/plugin-ui' &&
+            url.searchParams.get('format') === 'client',
+          route => {
+            fixtureServed = true;
 
-    // An app page is the app: no chrome of its own, just the frame.
-    await expect(main.locator('iframe[title="App"]')).toBeVisible();
+            return route.fulfill({
+              body,
+              contentType: 'application/javascript',
+              headers: { 'Access-Control-Allow-Origin': '*' },
+            });
+          },
+        );
+      }
 
-    // And the frame is the page. An iframe never grows to fit its document,
-    // so a box shorter than the page does not scroll — it clips the app and
-    // leaves dead space underneath. Only the container's own padding should
-    // sit between the bottom of the frame and the bottom of the page.
-    const pageBox = (await main.boundingBox())!;
-    const frameBox = (await main.locator('iframe[title="App"]').boundingBox())!;
-    expect(frameBox.y + frameBox.height).toBeGreaterThan(
-      pageBox.y + pageBox.height - 48,
-    );
+      const main = page.getByRole('main');
 
-    // Null-origin, so Playwright reaches it as a frame rather than through
-    // the parent's DOM — which is the isolation doing its job.
-    const app = page.frameLocator('iframe[title="App"]');
+      // `New app` is search-only: it creates the drive's plugin schema on first
+      // use, so it stays out of the default listing.
+      await page.getByRole('button', { name: 'More' }).click();
+      await page.getByPlaceholder(/filter/i).fill('app');
+      await page.locator('[data-testid="menu-item-new-app"]').click();
 
-    await expect(app.getByRole('heading', { name: 'New app' })).toBeVisible();
+      // An app page is the app: no chrome of its own, just the frame.
+      await expect(main.locator('iframe[title="App"]')).toBeVisible();
 
-    const add = app.getByRole('button', { name: 'Add an item' });
-    await expect(add).toBeVisible();
+      // And the frame is the page. An iframe never grows to fit its document,
+      // so a box shorter than the page does not scroll — it clips the app and
+      // leaves dead space underneath. Only the container's own padding should
+      // sit between the bottom of the frame and the bottom of the page.
+      const pageBox = (await main.boundingBox())!;
+      const frameBox = (await main
+        .locator('iframe[title="App"]')
+        .boundingBox())!;
+      expect(frameBox.y + frameBox.height).toBeGreaterThan(
+        pageBox.y + pageBox.height - 48,
+      );
 
-    // The click is the whole chain: the app's code calls store.newResource,
-    // that crosses postMessage to the host, the host asks the server to write
-    // as the app, and the app re-reads what landed.
-    await add.click();
-    await expect(app.getByRole('listitem').first()).toBeVisible();
+      // Null-origin, so Playwright reaches it as a frame rather than through
+      // the parent's DOM — which is the isolation doing its job.
+      const app = page.frameLocator('iframe[title="App"]');
 
-    await add.click();
-    await expect(app.getByRole('listitem')).toHaveCount(2);
-  });
+      await expect(app.getByRole('heading', { name: 'New app' })).toBeVisible();
+
+      const add = app.getByRole('button', { name: 'Add an item' });
+      await expect(add).toBeVisible();
+
+      // The click is the whole chain: the app's code calls store.newResource,
+      // that crosses postMessage to the host, the host asks the server to write
+      // as the app, and the app re-reads what landed.
+      await add.click();
+      await expect(app.getByRole('listitem').first()).toBeVisible();
+
+      await add.click();
+      await expect(app.getByRole('listitem')).toHaveCount(2);
+      if (client === 'v1 fixture') expect(fixtureServed).toBe(true);
+    });
+  }
 
   test('rows an app adds are in its table, editable without the app', async ({
     page,
@@ -77,7 +112,13 @@ test.describe('apps', () => {
     // table UI — which is the point of not having the app draw a list:
     // sorting, filtering and editing come from the table, not from the app.
     const sidebar = page.getByRole('navigation').last();
-    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar
+      .locator('[data-sidebar-id]')
+      .filter({
+        has: page.getByRole('button', { name: 'New app', exact: true }),
+      })
+      .getByRole('button', { name: 'Expand folder' })
+      .click();
     await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
 
     // The table renders the row the app made, with the table's own UI around
@@ -97,7 +138,13 @@ test.describe('apps', () => {
 
     // Open the app's own table and add the app as a second way to see it.
     const sidebar = page.getByRole('navigation').last();
-    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar
+      .locator('[data-sidebar-id]')
+      .filter({
+        has: page.getByRole('button', { name: 'New app', exact: true }),
+      })
+      .getByRole('button', { name: 'Expand folder' })
+      .click();
     await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
     await expect(main.getByRole('tablist')).toBeVisible();
 

@@ -49,6 +49,8 @@ pub mod export;
 pub mod external;
 pub mod files;
 pub mod importer;
+#[cfg(feature = "wasm-plugins")]
+pub mod installation;
 pub mod invite;
 #[cfg(feature = "wasm-plugins")]
 pub mod journal;
@@ -61,6 +63,8 @@ pub mod plan;
 pub mod plugin;
 pub mod prunetests;
 pub mod query;
+#[cfg(feature = "wasm-plugins")]
+pub mod release_binding;
 pub mod replicate;
 #[cfg(feature = "wasm-plugins")]
 pub mod run_log;

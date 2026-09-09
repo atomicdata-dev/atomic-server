@@ -168,6 +168,7 @@ export async function install(
     arrival: arrival.subject,
     tags,
   };
+  await plugin.set(schema.properties['plugin-workspace'], table.subject);
   await plugin.set(schema.properties['plugin-connection'], {
     release: pinned.id,
     config: connection,

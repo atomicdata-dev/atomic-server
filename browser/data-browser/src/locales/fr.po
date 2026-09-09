@@ -551,6 +551,7 @@ msgstr "En-têtes HTTP optionnels à envoyer lors de la connexion à ce serveur 
 #: src/actions/resourceActions.tsx
 #: src/actions/resourceActions.tsx src/chunks/AI/AgentConfigItem.tsx
 #: src/chunks/AI/AgentConfigItem.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/TablePage/DerivedColumnHeading.tsx
 #: src/chunks/TablePage/RowActionHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
@@ -850,8 +851,10 @@ msgid "Learn more & get involved"
 msgstr "En savoir plus et participer"
 
 #. 0: metadata.version
+#. 0: metadata.version
 #. 0: __APP_VERSION__
 #. 0: resource.props.version
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/routes/AboutRoute.tsx
 #: src/routes/AboutRoute.tsx
 #: src/views/Plugin/PluginPage.tsx
@@ -1415,7 +1418,9 @@ msgid "Keyboard shortcuts"
 msgstr "Raccourcis clavier"
 
 #. 0: metadata.author
+#. 0: metadata.author
 #. 0: resource.props.pluginAuthor
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/views/Plugin/PluginPage.tsx
 #: src/views/Plugin/PluginPage.tsx
 msgid "by {0}"
@@ -4791,10 +4796,13 @@ msgstr ""
 
 #: src/chunks/AI/RealAIChat.tsx
 #: src/chunks/AI/RealAIChat.tsx src/components/pairing/PairingFlowProvider.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Try again"
 msgstr ""
 
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Open workspace"
 msgstr ""
@@ -7286,6 +7294,7 @@ msgid "Enable keyboard drag & drop in sidebar"
 msgstr "Activer le glisser-déposer au clavier dans la barre latérale"
 
 #: src/chunks/Plugins/NewPluginButton.tsx
+#: src/chunks/Plugins/NewPluginButton.tsx
 msgid "Upload Plugin"
 msgstr "Téléverser le plugin"
 
@@ -7388,6 +7397,7 @@ msgstr ""
 msgid "Create a plugin here. It proposes changes that you review before anything is written."
 msgstr ""
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
 #: src/chunks/PluginRuns/PluginView.tsx
 #: src/routes/NewResource/NewRoute.tsx
@@ -7465,6 +7475,7 @@ msgstr ""
 msgid "Not signed in"
 msgstr ""
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx src/chunks/PluginRuns/PluginView.tsx
 msgid "Source"
 msgstr ""
@@ -7473,6 +7484,7 @@ msgstr ""
 msgid "<0/> Run"
 msgstr ""
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx src/chunks/PluginRuns/PluginView.tsx
 msgid "This plugin has no source yet."
 msgstr ""
@@ -7613,7 +7625,6 @@ msgid "Button.tsx"
 msgstr ""
 
 #: src/chunks/AppPage/AppFrame.tsx
-#: src/chunks/AppPage/index.tsx
 msgid "This app has no entry point, so there is nothing to open."
 msgstr ""
 
@@ -7668,8 +7679,9 @@ msgstr ""
 msgid "Discover published integrations"
 msgstr ""
 
-#~ msgid "Publish to integration store"
-#~ msgstr ""
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Publish to integration store"
+msgstr ""
 
 #: src/chunks/PluginRuns/PluginSchedule.tsx
 msgid "Review the saved proposal and run history before continuing."
@@ -7737,7 +7749,6 @@ msgstr ""
 msgid "Sync complete."
 msgstr ""
 
-#: src/routes/IntegrationStore.tsx
 #: src/routes/IntegrationStore.tsx
 msgid "Your integrations"
 msgstr ""
@@ -7831,7 +7842,6 @@ msgstr ""
 msgid "Creating automation…"
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectedIntegration.tsx
 #: src/chunks/PluginRuns/CreateEventAutomation.tsx
 msgid "Create automation"
 msgstr ""
@@ -7839,6 +7849,8 @@ msgstr ""
 #: src/chunks/PluginRuns/CreateEventAutomation.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
 msgid "Automations"
 msgstr ""
 
@@ -8482,7 +8494,6 @@ msgid "Bring your completed entries into the Time Tracker template, linked to pr
 msgstr ""
 
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/PluginPage.tsx
 msgid "Workspace"
 msgstr ""
 
@@ -9470,17 +9481,15 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDataView.tsx
-msgid "Loading your data…"
-msgstr ""
+#~ msgid "Loading your data…"
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDataView.tsx
 msgid "Opening view"
 msgstr ""
 
-#: src/chunks/PluginRuns/IntegrationDataView.tsx
-msgid "Choose which view opens when you visit this integration or its table."
-msgstr ""
+#~ msgid "Choose which view opens when you visit this integration or its table."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/PluginPage.tsx
 msgid "Edit with AI"
@@ -9496,6 +9505,56 @@ msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationConnection.tsx
 msgid "Checking for changes. This may take a moment."
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Your connections"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connection settings"
+msgstr ""
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "On demand"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Choose which view opens when you visit this workspace."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connections"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Loading workspace…"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No connections yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No automations yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect services to this workspace. Your data and views stay here when sync is paused."
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect a service"
+msgstr ""
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Automations act on your data and can use connected services. Sync works independently."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "This integration creates a new workspace for its imported data."
 msgstr ""
 
 #: src/chunks/PluginRuns/ConnectPets.tsx

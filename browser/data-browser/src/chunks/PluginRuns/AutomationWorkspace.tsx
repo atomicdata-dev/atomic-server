@@ -30,11 +30,15 @@ export function useAutomationTrigger(subject: string, drive: string) {
       const property = schema.properties?.['automation-trigger'];
       const raw = property ? resource.get(property) : undefined;
       const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const usage = schema.properties?.['automation-integrations'];
+      const isAutomation = usage && Array.isArray(resource.get(usage));
       if (active)
         setTrigger(
           value && typeof value === 'object' && 'event' in value
             ? (value as { event: string; name?: string; integration?: string })
-            : null,
+            : isAutomation
+              ? { event: 'manual', name: 'On demand' }
+              : null,
         );
     };
 

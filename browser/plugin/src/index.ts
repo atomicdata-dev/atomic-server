@@ -25,3 +25,14 @@ export type {
   SetIntent,
   Verdict,
 } from '@tomic/lib';
+export {
+  VIEW_PROTOCOL_VERSION,
+  isViewRequest,
+  viewRequest,
+  packagedViewOperations,
+} from './viewProtocol.js';
+export type {
+  ViewOperation,
+  ViewRequest,
+  ViewResponse,
+} from './viewProtocol.js';

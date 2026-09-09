@@ -4,10 +4,7 @@ use crate::{
     context::RequestContext,
     errors::AtomicServerResult,
     plugins::{
-        js_runtime::StoreHost,
-        manifest::Manifest,
-        store_host::{app_signing_for, StoreApplyHost},
-        sync_session,
+        js_runtime::StoreHost, manifest::Manifest, store_host::StoreApplyHost, sync_session,
     },
 };
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -111,11 +108,13 @@ pub async fn apply(
     )
     .await?;
     let actor = host.for_agent.to_string();
-    let mut atomic = StoreApplyHost {
-        store: app.store.clone(),
-        for_agent: host.for_agent.clone(),
-        signing_as: app_signing_for(&app.store, &body.drive, &body.plugin).await?,
-    };
+    let mut atomic = StoreApplyHost::for_installation(
+        &app.store,
+        &body.drive,
+        &body.plugin,
+        host.for_agent.clone(),
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(
         sync_session::advance(
             &app.store,

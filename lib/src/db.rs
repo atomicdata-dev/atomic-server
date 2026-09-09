@@ -48,7 +48,7 @@ use crate::{
     },
     commit::{CommitOpts, CommitResponse},
     db::{
-        app_agent::{AppAgent, AppAgentInfo, AppAgentKey},
+        app_agent::{AppAgent, AppAgentInfo, AppAgentKey, AppAgentState},
         encoding::{decode_propvals, encode_propvals},
         plugin_meta::{PluginMeta, PluginMetaKey},
         plugin_schedule::{PluginSchedule, PluginScheduleKey},
@@ -2326,6 +2326,7 @@ impl Db {
     pub fn set_app_agent(&self, key: &AppAgentKey, agent: &AppAgent) -> AtomicResult<()> {
         let mut stored = agent.clone();
         stored.secret = self.wrap_secret(&agent.secret)?;
+        stored.revoked = false;
 
         self.kv
             .insert(Tree::AppAgent, &key.encode()?, &stored.encode()?)?;
@@ -2334,11 +2335,24 @@ impl Db {
 
     /// Which DID an app writes as, without opening its key.
     pub fn get_app_agent_info(&self, key: &AppAgentKey) -> AtomicResult<Option<AppAgentInfo>> {
-        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
-            return Ok(None);
-        };
+        Ok(match self.get_app_agent_state(key)? {
+            AppAgentState::Active(info) => Some(info),
+            _ => None,
+        })
+    }
 
-        Ok(Some(AppAgent::from_bytes(&bin)?.info()))
+    /// Read identity and lifecycle atomically, so revocation cannot look legacy
+    /// between separate existence and status probes.
+    pub fn get_app_agent_state(&self, key: &AppAgentKey) -> AtomicResult<AppAgentState> {
+        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
+            return Ok(AppAgentState::Legacy);
+        };
+        let stored = AppAgent::from_bytes(&bin)?;
+        Ok(if stored.revoked {
+            AppAgentState::Revoked
+        } else {
+            AppAgentState::Active(stored.info())
+        })
     }
 
     /// Runs `f` with the app's signing agent.
@@ -2356,6 +2370,9 @@ impl Db {
         };
 
         let stored = AppAgent::from_bytes(&bin)?;
+        if stored.revoked {
+            return Ok(None);
+        }
         let secret = self.unwrap_secret(&stored.secret)?;
         let agent = crate::agents::Agent::from_secret(&secret)?;
 
@@ -2363,8 +2380,21 @@ impl Db {
     }
 
     pub fn delete_app_agent(&self, key: &AppAgentKey) -> AtomicResult<()> {
-        self.kv.remove(Tree::AppAgent, &key.encode()?)?;
+        // Replace the encrypted key and state in one KV write. Keep no secret,
+        // but remember that this installation must not use the legacy signer.
+        let mut tombstone = AppAgent::new(String::new(), String::new(), 0);
+        tombstone.revoked = true;
+        self.kv
+            .insert(Tree::AppAgent, &key.encode()?, &tombstone.encode()?)?;
+        self.flush()?;
         Ok(())
+    }
+
+    pub fn app_agent_was_revoked(&self, key: &AppAgentKey) -> AtomicResult<bool> {
+        Ok(matches!(
+            self.get_app_agent_state(key)?,
+            AppAgentState::Revoked
+        ))
     }
 
     /// Secrets this node could not open with nobody present.

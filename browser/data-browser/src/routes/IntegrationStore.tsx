@@ -47,9 +47,14 @@ export const IntegrationStoreRoute = createRoute({
   getParentRoute: () => appRoute,
   path: pathNames.integrations,
   component: IntegrationStore,
+  validateSearch: (search: Record<string, unknown>) => ({
+    workspace:
+      typeof search.workspace === 'string' ? search.workspace : undefined,
+  }),
 });
 
 function IntegrationStore(): React.JSX.Element {
+  const { workspace } = IntegrationStoreRoute.useSearch();
   const store = useStore();
   const { drive } = useSettings();
   const navigate = useNavigateWithTransition();
@@ -185,7 +190,7 @@ function IntegrationStore(): React.JSX.Element {
           </Header>
           {installed.length > 0 && (
             <section aria-label='Your integrations'>
-              <h2>Your integrations</h2>
+              <h2>Your connections</h2>
               <Grid>
                 {installed.map(subject => (
                   <ConnectedIntegration
@@ -233,6 +238,7 @@ function IntegrationStore(): React.JSX.Element {
               <IntegrationDiscovery
                 key={entry.id}
                 entry={entry}
+                workspace={workspace}
                 drive={drive}
               />
             ))}
