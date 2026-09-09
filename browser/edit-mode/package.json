@@ -1,6 +1,6 @@
 {
   "name": "@tomic/edit-mode",
-  "version": "0.41.0-beta.5",
+  "version": "0.41.0-beta.6",
   "description": "Turn any page rendered from Atomic Data into an editable local-first clone: 'Edit this page' for visitors (guest agent + local-only drive, zero server writes) and inline-editing UI chrome.",
   "type": "module",
   "license": "MIT",

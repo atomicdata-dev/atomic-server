@@ -1,6 +1,6 @@
 {
   "name": "@tomic/react",
-  "version": "0.41.0-beta.5",
+  "version": "0.41.0-beta.6",
   "author": "Joep Meindertsma",
   "description": "Atomic Data React library",
   "homepage": "https://docs.atomicdata.dev/usecases/react",

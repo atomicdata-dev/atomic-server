@@ -90,28 +90,11 @@ fn plugin_nonce() -> String {
 /// network response (not a client-side `srcdoc`) so it gets its OWN
 /// Content-Security-Policy instead of inheriting the parent SPA's nonce-locked
 /// CSP — otherwise the plugin's `<script>` is blocked on any CSP-enforced
-/// server. The plugin script is locked to a fresh per-response nonce; the host
-/// SPA hands over theme CSS via `postMessage` (see PluginView.tsx).
-fn render_plugin_ui_html(query_string: &str, css_exists: bool, nonce: &str) -> String {
-    // The query string is reflected into attributes of a same-origin page,
-    // so it must be attribute-escaped; a stray `"` would otherwise close the
-    // attribute and inject markup (a `<meta http-equiv=refresh>` is enough
-    // to redirect every visitor, CSP or not).
-    let query_string = super::single_page_app::escape_html(query_string);
-    let js_url = format!(
-        "/plugin-ui?{}",
-        query_string.replace("format=html", "format=js")
-    );
-    let css_link = if css_exists {
-        let css_url = format!(
-            "/plugin-ui?{}",
-            query_string.replace("format=html", "format=css")
-        );
-        format!(r#"<link rel="stylesheet" href="{css_url}" />"#)
-    } else {
-        String::new()
-    };
-
+/// server. The parent fetches private assets with signed requests, then hands
+/// their contents to this shell. Only messages from that parent can install
+/// the module, which is locked to a fresh per-response nonce. No credentials
+/// are exposed to the null-origin plugin (see PluginView.tsx).
+fn render_plugin_ui_html(nonce: &str) -> String {
     format!(
         r#"<!DOCTYPE html>
 <html lang="en">
@@ -119,14 +102,26 @@ fn render_plugin_ui_html(query_string: &str, css_exists: bool, nonce: &str) -> S
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Plugin</title>
-{css_link}
 <style id="__atomic_theme"></style>
-<script type="module" src="{js_url}" nonce="{nonce}"></script>
 <script nonce="{nonce}">
+var loaded = false;
 window.addEventListener('message', function (e) {{
+  if (e.source !== window.parent) return;
   if (e.data && e.data.type === '__atomic_style') {{
     var s = document.getElementById('__atomic_theme');
     if (s) s.textContent = e.data.css;
+  }}
+  if (!loaded && e.data && e.data.type === '__atomic_plugin_assets' &&
+      typeof e.data.js === 'string' && typeof e.data.css === 'string') {{
+    loaded = true;
+    var style = document.createElement('style');
+    style.textContent = e.data.css;
+    document.head.appendChild(style);
+    var script = document.createElement('script');
+    script.type = 'module';
+    script.nonce = '{nonce}';
+    script.textContent = e.data.js;
+    document.head.appendChild(script);
   }}
 }});
 if (window.parent) window.parent.postMessage({{ type: '__atomic_plugin_ready' }}, '*');
@@ -158,12 +153,11 @@ pub async fn handle_plugin_ui(
     // `html` is generated (not a file on disk): serve the iframe host document
     // with its own CSP so the plugin script isn't blocked by the parent CSP.
     if format == "html" {
-        let css_exists =
-            get_plugin_file_path(&appstate, drive_subject, plugin_name, "css")?.exists();
         let nonce = plugin_nonce();
-        let body = render_plugin_ui_html(req.query_string(), css_exists, &nonce);
+        let body = render_plugin_ui_html(&nonce);
         let csp = format!(
-            "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
+            "sandbox allow-scripts allow-downloads allow-pointer-lock allow-presentation; \
+             default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
              img-src * data:; connect-src *; font-src *; base-uri 'none'; object-src 'none';"
         );
 

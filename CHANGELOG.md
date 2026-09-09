@@ -5,6 +5,12 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## UNRELEASED
+
+## [v0.41.0-beta.6] - 2026-09-09
+
+- Desktop restore discovers reachable workspace sources and supports an explicit server address when automatic discovery does not find one.
+
 - **Security audit fixes** (`planning/security-audit-2026-09.md`, #1384).
   `POST /iroh-sync` requires a signed agent with write on the drive and only
   answers POST; `SYNC_PUSH` entries are checked against the admitted drive;

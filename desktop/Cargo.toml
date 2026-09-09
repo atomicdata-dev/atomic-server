@@ -10,7 +10,7 @@ name = "atomic-server-tauri"
 # crates.io forbids — see the note on `publish` in ../wasm/Cargo.toml.
 publish = false
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.41.0-beta.5"
+version = "0.41.0-beta.6"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

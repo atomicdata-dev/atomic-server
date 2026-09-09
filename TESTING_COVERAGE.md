@@ -373,6 +373,7 @@ Not covered: leftover Yjs-era DocumentV2 bodies end-to-end (needs a stored `{ ty
 | Two stores with the same key mint the same subject | `store.personal-drive.test.ts` |
 | Extra drives are listed on the derived personal drive | `store.personal-drive.test.ts` |
 | Extra drive created offline drains on reconnect (genesis must not set a rewind baseline) | `browser/lib/src/offline-create-drain.test.ts` |
+| Idempotent offline saves clear only after a complete local snapshot matches the synced baseline | `browser/lib/src/offline-create-drain.test.ts`, `browser/e2e/tests/offline-create-then-online.spec.ts` |
 | Lists from a previous random-DID home are unioned onto the derived drive | `store.personal-drive.test.ts` |
 | `Agent.personalDriveSubject` matches the genesis helper | `agent.test.ts` |
 | `Db::setup` / `ensure_personal_drive` use the derived DID and are idempotent | `lib/src/db.rs::personal_drive_tests` |
@@ -534,3 +535,11 @@ This does not yet prove restoration of the user's private staging workspace.
 ## Recovery-code passkey enrollment
 
 `browser/data-browser/src/helpers/managed/recovery-enrollment.test.ts` verifies code-only reveal without WebAuthn, preservation of ciphertext and existing wrappers when adding a passkey, unlocking with either passkey, and no writes on wrong-code, account-mismatch or cancelled registration. Tests use WebCrypto, Argon2id and a simulated authenticator; physical mobile PRF support remains a device acceptance check.
+
+## Plugin UI sandbox and private assets
+
+- `browser/e2e/tests/plugin.spec.ts`: private plugin assets load through signed parent requests; custom rendering and RPC still work.
+- The bootstrap test opens the shell directly and verifies its server-enforced opaque origin, independently of iframe attributes.
+- `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
+
+- `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
