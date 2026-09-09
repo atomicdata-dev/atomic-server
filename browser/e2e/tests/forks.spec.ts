@@ -27,16 +27,17 @@ test.describe('forks', () => {
     await newResource('folder', page);
     await editTitle('Ordinary folder', page);
     const subject = await getCurrentSubject(page);
-    const remoteMembers = await page.evaluate(async subject => {
+    const remoteMembers = await page.evaluate(async targetSubject => {
       const store = window.store!;
       const query = new URL('/query', store.getServerUrl());
       query.searchParams.set(
         'property',
         'https://atomicdata.dev/properties/originalSubject',
       );
-      query.searchParams.set('value', subject);
+      query.searchParams.set('value', targetSubject);
       query.searchParams.set('drive', store.getDrive()!);
       const result = await store.fetchResourceFromServer(query.toString());
+
       return result.get('https://atomicdata.dev/properties/collection/members');
     }, subject);
     expect(remoteMembers).toEqual([]);

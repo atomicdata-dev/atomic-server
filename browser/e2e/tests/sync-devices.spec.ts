@@ -46,7 +46,9 @@ test.describe('sync page devices', () => {
       });
     });
     await page.route('**/drive-usage?**', route =>
-      route.fulfill({ json: { resourceCount: 3, blobBytes: 0, loroBytes: 7800 } }),
+      route.fulfill({
+        json: { resourceCount: 3, blobBytes: 0, loroBytes: 7800 },
+      }),
     );
     await page.route('**/api/**', route => {
       const path = new URL(route.request().url()).pathname;

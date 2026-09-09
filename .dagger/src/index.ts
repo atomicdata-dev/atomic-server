@@ -284,9 +284,10 @@ export class AtomicServer {
   ): Container {
     return container
       .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
-        // Shared: Locked serialized every parallel CI lane behind whichever
-        // job held the volume. Cargo's own flock handles concurrent writers.
-        sharing: CacheSharingMode.Shared,
+        // Cargo locks live outside this registry mount, so separate containers
+        // cannot coordinate extraction. Lock the mount to prevent concurrent
+        // unpack failures (including bzip2-sys .cargo-ok collisions).
+        sharing: CacheSharingMode.Locked,
       })
       .withMountedCache(`${cargoHome}/git`, dag.cacheVolume('cargo-git'), {
         sharing: CacheSharingMode.Shared,
