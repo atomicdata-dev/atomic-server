@@ -4,6 +4,12 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- An older server response no longer rolls back the local cache after an edit, fixing dashboard configuration reverting on reload.
+
+- Private plugin views load authenticated assets through the parent while retaining their sandbox.
+- Idempotent offline saves no longer leave the sync queue retrying an empty update.
+- Navigating to sign-in no longer fetches the welcome screen as a data resource.
+
 - Account recovery: reveal the agent secret with a recovery code when passkey authentication is unavailable, and enroll an additional passkey.
 - Desktop onboarding explains workspace discovery with a dedicated loading screen, offers discovered sources and a manual server address, and retries while waiting for another device.
 - Sync and Cloud Server status now describe the selected drive; linking a cloud account does not imply that its workspace has been transferred.

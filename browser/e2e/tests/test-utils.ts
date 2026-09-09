@@ -484,16 +484,12 @@ function waitForCommitForSubject(page: Page, subject: string, since: number) {
 /**
  * Types the agent secret and lets the flow sign itself in.
  *
- * `fill()` alone usually suffices — it dispatches the input event React's
- * onChange listens for, which calls `trySecret`. The explicit blur() covers the
- * other half of the component's contract (`onBlur` re-runs `trySecret` with its
- * final flag), so a value that arrives too fast for the change handler still
- * gets validated rather than sitting in a field nobody submitted.
+ * Filling a valid secret starts sign-in immediately. Do not blur or submit
+ * afterward: the input may already have unmounted. Callers await the resulting
+ * signed-in state before continuing.
  */
 async function enterSecret(page: Page, secret: string) {
-  const field = page.getByLabel('Agent secret');
-  await field.fill(secret);
-  await field.blur();
+  await page.getByLabel('Agent secret').fill(secret);
 }
 
 export async function signIn(page: Page, secret: string = SECRET) {
@@ -1291,11 +1287,19 @@ export async function waitForSynced(page: Page, timeoutMs = 30_000) {
                 enqueuedAt: number;
                 signedGenesis?: unknown;
                 lastAttemptError?: unknown;
+                baseVersion?: string;
               }) => ({
                 subject: entry.subject,
                 enqueuedAt: entry.enqueuedAt,
                 hasSignedGenesis: !!entry.signedGenesis,
                 lastAttemptError: entry.lastAttemptError,
+                baseVersion: entry.baseVersion,
+                saveCursor: store?.resources
+                  .get(entry.subject)
+                  ?.getEncodedSaveCursor(),
+                hasUnsavedChanges: store?.resources
+                  .get(entry.subject)
+                  ?.hasUnsavedChanges(),
               }),
             ) ?? [];
 

@@ -12,7 +12,7 @@ Status: preparation only; do not tag until the gates below pass.
 
 ## Local E2E evidence
 
-Full suite and isolated reruns completed on 2026-09-09: latest result per case is 174 passed, 20 failed, 6 skipped. See [detailed results](beta6-e2e-results.md). Release remains blocked.
+The full 201-case Playwright run passed: **195 passed, 6 existing skips, zero failures**. Library tests passed (392 tests), as did frontend typecheck, production frontend build and native server build. See [detailed results](beta6-e2e-results.md) for fixes, artifacts and scope. Release remains draft pending the release gates below.
 
 ## Release gates
 

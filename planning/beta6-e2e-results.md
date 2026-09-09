@@ -1,74 +1,39 @@
-# Beta.6 local E2E results — 2026-09-09
+# Beta.6 local E2E validation — 2026-09-09
 
-Tested commit: c9fe15630. Scope: the full Atomic Server Playwright suite, including configured Firefox locks and opt-in WebKit storage tests, with local SaaS/Vault services. This is not real Tauri device acceptance or a full SaaS portal-suite run.
+Scope: the full Atomic Server Playwright suite, including Firefox locks and opt-in WebKit storage tests, with local SaaS/Vault services. This is not native Tauri acceptance or the full SaaS portal suite.
 
-## Results
+## Current validation
 
-- Full pass: 164 passed, 29 failed, 6 skipped, 1 not run (9.6 minutes).
-- Single-worker failed-case rerun: 8 passed, 21 failed (7.3 minutes).
-- After building CLI/Svelte dependencies, both template cases passed individually, including the previously unrun serial Svelte case.
-- Latest result per case across runs: **174 passed, 20 failed, 6 skipped**. This is not one clean full-suite pass.
+- [x] Original failures reproduced and investigated.
+- [x] Affected scenarios passed on focused reruns, including offline sync, private plugin rendering, Vault, and WebKit storage.
+- [x] Library tests: 64 files, 392 tests passed.
+- [x] Frontend production build and typecheck passed.
+- [x] Final full 201-case run after the cache fix: **195 passed, 6 existing skips, zero failures (9.3 minutes)**. Playwright exited 0 and reported no failed tests.
+- [x] Native server build, targeted formatting/lint checks, and git diff --check passed. The full Rust test suite was not rerun.
 
-Initial setup failures involved the preview proxy, VITE_E2E and the managed API address. These were corrected before the failed-case rerun. Test services used ports 6757/9893/3040 and MinIO 9110, with disposable databases.
+## Changes
 
-## Remaining failures
+- Dashboard reload diagnosis found that an older resource response was merged correctly in memory but persisted unmerged to OPFS. Cache writes now serialize the canonical merged resource; the regression is covered in store.test.ts and the dashboard reload E2E.
 
-- [chromium] › tests/canvas-live-update.spec.ts:71:7 › canvas live update › a stroke drawn in one session appears live in another session viewing the same canvas
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/documents.spec.ts:41:7 › documents › create document, edit, page title, websockets
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/documents.spec.ts:175:7 › documents › shows a collaborator’s ephemeral cursor position
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/kanban.spec.ts:376:7 › kanban › view tab menu: change type, duplicate, and delete
-  - TimeoutError: locator.click: Timeout 10000ms exceeded.
-- [chromium] › tests/meetings.spec.ts:113:5 › start a meeting, join it, follow along, and end it
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/meetings.spec.ts:237:5 › records join and leave in the meeting chat ────────
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/offline-create-then-online.spec.ts:26:7 › offline create → online sync → disable localDB › offline-created drive loads after disabling localDB
-  - Error: waitForSynced timed out. Outbox diagnostics: {"status":{"serverConnected":true,"syncInProgress":true,"pendingDirtyCount":1,"blockedCount":0,"serverUrl":"http://localhost:9893","drive":"did:ad:JsacRosa93F_ZoKH7dRPT1skj854W8E3u9j0e88g2tmZw7yVmq5RkjhoU3U7CdSuGKnMQgHQ2r9lpaSa0q7RBA","clientDbReady":true,"clientDbAttached":true,"lastDriveSync":{"drive":"did:ad:JsacRosa93F_ZoKH7dRPT1skj854W8E3u9j0e88g2tmZw7yVmq5Rkjh
-- [chromium] › tests/onboarding.spec.ts:13:7 › onboarding › create new identity with verifySecret flow - profile name persists
-  - TimeoutError: locator.press: Timeout 10000ms exceeded.
-- [chromium] › tests/plugin.spec.ts:21:7 › Plugins › install a plugin ───────────────────────────
-  - Error: expect(locator).toBeVisible() failed
-- [chromium] › tests/presence-follow.spec.ts:27:5 › presence avatars and follow mode across two sessions
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/second-device-load.spec.ts:18:5 › a fresh-OPFS second device loads an existing drive’s contents @smoke
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/sign-in-without-data.spec.ts:62:7 › signing in on a device that holds none of the account’s data › stops, and says so, instead of opening a workspace
-  - Error: Unexpected browser warnings/errors (2); first 20 shown, full browser-diagnostics attached
-- [chromium] › tests/sign-in-without-data.spec.ts:80:7 › signing in on a device that holds none of the account’s data › leaves no other workspace active
-  - Error: Unexpected browser warnings/errors (2); first 20 shown, full browser-diagnostics attached
-- [chromium] › tests/sign-in-without-data.spec.ts:99:7 › signing in on a device that holds none of the account’s data › names the account’s own drive as the place to write
-  - Error: Unexpected browser warnings/errors (2); first 20 shown, full browser-diagnostics attached
-- [chromium] › tests/signout-signin-data.spec.ts:145:7 › sign-out / sign-in round trip › content made before signing out is still readable after signing back in
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/signout-signin-data.spec.ts:172:7 › sign-out / sign-in round trip › the local database key survives sign-out and is restored on sign-in
-  - TimeoutError: locator.blur: Timeout 10000ms exceeded.
-- [chromium] › tests/vault-backup-restore.spec.ts:236:7 › Cloud Vault backup and restore › a second backup after an edit stores more than the first
-  - Error: signup failed: 400 {"error":"Enter a single valid email address, like name@example.com."}
-- [chromium] › tests/vault-backup-restore.spec.ts:283:7 › Cloud Vault backup and restore › a device with no local data restores the workspace from the vault
-  - Error: signup failed: 400 {"error":"Enter a single valid email address, like name@example.com."}
-- [webkit] › tests/signout-signin-data.spec.ts:145:7 › sign-out / sign-in round trip › content made before signing out is still readable after signing back in
-  - TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
-- [webkit] › tests/signout-signin-data.spec.ts:172:7 › sign-out / sign-in round trip › the local database key survives sign-out and is restored on sign-in
-  - TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+- Sign-in tests stop acting on the input after automatic submission and wait for the signed-in state. Storage tests navigate through the app instead of interrupting background requests with hard navigations.
+- The outgoing data route no longer fetches an incoming `/app/` screen as a resource.
+- Private plugin assets are fetched with signed requests in the parent and passed into the sandbox. The server enforces an opaque origin even without iframe sandbox attributes; the E2E suite checks this directly.
+- Offline saves with no changes beyond the synced baseline clear only after loading a complete local snapshot. Unit tests verify that missing snapshots leave the queue intact.
+- The duplicated-view test waits for selection before opening the active tab menu.
+- Vault signup uses a valid example.com email fixture. macOS WebKit storage tests use fresh regular profiles because ephemeral contexts reject OPFS.
 
-## Interpretation and next work
+## Local setup
 
-- [ ] Investigate the disappearing Agent secret field: shared helper blur/Enter waits block several collaboration, second-device and storage assertions.
-- [ ] Investigate /app/welcome 404 diagnostics in signed-out and no-data flows.
-- [ ] Investigate offline agent outbox drain, kanban deletion menu and plugin iframe rendering.
-- [ ] Update Vault test email fixtures to valid domains accepted by the security validator, then actually exercise backup/restore. Current failures stop at signup.
-- [ ] Diagnose WebKit dev-drive setup timeouts.
-- [ ] Obtain a clean full-suite run after fixes; keep the release draft.
+Frontend preview 6757, Atomic Server 9893, local SaaS 3040, MinIO 9110. Build variables: VITE_E2E=true, VITE_ATOMIC_SERVER_URL=http://localhost:9893, VITE_MANAGED_API_BASE=http://localhost:3040/api, VITE_MANAGED_PORTAL_URL=http://localhost:3040. Preview also receives VITE_ATOMIC_SERVER_URL for its proxy. Wait for `/server` readiness before starting tests.
 
-Skips: four opt-in performance instrumentation cases, one existing drafts fixme, and the existing Cmd+M context-menu fixme. No test was newly disabled.
+MinIO refused uploads with 507 because the host was below its free-disk threshold. The disposable `atomic-beta6-e2e-minio-memory` container instead uses a 1 GiB tmpfs at /data with the atomic-vault-e2e bucket. The original test data remains untouched.
 
-## Local artifacts
+## Previous baseline and artifacts
 
-- Full report: /tmp/beta6-e2e-first/playwright-report/index.html
-- Failed-case rerun report: /tmp/beta6-e2e-rerun/playwright-report/index.html
-- Logs: /tmp/beta6-e2e.log, /tmp/beta6-e2e-rerun.log, /tmp/beta6-next-e2e.log, /tmp/beta6-svelte-e2e.log
+Before these fixes, latest results across the initial full run and reruns were 174 passed, 20 failed, 6 skipped; this was not a clean full pass. Earlier reports remain at /tmp/beta6-e2e-first/playwright-report/index.html and /tmp/beta6-e2e-rerun/playwright-report/index.html.
 
-Reports contain screenshots and traces. These temporary local paths are not CI artifacts and are not committed.
+Previous full-run log: /tmp/beta6-e2e-final.log; report preserved at /tmp/beta6-full-before-cache-fix/playwright-report/index.html. Focused logs: /tmp/beta6-fixes2-e2e.log, /tmp/beta6-final-focused.log, /tmp/beta6-plugin-webkit-final.log, /tmp/beta6-webkit-green.log. Reports and traces are temporary local artifacts, not CI evidence.
+
+Six pre-existing skips: four opt-in profiling cases, drafts fixme, and Cmd+M context-menu fixme. No new skips or diagnostic allowlists were added.
+
+Final log: /tmp/beta6-e2e-verified.log; HTML report: /tmp/beta6-e2e-verified/playwright-report/index.html. Test-owned services and MinIO were stopped after the run.

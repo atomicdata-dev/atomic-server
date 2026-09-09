@@ -183,7 +183,9 @@ const TopRouteComponent: React.FC = () => {
 
   const subject = `${origin}${pathname}${window.location.search}`;
 
-  if (resolvingRoot) return null;
+  // During a route transition this outgoing component can observe the new
+  // location before it unmounts. App routes are screens, not data subjects.
+  if (resolvingRoot || pathname.startsWith('/app/')) return null;
 
   return <ResourcePage subject={subject} key={subject} />;
 };

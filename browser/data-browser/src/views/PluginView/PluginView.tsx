@@ -3,7 +3,9 @@ import { useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
 import { usePluginRPC } from '@views/PluginView/pluginRPC';
 import styled from 'styled-components';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { signRequest } from '@tomic/lib';
+import { ErrorBlock } from '@components/ErrorLook';
 
 import resetCss from '../../reset.css?raw';
 import { useCreateThemeVars } from './useCreateThemeVars';
@@ -44,6 +46,62 @@ export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
   const pluginUrl = `${store.getServerUrl()}/plugin-ui?drive=${encodeURIComponent(drive)}&plugin=${encodeURIComponent(plugin)}`;
   const src = `${pluginUrl}&format=html`;
 
+  const hasCss = pluginData?.uiManifest.css ?? false;
+  const [loadError, setLoadError] = useState<Error>();
+
+  // A null-origin sandbox cannot send the account cookie. Fetch assets in
+  // the trusted parent with signed requests and send only their contents to
+  // the frame; credentials and signing keys never enter the plugin sandbox.
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAsset = async (format: string) => {
+      const url = `${pluginUrl}&format=${format}`;
+      const agent = store.getAgent();
+      const headers = agent ? await signRequest(url, agent, {}) : {};
+      const response = await fetch(url, { headers, credentials: 'include' });
+      if (!response.ok)
+        throw new Error(
+          /* @wc-ignore */ `Plugin asset request failed (${response.status})`,
+        );
+
+      return response.text();
+    };
+
+    const onReady = (event: MessageEvent) => {
+      if (
+        event.source !== frameRef.current?.contentWindow ||
+        event.data?.type !== '__atomic_plugin_ready'
+      )
+        return;
+      setLoadError(undefined);
+      void Promise.all([
+        fetchAsset('js'),
+        hasCss ? fetchAsset('css') : Promise.resolve(''),
+      ])
+        .then(([js, css]) => {
+          if (!cancelled)
+            frameRef.current?.contentWindow?.postMessage(
+              { type: '__atomic_plugin_assets', js, css },
+              '*',
+            );
+        })
+        .catch(error => {
+          if (!cancelled)
+            setLoadError(
+              error instanceof Error ? error : new Error(String(error)),
+            );
+        });
+    };
+
+    window.addEventListener('message', onReady);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('message', onReady);
+    };
+  }, [pluginUrl, hasCss, store, frameRef]);
+
   // Hand the reset + theme CSS to the null-origin iframe via postMessage. The
   // iframe applies it to its `<style id="__atomic_theme">`. We (re)send on the
   // iframe's ready signal and whenever the theme changes.
@@ -79,6 +137,7 @@ export const PluginView: React.FC<PluginViewProps> = ({ plugin }) => {
 
   return (
     <>
+      {loadError && <ErrorBlock error={loadError} />}
       <StyledIframe
         title='plugin-view'
         id='custom-view'

@@ -43,7 +43,7 @@ const PORTAL_URL =
  * the page back on the welcome gate, which reads like an onboarding bug and
  * is not one.
  */
-const uniqueEmail = () => `vault-${randomUUID()}@localhost`;
+const uniqueEmail = () => `vault-${randomUUID()}@example.com`;
 
 /**
  * The control plane answers `/api/me` with 401 when nobody is signed in, which
