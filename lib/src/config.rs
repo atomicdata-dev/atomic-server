@@ -12,13 +12,24 @@ pub struct Config {
     pub client: Option<ClientConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SharedConfig {
     /// Sudo agent on the server, also used as agent in the CLI. Usually lives on the server, but not necessarily so.
     pub agent_secret: String,
     /// The DID of the initial drive created for the base domain
     #[serde(rename = "initialDrive")]
     pub initial_drive: Option<String>,
+}
+
+/// Hand-written so the agent secret never reaches a log line through `{:?}`
+/// (`Config` derives `Debug` and prints this).
+impl std::fmt::Debug for SharedConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedConfig")
+            .field("agent_secret", &"[redacted]")
+            .field("initial_drive", &self.initial_drive)
+            .finish()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -71,6 +82,13 @@ fn write_config(path: &Path, config: Config) -> AtomicResult<String> {
 
     std::fs::write(path, out.clone())
         .map_err(|e| format!("Error writing config file to {:?}. {}", path, e))?;
+    // The file holds the agent's private key: owner-only, whatever the umask.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Could not restrict permissions of {:?}. {}", path, e))?;
+    }
     Ok(out)
 }
 
@@ -128,4 +146,24 @@ fn config_v0_to_v1(config_v0: &ConfigV0) -> AtomicResult<Config> {
     };
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// `{:?}` on a Config must never print the agent secret.
+    #[test]
+    fn debug_output_redacts_the_agent_secret() {
+        let config = Config {
+            shared: SharedConfig {
+                agent_secret: "s3cret-agent-secret".into(),
+                initial_drive: None,
+            },
+            client: None,
+        };
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("s3cret"), "{debug}");
+        assert!(debug.contains("[redacted]"), "{debug}");
+    }
 }

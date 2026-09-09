@@ -9,7 +9,7 @@ import {
   type JSX,
 } from 'react';
 import type { ListImperativeAPI } from 'react-window';
-import { EventManager } from '@helpers/EventManager';
+import { EventManager } from '@tomic/lib';
 import { KeyboardInteraction } from './helpers/keyboardHandlers';
 
 export enum TableEvent {

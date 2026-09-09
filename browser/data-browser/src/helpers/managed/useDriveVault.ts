@@ -1,3 +1,4 @@
+import { driveDisplayMetadata } from './driveDisplayMetadata';
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '@tomic/react';
 import { reopenRestoredDrive } from '../driveData';
@@ -54,7 +55,16 @@ export function useDriveVault(driveSubject: string | null): UseVaultBackup {
 
   const agent = store.getAgent();
 
+  const getDisplayMetadata = useCallback(
+    () =>
+      driveSubject
+        ? driveDisplayMetadata(store, driveSubject)
+        : Promise.resolve({}),
+    [store, driveSubject],
+  );
+
   const vault = useVaultBackup({
+    getDisplayMetadata,
     // Whichever local store this build actually keeps the drive in. A browser
     // has the ClientDb; the desktop and Android apps have the embedded node and
     // deliberately no ClientDb, since a second copy of the same drive is the

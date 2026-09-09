@@ -1,6 +1,7 @@
 import test, { expect } from './fixtures';
 import {
   before,
+  SERVER_URL,
   currentDriveTitle,
   fillSearchBox,
   inDialog,
@@ -266,4 +267,17 @@ test.describe('Plugins', () => {
     await expect(page.locator('#custom-view')).toHaveCount(0);
     await expect(page.getByTestId('editable-title')).toHaveText('Duck');
   });
+});
+
+// The bootstrap accepts asset contents from its parent, so the server must
+// enforce an opaque origin even when a caller omits the iframe sandbox.
+test('plugin bootstrap enforces its own sandbox', async ({ page }) => {
+  const response = await page.goto(
+    `${SERVER_URL}/plugin-ui?drive=unused&plugin=test.shell&format=html`,
+  );
+  expect(response?.headers()['content-security-policy']).toMatch(
+    /sandbox[^;]*;/,
+  );
+  expect(await page.evaluate(() => window.origin)).toBe('null');
+  expect(await page.locator('script[src]').count()).toBe(0);
 });

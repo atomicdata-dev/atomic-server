@@ -1,5 +1,7 @@
-import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
+import { driveDisplayMetadata } from './driveDisplayMetadata';
+import { StoreEvents, type Store } from '@tomic/lib';
 import {
+  VaultSessionEndedError,
   agentVaultProof,
   canEnrollVault,
   getVaultState,
@@ -282,18 +284,7 @@ async function ensureVaultBackupOnce(
     let known = enrolled.get(driveSubject);
 
     // Display metadata is shared with SaaS; read it from the local drive.
-    const drive = store.resources.get(driveSubject);
-    const name = drive?.get(core.properties.name);
-    const emoji = drive?.get(dataBrowser.properties.emoji);
-    const metadata = {
-      name: typeof name === 'string' ? name : undefined,
-      emoji:
-        typeof emoji === 'string'
-          ? emoji
-          : typeof name === 'string'
-            ? ''
-            : undefined,
-    };
+    const metadata = await driveDisplayMetadata(store, driveSubject);
     const metadataKey = JSON.stringify(metadata);
 
     if (!known || (known.metadata ?? '{}') !== metadataKey) {
@@ -355,6 +346,7 @@ async function ensureVaultBackupOnce(
 
     signal.throwIfAborted();
     const held = known;
+    const agentSubject = agent.subject;
     const outcome = await deps.runVaultBackup({
       signal,
       db,
@@ -363,6 +355,18 @@ async function ensureVaultBackupOnce(
       devicePubkey: lane,
       driveKey: held.driveKey,
       driveKeyEpoch: held.keyEpoch,
+      beforeNetworkWrite: async () => {
+        signal.throwIfAborted();
+
+        if (
+          !(await deps.hasAccount()) ||
+          (deps.identityMatches && !(await deps.identityMatches(agentSubject)))
+        ) {
+          controller.abort();
+        }
+
+        signal.throwIfAborted();
+      },
       // The drive was re-keyed since this key was cached: fetch the current
       // envelope, and remember it so the next tick does not refetch.
       refreshDriveKey: async () => {
@@ -389,7 +393,7 @@ async function ensureVaultBackupOnce(
     // attempt re-derives both from the control plane.
     enrolled.delete(driveSubject);
 
-    if (signal.aborted) {
+    if (signal.aborted || error instanceof VaultSessionEndedError) {
       return {
         status: 'skipped',
         reason: 'backup cancelled by account change',

@@ -1307,6 +1307,8 @@ export class Store {
     // Then rewind the cursor to the synced baseline so the export emits the
     // offline delta. No-op during normal online operation (`baseVersion` is
     // only set on the offline path).
+    let offlineSnapshotLoaded = false;
+
     if (entry.baseVersion) {
       if (this.clientDb && !this.clientDb.isReady) {
         this.emitSyncStatus();
@@ -1328,7 +1330,10 @@ export class Store {
           if (refreshed && snapshot && snapshot.length > 0) {
             // OPFS stores a full snapshot — replace any server-hydrated doc
             // that raced ahead of the offline local state.
-            refreshed.importLoroUpdate(snapshot, true);
+            offlineSnapshotLoaded = refreshed.importLoroUpdate(
+              snapshot,
+              true,
+            ).complete;
           }
 
           if (refreshed) resource = refreshed;
@@ -1358,11 +1363,17 @@ export class Store {
     let exported = resource.exportLoroDeltaForDrain(isFirstCommit, commitToken);
 
     if (!exported) {
-      if (entry.baseVersion && postedGenesis) {
-        // Genesis already captured the doc. An empty follow-up is "caught
-        // up", not "OPFS not ready" — leaving dirty here is what stranded
-        // `offline-create-then-online` (pendingDirtyCount stuck at 1,
-        // hasSignedGenesis false, drain spinning).
+      if (
+        entry.baseVersion &&
+        (postedGenesis ||
+          (offlineSnapshotLoaded &&
+            resource.hasLoroDoc() &&
+            !resource.hasOpsPastSaveCursor()))
+      ) {
+        // A complete local snapshot equal to the last synced baseline has
+        // nothing left to send. Idempotent offline saves (e.g. re-linking an
+        // existing personal drive) still enqueue a baseline. Clear them only
+        // after reading that snapshot, never from a possibly stale server copy.
         this.outbox.clearBaseVersion(subject);
         this.outbox.clearDirty(subject);
         this.emitSyncStatus();
@@ -2049,6 +2060,10 @@ export class Store {
 
     const emitResource = storeResource ?? resource.__internalObject;
 
+    // Persist the canonical merged resource, not the incoming snapshot. An
+    // older response may contribute valid CRDT history without replacing a
+    // newer local edit; writing the incoming object would roll back OPFS while
+    // mounted readers continue to show the merged (correct) state.
     // Atomic put queued BEFORE notify. The worker's serialised
     // queue means a follow-up `queryLocalDb` (e.g. from
     // Collection.refresh in a notify listener) sees the new
@@ -2065,7 +2080,7 @@ export class Store {
       // the `lastCommit` skip above, they are re-added (and so re-written) on
       // every refresh. Building one table from a template wrote a single
       // collection page seven times.
-      !resource.hasClasses(collections.classes.collection) &&
+      !emitResource.hasClasses(collections.classes.collection) &&
       // Skip persisting when the worker has a known init failure (e.g.
       // OPFS leader-election couldn't steal the lock — Firefox doesn't
       // support `navigator.locks.request({ steal: true })`). Without this
@@ -2074,19 +2089,19 @@ export class Store {
       // stack trace per resource. The worker itself has already warned
       // once when init failed — that single line is the actionable signal.
       !this.clientDb.initError &&
-      !resource.loading &&
-      !resource.new &&
-      !resource.hasPendingCommits &&
-      !resource.get(core.properties.incomplete)
+      !emitResource.loading &&
+      !emitResource.new &&
+      !emitResource.hasPendingCommits &&
+      !emitResource.get(core.properties.incomplete)
     ) {
       try {
-        const jsonAd = resourceToJsonAd(resource);
+        const jsonAd = resourceToJsonAd(emitResource);
 
         if (jsonAd) {
-          const doc = resource.getLoroDoc?.();
+          const doc = emitResource.getLoroDoc?.();
           // A snapshot export commits pending ops, untagged; keep a
           // mid-edit persist from stripping the edit's history token.
-          resource.sealPendingEdits();
+          emitResource.sealPendingEdits();
           const snapshot = doc?.export({ mode: 'snapshot' });
 
           // One local-DB write costs ~9ms, three quarters of it rebuilding
@@ -2103,16 +2118,16 @@ export class Store {
           // is a cache, not the record.
           const stamp = hashPersistedState(jsonAd, snapshot);
 
-          if (this.lastPersistedStamp.get(resource.subject) !== stamp) {
-            this.lastPersistedStamp.set(resource.subject, stamp);
+          if (this.lastPersistedStamp.get(emitResource.subject) !== stamp) {
+            this.lastPersistedStamp.set(emitResource.subject, stamp);
             this.clientDb
-              .putResourceWithSnapshot(resource.subject, jsonAd, snapshot)
+              .putResourceWithSnapshot(emitResource.subject, jsonAd, snapshot)
               .catch(e => {
                 // Failed write: drop the stamp so the next attempt is not
                 // skipped as a duplicate of a write that never landed.
-                this.lastPersistedStamp.delete(resource.subject);
+                this.lastPersistedStamp.delete(emitResource.subject);
                 console.error(
-                  `[ClientDb] put failed for ${resource.subject.slice(0, 60)}:`,
+                  `[ClientDb] put failed for ${emitResource.subject.slice(0, 60)}:`,
                   e,
                 );
               });
@@ -2120,7 +2135,7 @@ export class Store {
         }
       } catch (e) {
         console.error(
-          `[ClientDb] put serialization threw for ${resource.subject.slice(0, 60)}:`,
+          `[ClientDb] put serialization threw for ${emitResource.subject.slice(0, 60)}:`,
           e,
         );
       }
@@ -2401,21 +2416,25 @@ export class Store {
     // the outgoing snapshot, and the edit form later errors with
     // "<class> is not a Class". HTTP (not WS): onboarding can still be
     // authenticated as a previous agent on the socket.
-    let agentResource: Resource | undefined;
+    let agentResource: Resource | undefined = prior?.isReady()
+      ? prior
+      : undefined;
 
-    try {
-      agentResource = await this.fetchResourceFromServer(agentSubject, {
-        noWebSocket: true,
-      });
+    if (this.serverUrlWithoutSocket !== this.serverUrl) {
+      try {
+        agentResource = await this.fetchResourceFromServer(agentSubject, {
+          noWebSocket: true,
+        });
 
-      if (agentResource.error) {
-        throw agentResource.error;
+        if (agentResource.error) {
+          throw agentResource.error;
+        }
+      } catch {
+        // Offline / local-only. An error stub is not usable — writing on
+        // it would mint a partial Agent Loro doc. The derived DID is
+        // identity; the pointer is only a cache for older clients.
+        agentResource = prior?.isReady() ? prior : undefined;
       }
-    } catch {
-      // Offline / local-only. An error stub is not usable — writing on
-      // it would mint a partial Agent Loro doc. The derived DID is
-      // identity; the pointer is only a cache for older clients.
-      agentResource = prior?.isReady() ? prior : undefined;
     }
 
     const oldPointer = agentResource?.isReady()
@@ -4781,18 +4800,20 @@ export class Store {
 
     const normalized = this.normalizeSubject(subject);
 
-    return this.addLoroSubscriber(this.subscribers, normalized, callback, () =>
-      this.subscribeWebSocket(normalized),
+    return this.addLoroSubscriber(
+      this.subscribers,
+      normalized,
+      callback,
+      () => this.subscribeWebSocket(normalized),
+      () =>
+        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+          normalized,
+        ),
     );
   }
 
-  /** v2 uses drive-level WS subscriptions — every resource in the drive
-   *  is delivered through the single `SUB <drive>` sent in
-   *  {@link WSClient.handleOpen}. The server's `CommitMonitor` fans
-   *  CommitMessages out to drive subscribers when the commit's target
-   *  lives under that drive. This per-resource entry-point is kept as
-   *  a no-op for API stability — callers don't need to gate themselves.
-   *  The lookup confirms the origin's WS exists. */
+  /** Drive resources use drive-wide fan-out. Mounted agent profiles also need
+   * a targeted subscription: another user's profile is outside our drive. */
   public subscribeWebSocket(subject: string): void {
     if (!this._serverConnected) return;
     const normalized = this.normalizeSubject(subject);
@@ -4807,7 +4828,9 @@ export class Store {
     }
 
     try {
-      this.getWebSocketForSubject(subject);
+      const ws = this.getWebSocketForSubject(subject);
+      if (this.subscribers.has(normalized))
+        ws?.subscribeAgentProfile(normalized);
     } catch (e) {
       console.error(e);
     }
@@ -5060,8 +5083,12 @@ export class Store {
     const subs = this.subscribers.get(normalized);
     if (!subs) return;
     const filtered = subs.filter(cb => cb !== callback);
-    if (filtered.length === 0) this.subscribers.delete(normalized);
-    else this.subscribers.set(normalized, filtered);
+    if (filtered.length === 0) {
+      this.subscribers.delete(normalized);
+      this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+        normalized,
+      );
+    } else this.subscribers.set(normalized, filtered);
   }
 
   /**

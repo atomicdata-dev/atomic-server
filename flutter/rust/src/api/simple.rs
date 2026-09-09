@@ -142,13 +142,14 @@ pub async fn open_db(path: String) -> Result<(), String> {
         let uploads_path = base_path.join("uploads");
         match atomic_lib::Db::init_redb_file(base_path, None, &uploads_path).await {
             Ok(s) => s,
-            Err(e) => {
+            Err(e) if is_corruption_error(&e) => {
                 tracing::warn!("DB corrupted, deleting and recreating: {e}");
                 let _ = std::fs::remove_file(&db_path);
                 atomic_lib::Db::init_redb_file(base_path, None, &uploads_path)
                     .await
                     .map_err(err)?
             }
+            Err(e) => return Err(err(e)),
         }
     };
 
@@ -159,6 +160,16 @@ pub async fn open_db(path: String) -> Result<(), String> {
 
     set_db(store);
     Ok(())
+}
+
+/// Whether an open error means the file itself is damaged. redb reports that
+/// as `StorageError::Corrupted` ("DB corrupted: …"), and atomic_lib's own
+/// deserialisation failures say the DB is "possibly corrupt". Anything else —
+/// the file locked by another process, a permission problem, a redb version
+/// that needs an upgrade — is not a reason to throw the user's data away.
+#[cfg(not(target_arch = "wasm32"))]
+fn is_corruption_error(e: &atomic_lib::errors::AtomicError) -> bool {
+    e.to_string().to_ascii_lowercase().contains("corrupt")
 }
 
 #[frb(init)]

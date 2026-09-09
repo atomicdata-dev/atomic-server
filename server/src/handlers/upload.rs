@@ -82,6 +82,15 @@ async fn save_file_and_create_resource(
     // Field in turn is stream of *Bytes* object
     while let Some(chunk) = field.next().await {
         let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
+        // `PayloadConfig` only bounds the `Bytes`/`String` extractors, not a
+        // multipart stream read by hand, so bound it here.
+        if buffer.len() + data.len() > crate::serve::PAYLOAD_MAX {
+            return Err(format!(
+                "Uploaded file exceeds the maximum size of {} bytes",
+                crate::serve::PAYLOAD_MAX
+            )
+            .into());
+        }
         hasher.update(&data);
         buffer.extend_from_slice(&data);
     }

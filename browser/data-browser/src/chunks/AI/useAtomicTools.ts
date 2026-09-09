@@ -839,56 +839,6 @@ export function useAtomicMCPTools({
         },
         strict: true,
       }),
-      // [TOOL_NAMES.READ_FILE_RESOURCE]: tool({
-      //   description: 'Read the contents of a file resource',
-      //   inputSchema: z.object({
-      //     subject: z
-      //       .string()
-      //       .describe('The subject of the file resource to read'),
-      //   }),
-      //   execute: async ({ subject }) => {
-      //     const resource = await store.getResource(subject);
-
-      //     if (resource.error) {
-      //       return `Error reading ${resource.subject}: ${resource.error.message}`;
-      //     }
-
-      //     if (!resource.hasClasses(server.classes.file)) {
-      //       return `Error: Resource ${resource.subject} does not have a file class`;
-      //     }
-
-      //     const downloadUrl = resource.get(server.properties.downloadUrl);
-
-      //     if (!downloadUrl) {
-      //       return `Error: Resource ${resource.subject} does not have a download URL`;
-      //     }
-
-      //     const mimetype = resource.get(server.properties.mimetype) as string;
-
-      //     try {
-      //       const response = await fetch(downloadUrl, {
-      //         headers: { Accept: mimetype },
-      //       });
-
-      //       const buffer = await response.arrayBuffer();
-
-      //       return [
-      //         {
-      //           type: 'text',
-      //           text: `Read file ${resource.title || subject}`,
-      //         },
-      //         {
-      //           type: 'media',
-      //           data: buffer,
-      //           mediaType: mimetype || 'application/octet-stream',
-      //         },
-      //       ];
-      //     } catch (error) {
-      //       return `Error reading ${resource.subject}: ${error}`;
-      //     }
-      //   },
-      //   strict: true,
-      // }),
       [TOOL_NAMES.NAVIGATE_TO_RESOURCE]: tool({
         description: 'Navigates the user to a resource',
         inputSchema: z.object({

@@ -35,6 +35,7 @@ Remaining work, not "this file exists."
 
 | Document | Status |
 | --- | --- |
+| [`google-calendar-import-gaps.md`](./google-calendar-import-gaps.md) | **Active audit.** All-day ranges implemented; remaining Google import fidelity work, formats and recurrence integration checklist. |
 | [`extension-architecture.md`](./extension-architecture.md) | **Migration in progress.** Shared view protocol, scope policy and installation identity resolution are implemented; package activation and legacy UI signing remain. Apps contain data/views, connections synchronize sources, automations act; one extension lifecycle and host API, with phased convergence of packaged views, source-as-data apps, JS integrations and Reflector, retaining a separate privileged server-extension boundary. |
 | [`sentry-feedback-readiness.md`](./sentry-feedback-readiness.md) | **Active.** Sidebar feedback and React error capture implemented and locally verified against Sentry. Staging rollout, email receipt and private source-map upload remain release gates. |
 | [`mt940.md`](./mt940.md) | **Pilot implemented.** Sandboxed MT940 import, exact amounts, balance checks, nested table and repeat detection; real bunq sample validation remains. |

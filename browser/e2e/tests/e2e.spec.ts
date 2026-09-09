@@ -127,7 +127,44 @@ test.describe('data-browser', async () => {
 
       // Create invite
       await page.click('button:has-text("Create Invite")');
-      context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.getByLabel('Full name', { exact: true }).fill('Drive Owner');
+      await page
+        .getByLabel('Profile picture (optional)', { exact: true })
+        .setInputFiles({
+          name: 'profile.svg',
+          mimeType: 'image/svg+xml',
+          buffer: Buffer.from(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#${Math.floor(
+              Math.random() * 0xffffff,
+            )
+              .toString(16)
+              .padStart(6, '0')}"/></svg>`,
+          ),
+        });
+      await page
+        .getByRole('dialog')
+        .filter({ has: page.getByRole('heading', { name: 'Adjust image' }) })
+        .getByRole('button', { name: 'Save', exact: true })
+        .click();
+      await expect(
+        page.getByText('Picture ready to save.', { exact: true }),
+      ).toBeVisible();
+
+      await page
+        .getByRole('button', { name: 'Save and continue', exact: true })
+        .click();
+      await expect(page.getByLabel('Allow edits')).toBeVisible();
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      const ownerProfile = await page.evaluate(async () => {
+        const subject = window.store!.getAgent()!.subject!;
+        const profile = await window.store!.getResource(subject);
+
+        return {
+          subject,
+          icon: profile.get('https://atomicdata.dev/properties/icon'),
+        };
+      });
+      expect(ownerProfile.icon).toBeTruthy();
       await page.click('button:has-text("Create")');
       await expect(
         page.locator('text=Invite created and copied '),
@@ -161,6 +198,82 @@ test.describe('data-browser', async () => {
       await expect(page3.getByTestId('current-drive-title')).toHaveText(
         driveTitle,
       );
+      const sharedProfile = await page3.evaluate(async subject => {
+        const profile = await window.store!.fetchResourceFromServer(subject);
+        if (profile.error) throw profile.error;
+
+        return {
+          name: profile.get('https://atomicdata.dev/properties/name'),
+          icon: profile.get('https://atomicdata.dev/properties/icon'),
+        };
+      }, ownerProfile.subject);
+      expect(sharedProfile).toEqual({
+        name: 'Drive Owner',
+        icon: ownerProfile.icon,
+      });
+      const pictureDownload = await page3.evaluate(async icon => {
+        const file = await window.store!.fetchResourceFromServer(
+          icon as string,
+        );
+        if (file.error) throw file.error;
+        const url = file.get(
+          'https://atomicdata.dev/properties/downloadURL',
+        ) as string;
+        const response = await fetch(url);
+
+        return {
+          ok: response.ok,
+          bytes: (await response.arrayBuffer()).byteLength,
+        };
+      }, ownerProfile.icon);
+      expect(pictureDownload.ok).toBe(true);
+      expect(pictureDownload.bytes).toBeGreaterThan(0);
+
+      await devDrive(page2);
+      const invitePath = new URL(inviteUrl as string);
+      await page2.goto(
+        `${FRONTEND_URL}${invitePath.pathname}${invitePath.search}`,
+      );
+      await page2.locator('[data-test="accept-existing"]').click();
+      await page2
+        .getByLabel('Full name', { exact: true })
+        .fill('Existing Colleague');
+      await page2
+        .getByRole('button', { name: 'Save and continue', exact: true })
+        .click();
+      await expect(page2.getByTestId('current-drive-title')).toHaveText(
+        driveTitle,
+      );
+      await expect(
+        page2.getByRole('heading', { name: 'Agent created!' }),
+      ).toHaveCount(0);
+
+      // A saved avatar suppresses the profile nudge in both directions.
+      await page.goto(
+        `${FRONTEND_URL}${invitePath.pathname}${invitePath.search}`,
+      );
+      await page.locator('[data-test="accept-existing"]').click();
+      await expect(page.getByTestId('current-drive-title')).toHaveText(
+        driveTitle,
+      );
+      await expect(
+        page.getByRole('heading', { name: 'How your colleagues see you' }),
+      ).toHaveCount(0);
+      await topBarShareButton(page).click();
+      await page
+        .getByRole('button', { name: 'Create Invite', exact: true })
+        .click();
+      await expect(page.getByLabel('Allow edits')).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'How your colleagues see you' }),
+      ).toHaveCount(0);
+
+      const createAction = page
+        .locator('dialog[open] footer')
+        .getByRole('button', { name: 'Create', exact: true });
+      await expect(createAction).toBeVisible();
+      await createAction.hover();
+      await page.screenshot({ path: 'test-results/invite-footer-hover.png' });
     },
   );
 
@@ -264,6 +377,10 @@ test.describe('data-browser', async () => {
       origin: new URL(FRONTEND_URL).origin,
     });
     await page.getByRole('button', { name: 'Create Invite' }).click();
+    await page.getByLabel('Full name', { exact: true }).fill('Chat Owner');
+    await page
+      .getByRole('button', { name: 'Save and continue', exact: true })
+      .click();
     await page.getByLabel('Allow edits').check();
     await page.getByRole('button', { name: 'Create' }).click();
     await expect(page.locator('text=Invite created and copied ')).toBeVisible();

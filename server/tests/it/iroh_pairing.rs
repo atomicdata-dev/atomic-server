@@ -201,17 +201,31 @@ async fn spawn_server_process(tag: &str) -> (String, std::process::Child) {
 
 /// Ask a server to pair with `node_did` and pull `drive`. This is byte-for-byte
 /// the request `pairAndSync` in the data-browser sends.
+/// `POST /iroh-sync`, signed as a fresh agent created on that server. The
+/// route needs a signed-in agent: write on the drive when the node already
+/// holds it, or the policy's leave to bring a new drive here (any agent on an
+/// open node, which these servers are).
 async fn post_iroh_sync(
     base_url: &str,
     node_did: &str,
     drive: &str,
 ) -> (reqwest::StatusCode, serde_json::Value) {
-    let response = reqwest::Client::new()
-        .post(format!("{base_url}/iroh-sync"))
-        .json(&serde_json::json!({ "nodeId": node_did, "drive": drive }))
-        .send()
+    let agent = Client::new(base_url)
         .await
-        .expect("iroh-sync request");
+        .unwrap()
+        .new_agent("Pairer")
+        .await
+        .unwrap();
+    let url = format!("{base_url}/iroh-sync");
+    let headers =
+        atomic_lib::client::get_authentication_headers(&url, &agent).expect("auth headers");
+    let mut request = reqwest::Client::new()
+        .post(&url)
+        .json(&serde_json::json!({ "nodeId": node_did, "drive": drive }));
+    for (key, value) in headers {
+        request = request.header(key, value);
+    }
+    let response = request.send().await.expect("iroh-sync request");
 
     let status = response.status();
     let body = response.json().await.unwrap_or(serde_json::Value::Null);
@@ -503,27 +517,46 @@ async fn a_paired_device_can_be_forgotten() {
         "a device that just paired must be listed before it can be forgotten"
     );
 
-    // Signed as an agent this server knows. The client signs the exact URL it
-    // fetches, query string included, and the server rebuilds it to verify.
-    let peer_agent = Client::new(&peer.base_url)
+    // A signature alone is not enough: a key nobody here has ever seen must
+    // not be able to drop the operator's devices. The client signs the exact
+    // URL it fetches, query string included, and the server rebuilds it to
+    // verify.
+    let stranger = Client::new(&peer.base_url)
         .await
         .unwrap()
-        .new_agent("Owner")
+        .new_agent("Stranger")
         .await
         .unwrap();
     let url = forget_peer_url(&peer.base_url, &node_a);
     let headers =
-        atomic_lib::client::get_authentication_headers(&url, &peer_agent).expect("auth headers");
-
+        atomic_lib::client::get_authentication_headers(&url, &stranger).expect("auth headers");
     let mut request = reqwest::Client::new().post(&url);
     for (key, value) in headers {
         request = request.header(key, value);
     }
     let response = request.send().await.expect("forget-peer request");
+    assert!(
+        !response.status().is_success(),
+        "a stranger must not be able to forget a peer, got {}",
+        response.status()
+    );
+    assert!(
+        listed_peer_node_ids(&peer.base_url).await.contains(&node_a),
+        "a refused forget-peer must leave the device listed"
+    );
 
+    // Alice may write the drive this peer was paired for, so Alice may undo
+    // the pairing.
+    let headers =
+        atomic_lib::client::get_authentication_headers(&url, &agent).expect("auth headers");
+    let mut request = reqwest::Client::new().post(&url);
+    for (key, value) in headers {
+        request = request.header(key, value);
+    }
+    let response = request.send().await.expect("forget-peer request");
     assert!(
         response.status().is_success(),
-        "a signed forget-peer must be accepted, got {}",
+        "a forget-peer signed by the drive's writer must be accepted, got {}",
         response.status()
     );
     assert!(

@@ -144,3 +144,17 @@ describe('enableCloudSyncForDrive', () => {
     expect(store.promoteLocalDrive).not.toHaveBeenCalled();
   });
 });
+
+describe('runtime provider configuration', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('offers hosting before a colleague connects to a managed node', () => {
+    vi.stubGlobal('window', {
+      __ATOMIC_MANAGED__: { portalUrl: 'https://staging.portal.example/' },
+    });
+    expect(getManagedPortalUrl(null)).toBe('https://staging.portal.example');
+    expect(isCloudSyncAvailable(null)).toBe(true);
+  });
+});

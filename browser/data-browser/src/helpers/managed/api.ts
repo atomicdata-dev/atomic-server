@@ -1,3 +1,25 @@
+declare global {
+  interface Window {
+    __ATOMIC_MANAGED__?: { portalUrl?: string };
+  }
+}
+
+export function getRuntimeManagedPortalUrl(): string | null {
+  const value =
+    typeof window === 'undefined'
+      ? undefined
+      : window.__ATOMIC_MANAGED__?.portalUrl;
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 // [RECOVERY-RECONSTRUCTED] The original `helpers/managed/api.ts` was never captured
 // in any Claude transcript (it predates the recovery window and isn't on the
 // pushed `did` branch). Reconstructed from its call sites: every managed helper
@@ -9,8 +31,62 @@
 import { isRunningInTauri } from '../tauri';
 
 const PORTAL_URL_STORAGE_KEY = 'atomic-managed-portal-url';
+/** The portal the device token was issued by. See {@link getLinkedPortalOrigin}. */
+const LINKED_PORTAL_STORAGE_KEY = 'atomic-managed-portal-origin-linked';
+const DEVICE_TOKEN_STORAGE_KEY = 'atomic-managed-device-token';
 
 const trimTrailingSlashes = (url: string): string => url.replace(/\/+$/, '');
+
+/**
+ * A portal URL this app may open, navigate to, or send its bearer token to —
+ * or undefined when it is not one.
+ *
+ * Only absolute `https:` URLs qualify, plus `http:` on `localhost` /
+ * `127.0.0.1` for development. The value usually comes from a remote node's
+ * `GET /server`, which is exactly the party that must not be able to point
+ * "Sign in" at a phishing page or a `javascript:` URL. Trailing slashes are
+ * trimmed so `${url}/api` composes cleanly.
+ */
+export function safePortalUrl(
+  url: string | null | undefined,
+): string | undefined {
+  if (typeof url !== 'string') return undefined;
+
+  const trimmed = url.trim();
+
+  if (trimmed.length === 0) return undefined;
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return undefined;
+  }
+
+  // Embedded credentials have no business in a portal address.
+  if (parsed.username || parsed.password) return undefined;
+
+  const isLocalhost =
+    parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+  if (
+    parsed.protocol === 'https:' ||
+    (parsed.protocol === 'http:' && isLocalhost)
+  ) {
+    return trimTrailingSlashes(trimmed);
+  }
+
+  return undefined;
+}
+
+function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
 
 let rememberedPortalUrl: string | null = null;
 
@@ -27,11 +103,34 @@ let rememberedPortalUrl: string | null = null;
  * A falsy URL is ignored rather than clearing the memory: the desktop shell
  * also asks its own embedded node, which is not managed and reports no portal.
  * That answer must not erase the real control plane.
+ *
+ * Two refusals, both logged: a URL that fails {@link safePortalUrl}, and — while
+ * this device holds a token — any origin other than the one it was linked to.
+ * Whatever node is connected right now does not get to redirect an existing
+ * session; that portal stays until the device is unlinked.
  */
 export function rememberManagedPortalUrl(url: string | null | undefined): void {
   if (!url) return;
 
-  rememberedPortalUrl = trimTrailingSlashes(url);
+  const safe = safePortalUrl(url);
+
+  if (!safe) {
+    console.warn('Ignoring portal URL that is not https:', url);
+
+    return;
+  }
+
+  const linked = getLinkedPortalOrigin();
+
+  if (linked && !sameOrigin(linked, safe)) {
+    console.warn(
+      `Ignoring portal ${safe}: this device is linked to ${linked}. Unlink it first to switch.`,
+    );
+
+    return;
+  }
+
+  rememberedPortalUrl = safe;
 
   try {
     localStorage.setItem(PORTAL_URL_STORAGE_KEY, rememberedPortalUrl);
@@ -40,14 +139,26 @@ export function rememberManagedPortalUrl(url: string | null | undefined): void {
   }
 }
 
-/** The last control plane a managed node named, or null if none ever has. */
+/**
+ * The last control plane a managed node named, or null if none ever has.
+ *
+ * While a device token exists this is the portal that issued it, whatever any
+ * node has said since — the same rule {@link getManagedApiBase} applies, so
+ * the "Sign in" buttons and the bearer token always agree on where the account
+ * lives.
+ */
 export function getRememberedManagedPortalUrl(): string | null {
+  const linked = getLinkedPortalOrigin();
+
+  if (linked) return linked;
+
   if (rememberedPortalUrl) return rememberedPortalUrl;
 
   try {
     const stored = localStorage.getItem(PORTAL_URL_STORAGE_KEY);
 
-    if (stored) rememberedPortalUrl = trimTrailingSlashes(stored);
+    // Written before `safePortalUrl` existed, so re-checked on the way out.
+    if (stored) rememberedPortalUrl = safePortalUrl(stored) ?? null;
   } catch {
     // Storage disabled — nothing remembered.
   }
@@ -69,8 +180,35 @@ function portalFromEnv(): string | null {
   return fromEnv ? trimTrailingSlashes(fromEnv) : null;
 }
 
+/**
+ * Whether this install knows of a control plane at all. A FOSS or self-hosted
+ * node has no SaaS session to end, and its origin answers `/api/logout` with a
+ * 405 that the browser logs as an error. Ported from #1386.
+ */
+export function hasManagedApi(): boolean {
+  return Boolean(
+    getLinkedPortalOrigin() ||
+    getRuntimeManagedPortalUrl() ||
+    (typeof import.meta !== 'undefined' &&
+      import.meta.env?.VITE_MANAGED_API_BASE) ||
+    getRememberedManagedPortalUrl() ||
+    portalFromEnv(),
+  );
+}
+
 /** Base URL of the control-plane API (includes the `/api` prefix). */
 export function getManagedApiBase(): string {
+  // A linked device talks to the portal that issued its token and nothing
+  // else. Checked before every other source, including the remembered portal:
+  // that one is fed by whichever node happens to be connected, and a hostile
+  // node must not be able to collect the bearer token by naming itself.
+  const linked = getLinkedPortalOrigin();
+
+  if (linked) return `${linked}/api`;
+
+  const runtime = getRuntimeManagedPortalUrl();
+  if (runtime) return `${runtime}/api`;
+
   const fromEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_MANAGED_API_BASE as string | undefined)
@@ -108,8 +246,6 @@ export function getManagedApiBase(): string {
   return '/api';
 }
 
-const DEVICE_TOKEN_STORAGE_KEY = 'atomic-managed-device-token';
-
 /**
  * The session a linked device holds, if this install has one.
  *
@@ -128,12 +264,69 @@ export function getManagedDeviceToken(): string | null {
   }
 }
 
-export function setManagedDeviceToken(token: string | null): void {
+/**
+ * The portal the device token belongs to, or null when the device is not
+ * linked. A token is only ever sent here — see {@link getManagedApiBase}.
+ *
+ * A token stored by a build that predates this record adopts the portal that
+ * was remembered at the time, once: that is the portal it was linked against,
+ * and adopting it before any node can overwrite the memory is what closes the
+ * hole for existing installs.
+ */
+export function getLinkedPortalOrigin(): string | null {
+  if (!getManagedDeviceToken()) return null;
+
+  try {
+    const stored = localStorage.getItem(LINKED_PORTAL_STORAGE_KEY);
+    const safe = safePortalUrl(stored);
+
+    if (safe) return safe;
+
+    const legacy =
+      safePortalUrl(rememberedPortalUrl) ??
+      safePortalUrl(localStorage.getItem(PORTAL_URL_STORAGE_KEY));
+
+    if (legacy) {
+      localStorage.setItem(LINKED_PORTAL_STORAGE_KEY, legacy);
+    }
+
+    return legacy ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Store (or clear, with `null`) the linked-device session.
+ *
+ * `linkedPortalUrl` is the portal that issued the token; it is recorded next
+ * to the token and is the only place the token will ever be sent. Clearing
+ * the token clears it too, so a later link to another provider starts clean.
+ */
+export function setManagedDeviceToken(
+  token: string | null,
+  linkedPortalUrl?: string,
+): void {
   try {
     if (token) {
       localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, token);
+
+      if (linkedPortalUrl !== undefined) {
+        const safe = safePortalUrl(linkedPortalUrl);
+
+        if (safe) {
+          localStorage.setItem(LINKED_PORTAL_STORAGE_KEY, safe);
+        } else {
+          console.warn(
+            'Not recording link origin: not https:',
+            linkedPortalUrl,
+          );
+          localStorage.removeItem(LINKED_PORTAL_STORAGE_KEY);
+        }
+      }
     } else {
       localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+      localStorage.removeItem(LINKED_PORTAL_STORAGE_KEY);
     }
   } catch {
     // Same as above: unlinkable rather than broken.

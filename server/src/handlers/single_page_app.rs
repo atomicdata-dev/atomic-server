@@ -141,7 +141,9 @@ impl Default for MetaTags {
 impl Display for MetaTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let description = escape_html(&self.description);
-        let image = &self.image;
+        // `image` is the resource's `downloadUrl`, an ordinary user-settable
+        // property, and this page is rendered for public visitors.
+        let image = escape_html(&self.image);
         let title = escape_html(&self.title);
 
         write!(
@@ -168,7 +170,7 @@ impl Display for MetaTags {
     }
 }
 
-fn escape_html(s: &str) -> String {
+pub(crate) fn escape_html(s: &str) -> String {
     s.replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('&', "&amp;")

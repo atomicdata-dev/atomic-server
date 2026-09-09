@@ -200,6 +200,16 @@ mod tests {
             "bob must not see alice's write before ingesting it"
         );
 
+        // Bob already holds Alice's drive, as a replica does after its first
+        // sync. A child arriving for a drive this node does not hold is
+        // refused: nothing here would say Alice may append to it.
+        let alice_drive = alice_node.db().get_resource(&drive).await.unwrap();
+        bob_node
+            .db()
+            .add_resource_opts(&alice_drive, false, true, true)
+            .await
+            .unwrap();
+
         // The commit crosses the (in-process) wire as JSON-AD.
         let wire = commit_to_wire_json(&response.commit, alice_node.db())
             .await

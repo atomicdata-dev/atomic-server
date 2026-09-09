@@ -1,3 +1,4 @@
+import { DiscoverWorkspace } from './DiscoverWorkspace';
 import React, { useEffect, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaMobileScreenButton, FaLock } from 'react-icons/fa6';
@@ -6,6 +7,7 @@ import { useDriveVault } from '../../helpers/managed/useDriveVault';
 import { listVaultDrives } from '../../helpers/managed/vault';
 import { getManagedAccount } from '../../helpers/managed/session';
 import { canHoldProviderCookie } from '../../helpers/managed/deviceLink';
+import { safePortalUrl } from '../../helpers/managed/api';
 import { openExternal } from '../../helpers/openExternal';
 import { PRODUCT_NAME } from '../../helpers/managed/product';
 import { LinkProviderPanel } from '../../components/Vault/LinkProviderPanel';
@@ -456,8 +458,13 @@ export function ConnectDeviceStep({
               <FaLock aria-hidden />
             )}
           </Badge>
-          <CardTitle>{title}</CardTitle>
-          <CardSubtitle>{subtitle}</CardSubtitle>
+          <CardTitle>
+            {isNode && drive ? 'Find your workspace' : title}
+          </CardTitle>
+          {!(isNode && drive) && <CardSubtitle>{subtitle}</CardSubtitle>}
+          {isNode && drive && (
+            <DiscoverWorkspace drive={drive} onConnected={onConnected} />
+          )}
 
           {/* The vault's own account of why there is nothing to restore. Five
               situations answer "no backup" — never enrolled, enrolled but
@@ -485,9 +492,13 @@ export function ConnectDeviceStep({
                       // link that lands on the portal, and this screen is
                       // where the restore happens. Leaving it means finding
                       // the way back through Sync.
-                      void openExternal(
-                        new URL('/signin', portalUrl!).toString(),
-                      );
+                      const portal = safePortalUrl(portalUrl);
+
+                      if (portal) {
+                        void openExternal(
+                          new URL('/signin', portal).toString(),
+                        );
+                      }
                     }}
                   >
                     {`Sign in to ${PRODUCT_NAME}`}

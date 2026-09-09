@@ -26,6 +26,8 @@ pub struct SearchQuery {
 }
 
 const DEFAULT_RETURN_LIMIT: usize = 30;
+/// Upper bound for a client-supplied `limit`.
+const MAX_RETURN_LIMIT: usize = 500;
 // We fetch extra documents, as the user may not have the rights to the first ones!
 // We filter these results later.
 // https://github.com/atomicdata-dev/atomic-server/issues/279.
@@ -39,14 +41,11 @@ pub async fn search_query(
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
-    let limit = if let Some(l) = params.limit {
-        if l > 0 {
-            l
-        } else {
-            DEFAULT_RETURN_LIMIT
-        }
-    } else {
-        DEFAULT_RETURN_LIMIT
+    let limit = match params.limit {
+        // Bounded: the caller is unauthenticated, and `limit` feeds
+        // multiplications and a result loop below.
+        Some(l) if l > 0 => l.min(MAX_RETURN_LIMIT),
+        _ => DEFAULT_RETURN_LIMIT,
     };
 
     let origin = RequestContext::new(&req, &appstate).origin;

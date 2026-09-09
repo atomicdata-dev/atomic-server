@@ -69,6 +69,42 @@ describe('Store', () => {
     ).toBe(true);
   });
 
+  it('persists merged state when an older resource arrives after an acknowledged edit', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    const resource = await store.newResource({
+      isA: core.classes.resource,
+      propVals: { [core.properties.name]: 'Before' },
+    });
+    await resource.save();
+    const older = new Resource(resource.subject);
+    older.setStore(store);
+    older.importLoroUpdate(
+      resource.getLoroDoc()!.export({ mode: 'snapshot' }),
+      true,
+    );
+    const putResourceWithSnapshot = vi.fn().mockResolvedValue(undefined);
+    store.setClientDb({
+      isReady: true,
+      flush: async () => undefined,
+      putResourceWithSnapshot,
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    await resource.set(core.properties.name, 'After', false);
+    await resource.save();
+    store.addResource(older, { skipCommitCompare: true });
+    expect(
+      store.resources.get(resource.subject)!.get(core.properties.name),
+    ).toBe('After');
+    expect(putResourceWithSnapshot).toHaveBeenCalled();
+    const [, json, snapshot] = putResourceWithSnapshot.mock.calls.at(-1)!;
+    expect(JSON.parse(json)[core.properties.name]).toBe('After');
+    const persisted = new Resource(resource.subject);
+    persisted.setStore(store);
+    persisted.importLoroUpdate(snapshot, true);
+    expect(persisted.get(core.properties.name)).toBe('After');
+  });
+
   it.each(['snapshot', 'flush'])(
     'an acknowledged edit waits for local %s before save resolves',
     async stage => {

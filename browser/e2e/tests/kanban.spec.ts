@@ -394,6 +394,9 @@ test.describe('kanban', () => {
     const copyTab = page.getByRole('tab', { name: 'Board copy' });
     await expect(copyTab).toBeVisible();
 
+    // Duplication persists the view before navigating to it. Wait for that
+    // navigation so the click opens the active tab's menu.
+    await expect(copyTab).toHaveAttribute('aria-selected', 'true');
     // Delete the copy via its tab menu + confirmation dialog.
     await copyTab.click();
     await page.getByTestId('menu-item-delete').click();

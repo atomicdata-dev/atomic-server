@@ -484,16 +484,12 @@ function waitForCommitForSubject(page: Page, subject: string, since: number) {
 /**
  * Types the agent secret and lets the flow sign itself in.
  *
- * `fill()` alone usually suffices — it dispatches the input event React's
- * onChange listens for, which calls `trySecret`. The explicit blur() covers the
- * other half of the component's contract (`onBlur` re-runs `trySecret` with its
- * final flag), so a value that arrives too fast for the change handler still
- * gets validated rather than sitting in a field nobody submitted.
+ * Filling a valid secret starts sign-in immediately. Do not blur or submit
+ * afterward: the input may already have unmounted. Callers await the resulting
+ * signed-in state before continuing.
  */
 async function enterSecret(page: Page, secret: string) {
-  const field = page.getByLabel('Agent secret');
-  await field.fill(secret);
-  await field.blur();
+  await page.getByLabel('Agent secret').fill(secret);
 }
 
 export async function signIn(page: Page, secret: string = SECRET) {
@@ -1309,11 +1305,19 @@ export async function waitForSynced(page: Page, timeoutMs = 30_000) {
                 enqueuedAt: number;
                 signedGenesis?: unknown;
                 lastAttemptError?: unknown;
+                baseVersion?: string;
               }) => ({
                 subject: entry.subject,
                 enqueuedAt: entry.enqueuedAt,
                 hasSignedGenesis: !!entry.signedGenesis,
                 lastAttemptError: entry.lastAttemptError,
+                baseVersion: entry.baseVersion,
+                saveCursor: store?.resources
+                  .get(entry.subject)
+                  ?.getEncodedSaveCursor(),
+                hasUnsavedChanges: store?.resources
+                  .get(entry.subject)
+                  ?.hasUnsavedChanges(),
               }),
             ) ?? [];
 
@@ -2053,6 +2057,13 @@ export async function acceptInvite(page: Page) {
   await expect(acceptBtn).toBeVisible({ timeout: 15000 });
   await acceptBtn.click();
 
+  await page
+    .getByLabel('Full name', { exact: true })
+    .fill(`Test User ${timestamp()}`);
+  await page
+    .getByRole('button', { name: 'Save and continue', exact: true })
+    .click();
+
   // Unlike most dialogs (one round trip), the click above kicks off TWO
   // sequential server round trips before the dialog opens: InvitePage's
   // handleNew() saves the new agent's genesis commit, then handleAccept()
@@ -2065,7 +2076,7 @@ export async function acceptInvite(page: Page) {
       await expect(
         dialog.getByRole('heading', { name: 'Agent created!' }),
       ).toBeVisible();
-      await dialog.getByLabel('Agent Name').fill(`Test User ${timestamp()}`);
+      await expect(dialog.getByLabel('Agent Name')).toHaveCount(0);
       await dialog.getByRole('button', { name: 'Copy to clipboard' }).click();
       await closeDialog('Continue');
     },
