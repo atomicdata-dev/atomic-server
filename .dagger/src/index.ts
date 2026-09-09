@@ -1049,6 +1049,11 @@ export class AtomicServer {
       // Integration sources live at the repository root. The browser mounts at
       // /app, and its raw imports resolve these paths from /integrations.
       .withDirectory('/integrations', this.source.directory('integrations'))
+      // Each integrations/*/tsconfig.json extends the repo-root-relative
+      // `../../browser/tsconfig.build.json`. Same fix jsTest()/
+      // integrationCertificationReport() already use for this: alias /browser
+      // to the /app mount so those relative paths resolve.
+      .withExec(['ln', '-s', '/app', '/browser'])
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
       // Provide the prebuilt WASM artifacts so data-browser's `build` can skip
       // wasm-pack when `SKIP_WASM_BUILD=1` (`wasm-pack` isn't available in this
