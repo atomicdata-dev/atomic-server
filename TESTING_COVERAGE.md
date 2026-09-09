@@ -1087,6 +1087,12 @@ LocalThought: Rust handler tests cover connection binding, request signing, dupl
 
 Google Calendar one-way projection: `integrations/localthought/calendar.test.ts`
 covers all-day/timed start dates, offset boundaries, exclusive end preservation,
-feature notes, cancellations without start data, invalid active events,
-namespace isolation and repeat import/local-field preservation. `browser/e2e/tests/google-calendar-import.spec.ts` covers synthetic provider responses through real schema installation, sandbox review/apply and Calendar rendering, including feature notes. Local verification passed with the React compiler disabled to bypass a dependency-loader problem; live-provider verification of the new view remains outstanding. Missing rows in a bounded snapshot
-are retained, not interpreted as deletions.
+feature notes (including WASM-normalized field names), cancellations without
+start data, invalid active events, namespace isolation and repeat import/local
+field preservation. `browser/e2e/tests/google-calendar-import.spec.mts` uses the
+shared HTTP mock integration-proxy with a paginated Google Calendar, tenant
+secret entry and OAuth consent. It covers browser WASM fetching, local
+schema/proposal/apply, Calendar display, provider updates, OPFS reload and
+stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
+rows in a bounded snapshot are retained, not interpreted as deletions.
+Live-provider browser OAuth verification remains separate from this fixture test.

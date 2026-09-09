@@ -107,4 +107,28 @@ scope is requested and edits in Atomic do not update Google.
 recurrence/attendee notes, cancellations, malformed starts, cross-calendar
 identity and repeated imports with private local fields.
 
-Browser regression: `browser/e2e/tests/google-calendar-import.spec.ts` uses synthetic provider responses with real schema installation, sandbox review/apply and Calendar rendering. Local run passed with a temporary compiler-disabled Vite configuration; the default local compiler runtime had a dependency-loader error before app startup. The workaround is not shipped.
+## Browser-only Calendar regression
+
+`browser/e2e/tests/google-calendar-import.spec.mts` starts the shared mock
+integration-proxy from #1399 with a synthetic Google Calendar. The test enters
+the public fixture tenant secret, completes consent, and exercises real browser
+credential rotation, WASM pagination, local schema installation, proposal review,
+OPFS application, and Calendar rendering. It refreshes changed provider data
+and checks that native identities and Atomic-only notes survive reload.
+AtomicServer HTTP and all WebSockets are blocked throughout; only GET requests
+are permitted for provider data. The configured LocalThought origin is forwarded
+to the isolated HTTP fixture, so no live provider credentials or data are used.
+
+Run with a dev frontend built from this branch and its matching WASM bundle:
+
+```sh
+FRONTEND_URL=http://127.0.0.1:6747 SERVER_URL=http://127.0.0.1:19999 \
+  browser/e2e/node_modules/.bin/playwright test \
+  --config browser/e2e/playwright.config.ts \
+  browser/e2e/tests/google-calendar-import.spec.mts --project chromium
+```
+
+If the frontend uses `VITE_INTEGRATION_PROXY_URL`, pass the same value to the
+test process. The test forwards that origin to its own fixture. Live Google
+OAuth on the browser path still depends on the proxy CORS deployment described
+above; this fixture test does not claim live-provider verification.
