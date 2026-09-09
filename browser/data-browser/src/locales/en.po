@@ -9535,3 +9535,23 @@ msgstr "Applying sync…"
 #: src/chunks/PluginRuns/IntegrationConnection.tsx
 msgid "Checking for changes. This may take a moment."
 msgstr "Checking for changes. This may take a moment."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Pets"
+msgstr "Pets"
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "A trivial demo collection, useful for trying plugins out."
+msgstr "A trivial demo collection, useful for trying plugins out."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+msgstr "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "A one-off, on-demand import. Nothing runs in the background."
+msgstr "A one-off, on-demand import. Nothing runs in the background."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "No external account, API key or network call. Static sample data only, not a live provider."
+msgstr "No external account, API key or network call. Static sample data only, not a live provider."
