@@ -256,4 +256,7 @@ export {
   isCalendarDate,
   isAllDayOnDate,
   nextCalendarDate,
+  matchesCalendarField,
 } from './calendar-date.js';
+
+export * from './calendar-recurrence.js';

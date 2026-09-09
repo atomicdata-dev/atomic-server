@@ -13,6 +13,7 @@ export function isCalendarDate(value: unknown): value is string {
   if (year < 1 || month < 1 || month > 12 || day < 1) return false;
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
   return day <= days[month - 1];
 }
 
@@ -40,14 +41,26 @@ export function nextCalendarDate(value: string): string {
   const format = () =>
     `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   day += 1;
+
   if (!isCalendarDate(format())) {
     day = 1;
     month += 1;
   }
+
   if (month > 12) {
     month = 1;
     year += 1;
   }
+
   if (!isCalendarDate(format())) throw new Error('Calendar date out of range');
+
   return format();
+}
+
+/** Imported properties are namespaced by platformSchema; native ones are not. */
+export function matchesCalendarField(
+  actual: string | undefined,
+  field: string,
+): boolean {
+  return actual === field || actual === `lt-google-calendar-property-${field}`;
 }

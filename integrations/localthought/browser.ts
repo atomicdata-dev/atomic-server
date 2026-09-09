@@ -269,7 +269,7 @@ export class BrowserIntegrations {
     actor: string,
     id: string,
     constants: Record<string, string>,
-    range?: { start: string; end: string },
+    range?: { start: string; end: string; series?: boolean },
   ) {
     // Web Locks serialize rotating credentials across tabs as well as UI actions.
     if (!navigator.locks)

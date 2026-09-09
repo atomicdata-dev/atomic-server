@@ -1,3 +1,4 @@
+import { calendarRecurrenceProjection } from '../../../../../integrations/localthought/calendarRecurrence';
 import { useEffect, useState } from 'react';
 import {
   core,
@@ -59,6 +60,7 @@ export function ConnectLocalThought({
   const [parameters, setParameters] = useState<string[]>([]);
   const [constants, setConstants] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<string[]>([]);
+  const [keepSeries, setKeepSeries] = useState(false);
   const [calendarRange, setCalendarRange] = useState(() => ({
     start: new Date().toISOString().slice(0, 10),
     end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -138,15 +140,19 @@ export function ConnectLocalThought({
         drive,
         connection: connection.connection,
         constants,
-        ...(platform === 'google-calendar' ? { calendarRange } : {}),
+        ...(platform === 'google-calendar'
+          ? { calendarRange: { ...calendarRange, series: keepSeries } }
+          : {}),
       });
-      const fetched = calendarProjection(response);
+      const fetched = calendarRecurrenceProjection(
+        calendarProjection(response),
+      );
       if (fetched.platform !== platform)
         throw new Error('Imported platform did not match this connection');
       const schemaStore = localSchemaStore(store);
       const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
-      const identity = `localthought:${connection.connection}:${JSON.stringify(Object.entries(constants).sort())}`;
+      const identity = `localthought:${connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${platform === 'google-calendar' && keepSeries ? ':series' : ''}`;
       const resource = await ensureInstallationResource(store, drive, {
         parent: drive,
         localId: identity,
@@ -309,12 +315,28 @@ export function ConnectLocalThought({
           ))}
           {platform === 'google-calendar' && (
             <>
+              <label>
+                <input
+                  type='checkbox'
+                  checked={keepSeries}
+                  disabled={busy}
+                  onChange={e => setKeepSeries(e.target.checked)}
+                />{' '}
+                Keep recurring series (fetch full calendars)
+              </label>
+              {keepSeries && (
+                <p>
+                  Includes all dates and exceptions. Large calendars may exceed
+                  the import limit. Unsupported recurrence rules stop the
+                  preview.
+                </p>
+              )}
               <Field fieldId='calendar-start' label='Events from (UTC)'>
                 <Input
                   id='calendar-start'
                   type='date'
                   value={calendarRange.start}
-                  disabled={busy}
+                  disabled={busy || keepSeries}
                   onChange={e =>
                     setCalendarRange({
                       ...calendarRange,
@@ -328,7 +350,7 @@ export function ConnectLocalThought({
                   id='calendar-end'
                   type='date'
                   value={calendarRange.end}
-                  disabled={busy}
+                  disabled={busy || keepSeries}
                   onChange={e =>
                     setCalendarRange({ ...calendarRange, end: e.target.value })
                   }

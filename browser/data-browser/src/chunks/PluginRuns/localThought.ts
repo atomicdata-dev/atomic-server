@@ -44,7 +44,7 @@ export async function proxyRequest<T>(
     connectionCode?: string;
     connection?: string;
     constants?: Record<string, string>;
-    calendarRange?: { start: string; end: string };
+    calendarRange?: { start: string; end: string; series?: boolean };
   },
 ): Promise<T> {
   const actor = store.getAgent()?.subject;
