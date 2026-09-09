@@ -54,4 +54,7 @@ Calendar live follow-up: proxy PR #30 fixes catalog base paths (deployed v39).
 OAuth and paginated reads work, but an unbounded import exceeds 5,000 records.
 - [x] Add explicit UTC event date bounds and verify a scoped live import.
 
-- [ ] Rebase onto the latest `feat/api-plugins` CI fixes and make branch CI pass.
+- [x] Rebase onto `2ca03bd2c`, verified tree-identical to requested `550cc5f`.
+- [ ] Make branch CI pass. Local JS suite, lint, typecheck, Rust handler tests
+  and focused Pets E2E pass. Main run 34349742940 exposed independent Cargo
+  cache locks around a shared registry; link the locks into the shared volume.

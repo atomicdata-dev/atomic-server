@@ -273,23 +273,49 @@ export class AtomicServer {
    * Mount shared crates.io + git dependency caches under `cargoHome`, and
    * pin `CARGO_BUILD_JOBS` so rustc doesn't spawn one job per visible host
    * CPU (containers see the full Mancave SMT count). Registry content is
-   * identical across glibc/musl images, so both share the `cargo` /
-   * `cargo-git` volumes — only the mount path differs.
+   * identical across glibc/musl images, so both share dependency volumes
+   * and Cargo cache locks — only the mount path differs.
    */
   private withCargoHomeCache(
     container: Container,
     cargoHome: string,
   ): Container {
-    return container
-      .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
-        // Shared: Locked serialized every parallel CI lane behind whichever
-        // job held the volume. Cargo's own flock handles concurrent writers.
-        sharing: CacheSharingMode.Shared,
-      })
-      .withMountedCache(`${cargoHome}/git`, dag.cacheVolume('cargo-git'), {
-        sharing: CacheSharingMode.Shared,
-      })
-      .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs);
+    return (
+      container
+        .withMountedCache(
+          `${cargoHome}/registry`,
+          dag.cacheVolume('cargo-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        .withMountedCache(
+          `${cargoHome}/git`,
+          dag.cacheVolume('cargo-git-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        // Cargo locks live in CARGO_HOME, outside registry/git. Sharing only
+        // those directories leaves every container with independent locks and
+        // lets simultaneous downloads race while unpacking the same crate.
+        // Put both lock inodes in the shared registry volume; Cargo still only
+        // serializes downloads/mutations, not the entire parallel build lane.
+        // Fresh volume names keep older jobs with private locks out of this cache.
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache',
+          `${cargoHome}/.package-cache`,
+        ])
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache-mutate',
+          `${cargoHome}/.package-cache-mutate`,
+        ])
+        .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs)
+    );
   }
 
   /**
@@ -1635,9 +1661,11 @@ export class AtomicServer {
     // `--release` was reverted once for 15-30 min of cold compile; the `e2e`
     // profile drops LTO and the single codegen unit, which is where that time
     // went. Deploy still goes through `rustBuildRelease` (release=true).
-    const atomicServerBinary = this.rustBuild(!e2e, 'x86_64-unknown-linux-musl', e2e).file(
-      '/atomic-server-binary',
-    );
+    const atomicServerBinary = this.rustBuild(
+      !e2e,
+      'x86_64-unknown-linux-musl',
+      e2e,
+    ).file('/atomic-server-binary');
 
     let service = dag
       .container()
@@ -1654,14 +1682,27 @@ export class AtomicServer {
       .withEntrypoint(['/atomic-server-bin']);
     if (e2e)
       service = service
-        .withDirectory('/mock-proxy', this.source.directory('integrations/localthought'))
-        .withEnvVariable('ATOMIC_INTEGRATION_PROXY_URL', 'http://127.0.0.1:19090')
+        .withDirectory(
+          '/mock-proxy',
+          this.source.directory('integrations/localthought'),
+        )
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_PROXY_URL',
+          'http://127.0.0.1:19090',
+        )
         .withEnvVariable('TENANT_SECRET', 'bW9jay10ZW5hbnQ.mock-signature')
-        .withEnvVariable('ATOMIC_INTEGRATION_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_FRONTEND_ORIGIN',
+          'http://atomic.localhost:9883',
+        )
         .withEnvVariable('MOCK_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
         .withEnvVariable('MOCK_PROXY_HOST', '0.0.0.0')
         .withExposedPort(19090)
-        .withEntrypoint(['sh', '-c', 'node /mock-proxy/mock-proxy.mjs & exec /atomic-server-bin']);
+        .withEntrypoint([
+          'sh',
+          '-c',
+          'node /mock-proxy/mock-proxy.mjs & exec /atomic-server-bin',
+        ]);
     return service.asService().withHostname(ATOMIC_DOMAIN);
   }
 
