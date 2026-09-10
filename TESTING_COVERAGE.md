@@ -623,3 +623,14 @@ URLs and confirm the rejected-write rate falls after clients update.
 Automatic browser discovery: `browser/data-browser/src/helpers/browserPeerSync.test.ts` verifies deterministic per-drive rooms, automatic startup for locally snapshotted drives, duplicate prevention, and skipping unknown snapshots. `ATOMIC_PEER_AUTOMATIC=1` with `verify-peer-mesh.mjs` verifies eight browsers rediscover trusted local drives without saved invitations, then sync creations, presence, attachments, reconnects and deletion. Full app UI acceptance remains separate.
 
 The WebSocket unit suite also covers a socket closing while an asynchronous version-vector probe is computed: no SYNC is sent on the closed connection. General UI tests stub public discovery with an empty room; the separate peer mesh acceptance script still exercises real signaling and authenticated sync.
+
+## Account drive catalog
+
+`helpers/managed/driveCatalog.test.ts` covers union/deduplication, removal precedence,
+offline retry/cache isolation, and stale results after logout or account switching.
+`e2e/tests/drive-catalog.spec.ts` renders an account-only drive without a local
+saved pointer, publishes the local drive, and applies a removal after reconnect
+(real app/node, mocked account API). Existing saved-drive tests remain separate.
+SaaS handler tests cover authenticated additive registration, account isolation,
+service-backed discovery and removal versus stale upload. Catalog entries confer
+no access to resource content. A live cross-app deployment acceptance is separate.

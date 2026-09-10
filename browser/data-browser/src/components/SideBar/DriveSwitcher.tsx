@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { useAccountDriveCatalog } from '../../hooks/useAccountDriveCatalog';
 import { useDriveHostingStates } from '../../hooks/useDriveHostingStates';
 import { Resource, core, server, useResources } from '@tomic/react';
 import {
@@ -48,10 +49,18 @@ export function DriveSwitcher({
   const [history, addToHistory] = useDriveHistory(savedDrives, 5);
 
   // The private drive leads the menu; keep it out of the lists below.
-  const myDrives = savedDrives.filter(subject => subject !== privateDrive);
-  const recentDrives = history.filter(subject => subject !== privateDrive);
+  const catalog = useAccountDriveCatalog(
+    privateDrive ? [privateDrive, ...savedDrives] : savedDrives,
+  );
+  const myDrives = catalog.subjects.filter(subject => subject !== privateDrive);
+  const recentDrives = history.filter(
+    subject =>
+      subject !== privateDrive &&
+      !catalog.removed.includes(subject) &&
+      !myDrives.includes(subject),
+  );
 
-  const myDrivesMap = useResources(myDrives);
+  const myDrivesMap = useResources(savedDrives);
   const recentDrivesMap = useResources(recentDrives);
 
   const switchTo = (subject: string) => {
@@ -63,7 +72,7 @@ export function DriveSwitcher({
   const createNewResource = useNewResourceUI();
 
   const items: DropdownItem[] = [
-    ...(privateDrive
+    ...(privateDrive && !catalog.removed.includes(privateDrive)
       ? [
           {
             id: privateDrive,
@@ -76,17 +85,24 @@ export function DriveSwitcher({
           },
         ]
       : []),
-    ...Array.from(myDrivesMap.entries())
-      .filter(([_, resource]) => !resource.error)
-      .map(([subject, resource]) => ({
+    ...myDrives.map(subject => {
+      const resource = myDrivesMap.get(subject);
+      const label =
+        resource && !resource.error
+          ? getTitle(resource)
+          : catalog.entries.find(e => e.drive_subject === subject)
+              ?.drive_name || subject;
+
+      return {
         id: subject,
         suffix: badge(subject),
-        label: getTitle(resource),
-        helper: `Switch to ${getTitle(resource)}`,
+        label,
+        helper: `Switch to ${label}`,
         disabled: false,
         onClick: (): void => switchTo(subject),
         icon: subject === drive ? <FaSquareCheck /> : <FaRegCircle />,
-      })),
+      };
+    }),
     {
       id: 'new-drive',
       label: 'New Drive',
