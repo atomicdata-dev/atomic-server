@@ -1,4 +1,9 @@
-import { BrowserPeerSync, randomPeerToken, type Store } from '@tomic/lib';
+import {
+  BrowserPeerSync,
+  randomPeerToken,
+  server,
+  type Store,
+} from '@tomic/lib';
 
 export interface SavedPeerLink {
   drive: string;
@@ -161,4 +166,78 @@ export function parsePeerLink(invitation: string): SavedPeerLink {
     signalingUrl: link.signalingUrl,
     expectedPeer: link.expectedPeer,
   };
+}
+
+/** Discovery is not authorization: signed sessions still enforce drive ACLs. */
+export async function automaticPeerRoom(drive: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`atomic-browser-drive-v1:${drive}`),
+  );
+
+  return Array.from(new Uint8Array(digest), byte =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
+const discovering = new WeakSet<Store>();
+
+export async function discoverPeerDrives(store: Store): Promise<void> {
+  const agent = store.getAgent();
+  const db = store.getClientDb();
+  if (!agent || !db || discovering.has(store)) return;
+  discovering.add(store);
+  let links = active.get(store);
+
+  if (!links) {
+    links = new Map();
+    active.set(store, links);
+  }
+
+  const current = () =>
+    store.getAgent() === agent &&
+    store.getClientDb() === db &&
+    active.get(store) === links;
+
+  try {
+    for (const resource of store.resources.values()) {
+      const drive = resource.subject;
+      const id = `automatic:${drive}`;
+      if (
+        !drive.startsWith('did:ad:') ||
+        !resource.isReady() ||
+        resource.error ||
+        !resource.hasClasses(server.classes.drive) ||
+        links.has(id)
+      )
+        continue;
+
+      try {
+        // Never bootstrap trust from a discovered stranger's snapshot.
+        if (!(await db.getResourceWithSnapshot(drive)).snapshot) continue;
+        const room = await automaticPeerRoom(drive);
+        if (!current()) return;
+        links.set(
+          id,
+          new BrowserPeerSync(store, {
+            drive,
+            room,
+            signalingUrl: defaultPeerSignalingUrl(),
+            iceServers: import.meta.env.VITE_ATOMIC_ICE_SERVERS
+              ? JSON.parse(import.meta.env.VITE_ATOMIC_ICE_SERVERS)
+              : undefined,
+            onStatus: status => {
+              if (!current()) return;
+              statuses.set(drive, status);
+              window.dispatchEvent(new Event(PEER_LINK_CHANGED));
+            },
+          }),
+        );
+      } catch {
+        /* Retry after local storage becomes ready. */
+      }
+    }
+  } finally {
+    discovering.delete(store);
+  }
 }

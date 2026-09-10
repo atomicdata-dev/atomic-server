@@ -1,5 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Store } from '@tomic/lib';
+import { BrowserPeerSync, server, type Store } from '@tomic/lib';
+vi.mock('@tomic/lib', async importOriginal => ({
+  ...(await importOriginal<typeof import('@tomic/lib')>()),
+  BrowserPeerSync: vi.fn(
+    class {
+      close() {}
+    },
+  ),
+}));
 import {
   createPeerLink,
   parsePeerLink,
@@ -76,4 +84,57 @@ it('creates a local-drive invitation without asking a node for discovery', () =>
   expect(parsePeerLink(invitation).signalingUrl).toBe(
     'wss://staging.atomicserver.eu/webrtc-signal',
   );
+});
+
+it('derives the same discovery room independently, and separates drives', async () => {
+  const { automaticPeerRoom } = await import('./browserPeerSync');
+  expect(await automaticPeerRoom('did:ad:one')).toMatch(/^[a-f0-9]{64}$/);
+  expect(await automaticPeerRoom('did:ad:one')).toBe(
+    await automaticPeerRoom('did:ad:one'),
+  );
+  expect(await automaticPeerRoom('did:ad:one')).not.toBe(
+    await automaticPeerRoom('did:ad:two'),
+  );
+});
+
+it('automatically connects stored drives once, without bootstrapping unknown drives', async () => {
+  const { discoverPeerDrives, stopPeerLinks } =
+    await import('./browserPeerSync');
+  vi.stubGlobal('window', {
+    location: { hostname: 'localhost' },
+    dispatchEvent: vi.fn(),
+  });
+  const agent = { subject: 'did:ad:agent:test' };
+  const db = {
+    getResourceWithSnapshot: vi.fn(async (drive: string) => ({
+      snapshot: drive === 'did:ad:stored' ? 'snapshot' : undefined,
+    })),
+  };
+  const resources = new Map(
+    ['did:ad:stored', 'did:ad:unknown'].map(subject => [
+      subject,
+      {
+        subject,
+        isReady: () => true,
+        hasClasses: (cls: string) => cls === server.classes.drive,
+      },
+    ]),
+  );
+  const store = {
+    getAgent: () => agent,
+    getClientDb: () => db,
+    resources,
+  } as unknown as Store;
+  vi.mocked(BrowserPeerSync).mockImplementation(function () {
+    return { close: vi.fn() } as unknown as BrowserPeerSync;
+  });
+  vi.mocked(BrowserPeerSync).mockClear();
+  await discoverPeerDrives(store);
+  await discoverPeerDrives(store);
+  expect(BrowserPeerSync).toHaveBeenCalledOnce();
+  expect(BrowserPeerSync).toHaveBeenCalledWith(
+    store,
+    expect.objectContaining({ drive: 'did:ad:stored' }),
+  );
+  stopPeerLinks(store);
 });

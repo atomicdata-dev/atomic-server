@@ -4764,7 +4764,6 @@ msgstr "Pairing code copied."
 msgid "Could not copy — select and copy the code manually."
 msgstr "Could not copy — select and copy the code manually."
 
-#: src/components/BrowserPeerPanel.tsx
 #: src/components/ConnectServerDialog.tsx
 #: src/components/ConnectToDeviceForm.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
@@ -6691,7 +6690,6 @@ msgstr "A hosted workspace on {0}: shareable links, search across everything, AP
 msgid "Cloud Vault is not available here: {0}."
 msgstr "Cloud Vault is not available here: {0}."
 
-#: src/components/BrowserPeerPanel.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
 msgstr "Disconnect"
@@ -7428,7 +7426,6 @@ msgstr "Feedback reporting is unavailable on this installation. Email"
 msgid "Private"
 msgstr "Private"
 
-#: src/components/BrowserPeerPanel.tsx
 #: src/components/Share/ShareDialog.tsx
 msgid "Copy link"
 msgstr "Copy link"
@@ -7802,25 +7799,20 @@ msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Could not unlock with a passkey. Use your recovery code instead."
 
-#: src/components/BrowserPeerPanel.tsx
-msgid "Peer sync"
-msgstr "Peer sync"
+#~ msgid "Peer sync"
+#~ msgstr "Peer sync"
 
-#: src/components/BrowserPeerPanel.tsx
-msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
-msgstr "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+#~ msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+#~ msgstr "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
 
-#: src/components/BrowserPeerPanel.tsx
-msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
-msgstr "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+#~ msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+#~ msgstr "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
 
-#: src/components/BrowserPeerPanel.tsx
-msgid "Create peer link"
-msgstr "Create peer link"
+#~ msgid "Create peer link"
+#~ msgstr "Create peer link"
 
-#: src/components/BrowserPeerPanel.tsx
-msgid "Peer link"
-msgstr "Peer link"
+#~ msgid "Peer link"
+#~ msgstr "Peer link"
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect existing account"
