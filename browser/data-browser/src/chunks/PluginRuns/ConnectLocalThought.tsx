@@ -1,5 +1,8 @@
 import { getIntegrationProxy } from '@helpers/integrationProxy';
-import { readSavedConnection } from '../../../../../integrations/localthought/settings';
+import {
+  importInstallationIdentity,
+  readSavedConnection,
+} from '../../../../../integrations/localthought/settings';
 import { googleCalendarIntegration } from '@localthought/atomic-integrations/ui/GoogleCalendar';
 import { useEffect, useState } from 'react';
 import {
@@ -135,8 +138,6 @@ export function ConnectLocalThought({
           drive,
           actor,
           platform,
-          installationConnection:
-            connection?.installationConnection ?? connection?.connection,
         }),
       );
       location.assign(result.url);
@@ -167,7 +168,11 @@ export function ConnectLocalThought({
       const schemaStore = localSchemaStore(store);
       const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
-      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${extension && selection ? extension.identitySuffix(selection) : ''}`;
+      const identity = importInstallationIdentity(
+        connection,
+        constants,
+        extension && selection ? extension.identitySuffix(selection) : '',
+      );
       const resource = await ensureInstallationResource(store, drive, {
         parent: drive,
         localId: identity,

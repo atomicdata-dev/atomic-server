@@ -104,7 +104,6 @@ export function LocalThoughtCatalog({
           ...result,
           drive,
           actor,
-          installationConnection: pending.installationConnection,
         }),
       );
       setReturned(result.platform);

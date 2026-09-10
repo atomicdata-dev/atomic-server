@@ -53,3 +53,13 @@ export function readSavedConnection(
     return;
   }
 }
+
+/** The proxy does not attest account identity. Each OAuth connection must own
+ * a separate installation, including reconnects and legacy saved connections. */
+export function importInstallationIdentity(
+  connection: { connection: string },
+  constants: Record<string, string>,
+  selectionSuffix = "",
+) {
+  return `localthought:${connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${selectionSuffix}`;
+}

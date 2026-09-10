@@ -189,3 +189,8 @@ above; this fixture test does not claim live-provider verification.
 Verification: the focused LocalThought fixture and frontend checks cover the
 redirect, PKCE, rotation and import paths. Live LocalThought login, consent,
 redemption and Google write verification remain pending.
+
+Each OAuth authorization creates a separate import installation. The proxy does
+not provide a verified provider account identity, so reconnecting (even to the
+same account to change scopes) creates new tables instead of reusing a previous
+account’s tables. Repeated imports using the same connection reuse its tables.

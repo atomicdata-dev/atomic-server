@@ -8,6 +8,14 @@ and verifies local recovery, refusal to recreate an indexed-but-missing
 installation, and an unavailable database. This is a unit reproduction of the
 local/server lookup mismatch; the patched live Calendar flow remains unverified.
 
+`browser/lib/src/local-import-rows.test.ts` covers cold imported rows in the real
+Store while online: available local snapshots are read without a server fetch,
+and missing snapshots fail rather than falling back to remote state.
+`integrations/localthought/settings.test.ts` verifies that reconnects cannot reuse
+legacy installation identities, while repeated imports on one connection remain
+stable. The LocalThought Vitest config has an explicit root so all six suites
+also execute when invoked from outside the repository (including `/`).
+
 LocalThought browser migration: `integrations/localthought/browser.test.ts`
 covers secret-free selected-platform redirects, S256 PKCE, one-time redemption,
 actor/drive/platform ownership, cancellation, expiry, rotation before dispatch,

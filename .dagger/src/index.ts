@@ -470,7 +470,6 @@ export class AtomicServer {
         .withExec(['pnpm', 'run', 'test'])
         // jsBuild mounts external integration tests at /integrations and
         // exposes the installed browser workspace at /browser.
-        .withWorkdir('/')
         .withExec([
           '/app/node_modules/.bin/vitest',
           'run',

@@ -79,8 +79,6 @@ export async function proxyRequest<T>(
 }
 export interface SavedConnection {
   connection: string;
-  /** Keep imported tables stable when reauthorizing account scopes. */
-  installationConnection?: string;
   platform: string;
   drive: string;
   actor: string;

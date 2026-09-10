@@ -27,7 +27,10 @@ export async function localImportRows(
       if (!result)
         throw new Error('Local database must be available before importing');
       for (const subject of result.subjects)
-        rows.set(subject, (await store.getResource(subject)).getPropVals());
+        rows.set(
+          subject,
+          (await store.getLocalResource(subject)).getPropVals(),
+        );
       offset += result.subjects.length;
       if (offset >= result.count) break;
       if (!result.subjects.length)

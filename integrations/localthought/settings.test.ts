@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   configuredProxy,
+  importInstallationIdentity,
   proxySettingKey,
   readSavedConnection,
   savedConnectionKey,
@@ -65,5 +66,23 @@ it("migrates legacy connections only for the matching proxy and owner", () => {
   expect(readSavedConnection(s, "https://a.example", "drive", "actor", "github")).toBe(saved);
   expect(s.getItem(savedConnectionKey("https://a.example", "drive", "actor", "github"))).toBe(
     saved,
+  );
+});
+
+it("isolates reconnects even when a legacy installation identity is present", () => {
+  const previous = { connection: "old" };
+  const reconnected = { connection: "new", installationConnection: "old" };
+  const options = { calendar: "primary" };
+  expect(importInstallationIdentity(reconnected, options)).not.toBe(
+    importInstallationIdentity(previous, options),
+  );
+  expect(importInstallationIdentity(reconnected, options)).toBe(
+    importInstallationIdentity({ connection: "new" }, options),
+  );
+});
+it("reuses an installation for repeated imports with the same connection and options", () => {
+  const connection = { connection: "same-account-session" };
+  expect(importInstallationIdentity(connection, { a: "1", b: "2" }, ":selection")).toBe(
+    importInstallationIdentity(connection, { b: "2", a: "1" }, ":selection"),
   );
 });
