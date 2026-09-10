@@ -1183,14 +1183,16 @@ Live-provider browser OAuth verification remains separate from this fixture test
   COUNT/UNTIL, DST gaps and offset changes, exclusions/additions, moved/cancelled
   instances, cross-calendar identities, provider-expanded deduplication and
   date-only recurring spans. No real provider calls.
-- `integrations/localthought/calendarRecurrence.test.ts`: complete recurrence
+- The version-pinned Google Calendar Devonian package tests complete recurrence
   metadata projection, normalized fields, minimal cancellation records and
-  refusal when instance identity is missing.
+  refusal when instance identity is missing. The catalog's schema overlay
+  declares `recurrence` and `originalStartTime` on the provider response.
 - `browser/data-browser/src/chunks/TablePage/Calendar/calendarOccurrences.test.ts`:
   imported/native property names, civil-day placement across offset boundaries,
   recurring all-day spans clipped to the visible grid.
-- `wasm/src/calendar_import.rs` unit tests: full-series queries omit date bounds,
-  both modes request tombstones, and catalogs retain recurrence/exception fields.
+- `wasm/src/calendar_import.rs` unit tests: generic catalog selections set
+  documented query parameters, reject unknown paths and parameters, and remove
+  inherited `timeMin`, `timeMax`, and `orderBy` values for series requests.
 - `browser/e2e/tests/google-calendar-import.spec.mts`: real browser/OPFS/import
   preview using a mock provider, covering bounded instances and retained series,
   moved/cancelled slots, reimport, reload and preservation of local notes.
