@@ -86,8 +86,9 @@ unimplemented.
 Integration maintenance: `node integrations/tooling/certify.mjs` automatically
 discovers provider packages, verifies reproducible shipped bundles and types,
 runs fixture suites and exact Rust sandbox tests, and exports JSON evidence.
-`integrations/tooling/certify.test.mjs` covers zero-test refusal and missing
-metadata. Dagger's JS gate discovers provider packages, while Rust includes all provider
+`integrations/tooling/certify.test.mjs` covers zero-test refusal, missing
+metadata, and concise diagnostics for failed commands or bundle validation.
+The browser workspace explicitly declares esbuild for clean-install certification. Dagger's JS gate discovers provider packages, while Rust includes all provider
 fixtures. Reports explicitly distinguish selected offline layers and unrun live
 checks. GitHub's compatible code-only upgrade preserves bindings and prevents
 replacement of pending effects across upgrade/rollback. Mapping migrations and
