@@ -1492,12 +1492,11 @@ export class AtomicServer {
     // system OpenSSL we don't ship. Default features are what the release
     // binary already builds with.
     //
-    // `--no-default-features --features light`: same ort/musl/cuda gap as
-    // `rustTest` above — `vector-search`'s `ort` dep has no prebuilt binary
-    // for this target, so even a lint-only pass can't compile it. Means
-    // vector-search-gated code isn't clippy-checked on this path; the
-    // tradeoff was a deliberate call, not an oversight — see rustTest's
-    // comment for the full reasoning.
+    // `--no-default-features --features light,wasm-plugins`: same
+    // ort/musl/cuda gap as `rustTest` above — `vector-search`'s `ort` dep has
+    // no prebuilt binary for this target, so even a lint-only pass can't
+    // compile it. Vector-search-gated code isn't clippy-checked on this path;
+    // plugin code is included because rustTest uses the same feature set.
     return this.rustChecksContainer()
       .withExec([
         'cargo',
@@ -1509,7 +1508,7 @@ export class AtomicServer {
         '--all-targets',
         '--no-default-features',
         '--features',
-        'light',
+        'light,wasm-plugins',
       ])
       .stdout();
   }
