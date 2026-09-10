@@ -354,7 +354,8 @@ impl SyncClient {
             };
             for invocation in invocations {
                 match self.walk_read(document, base, read, &invocation).await {
-                    Ok(value) => {
+                    Ok(None) => continue,
+                    Ok(Some(value)) => {
                         let bound_path = match bind_url(&read.url, &invocation.path) {
                             Ok(path) => path,
                             Err(error) => {
@@ -396,8 +397,8 @@ impl SyncClient {
         base: &str,
         read: &ManagedRead,
         invocation: &Invocation,
-    ) -> std::result::Result<Map<String, Value>, String> {
-        let _operation = document
+    ) -> std::result::Result<Option<Map<String, Value>>, String> {
+        let operation = document
             .paths
             .get(&read.url)
             .and_then(|p| p.get.as_ref())
@@ -418,6 +419,11 @@ impl SyncClient {
             })
             .await
             .map_err(|error| error.to_string())?;
+        // An explicitly documented missing-object response is a valid read
+        // outcome. Authorization, server, and undeclared errors remain failures.
+        if response.status == 404 && operation.responses.contains_key("404") {
+            return Ok(None);
+        }
         if !(200..300).contains(&response.status) {
             return Err(format!(
                 "GET {} responded {}",
@@ -429,6 +435,7 @@ impl SyncClient {
             .map_err(|e| e.to_string())?
             .as_object()
             .cloned()
+            .map(Some)
             .ok_or_else(|| "read response was not an object".to_string())
     }
 
@@ -501,8 +508,12 @@ impl SyncClient {
                 ));
             }
 
-            let body: Value =
-                serde_json::from_slice(&response.body).map_err(|error| error.to_string())?;
+            // Links retain the originating response, shared by every item on
+            // this page rather than copying the whole page for each record.
+            let body = Arc::new(
+                serde_json::from_slice::<Value>(&response.body)
+                    .map_err(|error| error.to_string())?,
+            );
             let page_items = response_items(
                 response_schema,
                 effective.as_ref().map(|e| &e.scheme),
@@ -568,7 +579,7 @@ struct OriginRecord {
     value: Map<String, Value>,
     path: BTreeMap<String, String>,
     query: IndexMap<String, String>,
-    response_body: Value,
+    response_body: Arc<Value>,
 }
 
 fn link_invocations(
