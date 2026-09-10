@@ -2,11 +2,11 @@
 import { type Store } from '@tomic/react';
 
 export const platformName = (id: string) =>
-  ({
-    'github-issues': 'GitHub issues',
-    'google-calendar': 'Google Calendar',
-    pets: 'Pets',
-  })[id] ?? id;
+  id
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(word => `${word[0]?.toUpperCase() ?? ''}${word.slice(1)}`)
+    .join(' ');
 import {
   BrowserIntegrations,
   type Engine,

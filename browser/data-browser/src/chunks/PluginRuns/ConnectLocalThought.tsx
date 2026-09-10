@@ -1,9 +1,4 @@
-import {
-  calendarRecurrenceProjection,
-  calendarProjection,
-  calendarFields,
-  googleCalendarLens,
-} from 'devonian/platform-lenses/google-calendar';
+import { externalIntegrationRegistry } from '@localthought/atomic-integrations';
 import { useEffect, useState } from 'react';
 import {
   core,
@@ -12,6 +7,7 @@ import {
   pluginSchema,
   useStore,
   type Resource,
+  type JSONValue,
 } from '@tomic/react';
 import { Button } from '@components/Button';
 import { Column } from '@components/Row';
@@ -37,7 +33,7 @@ import {
 } from '../../../../../integrations/localthought/schema';
 import type { Config } from '../../../../../integrations/localthought/plugin';
 import { localImportVerdict } from './localImportVerdict';
-import { CalendarSync } from './CalendarSync';
+import { localImportRows } from './localImportVerdict';
 import source from '../../../../../integrations/localthought/plugin.js?raw';
 
 export function ConnectLocalThought({
@@ -47,7 +43,9 @@ export function ConnectLocalThought({
   drive: string;
   platform: string;
 }) {
-  const calendarLens = googleCalendarLens.isFor(platform) ? googleCalendarLens : undefined;
+  const extension = externalIntegrationRegistry.find(item => item.id === platform);
+  const ImportControls = extension?.ImportControls;
+  const Sync = extension?.Sync;
   const store = useStore();
   const actor = store.getAgent()?.subject ?? '';
   const [connection] = useState<SavedConnection | undefined>(() => {
@@ -63,11 +61,7 @@ export function ConnectLocalThought({
   const [parameters, setParameters] = useState<string[]>([]);
   const [constants, setConstants] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<string[]>([]);
-  const [keepSeries, setKeepSeries] = useState(false);
-  const [calendarRange, setCalendarRange] = useState(() => ({
-    start: new Date().toISOString().slice(0, 10),
-    end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-  }));
+  const [selection, setSelection] = useState(() => extension?.defaultSelection());
   const [tenantSecret, setTenantSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +88,7 @@ export function ConnectLocalThought({
                 {
                   owner: 'ontola',
                   repo: 'atomic-server',
-                  ...googleCalendarLens.defaultConstants,
+                  ...(extension?.defaultConstants ?? {}),
                 } as Record<string, string>
               )[key] ?? '',
             ]),
@@ -151,19 +145,17 @@ export function ConnectLocalThought({
         drive,
         connection: connection.connection,
         constants,
-        ...(calendarLens
-          ? { calendarRange: calendarLens.query({ ...calendarRange, series: keepSeries }) }
+        ...(extension && selection
+          ? { calendarRange: extension.selection(selection) }
           : {}),
       });
-      const fetched = calendarRecurrenceProjection(
-        calendarProjection(response),
-      );
+      const fetched = extension ? extension.project(response) : response;
       if (fetched.platform !== platform)
         throw new Error('Imported platform did not match this connection');
       const schemaStore = localSchemaStore(store);
       const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
-      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${calendarLens && keepSeries ? ':series' : ''}`;
+      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${extension && selection ? extension.identitySuffix(selection) : ''}`;
       const resource = await ensureInstallationResource(store, drive, {
         parent: drive,
         localId: identity,
@@ -218,7 +210,7 @@ export function ConnectLocalThought({
           },
         });
         const calendar =
-          calendarLens && term.shortname === 'event'
+          extension?.view.classShortname === term.shortname
             ? await ensureInstallationResource(store, drive, {
                 parent: destination.subject,
                 localId: `${identity}:calendar:${term.shortname}`,
@@ -227,7 +219,7 @@ export function ConnectLocalThought({
                   [core.properties.name]: tableName,
                   [dataBrowser.properties.viewKind]: 'calendar',
                   [dataBrowser.properties.viewGroupBy]:
-                    properties[calendarFields.day],
+                    properties[extension.view.groupByShortname],
                   [dataBrowser.properties.viewColumns]: columns,
                 },
               })
@@ -325,53 +317,9 @@ export function ConnectLocalThought({
               />
             </Field>
           ))}
-          {calendarLens && (
-            <>
-              <label>
-                <input
-                  type='checkbox'
-                  checked={keepSeries}
-                  disabled={busy}
-                  onChange={e => setKeepSeries(e.target.checked)}
-                />{' '}
-                Keep recurring series (fetch full calendars)
-              </label>
-              {keepSeries && (
-                <p>
-                  Includes all dates and exceptions. Large calendars may exceed
-                  the import limit. Unsupported recurrence rules stop the
-                  preview.
-                </p>
-              )}
-              <Field fieldId='calendar-start' label='Events from (UTC)'>
-                <Input
-                  id='calendar-start'
-                  type='date'
-                  value={calendarRange.start}
-                  disabled={busy || keepSeries}
-                  onChange={e =>
-                    setCalendarRange({
-                      ...calendarRange,
-                      start: e.target.value,
-                    })
-                  }
-                />
-              </Field>
-              <Field fieldId='calendar-end' label='Events before (UTC)'>
-                <Input
-                  id='calendar-end'
-                  type='date'
-                  value={calendarRange.end}
-                  disabled={busy || keepSeries}
-                  onChange={e =>
-                    setCalendarRange({ ...calendarRange, end: e.target.value })
-                  }
-                />
-              </Field>
-            </>
-          )}
+          {ImportControls && selection && <ImportControls value={selection} disabled={busy} onChange={setSelection} />}
           <p>{collections.join(', ')}</p>
-          <ImportScopeHelp calendar={!!calendarLens} />
+          <ImportScopeHelp writable={!!extension} />
           <Button
             disabled={
               busy || !collections.length || parameters.some(p => !constants[p])
@@ -382,12 +330,17 @@ export function ConnectLocalThought({
           </Button>
         </>
       )}
-      {calendarLens && connection && syncConfig && (
-        <CalendarSync
-          drive={drive}
-          connection={connection.connection}
+      {Sync && connection && syncConfig && (
+        <Sync
           config={syncConfig}
           disabled={busy || !!preview}
+          rows={() => localImportRows(store, drive, syncConfig)}
+          request={(path, init) => browserIntegrations().request(drive, actor, connection.connection, platform, path, init)}
+          checkpoint={async (subject, values) => {
+            const resource = await store.getResource(subject);
+            for (const [property, value] of Object.entries(values)) await resource.set(property, value as JSONValue);
+            await resource.save();
+          }}
         />
       )}
       {error && <ErrMessage role='alert'>{error}</ErrMessage>}
@@ -416,13 +369,13 @@ export function ConnectLocalThought({
   );
 }
 
-function ImportScopeHelp({ calendar }: { calendar: boolean }) {
+function ImportScopeHelp({ writable }: { writable: boolean }) {
   return (
     <p>
       Imports the collections described by the platform, following pagination.
       Review changes before applying them. No background sync.
-      {calendar
-        ? ' After importing, preview edits to send changes back to Google Calendar.'
+      {writable
+        ? ' After importing, preview supported edits to send changes back.'
         : ' No provider writes.'}
     </p>
   );

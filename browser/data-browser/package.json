@@ -62,7 +62,7 @@
     "clsx": "^2.1.1",
     "codemirror-json-schema": "^0.8.1",
     "diff": "^8.0.4",
-    "devonian": "github:localthought/devonian#68c23cf9deb1522bb78580719a21db6b211c90c9",
+    "devonian": "github:localthought/devonian#92da8231961a36a640cde303f3710ce81717069a",
     "downshift": "^9.3.3",
     "emoji-mart": "^5.6.0",
     "fast-json-patch": "^3.1.1",
