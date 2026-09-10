@@ -598,7 +598,7 @@ export function AccountRecoveryCard({
           <SecretCodeBlock className='revealed-agent-secret' content={secret} />
           <Row>
             <Button subtle onClick={() => setSecret(null)}>
-              Hide
+              {'Hide'}
             </Button>
           </Row>
         </Column>

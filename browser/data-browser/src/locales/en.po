@@ -1730,9 +1730,8 @@ msgstr "Error: Expected {0}<node-id>"
 msgid "This device"
 msgstr "This device"
 
-#: src/routes/SyncRoute.tsx
-msgid "Manage account & plan →"
-msgstr "Manage account & plan →"
+#~ msgid "Manage account & plan →"
+#~ msgstr "Manage account & plan →"
 
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
@@ -2419,7 +2418,7 @@ msgstr "Add tag"
 #~ msgid "Could not update your list: no personal drive is set up for this account yet."
 #~ msgstr "Could not update your list: no personal drive is set up for this account yet."
 
-#. 0: getTitle(resource)
+#. 0: label
 #. 0: getTitle(resource)
 #: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -6699,6 +6698,7 @@ msgstr "Disconnect"
 msgid "Reconnect"
 msgstr "Reconnect"
 
+#: src/helpers/browserPeerSync.ts
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
 msgstr "Not connected"
@@ -7799,6 +7799,21 @@ msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Could not unlock with a passkey. Use your recovery code instead."
 
+#~ msgid "Peer sync"
+#~ msgstr "Peer sync"
+
+#~ msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+#~ msgstr "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+
+#~ msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+#~ msgstr "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+
+#~ msgid "Create peer link"
+#~ msgstr "Create peer link"
+
+#~ msgid "Peer link"
+#~ msgstr "Peer link"
+
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect existing account"
 msgstr "Connect existing account"
@@ -7868,3 +7883,11 @@ msgstr "Local storage is taking too long to initialize."
 #: src/views/InvitePage.tsx
 msgid "Accepting your invitation…"
 msgstr "Accepting your invitation…"
+
+#: src/routes/SyncRoute.tsx
+msgid "This status describes data synchronization. View this drive’s subscription and price in billing."
+msgstr "This status describes data synchronization. View this drive’s subscription and price in billing."
+
+#: src/routes/SyncRoute.tsx
+msgid "Manage this drive’s plan →"
+msgstr "Manage this drive’s plan →"

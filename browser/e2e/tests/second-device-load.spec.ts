@@ -55,18 +55,17 @@ test(
 
     const ctx2 = await browser.newContext(); // brand-new context ⇒ empty OPFS
     const p2 = await ctx2.newPage();
-    // Enter the drive's sign-in screen directly. The bare root redirects
-    // asynchronously, so its transient sidebar is not a sign-in readiness
-    // signal. Let sign-in finish navigating before inspecting the drive; a
-    // forced page.goto here can interrupt identity/ClientDb initialization.
     await p2.goto(
-      `${FRONTEND_URL}/app/welcome?next=${encodeURIComponent(drive)}`,
-    );
-    await p2.getByLabel('Agent secret').fill(secret);
-    await expect(p2).toHaveURL(
       `${FRONTEND_URL}/app/show?subject=${encodeURIComponent(drive)}`,
-      { timeout: 30_000 },
     );
+
+    // Open the private drive as a returning device actually would. The
+    // generic root-page helper can mistake a public sidebar for a signed-in
+    // session and return without ever entering the secret.
+    await expect(
+      p2.getByRole('heading', { name: 'Sign in to access this drive' }),
+    ).toBeVisible();
+    await p2.getByLabel('Agent secret').fill(secret);
 
     await expect(p2.getByText('SecondDeviceChild').first()).toBeVisible({
       timeout: 12000,

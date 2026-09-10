@@ -1730,9 +1730,8 @@ msgstr ""
 msgid "This device"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Manage account & plan →"
-msgstr ""
+#~ msgid "Manage account & plan →"
+#~ msgstr ""
 
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
@@ -2419,7 +2418,7 @@ msgstr ""
 #~ msgid "Could not update your list: no personal drive is set up for this account yet."
 #~ msgstr ""
 
-#. 0: getTitle(resource)
+#. 0: label
 #. 0: getTitle(resource)
 #: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -6665,6 +6664,7 @@ msgstr ""
 msgid "Reconnect"
 msgstr ""
 
+#: src/helpers/browserPeerSync.ts
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
 msgstr ""
@@ -7765,6 +7765,21 @@ msgstr ""
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Entsperren mit einem Passkey fehlgeschlagen. Verwende stattdessen deinen Wiederherstellungscode."
 
+#~ msgid "Peer sync"
+#~ msgstr ""
+
+#~ msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+#~ msgstr ""
+
+#~ msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+#~ msgstr ""
+
+#~ msgid "Create peer link"
+#~ msgstr ""
+
+#~ msgid "Peer link"
+#~ msgstr ""
+
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect existing account"
 msgstr ""
@@ -7833,4 +7848,12 @@ msgstr ""
 
 #: src/views/InvitePage.tsx
 msgid "Accepting your invitation…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This status describes data synchronization. View this drive’s subscription and price in billing."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Manage this drive’s plan →"
 msgstr ""

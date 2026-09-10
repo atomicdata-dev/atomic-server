@@ -13,6 +13,34 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## Browser WebRTC transport (issue #1396)
+
+`browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,
+backpressure and cancellation, bounded queues, caller buffer ownership, malformed
+input and close behavior. `browser/e2e/scripts/verify-webrtc.mjs` establishes real
+WebRTC channels between isolated browser contexts in Chromium and Firefox and
+checks bidirectional 1 MiB transfers and disconnects without an AtomicServer.
+The harness is loaded through Playwright routing; ICE and data transfer are real.
+`lib/src/sync/browser_peer.rs` tests authentication, replay, drive isolation,
+unauthorized snapshot writes, forged commits and outgoing permission revocation.
+`browser/e2e/scripts/verify-peer-sync.mjs` uses distinct agents, real signaling,
+WebRTC and OPFS with HTTP data access disabled: initial sync, concurrent edits,
+presence, attachments, offline reconciliation, reload and signed deletion.
+`browser-peer-sync.test.ts` covers parallel negotiation, isolated retries,
+departure, membership checks and the per-browser connection bound.
+`verify-peer-mesh.mjs` uses eight distinct Chromium agents: full mesh, ninth-member
+rejection, concurrent creations, group presence, attachment replication, creator
+departure, offline reconciliation and signed deletion. Rust regressions cover
+late snapshots and delayed pulls after deletion (unknown pulls still fail), and concurrent blob replies across independent edges.
+`browserPeerSync.test.ts` checks that another member can mint an invitation for
+the existing room without restarting its connection.
+`verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
+These scripts require built WASM and `ATOMIC_PEER_SIGNALING_URL` pointing to the
+SaaS signaling handler; neither starts an AtomicServer data process. The UI script requires
+a running app at its configured test URL. They are not wired into CI yet.
+Still uncovered: two physical devices, forced TURN, full Firefox drive sync,
+public deployment, and interactive rich-text editor/cursor acceptance.
+
 ## How to read this
 
 Coverage is split by *layer*, because the same flow can be well covered in one
@@ -399,8 +427,14 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   and failed connection without local-drive promotion.
 - `data-browser/src/helpers/managed/reconcile.test.ts`: pending/empty placements
   do not switch the app away from its source.
-- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup opens the selected
-  existing drive, never creates a content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup checks the selected
+  drive's subscription before opening hosting in the app; it never creates a
+  content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/drive-billing-ux.spec.ts`: billing has no fake
+  account-wide free plan, named drives survive selection/reload/Back, and a
+  paid drive's price and quota do not leak into an unsubscribed drive.
+- `data-browser/src/helpers/driveBillingUrl.test.ts`: Sync links preserve the
+  exact drive and portal, or open the picker when no drive is selected.
 - Paired `atomic-saas/portal/e2e/server-hosting-live.spec.ts`: opt-in real sign-in,
   grant, signed enrollment, setup UI, source replication and destination HTTP
   read. Requires two isolated nodes and dev magic links (`ATOMIC_HOSTING_LIVE=1`).
@@ -592,3 +626,18 @@ setup currently fails opening OPFS before it can create its dev drive.
 Staging triage verified that the two reported hashes still returned HTTP 200
 without resize parameters. Deployment acceptance must recheck their resized
 URLs and confirm the rejected-write rate falls after clients update.
+
+Automatic browser discovery: `browser/data-browser/src/helpers/browserPeerSync.test.ts` verifies deterministic per-drive rooms, automatic startup for locally snapshotted drives, duplicate prevention, and skipping unknown snapshots. `ATOMIC_PEER_AUTOMATIC=1` with `verify-peer-mesh.mjs` verifies eight browsers rediscover trusted local drives without saved invitations, then sync creations, presence, attachments, reconnects and deletion. Full app UI acceptance remains separate.
+
+The WebSocket unit suite also covers a socket closing while an asynchronous version-vector probe is computed: no SYNC is sent on the closed connection. General UI tests stub public discovery with an empty room; the separate peer mesh acceptance script still exercises real signaling and authenticated sync.
+
+## Account drive catalog
+
+`helpers/managed/driveCatalog.test.ts` covers union/deduplication, removal precedence,
+offline retry/cache isolation, and stale results after logout or account switching.
+`e2e/tests/drive-catalog.spec.ts` renders an account-only drive without a local
+saved pointer, publishes the local drive, and applies a removal after reconnect
+(real app/node, mocked account API). Existing saved-drive tests remain separate.
+SaaS handler tests cover authenticated additive registration, account isolation,
+service-backed discovery and removal versus stale upload. Catalog entries confer
+no access to resource content. A live cross-app deployment acceptance is separate.

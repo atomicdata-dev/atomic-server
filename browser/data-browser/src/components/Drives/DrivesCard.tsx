@@ -9,6 +9,7 @@ import type { JSX } from 'react';
 
 export interface DriveCardProps {
   drives: string[];
+  labels?: Record<string, string>;
   /** Lets a test name this list, since two of them render on the same page. */
   testId?: string;
   /** Which of these, if any, is the user's private drive. */
@@ -29,6 +30,7 @@ export interface DriveCardProps {
  */
 export function DrivesCard({
   drives,
+  labels,
   testId,
   privateDrive,
   showNewOption,
@@ -49,6 +51,7 @@ export function DrivesCard({
           <DriveRow
             key={subject}
             subject={subject}
+            label={labels?.[subject]}
             selected={subject === drive}
             isPrivate={subject === privateDrive}
             // Never unstarrable: it is not in the list by choice, and a star

@@ -1,3 +1,4 @@
+import { useAccountDriveCatalog } from '../hooks/useAccountDriveCatalog';
 import * as React from 'react';
 import { useEffect, useId, useState } from 'react';
 import { core, server, urls, useCurrentAgent, useStore } from '@tomic/react';
@@ -65,11 +66,17 @@ const SettingsAgent: React.FunctionComponent = () => {
   // thing" when the honest statement is "these are your drives, and one of
   // them is special". A reader with a single other drive met two headings and
   // two cards to hold two rows.
-  const myDrives = privateDrive
-    ? [privateDrive, ...savedDrives.filter(subject => subject !== privateDrive)]
-    : savedDrives;
+  const catalog = useAccountDriveCatalog(
+    privateDrive ? [privateDrive, ...savedDrives] : savedDrives,
+  );
+  const myDrives = catalog.subjects;
   // Still kept out of Recently visited: it is not somewhere you happened to go.
-  const recentDrives = history.filter(subject => subject !== privateDrive);
+  const recentDrives = history.filter(
+    subject =>
+      subject !== privateDrive &&
+      !catalog.removed.includes(subject) &&
+      !myDrives.includes(subject),
+  );
 
   const driveUrlId = useId();
   const [driveInput, setDriveInput] = useState('');
@@ -258,6 +265,15 @@ const SettingsAgent: React.FunctionComponent = () => {
 
               <DrivesCard
                 drives={myDrives}
+                labels={Object.fromEntries(
+                  catalog.entries
+                    .filter(
+                      e =>
+                        e.drive_name &&
+                        !store.resources.get(e.drive_subject)?.isReady(),
+                    )
+                    .map(e => [e.drive_subject, e.drive_name!]),
+                )}
                 testId='my-drives'
                 privateDrive={privateDrive}
                 onDriveSelect={handleSetDrive}
