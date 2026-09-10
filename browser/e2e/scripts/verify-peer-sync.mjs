@@ -73,24 +73,38 @@ try {
   const identities = await Promise.all(
     [a, b].map(page => page.evaluate(() => window.state.agent.subject)),
   );
-  const invitation = process.env.ATOMIC_PEER_INVITE === '1'
-    ? await a.evaluate(drive => window.harness.generateInviteToken(drive, window.state.agent, true, undefined, undefined, true), drive)
-    : undefined;
+  const invitation =
+    process.env.ATOMIC_PEER_INVITE === '1'
+      ? await a.evaluate(
+          drive =>
+            window.harness.generateInviteToken(
+              drive,
+              window.state.agent,
+              true,
+              undefined,
+              undefined,
+              true,
+            ),
+          drive,
+        )
+      : undefined;
+
   if (!invitation) {
-  await a.evaluate(
-    async ({ drive, identities }) => {
-      const resource = window.state.store.resources.get(drive);
-      for (const prop of ['read', 'write'])
-        await resource.set(
-          `https://atomicdata.dev/properties/${prop}`,
-          identities,
-          false,
-        );
-      await resource.save();
-    },
-    { drive, identities },
-  );
+    await a.evaluate(
+      async ({ drive, identities }) => {
+        const resource = window.state.store.resources.get(drive);
+        for (const prop of ['read', 'write'])
+          await resource.set(
+            `https://atomicdata.dev/properties/${prop}`,
+            identities,
+            false,
+          );
+        await resource.save();
+      },
+      { drive, identities },
+    );
   }
+
   const room = randomBytes(32).toString('hex');
   const connect = async page =>
     page.evaluate(
