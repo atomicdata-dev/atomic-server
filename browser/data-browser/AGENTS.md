@@ -29,6 +29,41 @@ Additionally the use of `finally` is not yet supported inside components.
 Those show up as Vite warnings from `oxc-transform-react` and as Oxlint `react/*` compiler rules; the component still runs, just without auto-memoization.
 styled-components `displayName` is added by Oxc's built-in plugin on Vite's oxc pass — there is no Babel in this package.
 
+After editing a React component or hook, check its compiler diagnostics with:
+
+```sh
+# From the repository root; accepts multiple files or absolute paths.
+node browser/data-browser/scripts/check-react-compiler.mjs browser/data-browser/src/chunks/AI/useAtomicTools.ts
+# From browser/data-browser:
+pnpm check:react-compiler src/chunks/AI/useAtomicTools.ts
+```
+
+The check uses the app's installed Oxc compiler and exits nonzero on diagnostics
+(including optimization bailouts). It reports whether memoization was emitted
+for the file, not whether every function was memoized. A clean transform without
+memoization is explicitly reported; check for opt-outs or ineligible functions.
+IDE extensions using Babel React Compiler can report different results. Run
+`pnpm typecheck` separately for TypeScript errors.
+
+Diagnostics default to `file:line:column — message`; add `--verbose` for code
+frames. The repository's `.codex/hooks.json` also runs this compiler after
+`apply_patch` and Bash tools. It checks staged, unstaged and untracked JS/TS in
+`browser/data-browser/src`, excluding tests, declaration files and workers.
+Content hashes are cached per checkout and Codex session in the OS temporary
+directory. Successful and unchanged files produce no hook output; failures are
+advisory context, not a blocking gate. Existing issues may be reported on the
+first check; fix regressions relevant to the current task, not unrelated bailouts.
+
+New or changed Codex hooks require a trust review: open `/hooks` in the Codex CLI
+for this repository and review the React Compiler hook. Until trusted, use the
+manual command above. Hook feedback does not replace typecheck or runtime tests.
+
+Claude Code uses the same checker through `.claude/settings.json`, after `Edit`,
+`Write` and successful `Bash` calls. It has the same compact, cached, advisory
+behavior. Check `/hooks` in Claude Code to inspect the project hook. Both clients
+key their cache by checkout and session ID; personal Claude settings and worktrees
+remain git-ignored.
+
 ## Localization
 
 We are using Wuchale for localization.

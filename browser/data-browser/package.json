@@ -151,6 +151,7 @@
     "start": "vite",
     "test": "vitest run",
     "typecheck": "pnpm exec tsc --noEmit -p tsconfig.build.json",
+    "check:react-compiler": "node scripts/check-react-compiler.mjs",
     "clean-translations": "pnpm exec wuchale --clean"
   }
 }

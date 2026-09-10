@@ -477,6 +477,16 @@ editors do not expose state/commands) and `oxc-react-compiler.test.ts` (producti
 compilation does not hoist command getters into render). `sentry.test.ts` covers
 packaged WebView initialization without server-injected Sentry configuration.
 
+`react-compiler-cli.test.ts` covers the file-targeted compiler command: emitted
+memoization, a bailout in a partially optimized file, explicit opt-outs, relative
+paths, and continued checking after an unreadable file with a failing exit code.
+It also verifies compact line/column diagnostics and optional verbose output.
+`react-compiler-hook.test.mjs` covers UTF-8 source locations, advisory hook JSON,
+per-session content caching, source changes, staged/untracked/deleted files,
+excluded files, subdirectory invocation and the repository hook registration.
+The Claude Code registration is exercised with an Edit event, verifying compact
+advisory JSON and silence on a repeated check through the shared hook command.
+
 Automatic Vault scheduling (`vaultAutoBackup.test.ts`) covers sustained-edit
 maximum delay, queued edits across drive switches, late account availability,
 connectivity recovery, enrollment rediscovery after reload, account expiry during

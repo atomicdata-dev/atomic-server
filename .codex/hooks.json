@@ -1,0 +1,18 @@
+{
+  "description": "Advisory React Compiler checks for changed frontend source files.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/browser/data-browser/scripts/react-compiler-hook.mjs\"",
+            "timeout": 30,
+            "additionalContextLimit": 1500
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -854,7 +854,7 @@ export function useAtomicMCPTools({
             const dashboard = await store.getResource(expandSubject(reference));
 
             if (dashboard.error) {
-              throw new Error(String(dashboard.error));
+              return `Error describing dashboard: Error: ${String(dashboard.error)}`;
             }
 
             return shortenRefsDeep(await describeDashboard(store, dashboard));
@@ -1049,7 +1049,11 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
 
             if (parentResource.hasClasses(dataBrowser.classes.table)) {
               // The parent is a table meaning the resource that is being created is a row. We should add a createdAt property to it.
-              propVals[commits.properties.createdAt] ??= Date.now();
+              const createdAt = propVals[commits.properties.createdAt];
+
+              if (createdAt === null || createdAt === undefined) {
+                propVals[commits.properties.createdAt] = Date.now();
+              }
             }
 
             const resource = await store.newResource({
@@ -1181,9 +1185,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
 
             for (const column of columns) {
               if (existing.byName[column.name.toLowerCase()]) {
-                throw new Error(
-                  `The table already has a column called "${column.name}".`,
-                );
+                return `Error adding columns: Error: The table already has a column called "${column.name}".`;
               }
             }
 
@@ -1242,13 +1244,11 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             );
 
             if (!template?.spec) {
-              throw new Error(
-                `Unknown template "${templateId}". Available: ${TABLE_TEMPLATES.filter(
-                  candidate => candidate.spec,
-                )
-                  .map(candidate => candidate.id)
-                  .join(', ')}`,
-              );
+              return `Error creating table from template: Error: Unknown template "${templateId}". Available: ${TABLE_TEMPLATES.filter(
+                candidate => candidate.spec,
+              )
+                .map(candidate => candidate.id)
+                .join(', ')}`;
             }
 
             const result = await buildTableFromSpec(
@@ -1356,7 +1356,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             const dashboard = await store.getResource(expandSubject(reference));
 
             if (dashboard.error) {
-              throw new Error(String(dashboard.error));
+              return `Error configuring block: Error: ${String(dashboard.error)}`;
             }
 
             const block = await resolveBlock(store, dashboard, blockRef);
