@@ -1,4 +1,9 @@
-import { calendarRecurrenceProjection } from '../../../../../integrations/localthought/calendarRecurrence';
+import {
+  calendarRecurrenceProjection,
+  calendarProjection,
+  calendarFields,
+  googleCalendarLens,
+} from 'devonian/platform-lenses/google-calendar';
 import { useEffect, useState } from 'react';
 import {
   core,
@@ -34,10 +39,6 @@ import type { Config } from '../../../../../integrations/localthought/plugin';
 import { localImportVerdict } from './localImportVerdict';
 import { CalendarSync } from './CalendarSync';
 import source from '../../../../../integrations/localthought/plugin.js?raw';
-import {
-  calendarProjection,
-  calendarFields,
-} from '../../../../../integrations/localthought/calendar';
 
 export function ConnectLocalThought({
   drive,
@@ -46,6 +47,7 @@ export function ConnectLocalThought({
   drive: string;
   platform: string;
 }) {
+  const calendarLens = googleCalendarLens.isFor(platform) ? googleCalendarLens : undefined;
   const store = useStore();
   const actor = store.getAgent()?.subject ?? '';
   const [connection] = useState<SavedConnection | undefined>(() => {
@@ -92,7 +94,7 @@ export function ConnectLocalThought({
                 {
                   owner: 'ontola',
                   repo: 'atomic-server',
-                  calendarId: 'primary',
+                  ...googleCalendarLens.defaultConstants,
                 } as Record<string, string>
               )[key] ?? '',
             ]),
@@ -129,9 +131,7 @@ export function ConnectLocalThought({
           actor,
           platform,
           installationConnection:
-            platform === 'google-calendar'
-              ? (connection?.installationConnection ?? connection?.connection)
-              : undefined,
+            connection?.installationConnection ?? connection?.connection,
         }),
       );
       location.assign(result.url);
@@ -151,8 +151,8 @@ export function ConnectLocalThought({
         drive,
         connection: connection.connection,
         constants,
-        ...(platform === 'google-calendar'
-          ? { calendarRange: { ...calendarRange, series: keepSeries } }
+        ...(calendarLens
+          ? { calendarRange: calendarLens.query({ ...calendarRange, series: keepSeries }) }
           : {}),
       });
       const fetched = calendarRecurrenceProjection(
@@ -163,7 +163,7 @@ export function ConnectLocalThought({
       const schemaStore = localSchemaStore(store);
       const terms = await ensureSchema(schemaStore, drive, pluginSchema());
       const name = platformName(platform);
-      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${platform === 'google-calendar' && keepSeries ? ':series' : ''}`;
+      const identity = `localthought:${connection.installationConnection ?? connection.connection}:${JSON.stringify(Object.entries(constants).sort())}${calendarLens && keepSeries ? ':series' : ''}`;
       const resource = await ensureInstallationResource(store, drive, {
         parent: drive,
         localId: identity,
@@ -218,7 +218,7 @@ export function ConnectLocalThought({
           },
         });
         const calendar =
-          platform === 'google-calendar' && term.shortname === 'event'
+          calendarLens && term.shortname === 'event'
             ? await ensureInstallationResource(store, drive, {
                 parent: destination.subject,
                 localId: `${identity}:calendar:${term.shortname}`,
@@ -325,7 +325,7 @@ export function ConnectLocalThought({
               />
             </Field>
           ))}
-          {platform === 'google-calendar' && (
+          {calendarLens && (
             <>
               <label>
                 <input
@@ -371,7 +371,7 @@ export function ConnectLocalThought({
             </>
           )}
           <p>{collections.join(', ')}</p>
-          <ImportScopeHelp calendar={platform === 'google-calendar'} />
+          <ImportScopeHelp calendar={!!calendarLens} />
           <Button
             disabled={
               busy || !collections.length || parameters.some(p => !constants[p])
@@ -382,7 +382,7 @@ export function ConnectLocalThought({
           </Button>
         </>
       )}
-      {platform === 'google-calendar' && connection && syncConfig && (
+      {calendarLens && connection && syncConfig && (
         <CalendarSync
           drive={drive}
           connection={connection.connection}

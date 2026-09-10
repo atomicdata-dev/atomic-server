@@ -47,7 +47,13 @@ export async function proxyRequest<T>(
     connectionCode?: string;
     connection?: string;
     constants?: Record<string, string>;
-    calendarRange?: { start: string; end: string; series?: boolean };
+    calendarRange?: {
+      query_overrides: { path: string; values: Record<string, unknown> }[];
+      schema_property_overrides?: {
+        schema: string;
+        properties: Record<string, unknown>;
+      }[];
+    };
   },
 ): Promise<T> {
   const actor = store.getAgent()?.subject;
@@ -80,7 +86,7 @@ export async function proxyRequest<T>(
 }
 export interface SavedConnection {
   connection: string;
-  /** Keep imported tables stable when reauthorizing Calendar write access. */
+  /** Keep imported tables stable when reauthorizing account scopes. */
   installationConnection?: string;
   platform: string;
   drive: string;

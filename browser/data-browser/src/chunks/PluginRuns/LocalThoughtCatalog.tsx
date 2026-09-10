@@ -14,7 +14,9 @@ import {
 } from './localThought';
 
 const DirectGitHub = lazy(() =>
-  import('./ConnectGitHub').then(m => ({ default: m.ConnectGitHub })),
+  import('@localthought/atomic-integrations').then(m => ({
+    default: m.ConnectGitHub,
+  })),
 );
 
 export function LocalThoughtCatalog({

@@ -10,9 +10,17 @@ struct QueryOverride {
 }
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SchemaPropertyOverride {
+    schema: String,
+    properties: BTreeMap<String, Value>,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ImportOverrides {
     #[serde(default)]
     query_overrides: Vec<QueryOverride>,
+    #[serde(default)]
+    schema_property_overrides: Vec<SchemaPropertyOverride>,
 }
 
 /// Applies values supplied by the selected external lens. The host only
@@ -91,8 +99,26 @@ pub(super) fn apply_query_overrides(
                 .as_object_mut()
                 .ok_or("Invalid collection query")?;
             for (name, value) in &override_.values {
-                query.insert(name.clone(), value.clone());
+                if value.is_null() {
+                    query.remove(name);
+                } else {
+                    query.insert(name.clone(), value.clone());
+                }
             }
+        }
+    }
+    let schemas = document
+        .pointer_mut("/components/schemas")
+        .and_then(Value::as_object_mut)
+        .ok_or("Catalog has no schemas")?;
+    for override_ in &overrides.schema_property_overrides {
+        let properties = schemas
+            .get_mut(&override_.schema)
+            .and_then(|schema| schema.get_mut("properties"))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| format!("Unknown schema {}", override_.schema))?;
+        for (name, value) in &override_.properties {
+            properties.insert(name.clone(), value.clone());
         }
     }
     Ok(())
@@ -134,5 +160,20 @@ mod tests {
         .unwrap_err()
         .to_string()
         .contains("Unknown query parameter typo"));
+    }
+
+    #[test]
+    fn removes_defaults_and_extends_existing_schema() {
+        let mut doc = json!({"paths":{"/events":{"get":{"parameters":[{"name":"from","in":"query"}]}}},"components":{"schemas":{"event":{"properties":{}}},"crudResources":{"event":{"collections":{"events":{"urlTemplate":"/events","x-list-query":{"from":"stale"}}}}}}});
+        apply_query_overrides(
+            &mut doc,
+            r#"{"query_overrides":[{"path":"/events","values":{"from":null}}],"schema_property_overrides":[{"schema":"event","properties":{"recurrence":{"type":"array"}}}]}"#,
+        )
+        .unwrap();
+        assert!(doc["components"]["crudResources"]["event"]["collections"]["events"]
+            ["x-list-query"]
+            .get("from")
+            .is_none());
+        assert_eq!(doc["components"]["schemas"]["event"]["properties"]["recurrence"]["type"], "array");
     }
 }

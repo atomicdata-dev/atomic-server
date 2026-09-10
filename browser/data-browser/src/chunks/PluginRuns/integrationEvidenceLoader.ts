@@ -1,5 +1,5 @@
 // @wc-ignore-file
-import github from '../../../../../integrations/github-issues/plugin.js?raw';
+import github from 'devonian/platform-lenses/github-issues/plugin.js?raw';
 import notion from '@localthought/atomic-integrations/notion/plugin.js?raw';
 import clockify from '@localthought/atomic-integrations/clockify/plugin.js?raw';
 import mt940 from '../../../../../integrations/mt940/plugin.js?raw';

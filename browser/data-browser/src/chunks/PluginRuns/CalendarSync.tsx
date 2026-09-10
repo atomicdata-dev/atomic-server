@@ -10,7 +10,7 @@ import {
   applyCalendarEdit,
   previewCalendarEdits,
   type CalendarEdit,
-} from '../../../../../integrations/localthought/calendar-sync';
+} from 'devonian/platform-lenses/google-calendar';
 
 export function CalendarSync({
   drive,
