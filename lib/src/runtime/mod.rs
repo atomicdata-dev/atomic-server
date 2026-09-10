@@ -2,13 +2,17 @@
 //! (HTTP, WebSocket, Iroh, WASM, FFI, Flutter) bind to instead of wrapping
 //! [`crate::Db`] themselves.
 //!
-//! Slice 1 (`planning/atomic-lib-runtime.md`, `planning/completed/runtime-boundary-decision.md`)
-//! is a thin wrapper: every method delegates to code that already existed, so
-//! there is no behaviour change — only a named place for it. The surface is
-//! deliberately no wider than what binds to it today (the WASM `ClientDb`):
-//! `from_db`, `db`, the agent accessors, `query` and `apply_commit` under an
-//! [`IngestPolicy`].
+//! WASM binds existing storage through `from_db`. Native adapters can open
+//! local storage, load a persisted identity and own a durable-flush worker
+//! here without a server crate, HTTP origin or Actix executor.
 
 mod node;
 
 pub use node::{AtomicNode, IngestPolicy};
+
+#[cfg(not(target_arch = "wasm32"))]
+mod durable_flush;
+#[cfg(not(target_arch = "wasm32"))]
+pub use durable_flush::DurableFlush;
+#[cfg(all(feature = "config", not(target_arch = "wasm32")))]
+mod identity;

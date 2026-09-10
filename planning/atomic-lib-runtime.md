@@ -719,6 +719,9 @@ Active implementation (2026-09-10, `codex/tauri-http-optional`):
   opting into HTTP still reports binding failures.
 - [ ] Replace frontend local HTTP/WS operations with native commands/events,
   including reads, commits, live updates, search and attachment bytes.
+- [x] Move native storage opening, identity loading and durable flushing into
+  `atomic_lib::runtime`; exercise them without HTTP or Actix under standalone
+  `db-redb,config` features and enforce the core dependency boundary in CI.
 - [ ] Move remaining server-owned bootstrap/plugins into shared runtime
   services, then make Actix an optional Tauri build dependency.
 - [ ] Verify fresh install, sign-in/restore, drive switching, offline restart,
@@ -733,7 +736,28 @@ alive if HTTP stops. Its Vault bridge now shares the same startup-error path
 as other native commands. The periodic flush worker is owned and joined, with
 a final flush when its lifecycle ends.
 
-The first extraction still uses `AppState` to bootstrap existing plugins and
+End state: the default Tauri dependency graph must contain neither
+`atomic-server` nor Actix. HTTP hosting can be a separate opt-in adapter;
+keeping it mandatory behind an environment flag does not meet this gate.
+
+Remaining direct coupling:
+
+- `desktop/src/lib.rs` still uses server CLI/config and `run_node`/`serve_http`.
+- `server::AppState` still registers feature plugins and Actix commit/presence
+  actors. Native startup must own equivalent shared services, not duplicate
+  their logic in Tauri.
+- The frontend still reads, commits, subscribes and loads attachment bytes
+  through the local HTTP/WS adapter.
+- Iroh is already in atomic_lib, but its global endpoint/router lifetime must
+  be owned independently before native shutdown/restart is promised.
+
+`AtomicNode::open_local`, `load_or_create_agent` and `start_durable_flush` now
+provide the server-free storage/identity/durability path. The hosted adapter
+uses those same operations. Identity loading fails on damaged existing config
+rather than silently replacing the key. The tray accepts ordinary values and
+no longer names the server configuration type.
+
+The current embedding still uses `AppState` to bootstrap existing plugins and
 Actix actors. It must not be described as removing Actix or as making the
 current Tauri frontend work without HTTP. Do not expose a no-HTTP user setting
 until that frontend acceptance gate passes.

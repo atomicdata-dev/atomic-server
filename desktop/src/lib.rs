@@ -736,7 +736,7 @@ pub fn run() {
       {
         let menu = crate::menu::build(app.handle())?;
         app.handle().set_menu(menu)?;
-        system_tray::setup(app, &config)?;
+        system_tray::setup(app, &config.get_origin(), &config.config_dir)?;
       }
 
       Ok(())

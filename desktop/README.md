@@ -15,7 +15,9 @@ cargo tauri build
 ## Node and HTTP lifecycle
 
 The embedded node is initialized by `atomic_server_lib::serve::run_node`.
-Tauri binds its native commands to the shared `AtomicNode`, then explicitly
+Storage opening, identity loading and periodic durable flushing are provided
+by `atomic_lib::runtime`, with no Actix dependency in that core. Tauri binds
+its native commands to the shared `AtomicNode`, then explicitly
 starts `serve_http` for the current webview. A stopped HTTP adapter does not
 stop the native node's flush worker and peer tasks while the app is open.
 

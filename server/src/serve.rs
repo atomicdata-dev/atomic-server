@@ -345,7 +345,7 @@ where
 
     // Native adapters need durability even when no HTTP listener runs.
     // Own the worker so returning/cancelling this lifecycle stops and joins it.
-    let _flush_worker = DurableFlush::start(appstate.store.clone())?;
+    let _flush_worker = appstate.node().start_durable_flush()?;
 
     // Start Iroh peer-to-peer transport
     let _iroh_router = {
@@ -525,49 +525,6 @@ pub async fn serve_http(appstate: crate::appstate::AppState) -> AtomicServerResu
     Ok(())
 }
 
-/// Fsync runs off the async executor. Dropping the lifecycle wakes the worker
-/// immediately, performs a final flush and joins it; the old detached loop
-/// kept the database open forever after a failed bind or an embedder exit.
-struct DurableFlush {
-    stop: Option<std::sync::mpsc::Sender<()>>,
-    thread: Option<std::thread::JoinHandle<()>>,
-}
-
-impl DurableFlush {
-    fn start(store: atomic_lib::Db) -> std::io::Result<Self> {
-        let (stop, rx) = std::sync::mpsc::channel();
-        let thread = std::thread::Builder::new()
-            .name("durable-flush".into())
-            .spawn(move || loop {
-                let stopping = !matches!(
-                    rx.recv_timeout(std::time::Duration::from_millis(100)),
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout)
-                );
-                if let Err(error) = store.flush() {
-                    tracing::warn!("durable flush failed: {error}");
-                }
-                if stopping {
-                    break;
-                }
-            })?;
-        Ok(Self {
-            stop: Some(stop),
-            thread: Some(thread),
-        })
-    }
-}
-
-impl Drop for DurableFlush {
-    fn drop(&mut self) {
-        self.stop.take();
-        if let Some(thread) = self.thread.take() {
-            if thread.join().is_err() {
-                tracing::error!("durable-flush thread panicked");
-            }
-        }
-    }
-}
-
 /// Amount of seconds before server shuts down connections after SIGTERM signal
 const TIMEOUT: u64 = 15;
 
@@ -607,39 +564,3 @@ const BANNER: &str = r#"
 / /_/ / /_/ /_/ / / / / / / / /__/_____(__  )  __/ /   | |/ /  __/ /
 \__,_/\__/\____/_/ /_/ /_/_/\___/     /____/\___/_/    |___/\___/_/
 "#;
-
-#[cfg(test)]
-mod lifecycle_tests {
-    use super::DurableFlush;
-    use atomic_lib::{urls, Resource, Storelike, Value};
-
-    #[actix_web::test]
-    async fn dropping_flush_worker_releases_database_and_persists_final_write() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("node.redb");
-        let blobs = dir.path().join("blobs");
-        let db = atomic_lib::Db::init_redb_file(&path, None, &blobs)
-            .await
-            .unwrap();
-        let worker = DurableFlush::start(db.clone()).unwrap();
-        let mut resource = Resource::new("did:ad:flush-test".into());
-        resource
-            .set_unsafe(urls::NAME.into(), Value::String("Durable".into()))
-            .unwrap();
-        db.add_resource_opts(&resource, false, false, true)
-            .await
-            .unwrap();
-        drop(db);
-        // The worker owns the final Db reference. A detached loop would keep
-        // redb locked and reopening below would fail with DatabaseAlreadyOpen.
-        drop(worker);
-        let reopened = atomic_lib::Db::init_redb_file(&path, None, &blobs)
-            .await
-            .unwrap();
-        let resource = reopened
-            .get_resource(&resource.get_subject())
-            .await
-            .unwrap();
-        assert_eq!(resource.get(urls::NAME).unwrap().to_string(), "Durable");
-    }
-}
