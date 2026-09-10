@@ -1126,5 +1126,5 @@ impl ClientDb {
     }
 }
 
-mod integrations;
 mod calendar_import;
+mod integrations;
