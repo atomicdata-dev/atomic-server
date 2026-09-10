@@ -910,7 +910,6 @@ msgid "App menu"
 msgstr "Menu de l'application"
 
 #: src/components/SideBar/SideBarDrive.tsx
-#: src/views/ErrorPage.tsx
 msgid "Unauthorized"
 msgstr "Non autorisé"
 
@@ -1053,12 +1052,12 @@ msgstr "Copier le secret pour continuer"
 
 #: src/views/ErrorPage.tsx
 #: src/views/ErrorPage.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Retry"
 msgstr "Réessayer"
 
-#: src/views/ErrorPage.tsx
-msgid "You don't have access to this, try signing in:"
-msgstr "Vous n'avez pas accès à ceci, essayez de vous connecter :"
+#~ msgid "You don't have access to this, try signing in:"
+#~ msgstr "Vous n'avez pas accès à ceci, essayez de vous connecter :"
 
 #. 0: resource.subject
 #: src/views/ErrorPage.tsx
@@ -3723,6 +3722,7 @@ msgstr "Entrez une URL Atomique ou recherchez (appuyez sur \"/\")"
 msgid "Search"
 msgstr "Rechercher"
 
+#: src/components/InviteForm.tsx
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/reconcile.test.ts
 #: src/helpers/managed/reconcile.ts
@@ -3963,9 +3963,8 @@ msgstr ""
 msgid "Restore & sign in"
 msgstr ""
 
-#: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Sign in to access this drive"
-msgstr ""
+#~ msgid "Sign in to access this drive"
+#~ msgstr ""
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter your agent secret to unlock this drive on this device."
@@ -4853,6 +4852,7 @@ msgstr ""
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 #: src/routes/SyncRoute.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Connecting…"
 msgstr ""
 
@@ -5668,6 +5668,7 @@ msgstr ""
 msgid "Could not show your secret."
 msgstr ""
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 msgid "Unlocking…"
 msgstr ""
@@ -6863,20 +6864,16 @@ msgstr ""
 msgid "Store it with {0}"
 msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/components/AccountRecoveryCard.tsx
-msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
-msgstr ""
+#~ msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
+#~ msgstr ""
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in."
 msgstr ""
 
-#. 0: ' '; 1: `${ [hasPasskey && 'your passkey', hasCode && 'your recovery code'] .filter(Boolean) .join(' or ') || 'your recovery password' }${deviceOnly ? ', on this device' \\: ''}.`
-#: src/components/AccountRecoveryCard.tsx
-msgid "You can get back in with:{0} {1}"
-msgstr ""
+#~ msgid "You can get back in with:{0} {1}"
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. One you carry has a code instead, shown below."
@@ -7614,9 +7611,8 @@ msgstr ""
 #~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
 #~ msgstr ""
 
-#: src/components/InviteForm.tsx
-msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
-msgstr ""
+#~ msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+#~ msgstr ""
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
@@ -7742,6 +7738,7 @@ msgid "A recovery code is a spare key for when your passkey isn't available. You
 msgstr ""
 
 #: src/components/AccountRecoveryCard.tsx
+#: src/components/AccountRecoveryCard.tsx
 msgid "Add a passkey"
 msgstr "Ajouter une clé d’accès"
 
@@ -7862,18 +7859,122 @@ msgstr ""
 msgid "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
 msgstr ""
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Could not update your passkey."
-msgstr ""
+#~ msgid "Could not update your passkey."
+#~ msgstr ""
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Create a compatible account passkey"
 msgstr ""
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Use one passkey for sign-in and recovery"
-msgstr ""
+#~ msgid "Use one passkey for sign-in and recovery"
+#~ msgstr ""
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Unlock this drive"
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "You’re signed in as"
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid ", but this browser needs your account key to open this private drive. Paste your saved agent secret below. No account recovery backup is available."
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Loading account"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock with recovery code"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Setting up passkey…"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Continue with passkey"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not update your passkey. Please try again."
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "Use another account"
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "This account does not have access"
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "You’re signed in, but this account cannot read this resource. Open it with the account that owns it, or ask its owner to share it with you."
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server."
+msgstr ""
+
+#: src/routes/InviteRoute.tsx
+msgid "Invalid invitation."
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Could not join this drive."
+msgstr ""
+
+#~ msgid "Connected to"
+#~ msgstr ""
+
+#~ msgid "You're invited to {0} this drive"
+#~ msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Invitation unavailable"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Join drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Looking for the inviter’s browser…"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Sign in to join"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Open drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "This invitation is invalid or has expired. Ask for a new invitation."
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "This drive syncs between browsers. The person who invited you needs to keep their browser open while you join."
+msgstr ""
+
+#~ msgid "Disconnected"
+#~ msgstr ""
+
+#. 0: status
+#: src/components/BrowserPeerPanel.tsx
+msgid "Browser sync · {0}"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to edit this drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to view this drive"
 msgstr ""

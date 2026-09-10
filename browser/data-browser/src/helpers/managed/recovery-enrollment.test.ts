@@ -218,3 +218,11 @@ it('offers an explicit compatible-passkey upgrade when the login key has no PRF'
   expect(stored).toEqual(original);
   expect(create).toHaveBeenCalledTimes(1);
 });
+
+it('reports a wrong code before attempting account passkey registration', async () => {
+  vi.mocked(accountPasskey).mockClear();
+  await expect(
+    unifyAccountPasskey(subject, 'wrong-recovery-code'),
+  ).rejects.toThrow('Wrong recovery code');
+  expect(accountPasskey).not.toHaveBeenCalled();
+});

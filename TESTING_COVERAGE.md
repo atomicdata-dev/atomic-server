@@ -640,3 +640,11 @@ no access to resource content. A live cross-app deployment acceptance is separat
 `helpers/managed/accountPasskey.test.ts` checks account-credential reuse, server-challenge registration, PRF-output exclusion from API payloads, cancellation and standalone fallback. `recovery-enrollment.test.ts` covers additive migration, old recovery-code preservation, failed upgrades, unsupported login credentials and duplicate-credential PRF-salt selection. These use simulated authenticators and real WebCrypto/Argon2id.
 
 Paired SaaS `portal/e2e/recovery-passkey.spec.ts` uses Chromium virtual PRF authenticators with the real control plane to verify app enrollment followed by portal login using one credential, reuse of a portal-created credential, and account-settings migration without replacing ciphertext or old wrappers. Physical Safari/iCloud, Android/password-manager and native-shell behavior remain device acceptance checks.
+
+## September 10 SaaS and browser invite regressions
+
+- `browser/lib/src/browser-peer-invite.test.ts`: signed invitation validation, expiry, target and issuer checks, recipient proof, and additive permission grants.
+- `browser/e2e/tests/browser-invite.spec.ts`: distinct signed-in identities join a local drive through the app without the server invite endpoint.
+- `browser/e2e/scripts/verify-peer-sync.mjs` with `ATOMIC_PEER_INVITE=1`: invitation bootstrap and real WebRTC reconciliation with HTTP data access disabled.
+- `browser/e2e/tests/recovery-option.spec.ts`: recovery availability in the managed welcome flow.
+- Existing-drive migration to browser-only storage and fresh-account email onboarding through a peer invitation remain unverified.

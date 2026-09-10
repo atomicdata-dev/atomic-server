@@ -308,6 +308,8 @@ function searchDebug(...args: unknown[]): void {
 }
 
 export interface CreateDriveOpts {
+  /** Keep a newly created drive local until explicit hosting enrollment. */
+  localOnly?: boolean;
   /** Shown on the drive page. Personal drives default to 'Your personal drive.'. */
   description?: string;
   /** Subdomain to serve the drive on (e.g. 'my-drive'). */
@@ -2340,6 +2342,7 @@ export class Store {
       subject: personalSubject,
     });
 
+    if (opts.localOnly) this.registerLocalOnlyDrive(drive.subject);
     await drive.save();
 
     if (personal) {

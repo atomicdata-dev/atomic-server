@@ -73,6 +73,10 @@ try {
   const identities = await Promise.all(
     [a, b].map(page => page.evaluate(() => window.state.agent.subject)),
   );
+  const invitation = process.env.ATOMIC_PEER_INVITE === '1'
+    ? await a.evaluate(drive => window.harness.generateInviteToken(drive, window.state.agent, true, undefined, undefined, true), drive)
+    : undefined;
+  if (!invitation) {
   await a.evaluate(
     async ({ drive, identities }) => {
       const resource = window.state.store.resources.get(drive);
@@ -86,10 +90,11 @@ try {
     },
     { drive, identities },
   );
+  }
   const room = randomBytes(32).toString('hex');
   const connect = async page =>
     page.evaluate(
-      ({ drive, room, expectedPeer, signalingUrl }) => {
+      ({ drive, room, expectedPeer, signalingUrl, invitation }) => {
         const { store } = window.state;
         store.registerLocalOnlyDrive(drive);
         store.setDrive(drive);
@@ -98,6 +103,7 @@ try {
           room,
           signalingUrl,
           expectedPeer,
+          invitation,
           iceServers: [],
           onStatus: status => {
             window.peerStatus = status;
@@ -109,6 +115,7 @@ try {
         drive,
         room,
         signalingUrl,
+        invitation: page === b ? invitation : undefined,
         expectedPeer: page === a ? identities[1] : identities[0],
       },
     );

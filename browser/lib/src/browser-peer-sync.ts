@@ -1,3 +1,4 @@
+import { authorizeBrowserInvite } from './browser-peer-invite.js';
 import type { Agent } from './agent.js';
 import type { ClientDbWorker } from './client-db.js';
 import type { Store } from './store.js';
@@ -12,6 +13,8 @@ export interface BrowserPeerOptions {
   signalingUrl: string;
   /** Trusted agent for bootstrapping an unknown drive; stored drive ACLs govern subsequent peers. */
   expectedPeer?: string;
+  /** Signed bearer invite; sent only after authenticating expectedPeer. */
+  invitation?: string;
   iceServers?: RTCIceServer[];
   onStatus?: (status: string) => void;
 }
@@ -303,11 +306,13 @@ class BrowserPeerConnection {
       this.store.getClientDb() === this.db;
     const binding = await peer.channelBinding();
     const challenge = `${binding}:${randomPeerToken()}`;
+    const hasSnapshot = !!(
+      await this.db.getResourceWithSnapshot(this.options.drive)
+    ).snapshot;
+    const invitation = hasSnapshot ? undefined : this.options.invitation;
     const session = await this.db!.createPeerSession(
       this.options.drive,
-      (await this.db.getResourceWithSnapshot(this.options.drive)).snapshot
-        ? undefined
-        : this.options.expectedPeer,
+      hasSnapshot && !invitation ? undefined : this.options.expectedPeer,
       challenge,
     );
 
@@ -325,6 +330,7 @@ class BrowserPeerConnection {
     let authenticated = false;
     let accepted = false;
     let started = false;
+    let pendingAuth: Record<string, unknown> | undefined;
     const timeout = setTimeout(() => {
       if (!started) this.fail(new Error('Peer authentication timed out'));
     }, 15000);
@@ -346,14 +352,52 @@ class BrowserPeerConnection {
             `${this.options.drive}#${remoteChallenge}`,
             this.agent!,
           );
-          await pipe.send(encodeAuth(JSON.stringify(auth)));
+
+          if (invitation) {
+            if (!this.options.expectedPeer)
+              throw new Error('Invite issuer is required');
+            pendingAuth = { ...auth, browserInvite: invitation };
+          } else {
+            await pipe.send(encodeAuth(JSON.stringify(auth)));
+          }
         } else if (frame[0] === Tag.AUTH_OK) {
           if (!challenged || accepted)
             throw new Error('Unexpected authentication acknowledgement');
           accepted = true;
         } else {
+          if (frame[0] === Tag.AUTH && !authenticated) {
+            if (frame.length > 8192)
+              throw new Error('Peer authentication is too large');
+            const auth = JSON.parse(
+              new TextDecoder().decode(frame.subarray(1)),
+            );
+
+            if (auth.browserInvite !== undefined) {
+              if (typeof auth.browserInvite !== 'string')
+                throw new Error('Invalid browser invite');
+              await authorizeBrowserInvite(
+                this.store,
+                this.options.drive,
+                auth.browserInvite,
+                auth,
+                `${this.options.drive}#${challenge}`,
+              );
+            }
+          }
+
           const output = await this.db!.handlePeerFrame(session, frame);
-          if (frame[0] === Tag.AUTH) authenticated = true;
+
+          if (frame[0] === Tag.AUTH) {
+            authenticated = true;
+
+            // Rust verified the issuer against the link's pinned identity. Only
+            // now may this connection receive the bearer invitation.
+            if (pendingAuth) {
+              await pipe.send(encodeAuth(JSON.stringify(pendingAuth)));
+              pendingAuth = undefined;
+            }
+          }
+
           for (const bytes of output.frames)
             await pipe.send(Uint8Array.from(bytes));
 

@@ -73,6 +73,7 @@ export function AccountRecoveryCard({
   const [needsCode, setNeedsCode] = useState(false);
   const [passkeyAdded, setPasskeyAdded] = useState(false);
   const [needsCompatiblePasskey, setNeedsCompatiblePasskey] = useState(false);
+  const [addingAccountPasskey, setAddingAccountPasskey] = useState(false);
   /**
    * The secret being enrolled, typed by the user.
    *
@@ -406,7 +407,9 @@ export function AccountRecoveryCard({
     if (!agentSubject || backup.phase !== 'ready') return;
 
     if (!envelopeWrapperKinds(backup.secret).hasPasskey && !codeInput.trim()) {
+      setAddingAccountPasskey(true);
       setNeedsCode(true);
+      setError(undefined);
 
       return;
     }
@@ -424,12 +427,15 @@ export function AccountRecoveryCard({
       setCodeInput('');
       setNeedsCode(false);
       setNeedsCompatiblePasskey(false);
+      setAddingAccountPasskey(false);
       setPasskeyAdded(true);
     } catch (e) {
       if (e instanceof AccountPasskeyUnsupportedError)
         setNeedsCompatiblePasskey(true);
       setError(
-        e instanceof Error ? e.message : 'Could not update your passkey.',
+        e instanceof Error && e.message.trim()
+          ? e.message
+          : 'Could not update your passkey. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -437,7 +443,7 @@ export function AccountRecoveryCard({
   }
 
   async function handleAddPasskey() {
-    if (!needsCode || !codeInput.trim()) {
+    if (!codeInput.trim()) {
       setNeedsCode(true);
       setError(undefined);
 
@@ -536,6 +542,7 @@ export function AccountRecoveryCard({
 
   return (
     <Column gap='0.75rem'>
+      {error && <ErrorLook role='alert'>{error}</ErrorLook>}
       <Protections>
         {/* One expression, because JSX turns the newline between two of them
             into a space and the sentence read "your passkey ." */}
@@ -570,6 +577,7 @@ export function AccountRecoveryCard({
       ) : null}
 
       {hasSession &&
+      !addingAccountPasskey &&
       backup.secret.format_version === 2 &&
       !backup.secret.wrappers.some(w => w.kdf_params.account_passkey) ? (
         <Column gap='0.5rem'>
@@ -578,9 +586,11 @@ export function AccountRecoveryCard({
             onClick={handleUnifyPasskey}
             data-test='unify-passkey'
           >
-            {needsCompatiblePasskey
-              ? 'Create a compatible account passkey'
-              : 'Use one passkey for sign-in and recovery'}
+            {loading
+              ? 'Setting up passkey…'
+              : needsCompatiblePasskey
+                ? 'Create a compatible account passkey'
+                : 'Add a passkey'}
           </Button>
           <Hint>
             Unlock your backup, then choose your account passkey. Your existing
@@ -597,6 +607,15 @@ export function AccountRecoveryCard({
             type='password'
             placeholder='Recovery code'
             aria-label='Recovery code'
+            autoFocus
+            onKeyDown={event => {
+              if (event.key === 'Enter' && codeInput.trim() && !loading) {
+                event.preventDefault();
+                void (addingAccountPasskey
+                  ? handleUnifyPasskey()
+                  : handleReveal());
+              }
+            }}
           />
         </InputWrapper>
       ) : null}
@@ -605,15 +624,27 @@ export function AccountRecoveryCard({
           <Row gap='1rem' wrapItems>
             <Button
               subtle
-              disabled={loading}
+              disabled={loading || (needsCode && !codeInput.trim())}
               onClick={() => {
-                setNeedsCode(true);
-                setError(undefined);
+                if (needsCode) {
+                  void (addingAccountPasskey
+                    ? handleUnifyPasskey()
+                    : handleReveal());
+                } else {
+                  setNeedsCode(true);
+                  setError(undefined);
+                }
               }}
             >
-              Use recovery code
+              {loading
+                ? 'Unlocking…'
+                : addingAccountPasskey
+                  ? 'Continue with passkey'
+                  : needsCode
+                    ? 'Unlock with recovery code'
+                    : 'Use recovery code'}
             </Button>
-            {hasSession === true ? (
+            {hasSession === true && backup.secret.format_version !== 2 ? (
               <Button
                 subtle
                 disabled={loading || !agentSubject}
@@ -622,7 +653,7 @@ export function AccountRecoveryCard({
               >
                 Add a passkey
               </Button>
-            ) : portalUrl ? (
+            ) : hasSession !== true && portalUrl ? (
               <Button
                 subtle
                 onClick={() => window.open(`${portalUrl}/dashboard`, '_blank')}
@@ -717,8 +748,6 @@ export function AccountRecoveryCard({
           />
         </Column>
       ) : null}
-
-      {error && <ErrorLook>{error}</ErrorLook>}
     </Column>
   );
 }

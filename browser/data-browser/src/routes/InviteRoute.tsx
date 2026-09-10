@@ -1,3 +1,4 @@
+import { PeerInvitePage } from '../views/PeerInvitePage';
 import { createRoute } from '@tanstack/react-router';
 import { useResource, useStore } from '@tomic/react';
 import InvitePage from '../views/InvitePage';
@@ -22,6 +23,20 @@ function InviteRouteComponent() {
   if (!token) {
     return <p>No invite token provided.</p>;
   }
+
+  let browserInvite = false;
+  let invalid = false;
+
+  try {
+    const data = JSON.parse(atob(token));
+    browserInvite =
+      data['https://atomicdata.dev/properties/invite/transport'] === 'webrtc';
+  } catch {
+    invalid = true;
+  }
+
+  if (invalid) return <p>Invalid invitation.</p>;
+  if (browserInvite) return <PeerInvitePage token={token} />;
 
   const subject = `${store.getServerUrl()}/invites?token=${encodeURIComponent(token)}`;
 

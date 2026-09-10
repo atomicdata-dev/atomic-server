@@ -13,6 +13,13 @@ import {
 import { generateInviteToken } from '@tomic/lib';
 import { useCallback, useState, type ReactNode } from 'react';
 import { Dialog } from './Dialog';
+import { managedFetch } from '../helpers/managed/api';
+import {
+  automaticPeerRoom,
+  defaultPeerSignalingUrl,
+  savePeerLink,
+  resumePeerLinks,
+} from '../helpers/browserPeerSync';
 import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
 import toast from 'react-hot-toast';
 import { ErrorLook } from './ErrorLook';
@@ -81,14 +88,59 @@ function InviteFormContent({
         urls.properties.invite.expiresAt,
       )) as number;
 
+      const isDrive = target.hasClasses(server.classes.drive);
+      let browserPeer = isDrive && store.isLocalOnlyDrive(target.subject);
+
+      if (isDrive && isSaas && !browserPeer) {
+        const response = await managedFetch('/sync-enrollments', {});
+        if (!response.ok || response.status === 204)
+          throw new Error(
+            'Sign in to your portal account to check this drive before sharing.',
+          );
+        const body = await response.json();
+        const enrollments = Array.isArray(body) ? body : body.enrollments;
+        if (!Array.isArray(enrollments))
+          throw new Error('Could not check Cloud Server status. Try again.');
+        browserPeer = !enrollments.some(
+          e => e.drive_subject === target.subject && e.status !== 'Disabled',
+        );
+      }
+
+      if (browserPeer && !store.isLocalOnlyDrive(target.subject)) {
+        throw new Error(
+          'This drive still uses a data server. A complete local copy must be verified before switching it to browser-only sharing. Its existing server connection has been kept.',
+        );
+      }
+
+      if (
+        browserPeer &&
+        !(await store.getClientDb()?.getResourceWithSnapshot(target.subject))
+          ?.snapshot
+      )
+        throw new Error(
+          'Wait for this drive to be saved on this device before sharing.',
+        );
       const tokenBase64 = await generateInviteToken(
         target.subject,
         agent,
         !!write,
         expiresAt,
+        invite.get(core.properties.description) as string | undefined,
+        browserPeer,
       );
 
-      const baseUrl = store.getServerUrl();
+      if (browserPeer) {
+        savePeerLink(store, {
+          drive: target.subject,
+          room: await automaticPeerRoom(target.subject),
+          signalingUrl: defaultPeerSignalingUrl(),
+        });
+        resumePeerLinks(store);
+      }
+
+      const baseUrl = browserPeer
+        ? window.location.origin
+        : store.getServerUrl();
       const finalUrl = `${baseUrl}/app/invite?token=${encodeURIComponent(
         tokenBase64,
       )}`;
@@ -100,7 +152,7 @@ function InviteFormContent({
     } catch (e) {
       setErr(e);
     }
-  }, [invite, agent, target, store]);
+  }, [invite, agent, target, store, isSaas]);
 
   if (agent?.subject && !profileReviewed) {
     return (
@@ -129,7 +181,7 @@ function InviteFormContent({
             <p>
               {allowEdits
                 ? 'Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free.'
-                : 'Viewers are free. Allowing edits requires a team editor seat for Cloud Server.'}
+                : 'Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server.'}
             </p>
           )}
           <ResourceField

@@ -1136,11 +1136,18 @@ export async function unifyAccountPasskey(
       ['decrypt'],
       wrapper.kdf_params,
     );
-    dek = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: base64ToBytes(wrapper.wrap_nonce) },
-      key,
-      base64ToBytes(wrapper.wrapped_dek),
-    );
+
+    try {
+      dek = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: base64ToBytes(wrapper.wrap_nonce) },
+        key,
+        base64ToBytes(wrapper.wrapped_dek),
+      );
+    } catch {
+      throw new Error(
+        'Wrong recovery code. Use the recovery code saved for this account, not your agent secret.',
+      );
+    }
   } else {
     const { wrapper, key } = await unlockPasskeyWrapper(recovery);
     dek = await crypto.subtle.decrypt(

@@ -138,3 +138,14 @@ it('automatically connects stored drives once, without bootstrapping unknown dri
   );
   stopPeerLinks(store);
 });
+
+it('keeps node-hosted staging apps on staging discovery', () => {
+  vi.stubEnv('VITE_ATOMIC_SIGNALING_URL', '');
+  vi.stubEnv('VITE_MANAGED_PORTAL_URL', '');
+  vi.stubGlobal('window', {
+    location: { hostname: 'node1.staging.atomicserver.eu' },
+  });
+  expect(defaultPeerSignalingUrl()).toBe(
+    'wss://staging.atomicserver.eu/webrtc-signal',
+  );
+});
