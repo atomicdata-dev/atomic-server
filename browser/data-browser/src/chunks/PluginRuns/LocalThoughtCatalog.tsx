@@ -1,3 +1,4 @@
+import { useIntegrationProxy } from '@helpers/integrationProxy';
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useStore } from '@tomic/react';
 import { Card } from '@components/Card';
@@ -6,7 +7,6 @@ import { Button } from '@components/Button';
 import { Dialog, useDialog } from '@components/Dialog';
 import { ErrMessage } from '@components/forms/InputStyles';
 import { ConnectLocalThought } from './ConnectLocalThought';
-import { integrationRegistry } from '@localthought/atomic-integrations';
 import {
   browserIntegrations,
   connectionKey,
@@ -22,21 +22,27 @@ export function LocalThoughtCatalog({
   search: string;
 }) {
   const store = useStore();
+  const origin = useIntegrationProxy();
   const [platforms, setPlatforms] = useState<string[]>();
   const [error, setError] = useState('');
   const [returned, setReturned] = useState<string>();
   const completing = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
-    browserIntegrations()
+    setPlatforms(undefined);
+    setError('');
+    setReturned(undefined);
+    browserIntegrations(origin)
       .catalog(controller.signal)
-      .then(setPlatforms)
+      .then(data => {
+        if (!controller.signal.aborted) setPlatforms(data);
+      })
       .catch(reason => {
         if (!controller.signal.aborted) setError(String(reason));
       });
 
     return () => controller.abort();
-  }, [store]);
+  }, [store, origin]);
   useEffect(() => {
     if (!drive || completing.current) return;
     const url = new URL(location.href);
@@ -69,7 +75,11 @@ export function LocalThoughtCatalog({
       sessionStorage.removeItem('localthought-pending');
 
       if (callbackError) {
-        browserIntegrations().cancel(drive, actor!, state);
+        browserIntegrations(pending.origin ?? origin).cancel(
+          drive,
+          actor!,
+          state,
+        );
         throw new Error(
           'The connection was not authorized. Start connecting again when you are ready.',
         );
@@ -78,13 +88,18 @@ export function LocalThoughtCatalog({
       const result = await proxyRequest<{
         connection: string;
         platform: string;
-      }>(store, 'finish', { drive, state, connectionCode: code! });
+      }>(store, 'finish', {
+        drive,
+        state,
+        connectionCode: code!,
+        origin: pending.origin ?? origin,
+      });
       if (result.platform !== pending.platform)
         throw new Error(
           'Returned platform did not match the requested platform',
         );
       localStorage.setItem(
-        connectionKey(drive, actor!, result.platform),
+        connectionKey(drive, actor!, result.platform, pending.origin ?? origin),
         JSON.stringify({
           ...result,
           drive,
@@ -98,9 +113,7 @@ export function LocalThoughtCatalog({
     void finish().catch(reason => setError(String(reason)));
   }, [drive, store]);
   const visible = platforms?.filter(id =>
-    `${id} ${platformName(id)}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
+    `${id} ${platformName(id)}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -109,8 +122,9 @@ export function LocalThoughtCatalog({
       {!platforms && !error && <p>Loading LocalThought platforms…</p>}
       {visible?.map(platform => (
         <PlatformCard
-          key={`${platform}:${returned}`}
+          key={`${origin}:${platform}:${returned}`}
           platform={platform}
+          origin={origin}
           drive={drive}
           returned={returned === platform}
         />
@@ -123,28 +137,27 @@ function PlatformCard({
   platform,
   drive,
   returned,
+  origin,
 }: {
   platform: string;
   drive?: string;
   returned: boolean;
+  origin: string;
 }) {
   const [dialog, show, , isOpen] = useDialog();
-  const [direct, setDirect] = useState(false);
-  const directEntry = integrationRegistry.find(
-    entry =>
-      entry.id === platform &&
-      'catalogDirect' in entry &&
-      entry.catalogDirect,
-  );
-  const DirectSetup = directEntry?.Component;
   useEffect(() => {
     if (returned) show();
   }, [returned, show]);
 
   return (
-    <Card data-integration={platform}>
+    <Card
+      highlight
+      data-integration={`proxy:${platform}`}
+      data-integration-source='proxy'
+    >
       <Column gap='0.75rem'>
         <h2>{platformName(platform)}</h2>
+        <small>Via integration proxy</small>
         <p>
           Connect your account through LocalThought and import records into your
           drive.
@@ -160,16 +173,11 @@ function PlatformCard({
         <Dialog.Content>
           {isOpen && drive && (
             <Suspense fallback={<p>Loading setup…</p>}>
-              {direct && DirectSetup ? (
-                <DirectSetup drive={drive} />
-              ) : (
-                <ConnectLocalThought drive={drive} platform={platform} />
-              )}
-              {DirectSetup && !direct && (
-                <Button subtle onClick={() => setDirect(true)}>
-                  Use direct credentials instead
-                </Button>
-              )}
+              <ConnectLocalThought
+                drive={drive}
+                platform={platform}
+                origin={origin}
+              />
             </Suspense>
           )}
         </Dialog.Content>

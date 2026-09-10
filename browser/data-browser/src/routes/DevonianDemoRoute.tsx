@@ -1,3 +1,4 @@
+import { getIntegrationProxy } from '@helpers/integrationProxy';
 import { createLazyRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@tomic/react';
@@ -25,7 +26,7 @@ function DevonianDemo() {
   const store = useStore();
   const [demo, setDemo] = useState<Demo>();
   const [rows, setRows] = useState<Row[]>([]);
-  const [proxy, setProxy] = useState('https://localthought.io');
+  const [proxy, setProxy] = useState(getIntegrationProxy);
   const [repository, setRepository] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

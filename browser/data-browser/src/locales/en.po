@@ -1543,6 +1543,7 @@ msgstr "Textual Description <0/>"
 #: src/chunks/TablePage/RowActionDialog.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx src/components/AvatarCropper.tsx
 #: src/components/AvatarCropper.tsx
+#: src/components/Settings/IntegrationSettings.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/OntologyPage/NewClassButton.tsx
@@ -8176,20 +8177,25 @@ msgstr "Automation name"
 msgid "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 msgstr "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 
-#~ msgid "GitHub issues"
-#~ msgstr "GitHub issues"
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "GitHub issues"
+msgstr "GitHub issues"
 
-#~ msgid "Keep GitHub issues and your kanban board in sync."
-#~ msgstr "Keep GitHub issues and your kanban board in sync."
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Keep GitHub issues and your kanban board in sync."
+msgstr "Keep GitHub issues and your kanban board in sync."
 
-#~ msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
-#~ msgstr "Sync titles, descriptions and status in both directions. Create issues from either app."
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
+msgstr "Sync titles, descriptions and status in both directions. Create issues from either app."
 
-#~ msgid "Start automations when a new issue is discovered."
-#~ msgstr "Start automations when a new issue is discovered."
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Start automations when a new issue is discovered."
+msgstr "Start automations when a new issue is discovered."
 
-#~ msgid "Issues only. Comments and pull requests are not synced."
-#~ msgstr "Issues only. Comments and pull requests are not synced."
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Issues only. Comments and pull requests are not synced."
+msgstr "Issues only. Comments and pull requests are not synced."
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Notion"
@@ -9661,8 +9667,9 @@ msgstr "Describe your idea and build it with the Atomic assistant."
 #~ msgid "Connect an integration with automation events first. Close this dialog and choose one under Discover integrations."
 #~ msgstr "Connect an integration with automation events first. Close this dialog and choose one under Discover integrations."
 
-#~ msgid "Integration"
-#~ msgstr "Integration"
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration"
+msgstr "Integration"
 
 #~ msgid "Choose an integration"
 #~ msgstr "Choose an integration"
@@ -9840,9 +9847,8 @@ msgstr "Loading LocalThought platforms…"
 msgid "Connect your account through LocalThought and import records into your drive."
 msgstr "Connect your account through LocalThought and import records into your drive."
 
-#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
-msgid "Use a direct GitHub token instead"
-msgstr "Use a direct GitHub token instead"
+#~ msgid "Use a direct GitHub token instead"
+#~ msgstr "Use a direct GitHub token instead"
 
 #: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
 msgid "Loading setup…"
@@ -9896,13 +9902,11 @@ msgstr "Open imported records"
 #~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 #~ msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Events from (UTC)"
-msgstr "Events from (UTC)"
+#~ msgid "Events from (UTC)"
+#~ msgstr "Events from (UTC)"
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Events before (UTC)"
-msgstr "Events before (UTC)"
+#~ msgid "Events before (UTC)"
+#~ msgstr "Events before (UTC)"
 
 #: src/routes/DevonianDemoRoute.tsx
 msgid "LocalThought tenant secret"
@@ -9916,6 +9920,7 @@ msgstr "LocalThought tenant secret"
 msgid "Synchronized {0} issues and comments."
 msgstr "Synchronized {0} issues and comments."
 
+#: src/components/Settings/IntegrationSettings.tsx
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Integration proxy URL"
 msgstr "Integration proxy URL"
@@ -10054,7 +10059,7 @@ msgstr "Error: Sign in before syncing with another device"
 msgid "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
 msgstr "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
 
-#. 0: calendar ? ' After importing, preview edits to send changes back to Google Calendar.' \\: ' No provider writes.'
+#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
 msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
@@ -10082,3 +10087,23 @@ msgstr "Applying these edits updates Google Calendar and notifies event guests."
 #: src/chunks/PluginRuns/CalendarSync.tsx
 msgid "Apply edits to Google"
 msgstr "Apply edits to Google"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Via integration proxy"
+msgstr "Via integration proxy"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration proxy"
+msgstr "Integration proxy"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Connect accounts and import records using a LocalThought integration-proxy server. This setting is saved in this browser."
+msgstr "Connect accounts and import records using a LocalThought integration-proxy server. This setting is saved in this browser."
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Reset to default"
+msgstr "Reset to default"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
+msgstr "Enter an HTTPS server URL or a localhost HTTP URL, without a path."

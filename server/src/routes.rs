@@ -420,27 +420,27 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .route(web::delete().to(handlers::plugin_secret::handle_delete_secret)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/list")
+        web::resource("/integration-oauth/notion/list")
             .route(web::post().to(handlers::integration_oauth::list)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/start")
+        web::resource("/integration-oauth/notion/start")
             .route(web::post().to(handlers::integration_oauth::start)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/finish")
+        web::resource("/integration-oauth/notion/finish")
             .route(web::post().to(handlers::integration_oauth::finish)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/callback")
+        web::resource("/integration-oauth/notion/callback")
             .route(web::get().to(handlers::integration_oauth::callback)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/discover")
+        web::resource("/integration-oauth/notion/discover")
             .route(web::post().to(handlers::integration_oauth::discover)),
     )
     .service(
-        web::resource("/integration-oauth/{provider}/bind")
+        web::resource("/integration-oauth/notion/bind")
             .route(web::post().to(handlers::integration_oauth::bind)),
     )
     // Serve pre-compressed brotli assets when:

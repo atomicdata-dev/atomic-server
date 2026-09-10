@@ -35,18 +35,14 @@ impl Remote {
         }
         Ok(Some(Self::new(&origin, token)?))
     }
-    async fn post<T: Serialize>(&self, provider: &str, path: &str, body: &T) -> Result<Value> {
-        let metadata = crate::oauth::provider::load(provider)?;
+    async fn post<T: Serialize>(&self, path: &str, body: &T) -> Result<Value> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|_| "Could not initialize authorization client")?;
         let mut response = client
-            .post(format!(
-                "{}/oauth-service/{}/{path}",
-                self.origin, metadata.id
-            ))
+            .post(format!("{}/oauth-service/notion/{path}", self.origin))
             .bearer_auth(&self.token)
             .json(body)
             .send()
@@ -68,20 +64,11 @@ impl Remote {
         }
         serde_json::from_slice(&bytes).map_err(|_| "Invalid authorization service response".into())
     }
-    pub async fn start(
-        &self,
-        provider: String,
-        actor: String,
-        drive: String,
-        attempt: String,
-    ) -> Result<Ticket> {
-        let metadata = crate::oauth::provider::load(&provider)?;
+    pub async fn start(&self, actor: String, drive: String, attempt: String) -> Result<Ticket> {
         let value = self
             .post(
-                &provider,
                 "start",
                 &Attempt {
-                    provider: provider.clone(),
                     actor,
                     drive,
                     attempt,
@@ -94,20 +81,17 @@ impl Remote {
             return Err("Invalid authorization ticket".into());
         }
         let u = url::Url::parse(&ticket.url).map_err(|_| "Invalid authorization URL")?;
-        if u.origin() != metadata.authorization_url.origin()
-            || u.path() != metadata.authorization_url.path()
+        if u.origin().ascii_serialization() != "https://api.notion.com"
+            || u.path() != "/v1/oauth/authorize"
             || !u.username().is_empty()
             || u.password().is_some()
         {
-            return Err("Invalid provider authorization URL".into());
+            return Err("Invalid Notion authorization URL".into());
         }
         let query: std::collections::BTreeMap<_, _> = u.query_pairs().into_owned().collect();
         if query.get("state") != Some(&ticket.id)
             || query.get("redirect_uri")
-                != Some(&format!(
-                    "{}/oauth-service/{provider}/callback",
-                    self.origin
-                ))
+                != Some(&format!("{}/oauth-service/notion/callback", self.origin))
             || query.get("response_type").map(String::as_str) != Some("code")
         {
             return Err("Authorization ticket URL does not match this service".into());
@@ -117,19 +101,16 @@ impl Remote {
     pub async fn redeem(
         &self,
         ticket: &Ticket,
-        provider: String,
         actor: String,
         drive: String,
         attempt: String,
     ) -> Result<Value> {
         self.post(
-            &provider,
             "redeem",
             &Redemption {
                 id: ticket.id.clone(),
                 proof: ticket.proof.clone(),
                 binding: Attempt {
-                    provider: provider.clone(),
                     actor,
                     drive,
                     attempt,

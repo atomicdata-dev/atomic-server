@@ -29,8 +29,13 @@ Local edits and repeated imports retain the existing reconciliation behavior.
 ## Build and proxy requirements
 
 - Build `atomic-wasm` using `cd browser/data-browser && pnpm build:wasm`.
-- Set `VITE_INTEGRATION_PROXY_URL` at frontend build/dev time to override the
-  default `https://localthought.io`. HTTPS or loopback HTTP origins only.
+- Open **Settings → Integration** to select the integration-proxy URL. The
+  preference is saved in this browser and applies without rebuilding. Connections
+  are isolated by proxy origin; switching back restores that proxy’s connections.
+  HTTPS or loopback HTTP origins only. **Reset to default** uses the deployment’s
+  `VITE_INTEGRATION_PROXY_URL`, or `https://localthought.io` when unset.
+- Existing bundled GitHub, Notion, Clockify and MT940 plugins remain available
+  independently. Proxy cards have an accent border and a “Via integration proxy” label.
 - Deploy the companion integration-proxy CORS change. It handles preflights for
   explicit Authorization headers and exposes `X-Connection-Code`, `Link`,
   pagination/count headers, `ETag` and `Retry-After`. Cookie credentials are not

@@ -805,9 +805,9 @@ mod tests {
             .appstate
             .store
             .publish_plugin_release(&atomic_lib::db::plugin_release::PluginRelease {
-                source: include_str!("fixtures/external-actions/plugin.js").into(),
+                source: include_str!("../../../integrations/github-issues/plugin.js").into(),
                 manifest: serde_json::from_str(include_str!(
-                    "fixtures/external-actions/manifest.fixture.json"
+                    "../../../integrations/github-issues/manifest.fixture.json"
                 ))
                 .unwrap(),
                 runtime: atomic_lib::db::plugin_release::RUNTIME.into(),

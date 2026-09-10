@@ -1,4 +1,6 @@
 // @wc-ignore-file
+import { getIntegrationProxy } from '@helpers/integrationProxy';
+import { savedConnectionKey } from '../../../../../integrations/localthought/settings';
 import { type Store } from '@tomic/react';
 
 export const platformName = (id: string) =>
@@ -29,16 +31,13 @@ async function engine(): Promise<Engine> {
   }));
 }
 
-export const browserIntegrations = () =>
-  new BrowserIntegrations(
-    localStorage,
-    engine,
-    import.meta.env.VITE_INTEGRATION_PROXY_URL || undefined,
-  );
+export const browserIntegrations = (origin = getIntegrationProxy()) =>
+  new BrowserIntegrations(localStorage, engine, origin);
 export async function proxyRequest<T>(
   store: Store,
   action: string,
   body: {
+    origin?: string;
     drive: string;
     platform?: string;
     returnUrl?: string;
@@ -53,7 +52,7 @@ export async function proxyRequest<T>(
 ): Promise<T> {
   const actor = store.getAgent()?.subject;
   if (!actor) throw new Error('Sign in before connecting an account');
-  const client = browserIntegrations();
+  const client = browserIntegrations(body.origin);
   if (action === 'start')
     return (await client.start(
       body.drive,
@@ -86,5 +85,9 @@ export interface SavedConnection {
   drive: string;
   actor: string;
 }
-export const connectionKey = (drive: string, actor: string, platform: string) =>
-  `localthought-browser:${JSON.stringify([drive, actor, platform])}`;
+export const connectionKey = (
+  drive: string,
+  actor: string,
+  platform: string,
+  origin = getIntegrationProxy(),
+) => savedConnectionKey(origin, drive, actor, platform);

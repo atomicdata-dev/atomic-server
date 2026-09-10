@@ -1543,6 +1543,7 @@ msgstr ""
 #: src/chunks/TablePage/RowActionDialog.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx src/components/AvatarCropper.tsx
 #: src/components/AvatarCropper.tsx
+#: src/components/Settings/IntegrationSettings.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/OntologyPage/NewClassButton.tsx
@@ -8165,20 +8166,25 @@ msgstr ""
 msgid "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 msgstr ""
 
-#~ msgid "GitHub issues"
-#~ msgstr ""
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "GitHub issues"
+msgstr ""
 
-#~ msgid "Keep GitHub issues and your kanban board in sync."
-#~ msgstr ""
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Keep GitHub issues and your kanban board in sync."
+msgstr ""
 
-#~ msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
-#~ msgstr ""
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
+msgstr ""
 
-#~ msgid "Start automations when a new issue is discovered."
-#~ msgstr ""
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Start automations when a new issue is discovered."
+msgstr ""
 
-#~ msgid "Issues only. Comments and pull requests are not synced."
-#~ msgstr ""
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Issues only. Comments and pull requests are not synced."
+msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Notion"
@@ -9622,8 +9628,9 @@ msgstr ""
 #~ msgid "Connect an integration with automation events first. Close this dialog and choose one under Discover integrations."
 #~ msgstr ""
 
-#~ msgid "Integration"
-#~ msgstr ""
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration"
+msgstr ""
 
 #~ msgid "Choose an integration"
 #~ msgstr ""
@@ -9801,9 +9808,8 @@ msgstr ""
 msgid "Connect your account through LocalThought and import records into your drive."
 msgstr ""
 
-#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
-msgid "Use a direct GitHub token instead"
-msgstr ""
+#~ msgid "Use a direct GitHub token instead"
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
 msgid "Loading setup…"
@@ -9857,13 +9863,11 @@ msgstr ""
 #~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 #~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Events from (UTC)"
-msgstr ""
+#~ msgid "Events from (UTC)"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Events before (UTC)"
-msgstr ""
+#~ msgid "Events before (UTC)"
+#~ msgstr ""
 
 #: src/routes/DevonianDemoRoute.tsx
 msgid "LocalThought tenant secret"
@@ -9877,6 +9881,7 @@ msgstr ""
 msgid "Synchronized {0} issues and comments."
 msgstr ""
 
+#: src/components/Settings/IntegrationSettings.tsx
 #: src/routes/DevonianDemoRoute.tsx
 msgid "Integration proxy URL"
 msgstr ""
@@ -10015,7 +10020,7 @@ msgstr ""
 msgid "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
 msgstr ""
 
-#. 0: calendar ? ' After importing, preview edits to send changes back to Google Calendar.' \\: ' No provider writes.'
+#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
 msgstr ""
@@ -10042,4 +10047,24 @@ msgstr ""
 
 #: src/chunks/PluginRuns/CalendarSync.tsx
 msgid "Apply edits to Google"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Via integration proxy"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration proxy"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Connect accounts and import records using a LocalThought integration-proxy server. This setting is saved in this browser."
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Reset to default"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
 msgstr ""

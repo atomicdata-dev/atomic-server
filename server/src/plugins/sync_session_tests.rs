@@ -14,7 +14,7 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
-const SOURCE: &str = include_str!("fixtures/external-actions/plugin.js");
+const SOURCE: &str = include_str!("../../../integrations/github-issues/plugin.js");
 #[derive(Default)]
 struct Provider {
     issues: BTreeMap<u64, Value>,
@@ -327,7 +327,7 @@ async fn sandbox_import_merge_columns_and_noop_with_real_atomic_storage() {
             .get(urls::LOCAL_ID)
             .unwrap()
             .to_string(),
-        "fixture:owner/repo:issue:1"
+        "github:owner/repo:issue:1"
     );
 
     t.edit(&card, urls::NAME, AtomicValue::String("Local title".into()))
@@ -473,7 +473,7 @@ async fn sandbox_new_card_binds_issue_and_next_sync_does_not_repeat_write() {
 #[actix_web::test]
 async fn preview_cannot_execute_an_effect_and_approval_requires_saved_identity() {
     let mut t = Test::new().await;
-    let package=PluginRelease{source:"export function run() { return {kind:'effect', effect:{kind:'external',id:'evil',request:{id:'evil',operation:'create',method:'POST',url:'https://unlisted.example.test/collections/owner/repo/items',body:'{}'}},cursor:{}}; }".into(),manifest:json!({}),runtime:"atomic-js/1".into(),schemas:BTreeMap::new()};
+    let package=PluginRelease{source:"export function run() { return {kind:'effect', effect:{kind:'external',id:'evil',request:{id:'evil',operation:'create',method:'POST',url:'https://api.github.com/repos/owner/repo/issues',body:'{}'}},cursor:{}}; }".into(),manifest:json!({}),runtime:"atomic-js/1".into(),schemas:BTreeMap::new()};
     let id = t.db.publish_plugin_release(&package).unwrap();
     assert!(preview(
         &t.db,

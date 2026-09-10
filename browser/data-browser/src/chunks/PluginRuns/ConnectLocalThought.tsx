@@ -1,4 +1,6 @@
-import { externalIntegrationRegistry } from '@localthought/atomic-integrations';
+import { getIntegrationProxy } from '@helpers/integrationProxy';
+import { readSavedConnection } from '../../../../../integrations/localthought/settings';
+import { googleCalendarIntegration } from '@localthought/atomic-integrations/ui/GoogleCalendar';
 import { useEffect, useState } from 'react';
 import {
   core,
@@ -21,7 +23,6 @@ import {
 import { RunPluginDialog } from './RunPluginDialog';
 import {
   browserIntegrations,
-  connectionKey,
   platformName,
   proxyRequest,
   type SavedConnection,
@@ -39,17 +40,27 @@ import source from '../../../../../integrations/localthought/plugin.js?raw';
 export function ConnectLocalThought({
   drive,
   platform,
+  origin = getIntegrationProxy(),
 }: {
   drive: string;
   platform: string;
+  origin?: string;
 }) {
-  const extension = externalIntegrationRegistry.find(item => item.id === platform);
+  const extension = [googleCalendarIntegration].find(
+    item => item.id === platform,
+  );
   const ImportControls = extension?.ImportControls;
   const Sync = extension?.Sync;
   const store = useStore();
   const actor = store.getAgent()?.subject ?? '';
   const [connection] = useState<SavedConnection | undefined>(() => {
-    const raw = localStorage.getItem(connectionKey(drive, actor, platform));
+    const raw = readSavedConnection(
+      localStorage,
+      origin,
+      drive,
+      actor,
+      platform,
+    );
     if (!raw) return;
 
     try {
@@ -61,7 +72,9 @@ export function ConnectLocalThought({
   const [parameters, setParameters] = useState<string[]>([]);
   const [constants, setConstants] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<string[]>([]);
-  const [selection, setSelection] = useState(() => extension?.defaultSelection());
+  const [selection, setSelection] = useState(() =>
+    extension?.defaultSelection(),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<{
@@ -73,7 +86,7 @@ export function ConnectLocalThought({
   const [tables, setTables] = useState<string[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    browserIntegrations()
+    browserIntegrations(origin)
       .describe(platform)
       .then(data => {
         if (controller.signal.aborted) return;
@@ -83,9 +96,11 @@ export function ConnectLocalThought({
           Object.fromEntries(
             data.parameters.map((key: string) => [
               key,
-              (extension?.defaultConstants as
-                | Record<string, string>
-                | undefined)?.[key] ?? '',
+              (
+                extension?.defaultConstants as
+                  | Record<string, string>
+                  | undefined
+              )?.[key] ?? '',
             ]),
           ),
         );
@@ -107,6 +122,7 @@ export function ConnectLocalThought({
         'start',
         {
           drive,
+          origin,
           platform,
           returnUrl: `${location.origin}/app/integrations`,
         },
@@ -115,6 +131,7 @@ export function ConnectLocalThought({
         'localthought-pending',
         JSON.stringify({
           state: result.state,
+          origin,
           drive,
           actor,
           platform,
@@ -136,6 +153,7 @@ export function ConnectLocalThought({
 
     try {
       const response = await proxyRequest<FetchedPlatform>(store, 'fetch', {
+        origin,
         drive,
         connection: connection.connection,
         constants,
@@ -301,7 +319,13 @@ export function ConnectLocalThought({
               />
             </Field>
           ))}
-          {ImportControls && selection && <ImportControls value={selection} disabled={busy} onChange={setSelection} />}
+          {ImportControls && selection && (
+            <ImportControls
+              value={selection}
+              disabled={busy}
+              onChange={setSelection}
+            />
+          )}
           <p>{collections.join(', ')}</p>
           <ImportScopeHelp writable={!!extension} />
           <Button
@@ -319,10 +343,20 @@ export function ConnectLocalThought({
           config={syncConfig}
           disabled={busy || !!preview}
           rows={() => localImportRows(store, drive, syncConfig)}
-          request={(path, init) => browserIntegrations().request(drive, actor, connection.connection, platform, path, init)}
+          request={(path, init) =>
+            browserIntegrations(origin).request(
+              drive,
+              actor,
+              connection.connection,
+              platform,
+              path,
+              init,
+            )
+          }
           checkpoint={async (subject, values) => {
             const resource = await store.getResource(subject);
-            for (const [property, value] of Object.entries(values)) await resource.set(property, value as JSONValue);
+            for (const [property, value] of Object.entries(values))
+              await resource.set(property, value as JSONValue);
             await resource.save();
           }}
         />

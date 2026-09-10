@@ -96,7 +96,7 @@ for (const keepSeries of [false, true]) {
           .getByRole('link', { name: 'Integrations', exact: true })
           .click();
         await page
-          .locator('[data-integration="google-calendar"]')
+          .locator('[data-integration="proxy:google-calendar"]')
           .getByRole('button', { name: 'Set up connection' })
           .click();
       };

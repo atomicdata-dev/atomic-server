@@ -110,18 +110,10 @@ pub fn begin(db: &Db, binding: Binding, at: i64) -> Result<Ticket> {
 }
 /// Claim a provider callback exactly once before exchanging its code.
 /// The random ID is the OAuth state; this reveals no retrieval proof.
-pub async fn claim_callback(
-    db: &Db,
-    id: &str,
-    expected_provider: &str,
-    at: i64,
-) -> Result<Binding> {
+pub async fn claim_callback(db: &Db, id: &str, at: i64) -> Result<Binding> {
     let _lock = db.lock_plugin(&key(id)).await;
     let mut record = read(db, id)?;
     active(&record, at)?;
-    if record.binding.provider != expected_provider {
-        return Err("Authorization callback provider does not match state".into());
-    }
     if record.exchange_started || record.ready {
         return Err("Authorization callback already handled".into());
     }
@@ -301,14 +293,6 @@ mod tests {
             .get_plugin_secret_info(&secret_key(&t.id))
             .unwrap()
             .is_none());
-    }
-    #[tokio::test]
-    async fn wrong_provider_cannot_consume_callback_state() {
-        let db = db("handoff_provider_binding").await;
-        let b = binding();
-        let t = begin(&db, b.clone(), 0).unwrap();
-        assert!(claim_callback(&db, &t.id, "other", 1).await.is_err());
-        assert!(claim_callback(&db, &t.id, &b.provider, 1).await.unwrap() == b);
     }
     #[tokio::test]
     async fn expiry_cleanup_and_duplicate_completion() {

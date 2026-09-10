@@ -42,7 +42,7 @@ test.describe('plugins', () => {
         await route.fulfill({ response });
       });
     await page.getByRole('link', { name: 'Integrations', exact: true }).click();
-    const pets = page.locator('[data-integration=pets]');
+    const pets = page.locator('[data-integration="proxy:pets"]');
     await expect(
       pets.getByRole('heading', { name: 'Pets', exact: true }),
     ).toBeVisible();
@@ -349,10 +349,10 @@ export function run() { return { intents: [] }; }
 
     await expect(
       page.getByText('Offline checks passed:', { exact: false }),
-    ).toHaveCount(3);
+    ).toHaveCount(4);
     await expect(
       page.getByText('Live provider checks are not included in these results.'),
-    ).toHaveCount(3);
+    ).toHaveCount(4);
     await page
       .locator('details')
       .filter({ hasText: 'Repository test results' })
@@ -780,9 +780,6 @@ export function run() { return { intents: [] }; }
       .locator('[data-integration=github-issues]')
       .getByRole('button', { name: 'Set up connection' })
       .click();
-    await page
-      .getByRole('button', { name: 'Use a direct GitHub token instead' })
-      .click();
     await expect(page.getByLabel('Sync into')).toContainText(
       'Shared project tasks',
     );
@@ -822,9 +819,6 @@ export function run() { return { intents: [] }; }
     await page
       .locator('[data-integration=github-issues]')
       .getByRole('button', { name: 'Set up connection' })
-      .click();
-    await page
-      .getByRole('button', { name: 'Use a direct GitHub token instead' })
       .click();
     await page
       .getByLabel('Repository', { exact: true })

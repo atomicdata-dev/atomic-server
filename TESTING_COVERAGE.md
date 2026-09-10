@@ -1256,16 +1256,23 @@ coverage.
 
 `integrations/localthought/browser.test.ts` covers consumer-owned request budgets,
 Retry-After handling with rotating credentials, deadline rejection, and separate
-catalog selections with explicit caller precedence. OAuth provider tests cover
-trusted external descriptors, origin/URL validation, and descriptor drift; the
-real HTTP handoff test requires permission to bind a local socket.
+catalog selections with explicit caller precedence. Existing Notion OAuth
+coverage and its wire protocol remain unchanged.
 
 The Local Thought Vitest suite imports Calendar code from the pinned Devonian
-package. `integrations/external-platform-tests.vitest.config.ts` separately runs
-relocated Clockify, Notion, and GitHub regressions against the installed package
-with Atomic host aliases. Both suites are included in the Dagger integration
-check; Devonian's own core tests do not replace these host integration tests.
+package. Existing GitHub, Notion and Clockify implementations, fixture suites,
+certification metadata and Rust tests remain in this repository; Rust tests
+execute the shipped provider bundles.
+
+`integrations/localthought/settings.test.ts` covers runtime proxy selection,
+deployment-default fallback, URL validation without losing the previous setting,
+origin-separated connection keys and migration of legacy connections only for
+the matching proxy and owner.
 
 Known limitations: Link `operationRef` is explicitly rejected; the implemented
 traversal uses `operationId`. The browser preview rejects more than 5,000 records
 with an explicit incomplete-import error rather than silently truncating.
+
+`IntegrationDiscovery.test.ts` verifies that all four bundled plugins remain
+discoverable without contacting an integration proxy. The original Notion auth
+and Clockify upgrade tests remain alongside it.

@@ -477,12 +477,6 @@ export class AtomicServer {
           '--config',
           '/integrations/localthought/vitest.config.ts',
         ])
-        .withExec([
-          '/app/node_modules/.bin/vitest',
-          'run',
-          '--config',
-          '/integrations/external-platform-tests.vitest.config.ts',
-        ])
         .withWorkdir('/app')
         .withExec([
           'node',

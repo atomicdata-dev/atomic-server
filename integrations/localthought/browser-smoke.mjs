@@ -13,7 +13,7 @@ try {
   console.log('Opening integrations');
   await page.getByRole('link', { name: 'Integrations', exact: true }).click();
   console.log('Opening Pets');
-  const pets = page.locator('[data-integration=pets]');
+  const pets = page.locator('[data-integration="proxy:pets"]');
   await pets.getByRole('button', { name: 'Set up connection' }).click();
   await page
     .getByRole('button', { name: 'Install and connect', exact: true })
