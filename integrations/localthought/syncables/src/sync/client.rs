@@ -259,10 +259,11 @@ impl SyncClient {
                         &records_by_collection,
                     )
                 } else {
-                    incoming
-                        .iter()
-                        .flat_map(|link| link_invocations(link, &records_by_collection))
-                        .collect()
+                    deduplicate_invocations(
+                        incoming
+                            .iter()
+                            .flat_map(|link| link_invocations(link, &records_by_collection)),
+                    )
                 };
                 for invocation in invocations {
                     match self
@@ -345,10 +346,11 @@ impl SyncClient {
                     Vec::new()
                 }
             } else {
-                incoming
-                    .iter()
-                    .flat_map(|link| link_invocations(link, &records_by_collection))
-                    .collect()
+                deduplicate_invocations(
+                    incoming
+                        .iter()
+                        .flat_map(|link| link_invocations(link, &records_by_collection)),
+                )
             };
             for invocation in invocations {
                 match self.walk_read(document, base, read, &invocation).await {
@@ -613,6 +615,16 @@ fn link_invocations(
         }
     }
     result
+}
+
+fn deduplicate_invocations(invocations: impl IntoIterator<Item = Invocation>) -> Vec<Invocation> {
+    let mut unique = Vec::new();
+    for invocation in invocations {
+        if !unique.contains(&invocation) {
+            unique.push(invocation);
+        }
+    }
+    unique
 }
 
 /// Every combination of constants plus one parent record's value per

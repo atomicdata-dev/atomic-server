@@ -141,6 +141,42 @@ async fn unknown_link_target_parameter_fails_before_http() {
     assert!(requests.lock().unwrap().is_empty());
 }
 
+#[tokio::test]
+async fn duplicate_incoming_links_do_not_repeat_target_invocations() {
+    let mut document = document(false);
+    let response = document
+        .paths
+        .get_mut("/{administration_id}/contacts{format}")
+        .unwrap()
+        .get
+        .as_mut()
+        .unwrap()
+        .responses
+        .get_mut("200")
+        .unwrap();
+    let links = response.links.as_mut().unwrap();
+    links.insert(
+        "subscriptionsAgain".to_string(),
+        links["subscriptions"].clone(),
+    );
+    let fetch = RecordingFetch::default();
+    let requests = fetch.requests.clone();
+    let report = client(fetch)
+        .sync_document(&document, &InMemoryStorage::new())
+        .await
+        .unwrap();
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+    assert_eq!(
+        requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|url| url.contains("subscriptions"))
+            .count(),
+        2
+    );
+}
+
 #[test]
 fn root_parameters_exclude_link_and_item_identity_bindings() {
     let model = syncables::discover_resource_model(&document(false)).unwrap();
