@@ -19,6 +19,8 @@ use serde_json::Value;
 
 use crate::error::{Error, Result};
 use crate::openapi::types::{JsonMap, OpenApiDocument, OperationObject, SchemaObject};
+use crate::pagination::autodetect::resolve_effective_scheme;
+use crate::pagination::items::locate_items_field;
 
 // --- The raw `crudResources` shape, as the overlay declares it ------------
 
@@ -526,11 +528,36 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
                     let object = for_each.as_object().ok_or_else(|| {
                         Error::InvalidLink(format!("{link_name}: x-for-each must be an object"))
                     })?;
-                    object.get("items").and_then(Value::as_str).ok_or_else(|| {
-                        Error::InvalidLink(format!(
-                            "{link_name}: x-for-each.items must be a JSON Pointer string"
-                        ))
-                    })?;
+                    let items_pointer =
+                        object.get("items").and_then(Value::as_str).ok_or_else(|| {
+                            Error::InvalidLink(format!(
+                                "{link_name}: x-for-each.items must be a JSON Pointer string"
+                            ))
+                        })?;
+                    let response_schema = response
+                        .content
+                        .as_ref()
+                        .and_then(|content| content.get("application/json"))
+                        .and_then(|media| media.schema.as_ref());
+                    let effective = resolve_effective_scheme(document, operation);
+                    let expected_pointer = if response_schema.is_none()
+                        || response_schema.and_then(|schema| schema.schema_type.as_deref())
+                            == Some("array")
+                    {
+                        Some(String::new())
+                    } else {
+                        locate_items_field(
+                            response_schema,
+                            effective.as_ref().map(|effective| &effective.scheme),
+                        )
+                        .map(|field| format!("/{}", field.replace('~', "~0").replace('/', "~1")))
+                    };
+                    if expected_pointer.as_deref() != Some(items_pointer) {
+                        return Err(Error::InvalidLink(format!(
+                            "{link_name}: x-for-each.items {items_pointer:?} does not select this collection's response items (expected {})",
+                            expected_pointer.as_deref().unwrap_or("a declared response items array")
+                        )));
+                    }
                     let item_parameters = object
                         .get("parameters")
                         .and_then(Value::as_object)

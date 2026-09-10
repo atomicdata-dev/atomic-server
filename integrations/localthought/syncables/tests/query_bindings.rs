@@ -216,6 +216,29 @@ fn standard_link_allows_an_unqualified_unique_target_parameter() {
         .contains_key(&("query".to_string(), "contact_id".to_string()))));
 }
 
+#[test]
+fn rejects_for_each_pointer_that_does_not_select_collection_items() {
+    let mut document = document(false);
+    document
+        .paths
+        .get_mut("/administrations{format}")
+        .unwrap()
+        .get
+        .as_mut()
+        .unwrap()
+        .responses
+        .get_mut("200")
+        .unwrap()
+        .links
+        .as_mut()
+        .unwrap()["contacts"]
+        .extensions["x-for-each"]["items"] = json!("/other");
+    let error = syncables::discover_resource_model(&document).unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("x-for-each.items \"/other\" does not select this collection's response items"));
+}
+
 #[derive(Clone, Default)]
 struct PagingFetch {
     requests: Arc<Mutex<Vec<String>>>,
