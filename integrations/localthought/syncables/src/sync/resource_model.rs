@@ -236,15 +236,17 @@ impl ResourceModel {
     /// and per-item identity parameters are excluded.
     #[must_use]
     pub fn root_parameters(&self) -> std::collections::BTreeSet<String> {
-        let linked_targets: std::collections::BTreeSet<_> = self
-            .links
-            .iter()
-            .flat_map(|link| link.parameters.keys().map(|(_, name)| name.clone()))
-            .collect();
         let mut parameters = std::collections::BTreeSet::new();
         for collection in &self.collections {
+            let is_linked = self
+                .links
+                .iter()
+                .any(|link| link.target == LinkTarget::Collection(collection.name.clone()));
+            if is_linked {
+                continue;
+            }
             for param in &collection.context_params {
-                if self.provider_for(param).is_none() && !linked_targets.contains(param) {
+                if self.provider_for(param).is_none() {
                     parameters.insert(param.clone());
                 }
             }
@@ -576,25 +578,49 @@ fn insert_link_parameter(
     target: &OperationObject,
     bindings: &mut IndexMap<(String, String), LinkValueSource>,
 ) -> Result<()> {
-    let (location, name) = qualified.split_once('.').ok_or_else(|| {
-        Error::InvalidLink(format!(
-            "{link_name}: target parameter {qualified} must be location-qualified"
-        ))
-    })?;
+    let (location, name) = if let Some((location, name)) = qualified.split_once('.') {
+        (location.to_string(), name.to_string())
+    } else {
+        let matches: Vec<_> = target
+            .parameters
+            .iter()
+            .flatten()
+            .filter(|parameter| parameter.name == qualified)
+            .collect();
+        match matches.as_slice() {
+            [parameter] => (
+                serde_json::to_value(parameter.location)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .expect("parameter location serializes as a string"),
+                qualified.to_string(),
+            ),
+            [] => {
+                return Err(Error::InvalidLink(format!(
+                    "{link_name}: unknown target parameter {qualified}"
+                )))
+            }
+            _ => {
+                return Err(Error::InvalidLink(format!(
+                    "{link_name}: ambiguous target parameter {qualified}; qualify its location"
+                )))
+            }
+        }
+    };
     let found = target.parameters.iter().flatten().any(|parameter| {
         parameter.name == name
             && serde_json::to_value(parameter.location)
                 .ok()
                 .and_then(|v| v.as_str().map(str::to_owned))
                 .as_deref()
-                == Some(location)
+                == Some(location.as_str())
     });
     if !found {
         return Err(Error::InvalidLink(format!(
             "{link_name}: unknown target parameter {qualified}"
         )));
     }
-    let key = (location.to_string(), name.to_string());
+    let key = (location, name);
     if bindings.insert(key, source).is_some() {
         return Err(Error::InvalidLink(format!(
             "{link_name}: target parameter {qualified} is bound more than once"

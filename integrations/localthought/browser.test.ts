@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { BrowserIntegrations, proxyOrigin, sign, type Engine, type ImportLimits } from './browser';
+import { BrowserIntegrations, mergeQuerySelections, proxyOrigin, sign, type Engine, type ImportLimits } from './browser';
 const secret = 'bW9jay10ZW5hbnQ.mock-signature';
 const origin = 'https://proxy.example';
 function setup(policy?: Partial<ImportLimits>, sleep?: (milliseconds: number) => Promise<void>) {
@@ -62,6 +62,20 @@ it('validates consumer import limits', async () => {
   );
   const defaultClient = setup().client;
   expect(defaultClient).toBeDefined();
+});
+
+it('merges catalog selections with explicit caller values winning', () => {
+  expect(
+    mergeQuerySelections(
+      { query_overrides: [{ path: '/items', values: { active: false, archived: true } }] },
+      { query_overrides: [{ path: '/items', values: { active: true } }, { path: '/other', values: { all: true } }] },
+    ),
+  ).toEqual({
+    query_overrides: [
+      { path: '/items', values: { active: true, archived: true } },
+      { path: '/other', values: { all: true } },
+    ],
+  });
 });
 
 it('paces requests and permits a configured request budget', async () => {

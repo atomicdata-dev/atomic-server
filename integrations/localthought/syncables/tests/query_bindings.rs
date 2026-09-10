@@ -186,6 +186,36 @@ fn root_parameters_exclude_link_and_item_identity_bindings() {
     );
 }
 
+#[test]
+fn standard_link_allows_an_unqualified_unique_target_parameter() {
+    let mut document = document(false);
+    let links = document
+        .paths
+        .get_mut("/{administration_id}/contacts{format}")
+        .unwrap()
+        .get
+        .as_mut()
+        .unwrap()
+        .responses
+        .get_mut("200")
+        .unwrap()
+        .links
+        .as_mut()
+        .unwrap();
+    let item_parameters = links["subscriptions"]
+        .extensions
+        .get_mut("x-for-each")
+        .unwrap()["parameters"]
+        .as_object_mut()
+        .unwrap();
+    let value = item_parameters.shift_remove("query.contact_id").unwrap();
+    item_parameters.insert("contact_id".to_string(), value);
+    let model = syncables::discover_resource_model(&document).unwrap();
+    assert!(model.links.iter().any(|link| link
+        .parameters
+        .contains_key(&("query".to_string(), "contact_id".to_string()))));
+}
+
 #[derive(Clone, Default)]
 struct PagingFetch {
     requests: Arc<Mutex<Vec<String>>>,

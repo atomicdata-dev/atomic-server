@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use serde_json::Value;
 use syncables::client::client::{Fetch, HttpRequest, HttpResponse};
 use syncables::{ClientConfig, Credentials, InMemoryStorage, SyncClient};
 
@@ -40,29 +41,34 @@ impl Fetch for MoneybirdFetch {
 }
 
 #[tokio::test]
+#[ignore = "requires external published metadata fixtures"]
 async fn every_moneybird_collection_and_linked_read_is_requested() {
-    let (Ok(oad_dir), Ok(overlays_dir)) = (
-        std::env::var("MONEYBIRD_OAD_DIR"),
-        std::env::var("MONEYBIRD_OVERLAYS_DIR"),
-    ) else {
-        return;
-    };
+    let oad_dir = std::env::var("MONEYBIRD_OAD_DIR").expect("set MONEYBIRD_OAD_DIR");
+    let overlays_dir = std::env::var("MONEYBIRD_OVERLAYS_DIR").expect("set MONEYBIRD_OVERLAYS_DIR");
     let document_path = PathBuf::from(oad_dir).join("openapi.yaml");
     let overlays_dir = PathBuf::from(overlays_dir);
     let overlays = [
         "crud-causality-overlay.yaml",
         "pagination-overlay.yaml",
         "auth-overlay.yaml",
-        "all-records-selection-overlay.yaml",
     ]
     .map(|name| overlays_dir.join(name))
     .to_vec();
-    let document =
+    let mut document =
         syncables::load_open_api_document_with_overlays(document_path.as_path(), &overlays)
             .await
             .unwrap();
+    let selection: Value = serde_json::from_slice(
+        &std::fs::read(overlays_dir.join("all-records-selection.json")).unwrap(),
+    )
+    .unwrap();
+    apply_query_overrides(&mut document, &selection);
     let model = syncables::discover_resource_model(&document).unwrap();
     assert_eq!(model.collections.len(), 32);
+    assert_eq!(
+        model.root_parameters(),
+        ["administration_id".to_string()].into_iter().collect()
+    );
     assert!(model
         .reads
         .iter()
@@ -110,4 +116,44 @@ async fn every_moneybird_collection_and_linked_read_is_requested() {
     assert!(requests
         .iter()
         .any(|url| url.contains("verifications.json")));
+    for expected in [
+        "assets.json?active=false",
+        "contacts.json?include_archived=true",
+        "products.json?active=false",
+        "projects.json?filter=state:all",
+        "contacts/contact%20%2F%20one/additional_charges.json?include_billed=true",
+        "subscriptions/subscription%20%2F%20one/additional_charges.json?include_billed=true",
+    ] {
+        assert!(
+            requests.iter().any(|url| url.contains(expected)),
+            "missing selection {expected}"
+        );
+    }
+}
+
+fn apply_query_overrides(document: &mut syncables::OpenApiDocument, selection: &Value) {
+    let overrides = selection["query_overrides"].as_array().unwrap();
+    let resources = document
+        .components
+        .as_mut()
+        .unwrap()
+        .extensions
+        .get_mut("crudResources")
+        .unwrap()
+        .as_object_mut()
+        .unwrap();
+    for resource in resources.values_mut() {
+        let Some(collections) = resource["collections"].as_object_mut() else {
+            continue;
+        };
+        for collection in collections.values_mut() {
+            let path = collection["urlTemplate"].as_str().unwrap();
+            if let Some(override_) = overrides.iter().find(|item| item["path"] == path) {
+                collection
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("x-list-query".to_string(), override_["values"].clone());
+            }
+        }
+    }
 }

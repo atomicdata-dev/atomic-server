@@ -25,6 +25,45 @@ export interface ImportLimits {
   maxRequests: number;
   timeoutMs: number;
 }
+interface QuerySelection {
+  query_overrides: { path: string; values: Record<string, unknown> }[];
+}
+function querySelection(value: unknown): QuerySelection {
+  if (value === undefined || value === null) return { query_overrides: [] };
+  if (typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Invalid catalog selection');
+  const raw = value as Record<string, unknown>;
+  if (raw.query_overrides === undefined) return { query_overrides: [] };
+  if (
+    !Array.isArray(raw.query_overrides) ||
+    raw.query_overrides.some(
+      item =>
+        typeof item !== 'object' ||
+        item === null ||
+        Array.isArray(item) ||
+        typeof (item as Record<string, unknown>).path !== 'string' ||
+        typeof (item as Record<string, unknown>).values !== 'object' ||
+        (item as Record<string, unknown>).values === null ||
+        Array.isArray((item as Record<string, unknown>).values),
+    )
+  )
+    throw new Error('Invalid catalog selection');
+  return raw as unknown as QuerySelection;
+}
+export function mergeQuerySelections(defaults: unknown, explicit?: unknown) {
+  const merged = new Map<string, Record<string, unknown>>();
+  for (const selection of [querySelection(defaults), querySelection(explicit)]) {
+    for (const override of selection.query_overrides) {
+      merged.set(override.path, {
+        ...merged.get(override.path),
+        ...override.values,
+      });
+    }
+  }
+  return merged.size
+    ? { query_overrides: [...merged].map(([path, values]) => ({ path, values })) }
+    : undefined;
+}
 const DEFAULT_IMPORT_LIMITS: ImportLimits = {
   minRequestIntervalMs: 0,
   maxRequests: 10000,
@@ -144,6 +183,11 @@ export class BrowserIntegrations {
     if (!/^[a-z0-9-]{1,80}$/.test(platform))
       throw new Error('Invalid platform');
     return this.get(`/catalog/${platform}.yaml`);
+  }
+  private async selection(platform: string) {
+    if (!/^[a-z0-9-]{1,80}$/.test(platform))
+      throw new Error('Invalid platform');
+    return JSON.parse(await this.get(`/catalog/${platform}.selection.json`));
   }
   async describe(platform: string) {
     return JSON.parse(
@@ -319,7 +363,10 @@ export class BrowserIntegrations {
     return navigator.locks.request(key + id, async () => {
       const c = this.connection(id, drive, actor);
       if (!c.ready || !c.code) throw new Error('Reconnect your account');
-      const text = await this.document(c.platform);
+      const [text, defaults] = await Promise.all([
+        this.document(c.platform),
+        this.selection(c.platform),
+      ]);
       const engine = await this.engine();
       const description = JSON.parse(await engine.describeIntegration(text));
       const { upstream } = description;
@@ -397,7 +444,7 @@ export class BrowserIntegrations {
         text,
         c.platform,
         JSON.stringify(constants),
-        range ? JSON.stringify(range) : undefined,
+        JSON.stringify(mergeQuerySelections(defaults, range)),
         transport,
       );
       signal.throwIfAborted();
