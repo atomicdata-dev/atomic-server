@@ -7891,3 +7891,23 @@ msgstr "This status describes data synchronization. View this drive’s subscrip
 #: src/routes/SyncRoute.tsx
 msgid "Manage this drive’s plan →"
 msgstr "Manage this drive’s plan →"
+
+#: src/helpers/managed/recovery.ts
+msgid "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
+msgstr "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not update your passkey."
+msgstr "Could not update your passkey."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Create a compatible account passkey"
+msgstr "Create a compatible account passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use one passkey for sign-in and recovery"
+msgstr "Use one passkey for sign-in and recovery"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
+msgstr "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."

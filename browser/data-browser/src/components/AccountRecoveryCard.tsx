@@ -19,6 +19,8 @@ import {
 import {
   addRecoveryCodeWrapper,
   addPasskeyWrapper,
+  unifyAccountPasskey,
+  AccountPasskeyUnsupportedError,
   buildEnvelopeV2,
   buildEnvelopeWithPasskeyAndCode,
   envelopeWrapperKinds,
@@ -70,6 +72,7 @@ export function AccountRecoveryCard({
   const [codeInput, setCodeInput] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
   const [passkeyAdded, setPasskeyAdded] = useState(false);
+  const [needsCompatiblePasskey, setNeedsCompatiblePasskey] = useState(false);
   /**
    * The secret being enrolled, typed by the user.
    *
@@ -399,6 +402,40 @@ export function AccountRecoveryCard({
     }
   }
 
+  async function handleUnifyPasskey() {
+    if (!agentSubject || backup.phase !== 'ready') return;
+
+    if (!envelopeWrapperKinds(backup.secret).hasPasskey && !codeInput.trim()) {
+      setNeedsCode(true);
+
+      return;
+    }
+
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const saved = await unifyAccountPasskey(
+        agentSubject,
+        codeInput.trim() || undefined,
+        needsCompatiblePasskey,
+      );
+      setBackup({ phase: 'ready', secret: saved, onServer: true });
+      setCodeInput('');
+      setNeedsCode(false);
+      setNeedsCompatiblePasskey(false);
+      setPasskeyAdded(true);
+    } catch (e) {
+      if (e instanceof AccountPasskeyUnsupportedError)
+        setNeedsCompatiblePasskey(true);
+      setError(
+        e instanceof Error ? e.message : 'Could not update your passkey.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleAddPasskey() {
     if (!needsCode || !codeInput.trim()) {
       setNeedsCode(true);
@@ -532,6 +569,25 @@ export function AccountRecoveryCard({
         </Column>
       ) : null}
 
+      {hasSession &&
+      backup.secret.format_version === 2 &&
+      !backup.secret.wrappers.some(w => w.kdf_params.account_passkey) ? (
+        <Column gap='0.5rem'>
+          <Button
+            disabled={loading || !agentSubject}
+            onClick={handleUnifyPasskey}
+            data-test='unify-passkey'
+          >
+            {needsCompatiblePasskey
+              ? 'Create a compatible account passkey'
+              : 'Use one passkey for sign-in and recovery'}
+          </Button>
+          <Hint>
+            Unlock your backup, then choose your account passkey. Your existing
+            recovery methods keep working.
+          </Hint>
+        </Column>
+      ) : null}
       {needsCode ? (
         <InputWrapper hasPrefix>
           <FaKey />
