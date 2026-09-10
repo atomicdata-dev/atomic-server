@@ -1,3 +1,4 @@
+import { accountPasskey } from './accountPasskey';
 import { getManagedAccount } from './session';
 import { isRunningInTauri } from '../tauri';
 import { wasmBinaryUrl, wasmJsUrl } from '../wasmUrls';
@@ -406,6 +407,14 @@ export class PrfUnsupportedError extends Error {
   }
 }
 
+export class AccountPasskeyUnsupportedError extends PrfUnsupportedError {
+  constructor() {
+    super(
+      'This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both.',
+    );
+  }
+}
+
 /**
  * Whether to offer the passkey path at all. `getClientCapabilities` answers
  * directly where it exists; otherwise the presence of a platform
@@ -470,6 +479,7 @@ function importPrfKey(
 async function evaluatePrf(
   credentialId: Uint8Array,
   salt: Uint8Array,
+  rpId = passkeyRpId(),
 ): Promise<ArrayBuffer> {
   const assertion = (await navigator.credentials.get({
     publicKey: {
@@ -477,7 +487,7 @@ async function evaluatePrf(
       // Must name the same RP the credential was created under, for the same
       // reason `create` does — see {@link passkeyRpId}. An assertion whose
       // rpId does not match the one in the credential is simply not found.
-      rpId: passkeyRpId(),
+      rpId,
       allowCredentials: [{ type: 'public-key', id: credentialId }],
       userVerification: 'required',
       // Without this the browser's own (multi-minute) default applies, and a
@@ -558,41 +568,52 @@ function readPasskeyDurability(
  */
 async function wrapDekWithPasskey(
   dek: Uint8Array<ArrayBuffer>,
-  { userName, userDisplayName }: { userName: string; userDisplayName: string },
+  {
+    userName,
+    userDisplayName,
+    createNew = false,
+  }: { userName: string; userDisplayName: string; createNew?: boolean },
 ): Promise<{ wrapper: RecoveryWrapperInput; durability: PasskeyDurability }> {
   // Generated up front so the same salt can be evaluated at creation time.
   const prfSalt = randomBytes(SALT_BYTES);
 
-  const credential = (await navigator.credentials.create({
-    publicKey: {
-      challenge: randomBytes(32),
-      rp: { name: PRODUCT_NAME, id: passkeyRpId() },
-      user: {
-        // Opaque by design — we never do discoverable-credential login, so
-        // this identifies nothing and leaks nothing.
-        id: randomBytes(32),
-        name: userName,
-        displayName: userDisplayName,
+  const account = await accountPasskey(prfSalt, createNew);
+  const credential =
+    account?.credential ??
+    ((await navigator.credentials.create({
+      publicKey: {
+        challenge: randomBytes(32),
+        rp: { name: PRODUCT_NAME, id: passkeyRpId() },
+        user: {
+          // Opaque by design — we never do discoverable-credential login, so
+          // this identifies nothing and leaks nothing.
+          id: randomBytes(32),
+          name: userName,
+          displayName: userDisplayName,
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 },
+        ],
+        authenticatorSelection: {
+          residentKey: 'preferred',
+          // PRF requires user verification.
+          userVerification: 'required',
+        },
+        timeout: WEBAUTHN_TIMEOUT_MS,
+        extensions: { prf: { eval: { first: prfSalt } } },
       },
-      pubKeyCredParams: [
-        { type: 'public-key', alg: -7 },
-        { type: 'public-key', alg: -257 },
-      ],
-      authenticatorSelection: {
-        residentKey: 'preferred',
-        // PRF requires user verification.
-        userVerification: 'required',
-      },
-      timeout: WEBAUTHN_TIMEOUT_MS,
-      extensions: { prf: { eval: { first: prfSalt } } },
-    },
-  } as CredentialCreationOptions)) as PublicKeyCredential | null;
+    } as CredentialCreationOptions)) as PublicKeyCredential | null);
 
   if (!credential) {
     throw new PrfUnsupportedError('Passkey creation was cancelled.');
   }
 
   const created = credential.getClientExtensionResults() as PrfExtensionOutputs;
+
+  if (account?.existing && !created.prf?.results?.first) {
+    throw new AccountPasskeyUnsupportedError();
+  }
 
   if (created.prf?.enabled === false) {
     throw new PrfUnsupportedError();
@@ -603,7 +624,8 @@ async function wrapDekWithPasskey(
   // Present on browsers that evaluate PRF at creation; otherwise fall back to
   // a second prompt. Either way the salt (and so the KEK) is identical.
   const prfOutput =
-    created.prf?.results?.first ?? (await evaluatePrf(credentialId, prfSalt));
+    created.prf?.results?.first ??
+    (await evaluatePrf(credentialId, prfSalt, account?.rpId));
   const wrapKey = await importPrfKey(prfOutput, ['encrypt']);
   const wrappedDek = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: wrapNonce },
@@ -620,7 +642,7 @@ async function wrapDekWithPasskey(
     wrapper: {
       wrapper_type: 'webauthn-prf',
       kdf_algorithm: '',
-      kdf_params: {},
+      kdf_params: account ? { rp_id: account.rpId, account_passkey: true } : {},
       salt: bytesToBase64(prfSalt),
       wrapped_dek: bytesToBase64(new Uint8Array(wrappedDek)),
       wrap_nonce: bytesToBase64(wrapNonce),
@@ -855,16 +877,54 @@ async function openWithDekKey(
 
 /** Let the authenticator choose any registered passkey, including one added later. */
 async function unlockPasskeyWrapper(recovery: RecoverySecret) {
-  const wrappers = recovery.wrappers.filter(
+  const allWrappers = recovery.wrappers.filter(
     w => w.wrapper_type === 'webauthn-prf' && w.credential_id,
   );
 
-  if (!wrappers.length) throw new Error('This backup has no passkey.');
+  if (!allWrappers.length) throw new Error('This backup has no passkey.');
+  const groups = new Map<string | undefined, RecoveryWrapper[]>();
 
+  for (const wrapper of [...allWrappers].sort(
+    (a, b) =>
+      Number(Boolean(b.kdf_params.account_passkey)) -
+      Number(Boolean(a.kdf_params.account_passkey)),
+  )) {
+    const rp =
+      typeof wrapper.kdf_params.rp_id === 'string'
+        ? wrapper.kdf_params.rp_id
+        : passkeyRpId();
+    const group = groups.get(rp) ?? [];
+
+    // A migrated credential may have both old and new PRF salts. Offer one
+    // wrapper per credential so evalByCredential and the selected wrapper agree.
+    if (
+      !group.some(existing => existing.credential_id === wrapper.credential_id)
+    ) {
+      groups.set(rp, [...group, wrapper]);
+    }
+  }
+
+  let lastError: unknown;
+
+  for (const [rpId, wrappers] of groups) {
+    try {
+      return await unlockPasskeyGroup(rpId, wrappers);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+async function unlockPasskeyGroup(
+  rpId: string | undefined,
+  wrappers: RecoveryWrapper[],
+) {
   const assertion = (await navigator.credentials.get({
     publicKey: {
       challenge: randomBytes(32),
-      rpId: passkeyRpId(),
+      rpId,
       allowCredentials: wrappers.map(w => ({
         type: 'public-key',
         id: base64ToBytes(w.credential_id!),
@@ -1043,6 +1103,90 @@ export async function addRecoveryCodeWrapper(agentSubject?: string): Promise<{
   });
 
   return { recoveryCode, saved };
+}
+
+/** Add the account credential to an existing backup, preserving every old wrapper. */
+export async function unifyAccountPasskey(
+  agentSubject: string,
+  recoveryCode?: string,
+  createNew = false,
+): Promise<RecoverySecret> {
+  const recovery = await getRecoverySecret();
+
+  if (
+    !recovery ||
+    recovery.agent_subject !== agentSubject ||
+    recovery.format_version !== 2
+  ) {
+    throw new Error(
+      'Sign in to the account holding this backup before updating its passkey.',
+    );
+  }
+
+  let dek: ArrayBuffer;
+
+  if (recoveryCode) {
+    const wrapper = recovery.wrappers.find(
+      w => w.wrapper_type === 'recovery-code',
+    );
+    if (!wrapper) throw new Error('This backup has no recovery code.');
+    const key = await deriveKeyFromRecoveryCode(
+      normalizeRecoveryCodeInput(recoveryCode),
+      base64ToBytes(wrapper.salt),
+      ['decrypt'],
+      wrapper.kdf_params,
+    );
+    dek = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(wrapper.wrap_nonce) },
+      key,
+      base64ToBytes(wrapper.wrapped_dek),
+    );
+  } else {
+    const { wrapper, key } = await unlockPasskeyWrapper(recovery);
+    dek = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(wrapper.wrap_nonce) },
+      key,
+      base64ToBytes(wrapper.wrapped_dek),
+    );
+  }
+
+  const { wrapper } = await wrapDekWithPasskey(new Uint8Array(dek), {
+    userName: recovery.owner_email,
+    userDisplayName: recovery.owner_email,
+    createNew,
+  });
+  if (!wrapper.kdf_params.account_passkey)
+    throw new Error('Sign in to your account before updating its passkey.');
+  // Verify the new wrapper before persisting it. Existing wrappers are never retired here.
+  const output = await evaluatePrf(
+    base64ToBytes(wrapper.credential_id!),
+    base64ToBytes(wrapper.salt),
+    wrapper.kdf_params.rp_id as string,
+  );
+  const key = await importPrfKey(output, ['decrypt']);
+  await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(wrapper.wrap_nonce) },
+    key,
+    base64ToBytes(wrapper.wrapped_dek),
+  );
+  const response = await managedFetch('/recovery-secret/wrappers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agent_subject: recovery.agent_subject,
+      encrypted_secret: recovery.encrypted_secret,
+      nonce: recovery.nonce,
+      wrapper,
+    }),
+  });
+  if (!response.ok)
+    throw new Error(
+      'Could not update your backup. Your existing recovery methods still work.',
+    );
+  const saved = (await response.json()) as RecoverySecret;
+  cacheRecoverySecret(saved);
+
+  return saved;
 }
 
 /** Add a passkey without replacing the recovery code or existing passkeys. */

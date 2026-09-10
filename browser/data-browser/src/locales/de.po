@@ -7857,3 +7857,23 @@ msgstr ""
 #: src/routes/SyncRoute.tsx
 msgid "Manage this drive’s plan →"
 msgstr ""
+
+#: src/helpers/managed/recovery.ts
+msgid "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not update your passkey."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Create a compatible account passkey"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use one passkey for sign-in and recovery"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
+msgstr ""

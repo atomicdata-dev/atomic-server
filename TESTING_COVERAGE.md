@@ -634,3 +634,9 @@ saved pointer, publishes the local drive, and applies a removal after reconnect
 SaaS handler tests cover authenticated additive registration, account isolation,
 service-backed discovery and removal versus stale upload. Catalog entries confer
 no access to resource content. A live cross-app deployment acceptance is separate.
+
+## Unified account passkey
+
+`helpers/managed/accountPasskey.test.ts` checks account-credential reuse, server-challenge registration, PRF-output exclusion from API payloads, cancellation and standalone fallback. `recovery-enrollment.test.ts` covers additive migration, old recovery-code preservation, failed upgrades, unsupported login credentials and duplicate-credential PRF-salt selection. These use simulated authenticators and real WebCrypto/Argon2id.
+
+Paired SaaS `portal/e2e/recovery-passkey.spec.ts` uses Chromium virtual PRF authenticators with the real control plane to verify app enrollment followed by portal login using one credential, reuse of a portal-created credential, and account-settings migration without replacing ciphertext or old wrappers. Physical Safari/iCloud, Android/password-manager and native-shell behavior remain device acceptance checks.
