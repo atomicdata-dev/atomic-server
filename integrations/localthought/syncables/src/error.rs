@@ -75,6 +75,10 @@ pub enum Error {
     )]
     UnboundContextParam(String),
 
+    /// A response Link cannot be evaluated safely by the sync traversal.
+    #[error("invalid OpenAPI Link: {0}")]
+    InvalidLink(String),
+
     /// Two differently-named resources or fields normalized to the same
     /// ontology shortname — the ontology would then mint one term for two
     /// distinct things.

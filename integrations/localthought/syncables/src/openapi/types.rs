@@ -76,6 +76,35 @@ pub struct ResponseObject {
     /// Response payloads, keyed by media type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<IndexMap<String, MediaTypeObject>>,
+    /// Named OpenAPI Links exposed by this response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub links: Option<IndexMap<String, LinkObject>>,
+}
+
+/// A response Link Object. Runtime-expression parameters are kept as JSON
+/// values because OpenAPI permits constants as well as expressions.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct LinkObject {
+    /// Target operation by its document-wide operation ID.
+    #[serde(
+        rename = "operationId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub operation_id: Option<String>,
+    /// Target operation by reference (preserved for round-tripping).
+    #[serde(
+        rename = "operationRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub operation_ref: Option<String>,
+    /// Target-operation parameters and their runtime expressions/constants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<IndexMap<String, Value>>,
+    /// Extension fields, including the proposed `x-for-each` binding.
+    #[serde(flatten)]
+    pub extensions: JsonMap,
 }
 
 /// A documented request body.

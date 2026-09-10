@@ -138,6 +138,21 @@ pub struct ManagedCollection {
     pub list_query: IndexMap<String, String>,
 }
 
+/// A GET operation annotated as an `x-crud` read of one object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagedRead {
+    /// Stable operation identifier, or the path when none is declared.
+    pub name: String,
+    /// CRUD resource key stored for this response.
+    pub resource: String,
+    /// GET path template.
+    pub url: String,
+    /// Payload field carrying a declared identity, conventionally `id`.
+    pub id_field: String,
+    /// Path parameters required to invoke and namespace the read.
+    pub context_params: Vec<String>,
+}
+
 /// How a collection's context variable is filled: enumerate `collection`
 /// and read `field` off each of its records. E.g. `issue_number` is
 /// provided by listing `issues` and reading each record's `number`.
@@ -156,7 +171,46 @@ pub struct ContextProvider {
 pub struct ResourceModel {
     /// Every managed collection, in document order.
     pub collections: Vec<ManagedCollection>,
+    /// Object-returning GET operations annotated with `x-crud.action: read`.
+    pub reads: Vec<ManagedRead>,
     providers: IndexMap<String, ContextProvider>,
+    /// Explicit response navigation between collection GET operations.
+    pub links: Vec<CollectionLink>,
+}
+
+/// One parameter value supplied while following a response Link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LinkValueSource {
+    /// A path parameter on the originating request.
+    RequestPath(String),
+    /// A query parameter on the originating request.
+    RequestQuery(String),
+    /// A JSON Pointer into the entire response body.
+    ResponseBody(String),
+    /// A JSON Pointer relative to one `x-for-each` item.
+    Item(String),
+    /// A literal Link parameter value.
+    Constant(String),
+}
+
+/// A Link from one collection response to another collection GET.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionLink {
+    /// Collection whose GET response declares the Link.
+    pub source_collection: String,
+    /// Operation target resolved to a managed collection or object read.
+    pub target: LinkTarget,
+    /// Target parameter keyed by `(location, name)`.
+    pub parameters: IndexMap<(String, String), LinkValueSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Kind and model key of a resolved Link target.
+pub enum LinkTarget {
+    /// A collection GET operation.
+    Collection(String),
+    /// An object-returning `x-crud` read operation.
+    Read(String),
 }
 
 impl ResourceModel {
@@ -271,6 +325,7 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
                 .flatten()
                 .map(|(key, value)| (key.clone(), stringify(value)))
                 .collect();
+            let context_params = path_variables(&collection.url_template);
 
             collections.push(ManagedCollection {
                 name: name.clone(),
@@ -278,7 +333,7 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
                 collection_url: collection.url_template.clone(),
                 item_url: item_url.to_string(),
                 id_field: id_field.clone(),
-                context_params: path_variables(&collection.url_template),
+                context_params,
                 identity_params: identity_params.clone(),
                 list_query,
             });
@@ -297,10 +352,212 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
         }
     }
 
+    let mut reads = Vec::new();
+    for (url, path) in &document.paths {
+        let Some(operation) = path.get.as_ref() else {
+            continue;
+        };
+        let Some(crud) = crud_operation(operation)? else {
+            continue;
+        };
+        if crud.action != CrudAction::Read {
+            continue;
+        }
+        let id_field = collections
+            .iter()
+            .find(|c| c.resource == crud.resource)
+            .map(|c| c.id_field.clone())
+            .unwrap_or_else(|| "id".to_string());
+        reads.push(ManagedRead {
+            name: operation
+                .operation_id
+                .clone()
+                .unwrap_or_else(|| url.clone()),
+            resource: crud.resource,
+            url: url.clone(),
+            id_field,
+            context_params: path_variables(url),
+        });
+    }
+
+    let mut operation_targets = IndexMap::new();
+    for collection in &collections {
+        if let Some(operation_id) = document
+            .paths
+            .get(&collection.collection_url)
+            .and_then(|path| path.get.as_ref())
+            .and_then(|operation| operation.operation_id.as_ref())
+        {
+            operation_targets.insert(
+                operation_id.clone(),
+                LinkTarget::Collection(collection.name.clone()),
+            );
+        }
+    }
+    for read in &reads {
+        if document
+            .paths
+            .get(&read.url)
+            .and_then(|p| p.get.as_ref())
+            .and_then(|o| o.operation_id.as_ref())
+            .is_some()
+        {
+            operation_targets.insert(read.name.clone(), LinkTarget::Read(read.name.clone()));
+        }
+    }
+
+    let mut links = Vec::new();
+    for source in &collections {
+        let Some(operation) = document
+            .paths
+            .get(&source.collection_url)
+            .and_then(|p| p.get.as_ref())
+        else {
+            continue;
+        };
+        for response in operation.responses.values() {
+            for (link_name, link) in response.links.iter().flatten() {
+                let Some(target_operation) = link.operation_id.as_ref() else {
+                    if link.operation_ref.is_some() {
+                        return Err(Error::InvalidLink(format!(
+                            "{link_name}: operationRef is not supported"
+                        )));
+                    }
+                    continue;
+                };
+                let Some(target) = operation_targets.get(target_operation) else {
+                    continue;
+                };
+                let target_url = match target {
+                    LinkTarget::Collection(name) => {
+                        &collections
+                            .iter()
+                            .find(|c| &c.name == name)
+                            .expect("indexed collection")
+                            .collection_url
+                    }
+                    LinkTarget::Read(name) => {
+                        &reads
+                            .iter()
+                            .find(|r| &r.name == name)
+                            .expect("indexed read")
+                            .url
+                    }
+                };
+                let target_op = document
+                    .paths
+                    .get(target_url)
+                    .and_then(|p| p.get.as_ref())
+                    .expect("collection GET");
+                let mut parameters = IndexMap::new();
+                for (target_param, raw) in link.parameters.iter().flatten() {
+                    let source_value = match raw {
+                        Value::String(value) if value.starts_with("$request.path.") => {
+                            LinkValueSource::RequestPath(value[14..].to_string())
+                        }
+                        Value::String(value) if value.starts_with("$request.query.") => {
+                            LinkValueSource::RequestQuery(value[15..].to_string())
+                        }
+                        Value::String(value) if value.starts_with("$response.body#") => {
+                            LinkValueSource::ResponseBody(value[15..].to_string())
+                        }
+                        Value::String(value) if value.starts_with('$') => {
+                            return Err(Error::InvalidLink(format!(
+                                "{link_name}: unsupported runtime expression {value}"
+                            )))
+                        }
+                        Value::String(value) => LinkValueSource::Constant(value.clone()),
+                        value => LinkValueSource::Constant(stringify(value)),
+                    };
+                    insert_link_parameter(
+                        link_name,
+                        target_param,
+                        source_value,
+                        target_op,
+                        &mut parameters,
+                    )?;
+                }
+                if let Some(for_each) = link.extensions.get("x-for-each") {
+                    let object = for_each.as_object().ok_or_else(|| {
+                        Error::InvalidLink(format!("{link_name}: x-for-each must be an object"))
+                    })?;
+                    object.get("items").and_then(Value::as_str).ok_or_else(|| {
+                        Error::InvalidLink(format!(
+                            "{link_name}: x-for-each.items must be a JSON Pointer string"
+                        ))
+                    })?;
+                    let item_parameters = object
+                        .get("parameters")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| {
+                            Error::InvalidLink(format!(
+                                "{link_name}: x-for-each.parameters must be an object"
+                            ))
+                        })?;
+                    for (target_param, pointer) in item_parameters {
+                        let pointer = pointer.as_str().ok_or_else(|| {
+                            Error::InvalidLink(format!(
+                                "{link_name}: item parameter pointer must be a string"
+                            ))
+                        })?;
+                        insert_link_parameter(
+                            link_name,
+                            target_param,
+                            LinkValueSource::Item(pointer.to_string()),
+                            target_op,
+                            &mut parameters,
+                        )?;
+                    }
+                }
+                links.push(CollectionLink {
+                    source_collection: source.name.clone(),
+                    target: target.clone(),
+                    parameters,
+                });
+            }
+        }
+    }
+
     Ok(ResourceModel {
         collections,
+        reads,
         providers,
+        links,
     })
+}
+
+fn insert_link_parameter(
+    link_name: &str,
+    qualified: &str,
+    source: LinkValueSource,
+    target: &OperationObject,
+    bindings: &mut IndexMap<(String, String), LinkValueSource>,
+) -> Result<()> {
+    let (location, name) = qualified.split_once('.').ok_or_else(|| {
+        Error::InvalidLink(format!(
+            "{link_name}: target parameter {qualified} must be location-qualified"
+        ))
+    })?;
+    let found = target.parameters.iter().flatten().any(|parameter| {
+        parameter.name == name
+            && serde_json::to_value(parameter.location)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .as_deref()
+                == Some(location)
+    });
+    if !found {
+        return Err(Error::InvalidLink(format!(
+            "{link_name}: unknown target parameter {qualified}"
+        )));
+    }
+    let key = (location.to_string(), name.to_string());
+    if bindings.insert(key, source).is_some() {
+        return Err(Error::InvalidLink(format!(
+            "{link_name}: target parameter {qualified} is bound more than once"
+        )));
+    }
+    Ok(())
 }
 
 // --- `x-crud`, the operation-level half of the extension -------------------
