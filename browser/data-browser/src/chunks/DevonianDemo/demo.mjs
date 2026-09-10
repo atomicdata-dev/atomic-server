@@ -289,6 +289,7 @@ export async function resumeDemo(store) {
       (callbackCode && callbackError)
     )
       throw new Error('Invalid connection callback state');
+
     if (callbackError) {
       client(handoff.proxy).cancel(handoff.drive, handoff.actor, handoff.state);
       sessionStorage.removeItem(handoffKey);
@@ -296,6 +297,7 @@ export async function resumeDemo(store) {
         'The connection was not authorized. Start connecting again when you are ready.',
       );
     }
+
     handoff.code = callbackCode;
     sessionStorage.setItem(handoffKey, JSON.stringify(handoff));
   }
