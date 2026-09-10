@@ -227,6 +227,12 @@ pub fn derive_ontology(document: &OpenApiDocument) -> Result<Ontology> {
             // merged into one reused term.
             let shortname = claim_shortname(&mut property_shortnames, field_name)?;
             let path = if let Some(&index) = property_terms.get(&shortname) {
+                // One property is shared across collections. A scalar type is
+                // safe only when every occurrence agrees; otherwise preserve
+                // the original JSON instead of coercing later records.
+                if terms[index].datatype != datatype_url(field_schema) {
+                    terms[index].datatype = None;
+                }
                 terms[index].path.clone()
             } else {
                 let path = format!("{ontology_path}/property/{shortname}");

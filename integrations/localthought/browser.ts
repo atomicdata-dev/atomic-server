@@ -20,6 +20,43 @@ export interface Engine {
     fetch: (url: string) => Promise<string>,
   ): Promise<string>;
 }
+export interface ImportLimits {
+  minRequestIntervalMs: number;
+  maxRequests: number;
+  timeoutMs: number;
+}
+const DEFAULT_IMPORT_LIMITS: ImportLimits = {
+  minRequestIntervalMs: 0,
+  maxRequests: 10000,
+  timeoutMs: 1800000,
+};
+const MAX_IMPORT_LIMITS: ImportLimits = {
+  minRequestIntervalMs: 300000,
+  maxRequests: 10000,
+  timeoutMs: 1800000,
+};
+function importLimits(value: unknown): ImportLimits {
+  if (value === undefined || value === null) return DEFAULT_IMPORT_LIMITS;
+  if (typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Invalid import limits');
+  const raw = value as Record<string, unknown>;
+  const result = { ...DEFAULT_IMPORT_LIMITS };
+  for (const key of Object.keys(result) as (keyof ImportLimits)[]) {
+    if (raw[key] !== undefined) {
+      if (
+        typeof raw[key] !== 'number' ||
+        !Number.isInteger(raw[key]) ||
+        raw[key] < 0 ||
+        raw[key] > MAX_IMPORT_LIMITS[key]
+      )
+        throw new Error(`Invalid import limits ${key}`);
+      result[key] = raw[key];
+    }
+  }
+  if (result.maxRequests < 1 || result.timeoutMs < 1000)
+    throw new Error('Invalid import limits');
+  return result;
+}
 export function proxyOrigin(value = DEFAULT_PROXY): string {
   const u = new URL(value);
   if (
@@ -77,6 +114,9 @@ export class BrowserIntegrations {
     private engine: () => Promise<Engine>,
     readonly origin = DEFAULT_PROXY,
     private http: typeof fetch = (...args) => fetch(...args),
+    private sleep: (milliseconds: number) => Promise<void> = milliseconds =>
+      new Promise(resolve => setTimeout(resolve, milliseconds)),
+    private limits: Partial<ImportLimits> = {},
   ) {
     proxyOrigin(origin);
   }
@@ -271,7 +311,7 @@ export class BrowserIntegrations {
     actor: string,
     id: string,
     constants: Record<string, string>,
-    range?: { start: string; end: string; series?: boolean },
+    range?: unknown,
   ) {
     // Web Locks serialize rotating credentials across tabs as well as UI actions.
     if (!navigator.locks)
@@ -281,10 +321,15 @@ export class BrowserIntegrations {
       if (!c.ready || !c.code) throw new Error('Reconnect your account');
       const text = await this.document(c.platform);
       const engine = await this.engine();
-      const { upstream } = JSON.parse(await engine.describeIntegration(text));
+      const description = JSON.parse(await engine.describeIntegration(text));
+      const { upstream } = description;
+      // Resource budgets belong to this consumer, not the API description.
+      const policy = importLimits(this.limits);
       const base = new URL(upstream);
       let requests = 0;
-      const signal = AbortSignal.timeout(120000);
+      const signal = AbortSignal.timeout(policy.timeoutMs);
+      const deadline = Date.now() + policy.timeoutMs;
+      let lastRequestAt: number | undefined;
       const transport = async (raw: string) => {
         signal.throwIfAborted();
         const target = new URL(raw);
@@ -295,16 +340,48 @@ export class BrowserIntegrations {
           target.hash
         )
           throw new Error('Pagination left the catalog API origin');
-        if (++requests > 200)
-          throw new Error('Import exceeds 200 requests; narrow its scope');
-        const response = await this.send(
-          id,
-          drive,
-          actor,
-          `${target.pathname}${target.search}`,
-          {},
-          signal,
-        );
+        if (lastRequestAt !== undefined) {
+          const wait = policy.minRequestIntervalMs - (Date.now() - lastRequestAt);
+          if (wait > 0) await this.sleep(wait);
+          signal.throwIfAborted();
+        }
+        lastRequestAt = Date.now();
+        let response: Response;
+        let retries = 0;
+        for (;;) {
+          if (++requests > policy.maxRequests)
+            throw new Error(
+              `Import exceeds ${policy.maxRequests} requests; narrow its scope`,
+            );
+          const requestSignal = AbortSignal.any([
+            signal,
+            AbortSignal.timeout(30000),
+          ]);
+          response = await this.send(
+            id,
+            drive,
+            actor,
+            `${target.pathname}${target.search}`,
+            {},
+            requestSignal,
+          );
+          if (response.status !== 429 || retries >= 3) break;
+          const retryAfter = response.headers.get('retry-after');
+          const seconds = retryAfter === null ? NaN : Number(retryAfter);
+          const retryAt = Number.isFinite(seconds)
+            ? Date.now() + Math.max(0, seconds) * 1000
+            : retryAfter
+              ? Date.parse(retryAfter)
+              : NaN;
+          if (!Number.isFinite(retryAt)) break;
+          const delay = Math.max(0, retryAt - Date.now());
+          if (delay > deadline - Date.now())
+            throw new Error('API retry delay exceeds remaining import time');
+          retries++;
+          await this.sleep(delay);
+          signal.throwIfAborted();
+          lastRequestAt = Date.now();
+        }
         const headers = Object.fromEntries(
           [...response.headers].filter(
             ([name]) => name !== 'x-connection-code',
