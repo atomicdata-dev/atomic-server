@@ -3683,6 +3683,9 @@ export class Store {
         let timer: ReturnType<typeof setTimeout> | undefined;
 
         const cb: ResourceCallback<C> = res => {
+          // Notifications also announce intermediate loading state. Readers
+          // need the completed resource (or its error), not an empty shell.
+          if (res.loading && !res.error) return;
           if (timer) clearTimeout(timer);
           this.unsubscribe(subjectRaw, cb);
           resolve(res);

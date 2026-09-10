@@ -4,7 +4,7 @@
  * server-written `config.toml` so tests can authenticate as the root agent.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -95,7 +95,29 @@ function parseConfigToml(text: string): MinimalConfigToml {
 }
 
 export async function startServer(): Promise<ServerHandle> {
-  const binPath = path.join(REPO_ROOT, 'target/debug/atomic-server');
+  // Respect Cargo's configured target directory, just like e2e-server.sh.
+  // CI may provide only a prebuilt binary, without Cargo installed.
+  let targetDir =
+    process.env.CARGO_TARGET_DIR || path.join(REPO_ROOT, 'target');
+
+  try {
+    const metadata = JSON.parse(
+      execFileSync(
+        'cargo',
+        ['metadata', '--no-deps', '--format-version', '1'],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      ),
+    );
+    targetDir = metadata.target_directory;
+  } catch {
+    // Use the supplied target directory or CI's conventional binary location.
+  }
+
+  const binPath = path.resolve(REPO_ROOT, targetDir, 'debug/atomic-server');
 
   if (!existsSync(binPath)) {
     throw new Error(

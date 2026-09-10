@@ -47,6 +47,9 @@ templates, and offline variants stay in the full suite. Policy:
 
 ## Where the suites live
 
+`browser/lib/src/store.test.ts` covers async reads waiting through intermediate
+loading notifications before exposing a resource to callers such as table columns.
+
 | Suite | Command | CI job |
 |---|---|---|
 | `atomic_lib` unit + integration | `cargo nextest run -p atomic_lib --features db-redb,iroh,ws` | `rustTest` |
@@ -519,6 +522,7 @@ stays off with its setup action visible.
 - Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
   present only in local storage, as well as rename/emoji refresh. Manual enable
   and automatic backup share `driveDisplayMetadata`; only name and emoji are sent.
+- FOSS account lookup: `helpers/managed/session.test.ts` verifies that an installation with no managed API does not probe the hosted account endpoint.
 - FOSS logout: `helpers/managed/session.test.ts` verifies that an installation
   with no configured control plane makes no SaaS logout request (the CI smoke
   test exposed a 405 at `/api/logout`).

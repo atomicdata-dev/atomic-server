@@ -8,6 +8,25 @@ describe('Store', () => {
     vi.clearAllMocks();
   });
 
+  it('waits for a loading resource to settle before resolving an async read', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const resource = new Resource('did:ad:loading-property');
+    resource.setStore(store);
+    resource.loading = true;
+    store.resources.set(resource.subject, resource);
+    const resolved = vi.fn();
+    const pending = store.getResource(resource.subject).then(resolved);
+    store.notifyResourceUpdated(resource);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(resolved).not.toHaveBeenCalled();
+    resource.loading = false;
+    store.notifyResourceUpdated(resource);
+    await pending;
+    expect(resolved).toHaveBeenCalledWith(resource);
+  });
+
   it('does not notify mounted readers while another reader takes its first snapshot', async ({
     expect,
   }) => {
@@ -74,7 +93,6 @@ describe('Store', () => {
   }) => {
     const { store } = await testStore();
     const resource = await store.newResource({
-      isA: core.classes.resource,
       propVals: { [core.properties.name]: 'Before' },
     });
     await resource.save();

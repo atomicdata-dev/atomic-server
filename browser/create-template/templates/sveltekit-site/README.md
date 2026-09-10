@@ -49,8 +49,10 @@ You can preview the production build with `<PACKAGE_MANAGER_RUN> preview`.
 
 ## Why `@swc/core` is pinned
 
-`package.json` pins `@swc/core` and `@swc/wasm` to an exact version through
-`pnpm.overrides`. Neither is a direct dependency: both arrive under
+`pnpm-workspace.yaml` pins `@swc/core` and `@swc/wasm` to an exact version.
+The same pins are kept in `package.json` under `pnpm.overrides` for older
+pnpm versions that do not read overrides from the workspace file. Update
+both copies together. Neither is a direct dependency: both arrive under
 `vite-plugin-top-level-await`, which needs them to rewrite top-level `await`
 (this project has some, via the `loro-crdt` wasm bundle).
 

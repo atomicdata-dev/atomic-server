@@ -2,6 +2,12 @@
 	"name": "sveltekit-site",
 	"version": "0.0.1",
 	"private": true,
+	"pnpm": {
+		"overrides": {
+			"@swc/core": "1.15.47",
+			"@swc/wasm": "1.15.47"
+		}
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",

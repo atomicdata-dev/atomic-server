@@ -9,6 +9,14 @@ vi.mock('./api', () => ({
   hasManagedApi: configured,
 }));
 import { getManagedAccount, logoutManagedSession } from './session';
+it('does not probe a hosted account when no managed API is configured', async () => {
+  configured.mockReturnValueOnce(false);
+  fetchMock.mockClear();
+  fetchMock.mockResolvedValue(Response.json({ email: 'test@example.com' }));
+  expect(await getManagedAccount()).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
 it('discards a session response that arrives after logout', async () => {
   const response = Promise.withResolvers<Response>();
   fetchMock.mockImplementation((path: string) =>

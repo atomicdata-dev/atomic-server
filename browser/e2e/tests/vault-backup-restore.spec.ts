@@ -300,7 +300,9 @@ test.describe('Cloud Vault backup and restore', () => {
     // makes "it came back" mean "it came back from the vault".
     await page.evaluate(() => {
       const store = window.store;
-      store.registerLocalOnlyDrive(store.getDrive());
+      const drive = store.getDrive();
+      if (!drive) throw new Error('Onboarding did not select a drive');
+      store.registerLocalOnlyDrive(drive);
       store.getDefaultWebSocket()?.close();
     });
 

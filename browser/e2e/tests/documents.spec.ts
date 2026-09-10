@@ -66,9 +66,11 @@ test.describe('documents', async () => {
     const editor = page.getByLabel('Rich Text Editor');
 
     await editor.fill('/heading');
-    await expect(page.getByText('Heading 1')).toBeVisible();
-    await page.keyboard.press('Enter');
-    await page.keyboard.type(teststring);
+    // Hover can select a different heading under the stationary mouse. Pick
+    // the intended command explicitly, then wait for focus to return.
+    await page.getByRole('button', { name: 'Heading 1', exact: true }).click();
+    await expect(editor).toBeFocused();
+    await page.keyboard.insertText(teststring);
 
     await expect(page.getByRole('heading', { name: teststring })).toBeVisible();
 

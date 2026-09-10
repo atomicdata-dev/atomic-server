@@ -513,6 +513,8 @@ test.describe('tables', async () => {
     // The cursor moved to the inserted row; typing fills its name cell.
     await enterGridEdit(page);
     await typeInActiveGridCell(page, 'rowINSERTED');
+    // Commit the persisted cell before leaving edit mode.
+    await page.keyboard.press('Tab');
     await page.keyboard.press('Escape');
     await waitForSynced(page);
 
