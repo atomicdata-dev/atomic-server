@@ -157,9 +157,9 @@ function reconcileRecord(base2, local, remote) {
   return result;
 }
 
-// integrations/notion/model.ts
+// integrations/table_service/model.ts
 var API_VERSION = "2026-03-11";
-var base = "https://api.notion.com/v1";
+var base = "https://table.example.test/v1";
 var P = {
   name: "https://atomicdata.dev/properties/name",
   parent: "https://atomicdata.dev/properties/parent",
@@ -179,7 +179,7 @@ function uuid(value) {
   if (!/^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(
     value
   ))
-    throw new Error("Expected a Notion data source/page/view UUID");
+    throw new Error("Expected a Table service data source/page/view UUID");
   const s = value.replaceAll("-", "").toLowerCase();
   return `${s.slice(0, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}-${s.slice(16, 20)}-${s.slice(20)}`;
 }
@@ -190,8 +190,8 @@ function request(operation, method, path, body, id = operation) {
     method,
     url: base + path,
     headers: {
-      Authorization: "secret:notion",
-      "Notion-Version": API_VERSION,
+      Authorization: "secret:table_service",
+      "Table service-Version": API_VERSION,
       "Content-Type": "application/json"
     },
     ...body === void 0 ? {} : { body: JSON.stringify(body) }
@@ -200,12 +200,12 @@ function request(operation, method, path, body, id = operation) {
 function parse(receipt) {
   if (receipt.status < 200 || receipt.status >= 300)
     throw new Error(
-      `Notion returned ${receipt.status}; sync paused, no deletion inferred`
+      `Table service returned ${receipt.status}; sync paused, no deletion inferred`
     );
   return JSON.parse(receipt.body);
 }
 function plainText(parts) {
-  if (!Array.isArray(parts)) throw new Error("Invalid Notion text");
+  if (!Array.isArray(parts)) throw new Error("Invalid Table service text");
   let text = "";
   for (const p of parts) {
     if (p.type !== "text" || typeof p.text?.content !== "string" || p.text.link || p.annotations && Object.entries(p.annotations).some(
@@ -299,7 +299,7 @@ function pagePatch(desired, previous, c) {
         i = end;
       }
       if (parts.length > 100)
-        throw new Error("Text exceeds Notion's block-array limit");
+        throw new Error("Text exceeds Table service's block-array limit");
       encoded = parts;
     } else if (f.type === "multi_select")
       encoded = value.map((id) => ({ id }));
@@ -403,13 +403,13 @@ function viewPatch(desired, current, c) {
   return patch;
 }
 
-// integrations/notion/plugin.ts
+// integrations/table_service/plugin.ts
 globalThis.structuredClone ??= ((v) => v === void 0 ? void 0 : JSON.parse(JSON.stringify(v)));
 function run(input) {
   const c = input.config;
   uuid(c.dataSource);
   if (!c.fields.length || new Set(c.fields.map((f) => f.id)).size !== c.fields.length || new Set(c.fields.map((f) => f.property)).size !== c.fields.length)
-    throw new Error("Invalid or duplicate Notion field mappings");
+    throw new Error("Invalid or duplicate Table service field mappings");
   const read = (operation, path, body) => parse(
     input.http(
       request(operation, body === void 0 ? "GET" : "POST", path, body)
@@ -448,12 +448,12 @@ function run(input) {
   };
   const page = (id) => {
     const p = read("page", `/pages/${uuid(id)}`);
-    if (uuid(p.id) !== uuid(id)) throw new Error("Unexpected Notion page");
+    if (uuid(p.id) !== uuid(id)) throw new Error("Unexpected Table service page");
     return p;
   };
   const view = (id) => {
     const v = read("view", `/views/${uuid(id)}`);
-    if (uuid(v.id) !== uuid(id)) throw new Error("Unexpected Notion view");
+    if (uuid(v.id) !== uuid(id)) throw new Error("Unexpected Table service view");
     return v;
   };
   const remote = (change) => change.kind === "page" ? projectPage(page(change.id), c) : change.kind === "view" ? projectView(view(change.id), c) : {
@@ -534,7 +534,7 @@ function run(input) {
       const id = input.read(s)[c.identity];
       if (id) {
         uuid(id);
-        if (byId.has(id)) throw new Error("Duplicate Notion page identity");
+        if (byId.has(id)) throw new Error("Duplicate Table service page identity");
         byId.set(id, s);
       } else add({ kind: "page", subject: s, local: row(s) });
     }
@@ -542,13 +542,13 @@ function run(input) {
     const cursors = /* @__PURE__ */ new Set();
     let cursor2;
     for (let batch = 0; ; batch++) {
-      if (batch >= 100) throw new Error("Notion pilot scan exceeds 100 pages");
+      if (batch >= 100) throw new Error("Table service pilot scan exceeds 100 pages");
       const result = read("query", `/data_sources/${c.dataSource}/query`, {
         page_size: 100,
         ...cursor2 ? { start_cursor: cursor2 } : {}
       });
       if (!Array.isArray(result.results) || typeof result.has_more !== "boolean")
-        throw new Error("Invalid Notion query page");
+        throw new Error("Invalid Table service query page");
       for (const p of result.results) {
         const id = uuid(p.id);
         if (seen.has(id))
@@ -565,7 +565,7 @@ function run(input) {
       }
       if (!result.has_more) break;
       if (typeof result.next_cursor !== "string" || !result.next_cursor || cursors.has(result.next_cursor))
-        throw new Error("Incomplete or looping Notion pagination");
+        throw new Error("Incomplete or looping Table service pagination");
       cursor2 = result.next_cursor;
       cursors.add(cursor2);
     }
@@ -591,7 +591,7 @@ function run(input) {
     };
   }
   if (!input.proposal || input.proposal.dataSource !== c.dataSource || input.proposal.conflicts.length)
-    throw new Error("A conflict-free approved Notion preview is required");
+    throw new Error("A conflict-free approved Table service preview is required");
   let cursor = input.cursor ?? { index: 0, stage: "start", records: [] };
   const effect = (value, next) => ({
     kind: "effect",
@@ -625,7 +625,7 @@ function run(input) {
       if (!equal2(local(change), change.local))
         throw new Error("Atomic data changed after preview");
       if (change.id && !equal2(remote(change), change.remote))
-        throw new Error("Notion data changed after preview");
+        throw new Error("Table service data changed after preview");
       cursor = {
         ...cursor,
         id: change.id,
@@ -668,7 +668,7 @@ function run(input) {
       const actual = { ...change, id: cursor.id };
       if (!equal2(remote(actual), change.desired))
         throw new Error(
-          "Notion has not converged; keep the saved run for reconciliation"
+          "Table service has not converged; keep the saved run for reconciliation"
         );
       const here = local(change, cursor.subject);
       if (!equal2(here, change.local) && !equal2(here, change.desired))
@@ -685,7 +685,7 @@ function run(input) {
           claimImportIdentity(
             input,
             c.table,
-            `notion:${uuid(c.dataSource)}:page:${uuid(cursor.id)}`,
+            `table_service:${uuid(c.dataSource)}:page:${uuid(cursor.id)}`,
             cursor.subject
           )
         );
@@ -708,7 +708,7 @@ function run(input) {
           ).property;
         else remove.push(P.group);
       }
-      if (equal2(here, change.desired) && (change.kind !== "page" || input.read(cursor.subject)[c.identity] === cursor.id && input.read(cursor.subject)[IMPORT_LOCAL_ID] === `notion:${uuid(c.dataSource)}:page:${uuid(cursor.id)}` && input.read(cursor.subject)[P.name] === change.desired[c.fields.find((f) => f.type === "title").id]))
+      if (equal2(here, change.desired) && (change.kind !== "page" || input.read(cursor.subject)[c.identity] === cursor.id && input.read(cursor.subject)[IMPORT_LOCAL_ID] === `table_service:${uuid(c.dataSource)}:page:${uuid(cursor.id)}` && input.read(cursor.subject)[P.name] === change.desired[c.fields.find((f) => f.type === "title").id]))
         cursor = { ...cursor, stage: "verify" };
       else {
         const intents = cursor.subject ? [
@@ -761,9 +761,9 @@ function run(input) {
         ]
       };
       return { kind: "continue", cursor };
-    } else throw new Error("Unknown Notion continuation");
+    } else throw new Error("Unknown Table service continuation");
   }
-  throw new Error("Notion continuation exceeded transition budget");
+  throw new Error("Table service continuation exceeded transition budget");
 }
 export {
   run

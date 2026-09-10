@@ -233,12 +233,12 @@ function importRecords(host, records) {
   return { intents, problems, summary: { created, updated, unchanged } };
 }
 
-// integrations/clockify/model.ts
-var origin = "https://api.clockify.me";
+// integrations/time_service/model.ts
+var origin = "https://time.example.test";
 var api = `${origin}/api/v1`;
 function id(value) {
   if (!/^[a-f\d]{24}$/i.test(value))
-    throw new Error("Invalid Clockify identifier");
+    throw new Error("Invalid Time service identifier");
   return value;
 }
 function request(operation, url, run2 = operation) {
@@ -247,18 +247,18 @@ function request(operation, url, run2 = operation) {
     method: "GET",
     url,
     id: run2,
-    headers: { "X-Api-Key": "secret:clockify" }
+    headers: { "X-Api-Key": "secret:time_service" }
   };
 }
 function parse(receipt) {
   if (receipt.status !== 200)
     throw new Error(
-      `Clockify returned ${receipt.status}. Check access and API limits, then retry.`
+      `Time service returned ${receipt.status}. Check access and API limits, then retry.`
     );
   return JSON.parse(receipt.body);
 }
 
-// integrations/clockify/plugin.ts
+// integrations/time_service/plugin.ts
 var P = {
   name: "https://atomicdata.dev/properties/name",
   parent: "https://atomicdata.dev/properties/parent"
@@ -273,17 +273,17 @@ function discover(ctx) {
     ctx.http(request("workspaces", `${api}/workspaces`))
   );
   if (!account || typeof account.name !== "string")
-    throw new Error("Clockify returned invalid account details");
+    throw new Error("Time service returned invalid account details");
   id(account.id);
   if (!Array.isArray(workspaces) || workspaces.length > 1e3)
-    throw new Error("Clockify returned invalid workspace details");
+    throw new Error("Time service returned invalid workspace details");
   const seen = /* @__PURE__ */ new Set();
   const spaces = workspaces.map((space) => {
     if (!space || typeof space.name !== "string")
-      throw new Error("Clockify returned invalid workspace details");
+      throw new Error("Time service returned invalid workspace details");
     id(space.id);
     if (seen.has(space.id))
-      throw new Error("Clockify returned duplicate workspaces");
+      throw new Error("Time service returned duplicate workspaces");
     seen.add(space.id);
     return { id: space.id, name: space.name };
   });
@@ -330,14 +330,14 @@ function importEntries(ctx, c, at) {
         )
       );
       if (!Array.isArray(rows))
-        throw new Error("Clockify returned an invalid page");
+        throw new Error("Time service returned an invalid page");
       for (const row of rows) {
         if (!row || typeof row !== "object" || typeof row.id !== "string")
-          throw new Error("Clockify returned an invalid record");
+          throw new Error("Time service returned an invalid record");
         id(row.id);
         if (seen.has(row.id))
           throw new Error(
-            "Clockify pagination repeated a record; narrow the range and retry"
+            "Time service pagination repeated a record; narrow the range and retry"
           );
         seen.add(row.id);
         all.push(row);
@@ -397,7 +397,7 @@ function importEntries(ctx, c, at) {
   for (const entry of entries) {
     if (entry.userId !== c.user || entry.workspaceId && entry.workspaceId !== c.workspace)
       throw new Error(
-        "Clockify returned entries for another user or workspace"
+        "Time service returned entries for another user or workspace"
       );
     if (!entry.timeInterval?.end) {
       skipped++;
@@ -405,15 +405,15 @@ function importEntries(ctx, c, at) {
     }
     const start = Date.parse(entry.timeInterval.start), end = Date.parse(entry.timeInterval.end);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start)
-      throw new Error("Clockify returned an invalid completed interval");
+      throw new Error("Time service returned an invalid completed interval");
     if (start < from || start >= until) continue;
     if (entry.type && entry.type !== "REGULAR") {
       skipped++;
       continue;
     }
     if (typeof entry.description !== "string" || typeof entry.billable !== "boolean")
-      throw new Error("Clockify returned invalid entry fields");
-    const identity = `clockify:${c.workspace}:entry:${entry.id}`;
+      throw new Error("Time service returned invalid entry fields");
+    const identity = `time_service:${c.workspace}:entry:${entry.id}`;
     let project;
     if (entry.projectId) {
       id(entry.projectId);
@@ -423,14 +423,14 @@ function importEntries(ctx, c, at) {
           "An entry references an inaccessible project; no partial import was proposed"
         );
       project = supportLink(
-        `clockify:${c.workspace}:project:${entry.projectId}`,
+        `time_service:${c.workspace}:project:${entry.projectId}`,
         c.projectClass,
         remote.name,
         `project-${entry.projectId}`
       );
     }
     const person = supportLink(
-      `clockify:${c.workspace}:person:${c.user}`,
+      `time_service:${c.workspace}:person:${c.user}`,
       c.personClass,
       c.userName,
       "person"
