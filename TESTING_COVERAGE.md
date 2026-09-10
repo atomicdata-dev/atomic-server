@@ -1170,8 +1170,10 @@ installation deletion must use the same selected identity as create/update.
 LocalThought: the browser and fixture tests cover selected-platform consent,
 PKCE redemption, one-time handoff consumption, rotating proxy credentials,
 duplicate-page rejection, typed paginated previews, and Calendar UTC date-range
-validation. The new redirect flow uses a synthetic fixture identity; live
-LocalThought login, consent, redemption and provider writes remain pending.
+validation. The new redirect flow uses a synthetic fixture identity. These
+automated checks do not certify live LocalThought login, consent, redemption or
+provider writes; matching deployment evidence is tracked separately in PR and
+release verification.
 
 Google Calendar one-way projection: `integrations/localthought/calendar.test.ts`
 covers all-day/timed start dates, offset boundaries, exclusive end preservation,
@@ -1183,8 +1185,9 @@ platform consent and PKCE redemption. It covers browser WASM fetching, local
 schema/proposal/apply, Calendar display, provider updates, OPFS reload and
 stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
-Live-provider browser OAuth verification remains pending and separate from this
-fixture test.
+Live-provider browser OAuth and write verification are tracked separately in PR
+and release verification; this fixture intentionally uses no live provider
+account.
 
 ## Google Calendar recurrence
 
