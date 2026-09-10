@@ -2,11 +2,11 @@
 import { type Store } from '@tomic/react';
 
 export const platformName = (id: string) =>
-  ({
-    'github-issues': 'GitHub issues',
-    'google-calendar': 'Google Calendar',
-    pets: 'Pets',
-  })[id] ?? id;
+  id
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(word => `${word[0]?.toUpperCase() ?? ''}${word.slice(1)}`)
+    .join(' ');
 import {
   BrowserIntegrations,
   type Engine,
@@ -46,7 +46,9 @@ export async function proxyRequest<T>(
     connectionCode?: string;
     connection?: string;
     constants?: Record<string, string>;
-    calendarRange?: { start: string; end: string; series?: boolean };
+    selection?: {
+      query_overrides: { path: string; values: Record<string, unknown> }[];
+    };
   },
 ): Promise<T> {
   const actor = store.getAgent()?.subject;
@@ -72,13 +74,13 @@ export async function proxyRequest<T>(
       actor,
       body.connection!,
       body.constants ?? {},
-      body.calendarRange,
+      body.selection,
     );
   throw new Error('Unknown browser integration action');
 }
 export interface SavedConnection {
   connection: string;
-  /** Keep imported tables stable when reauthorizing Calendar write access. */
+  /** Keep imported tables stable when reauthorizing account scopes. */
   installationConnection?: string;
   platform: string;
   drive: string;

@@ -45,7 +45,7 @@ pub use crate::openapi::overlay::{
 };
 pub use crate::openapi::resolve_refs::resolve_refs;
 pub use crate::openapi::types::{
-    OpenApiDocument, OperationObject, ParameterObject, SchemaObject, ServerObject,
+    LinkObject, OpenApiDocument, OperationObject, ParameterObject, SchemaObject, ServerObject,
 };
 
 pub use crate::resources::discover::{discover_resources, ResourceRoute};
@@ -74,8 +74,9 @@ pub use crate::sync::ontology::{
     derive_ontology, ontology_shortname, Ontology, OntologyTerm, TermKind,
 };
 pub use crate::sync::resource_model::{
-    crud_operation, discover_resource_model, AddedField, CollectionMembership, ContextProvider,
-    CrudAction, CrudOperation, CrudResourceObject, IdentityBindingObject, ManagedCollection,
-    ResourceCollectionObject, ResourceIdentityObject, ResourceModel,
+    crud_operation, discover_resource_model, AddedField, CollectionLink, CollectionMembership,
+    ContextProvider, CrudAction, CrudOperation, CrudResourceObject, IdentityBindingObject,
+    LinkTarget, LinkValueSource, ManagedCollection, ManagedRead, ResourceCollectionObject,
+    ResourceIdentityObject, ResourceModel,
 };
 pub use crate::sync::storage::{InMemoryStorage, Record, Storage, StorageError};

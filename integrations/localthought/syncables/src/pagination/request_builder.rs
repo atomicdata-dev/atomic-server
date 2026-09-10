@@ -7,7 +7,7 @@ use super::types::{PaginationQuery, PaginationResponseState, PaginationSchemeObj
 /// another page exists — cannot spin forever. Mirrors
 /// [`crate::client::client::MAX_PAGES`], the equivalent constant for the
 /// crate's existing `ApiClient` surface.
-pub const MAX_PAGES: usize = 50;
+pub const MAX_PAGES: usize = 10_000;
 
 /// Where the client is in a paginated traversal, independent of scheme type.
 #[derive(Debug, Clone, Default, PartialEq)]

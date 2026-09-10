@@ -468,15 +468,28 @@ export class AtomicServer {
       depsContainer
         .withWorkdir('/app')
         .withExec(['pnpm', 'run', 'test'])
+        // jsBuild mounts external integration tests at /integrations and
+        // exposes the installed browser workspace at /browser.
+        .withWorkdir('/')
+        .withExec([
+          '/app/node_modules/.bin/vitest',
+          'run',
+          '--config',
+          '/integrations/localthought/vitest.config.ts',
+        ])
+        .withExec([
+          '/app/node_modules/.bin/vitest',
+          'run',
+          '--config',
+          '/integrations/external-platform-tests.vitest.config.ts',
+        ])
+        .withWorkdir('/app')
         .withExec([
           'node',
           '--test',
           'data-browser/scripts/integration-mcp.test.mjs',
         ])
-        // Provider packages stay outside core/browser bundles, but their fixture
-        // tests run in the same JS gate. Mirror the repo layout for SDK imports.
-        .withDirectory('/integrations', this.source.directory('integrations'))
-        .withExec(['ln', '-s', '/app', '/browser'])
+        // Provider certification shares the integration and browser mounts.
         .withWorkdir('/')
         .withExec(['node', '--test', '/integrations/tooling/certify.test.mjs'])
         .withExec([

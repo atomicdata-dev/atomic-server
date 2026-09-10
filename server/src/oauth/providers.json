@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "providers": [{
+    "id": "notion",
+    "label": "Notion",
+    "callback_event": "atomic-notion-oauth",
+    "api_origin": "https://api.notion.com",
+    "authorization_url": "https://api.notion.com/v1/oauth/authorize",
+    "token_url": "https://api.notion.com/v1/oauth/token",
+    "authorization_params": { "owner": "user" },
+    "api_headers": { "Notion-Version": "2026-03-11" },
+    "token_auth": "basic",
+    "token_encoding": "json",
+    "authorization_scheme": "Bearer",
+    "access_token_pointer": "/access_token",
+    "refresh_token_pointer": "/refresh_token",
+    "account": {
+      "id_pointer": "/workspace_id",
+      "name_pointer": "/workspace_name",
+      "default_name": "Notion workspace"
+    },
+    "discovery": {
+      "path": "/v1/search",
+      "method": "POST",
+      "body": {
+        "filter": { "value": "data_source", "property": "object" },
+        "page_size": 50,
+        "query": ""
+      },
+      "results_pointer": "/results",
+      "cursor_pointer": "/next_cursor",
+      "include_pointer": "/object",
+      "include_value": "data_source",
+      "id_pointer": "/id",
+      "title_pointer": "/title",
+      "text_pointers": ["/plain_text", "/text/content"],
+      "icon_pointer": "/icon/emoji",
+      "default_icon": "📓",
+      "query_pointer": "/query",
+      "cursor_request_pointer": "/start_cursor"
+    }
+  }]
+}

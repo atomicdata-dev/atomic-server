@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useStore } from '@tomic/react';
 import { Card } from '@components/Card';
 import { Column } from '@components/Row';
@@ -6,16 +6,13 @@ import { Button } from '@components/Button';
 import { Dialog, useDialog } from '@components/Dialog';
 import { ErrMessage } from '@components/forms/InputStyles';
 import { ConnectLocalThought } from './ConnectLocalThought';
+import { integrationRegistry } from '@localthought/atomic-integrations';
 import {
   browserIntegrations,
   connectionKey,
   platformName,
   proxyRequest,
 } from './localThought';
-
-const DirectGitHub = lazy(() =>
-  import('./ConnectGitHub').then(m => ({ default: m.ConnectGitHub })),
-);
 
 export function LocalThoughtCatalog({
   drive,
@@ -101,7 +98,7 @@ export function LocalThoughtCatalog({
     void finish().catch(reason => setError(String(reason)));
   }, [drive, store]);
   const visible = platforms?.filter(id =>
-    `${id} ${platformName(id)} ${id === 'github-issues' ? 'kanban tasks' : ''}`
+    `${id} ${platformName(id)}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -133,6 +130,13 @@ function PlatformCard({
 }) {
   const [dialog, show, , isOpen] = useDialog();
   const [direct, setDirect] = useState(false);
+  const directEntry = integrationRegistry.find(
+    entry =>
+      entry.id === platform &&
+      'catalogDirect' in entry &&
+      entry.catalogDirect,
+  );
+  const DirectSetup = directEntry?.Component;
   useEffect(() => {
     if (returned) show();
   }, [returned, show]);
@@ -156,14 +160,14 @@ function PlatformCard({
         <Dialog.Content>
           {isOpen && drive && (
             <Suspense fallback={<p>Loading setup…</p>}>
-              {direct ? (
-                <DirectGitHub drive={drive} />
+              {direct && DirectSetup ? (
+                <DirectSetup drive={drive} />
               ) : (
                 <ConnectLocalThought drive={drive} platform={platform} />
               )}
-              {platform === 'github-issues' && !direct && (
+              {DirectSetup && !direct && (
                 <Button subtle onClick={() => setDirect(true)}>
-                  Use a direct GitHub token instead
+                  Use direct credentials instead
                 </Button>
               )}
             </Suspense>

@@ -15,6 +15,7 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use crate::error::{Error, Result};
 use crate::openapi::types::OpenApiDocument;
 
+use super::resource_model::LinkTarget;
 use super::resource_model::{path_variables, ResourceModel};
 
 /// Characters percent-encoded when a value is substituted into a URL path
@@ -85,7 +86,13 @@ pub fn validate_constants(
 
     for collection in &model.collections {
         for param in &collection.context_params {
-            if !is_resolvable(model, constants, param) {
+            let link_bound = model.links.iter().any(|link| {
+                link.target == LinkTarget::Collection(collection.name.clone())
+                    && link
+                        .parameters
+                        .contains_key(&("path".to_string(), param.clone()))
+            });
+            if !link_bound && !is_resolvable(model, constants, param) {
                 return Err(Error::UnboundContextParam(param.clone()));
             }
         }

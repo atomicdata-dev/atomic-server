@@ -14,13 +14,11 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
-const SOURCE: &str = include_str!("../../../integrations/notion/plugin.js");
+// Vendored from localthought/devonian's atomic-integrations package.
+const SOURCE: &str = include_str!("fixtures/table-sync/plugin.js");
 fn declared_manifest() -> super::manifest::Manifest {
     super::manifest::Manifest::parse(
-        serde_json::from_str(include_str!(
-            "../../../integrations/notion/manifest.fixture.json"
-        ))
-        .unwrap(),
+        serde_json::from_str(include_str!("fixtures/table-sync/manifest.fixture.json")).unwrap(),
     )
     .unwrap()
     .unwrap()
@@ -278,7 +276,7 @@ async fn notion_bundle_syncs_both_directions_and_renames_without_rebinding() {
         let mut row = db.get_resource(&subject.as_str().into()).await.unwrap();
         assert_eq!(
             row.get(urls::LOCAL_ID).unwrap().to_string(),
-            format!("notion:{DS}:page:{PAGE}")
+            format!("table_service:{DS}:page:{PAGE}")
         );
 
         if phase == 0 {

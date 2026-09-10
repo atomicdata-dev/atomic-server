@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { calendarProjection, calendarFields as fields } from './calendar';
+import {
+  calendarProjection,
+  calendarFields as fields,
+} from 'devonian/platform-lenses/google-calendar';
 import { Datatype } from '../../browser/lib/src/index';
 import { run } from './plugin';
 import { platformSchema, type FetchedPlatform } from './schema';

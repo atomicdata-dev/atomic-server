@@ -1196,14 +1196,16 @@ account.
   COUNT/UNTIL, DST gaps and offset changes, exclusions/additions, moved/cancelled
   instances, cross-calendar identities, provider-expanded deduplication and
   date-only recurring spans. No real provider calls.
-- `integrations/localthought/calendarRecurrence.test.ts`: complete recurrence
+- The version-pinned Google Calendar Devonian package tests complete recurrence
   metadata projection, normalized fields, minimal cancellation records and
-  refusal when instance identity is missing.
+  refusal when instance identity is missing. The catalog's schema overlay
+  declares `recurrence` and `originalStartTime` on the provider response.
 - `browser/data-browser/src/chunks/TablePage/Calendar/calendarOccurrences.test.ts`:
   imported/native property names, civil-day placement across offset boundaries,
   recurring all-day spans clipped to the visible grid.
-- `wasm/src/calendar_import.rs` unit tests: full-series queries omit date bounds,
-  both modes request tombstones, and catalogs retain recurrence/exception fields.
+- `wasm/src/calendar_import.rs` unit tests: generic catalog selections set
+  documented query parameters, reject unknown paths and parameters, and remove
+  inherited `timeMin`, `timeMax`, and `orderBy` values for series requests.
 - `browser/e2e/tests/google-calendar-import.spec.mts`: real browser/OPFS/import
   preview using a mock provider, covering bounded instances and retained series,
   moved/cancelled slots, reimport, reload and preservation of local notes.
@@ -1234,3 +1236,36 @@ tests reject malformed/mixed/nonpositive all-day intervals and verify raw
 provider Start/End retention. The existing Google import E2E now imports a
 three-day all-day event, asserts all three occupied cells and the excluded end,
 and verifies repeated chips survive reload without duplicate resources.
+
+## Metadata-driven platform extraction (2026-09-10)
+
+`integrations/localthought/syncables/tests/query_bindings.rs` exercises Link
+traversal with repeated identifiers in distinct parent contexts, query-only
+bindings, missing source fields, duplicate incoming Links, root input discovery,
+unqualified target parameters, and pagination beyond 50 pages.
+`read_absence.rs` distinguishes declared missing-object responses from permission,
+server, and undeclared errors. `ontology_shared_types.rs` preserves heterogeneous
+shared fields as JSON.
+
+`moneybird_fixture.rs` is explicitly ignored by the ordinary suite: it requires
+external OAD and overlay directories. Run with `MONEYBIRD_OAD_DIR` and
+`MONEYBIRD_OVERLAYS_DIR` plus `--ignored`. It covers 32 collections, two object
+reads, the administration input, and all six consumer query selections against
+the actual composed metadata. This is synthetic traversal, not live account
+coverage.
+
+`integrations/localthought/browser.test.ts` covers consumer-owned request budgets,
+Retry-After handling with rotating credentials, deadline rejection, and separate
+catalog selections with explicit caller precedence. OAuth provider tests cover
+trusted external descriptors, origin/URL validation, and descriptor drift; the
+real HTTP handoff test requires permission to bind a local socket.
+
+The Local Thought Vitest suite imports Calendar code from the pinned Devonian
+package. `integrations/external-platform-tests.vitest.config.ts` separately runs
+relocated Clockify, Notion, and GitHub regressions against the installed package
+with Atomic host aliases. Both suites are included in the Dagger integration
+check; Devonian's own core tests do not replace these host integration tests.
+
+Known limitations: Link `operationRef` is explicitly rejected; the implemented
+traversal uses `operationId`. The browser preview rejects more than 5,000 records
+with an explicit incomplete-import error rather than silently truncating.

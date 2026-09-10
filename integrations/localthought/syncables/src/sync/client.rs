@@ -38,7 +38,7 @@ use crate::openapi::overlay::load_open_api_document_with_overlays;
 use crate::openapi::types::{OpenApiDocument, SchemaObject};
 use crate::pagination::autodetect::resolve_effective_scheme;
 use crate::pagination::items::locate_items_field;
-use crate::pagination::request_builder::{build_query, next_step, PageCursor, PageStep};
+use crate::pagination::request_builder::{build_query, next_step, PageCursor, PageStep, MAX_PAGES};
 use crate::pagination::response_parser::parse_pagination_state;
 use crate::pagination::types::PaginationSchemeObject;
 
@@ -46,7 +46,8 @@ use super::constants::{bind_url, validate_constants};
 use super::credentials::{base_url, Credentials};
 use super::ontology::derive_ontology;
 use super::resource_model::{
-    discover_resource_model, ContextProvider, ManagedCollection, ResourceModel,
+    discover_resource_model, CollectionLink, ContextProvider, LinkTarget, LinkValueSource,
+    ManagedCollection, ManagedRead, ResourceModel,
 };
 use super::storage::{Record, Storage, StorageError};
 
@@ -211,7 +212,7 @@ impl SyncClient {
         storage: &dyn Storage,
         report: &mut SyncReport,
     ) {
-        let mut records_by_collection: BTreeMap<String, Vec<Map<String, Value>>> = BTreeMap::new();
+        let mut records_by_collection: BTreeMap<String, Vec<OriginRecord>> = BTreeMap::new();
         let mut pending: Vec<&ManagedCollection> = model.collections.iter().collect();
 
         loop {
@@ -219,6 +220,11 @@ impl SyncClient {
             let mut progressed = false;
 
             for collection in pending {
+                let incoming: Vec<&CollectionLink> = model
+                    .links
+                    .iter()
+                    .filter(|link| link.target == LinkTarget::Collection(collection.name.clone()))
+                    .collect();
                 let provider_params: Vec<(&str, &ContextProvider)> = collection
                     .context_params
                     .iter()
@@ -230,9 +236,15 @@ impl SyncClient {
                     })
                     .collect();
 
-                let ready = provider_params
-                    .iter()
-                    .all(|(_, provider)| records_by_collection.contains_key(&provider.collection));
+                let ready = if incoming.is_empty() {
+                    provider_params.iter().all(|(_, provider)| {
+                        records_by_collection.contains_key(&provider.collection)
+                    })
+                } else {
+                    incoming
+                        .iter()
+                        .all(|link| records_by_collection.contains_key(&link.source_collection))
+                };
                 if !ready {
                     still_pending.push(collection);
                     continue;
@@ -240,24 +252,36 @@ impl SyncClient {
                 progressed = true;
 
                 let mut collection_records = Vec::new();
-                for values in binding_combinations(
-                    &self.config.constants,
-                    &provider_params,
-                    &records_by_collection,
-                ) {
+                let invocations = if incoming.is_empty() {
+                    binding_combinations(
+                        &self.config.constants,
+                        &provider_params,
+                        &records_by_collection,
+                    )
+                } else {
+                    deduplicate_invocations(
+                        incoming
+                            .iter()
+                            .flat_map(|link| link_invocations(link, &records_by_collection)),
+                    )
+                };
+                for invocation in invocations {
                     match self
-                        .walk_collection(document, base, collection, &values)
+                        .walk_collection(document, base, collection, &invocation)
                         .await
                     {
                         Ok(records) => {
                             let namespace = collection
                                 .context_params
                                 .iter()
-                                .map(|param| values.get(param).cloned().unwrap_or_default())
+                                .map(|param| {
+                                    invocation.path.get(param).cloned().unwrap_or_default()
+                                })
                                 .collect::<Vec<_>>()
                                 .join("/");
                             for record in &records {
                                 let id = record
+                                    .value
                                     .get(&collection.id_field)
                                     .map(json_to_string)
                                     .unwrap_or_default();
@@ -265,7 +289,7 @@ impl SyncClient {
                                     namespace: namespace.clone(),
                                     resource: collection.resource.clone(),
                                     id,
-                                    value: record.clone(),
+                                    value: record.value.clone(),
                                 };
                                 if let Err(error) = storage.put(&stored).await {
                                     report.errors.push(format!("{}: {error}", collection.name));
@@ -301,6 +325,118 @@ impl SyncClient {
             }
             pending = still_pending;
         }
+
+        for read in &model.reads {
+            let incoming: Vec<&CollectionLink> = model
+                .links
+                .iter()
+                .filter(|link| link.target == LinkTarget::Read(read.name.clone()))
+                .collect();
+            let invocations = if incoming.is_empty() {
+                if read
+                    .context_params
+                    .iter()
+                    .all(|param| self.config.constants.contains_key(param))
+                {
+                    vec![Invocation {
+                        path: self.config.constants.clone(),
+                        query: IndexMap::new(),
+                    }]
+                } else {
+                    Vec::new()
+                }
+            } else {
+                deduplicate_invocations(
+                    incoming
+                        .iter()
+                        .flat_map(|link| link_invocations(link, &records_by_collection)),
+                )
+            };
+            for invocation in invocations {
+                match self.walk_read(document, base, read, &invocation).await {
+                    Ok(None) => continue,
+                    Ok(Some(value)) => {
+                        let bound_path = match bind_url(&read.url, &invocation.path) {
+                            Ok(path) => path,
+                            Err(error) => {
+                                report.errors.push(format!("{}: {error}", read.name));
+                                continue;
+                            }
+                        };
+                        let id = value
+                            .get(&read.id_field)
+                            .map(json_to_string)
+                            .unwrap_or_else(|| bound_path.clone());
+                        let namespace = read
+                            .context_params
+                            .iter()
+                            .map(|param| invocation.path.get(param).cloned().unwrap_or_default())
+                            .collect::<Vec<_>>()
+                            .join("/");
+                        let stored = Record {
+                            namespace,
+                            resource: read.resource.clone(),
+                            id,
+                            value,
+                        };
+                        if let Err(error) = storage.put(&stored).await {
+                            report.errors.push(format!("{}: {error}", read.name));
+                        } else {
+                            *report.read.entry(read.resource.clone()).or_insert(0) += 1;
+                        }
+                    }
+                    Err(message) => report.errors.push(format!("{}: {message}", read.name)),
+                }
+            }
+        }
+    }
+
+    async fn walk_read(
+        &self,
+        document: &OpenApiDocument,
+        base: &str,
+        read: &ManagedRead,
+        invocation: &Invocation,
+    ) -> std::result::Result<Option<Map<String, Value>>, String> {
+        let operation = document
+            .paths
+            .get(&read.url)
+            .and_then(|p| p.get.as_ref())
+            .ok_or_else(|| format!("{} declares no GET operation", read.url))?;
+        let path = bind_url(&read.url, &invocation.path).map_err(|error| error.to_string())?;
+        let request_url = request_url(base, &path, &invocation.query);
+        let mut headers = IndexMap::new();
+        if let Some(authorization) = self.config.credentials.authorization_header() {
+            headers.insert("Authorization".to_string(), authorization);
+        }
+        let response = self
+            .fetch
+            .fetch(HttpRequest {
+                method: "GET".to_string(),
+                url: request_url.clone(),
+                headers,
+                body: None,
+            })
+            .await
+            .map_err(|error| error.to_string())?;
+        // An explicitly documented missing-object response is a valid read
+        // outcome. Authorization, server, and undeclared errors remain failures.
+        if response.status == 404 && operation.responses.contains_key("404") {
+            return Ok(None);
+        }
+        if !(200..300).contains(&response.status) {
+            return Err(format!(
+                "GET {} responded {}",
+                redacted_request_url(&request_url),
+                response.status
+            ));
+        }
+        serde_json::from_slice::<Value>(&response.body)
+            .map_err(|e| e.to_string())?
+            .as_object()
+            .cloned()
+            .map(Some)
+            .ok_or_else(|| "read response was not an object".to_string())
     }
 
     /// Fetches every item of one managed collection under `values`,
@@ -310,8 +446,8 @@ impl SyncClient {
         document: &OpenApiDocument,
         base: &str,
         collection: &ManagedCollection,
-        values: &BTreeMap<String, String>,
-    ) -> std::result::Result<Vec<Map<String, Value>>, String> {
+        invocation: &Invocation,
+    ) -> std::result::Result<Vec<OriginRecord>, String> {
         let operation = document
             .paths
             .get(&collection.collection_url)
@@ -326,8 +462,8 @@ impl SyncClient {
             .and_then(|content| content.get("application/json"))
             .and_then(|media| media.schema.as_ref());
 
-        let path =
-            bind_url(&collection.collection_url, values).map_err(|error| error.to_string())?;
+        let path = bind_url(&collection.collection_url, &invocation.path)
+            .map_err(|error| error.to_string())?;
 
         let mut items = Vec::new();
         let mut cursor = PageCursor::default();
@@ -335,10 +471,12 @@ impl SyncClient {
         let mut next_url: Option<String> = None;
 
         loop {
+            let mut originating_query = collection.list_query.clone();
+            originating_query.extend(invocation.query.clone());
             let request_url = if let Some(url) = next_url.take() {
                 url
             } else {
-                let mut query = collection.list_query.clone();
+                let mut query = originating_query.clone();
                 if let Some(effective) = &effective {
                     for (name, value) in build_query(&effective.scheme, &cursor, None) {
                         query.insert(name, value);
@@ -370,15 +508,24 @@ impl SyncClient {
                 ));
             }
 
-            let body: Value =
-                serde_json::from_slice(&response.body).map_err(|error| error.to_string())?;
+            // Links retain the originating response, shared by every item on
+            // this page rather than copying the whole page for each record.
+            let body = Arc::new(
+                serde_json::from_slice::<Value>(&response.body)
+                    .map_err(|error| error.to_string())?,
+            );
             let page_items = response_items(
                 response_schema,
                 effective.as_ref().map(|e| &e.scheme),
                 &body,
             )?;
             let page_count = u64::try_from(page_items.len()).unwrap_or(u64::MAX);
-            items.extend(page_items);
+            items.extend(page_items.into_iter().map(|value| OriginRecord {
+                value,
+                path: invocation.path.clone(),
+                query: originating_query.clone(),
+                response_body: body.clone(),
+            }));
             pages_fetched += 1;
 
             let Some(effective) = &effective else { break };
@@ -389,6 +536,11 @@ impl SyncClient {
                 &response.headers,
                 Some(items_so_far),
             );
+            if state.has_next_page && pages_fetched >= MAX_PAGES {
+                return Err(format!(
+                    "pagination exceeded the maximum of {MAX_PAGES} pages"
+                ));
+            }
             match next_step(
                 &effective.scheme,
                 &cursor,
@@ -416,6 +568,76 @@ fn redacted_request_url(url: &str) -> String {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Invocation {
+    path: BTreeMap<String, String>,
+    query: IndexMap<String, String>,
+}
+
+#[derive(Clone, Debug)]
+struct OriginRecord {
+    value: Map<String, Value>,
+    path: BTreeMap<String, String>,
+    query: IndexMap<String, String>,
+    response_body: Arc<Value>,
+}
+
+fn link_invocations(
+    link: &CollectionLink,
+    records_by_collection: &BTreeMap<String, Vec<OriginRecord>>,
+) -> Vec<Invocation> {
+    let mut result = Vec::new();
+    for invocation in records_by_collection
+        .get(&link.source_collection)
+        .into_iter()
+        .flatten()
+        .filter_map(|record| {
+            let mut invocation = Invocation {
+                path: record.path.clone(),
+                query: IndexMap::new(),
+            };
+            for ((location, name), source) in &link.parameters {
+                let value = match source {
+                    LinkValueSource::RequestPath(source) => record.path.get(source).cloned(),
+                    LinkValueSource::RequestQuery(source) => record.query.get(source).cloned(),
+                    LinkValueSource::ResponseBody(pointer) => {
+                        record.response_body.pointer(pointer).map(json_to_string)
+                    }
+                    LinkValueSource::Item(pointer) => Value::Object(record.value.clone())
+                        .pointer(pointer)
+                        .map(json_to_string),
+                    LinkValueSource::Constant(value) => Some(value.clone()),
+                }?;
+                match location.as_str() {
+                    "path" => {
+                        invocation.path.insert(name.clone(), value);
+                    }
+                    "query" => {
+                        invocation.query.insert(name.clone(), value);
+                    }
+                    _ => return None,
+                }
+            }
+            Some(invocation)
+        })
+    {
+        if !result.contains(&invocation) {
+            result.push(invocation);
+        }
+    }
+    result
+}
+
+fn deduplicate_invocations(invocations: impl IntoIterator<Item = Invocation>) -> Vec<Invocation> {
+    let mut unique = Vec::new();
+    for invocation in invocations {
+        if !unique.contains(&invocation) {
+            unique.push(invocation);
+        }
+    }
+    unique
+}
+
 /// Every combination of constants plus one parent record's value per
 /// `provider_params` entry — the cartesian product across however many
 /// ancestor collections `collection` is nested under. Empty
@@ -425,9 +647,12 @@ fn redacted_request_url(url: &str) -> String {
 fn binding_combinations(
     constants: &BTreeMap<String, String>,
     provider_params: &[(&str, &ContextProvider)],
-    records_by_collection: &BTreeMap<String, Vec<Map<String, Value>>>,
-) -> Vec<BTreeMap<String, String>> {
-    let mut combinations = vec![constants.clone()];
+    records_by_collection: &BTreeMap<String, Vec<OriginRecord>>,
+) -> Vec<Invocation> {
+    let mut combinations = vec![Invocation {
+        path: constants.clone(),
+        query: IndexMap::new(),
+    }];
     for (param, provider) in provider_params {
         let empty = Vec::new();
         let parent_records = records_by_collection
@@ -436,11 +661,14 @@ fn binding_combinations(
         let mut next = Vec::new();
         for combination in &combinations {
             for record in parent_records {
-                let Some(value) = record.get(&provider.field) else {
+                let Some(value) = record.value.get(&provider.field) else {
                     continue;
                 };
                 let mut extended = combination.clone();
-                extended.insert((*param).to_string(), json_to_string(value));
+                extended.path.extend(record.path.clone());
+                extended
+                    .path
+                    .insert((*param).to_string(), json_to_string(value));
                 next.push(extended);
             }
         }
@@ -494,6 +722,7 @@ const QUERY_COMPONENT: &AsciiSet = &CONTROLS
     .add(b'&')
     .add(b'\'')
     .add(b'+')
+    .add(b'/')
     .add(b'<')
     .add(b'>')
     .add(b'=')

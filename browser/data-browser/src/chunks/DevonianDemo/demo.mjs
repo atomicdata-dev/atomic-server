@@ -1,20 +1,20 @@
 // @wc-ignore-file
 import { BrowserIntegrations } from '../../../../../integrations/localthought/browser';
-import { endpoint } from '../../../../../integrations/github-issues/adapter';
+import { endpoint } from 'devonian/platform-lenses/github-issues/adapter';
 import { get, set } from 'idb-keyval';
 import { core, server, dataBrowser, Datatype, enableLoro } from '@tomic/lib';
-import * as devonian from './devonian.js';
+import * as devonian from 'devonian';
 import { ensureAgentForDemo } from '../Demo/guestAgent';
 import { buildTableFromSpec } from '../TablePage/createTableFromSpec';
-import { Bridge } from '../../../../../integrations/github-issues/devonian/bridge.mjs';
+import { Bridge } from 'devonian/platform-lenses/github-issues';
 import {
   AtomicPort,
   GitHubPort,
-} from '../../../../../integrations/github-issues/devonian/ports.mjs';
+} from 'devonian/platform-lenses/github-issues/ports';
 import {
   fixtureTransport,
   proxyTransport,
-} from '../../../../../integrations/github-issues/devonian/proxy.mjs';
+} from 'devonian/platform-lenses/github-issues/proxy';
 
 export async function openDemo(store, options) {
   await enableLoro();

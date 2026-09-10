@@ -7,7 +7,7 @@ import { AtomicLink } from '@components/AtomicLink';
 import { pluginWorkspace } from '@tomic/react';
 import { Tabs } from '@components/Tabs';
 import { IntegrationDefaultView } from './IntegrationDataView';
-import { ClockifyUpgrade } from './ClockifyUpgrade';
+import { pluginUpgradeRegistry } from '@localthought/atomic-integrations';
 import { AutomationIntegrations } from './AutomationIntegrations';
 import {
   AutomationWorkspace,
@@ -169,13 +169,15 @@ export function PluginPage({
                   <FaPlay aria-hidden /> Run
                 </Button>
               )}
-              {source && (
-                <ClockifyUpgrade
-                  source={source}
-                  drive={drive}
-                  plugin={resource.subject}
-                />
-              )}
+              {source &&
+                pluginUpgradeRegistry.map(({ Component: Upgrade }, index) => (
+                  <Upgrade
+                    key={index}
+                    source={source}
+                    drive={drive}
+                    plugin={resource.subject}
+                  />
+                ))}
               {automation && (
                 <AutomationWorkspace
                   key={resource.subject}

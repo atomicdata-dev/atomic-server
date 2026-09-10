@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Datatype } from '../../browser/lib/src/index';
-import { calendarRecurrenceProjection } from './calendarRecurrence';
+import { calendarRecurrenceProjection } from 'devonian/platform-lenses/google-calendar';
 import { calendarRecurrenceShortname as prop } from '../../browser/lib/src/calendar-recurrence';
 import type { FetchedPlatform } from './schema';
 const data = (
