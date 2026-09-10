@@ -4,7 +4,7 @@ import {
   planCalendarEdit,
   previewCalendarEdits,
   eventPath,
-} from './calendar-sync';
+} from 'devonian/platform-lenses/google-calendar';
 import {
   IMPORT_BASELINE,
   IMPORT_LOCAL_ID,

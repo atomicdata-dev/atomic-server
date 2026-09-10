@@ -276,8 +276,8 @@ importers:
         specifier: ^0.8.1
         version: 0.8.1(@codemirror/language@6.12.3)(@codemirror/lint@6.9.7)(@codemirror/state@6.7.4)(@codemirror/view@6.43.0)(@lezer/common@1.5.2)
       devonian:
-        specifier: github:localthought/devonian#92da8231961a36a640cde303f3710ce81717069a
-        version: https://codeload.github.com/localthought/devonian/tar.gz/92da8231961a36a640cde303f3710ce81717069a(@tomic/lib@lib)
+        specifier: github:localthought/devonian#d7e6834702e0222c9c0872ce9d0e8d67ccc9d824
+        version: https://codeload.github.com/localthought/devonian/tar.gz/d7e6834702e0222c9c0872ce9d0e8d67ccc9d824(@tomic/lib@lib)
       diff:
         specifier: ^8.0.4
         version: 8.0.4
@@ -5564,8 +5564,8 @@ packages:
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
 
-  devonian@https://codeload.github.com/localthought/devonian/tar.gz/92da8231961a36a640cde303f3710ce81717069a:
-    resolution: {integrity: sha512-wfIpmx61F4n7hsk1RLkxfRFGpF99pVA2VJB+ReVcN2frbAJYFXxhwVgb6O7Kz5PIyt0dBkZWOuLbBpa9N3U7LQ==, tarball: https://codeload.github.com/localthought/devonian/tar.gz/92da8231961a36a640cde303f3710ce81717069a}
+  devonian@https://codeload.github.com/localthought/devonian/tar.gz/d7e6834702e0222c9c0872ce9d0e8d67ccc9d824:
+    resolution: {integrity: sha512-6mhBcy2VhUXQALJDdP8WXkrc4SdkLr8te/z3Up7aIKNmG9EvyINMXBKUSkUZpdE+0YApbhmpA9ynjvU5O5E7qg==, tarball: https://codeload.github.com/localthought/devonian/tar.gz/d7e6834702e0222c9c0872ce9d0e8d67ccc9d824}
     version: 0.4.1
     engines: {node: '>= 22.11 < 23'}
     peerDependencies:
@@ -15362,7 +15362,7 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  devonian@https://codeload.github.com/localthought/devonian/tar.gz/92da8231961a36a640cde303f3710ce81717069a(@tomic/lib@lib):
+  devonian@https://codeload.github.com/localthought/devonian/tar.gz/d7e6834702e0222c9c0872ce9d0e8d67ccc9d824(@tomic/lib@lib):
     dependencies:
       '@automerge/automerge-repo': 2.5.6
       '@tomic/lib': link:lib
