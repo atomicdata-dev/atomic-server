@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Small stdio host: no listener, provider credentials, approval tool or new worker.
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -8,7 +9,12 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Agent, integrationMcpAdapter } from '@tomic/lib';
+// This CLI runs directly in Node. The ESM build externalizes rrule,
+// whose package does not declare its ESM entry as type=module, so use the
+// package's CommonJS condition for Node's resolver.
+const { Agent, integrationMcpAdapter } = createRequire(import.meta.url)(
+  '@tomic/lib',
+);
 
 export function createIntegrationMcpServer(store, target) {
   const adapter = integrationMcpAdapter(store, target);

@@ -53,16 +53,18 @@ test.describe('plugins', () => {
       setup.getByRole('button', { name: 'Install and connect', exact: true }),
     ).toBeVisible();
     await setup
-      .getByLabel('LocalThought tenant secret')
-      .fill('bW9jay10ZW5hbnQ.mock-signature');
-    await setup
       .getByRole('button', { name: 'Install and connect', exact: true })
       .click();
 
     await expect(
       page.getByRole('heading', { name: 'Mock integration proxy' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Connect test account' }).click();
+    await page
+      .getByRole('button', {
+        name: 'Use LocalThought to sync Pets with your Atomic Data Hub',
+        exact: true,
+      })
+      .click();
     await expect(page).not.toHaveURL(/connection_code=/);
     await page.getByRole('button', { name: 'Fetch and preview' }).click();
 

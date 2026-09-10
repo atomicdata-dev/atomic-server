@@ -43,6 +43,5 @@ export function editFixture(
 export function connectDemo(
   store: Store,
   options: { repository: string; proxy: string },
-  secret: string,
 ): Promise<void>;
 export function resumeDemo(store: Store): Promise<Demo | undefined>;
