@@ -11,10 +11,13 @@ use url::Url;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Catalog {
-    source: String,
-    revision: String,
+    #[serde(rename = "schemaVersion")]
+    schema_version: u32,
     providers: Vec<Record>,
 }
+const SOURCE: &str = "https://github.com/localthought/devonian/tree/4ec37e2bc5c0a99d57150c530346fec9defde891/platform-lenses/atomic-integrations/oauth-providers.json";
+const REVISION: &str = "4ec37e2bc5c0a99d57150c530346fec9defde891";
+const DESCRIPTOR_BLAKE3: &str = "86bffb570c945f6c00a7664aa7c717beb03985b9f2b8e6075397f3770ca40979";
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Record {
@@ -113,10 +116,7 @@ pub(crate) fn load(id: &str) -> Result<Provider> {
     }
     let catalog: Catalog = serde_json::from_str(include_str!("providers.json"))
         .map_err(|_| "Invalid vendored OAuth provider metadata")?;
-    if catalog.source != "https://github.com/localthought/devonian"
-        || catalog.revision.len() != 40
-        || !catalog.revision.bytes().all(|b| b.is_ascii_hexdigit())
-    {
+    if catalog.schema_version != 1 || SOURCE.is_empty() || REVISION.len() != 40 {
         return Err("OAuth provider metadata has invalid provenance".into());
     }
     let r = catalog
@@ -303,6 +303,16 @@ mod tests {
         for id in ["", "notion/../../evil", "https://evil.test", "NOTION"] {
             assert!(load(id).is_err())
         }
+    }
+    #[test]
+    fn vendored_descriptor_matches_pinned_devonian_artifact() {
+        assert_eq!(
+            blake3::hash(include_bytes!("providers.json"))
+                .to_hex()
+                .as_str(),
+            DESCRIPTOR_BLAKE3,
+            "refresh only from {SOURCE} and update the digest"
+        );
     }
     #[test]
     fn endpoints_require_clean_https_urls() {

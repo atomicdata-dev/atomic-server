@@ -1,6 +1,5 @@
 {
-  "source": "https://github.com/localthought/devonian",
-  "revision": "4ec37e2bc5c0a99d57150c530346fec9defde891",
+  "schemaVersion": 1,
   "providers": [{
     "id": "notion",
     "label": "Notion",
@@ -15,11 +14,19 @@
     "authorization_scheme": "Bearer",
     "access_token_pointer": "/access_token",
     "refresh_token_pointer": "/refresh_token",
-    "account": { "id_pointer": "/workspace_id", "name_pointer": "/workspace_name", "default_name": "Notion workspace" },
+    "account": {
+      "id_pointer": "/workspace_id",
+      "name_pointer": "/workspace_name",
+      "default_name": "Notion workspace"
+    },
     "discovery": {
       "path": "/v1/search",
       "method": "POST",
-      "body": { "filter": { "value": "data_source", "property": "object" }, "page_size": 50, "query": "" },
+      "body": {
+        "filter": { "value": "data_source", "property": "object" },
+        "page_size": 50,
+        "query": ""
+      },
       "results_pointer": "/results",
       "cursor_pointer": "/next_cursor",
       "include_pointer": "/object",
