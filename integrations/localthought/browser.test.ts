@@ -68,11 +68,11 @@ it('merges catalog selections with explicit caller values winning', () => {
   expect(
     mergeQuerySelections(
       { query_overrides: [{ path: '/items', values: { active: false, archived: true } }] },
-      { query_overrides: [{ path: '/items', values: { active: true } }, { path: '/other', values: { all: true } }] },
+      { query_overrides: [{ path: '/items', values: { active: true, archived: null, orderBy: null } }, { path: '/other', values: { all: true } }] },
     ),
   ).toEqual({
     query_overrides: [
-      { path: '/items', values: { active: true, archived: true } },
+      { path: '/items', values: { active: true, archived: null, orderBy: null } },
       { path: '/other', values: { all: true } },
     ],
   });
