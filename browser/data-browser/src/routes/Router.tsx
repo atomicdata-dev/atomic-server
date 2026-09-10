@@ -19,6 +19,7 @@ import { unavailableLazyRoute } from './UnavailableLazyRoute';
 import { ImportRoute } from './ImportRoute';
 import { HistoryRoute } from './History/HistoryRoute';
 import { InviteRoute } from './InviteRoute';
+import { OpenRoute } from './OpenRoute';
 import { LinkOpenRouter } from './LinkOpenRouter';
 import { OnboardingRoute } from './OnboardingRoute';
 import { WelcomeRoute } from './WelcomeRoute';
@@ -90,6 +91,7 @@ const routeTree = rootRoute.addChildren({
     DevDriveRoute,
     DemoRoute,
     InviteRoute,
+    OpenRoute,
     LinkOpenRouter,
   }),
   topRoute,

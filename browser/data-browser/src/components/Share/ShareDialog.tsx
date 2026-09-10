@@ -16,6 +16,7 @@ import {
 import { Dialog, useDialog } from '../Dialog';
 import { Button } from '../Button';
 import { InviteForm } from '../InviteForm';
+import { CapabilityLinkForm } from './CapabilityLinkForm';
 import toast from 'react-hot-toast';
 import { Title } from '../Title';
 import { FaTriangleExclamation } from 'react-icons/fa6';
@@ -26,6 +27,7 @@ import {
   FaArrowLeft,
   FaChevronDown,
   FaChevronRight,
+  FaKey,
   FaLink,
   FaShare,
 } from 'react-icons/fa6';
@@ -70,7 +72,7 @@ export function ShareDialog({
     });
   }, [resource.stable]);
   const [showInherited, setShowInherited] = useState(false);
-  const [view, setView] = useState<'share' | 'invite'>('share');
+  const [view, setView] = useState<'share' | 'invite' | 'link'>('share');
 
   const handleSave = async () => {
     try {
@@ -128,6 +130,12 @@ export function ShareDialog({
                     <Button onClick={() => setView('invite')}>
                       <FaShare />
                       <span>Create Invite</span>
+                    </Button>
+                  )}
+                  {canWrite && (
+                    <Button onClick={() => setView('link')}>
+                      <FaKey />
+                      <span>Create link</span>
                     </Button>
                   )}
                 </Row>
@@ -191,6 +199,19 @@ export function ShareDialog({
               </BackButton>
             </Dialog.Title>
             <InviteForm target={resource} inDialog />
+          </>
+        )}
+        {isOpen && view === 'link' && (
+          <>
+            <Dialog.Title>
+              <BackButton onClick={() => setView('share')}>
+                <FaArrowLeft /> <span>Back</span>
+              </BackButton>
+              <span>Create link</span>
+            </Dialog.Title>
+            <Dialog.Content>
+              <CapabilityLinkForm target={resource} />
+            </Dialog.Content>
           </>
         )}
       </Dialog>
