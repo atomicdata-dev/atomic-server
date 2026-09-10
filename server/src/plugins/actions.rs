@@ -1359,9 +1359,9 @@ mod tests {
         let db = std::sync::Arc::new(f.appstate.store.clone());
         let release = db
             .publish_plugin_release(&PluginRelease {
-                source: include_str!("../../../integrations/github-issues/plugin.js").into(),
+                source: include_str!("fixtures/external-actions/plugin.js").into(),
                 manifest: serde_json::from_str(include_str!(
-                    "../../../integrations/github-issues/manifest.fixture.json"
+                    "fixtures/external-actions/manifest.fixture.json"
                 ))
                 .unwrap(),
                 runtime: atomic_lib::db::plugin_release::RUNTIME.into(),
@@ -1890,7 +1890,7 @@ mod tests {
         let p = saved(&host, "one").unwrap().unwrap();
         assert_eq!(
             p.intent.url,
-            "https://api.github.com/repos/atomic-fixtures/issues/issues"
+            "https://provider.example.test/repos/atomic-fixtures/issues/issues"
         );
         assert!(external::inspect(
             &host.db,
