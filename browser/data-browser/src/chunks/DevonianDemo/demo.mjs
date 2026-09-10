@@ -247,18 +247,24 @@ const client = origin =>
     origin,
   );
 
-export async function connectDemo(store, options, secret) {
+export async function connectDemo(store, options) {
   const demo = await openDemo(store, { ...options, sample: false });
   const result = await client(options.proxy).start(
     demo.state.config.connection.drive,
     store.getAgent().subject,
     'github-issues',
     `${location.origin}/app/devonian-demo`,
-    secret,
   );
   sessionStorage.setItem(
     handoffKey,
-    JSON.stringify({ key: demo.key, state: result.state }),
+    JSON.stringify({
+      key: demo.key,
+      state: result.state,
+      platform: 'github-issues',
+      drive: demo.state.config.connection.drive,
+      actor: store.getAgent().subject,
+      proxy: options.proxy,
+    }),
   );
   location.assign(result.url);
 }
@@ -266,14 +272,32 @@ export async function resumeDemo(store) {
   const url = new URL(location.href);
   const callbackCode = url.searchParams.get('connection_code');
   const callbackState = url.searchParams.get('integration_state');
+  const callbackPlatform = url.searchParams.get('platform');
+  const callbackError = url.searchParams.get('error');
   const handoff = JSON.parse(sessionStorage.getItem(handoffKey) ?? 'null');
 
   // Save the validated handoff before removing credentials from the URL, so a
   // reload while OPFS opens cannot abandon the completed proxy consent.
   if (callbackCode || callbackState) {
     history.replaceState(null, '', url.pathname);
-    if (!handoff || callbackState !== handoff.state || !callbackCode)
+    if (
+      !handoff ||
+      callbackState !== handoff.state ||
+      callbackPlatform !== handoff.platform ||
+      handoff.actor !== store.getAgent()?.subject ||
+      (!callbackCode && callbackError !== 'access_denied') ||
+      (callbackCode && callbackError)
+    )
       throw new Error('Invalid connection callback state');
+
+    if (callbackError) {
+      client(handoff.proxy).cancel(handoff.drive, handoff.actor, handoff.state);
+      sessionStorage.removeItem(handoffKey);
+      throw new Error(
+        'The connection was not authorized. Start connecting again when you are ready.',
+      );
+    }
+
     handoff.code = callbackCode;
     sessionStorage.setItem(handoffKey, JSON.stringify(handoff));
   }
@@ -296,7 +320,7 @@ export async function resumeDemo(store) {
 
   if (code) {
     if (!handoff.finished) {
-      client(saved.options.proxy).finish(
+      await client(saved.options.proxy).finish(
         saved.config.connection.drive,
         store.getAgent().subject,
         stateId,

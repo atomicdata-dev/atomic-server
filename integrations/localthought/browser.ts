@@ -8,6 +8,7 @@ export interface Connection {
   origin: string;
   expires: number;
   code?: string;
+  codeVerifier?: string;
   ready: boolean;
 }
 export interface Engine {
@@ -38,19 +39,6 @@ const base64url = (bytes: Uint8Array) =>
     .replaceAll('+', '-')
     .replaceAll('/', '_')
     .replaceAll('=', '');
-export async function sign(secret: string, text: string) {
-  const encoder = new TextEncoder();
-  const k = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  return base64url(
-    new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(text))),
-  );
-}
 async function limitedText(response: Response): Promise<string> {
   if (!response.body) throw new Error('Empty proxy response');
   const reader = response.body.getReader();
@@ -121,24 +109,9 @@ export class BrowserIntegrations {
     actor: string,
     platform: string,
     returnUrl: string,
-    secret: string,
   ) {
     if (!(await this.catalog()).includes(platform))
       throw new Error('Unknown platform');
-    const encoded = secret.split('.')[0];
-    let tenant: string;
-    try {
-      tenant = new TextDecoder('utf-8', { fatal: true }).decode(
-        Uint8Array.from(
-          atob(encoded.replaceAll('-', '+').replaceAll('_', '/')),
-          c => c.charCodeAt(0),
-        ),
-      );
-    } catch {
-      throw new Error('Invalid tenant secret');
-    }
-    if (!tenant || !secret.includes('.'))
-      throw new Error('Invalid tenant secret');
     const callback = new URL(returnUrl);
     if (
       callback.origin !== location.origin ||
@@ -150,23 +123,28 @@ export class BrowserIntegrations {
     )
       throw new Error('Invalid integration return URL');
     const state = base64url(crypto.getRandomValues(new Uint8Array(32)));
+    const codeVerifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+    const codeChallenge = base64url(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(codeVerifier),
+        ),
+      ),
+    );
     callback.searchParams.set('integration_state', state);
     callback.searchParams.set('platform', platform);
-    const challenge = JSON.parse(await this.get('/session'));
     const url = new URL(`${this.origin}/connect`);
     for (const [k, v] of Object.entries({
-      redirect_uri: callback.href,
       platform,
-      ts: String(challenge.ts),
-      nonce: challenge.nonce,
-      challenge: challenge.challenge,
-      tenant_id: tenant,
+      redirect_uri: callback.href,
       user_id: actor,
-      user_id_sig: await sign(secret, actor),
-      response: await sign(secret, challenge.challenge),
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      credentials: 'connection',
     }))
       url.searchParams.set(k, v as string);
-    // Only the short-lived handoff survives navigation, never the tenant secret.
+    // Only the short-lived PKCE handoff survives navigation.
     this.storage.setItem(
       key + state,
       JSON.stringify({
@@ -175,6 +153,7 @@ export class BrowserIntegrations {
         platform,
         origin: this.origin,
         expires: Date.now() + 600000,
+        codeVerifier,
         ready: false,
       } satisfies Connection),
     );
@@ -188,13 +167,47 @@ export class BrowserIntegrations {
       throw new Error('Connection belongs to another drive, agent or proxy');
     return c;
   }
-  finish(drive: string, actor: string, state: string, code: string) {
+  cancel(drive: string, actor: string, state: string) {
+    this.connection(state, drive, actor);
+    this.storage.removeItem(key + state);
+  }
+  async finish(drive: string, actor: string, state: string, code: string) {
     const c = this.connection(state, drive, actor);
-    if (c.ready || c.expires < Date.now() || !code || code.length > 4096)
-      throw new Error('Invalid, expired or completed connection');
+    if (c.expires < Date.now()) {
+      this.storage.removeItem(key + state);
+      throw new Error('Reconnect your account');
+    }
+    if (c.ready || !c.codeVerifier || !code || code.length > 4096)
+      throw new Error('Reconnect your account');
+    const verifier = c.codeVerifier;
+    delete c.codeVerifier;
+    // Consume before dispatch: a lost response may have spent the handoff code.
+    this.storage.setItem(key + state, JSON.stringify(c));
+    const response = await this.http(`${this.origin}/connect/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, code_verifier: verifier }),
+      credentials: 'omit',
+      redirect: 'error',
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok)
+      throw new Error(`LocalThought returned HTTP ${response.status}`);
+    const result = JSON.parse(await limitedText(response)) as {
+      connection_code?: unknown;
+      platform?: unknown;
+    };
+    if (result.platform !== c.platform)
+      throw new Error('Returned platform did not match the requested platform');
+    if (
+      typeof result.connection_code !== 'string' ||
+      !result.connection_code ||
+      result.connection_code.length > 4096
+    )
+      throw new Error('LocalThought returned an invalid connection code');
     this.storage.setItem(
       key + state,
-      JSON.stringify({ ...c, ready: true, code }),
+      JSON.stringify({ ...c, ready: true, code: result.connection_code }),
     );
     return { connection: state, platform: c.platform };
   }

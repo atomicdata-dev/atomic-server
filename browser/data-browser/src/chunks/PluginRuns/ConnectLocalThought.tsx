@@ -66,7 +66,6 @@ export function ConnectLocalThought({
     start: new Date().toISOString().slice(0, 10),
     end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
   }));
-  const [tenantSecret, setTenantSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<{
@@ -117,7 +116,6 @@ export function ConnectLocalThought({
         {
           drive,
           platform,
-          tenantSecret,
           returnUrl: `${location.origin}/app/integrations`,
         },
       );
@@ -290,21 +288,11 @@ export function ConnectLocalThought({
         Connect your personal account through LocalThought, then return here to
         preview an import.
       </p>
-      <Field fieldId='tenant-secret' label='LocalThought tenant secret'>
-        <Input
-          id='tenant-secret'
-          type='password'
-          autoComplete='off'
-          value={tenantSecret}
-          onChange={e => setTenantSecret(e.target.value)}
-          disabled={busy}
-        />
-      </Field>
       <p>
-        The tenant secret is used in this tab. Connection credentials stay in
-        this browser.
+        LocalThought will ask you to sign in and authorize this connection.
+        Connection credentials stay in this browser.
       </p>
-      <Button disabled={busy || !tenantSecret} onClick={connect}>
+      <Button disabled={busy} onClick={connect}>
         {connection ? 'Reconnect account' : 'Install and connect'}
       </Button>
       {connection && (

@@ -1,14 +1,11 @@
 import { test, expect } from '@playwright/test';
-import {
-  mockProxy,
-  tenantSecret,
-} from '../../../integrations/localthought/mock-proxy.mjs';
+import { mockProxy } from '../../../integrations/localthought/mock-proxy.mjs';
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:6747';
 const SERVER_URL = process.env.SERVER_URL ?? 'http://localhost:9883';
 test.use({ serviceWorkers: 'block' });
 
 // Reuse the browser transport and HTTP mock from the Devonian integration.
-// The tenant secret is a public fixture. No real provider credentials are used.
+// No real provider credentials are used.
 for (const keepSeries of [false, true]) {
   test(`Calendar ${keepSeries ? 'series' : 'instances'} import, refresh and persist without AtomicServer`, async ({
     page,
@@ -58,8 +55,8 @@ for (const keepSeries of [false, true]) {
     await page.routeWebSocket('**/*', socket => socket.close());
     const forbidden: string[] = [];
     const providerMethods: string[] = [];
-    // Forward the configured proxy to this test's isolated HTTP fixture. All
-    // tenant proof, consent, code rotation, pagination and WASM code remain real.
+    // Forward the configured proxy to this test's isolated HTTP fixture. Consent,
+    // PKCE redemption, code rotation, pagination and WASM code remain real.
     await page.route('**/*', async route => {
       const request = route.request();
       const url = new URL(request.url());
@@ -105,22 +102,19 @@ for (const keepSeries of [false, true]) {
       };
 
       await setup();
-      await page.getByLabel('LocalThought tenant secret').fill(tenantSecret);
       await page
         .getByRole('button', { name: 'Install and connect', exact: true })
         .click();
       await page
-        .getByRole('button', { name: 'Connect test account', exact: true })
+        .getByRole('button', {
+          name: 'Use LocalThought to sync Google Calendar with your Atomic Data Hub',
+          exact: true,
+        })
         .click();
       await expect(
         page.getByRole('button', { name: 'Fetch and preview', exact: true }),
       ).toBeVisible();
       expect(page.url()).not.toContain('connection_code');
-      expect(
-        await page.evaluate(() =>
-          JSON.stringify({ ...localStorage, ...sessionStorage }),
-        ),
-      ).not.toContain(tenantSecret);
 
       const apply = async (count: number) => {
         await page

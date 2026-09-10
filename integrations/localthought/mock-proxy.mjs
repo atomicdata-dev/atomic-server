@@ -3,15 +3,20 @@ import { calendarDocument, calendarFixture } from './mock-calendar.mjs';
 import { githubTracker } from './mock-github.mjs';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-export const tenantSecret = 'bW9jay10ZW5hbnQ.mock-signature';
-const sign = value =>
-  createHmac('sha256', tenantSecret).update(value).digest('base64url');
 const equal = (a, b) =>
   typeof a === 'string' &&
+  typeof b === 'string' &&
   a.length === b.length &&
   timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const pkceChallenge = verifier =>
+  createHash('sha256').update(verifier).digest('base64url');
+const platforms = {
+  'github-issues': 'GitHub Issues',
+  'google-calendar': 'Google Calendar',
+  pets: 'Pets',
+};
 const pets = ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'].map(
   (name, i) => ({
     id: i + 1,
@@ -29,7 +34,7 @@ export function mockProxy({
   const github = githubTracker();
   const calendar = calendarFixture();
   const codes = new Map();
-  const challenges = new Set();
+  const handoffs = new Map();
   const issueCode = platform => {
     const code = randomBytes(32).toString('base64url');
     codes.set(code, platform);
@@ -66,45 +71,73 @@ export function mockProxy({
     }
     if (url.pathname === '/catalog/google-calendar.yaml')
       return json(200, calendarDocument);
-    if (url.pathname === '/session') {
-      const challenge = randomBytes(32).toString('base64url');
-      challenges.add(challenge);
-      return json(200, {
-        ts: Math.floor(Date.now() / 1000),
-        nonce: randomBytes(16).toString('hex'),
-        challenge,
-      });
-    }
     if (url.pathname === '/connect') {
       const p = url.searchParams;
-      const challenge = p.get('challenge');
+      const platform = p.get('platform');
+      const verifierChallenge = p.get('code_challenge');
       if (
-        !challenges.has(challenge) ||
-        !equal(p.get('response'), sign(challenge)) ||
-        !equal(p.get('user_id_sig'), sign(p.get('user_id') ?? '')) ||
-        p.get('tenant_id') !== 'mock-tenant'
+        !Object.hasOwn(platforms, platform) ||
+        !verifierChallenge ||
+        p.get('code_challenge_method') !== 'S256' ||
+        p.get('credentials') !== 'connection' ||
+        !p.get('user_id')
       )
-        return json(401, { error: 'Invalid tenant proof' });
-      const redirect = new URL(p.get('redirect_uri'));
+        return json(400, { error: 'Invalid connection request' });
+      let redirect;
+      try {
+        redirect = new URL(p.get('redirect_uri'));
+      } catch {
+        return json(400, { error: 'Invalid callback' });
+      }
       if (
         redirect.origin !== frontendOrigin ||
-        !['/app/integrations', '/app/devonian-demo'].includes(redirect.pathname)
+        !['/app/integrations', '/app/devonian-demo'].includes(redirect.pathname) ||
+        !redirect.searchParams.get('integration_state') ||
+        redirect.searchParams.get('platform') !== platform
       )
         return json(400, { error: 'Invalid callback' });
-      const platform = p.get('platform');
-      if (!['github-issues', 'google-calendar', 'pets'].includes(platform))
-        return json(400, { error: 'Invalid platform' });
       if (req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         return res.end(
-          '<h1>Mock integration proxy</h1><p>Connect your test account.</p><form method="post"><button>Connect test account</button></form>',
+          `<h1>Mock integration proxy</h1><p>Signed in as mock-user.</p><p>Use the selected ${platforms[platform]} account to sync with your Atomic Data Hub.</p><form method="post"><button>Use LocalThought to sync ${platforms[platform]} with your Atomic Data Hub</button></form>`,
         );
       }
       if (req.method !== 'POST') return json(405, {});
-      challenges.delete(challenge);
-      redirect.searchParams.set('connection_code', issueCode(platform));
+      const handoff = randomBytes(32).toString('base64url');
+      handoffs.set(handoff, {
+        platform,
+        userId: p.get('user_id'),
+        codeChallenge: verifierChallenge,
+      });
+      redirect.searchParams.set('connection_code', handoff);
       res.writeHead(303, { Location: redirect.href });
       return res.end();
+    }
+    if (url.pathname === '/connect/redeem') {
+      if (req.method !== 'POST') return json(405, {});
+      let body;
+      try {
+        let text = '';
+        for await (const chunk of req) {
+          text += chunk;
+          if (text.length > 16 * 1024) return json(413, {});
+        }
+        body = JSON.parse(text);
+      } catch {
+        return json(400, { error: 'Invalid redemption body' });
+      }
+      const handoff = handoffs.get(body?.code);
+      if (
+        !handoff ||
+        typeof body?.code_verifier !== 'string' ||
+        !equal(pkceChallenge(body.code_verifier), handoff.codeChallenge)
+      )
+        return json(400, { error: 'Invalid or consumed connection code' });
+      handoffs.delete(body.code);
+      return json(200, {
+        connection_code: issueCode(handoff.platform),
+        platform: handoff.platform,
+      });
     }
     if (url.pathname.startsWith('/proxy/')) {
       const code = req.headers.authorization?.replace(/^Bearer /, '');

@@ -1,11 +1,15 @@
 use std::path::PathBuf;
 
 use actix_web::{http::header, web, HttpResponse};
-use atomic_lib::{db::plugin_meta::PluginMetaKey, hierarchy::check_read, urls, Storelike, Subject, Value};
+use atomic_lib::{
+    db::plugin_meta::PluginMetaKey, hierarchy::check_read, urls, Storelike, Subject, Value,
+};
 use base64::{engine::general_purpose, Engine as _};
 
 use crate::{
-    appstate::AppState, context::RequestContext, errors::{AtomicServerError, AtomicServerResult},
+    appstate::AppState,
+    context::RequestContext,
+    errors::{AtomicServerError, AtomicServerResult},
     helpers::get_client_agent,
 };
 

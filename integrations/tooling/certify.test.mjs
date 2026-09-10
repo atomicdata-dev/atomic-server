@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { discover, evaluateJs, evaluateRust } from './certify.mjs';
+import {
+  discover,
+  evaluateJs,
+  evaluateRust,
+  formatFailureSummary,
+  summarizeFailure,
+} from './certify.mjs';
 test('zero executed tests cannot certify an integration', () => {
   assert.equal(
     evaluateJs({ success: true, numPassedTests: 0, numFailedTests: 0 }),
@@ -39,6 +45,28 @@ test('new packages cannot silently escape certification', () => {
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+test('failed certification checks surface a concise useful diagnostic', () => {
+  assert.equal(
+    summarizeFailure({
+      error: 'spawnSync /browser/node_modules/.bin/esbuild ENOENT',
+      stderr: 'ignored stderr',
+      stdout: 'ignored stdout',
+    }),
+    'spawnSync /browser/node_modules/.bin/esbuild ENOENT',
+  );
+  assert.equal(
+    formatFailureSummary([
+      { name: 'typecheck', status: 'passed' },
+      {
+        name: 'reproducible-bundle',
+        status: 'failed',
+        detail: 'generated bundle differs from committed plugin.js',
+      },
+      { name: 'fixtures', status: 'failed' },
+    ]),
+    'reproducible-bundle: generated bundle differs from committed plugin.js; fixtures',
+  );
 });
 test('both current providers are discovered with exact sandbox tests', () => {
   const ids = discover().map(p => p.id);

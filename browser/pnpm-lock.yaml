@@ -43,6 +43,9 @@ importers:
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
+      esbuild:
+        specifier: '>=0.28.1 <0.29.0'
+        version: 0.28.1
       globals:
         specifier: ^17.6.0
         version: 17.6.0

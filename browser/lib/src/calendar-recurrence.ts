@@ -181,7 +181,8 @@ function parseRule(line: string, allDay = false) {
   )
     throw new Error('Invalid recurrence interval');
   if (
-    options.count !== undefined && options.count !== null &&
+    options.count !== undefined &&
+    options.count !== null &&
     (!Number.isSafeInteger(options.count) ||
       options.count < 1 ||
       options.count > MAX_STEPS)
@@ -296,7 +297,13 @@ export function expandCalendar(
     overrides = new Set<string>();
 
   for (const record of records) {
-    if (typeof record.calendarId !== 'string' || !record.calendarId || typeof record.subject !== 'string' || !record.subject) throw new Error('Calendar record needs source identity and subject');
+    if (
+      typeof record.calendarId !== 'string' ||
+      !record.calendarId ||
+      typeof record.subject !== 'string' ||
+      !record.subject
+    )
+      throw new Error('Calendar record needs source identity and subject');
     validateCalendarEvent(record.event);
     const key = identity(record.calendarId, record.event.id);
     if (masters.has(key)) throw new Error('Duplicate calendar event identity');
@@ -308,7 +315,8 @@ export function expandCalendar(
         record.event.recurringEventId,
         instant(record.event.originalStartTime),
       ]);
-      if (overrides.has(instanceKey)) throw new Error('Duplicate recurring instance');
+      if (overrides.has(instanceKey))
+        throw new Error('Duplicate recurring instance');
       overrides.add(instanceKey);
     }
   }

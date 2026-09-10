@@ -40,11 +40,13 @@ export function CalendarSync({
       path,
       init,
     );
+
   const preview = async () => {
     setBusy(true);
     setError('');
     setDone(false);
     setEdits(undefined);
+
     try {
       setEdits(
         await previewCalendarEdits(
@@ -59,10 +61,12 @@ export function CalendarSync({
       setBusy(false);
     }
   };
+
   const apply = async () => {
     if (!edits || busy) return;
     setBusy(true);
     setError('');
+
     try {
       for (const edit of edits) {
         const resource = await store.getResource(edit.subject);
@@ -77,6 +81,7 @@ export function CalendarSync({
           },
         );
       }
+
       setDone(true);
     } catch (reason) {
       setError(String(reason));
@@ -85,6 +90,7 @@ export function CalendarSync({
       setEdits(undefined);
     }
   };
+
   return (
     <Column gap='0.75rem'>
       <p>

@@ -27,7 +27,6 @@ function DevonianDemo() {
   const [rows, setRows] = useState<Row[]>([]);
   const [proxy, setProxy] = useState('https://localthought.io');
   const [repository, setRepository] = useState('');
-  const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -60,9 +59,7 @@ function DevonianDemo() {
   const start = (sample: boolean) =>
     run(async () => {
       if (!sample) {
-        const credential = secret;
-        setSecret('');
-        await connectDemo(store, { repository, proxy }, credential);
+        await connectDemo(store, { repository, proxy });
 
         return;
       }
@@ -113,8 +110,8 @@ function DevonianDemo() {
                 <summary>Connect a real GitHub repository</summary>
                 <Column gap='0.75rem'>
                   <p>
-                    Connect through LocalThought. The tenant secret is used in
-                    this tab to start the connection and is never saved.
+                    LocalThought will ask you to sign in and authorize the
+                    GitHub connection.
                   </p>
                   <Field fieldId='devonian-proxy' label='Integration proxy URL'>
                     <Input
@@ -133,20 +130,8 @@ function DevonianDemo() {
                       onChange={e => setRepository(e.target.value)}
                     />
                   </Field>
-                  <Field
-                    fieldId='devonian-secret'
-                    label='LocalThought tenant secret'
-                  >
-                    <Input
-                      id='devonian-secret'
-                      type='password'
-                      autoComplete='off'
-                      value={secret}
-                      onChange={e => setSecret(e.target.value)}
-                    />
-                  </Field>
                   <Button
-                    disabled={busy || !repository || !secret}
+                    disabled={busy || !repository}
                     onClick={() => start(false)}
                   >
                     Connect GitHub tracker

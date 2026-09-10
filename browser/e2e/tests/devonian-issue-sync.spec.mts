@@ -1,15 +1,11 @@
 import { test, expect } from '@playwright/test';
-import {
-  mockProxy,
-  tenantSecret,
-} from '../../../integrations/localthought/mock-proxy.mjs';
+import { mockProxy } from '../../../integrations/localthought/mock-proxy.mjs';
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:6747';
 const SERVER_URL = process.env.SERVER_URL ?? 'http://localhost:9883';
 
 test.use({ serviceWorkers: 'block' });
 
-// This is a public fixture secret, never an environment/live credential.
-// Exercise the real form, tenant challenge, consent, rotating HTTP transport and OPFS.
+// Exercise the real redirect consent, PKCE redemption, rotating HTTP transport and OPFS.
 test('Devonian syncs issue creation, state and comments both ways through the browser proxy', async ({
   page,
 }) => {
@@ -62,12 +58,14 @@ test('Devonian syncs issue creation, state and comments both ways through the br
       .click();
     await page.getByLabel('Integration proxy URL').fill(proxyOrigin);
     await page.getByLabel('GitHub repository (owner/repo)').fill(repository);
-    await page.getByLabel('LocalThought tenant secret').fill(tenantSecret);
     await page
       .getByRole('button', { name: 'Connect GitHub tracker', exact: true })
       .click();
     await page
-      .getByRole('button', { name: 'Connect test account', exact: true })
+      .getByRole('button', {
+        name: 'Use LocalThought to sync GitHub Issues with your Atomic Data Hub',
+        exact: true,
+      })
       .click();
 
     const sync = async () => {
@@ -84,11 +82,6 @@ test('Devonian syncs issue creation, state and comments both ways through the br
       page.getByRole('button', { name: 'Sync now', exact: true }),
     ).toBeVisible();
     expect(page.url()).not.toContain('connection_code');
-    expect(
-      await page.evaluate(() =>
-        JSON.stringify({ ...localStorage, ...sessionStorage }),
-      ),
-    ).not.toContain(tenantSecret);
     await sync();
     const issue = (title: string) =>
       page

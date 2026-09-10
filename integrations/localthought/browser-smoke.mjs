@@ -16,12 +16,14 @@ try {
   const pets = page.locator('[data-integration=pets]');
   await pets.getByRole('button', { name: 'Set up connection' }).click();
   await page
-    .getByLabel('LocalThought tenant secret')
-    .fill('bW9jay10ZW5hbnQ.mock-signature');
-  await page
     .getByRole('button', { name: 'Install and connect', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Connect test account' }).click();
+  await page
+    .getByRole('button', {
+      name: 'Use LocalThought to sync Pets with your Atomic Data Hub',
+      exact: true,
+    })
+    .click();
   console.log('Fetching preview');
   await page.getByRole('button', { name: 'Fetch and preview' }).click();
   console.log('Applying preview');

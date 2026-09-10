@@ -34,6 +34,7 @@ export async function localImportRows(
         throw new Error('Local import snapshot is incomplete');
     }
   }
+
   return rows;
 }
 
@@ -43,6 +44,7 @@ export async function localImportVerdict(
   config: Config,
 ) {
   const rows = await localImportRows(store, drive, config);
+
   return JSON.stringify(
     run({
       config,
