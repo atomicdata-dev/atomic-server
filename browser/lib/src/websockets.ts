@@ -1565,6 +1565,7 @@ export class WSClient {
     const selectedDrive = this.store.getDrive();
     const authenticatedWith = this.authenticatedWith;
     const current = () =>
+      this.readyState === WebSocket.OPEN &&
       this.store.getAgent()?.subject === agent &&
       this.store.getDrive() === selectedDrive &&
       this.authenticatedWith === authenticatedWith;
