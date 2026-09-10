@@ -1221,3 +1221,30 @@ tests reject malformed/mixed/nonpositive all-day intervals and verify raw
 provider Start/End retention. The existing Google import E2E now imports a
 three-day all-day event, asserts all three occupied cells and the excluded end,
 and verifies repeated chips survive reload without duplicate resources.
+
+## Metadata-driven platform extraction (2026-09-10)
+
+`integrations/localthought/syncables/tests/query_bindings.rs` exercises Link
+traversal with repeated identifiers in distinct parent contexts, query-only
+bindings, missing source fields, duplicate incoming Links, root input discovery,
+unqualified target parameters, and pagination beyond 50 pages.
+`read_absence.rs` distinguishes declared missing-object responses from permission,
+server, and undeclared errors. `ontology_shared_types.rs` preserves heterogeneous
+shared fields as JSON.
+
+`moneybird_fixture.rs` is explicitly ignored by the ordinary suite: it requires
+external OAD and overlay directories. Run with `MONEYBIRD_OAD_DIR` and
+`MONEYBIRD_OVERLAYS_DIR` plus `--ignored`. It covers 32 collections, two object
+reads, the administration input, and all six consumer query selections against
+the actual composed metadata. This is synthetic traversal, not live account
+coverage.
+
+`integrations/localthought/browser.test.ts` covers consumer-owned request budgets,
+Retry-After handling with rotating credentials, deadline rejection, and separate
+catalog selections with explicit caller precedence. OAuth provider tests cover
+trusted external descriptors, origin/URL validation, and descriptor drift; the
+real HTTP handoff test requires permission to bind a local socket.
+
+Known limitations: Link `operationRef` is explicitly rejected; the implemented
+traversal uses `operationId`. The browser preview rejects more than 5,000 records
+with an explicit incomplete-import error rather than silently truncating.
