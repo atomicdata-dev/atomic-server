@@ -619,3 +619,5 @@ setup currently fails opening OPFS before it can create its dev drive.
 Staging triage verified that the two reported hashes still returned HTTP 200
 without resize parameters. Deployment acceptance must recheck their resized
 URLs and confirm the rejected-write rate falls after clients update.
+
+Automatic browser discovery: `browser/data-browser/src/helpers/browserPeerSync.test.ts` verifies deterministic per-drive rooms, automatic startup for locally snapshotted drives, duplicate prevention, and skipping unknown snapshots. `ATOMIC_PEER_AUTOMATIC=1` with `verify-peer-mesh.mjs` verifies eight browsers rediscover trusted local drives without saved invitations, then sync creations, presence, attachments, reconnects and deletion. Full app UI acceptance remains separate.

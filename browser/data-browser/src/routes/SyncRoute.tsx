@@ -1460,7 +1460,6 @@ function SyncPage() {
       <ContainerNarrow>
         <h1>Sync</h1>
         <Lead>{summaryLine()}</Lead>
-        <BrowserPeerPanel drive={status.drive ?? undefined} />
 
         {/* Everything our paid services own, in one card.
 
@@ -1829,6 +1828,7 @@ function SyncPage() {
             spacious
             icon={<FaLaptop />}
             title='This device'
+            footer={<BrowserPeerPanel drive={status.drive ?? undefined} />}
             subtitle={
               isNode
                 ? status.lastDriveSync
