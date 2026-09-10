@@ -30,31 +30,9 @@ export function bundledIntegrations() {
       keywords:
         'bank bunq banking finance accounting statement mt940 import swift',
     },
-    {
-      id: 'clockify' as const,
-      name: 'Clockify',
-      icon: '⏱️',
-      description: 'Bring your completed work into the Time Tracker.',
-      capabilities:
-        'Import completed entries with project and person links, start/end times and billable flags.',
-      events:
-        'Review imports before applying them. This first version does not sync changes back.',
-      limitation:
-        'Your entries only; up to 31 days. No active timers, updates, deletions, tags, task links, rates or custom fields.',
-      keywords: 'clockify time tracking timesheet projects billable import',
-    },
-    {
-      id: 'notion' as const,
-      name: 'Notion',
-      icon: '📓',
-      description: 'Work with your Notion database in Atomic.',
-      capabilities:
-        'Sync supported row fields, property names and table or board views.',
-      events: 'Start automations from newly discovered rows.',
-      limitation:
-        'Formatted text, relations, formulas and filtered views need additional mappings.',
-      keywords: 'notion database table board rows knowledge tasks automation',
-    },
+    ...integrationRegistry.filter(
+      entry => 'description' in entry,
+    ),
   ];
 }
 
@@ -86,7 +64,9 @@ export function IntegrationDiscovery({
             them.
           </p>
         </details>
-        {workspace && (entry.id === 'notion' || entry.id === 'mt940') && (
+        {workspace &&
+          (('createsWorkspace' in entry && entry.createsWorkspace) ||
+            entry.id === 'mt940') && (
           <p>This integration creates a new workspace for its imported data.</p>
         )}
         <IntegrationEvidence id={entry.id} />

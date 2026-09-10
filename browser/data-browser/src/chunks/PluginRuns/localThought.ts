@@ -47,12 +47,8 @@ export async function proxyRequest<T>(
     connectionCode?: string;
     connection?: string;
     constants?: Record<string, string>;
-    calendarRange?: {
+    selection?: {
       query_overrides: { path: string; values: Record<string, unknown> }[];
-      schema_property_overrides?: {
-        schema: string;
-        properties: Record<string, unknown>;
-      }[];
     };
   },
 ): Promise<T> {
@@ -80,7 +76,7 @@ export async function proxyRequest<T>(
       actor,
       body.connection!,
       body.constants ?? {},
-      body.calendarRange,
+      body.selection,
     );
   throw new Error('Unknown browser integration action');
 }

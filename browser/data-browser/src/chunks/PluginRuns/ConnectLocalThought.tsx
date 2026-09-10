@@ -84,13 +84,9 @@ export function ConnectLocalThought({
           Object.fromEntries(
             data.parameters.map((key: string) => [
               key,
-              (
-                {
-                  owner: 'ontola',
-                  repo: 'atomic-server',
-                  ...(extension?.defaultConstants ?? {}),
-                } as Record<string, string>
-              )[key] ?? '',
+              (extension?.defaultConstants as
+                | Record<string, string>
+                | undefined)?.[key] ?? '',
             ]),
           ),
         );
@@ -146,7 +142,7 @@ export function ConnectLocalThought({
         connection: connection.connection,
         constants,
         ...(extension && selection
-          ? { calendarRange: extension.selection(selection) }
+          ? { selection: extension.selection(selection) }
           : {}),
       });
       const fetched = extension ? extension.project(response) : response;

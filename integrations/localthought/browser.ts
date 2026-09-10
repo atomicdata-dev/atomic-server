@@ -355,7 +355,7 @@ export class BrowserIntegrations {
     actor: string,
     id: string,
     constants: Record<string, string>,
-    range?: unknown,
+    selection?: unknown,
   ) {
     // Web Locks serialize rotating credentials across tabs as well as UI actions.
     if (!navigator.locks)
@@ -444,7 +444,7 @@ export class BrowserIntegrations {
         text,
         c.platform,
         JSON.stringify(constants),
-        JSON.stringify(mergeQuerySelections(defaults, range)),
+        JSON.stringify(mergeQuerySelections(defaults, selection)),
         transport,
       );
       signal.throwIfAborted();
