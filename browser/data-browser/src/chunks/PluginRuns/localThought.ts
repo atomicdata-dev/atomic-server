@@ -42,7 +42,6 @@ export async function proxyRequest<T>(
     drive: string;
     platform?: string;
     returnUrl?: string;
-    tenantSecret?: string;
     state?: string;
     connectionCode?: string;
     connection?: string;
@@ -59,15 +58,14 @@ export async function proxyRequest<T>(
       actor,
       body.platform!,
       body.returnUrl!,
-      body.tenantSecret!,
     )) as T;
   if (action === 'finish')
-    return client.finish(
+    return (await client.finish(
       body.drive,
       actor,
       body.state!,
       body.connectionCode!,
-    ) as T;
+    )) as T;
   if (action === 'fetch')
     return client.fetchRecords(
       body.drive,

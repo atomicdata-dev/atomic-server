@@ -46,7 +46,6 @@ interface CalendarFixture {
     query: Record<string, string>;
   }>;
 }
-export const tenantSecret: string;
 export function mockProxy(options?: {
   frontendOrigin?: string;
 }): Server & { github: GitHubTracker; calendar: CalendarFixture };

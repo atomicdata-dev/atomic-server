@@ -4329,7 +4329,6 @@ msgid "as a classtype."
 msgstr "as a classtype."
 
 #: src/components/Share/ShareDialog.tsx
-#: src/components/Share/ShareDialog.tsx
 #: src/components/Share/ShareDialog.tsx src/routes/Share/ShareRoute.tsx
 #: src/routes/Share/ShareRoute.tsx
 msgid "Create Invite"
@@ -4707,6 +4706,7 @@ msgstr "{0}% of storage used"
 msgid "{0}% used"
 msgstr "{0}% used"
 
+#: src/chunks/PluginRuns/CalendarSync.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
@@ -7546,6 +7546,7 @@ msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not unlock with a passkey. Use your recovery code instead."
 msgstr "Could not unlock with a passkey. Use your recovery code instead."
+
 #~ msgid "Last Modified"
 #~ msgstr "Last Modified"
 
@@ -9892,9 +9893,8 @@ msgstr "Connect your personal account through LocalThought, then return here to 
 msgid "Open imported records"
 msgstr "Open imported records"
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
-msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+#~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+#~ msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 
 #: src/chunks/PluginRuns/ConnectLocalThought.tsx
 msgid "Events from (UTC)"
@@ -9904,14 +9904,12 @@ msgstr "Events from (UTC)"
 msgid "Events before (UTC)"
 msgstr "Events before (UTC)"
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
 #: src/routes/DevonianDemoRoute.tsx
 msgid "LocalThought tenant secret"
 msgstr "LocalThought tenant secret"
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
-msgstr "The tenant secret is used in this tab. Connection credentials stay in this browser."
+#~ msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+#~ msgstr "The tenant secret is used in this tab. Connection credentials stay in this browser."
 
 #. 0: count
 #: src/routes/DevonianDemoRoute.tsx
@@ -10047,3 +10045,40 @@ msgstr "All day"
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 msgid "{0} · Recurring meeting (opens its series or exception)"
 msgstr "{0} · Recurring meeting (opens its series or exception)"
+
+#: src/routes/SyncRoute.tsx
+msgid "Error: Sign in before syncing with another device"
+msgstr "Error: Sign in before syncing with another device"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
+msgstr "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
+
+#. 0: calendar ? ' After importing, preview edits to send changes back to Google Calendar.' \\: ' No provider writes.'
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
+msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Preview edits for Google"
+msgstr "Preview edits for Google"
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "No supported local edits to send."
+msgstr "No supported local edits to send."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Edits synced. Fetch and preview to receive the latest Google changes."
+msgstr "Edits synced. Fetch and preview to receive the latest Google changes."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Send edits to imported events back to Google: Name or Summary, Description, Location, Start and End. Edit Start and End together to change duration or all-day dates. Calendar day and all-day display columns are derived on import. New events, deletion, recurrence rules, guests and RSVP stay in Google. Reconnect with Calendar write access before your first sync."
+msgstr "Send edits to imported events back to Google: Name or Summary, Description, Location, Start and End. Edit Start and End together to change duration or all-day dates. Calendar day and all-day display columns are derived on import. New events, deletion, recurrence rules, guests and RSVP stay in Google. Reconnect with Calendar write access before your first sync."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Applying these edits updates Google Calendar and notifies event guests."
+msgstr "Applying these edits updates Google Calendar and notifies event guests."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Apply edits to Google"
+msgstr "Apply edits to Google"

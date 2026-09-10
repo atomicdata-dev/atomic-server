@@ -1,6 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { BrowserIntegrations, proxyOrigin, sign, type Engine } from './browser';
-const secret = 'bW9jay10ZW5hbnQ.mock-signature';
+import { BrowserIntegrations, proxyOrigin, type Engine } from './browser';
 const origin = 'https://proxy.example';
 function setup() {
   const values = new Map<string, string>();
@@ -8,6 +7,9 @@ function setup() {
     getItem: (k: string) => values.get(k) ?? null,
     setItem: (k: string, v: string) => {
       values.set(k, v);
+    },
+    removeItem: (k: string) => {
+      values.delete(k);
     },
   } as Storage;
   vi.stubGlobal('location', { origin: 'https://atomic.example' });
@@ -18,8 +20,8 @@ function setup() {
     expect(init?.credentials).toBe('omit');
     expect(init?.redirect).toBe('error');
     if (url.endsWith('/catalog')) return new Response('["pets"]');
-    if (url.endsWith('/session'))
-      return Response.json({ ts: 1, nonce: 'nonce', challenge: 'challenge' });
+    if (url.endsWith('/connect/redeem'))
+      return Response.json({ connection_code: 'first', platform: 'pets' });
     return new Response('{}');
   });
   const engine: Engine = {
@@ -44,37 +46,141 @@ function setup() {
       'actor',
       'pets',
       'https://atomic.example/app/integrations',
-      secret,
     );
   return { values, storage, http, engine, client, start };
 }
 afterEach(() => vi.unstubAllGlobals());
-it('matches the tenant HMAC protocol and rejects non-origin proxy URLs', async () => {
-  expect(await sign('key', 'The quick brown fox jumps over the lazy dog')).toBe(
-    '97yD9DBThCSxMpjmqm-xQ-9NWaFJRhdZl0edvC0aPNg',
-  );
+it('rejects non-origin proxy URLs', () => {
   expect(() => proxyOrigin('https://proxy.example/path')).toThrow();
   expect(() => proxyOrigin('http://proxy.example')).toThrow();
 });
-it('binds returns to actor, drive and expiry without saving tenant secrets', async () => {
-  const { client, start, values } = setup();
+it('starts a platform-bound PKCE redirect without a tenant session', async () => {
+  const { start, values, http } = setup();
   const { state, url } = await start();
-  expect(url).not.toContain(secret);
-  expect([...values.values()].join()).not.toContain(secret);
-  expect(() => client.finish('other', 'actor', state, 'code')).toThrow();
-  expect(() => client.finish('drive', 'other', state, 'code')).toThrow();
-  expect(client.finish('drive', 'actor', state, 'code').platform).toBe('pets');
-  expect(() => client.finish('drive', 'actor', state, 'code')).toThrow();
+  const redirect = new URL(url);
+  const callback = new URL(redirect.searchParams.get('redirect_uri')!);
+  const pending = JSON.parse([...values.values()][0]);
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(pending.codeVerifier),
+  );
+  const expectedChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+
+  expect(redirect.pathname).toBe('/connect');
+  expect(Object.fromEntries(redirect.searchParams)).toEqual({
+    platform: 'pets',
+    redirect_uri: callback.href,
+    user_id: 'actor',
+    code_challenge: expectedChallenge,
+    code_challenge_method: 'S256',
+    credentials: 'connection',
+  });
+  expect(callback.searchParams.get('integration_state')).toBe(state);
+  expect(callback.searchParams.get('platform')).toBe('pets');
+  expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(
+    http.mock.calls.some(([request]) => String(request).endsWith('/session')),
+  ).toBe(false);
+});
+it('binds redemption to actor, drive, platform and expiry', async () => {
+  const { client, start, values, http } = setup();
+  const { state } = await start();
+  await expect(
+    client.finish('other', 'actor', state, 'code'),
+  ).rejects.toThrow();
+  await expect(
+    client.finish('drive', 'other', state, 'code'),
+  ).rejects.toThrow();
+  http.mockImplementationOnce(async (_url, init) => {
+    const pending = JSON.parse([...values.values()][0]);
+    expect(pending.codeVerifier).toBeUndefined();
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: expect.any(String),
+      credentials: 'omit',
+      redirect: 'error',
+    });
+    expect(JSON.parse(init!.body as string)).toEqual({
+      code: 'code',
+      code_verifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+    });
+    return Response.json({ connection_code: 'first', platform: 'pets' });
+  });
+  await expect(client.finish('drive', 'actor', state, 'code')).resolves.toEqual(
+    {
+      connection: state,
+      platform: 'pets',
+    },
+  );
+  expect(JSON.parse([...values.values()][0])).toMatchObject({
+    platform: 'pets',
+    ready: true,
+    code: 'first',
+  });
+  expect(JSON.parse([...values.values()][0]).codeVerifier).toBeUndefined();
+  await expect(
+    client.finish('drive', 'actor', state, 'code'),
+  ).rejects.toThrow();
+});
+it('does not save a credential when redemption returns another platform', async () => {
+  const { client, start, values, http } = setup();
+  const { state } = await start();
+  http.mockImplementationOnce(async () =>
+    Response.json({ connection_code: 'first', platform: 'github-issues' }),
+  );
+  await expect(client.finish('drive', 'actor', state, 'code')).rejects.toThrow(
+    'platform',
+  );
+  expect(JSON.parse([...values.values()][0])).toMatchObject({ ready: false });
+  expect(JSON.parse([...values.values()][0]).code).toBeUndefined();
+});
+it('clears expired and denied pending verifiers', async () => {
+  const { client, start, values, http } = setup();
+  const expired = await start();
+  const [expiredKey, expiredValue] = [...values.entries()][0];
+  values.set(
+    expiredKey,
+    JSON.stringify({ ...JSON.parse(expiredValue), expires: Date.now() - 1 }),
+  );
+  await expect(
+    client.finish('drive', 'actor', expired.state, 'code'),
+  ).rejects.toThrow('Reconnect');
+  expect(values.has(expiredKey)).toBe(false);
+
+  const denied = await start();
+  client.cancel('drive', 'actor', denied.state);
+  expect([...values.values()]).toHaveLength(0);
+  expect(
+    http.mock.calls.some(([request]) => String(request).endsWith('/redeem')),
+  ).toBe(false);
+});
+it('never retries an uncertain redemption after consuming its verifier', async () => {
+  const { client, start, http } = setup();
+  const { state } = await start();
+  http.mockImplementationOnce(async () => {
+    throw new Error('connection lost');
+  });
+  await expect(client.finish('drive', 'actor', state, 'code')).rejects.toThrow(
+    'lost',
+  );
+  const calls = http.mock.calls.length;
+  await expect(client.finish('drive', 'actor', state, 'code')).rejects.toThrow(
+    'Reconnect',
+  );
+  expect(http.mock.calls).toHaveLength(calls);
 });
 it('consumes before dispatch and preserves rotation and pagination', async () => {
   const { client, start, http, values } = setup();
   const { state } = await start();
-  client.finish('drive', 'actor', state, 'first');
+  await client.finish('drive', 'actor', state, 'handoff');
   const codes: string[] = [];
   http.mockImplementation(async (url, init) => {
     if (url.includes('/catalog/')) return new Response('{}');
     expect(JSON.parse([...values.values()][0]).code).toBeUndefined();
-    codes.push((init?.headers as Record<string, string>).Authorization);
+    codes.push((init!.headers as Record<string, string>).Authorization);
     return new Response('[]', {
       headers: {
         'x-connection-code': 'second',
@@ -89,7 +195,7 @@ it('consumes before dispatch and preserves rotation and pagination', async () =>
 it('never retries an uncertain consumed credential', async () => {
   const { client, start, http } = setup();
   const { state } = await start();
-  client.finish('drive', 'actor', state, 'first');
+  await client.finish('drive', 'actor', state, 'handoff');
   http.mockImplementation(async url => {
     if (url.includes('/catalog/')) return new Response('{}');
     throw new Error('connection lost');
@@ -106,7 +212,7 @@ it('never retries an uncertain consumed credential', async () => {
 it('rejects pagination to a different provider before spending a credential', async () => {
   const { client, start, engine, values } = setup();
   const { state } = await start();
-  client.finish('drive', 'actor', state, 'first');
+  await client.finish('drive', 'actor', state, 'handoff');
   engine.fetchIntegration = async (_t, _p, _c, _r, fetch) =>
     fetch('https://evil.example/pets');
   await expect(
@@ -132,9 +238,8 @@ it('supports the demo callback and write credentials without using the import en
     'actor',
     'pets',
     'https://atomic.example/app/devonian-demo',
-    secret,
   );
-  client.finish('drive', 'actor', state, 'first');
+  await client.finish('drive', 'actor', state, 'handoff');
   http.mockImplementation(async (_url, init) => {
     expect(JSON.parse([...values.values()][0]).code).toBeUndefined();
     expect(init?.method).toBe('POST');
@@ -161,7 +266,7 @@ it('supports the demo callback and write credentials without using the import en
 it('forwards the conditional event version while keeping authorization host-owned', async () => {
   const { client, start, http } = setup();
   const { state } = await start();
-  client.finish('drive', 'actor', state, 'first');
+  await client.finish('drive', 'actor', state, 'handoff');
   http.mockImplementation(async (_url, init) => {
     expect(init?.headers).toEqual({
       Authorization: 'Bearer first',

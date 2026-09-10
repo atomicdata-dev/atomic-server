@@ -9,20 +9,22 @@ installation, and an unavailable database. This is a unit reproduction of the
 local/server lookup mismatch; the patched live Calendar flow remains unverified.
 
 LocalThought browser migration: `integrations/localthought/browser.test.ts`
-covers tenant HMAC, actor/drive ownership, rotation before dispatch, pagination,
-uncertain-response refusal and cross-origin pagination refusal. The real generated
+covers secret-free selected-platform redirects, S256 PKCE, one-time redemption,
+actor/drive/platform ownership, cancellation, expiry, rotation before dispatch,
+pagination, uncertain-response refusal and cross-origin pagination refusal. The real generated
 WASM bundle is exercised by `wasm-smoke.mjs` for pagination, typed ontology,
 timestamps and provider failures. `browser-smoke.mjs` exercises the complete
 mock consent/import/review/OPFS/reload journey with AtomicServer unavailable
 (verified locally). Local installation/schema lookup tests reject missing or
 incomplete local databases rather than inferring permission to create duplicates.
 The companion Syncables branch has 142 passing native tests and a wasm32 build;
-the companion proxy branch has 39 passing tests including CORS preflight and
-exposed headers. Live OAuth on the browser path still requires deployment of
-the companion proxy CORS change and is not yet verified.
+the proxy redirect work has 60 passing Rust tests including PostgreSQL-backed
+consent/replay, optional credential grants, callback binding and redemption expiry.
+CORS was verified with the earlier live browser flow; the new secret-free flow
+still requires matching proxy/frontend deployments and live verification.
 
-`browser/e2e/tests/devonian-issue-sync.spec.mts` exercises tenant-secret entry,
-proxy consent, direct HTTP writes and local OPFS storage for two-way issue
+`browser/e2e/tests/devonian-issue-sync.spec.mts` exercises the no-paste redirect,
+selected-platform consent and PKCE redemption, direct HTTP writes and local OPFS storage for two-way issue
 creation, comments, close/reopen and reload without duplicate resources. Its
 stateful HTTP mock isolates repositories and consumes/rotates connection codes;
 it does not substitute the in-page sample transport.
@@ -99,17 +101,19 @@ It edits JavaScript, saves and reviews a real proposed effect, enables execution
 returns to review mode and checks history. The trigger HTTP response regression
 `response_filters_round_trip_into_updates` ensures GET filter values can be sent
 back to POST; tagged database values previously broke the enable button.
-The Pets flow now uses a real mock integration-proxy service: signed consent,
+The Pets flow uses a real mock integration-proxy service: selected-platform consent,
+PKCE handoff redemption,
 return to the same drive, rotating connection codes, two-page Syncables fetch,
 review/apply, and five displayed records with integer/boolean/float/timestamp
 properties. Dagger starts the mock for E2E; local runs opt in with
 `ATOMIC_MOCK_INTEGRATION_PROXY=1` and the README configuration.
-`browser.test.ts` and the real WASM smoke cover actor/drive binding, tenant HMAC,
+`browser.test.ts` and the real WASM smoke cover actor/drive binding, PKCE redemption,
 Syncables pagination/ontology and duplicate-page refusal. The mock's Node test
-covers invalid tenant proofs and replayed/rotated codes. The mapping tests cover
+covers invalid PKCE verifiers, replayed handoffs and rotated proxy codes. The mapping tests cover
 typed proposals, missing identities, repeat imports, local edits and duplicates.
 The historical server path was live-verified for GitHub and Google Calendar.
-The new browser path awaits deployment of the companion proxy CORS change.
+The new secret-free browser path awaits matching proxy/frontend deployment and
+live verification.
 Run it against a production build to catch missing translation catalog entries:
 Vite dev extracts them automatically and can hide blank production labels.
 The GitHub setup flow also covers opting into assistant-led automation creation:
@@ -1163,19 +1167,24 @@ cancelled on teardown. Old plugin-name grants are deliberately not migrated.
 `store_host::destroy_identity_tests` checks the signer of the persisted destroy
 commit. It failed with the server signer before `Resource::destroy_as` was used;
 installation deletion must use the same selected identity as create/update.
-LocalThought: Rust handler tests cover connection binding, request signing, duplicate-page rejection, typed paginated previews, and Calendar UTC date-range validation. Live Calendar OAuth, bounded fetch, review/apply and event table display were verified against proxy v39 (54 records).
+LocalThought: the browser and fixture tests cover selected-platform consent,
+PKCE redemption, one-time handoff consumption, rotating proxy credentials,
+duplicate-page rejection, typed paginated previews, and Calendar UTC date-range
+validation. The new redirect flow uses a synthetic fixture identity; live
+LocalThought login, consent, redemption and provider writes remain pending.
 
 Google Calendar one-way projection: `integrations/localthought/calendar.test.ts`
 covers all-day/timed start dates, offset boundaries, exclusive end preservation,
 feature notes (including WASM-normalized field names), cancellations without
 start data, invalid active events, namespace isolation and repeat import/local
 field preservation. `browser/e2e/tests/google-calendar-import.spec.mts` uses the
-shared HTTP mock integration-proxy with a paginated Google Calendar, tenant
-secret entry and OAuth consent. It covers browser WASM fetching, local
+shared HTTP mock integration-proxy with a paginated Google Calendar, selected
+platform consent and PKCE redemption. It covers browser WASM fetching, local
 schema/proposal/apply, Calendar display, provider updates, OPFS reload and
 stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
-Live-provider browser OAuth verification remains separate from this fixture test.
+Live-provider browser OAuth verification remains pending and separate from this
+fixture test.
 
 ## Google Calendar recurrence
 

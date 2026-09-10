@@ -1,14 +1,17 @@
 # LocalThought browser integrations
 
-The LocalThought flow runs entirely in the browser: catalog discovery, tenant
-challenge signing, OAuth return handling, paginated Syncables reads, ontology
+The LocalThought flow runs entirely in the browser: catalog discovery, OAuth
+consent, PKCE-protected return handling, paginated Syncables reads, ontology
 creation, proposal review and local Store/OPFS writes. No AtomicServer HTTP
 instance is needed. LocalThought remains the remote OAuth and API proxy.
 
-Open Integrations, select a platform and paste your `TENANT_SECRET`. It is used
-in tab memory to sign the handoff and is not persisted. OAuth returns to the
-same frontend `/app/integrations` page. The short-lived return is bound to the
-agent, drive and proxy; its code is removed from the address bar immediately.
+Open Integrations, select a platform and choose **Install and connect**. The
+browser creates a PKCE verifier and opens LocalThought's consent page, where
+the selected platform is shown before you approve access. OAuth returns to the
+same frontend `/app/integrations` page, and the browser redeems the one-time
+handoff with the verifier. No tenant secret is entered in the browser. The
+short-lived return is bound to the agent, drive and proxy; its code is removed
+from the address bar immediately.
 Connection codes are stored in this browser's localStorage, outside the synced
 graph, and may be read by code running on this frontend origin. Clearing site
 data requires reconnecting. Existing server-held connections require reconnecting.
@@ -31,7 +34,10 @@ Local edits and repeated imports retain the existing reconciliation behavior.
 - Deploy the companion integration-proxy CORS change. It handles preflights for
   explicit Authorization headers and exposes `X-Connection-Code`, `Link`,
   pagination/count headers, `ETag` and `Retry-After`. Cookie credentials are not
-  enabled; login and consent use top-level navigation.
+  enabled; login and consent use top-level navigation. The browser sends
+  `platform`, `redirect_uri`, `user_id`, `code_challenge`,
+  `code_challenge_method=S256` and `credentials=connection` to `/connect`, then
+  redeems the callback code at `/connect/redeem` with its PKCE verifier.
 - Native AtomicServer's `TENANT_SECRET`, `ATOMIC_INTEGRATION_PROXY_URL` and
   `ATOMIC_INTEGRATION_FRONTEND_ORIGIN` no longer configure this flow. Its
   `/integration-proxy/*` handlers and Syncables dependency have been removed.
@@ -59,9 +65,16 @@ VITE_INTEGRATION_PROXY_URL=http://127.0.0.1:19091 VITE_ATOMIC_SERVER_URL=http://
 node integrations/localthought/browser-smoke.mjs
 ```
 
-The mock is test-only. It uses synthetic credentials and data; never deploy it.
+The mock is test-only. It uses a synthetic signed-in identity and data; never
+deploy it.
 
 ## Historical server-flow verification
+
+The server-owned tenant-secret flow described by the historical notes below is
+superseded by the browser redirect and PKCE flow. Live verification of the new
+LocalThought login, selected-platform consent and one-time redemption is checked
+separately after matching deployments and recorded in PR/release verification.
+The fixture tests below do not claim live-provider verification.
 
 Live verification on 2026-09-09 succeeded against proxy Heroku release v38
 (`5960ae43`): OAuth returned to AtomicServer, Syncables fetched 29 issue/PR
@@ -145,8 +158,8 @@ identity and repeated imports with private local fields.
 ## Browser-only Calendar regression
 
 `browser/e2e/tests/google-calendar-import.spec.mts` starts the shared mock
-integration-proxy from #1399 with a synthetic Google Calendar. The test enters
-the public fixture tenant secret, completes consent, and exercises real browser
+integration-proxy with a synthetic Google Calendar. The test selects Calendar,
+completes the mock PKCE consent and redemption, and exercises real browser
 credential rotation, WASM pagination, local schema installation, proposal review,
 OPFS application, and Calendar rendering. It refreshes changed provider data
 and checks that native identities and Atomic-only notes survive reload.
@@ -168,4 +181,6 @@ test process. The test forwards that origin to its own fixture. Live Google
 OAuth on the browser path still depends on the proxy CORS deployment described
 above; this fixture test does not claim live-provider verification.
 
-Verification: 28 LocalThought Vitest tests, frontend TypeScript check, and all 41 companion proxy tests passed. Browser UI and live Google write verification remain unperformed.
+Verification: the focused LocalThought fixture and frontend checks cover the
+redirect, PKCE, rotation and import paths. Live LocalThought login, consent,
+redemption and Google write verification remain pending.

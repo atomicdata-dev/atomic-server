@@ -45,6 +45,8 @@ export function LocalThoughtCatalog({
     const url = new URL(location.href);
     const state = url.searchParams.get('integration_state');
     const code = url.searchParams.get('connection_code');
+    const callbackPlatform = url.searchParams.get('platform');
+    const callbackError = url.searchParams.get('error');
     if (!state) return;
     completing.current = true;
     // Remove the single-use credential before fetching anything else or following links.
@@ -59,15 +61,27 @@ export function LocalThoughtCatalog({
         pending.state !== state ||
         pending.drive !== drive ||
         pending.actor !== actor ||
-        !code
+        pending.platform !== callbackPlatform ||
+        (!code && callbackError !== 'access_denied') ||
+        (code && callbackError)
       )
         throw new Error(
           'Connection return is missing, expired or belongs to another account. Start connecting again.',
         );
+      // A redeem response can be lost after the one-time code is consumed.
+      sessionStorage.removeItem('localthought-pending');
+
+      if (callbackError) {
+        browserIntegrations().cancel(drive, actor!, state);
+        throw new Error(
+          'The connection was not authorized. Start connecting again when you are ready.',
+        );
+      }
+
       const result = await proxyRequest<{
         connection: string;
         platform: string;
-      }>(store, 'finish', { drive, state, connectionCode: code });
+      }>(store, 'finish', { drive, state, connectionCode: code! });
       if (result.platform !== pending.platform)
         throw new Error(
           'Returned platform did not match the requested platform',
@@ -81,7 +95,6 @@ export function LocalThoughtCatalog({
           installationConnection: pending.installationConnection,
         }),
       );
-      sessionStorage.removeItem('localthought-pending');
       setReturned(result.platform);
     };
 
