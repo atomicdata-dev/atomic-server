@@ -1,4 +1,5 @@
 import type { Store } from '@tomic/lib';
+
 export interface Demo {
   key: string;
   state: {

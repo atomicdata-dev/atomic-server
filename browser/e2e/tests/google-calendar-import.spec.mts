@@ -18,6 +18,7 @@ for (const keepSeries of [false, true]) {
     const month = new Date().toISOString().slice(0, 7);
     proxy.calendar.events[0].start = { date: `${month}-10` };
     proxy.calendar.events[0].end = { date: `${month}-13` };
+
     if (keepSeries) {
       const event = proxy.calendar.events[1];
       event.start = { dateTime: `${month}-05T09:00:00Z`, timeZone: 'UTC' };
@@ -47,6 +48,7 @@ for (const keepSeries of [false, true]) {
         },
       );
     }
+
     const chipCount = keepSeries ? 5 : 4;
     await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
     const port = (proxy.address() as { port: number }).port;
@@ -139,15 +141,18 @@ for (const keepSeries of [false, true]) {
       };
 
       await apply(keepSeries ? 4 : 2);
+
       for (const day of ['10', '11', '12']) {
         await expect(
           page.locator(`[data-date="${month}-${day}"] [data-all-day="true"]`),
         ).toHaveText('All dayCalendar all-day fixture');
       }
+
       await expect(
         page.locator(`[data-date="${month}-13"] [data-all-day="true"]`),
       ).toHaveCount(0);
       await expect(page.getByTestId('calendar-event')).toHaveCount(chipCount);
+
       if (keepSeries) {
         await expect(
           page.locator(`[data-date="${month}-14"] [data-recurring="true"]`),
@@ -159,6 +164,7 @@ for (const keepSeries of [false, true]) {
           page.getByText('Cancelled meeting', { exact: true }),
         ).toHaveCount(0);
       }
+
       await page
         .getByTestId('calendar-event')
         .filter({ hasText: 'Calendar timed fixture' })

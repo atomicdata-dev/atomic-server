@@ -3814,6 +3814,28 @@ export class Store {
     return result;
   }
 
+  /**
+   * Read from memory or the local database, without contacting a server.
+   * Use with queryLocalDb so a locally indexed identity is resolved against
+   * the same authority, even while online or before its commits have synced.
+   * Missing/unavailable local state is an error, never permission to recreate it.
+   */
+  public async getLocalResource(subjectRaw: string): Promise<Resource> {
+    const subject = this.resolveSubject(subjectRaw);
+    const cached = this.resources.get(subject);
+    if (cached?.isReady()) return cached;
+
+    const found = await this.hydrateFromLocalDb(subject);
+    const resource = this.resources.get(subject);
+    if (found && resource?.isReady()) return resource;
+
+    throw new Error(
+      found === undefined
+        ? 'Local resource database is unavailable'
+        : `Resource ${subjectRaw} is not available locally`,
+    );
+  }
+
   /** Gets a property by URL. */
   public async getProperty(subject: string): Promise<Property> {
     // This leads to multiple fetches!

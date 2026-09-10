@@ -1,5 +1,13 @@
 # Testing coverage map
 
+Local integration resource recovery (#1406):
+`browser/lib/src/local-schema-resource.test.ts` exercises the real Store and
+local installation adapter with a controlled ClientDb. It reproduces a cold
+schema lookup contacting a server that lacks the locally indexed resource,
+and verifies local recovery, refusal to recreate an indexed-but-missing
+installation, and an unavailable database. This is a unit reproduction of the
+local/server lookup mismatch; the patched live Calendar flow remains unverified.
+
 LocalThought browser migration: `integrations/localthought/browser.test.ts`
 covers tenant HMAC, actor/drive ownership, rotation before dispatch, pagination,
 uncertain-response refusal and cross-origin pagination refusal. The real generated

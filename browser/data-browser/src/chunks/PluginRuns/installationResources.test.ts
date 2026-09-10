@@ -59,7 +59,7 @@ it('uses complete local identities without a server and refuses a missing local 
     .mockResolvedValue({ subjects: ['saved'], count: 1 });
   const store = {
     queryLocalDb,
-    getResource: async () => resource,
+    getLocalResource: async () => resource,
     newResource: vi.fn(),
   };
   const options = {

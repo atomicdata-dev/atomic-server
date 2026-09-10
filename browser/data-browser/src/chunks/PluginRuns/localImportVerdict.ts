@@ -12,8 +12,10 @@ export async function localImportRows(
   config: Config,
 ) {
   const rows = new Map<string, Record<string, unknown>>();
+
   for (const { table } of Object.values(config.destinations)) {
     let offset = 0;
+
     for (;;) {
       const result = await store.queryLocalDb({
         drive,
@@ -51,6 +53,7 @@ export async function localImportVerdict(
       read: subject => {
         const row = rows.get(subject);
         if (!row) throw new Error('Missing local import record');
+
         return row;
       },
     }),

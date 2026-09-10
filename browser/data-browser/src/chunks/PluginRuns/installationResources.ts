@@ -22,7 +22,11 @@ export async function ensureInstallationResource(
     const ids = await (
       local ? readLocalInstallationSubjects : readConnectionSubjects
     )(store, drive, core.properties.localId, options.localId);
-    const resources = await Promise.all(ids.map(id => store.getResource(id)));
+    const resources = await Promise.all(
+      ids.map(id =>
+        local ? store.getLocalResource(id) : store.getResource(id),
+      ),
+    );
     const matches = resources.filter(
       r =>
         String(r.get(core.properties.parent)).split('?')[0] ===
@@ -86,6 +90,7 @@ async function readLocalInstallationSubjects(
     throw new Error(
       'Local installation query failed or is incomplete; refusing to create duplicates',
     );
+
   return result.subjects;
 }
 
@@ -101,7 +106,7 @@ export function ensureLocalInstallationResource(
 /** Schema recovery must use the same local identity authority as installation. */
 export function localSchemaStore(store: Store) {
   return {
-    getResource: store.getResource.bind(store),
+    getResource: store.getLocalResource.bind(store),
     newResource: store.newResource.bind(store),
     findByLocalId: async (drive: string, parent: string, localId: string) => {
       const subjects = await readLocalInstallationSubjects(
@@ -111,7 +116,7 @@ export function localSchemaStore(store: Store) {
         localId,
       );
       const resources = await Promise.all(
-        subjects.map(s => store.getResource(s)),
+        subjects.map(s => store.getLocalResource(s)),
       );
       const matches = resources.filter(
         r =>
@@ -122,6 +127,7 @@ export function localSchemaStore(store: Store) {
         throw new Error(
           'Duplicate local schema identity; resolve before importing',
         );
+
       return matches[0];
     },
   };

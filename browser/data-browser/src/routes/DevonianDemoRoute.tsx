@@ -32,11 +32,14 @@ function DevonianDemo() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [text, setText] = useState('');
+
   const run = async (work: () => Promise<Demo | undefined>) => {
     setBusy(true);
     setError('');
+
     try {
       const current = await work();
+
       if (current) {
         setDemo({ ...current });
         setRows(await demoRows(store, current));
@@ -47,6 +50,7 @@ function DevonianDemo() {
       setBusy(false);
     }
   };
+
   const resumed = useRef(false);
   useEffect(() => {
     if (resumed.current) return;
@@ -59,10 +63,13 @@ function DevonianDemo() {
         const credential = secret;
         setSecret('');
         await connectDemo(store, { repository, proxy }, credential);
+
         return;
       }
+
       const opened = await openDemo(store, { sample, repository, proxy });
       if (sample) await syncDemo(store, opened);
+
       return opened;
     });
   const sync = () =>
@@ -70,6 +77,7 @@ function DevonianDemo() {
       if (!demo) return;
       const count = await syncDemo(store, demo);
       setStatus(`Synchronized ${count} issues and comments.`);
+
       return demo;
     });
   const edit = (
@@ -83,8 +91,10 @@ function DevonianDemo() {
         await editAtomic(store, demo, command, id as string, text);
       else await editFixture(demo, command, id as number, text);
       setText('');
+
       return demo;
     });
+
   return (
     <Main>
       <ContainerWide>
@@ -281,6 +291,7 @@ function DevonianDemo() {
     </Main>
   );
 }
+
 export const devonianDemoRouteLazy = createLazyRoute('/app/devonian-demo')({
   component: DevonianDemo,
 });

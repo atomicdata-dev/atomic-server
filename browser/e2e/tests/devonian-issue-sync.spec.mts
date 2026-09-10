@@ -37,17 +37,22 @@ test('Devonian syncs issue creation, state and comments both ways through the br
   // Keep static app assets available even when frontend and AtomicServer share an origin.
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
+
     if (/^\/(integration-proxy|plugin-run|commit)(\/|$)/.test(url.pathname)) {
       forbidden.push(url.pathname);
+
       return route.abort();
     }
+
     if (
       url.origin === new URL(SERVER_URL).origin &&
       url.origin !== new URL(FRONTEND_URL).origin
     )
       return route.abort();
+
     return route.continue();
   });
+
   try {
     await page.goto(`${FRONTEND_URL}/app/dev-drive`);
     await page.waitForURL(/app\/show\?subject=/, { timeout: 60000 });
@@ -64,6 +69,7 @@ test('Devonian syncs issue creation, state and comments both ways through the br
     await page
       .getByRole('button', { name: 'Connect test account', exact: true })
       .click();
+
     const sync = async () => {
       const button = page.getByRole('button', {
         name: 'Sync now',
@@ -73,6 +79,7 @@ test('Devonian syncs issue creation, state and comments both ways through the br
       await expect(button).toBeEnabled();
       await expect(page.getByRole('alert')).toHaveCount(0);
     };
+
     await expect(
       page.getByRole('button', { name: 'Sync now', exact: true }),
     ).toBeVisible();
