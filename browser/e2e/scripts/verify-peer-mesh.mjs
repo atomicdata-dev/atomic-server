@@ -17,7 +17,9 @@ if (!signalingUrl)
   );
 const vite = await createServer({
   configFile: false,
-  define: { 'import.meta.env.VITE_ATOMIC_SIGNALING_URL': JSON.stringify(signalingUrl) },
+  define: {
+    'import.meta.env.VITE_ATOMIC_SIGNALING_URL': JSON.stringify(signalingUrl),
+  },
   root,
   cacheDir: join(root, 'browser/node_modules/.vite/peer-acceptance'),
   optimizeDeps: { entries: ['browser/e2e/scripts/peer-sync-harness.ts'] },
@@ -117,20 +119,30 @@ try {
   if (automatic) {
     // The devices now have trusted local snapshots, as after normal drive access.
     // Discard the explicit transport and discover with no saved invitation.
-    for (const page of pages) await page.evaluate(async drive => {
-      window.automaticDrive = drive;
-      window.link.close();
-      await window.state.db.flush();
-      window.discovery = await import('/browser/data-browser/src/helpers/browserPeerSync.ts');
-      window.addEventListener('atomic-peer-link-changed', () => {
-        window.peerStatus = window.discovery.peerLinkStatus(window.automaticDrive);
+    for (const page of pages)
+      await page.evaluate(async drive => {
+        window.automaticDrive = drive;
+        window.link.close();
+        await window.state.db.flush();
+        window.discovery =
+          await import('/browser/data-browser/src/helpers/browserPeerSync.ts');
+        window.addEventListener('atomic-peer-link-changed', () => {
+          window.peerStatus = window.discovery.peerLinkStatus(
+            window.automaticDrive,
+          );
+        });
+      }, drive);
+    room = await pages[0].evaluate(
+      drive => window.discovery.automaticPeerRoom(drive),
+      drive,
+    );
+    connect = page =>
+      page.evaluate(async () => {
+        await window.discovery.discoverPeerDrives(window.state.store);
+        window.link = {
+          close: () => window.discovery.stopPeerLinks(window.state.store),
+        };
       });
-    }, drive);
-    room = await pages[0].evaluate(drive => window.discovery.automaticPeerRoom(drive), drive);
-    connect = page => page.evaluate(async () => {
-      await window.discovery.discoverPeerDrives(window.state.store);
-      window.link = { close: () => window.discovery.stopPeerLinks(window.state.store) };
-    });
     for (const page of pages) await connect(page);
   }
 
