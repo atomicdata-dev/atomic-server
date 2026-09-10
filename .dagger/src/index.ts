@@ -764,7 +764,7 @@ export class AtomicServer {
           'atomic-server',
           '--no-default-features',
           '--features',
-          'light',
+          'light,wasm-plugins',
         ])
         .withExec([
           'cp',
@@ -1137,7 +1137,10 @@ export class AtomicServer {
       // data-browser/src/config.ts.
       buildContainer = buildContainer
         .withEnvVariable('VITE_E2E', 'true')
-        .withEnvVariable('VITE_INTEGRATION_PROXY_URL', 'http://127.0.0.1:19090');
+        .withEnvVariable(
+          'VITE_INTEGRATION_PROXY_URL',
+          'http://127.0.0.1:19090',
+        );
     }
 
     return buildContainer.withExec(['pnpm', 'run', 'build']);
@@ -1268,11 +1271,9 @@ export class AtomicServer {
     // `rustBuildSlim`'s glibc path (different symptom there — ABI mismatch,
     // not a missing binary — same root cause).
     //
-    // E2E exception: `plugin.spec.ts` needs `wasm-plugins` so the test
-    // plugin's `after_commit` can rename folders. `light` is https-only and
-    // silently makes that assertion hang until timeout. Defaults minus
-    // `vector-search` (the ort/musl gap above) is enough — wasmtime builds
-    // fine on this musl-cross image.
+    // All server builds include `wasm-plugins`: plugin handlers are compiled
+    // unconditionally, and the E2E suite also executes server-side plugins.
+    // `vector-search` remains excluded because of the ort/musl gap above.
     let wasmPluginsEnabled = false;
     if (target.includes('musl')) {
       if (e2e) {
@@ -1283,7 +1284,12 @@ export class AtomicServer {
         );
         wasmPluginsEnabled = true;
       } else {
-        buildArgs.push('--no-default-features', '--features', 'light');
+        buildArgs.push(
+          '--no-default-features',
+          '--features',
+          'light,wasm-plugins',
+        );
+        wasmPluginsEnabled = true;
       }
     }
     // A named profile lands in `target/<triple>/<profile>/`, not `release/`.
