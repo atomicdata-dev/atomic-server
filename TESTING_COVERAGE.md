@@ -621,3 +621,5 @@ without resize parameters. Deployment acceptance must recheck their resized
 URLs and confirm the rejected-write rate falls after clients update.
 
 Automatic browser discovery: `browser/data-browser/src/helpers/browserPeerSync.test.ts` verifies deterministic per-drive rooms, automatic startup for locally snapshotted drives, duplicate prevention, and skipping unknown snapshots. `ATOMIC_PEER_AUTOMATIC=1` with `verify-peer-mesh.mjs` verifies eight browsers rediscover trusted local drives without saved invitations, then sync creations, presence, attachments, reconnects and deletion. Full app UI acceptance remains separate.
+
+The WebSocket unit suite also covers a socket closing while an asynchronous version-vector probe is computed: no SYNC is sent on the closed connection. General UI tests stub public discovery with an empty room; the separate peer mesh acceptance script still exercises real signaling and authenticated sync.

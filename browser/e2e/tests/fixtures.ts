@@ -49,9 +49,28 @@ export const test = base.extend<{
         entries.push({ ...entry, expected: !!match });
       };
 
-      const watch = (context: BrowserContext) => {
+      const watch = async (context: BrowserContext) => {
         if (watched.has(context)) return;
         watched.add(context);
+
+        // General UI tests use an empty discovery room, independent of public
+        // service availability. verify-peer-mesh.mjs separately exercises real
+        // signaling, authenticated WebRTC, persistence and reconciliation.
+        await context.routeWebSocket(
+          /^wss:\/\/(?:staging\.)?atomicserver\.eu\/webrtc-signal$/,
+          socket => {
+            socket.onMessage(message => {
+              if (
+                typeof message === 'string' &&
+                JSON.parse(message).type === 'join'
+              ) {
+                socket.send(
+                  JSON.stringify({ type: 'joined', peers: [], iceServers: [] }),
+                );
+              }
+            });
+          },
+        );
 
         const onConsole = (msg: import('@playwright/test').ConsoleMessage) => {
           const kind = msg.type();
@@ -85,13 +104,13 @@ export const test = base.extend<{
       browser.newContext = async options => {
         const context = await newContext.call(browser, options);
         ownedContexts.add(context);
-        watch(context);
+        await watch(context);
 
         return context;
       };
 
-      watch(defaultContext);
-      browser.contexts().forEach(watch);
+      await watch(defaultContext);
+      await Promise.all(browser.contexts().map(watch));
 
       try {
         await use({

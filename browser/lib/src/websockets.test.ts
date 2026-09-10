@@ -267,6 +267,27 @@ describe('WSClient drive sync probe', () => {
     client.close();
   });
 
+  it('does not send a sync probe after the socket closes during computation', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(store, 'computeDriveSyncState').mockImplementation(async () => {
+      socket.readyState = 3;
+
+      return {
+        drive: 'did:ad:drive',
+        driveHash: 'hash',
+        peers: [],
+        resources: {},
+      } as never;
+    });
+    await (
+      client as unknown as { startVVSync: (drive: string) => Promise<void> }
+    ).startVVSync('did:ad:drive');
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(0);
+    client.close();
+  });
+
   it('stops range reconciliation when the identity changes between replies', async ({
     expect,
   }) => {

@@ -32,7 +32,7 @@ test.describe('saved drives', () => {
     });
     await page.goto(`${FRONTEND_URL}/app/show?${search}`);
     await expect
-      .poll(() => page.evaluate(() => window.store.getDrive()))
+      .poll(() => page.evaluate(() => window.store?.getDrive()))
       .toBe(original);
     await expect(currentDriveTitle(page)).toHaveText(originalTitle!);
     await expect
