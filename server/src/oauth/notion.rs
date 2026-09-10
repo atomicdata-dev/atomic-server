@@ -1,8 +1,10 @@
 //! Notion authorization adapter shared by local and managed deployments.
+use super::provider::Provider;
 use crate::errors::{AtomicServerError, AtomicServerResult as Result};
 use serde_json::{json, Value};
 
 pub(crate) async fn exchange_code(
+    provider: &Provider,
     client_id: &str,
     secret: &str,
     callback: &str,
@@ -14,7 +16,7 @@ pub(crate) async fn exchange_code(
         .build()
         .map_err(|_| "Could not initialize Notion authorization")?;
     let response = client
-        .post("https://api.notion.com/v1/oauth/token")
+        .post(provider.token.as_str())
         .basic_auth(client_id, Some(secret))
         .json(&json!({"grant_type":"authorization_code","code":code,"redirect_uri":callback}))
         .send()

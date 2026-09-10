@@ -1,0 +1,8 @@
+[
+  {
+    "id": "notion",
+    "origin": "https://api.notion.com",
+    "token_path": "/v1/oauth/token",
+    "authorize_path": "/v1/oauth/authorize"
+  }
+]

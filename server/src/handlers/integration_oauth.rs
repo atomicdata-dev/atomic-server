@@ -333,8 +333,15 @@ pub async fn finish(
             .filter(|s| !s.is_empty() && s.len() < 4096)
             .ok_or("Notion did not return an authorization code")?;
         let config = Config::load()?;
-        crate::oauth::notion::exchange_code(&config.client, &config.secret, &config.callback, code)
-            .await?
+        let provider = crate::oauth::provider::load("notion")?;
+        crate::oauth::notion::exchange_code(
+            &provider,
+            &config.client,
+            &config.secret,
+            &config.callback,
+            code,
+        )
+        .await?
     };
     let token = data["access_token"]
         .as_str()

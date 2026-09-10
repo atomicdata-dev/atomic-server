@@ -229,7 +229,10 @@ async fn callback(
         .filter(|s| !s.is_empty() && s.len() < 4096)
     {
         let callback = format!("{}/oauth-service/notion/callback", s.public_url);
-        match notion::exchange_code(&s.client_id, &s.client_secret, &callback, code).await {
+        let provider = crate::oauth::provider::load("notion")?;
+        match notion::exchange_code(&provider, &s.client_id, &s.client_secret, &callback, code)
+            .await
+        {
             Ok(data) => json!({"credentials":data}),
             Err(_) => json!({"error":"Could not finish Notion sign-in. Connect again."}),
         }
