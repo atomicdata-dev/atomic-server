@@ -1,3 +1,4 @@
+import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Agent, JSCryptoProvider, core, useStore } from '@tomic/react';
@@ -153,7 +154,7 @@ export function NewIdentitySection({
       // guest uses; `enableCloudSyncForDrive` lifts it when a node is
       // assigned. Registered right after `setAgent` and before anything
       // async, so no consumer can mount `useResource(agent)` and fetch first.
-      if (isOriginWithoutNode(store.getServerUrl())) {
+      if (getManagedPortalUrl() || isOriginWithoutNode(store.getServerUrl())) {
         store.registerLocalOnlyDrive(agentDID);
         store.registerLocalOnlyDrive(await newAgent.privateDriveSubject());
       }

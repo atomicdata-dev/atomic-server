@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { core, server, useStore } from '@tomic/react';
+import { driveDisplayMetadata } from '../helpers/managed/driveDisplayMetadata';
 import { hasManagedApi, managedFetch } from '../helpers/managed/api';
 import { evaluateIdentityReconciliation } from '../helpers/managed/reconcile';
 import { readManagedAccountBinding } from '../helpers/managed/binding';
@@ -88,16 +89,17 @@ export function useAccountDriveCatalog(local: string[]) {
             subjects.push(resource.subject);
         }
 
-        const entries = [...new Set(subjects)].map(subject => {
-          const resource = store.resources.get(subject);
+        const entries = await Promise.all(
+          [...new Set(subjects)].map(async subject => {
+            const metadata = await driveDisplayMetadata(store, subject);
 
-          return {
-            drive_subject: subject,
-            drive_name: resource?.get(core.properties.name) as
-              | string
-              | undefined,
-          };
-        });
+            return {
+              drive_subject: subject,
+              drive_name: metadata.name,
+              drive_emoji: metadata.emoji,
+            };
+          }),
+        );
         await sync.refresh(entries);
       } catch {
         /* Keep the last successful list; reconnect/focus retries. */

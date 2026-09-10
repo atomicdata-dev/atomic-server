@@ -1041,3 +1041,20 @@ Corrections to what this page previously claimed:
 - `UNSUB` was said to work. It did not, until this revision.
 - `SYNC_DIFF.remove` was said to be optional. The encoder always emits it;
   only decoders tolerate its absence.
+
+### Browser invitation bootstrap over WebRTC
+
+Browser-only drive invitations are signed JSON-AD invite tokens with
+`https://atomicdata.dev/properties/invite/transport` set to `webrtc`. The
+transport marker is included in the signature. These are not redeemed at a
+data node's `/invites` endpoint.
+
+The recipient pins the token issuer as its expected peer for the unknown drive.
+After verifying that issuer's channel-bound AUTH, it sends its own channel-bound
+AUTH with an optional `browserInvite` string carrying the signed token. This
+field is sent only over the authenticated WebRTC connection, never signaling.
+The issuer validates its own token, expiry, target and recipient proof, checks
+its current write authority, and saves a normal signed ACL commit granting the
+requested access. Ordinary peer AUTH/ACL checks then run before any sync data is
+sent. Other peers cannot redeem an issuer's token. Reconnecting after a trusted
+local snapshot exists uses normal ACL authentication without re-redeeming it.

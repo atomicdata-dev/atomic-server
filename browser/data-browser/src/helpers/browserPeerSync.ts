@@ -10,6 +10,7 @@ export interface SavedPeerLink {
   room: string;
   signalingUrl: string;
   expectedPeer?: string;
+  invitation?: string;
 }
 const active = new WeakMap<Store, Map<string, BrowserPeerSync>>();
 const statuses = new Map<string, string>();
@@ -54,6 +55,8 @@ export function savePeerLink(store: Store, link: SavedPeerLink): void {
   localStorage.setItem(key(store), JSON.stringify([...links, link]));
   active.get(store)?.get(link.drive)?.close();
   active.get(store)?.delete(link.drive);
+  active.get(store)?.get(`automatic:${link.drive}`)?.close();
+  active.get(store)?.delete(`automatic:${link.drive}`);
   window.dispatchEvent(new Event(PEER_LINK_CHANGED));
 }
 
@@ -111,7 +114,8 @@ export function stopPeerLinks(store: Store): void {
 export function defaultPeerSignalingUrl(): string {
   const portal =
     import.meta.env.VITE_MANAGED_PORTAL_URL ||
-    (window.location.hostname === 'app.staging.atomicserver.eu'
+    (window.location.hostname === 'staging.atomicserver.eu' ||
+    window.location.hostname.endsWith('.staging.atomicserver.eu')
       ? 'https://staging.atomicserver.eu'
       : 'https://atomicserver.eu');
   const endpoint = new URL(
@@ -208,7 +212,8 @@ export async function discoverPeerDrives(store: Store): Promise<void> {
         !resource.isReady() ||
         resource.error ||
         !resource.hasClasses(server.classes.drive) ||
-        links.has(id)
+        links.has(id) ||
+        savedPeerLinks(store).some(link => link.drive === drive)
       )
         continue;
 

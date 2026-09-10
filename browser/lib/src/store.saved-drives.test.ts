@@ -50,3 +50,20 @@ describe('recording a new drive on the personal drive', () => {
     expect(store.getAllSubjects().length).toBe(before);
   });
 });
+
+it('a local-only additional drive never posts its data to the selected server', async () => {
+  const { store, posted } = await testStore();
+  await store.ensurePrivateDrive();
+  posted.length = 0;
+  const drive = await store.createDrive('Browser collaboration', {
+    personal: false,
+    localOnly: true,
+  });
+  expect(store.isLocalOnlyDrive(drive.subject)).toBe(true);
+  const ontology = drive.get(server.properties.defaultOntology);
+  expect(
+    posted.some(
+      commit => commit.subject === drive.subject || commit.subject === ontology,
+    ),
+  ).toBe(false);
+});

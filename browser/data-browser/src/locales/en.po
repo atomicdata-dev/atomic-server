@@ -910,7 +910,6 @@ msgid "App menu"
 msgstr "App menu"
 
 #: src/components/SideBar/SideBarDrive.tsx
-#: src/views/ErrorPage.tsx
 msgid "Unauthorized"
 msgstr "Unauthorized"
 
@@ -1053,12 +1052,12 @@ msgstr "Copy secret to continue"
 
 #: src/views/ErrorPage.tsx
 #: src/views/ErrorPage.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Retry"
 msgstr "Retry"
 
-#: src/views/ErrorPage.tsx
-msgid "You don't have access to this, try signing in:"
-msgstr "You don't have access to this, try signing in:"
+#~ msgid "You don't have access to this, try signing in:"
+#~ msgstr "You don't have access to this, try signing in:"
 
 #. 0: resource.subject
 #: src/views/ErrorPage.tsx
@@ -3723,6 +3722,7 @@ msgstr "Enter an Atomic URL or search  (press \"/\")"
 msgid "Search"
 msgstr "Search"
 
+#: src/components/InviteForm.tsx
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/reconcile.test.ts
 #: src/helpers/managed/reconcile.ts
@@ -3963,9 +3963,8 @@ msgstr "Restoring…"
 msgid "Restore & sign in"
 msgstr "Restore & sign in"
 
-#: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Sign in to access this drive"
-msgstr "Sign in to access this drive"
+#~ msgid "Sign in to access this drive"
+#~ msgstr "Sign in to access this drive"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter your agent secret to unlock this drive on this device."
@@ -4887,6 +4886,7 @@ msgstr "Developer"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 #: src/routes/SyncRoute.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Connecting…"
 msgstr "Connecting…"
 
@@ -5702,6 +5702,7 @@ msgstr "Account recovery"
 msgid "Could not show your secret."
 msgstr "Could not show your secret."
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 msgid "Unlocking…"
 msgstr "Unlocking…"
@@ -6897,20 +6898,16 @@ msgstr "Storing…"
 msgid "Store it with {0}"
 msgstr "Store it with {0}"
 
-#. 0: PRODUCT_NAME
-#: src/components/AccountRecoveryCard.tsx
-msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
-msgstr "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
+#~ msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
+#~ msgstr "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in."
 msgstr "{0}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in."
 
-#. 0: ' '; 1: `${ [hasPasskey && 'your passkey', hasCode && 'your recovery code'] .filter(Boolean) .join(' or ') || 'your recovery password' }${deviceOnly ? ', on this device' \\: ''}.`
-#: src/components/AccountRecoveryCard.tsx
-msgid "You can get back in with:{0} {1}"
-msgstr "You can get back in with:{0} {1}"
+#~ msgid "You can get back in with:{0} {1}"
+#~ msgstr "You can get back in with:{0} {1}"
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. One you carry has a code instead, shown below."
@@ -7648,9 +7645,8 @@ msgstr "Your selected avatar"
 #~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
 #~ msgstr "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
 
-#: src/components/InviteForm.tsx
-msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
-msgstr "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+#~ msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+#~ msgstr "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
@@ -7776,6 +7772,7 @@ msgid "A recovery code is a spare key for when your passkey isn't available. You
 msgstr "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
 
 #: src/components/AccountRecoveryCard.tsx
+#: src/components/AccountRecoveryCard.tsx
 msgid "Add a passkey"
 msgstr "Add a passkey"
 
@@ -7896,18 +7893,122 @@ msgstr "Manage this drive’s plan →"
 msgid "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
 msgstr "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Could not update your passkey."
-msgstr "Could not update your passkey."
+#~ msgid "Could not update your passkey."
+#~ msgstr "Could not update your passkey."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Create a compatible account passkey"
 msgstr "Create a compatible account passkey"
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Use one passkey for sign-in and recovery"
-msgstr "Use one passkey for sign-in and recovery"
+#~ msgid "Use one passkey for sign-in and recovery"
+#~ msgstr "Use one passkey for sign-in and recovery"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
 msgstr "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Unlock this drive"
+msgstr "Unlock this drive"
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "You’re signed in as"
+msgstr "You’re signed in as"
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid ", but this browser needs your account key to open this private drive. Paste your saved agent secret below. No account recovery backup is available."
+msgstr ", but this browser needs your account key to open this private drive. Paste your saved agent secret below. No account recovery backup is available."
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Loading account"
+msgstr "Loading account"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock with recovery code"
+msgstr "Unlock with recovery code"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Setting up passkey…"
+msgstr "Setting up passkey…"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Continue with passkey"
+msgstr "Continue with passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not update your passkey. Please try again."
+msgstr "Could not update your passkey. Please try again."
+
+#: src/views/ErrorPage.tsx
+msgid "Use another account"
+msgstr "Use another account"
+
+#: src/views/ErrorPage.tsx
+msgid "This account does not have access"
+msgstr "This account does not have access"
+
+#: src/views/ErrorPage.tsx
+msgid "You’re signed in, but this account cannot read this resource. Open it with the account that owns it, or ask its owner to share it with you."
+msgstr "You’re signed in, but this account cannot read this resource. Open it with the account that owns it, or ask its owner to share it with you."
+
+#: src/components/InviteForm.tsx
+msgid "Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server."
+msgstr "Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server."
+
+#: src/routes/InviteRoute.tsx
+msgid "Invalid invitation."
+msgstr "Invalid invitation."
+
+#: src/views/PeerInvitePage.tsx
+msgid "Could not join this drive."
+msgstr "Could not join this drive."
+
+#~ msgid "Connected to"
+#~ msgstr "Connected to"
+
+#~ msgid "You're invited to {0} this drive"
+#~ msgstr "You're invited to {0} this drive"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Invitation unavailable"
+msgstr "Invitation unavailable"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Join drive"
+msgstr "Join drive"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Looking for the inviter’s browser…"
+msgstr "Looking for the inviter’s browser…"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Sign in to join"
+msgstr "Sign in to join"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Open drive"
+msgstr "Open drive"
+
+#: src/views/PeerInvitePage.tsx
+msgid "This invitation is invalid or has expired. Ask for a new invitation."
+msgstr "This invitation is invalid or has expired. Ask for a new invitation."
+
+#: src/views/PeerInvitePage.tsx
+msgid "This drive syncs between browsers. The person who invited you needs to keep their browser open while you join."
+msgstr "This drive syncs between browsers. The person who invited you needs to keep their browser open while you join."
+
+#~ msgid "Disconnected"
+#~ msgstr "Disconnected"
+
+#. 0: status
+#: src/components/BrowserPeerPanel.tsx
+msgid "Browser sync · {0}"
+msgstr "Browser sync · {0}"
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to edit this drive"
+msgstr "You're invited to edit this drive"
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to view this drive"
+msgstr "You're invited to view this drive"

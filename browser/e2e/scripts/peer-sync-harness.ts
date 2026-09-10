@@ -66,3 +66,4 @@ export async function createDrive(store: Store) {
   return drive.subject;
 }
 export { BrowserPeerSync, core };
+export { generateInviteToken } from '../../lib/src/invites.js';
