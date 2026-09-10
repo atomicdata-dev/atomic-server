@@ -141,6 +141,15 @@ async fn unknown_link_target_parameter_fails_before_http() {
     assert!(requests.lock().unwrap().is_empty());
 }
 
+#[test]
+fn root_parameters_exclude_link_and_item_identity_bindings() {
+    let model = syncables::discover_resource_model(&document(false)).unwrap();
+    assert_eq!(
+        model.root_parameters(),
+        ["format".to_string()].into_iter().collect()
+    );
+}
+
 #[derive(Clone, Default)]
 struct PagingFetch {
     requests: Arc<Mutex<Vec<String>>>,

@@ -151,6 +151,8 @@ pub struct ManagedRead {
     pub id_field: String,
     /// Path parameters required to invoke and namespace the read.
     pub context_params: Vec<String>,
+    /// Parameters supplied by the resource's own identity binding.
+    pub identity_params: Vec<String>,
 }
 
 /// How a collection's context variable is filled: enumerate `collection`
@@ -227,6 +229,41 @@ impl ResourceModel {
     #[must_use]
     pub fn provider_for(&self, param: &str) -> Option<&ContextProvider> {
         self.providers.get(param)
+    }
+
+    /// Parameters a caller must configure to start traversal at root
+    /// collections and standalone object reads. Link-bound, parent-provided,
+    /// and per-item identity parameters are excluded.
+    #[must_use]
+    pub fn root_parameters(&self) -> std::collections::BTreeSet<String> {
+        let linked_targets: std::collections::BTreeSet<_> = self
+            .links
+            .iter()
+            .flat_map(|link| link.parameters.keys().map(|(_, name)| name.clone()))
+            .collect();
+        let mut parameters = std::collections::BTreeSet::new();
+        for collection in &self.collections {
+            for param in &collection.context_params {
+                if self.provider_for(param).is_none() && !linked_targets.contains(param) {
+                    parameters.insert(param.clone());
+                }
+            }
+        }
+        for read in &self.reads {
+            let is_linked = self
+                .links
+                .iter()
+                .any(|link| link.target == LinkTarget::Read(read.name.clone()));
+            if is_linked {
+                continue;
+            }
+            for param in &read.context_params {
+                if !read.identity_params.contains(param) && self.provider_for(param).is_none() {
+                    parameters.insert(param.clone());
+                }
+            }
+        }
+        parameters
     }
 }
 
@@ -368,6 +405,11 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
             .find(|c| c.resource == crud.resource)
             .map(|c| c.id_field.clone())
             .unwrap_or_else(|| "id".to_string());
+        let identity_params = collections
+            .iter()
+            .find(|collection| collection.resource == crud.resource && collection.item_url == *url)
+            .map(|collection| collection.identity_params.clone())
+            .unwrap_or_default();
         reads.push(ManagedRead {
             name: operation
                 .operation_id
@@ -377,6 +419,7 @@ pub fn discover_resource_model(document: &OpenApiDocument) -> Result<ResourceMod
             url: url.clone(),
             id_field,
             context_params: path_variables(url),
+            identity_params,
         });
     }
 

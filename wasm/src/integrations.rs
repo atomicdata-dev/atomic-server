@@ -1,5 +1,5 @@
 //! Browser Syncables bridge: catalog parsing, typed previews, no filesystem or server.
-use crate::calendar_import::{scope_calendar, CalendarRange};
+use crate::calendar_import::apply_query_overrides;
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -59,13 +59,7 @@ async fn document(text: &str) -> std::result::Result<syncables::OpenApiDocument,
 pub async fn describe_integration(text: String) -> std::result::Result<String, JsValue> {
     let doc = document(&text).await?;
     let model = syncables::discover_resource_model(&doc).map_err(js_error)?;
-    let parameters: BTreeSet<_> = model
-        .collections
-        .iter()
-        .flat_map(|c| c.context_params.iter())
-        .filter(|p| model.provider_for(p).is_none())
-        .cloned()
-        .collect();
+    let parameters = model.root_parameters();
     Ok(json!({"parameters": parameters, "collections": model.collections.iter().map(|c| &c.name).collect::<Vec<_>>(),
         "upstream": syncables::base_url(&doc)}).to_string())
 }
@@ -78,12 +72,8 @@ pub async fn fetch_integration(
     fetch: js_sys::Function,
 ) -> std::result::Result<String, JsValue> {
     let mut value = syncables::openapi::load::parse_yaml(&text).map_err(js_error)?;
-    if let Some(range) = range {
-        if platform != "google-calendar" {
-            return Err(js_error("Calendar range only applies to Google Calendar"));
-        }
-        let range: CalendarRange = serde_json::from_str(&range).map_err(js_error)?;
-        scope_calendar(&mut value, &range).map_err(js_error)?;
+    if let Some(overrides) = range {
+        apply_query_overrides(&mut value, &overrides).map_err(js_error)?;
     }
     // Patch the raw catalog before refs are expanded into resource schemas.
     let doc = syncables::load_open_api_document(value)
