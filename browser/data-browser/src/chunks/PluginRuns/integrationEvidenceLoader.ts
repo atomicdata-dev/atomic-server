@@ -1,7 +1,7 @@
 // @wc-ignore-file
 import github from '../../../../../integrations/github-issues/plugin.js?raw';
-import notion from '../../../../../integrations/notion/plugin.js?raw';
-import clockify from '../../../../../integrations/clockify/plugin.js?raw';
+import notion from '@localthought/atomic-integrations/notion/plugin.js?raw';
+import clockify from '@localthought/atomic-integrations/clockify/plugin.js?raw';
 import mt940 from '../../../../../integrations/mt940/plugin.js?raw';
 import pets from '../../../../../integrations/pets/plugin.js?raw';
 import report from '../../../../../integrations/evidence.json';

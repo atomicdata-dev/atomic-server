@@ -7,7 +7,7 @@ import { AtomicLink } from '@components/AtomicLink';
 import { pluginWorkspace } from '@tomic/react';
 import { Tabs } from '@components/Tabs';
 import { IntegrationDefaultView } from './IntegrationDataView';
-import { ClockifyUpgrade } from './ClockifyUpgrade';
+import { ClockifyUpgrade } from '@localthought/atomic-integrations';
 import { AutomationIntegrations } from './AutomationIntegrations';
 import {
   AutomationWorkspace,

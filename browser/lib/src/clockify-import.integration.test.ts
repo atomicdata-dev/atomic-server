@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { importEntries } from '../../../integrations/clockify/plugin.js';
-import { type Config } from '../../../integrations/clockify/model.js';
+import { importEntries } from '@localthought/atomic-integrations/clockify';
+type Config = Parameters<typeof importEntries>[1];
 import { testStore } from './test-store.js';
 import { timeTrackingSchema } from './time-tracking-schema.js';
 import { parseVerdict } from './plugin-run.js';

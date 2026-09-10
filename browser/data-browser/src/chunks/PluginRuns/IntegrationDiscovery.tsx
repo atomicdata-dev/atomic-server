@@ -1,20 +1,17 @@
-import { lazy, Suspense } from 'react';
+import { Suspense, type ComponentType } from 'react';
 import { Card } from '@components/Card';
 import { Column } from '@components/Row';
 import { Button } from '@components/Button';
 import { Dialog, useDialog } from '@components/Dialog';
 import { IntegrationEvidence } from './IntegrationEvidence';
+import { integrationRegistry } from '@localthought/atomic-integrations';
+import { ImportMT940 } from './ImportMT940';
 
-const NotionSetup = lazy(() =>
-  import('./ConnectNotion').then(m => ({ default: m.ConnectNotion })),
-);
-
-const ClockifySetup = lazy(() =>
-  import('./ConnectClockify').then(m => ({ default: m.ConnectClockify })),
-);
-
-const MT940Setup = lazy(() =>
-  import('./ImportMT940').then(m => ({ default: m.ImportMT940 })),
+const externalSetup = new Map(
+  integrationRegistry.map(({ id, Component }) => [
+    id,
+    Component as ComponentType<{ drive: string; workspace?: string }>,
+  ]),
 );
 
 export function bundledIntegrations() {
@@ -105,15 +102,18 @@ export function IntegrationDiscovery({
         </Dialog.Title>
         <Dialog.Content>
           <Suspense fallback={<p>Loading setup…</p>}>
+            {isOpen && drive && entry.id === 'mt940' && (
+              <ImportMT940 drive={drive} />
+            )}
             {isOpen &&
               drive &&
-              (entry.id === 'mt940' ? (
-                <MT940Setup drive={drive} />
-              ) : entry.id === 'clockify' ? (
-                <ClockifySetup drive={drive} workspace={workspace} />
-              ) : (
-                <NotionSetup drive={drive} />
-              ))}
+              entry.id !== 'mt940' &&
+              (() => {
+                const Setup = externalSetup.get(entry.id);
+                return Setup ? (
+                  <Setup drive={drive} workspace={workspace} />
+                ) : null;
+              })()}
           </Suspense>
         </Dialog.Content>
       </Dialog>
