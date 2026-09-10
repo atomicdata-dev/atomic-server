@@ -14,13 +14,11 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
-const SOURCE: &str = include_str!("../../../integrations/notion/plugin.js");
+// Vendored from localthought/devonian's atomic-integrations package.
+const SOURCE: &str = include_str!("fixtures/notion/plugin.js");
 fn declared_manifest() -> super::manifest::Manifest {
     super::manifest::Manifest::parse(
-        serde_json::from_str(include_str!(
-            "../../../integrations/notion/manifest.fixture.json"
-        ))
-        .unwrap(),
+        serde_json::from_str(include_str!("fixtures/notion/manifest.fixture.json")).unwrap(),
     )
     .unwrap()
     .unwrap()

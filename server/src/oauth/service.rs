@@ -1,6 +1,6 @@
 //! Optional shared authorization HTTP service. Only provisioned AtomicServers
 //! may create/redeem attempts; the provider callback uses random single-use state.
-use super::{handoff, notion};
+use super::{exchange, handoff, provider};
 use crate::errors::{AtomicServerError, AtomicServerResult as Result};
 use actix_web::{web, HttpRequest, HttpResponse};
 use atomic_lib::{db::trees::Tree, Db};
@@ -12,8 +12,7 @@ pub struct AuthorizationService {
     db: Db,
     clients: BTreeMap<String, String>,
     public_url: String,
-    client_id: String,
-    client_secret: String,
+    credentials: BTreeMap<String, (String, String)>,
 }
 fn now() -> i64 {
     atomic_lib::utils::now()
@@ -65,17 +64,21 @@ impl AuthorizationService {
                 "Authorization service clients need unique IDs and strong per-server tokens".into(),
             );
         }
-        let client_id = env("ATOMIC_NOTION_CLIENT_ID")?;
-        let client_secret = env("ATOMIC_NOTION_CLIENT_SECRET")?;
-        if client_id.is_empty() || client_secret.is_empty() {
-            return Err("Notion OAuth credentials are empty".into());
+        let credentials: BTreeMap<String, (String, String)> = provider::registered_ids()?
+            .into_iter()
+            .filter_map(|id| {
+                let p = provider::load(&id).ok()?;
+                p.credentials().ok().map(|credentials| (id, credentials))
+            })
+            .collect();
+        if credentials.is_empty() {
+            return Err("Authorization service has no configured providers".into());
         }
         Ok(Some(Arc::new(Self {
             db,
             clients,
             public_url: base_url(&public)?,
-            client_id,
-            client_secret,
+            credentials,
         })))
     }
     fn authenticate(&self, req: &HttpRequest) -> Result<String> {
@@ -141,6 +144,7 @@ impl AuthorizationService {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Attempt {
+    pub provider: String,
     pub actor: String,
     pub drive: String,
     pub attempt: String,
@@ -151,7 +155,7 @@ fn binding(server: String, b: &Attempt) -> handoff::Binding {
         actor: b.actor.clone(),
         drive: b.drive.clone(),
         attempt: b.attempt.clone(),
-        provider: "notion".into(),
+        provider: b.provider.clone(),
     }
 }
 fn private_json(v: Value) -> HttpResponse {
@@ -160,22 +164,37 @@ fn private_json(v: Value) -> HttpResponse {
         .json(v)
 }
 async fn start(
+    provider_id: web::Path<String>,
     s: web::Data<AuthorizationService>,
     req: HttpRequest,
     body: web::Json<Attempt>,
 ) -> Result<HttpResponse> {
+    let provider = provider::load(&provider_id)?;
+    if body.provider != provider.id {
+        return Err("Authorization provider does not match route".into());
+    }
+    let (client_id, _) = s
+        .credentials
+        .get(&provider.id)
+        .ok_or("Provider is not configured on this authorization service")?;
     let server = s.authenticate(&req)?;
     s.admission(&server).await?;
     let ticket = handoff::begin(&s.db, binding(server, &body), now())?;
-    let callback = format!("{}/oauth-service/notion/callback", s.public_url);
-    let mut url = url::Url::parse("https://api.notion.com/v1/oauth/authorize").unwrap();
+    let callback = format!("{}/oauth-service/{}/callback", s.public_url, provider.id);
+    let mut url = provider.authorization_url.clone();
     url.query_pairs_mut().extend_pairs([
         ("owner", "user"),
         ("response_type", "code"),
-        ("client_id", s.client_id.as_str()),
+        ("client_id", client_id.as_str()),
         ("redirect_uri", callback.as_str()),
         ("state", ticket.id.as_str()),
     ]);
+    url.query_pairs_mut().extend_pairs(
+        provider
+            .authorization_params
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str())),
+    );
     // This endpoint is server-to-server only; the local host must strip proof.
     Ok(private_json(
         json!({"id":ticket.id,"proof":ticket.proof,"url":url.as_str()}),
@@ -189,10 +208,15 @@ pub(crate) struct Redemption {
     pub binding: Attempt,
 }
 async fn redeem(
+    provider_id: web::Path<String>,
     s: web::Data<AuthorizationService>,
     req: HttpRequest,
     body: web::Json<Redemption>,
 ) -> Result<HttpResponse> {
+    let provider = provider::load(&provider_id)?;
+    if body.binding.provider != provider.id {
+        return Err("Authorization provider does not match route".into());
+    }
     let server = s.authenticate(&req)?;
     let result = handoff::redeem(
         &s.db,
@@ -217,34 +241,37 @@ struct Callback {
     error: Option<String>,
 }
 async fn callback(
+    provider_id: web::Path<String>,
     s: web::Data<AuthorizationService>,
     query: web::Query<Callback>,
 ) -> Result<HttpResponse> {
-    let binding = handoff::claim_callback(&s.db, &query.state, now()).await?;
+    let provider = provider::load(&provider_id)?;
+    let binding = handoff::claim_callback(&s.db, &query.state, &provider.id, now()).await?;
     let payload = if query.error.is_some() {
-        json!({"error":"Notion sign-in was cancelled. You can try again."})
+        json!({"error":"Provider sign-in was cancelled. You can try again."})
     } else if let Some(code) = query
         .code
         .as_ref()
         .filter(|s| !s.is_empty() && s.len() < 4096)
     {
-        let callback = format!("{}/oauth-service/notion/callback", s.public_url);
-        let provider = crate::oauth::provider::load("notion")?;
-        match notion::exchange_code(&provider, &s.client_id, &s.client_secret, &callback, code)
-            .await
-        {
+        let callback = format!("{}/oauth-service/{}/callback", s.public_url, provider.id);
+        let (client_id, client_secret) = s
+            .credentials
+            .get(&provider.id)
+            .ok_or("Provider is not configured on this authorization service")?;
+        match exchange::exchange_code(&provider, client_id, client_secret, &callback, code).await {
             Ok(data) => json!({"credentials":data}),
-            Err(_) => json!({"error":"Could not finish Notion sign-in. Connect again."}),
+            Err(_) => json!({"error":"Could not finish provider sign-in. Connect again."}),
         }
     } else {
-        json!({"error":"Notion did not return an authorization code. Connect again."})
+        json!({"error":"Provider did not return an authorization code. Connect again."})
     };
     handoff::complete(&s.db, &query.state, &binding, &payload.to_string(), now()).await?;
     Ok(HttpResponse::Ok().insert_header(("Cache-Control","no-store")).insert_header(("Referrer-Policy","no-referrer")).insert_header(("Content-Security-Policy","default-src 'none'; frame-ancestors 'none'" )).content_type("text/html; charset=utf-8").body("<!doctype html><title>Return to Atomic</title><p>Authorization finished. Return to Atomic to continue.</p>"))
 }
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/oauth-service/notion")
+        web::scope("/oauth-service/{provider}")
             .app_data(web::JsonConfig::default().limit(8192))
             .route("/start", web::post().to(start))
             .route("/redeem", web::post().to(redeem))
@@ -268,8 +295,10 @@ mod tests {
                 ("host-b".into(), TOKEN_B.into()),
             ]),
             public_url: "http://localhost:1234".into(),
-            client_id: "fixture-client".into(),
-            client_secret: "fixture-secret".into(),
+            credentials: BTreeMap::from([(
+                "notion".into(),
+                ("fixture-client".into(), "fixture-secret".into()),
+            )]),
         }
     }
     #[actix_web::test]
@@ -281,7 +310,7 @@ mod tests {
                 .configure(routes),
         )
         .await;
-        let body = json!({"actor":"alice","drive":"drive","attempt":"attempt"});
+        let body = json!({"provider":"notion","actor":"alice","drive":"drive","attempt":"attempt"});
         let anonymous = test::TestRequest::post()
             .uri("/oauth-service/notion/start")
             .set_json(&body)
@@ -413,11 +442,22 @@ mod tests {
         actix_web::rt::spawn(server);
         let client = crate::oauth::remote::Remote::new(&origin, TOKEN_A.into()).unwrap();
         let ticket = client
-            .start("alice".into(), "drive".into(), "attempt".into())
+            .start(
+                "notion".into(),
+                "alice".into(),
+                "drive".into(),
+                "attempt".into(),
+            )
             .await
             .unwrap();
         let pending = client
-            .redeem(&ticket, "alice".into(), "drive".into(), "attempt".into())
+            .redeem(
+                &ticket,
+                "notion".into(),
+                "alice".into(),
+                "drive".into(),
+                "attempt".into(),
+            )
             .await
             .unwrap();
         assert_eq!(pending, json!({"pending":true}));
@@ -438,12 +478,24 @@ mod tests {
         .await
         .unwrap();
         let result = client
-            .redeem(&ticket, "alice".into(), "drive".into(), "attempt".into())
+            .redeem(
+                &ticket,
+                "notion".into(),
+                "alice".into(),
+                "drive".into(),
+                "attempt".into(),
+            )
             .await
             .unwrap();
         assert_eq!(result["credentials"]["access_token"], "host-only");
         assert!(client
-            .redeem(&ticket, "alice".into(), "drive".into(), "attempt".into())
+            .redeem(
+                &ticket,
+                "notion".into(),
+                "alice".into(),
+                "drive".into(),
+                "attempt".into()
+            )
             .await
             .is_err());
         handle.stop(true).await;
