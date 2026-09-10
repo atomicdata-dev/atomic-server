@@ -1,6 +1,6 @@
 # Atomic Lib Runtime: HTTP-Optional Local Node
 
-> **Status:** Partial. `AtomicNode` in `lib/src/runtime/` is the binding runtime (`from_db`, `db`, the agent accessors, `query`, `apply_commit` under `IngestPolicy::{Hub, Peer, LocalCache}`); the WASM `ClientDb` is its only adapter, and the unused `open` / `get` / `mutate` / `subscribe` / `sync_with_peer` surface was cut back 2026-09-04. Open: binding the remaining adapters (#1277 / #1241).
+> **Status:** Partial. `AtomicNode` in `lib/src/runtime/` is the binding runtime (`from_db`, `db`, the agent accessors, `query`, `apply_commit` under `IngestPolicy::{Hub, Peer, LocalCache}`); WASM `ClientDb` and Tauri's embedded native handle bind it, and the unused `open` / `get` / `mutate` / `subscribe` / `sync_with_peer` surface was cut back 2026-09-04. Open: binding the remaining adapters (#1277 / #1241).
 
 ## Status
 
@@ -709,6 +709,37 @@ Tests:
 - New tests use node-level WASM calls without HTTP for local get/query/mutate.
 
 ### Phase 7: Tauri / Android Without Loopback
+
+Active implementation (2026-09-10, `codex/tauri-http-optional`):
+
+- [x] Separate the existing embedding lifecycle from HTTP binding; keep the
+  managed-node `serve_with_hook` contract intact.
+- [x] Bind Tauri's existing native operations to `AtomicNode`.
+- [x] Prove native CRUD/query survives an unavailable HTTP port, and that
+  opting into HTTP still reports binding failures.
+- [ ] Replace frontend local HTTP/WS operations with native commands/events,
+  including reads, commits, live updates, search and attachment bytes.
+- [ ] Move remaining server-owned bootstrap/plugins into shared runtime
+  services, then make Actix an optional Tauri build dependency.
+- [ ] Verify fresh install, sign-in/restore, drive switching, offline restart,
+  attachment access and peer sync in the desktop UI with no listener bound.
+
+Implemented boundary: `serve::run_node(config, adapter)` initializes the node
+and keeps its services alive while the adapter future runs;
+`serve::serve_http(appstate)` binds the optional HTTP/WS listener.
+`serve_with_hook` remains source-compatible for hosted/managed nodes. Tauri
+installs `appstate.node()` before starting HTTP and keeps the native lifecycle
+alive if HTTP stops. Its Vault bridge now shares the same startup-error path
+as other native commands. The periodic flush worker is owned and joined, with
+a final flush when its lifecycle ends.
+
+The first extraction still uses `AppState` to bootstrap existing plugins and
+Actix actors. It must not be described as removing Actix or as making the
+current Tauri frontend work without HTTP. Do not expose a no-HTTP user setting
+until that frontend acceptance gate passes.
+
+Related: #1196 (local-first SDK/API), #749 (origin independence), #1277 and
+#1241 (native bindings), and the accepted runtime-boundary decision.
 
 - Add Tauri commands for node get/query/mutate/blob operations.
 - Add an event stream from node events to the webview.

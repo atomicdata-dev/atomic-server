@@ -39,6 +39,12 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Shared runtime boundary for native adapters. Clones share this store's
+    /// identity, event channels and durable data with the HTTP/WS adapter.
+    pub fn node(&self) -> atomic_lib::runtime::AtomicNode {
+        atomic_lib::runtime::AtomicNode::from_db(self.store.clone())
+    }
+
     /// Creates the AppState (the server's context available in Handlers).
     /// Initializes or opens a store on disk.
     /// Creates a new agent, if necessary.

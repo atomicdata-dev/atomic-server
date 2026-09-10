@@ -12,6 +12,20 @@ cargo tauri dev
 cargo tauri build
 ```
 
+## Node and HTTP lifecycle
+
+The embedded node is initialized by `atomic_server_lib::serve::run_node`.
+Tauri binds its native commands to the shared `AtomicNode`, then explicitly
+starts `serve_http` for the current webview. A stopped HTTP adapter does not
+stop the native node's flush worker and peer tasks while the app is open.
+
+This is the first step of [HTTP-optional local runtime](../planning/atomic-lib-runtime.md#phase-7-tauri--android-without-loopback).
+The current frontend **still requires HTTP/WebSocket**. There is no no-HTTP
+user setting yet: reads, commits, subscriptions and attachment access must
+move to native commands/events before removing the listener or the Actix
+build dependency. Hosted servers keep the existing `serve` / `serve_with_hook`
+entry points.
+
 ## Running in development
 
 `cargo tauri dev` starts the front-end for you — `beforeDevCommand` in `tauri.conf.json` runs `pnpm -C browser/data-browser dev:tauri`, and the app points at `localhost:6747` (`devUrl`).
