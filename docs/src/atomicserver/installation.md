@@ -8,6 +8,7 @@ You can run AtomicServer in different ways:
 2. From a published [binary](https://github.com/atomicdata-dev/atomic-server/releases)
 3. Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
 4. Manually from source
+5. Using [Easypanel](https://easypanel.io/), a server control panel with an [official one-click template](https://easypanel.io/templates/atomic-server)
 
 If you want to run AtomicServer locally as a developer / contributor, check out [the Contributors guide](https://github.com/atomicdata-dev/atomic-server/blob/develop/CONTRIBUTING.md).
 
