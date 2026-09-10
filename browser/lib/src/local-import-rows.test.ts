@@ -38,6 +38,7 @@ it.each([true, false])(
         pet: { table: 'did:ad:table', rowClass: 'did:ad:class' },
       },
     });
+
     if (available) {
       expect((await result).get(subject)?.[core.properties.name]).toBe(
         'Local row',
@@ -45,6 +46,7 @@ it.each([true, false])(
     } else {
       await expect(result).rejects.toThrow('not available locally');
     }
+
     expect(remote).not.toHaveBeenCalled();
   },
 );
