@@ -8,6 +8,7 @@ import { PrivateDriveBadge } from './PrivateDriveBadge';
 
 export interface DriveRowProps {
   subject: string;
+  label?: string;
   /** This is the drive the app is currently on. */
   selected?: boolean;
   /** The private drive can't be starred or unstarred — it's always yours. */
@@ -39,6 +40,7 @@ export interface DriveRowProps {
  */
 export function DriveRow({
   subject,
+  label,
   selected,
   hideFavorite,
   isPrivate,
@@ -55,9 +57,7 @@ export function DriveRow({
         onClick={() => onClick(subject)}
       >
         {selected ? <FaSquareCheck /> : <FaRegCircle />}
-        <Name>
-          <ResourceInline subject={subject} />
-        </Name>
+        <Name>{label || <ResourceInline subject={subject} />}</Name>
         {isPrivate && <PrivateDriveBadge />}
       </Choice>
       <Actions>

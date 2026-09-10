@@ -2418,7 +2418,7 @@ msgstr "Añadir etiqueta"
 #~ msgid "Could not update your list: no personal drive is set up for this account yet."
 #~ msgstr ""
 
-#. 0: getTitle(resource)
+#. 0: label
 #. 0: getTitle(resource)
 #: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
