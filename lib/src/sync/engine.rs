@@ -200,297 +200,304 @@ pub async fn handle_frame_full(
     store: &Db,
     agent: &mut crate::agents::ForAgent,
 ) -> HandleOutput {
-    if frame.is_empty() {
-        return HandleOutput::default();
-    }
+    store
+        .maintenance
+        .run(async {
+            if frame.is_empty() {
+                return HandleOutput::default();
+            }
 
-    let tag = frame[0];
-    let payload = &frame[1..];
+            let tag = frame[0];
+            let payload = &frame[1..];
 
-    match tag {
-        protocol::tag::SUB => return handle_sub(payload, store, agent).await,
-        protocol::tag::UNSUB => return handle_unsub(payload),
-        _ => {}
-    }
+            match tag {
+                protocol::tag::SUB => return handle_sub(payload, store, agent).await,
+                protocol::tag::UNSUB => return handle_unsub(payload),
+                _ => {}
+            }
 
-    let frames = match tag {
-        protocol::tag::AUTH => {
-            handle_auth_frame(
-                payload,
-                store,
-                agent,
-                AuthBinding::Unbound,
-                AuthChallenge::None,
-            )
-            .await
-        }
+            let frames = match tag {
+                protocol::tag::AUTH => {
+                    handle_auth_frame(
+                        payload,
+                        store,
+                        agent,
+                        AuthBinding::Unbound,
+                        AuthChallenge::None,
+                    )
+                    .await
+                }
 
-        protocol::tag::GET => {
-            if let Some(decoded) = protocol::decode_get(payload) {
-                let subject =
-                    crate::Subject::from_raw(decoded.subject, store.get_base_domain().as_deref());
+                protocol::tag::GET => {
+                    if let Some(decoded) = protocol::decode_get(payload) {
+                        let subject = crate::Subject::from_raw(
+                            decoded.subject,
+                            store.get_base_domain().as_deref(),
+                        );
 
-                match store.get_resource_extended(&subject, false, agent).await {
-                    Ok(r) => {
-                        let resource = r.to_single();
-                        let snapshot = resource.materialized_state().unwrap_or_else(|| {
-                            resource
-                                .build_state_doc()
-                                .map(|doc| doc.export_snapshot())
-                                .unwrap_or_default()
-                        });
+                        match store.get_resource_extended(&subject, false, agent).await {
+                            Ok(r) => {
+                                let resource = r.to_single();
+                                let snapshot = resource.materialized_state().unwrap_or_else(|| {
+                                    resource
+                                        .build_state_doc()
+                                        .map(|doc| doc.export_snapshot())
+                                        .unwrap_or_default()
+                                });
 
-                        if snapshot.is_empty() {
-                            vec![protocol::encode_error(
-                                decoded.request_id,
-                                protocol::error_code::UNKNOWN,
-                                "No state",
-                            )]
-                        } else {
-                            // Resolve `internal:/…` to this node's origin —
-                            // `internal:` is a node-local concept and must not
-                            // cross the wire; the recipient keys its resource
-                            // cache on whatever subject we emit. A no-op for
-                            // normal (External/DID) subjects, so it's safe on
-                            // every transport, not just the server's origin.
-                            let origin = store
-                                .get_base_domain()
-                                .unwrap_or_else(|| "http://localhost".to_string());
-                            let subject_resolved = resource.get_subject().resolve(&origin);
-                            // Include `lastCommit` so the recipient can stamp
-                            // `_lastCommit` and not mis-detect genesis on save.
-                            let last_commit = resource
-                                .get(crate::urls::LAST_COMMIT)
-                                .ok()
-                                .map(|v| v.to_string())
-                                .filter(|s| !s.is_empty());
-                            let mut flags = protocol::flags::SNAPSHOT;
-                            if last_commit.is_some() {
-                                flags |= protocol::flags::HAS_COMMIT_ID;
+                                if snapshot.is_empty() {
+                                    vec![protocol::encode_error(
+                                        decoded.request_id,
+                                        protocol::error_code::UNKNOWN,
+                                        "No state",
+                                    )]
+                                } else {
+                                    // Resolve `internal:/…` to this node's origin —
+                                    // `internal:` is a node-local concept and must not
+                                    // cross the wire; the recipient keys its resource
+                                    // cache on whatever subject we emit. A no-op for
+                                    // normal (External/DID) subjects, so it's safe on
+                                    // every transport, not just the server's origin.
+                                    let origin = store
+                                        .get_base_domain()
+                                        .unwrap_or_else(|| "http://localhost".to_string());
+                                    let subject_resolved = resource.get_subject().resolve(&origin);
+                                    // Include `lastCommit` so the recipient can stamp
+                                    // `_lastCommit` and not mis-detect genesis on save.
+                                    let last_commit = resource
+                                        .get(crate::urls::LAST_COMMIT)
+                                        .ok()
+                                        .map(|v| v.to_string())
+                                        .filter(|s| !s.is_empty());
+                                    let mut flags = protocol::flags::SNAPSHOT;
+                                    if last_commit.is_some() {
+                                        flags |= protocol::flags::HAS_COMMIT_ID;
+                                    }
+                                    vec![protocol::encode_update(
+                                        flags,
+                                        decoded.request_id,
+                                        &subject_resolved,
+                                        last_commit.as_deref(),
+                                        &snapshot,
+                                    )]
+                                }
                             }
-                            vec![protocol::encode_update(
-                                flags,
-                                decoded.request_id,
-                                &subject_resolved,
-                                last_commit.as_deref(),
-                                &snapshot,
-                            )]
+                            Err(e) => {
+                                vec![protocol::encode_error(
+                                    decoded.request_id,
+                                    protocol::error_code::UNKNOWN,
+                                    &e.to_string(),
+                                )]
+                            }
                         }
-                    }
-                    Err(e) => {
+                    } else {
                         vec![protocol::encode_error(
-                            decoded.request_id,
+                            0,
                             protocol::error_code::UNKNOWN,
-                            &e.to_string(),
+                            "Invalid GET frame",
                         )]
                     }
                 }
-            } else {
-                vec![protocol::encode_error(
-                    0,
-                    protocol::error_code::UNKNOWN,
-                    "Invalid GET frame",
-                )]
-            }
-        }
 
-        protocol::tag::COMMIT => {
-            // A signed commit is the unit of authority on every transport: it
-            // carries its own signature and the signer's rights are checked
-            // here, so a peer relaying it can only ever apply a change its
-            // signer was already entitled to make — no escalation from "I
-            // dialed you." This is what lets a serverless peer apply a `COMMIT`
-            // exactly like atomic-server's HTTP path does; the connection's own
-            // AUTH identity is not the gate (the commit's signature is).
-            //
-            // Differs from the server's WS `COMMIT` arm in two deliberate ways:
-            // no `source_id` echo-suppression (peer transports don't fan out
-            // through the commit monitor), and `validate_loro_causality` is
-            // OFF because concurrent writes between peers are expected (see the
-            // field's own docs in `commit.rs`).
-            match protocol::decode_commit(payload) {
-                Some(decoded) => {
-                    let request_id = decoded.request_id;
-                    match apply_peer_commit(store, decoded.commit_json).await {
-                        Ok(commit_json) => {
-                            vec![protocol::encode_commit_ok(request_id, &commit_json)]
+                protocol::tag::COMMIT => {
+                    // A signed commit is the unit of authority on every transport: it
+                    // carries its own signature and the signer's rights are checked
+                    // here, so a peer relaying it can only ever apply a change its
+                    // signer was already entitled to make — no escalation from "I
+                    // dialed you." This is what lets a serverless peer apply a `COMMIT`
+                    // exactly like atomic-server's HTTP path does; the connection's own
+                    // AUTH identity is not the gate (the commit's signature is).
+                    //
+                    // Differs from the server's WS `COMMIT` arm in two deliberate ways:
+                    // no `source_id` echo-suppression (peer transports don't fan out
+                    // through the commit monitor), and `validate_loro_causality` is
+                    // OFF because concurrent writes between peers are expected (see the
+                    // field's own docs in `commit.rs`).
+                    match protocol::decode_commit(payload) {
+                        Some(decoded) => {
+                            let request_id = decoded.request_id;
+                            match apply_peer_commit(store, decoded.commit_json).await {
+                                Ok(commit_json) => {
+                                    vec![protocol::encode_commit_ok(request_id, &commit_json)]
+                                }
+                                Err(e) => {
+                                    let msg = e.to_string();
+                                    vec![protocol::encode_error(
+                                        request_id,
+                                        protocol::classify_commit_error(&msg),
+                                        &msg,
+                                    )]
+                                }
+                            }
                         }
-                        Err(e) => {
-                            let msg = e.to_string();
-                            vec![protocol::encode_error(
-                                request_id,
-                                protocol::classify_commit_error(&msg),
-                                &msg,
-                            )]
+                        None => vec![protocol::encode_error(
+                            0,
+                            protocol::error_code::UNKNOWN,
+                            "Invalid COMMIT frame",
+                        )],
+                    }
+                }
+
+                protocol::tag::SYNC => match protocol::decode_sync(payload) {
+                    // Hash-first probe: compare the drive hash over what this
+                    // session may read, without either side exchanging the
+                    // O(drive) version vector. In sync → SYNC_OK; otherwise
+                    // SYNC_RESEND asks the client to reconcile. Hashed over the
+                    // readable subjects both so it can match the client's and so an
+                    // anonymous socket learns nothing about a drive it cannot read.
+                    Some(sync) if sync.probe => {
+                        match drive_sync_hash_for(store, &sync.drive, agent).await {
+                            Ok(server_hash) if server_hash == sync.drive_hash => {
+                                vec![protocol::encode_sync_ok(&sync.drive)]
+                            }
+                            Ok(_) => vec![protocol::encode_sync_resend(&sync.drive)],
+                            Err(reason) => vec![protocol::encode_error(
+                                0,
+                                protocol::error_code::UNAUTHORIZED_READ,
+                                &format!("SYNC refused for {}: {reason}", sync.drive),
+                            )],
                         }
                     }
-                }
-                None => vec![protocol::encode_error(
-                    0,
-                    protocol::error_code::UNKNOWN,
-                    "Invalid COMMIT frame",
-                )],
-            }
-        }
-
-        protocol::tag::SYNC => match protocol::decode_sync(payload) {
-            // Hash-first probe: compare the drive hash over what this
-            // session may read, without either side exchanging the
-            // O(drive) version vector. In sync → SYNC_OK; otherwise
-            // SYNC_RESEND asks the client to reconcile. Hashed over the
-            // readable subjects both so it can match the client's and so an
-            // anonymous socket learns nothing about a drive it cannot read.
-            Some(sync) if sync.probe => {
-                match drive_sync_hash_for(store, &sync.drive, agent).await {
-                    Ok(server_hash) if server_hash == sync.drive_hash => {
-                        vec![protocol::encode_sync_ok(&sync.drive)]
+                    Some(sync) => {
+                        // `subjects`, when present, is the RBSR-reduced set: build
+                        // version vectors for just those instead of walking the drive.
+                        let filter = sync
+                            .subjects
+                            .as_ref()
+                            .map(|s| s.iter().cloned().collect::<std::collections::HashSet<_>>());
+                        handle_sync_vv_filtered(
+                            &sync.drive,
+                            &sync.drive_hash,
+                            &sync.peers,
+                            &sync.resources,
+                            filter.as_ref(),
+                            store,
+                            agent,
+                        )
+                        .await
                     }
-                    Ok(_) => vec![protocol::encode_sync_resend(&sync.drive)],
-                    Err(reason) => vec![protocol::encode_error(
-                        0,
-                        protocol::error_code::UNAUTHORIZED_READ,
-                        &format!("SYNC refused for {}: {reason}", sync.drive),
-                    )],
-                }
-            }
-            Some(sync) => {
-                // `subjects`, when present, is the RBSR-reduced set: build
-                // version vectors for just those instead of walking the drive.
-                let filter = sync
-                    .subjects
-                    .as_ref()
-                    .map(|s| s.iter().cloned().collect::<std::collections::HashSet<_>>());
-                handle_sync_vv_filtered(
-                    &sync.drive,
-                    &sync.drive_hash,
-                    &sync.peers,
-                    &sync.resources,
-                    filter.as_ref(),
-                    store,
-                    agent,
-                )
-                .await
-            }
-            None => vec![protocol::encode_error(
-                0,
-                protocol::error_code::UNKNOWN,
-                "Invalid SYNC frame",
-            )],
-        },
-
-        protocol::tag::SYNC_PUSH => {
-            if let Some(push) = protocol::decode_sync_push(payload) {
-                // handle_frame serves connections dialed *into* us (accept side,
-                // WS): no owned-drive relaxation — the sender must itself hold
-                // write rights. The dial side calls import_sync_push directly
-                // with trust_owned=true.
-                match import_sync_push(&push, store, agent, false).await {
-                    Ok((_count, mut blob_requests)) => {
-                        let mut responses = vec![protocol::encode_sync_ok(&push.drive)];
-                        responses.append(&mut blob_requests);
-                        responses
-                    }
-                    // A refused import used to be answered with `SYNC_OK` all
-                    // the same, so a sender could never tell "landed" from
-                    // "dropped" (`replicate.rs` re-probed with a second SYNC
-                    // to find out). Say no when the answer is no.
-                    Err(rejected) => vec![rejected.to_error_frame()],
-                }
-            } else {
-                vec![protocol::encode_error(
-                    0,
-                    protocol::error_code::UNKNOWN,
-                    "Invalid SYNC_PUSH frame",
-                )]
-            }
-        }
-
-        protocol::tag::BLOB_REQUEST => {
-            if let Some(hash) = protocol::decode_blob_request(payload) {
-                match store.kv.get(Tree::Blobs, &hash) {
-                    Ok(Some(bytes)) => vec![protocol::encode_blob_response(&hash, &bytes)],
-                    _ => vec![protocol::encode_error(
+                    None => vec![protocol::encode_error(
                         0,
                         protocol::error_code::UNKNOWN,
-                        "Blob not found",
+                        "Invalid SYNC frame",
                     )],
-                }
-            } else {
-                vec![protocol::encode_error(
-                    0,
-                    protocol::error_code::UNKNOWN,
-                    "Invalid BLOB_REQUEST frame",
-                )]
-            }
-        }
+                },
 
-        protocol::tag::BLOB_RESPONSE => {
-            if let Some(resp) = protocol::decode_blob_response(payload) {
-                // F4 (planning/unified-sync.md): a `BLOB_RESPONSE` with no
-                // matching `BLOB_REQUEST` we issued is unsolicited — reject
-                // it rather than storing arbitrary bytes with no admission
-                // check at all. A matching entry names the (already-
-                // admitted at request time) drive; re-check admission here
-                // too, since enrollment/quota state can change between the
-                // request and this response.
-                match store.take_pending_blob_request(&resp.hash) {
-                    // Blobs are content-addressed: the bytes must hash to the
-                    // key they are stored under, or any session that answers
-                    // a pending request poisons what every later reader of
-                    // that hash gets.
-                    Some(_drive) if blake3::hash(&resp.bytes).as_bytes() != &resp.hash => {
-                        tracing::warn!(
-                            "BLOB_RESPONSE: bytes do not hash to {}, dropped",
-                            hex::encode(resp.hash)
-                        );
-                        vec![]
+                protocol::tag::SYNC_PUSH => {
+                    if let Some(push) = protocol::decode_sync_push(payload) {
+                        // handle_frame serves connections dialed *into* us (accept side,
+                        // WS): no owned-drive relaxation — the sender must itself hold
+                        // write rights. The dial side calls import_sync_push directly
+                        // with trust_owned=true.
+                        match import_sync_push(&push, store, agent, false).await {
+                            Ok((_count, mut blob_requests)) => {
+                                let mut responses = vec![protocol::encode_sync_ok(&push.drive)];
+                                responses.append(&mut blob_requests);
+                                responses
+                            }
+                            // A refused import used to be answered with `SYNC_OK` all
+                            // the same, so a sender could never tell "landed" from
+                            // "dropped" (`replicate.rs` re-probed with a second SYNC
+                            // to find out). Say no when the answer is no.
+                            Err(rejected) => vec![rejected.to_error_frame()],
+                        }
+                    } else {
+                        vec![protocol::encode_error(
+                            0,
+                            protocol::error_code::UNKNOWN,
+                            "Invalid SYNC_PUSH frame",
+                        )]
                     }
-                    Some(drive) if store.sync_policy().admit_drive_write(&drive) => {
-                        let _ = store.kv.insert(Tree::Blobs, &resp.hash, &resp.bytes);
-                        vec![]
+                }
+
+                protocol::tag::BLOB_REQUEST => {
+                    if let Some(hash) = protocol::decode_blob_request(payload) {
+                        match store.kv.get(Tree::Blobs, &hash) {
+                            Ok(Some(bytes)) => vec![protocol::encode_blob_response(&hash, &bytes)],
+                            _ => vec![protocol::encode_error(
+                                0,
+                                protocol::error_code::UNKNOWN,
+                                "Blob not found",
+                            )],
+                        }
+                    } else {
+                        vec![protocol::encode_error(
+                            0,
+                            protocol::error_code::UNKNOWN,
+                            "Invalid BLOB_REQUEST frame",
+                        )]
                     }
-                    Some(drive) => {
-                        tracing::warn!(
+                }
+
+                protocol::tag::BLOB_RESPONSE => {
+                    if let Some(resp) = protocol::decode_blob_response(payload) {
+                        // F4 (planning/unified-sync.md): a `BLOB_RESPONSE` with no
+                        // matching `BLOB_REQUEST` we issued is unsolicited — reject
+                        // it rather than storing arbitrary bytes with no admission
+                        // check at all. A matching entry names the (already-
+                        // admitted at request time) drive; re-check admission here
+                        // too, since enrollment/quota state can change between the
+                        // request and this response.
+                        match store.take_pending_blob_request(&resp.hash) {
+                            // Blobs are content-addressed: the bytes must hash to the
+                            // key they are stored under, or any session that answers
+                            // a pending request poisons what every later reader of
+                            // that hash gets.
+                            Some(_drive) if blake3::hash(&resp.bytes).as_bytes() != &resp.hash => {
+                                tracing::warn!(
+                                    "BLOB_RESPONSE: bytes do not hash to {}, dropped",
+                                    hex::encode(resp.hash)
+                                );
+                                vec![]
+                            }
+                            Some(drive) if store.sync_policy().admit_drive_write(&drive) => {
+                                let _ = store.kv.insert(Tree::Blobs, &resp.hash, &resp.bytes);
+                                vec![]
+                            }
+                            Some(drive) => {
+                                tracing::warn!(
                             "BLOB_RESPONSE: drive {} not admitted by sync policy, dropping blob",
                             drive
                         );
-                        vec![protocol::encode_error(
-                            0,
-                            protocol::error_code::UNKNOWN,
-                            "Drive not admitted for sync",
-                        )]
-                    }
-                    None => {
-                        tracing::warn!(
+                                vec![protocol::encode_error(
+                                    0,
+                                    protocol::error_code::UNKNOWN,
+                                    "Drive not admitted for sync",
+                                )]
+                            }
+                            None => {
+                                tracing::warn!(
                             "BLOB_RESPONSE: no matching pending BLOB_REQUEST, dropping blob"
                         );
+                                vec![protocol::encode_error(
+                                    0,
+                                    protocol::error_code::UNKNOWN,
+                                    "Unsolicited blob response",
+                                )]
+                            }
+                        }
+                    } else {
                         vec![protocol::encode_error(
                             0,
                             protocol::error_code::UNKNOWN,
-                            "Unsolicited blob response",
+                            "Invalid BLOB_RESPONSE frame",
                         )]
                     }
                 }
-            } else {
-                vec![protocol::encode_error(
-                    0,
-                    protocol::error_code::UNKNOWN,
-                    "Invalid BLOB_RESPONSE frame",
-                )]
+
+                _ => {
+                    tracing::debug!("Unhandled frame tag: 0x{:02x}", tag);
+                    vec![]
+                }
+            };
+
+            HandleOutput {
+                frames,
+                subscribe: None,
+                unsubscribe: None,
             }
-        }
-
-        _ => {
-            tracing::debug!("Unhandled frame tag: 0x{:02x}", tag);
-            vec![]
-        }
-    };
-
-    HandleOutput {
-        frames,
-        subscribe: None,
-        unsubscribe: None,
-    }
+        })
+        .await
 }
 
 /// `SUB <subject>`: parse, `check_read`, and tell the transport to register.
@@ -1390,6 +1397,7 @@ pub async fn import_sync_push(
     for_agent: &crate::agents::ForAgent,
     trust_owned: bool,
 ) -> Result<(usize, Vec<Vec<u8>>), SyncPushRejected> {
+    store.maintenance.run(async {
     let drive_subject = crate::Subject::from_raw(&push.drive, store.get_base_domain().as_deref());
     let policy = store.sync_policy();
 
@@ -1641,6 +1649,7 @@ pub async fn import_sync_push(
         );
     }
     Ok((count, blob_requests))
+    }).await
 }
 
 /// Whether the owner deliberately dialled this node. Peer-to-peer sync only

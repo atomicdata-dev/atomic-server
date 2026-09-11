@@ -13,6 +13,7 @@
   - [When (not) to use it](atomicserver/when-to-use.md)
   - [Installation](atomicserver/installation.md)
   - [Browser peer sync](browser-peer-sync.md)
+  - [Full-instance backups](instance-backups.md)
   - [Using the GUI](atomicserver/gui.md)
     - [Tables](atomicserver/gui/tables.md)
     - [AI and Atomic Assistant](atomicserver/gui/ai-and-atomic-assistant.md)

@@ -14,6 +14,14 @@ pub struct Opts {
     #[clap(subcommand)]
     pub command: Option<Command>,
 
+    /// Directory for full instance ZIP backups. Enables local token-protected control.
+    #[clap(long, env = "ATOMIC_BACKUP_DIR")]
+    pub backup_dir: Option<PathBuf>,
+
+    /// Explicitly allow a restored instance to reconnect using its copied identity.
+    #[clap(long)]
+    pub activate_restored: bool,
+
     /// Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
     #[clap(long, env = "ATOMIC_INITIALIZE")]
     pub initialize: bool,
@@ -230,6 +238,21 @@ pub enum RebuildIndexMode {
 
 #[derive(Parser, Clone, Debug)]
 pub enum Command {
+    /// Request a backup from a running local server and wait for verification.
+    Backup {
+        #[clap(long, default_value = "http://127.0.0.1:9883")]
+        server: String,
+        /// Defaults to backup.token in --config-dir.
+        #[clap(long)]
+        token_file: Option<PathBuf>,
+    },
+    /// Verify and restore a full instance ZIP into a new offline directory.
+    Restore {
+        #[clap(long)]
+        archive: PathBuf,
+        #[clap(long)]
+        target: PathBuf,
+    },
     /// Create and save a JSON-AD backup of the store.
     #[clap(name = "export")]
     Export(ExportOpts),

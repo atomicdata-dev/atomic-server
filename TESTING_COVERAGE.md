@@ -1,5 +1,30 @@
 # Testing coverage map
 
+Instance backup: `lib/src/backup.rs` covers full redb/file round-trip including
+Loro historical checkout, blobs, envelopes and configuration files; future byte tables;
+concurrent writer exclusion; buffered-batch refusal; capture error/panic recovery;
+unsafe paths, hash mismatch and corrupt-database refusal.
+`server/src/backup.rs` covers loopback/token authorization and adapter setup.
+`lib/src/db/maintenance.rs` covers nested admission during drain,
+overlapping pause refusal, queued work and cancellation recovery. The shared
+sync-engine test proves a paused import is neither acknowledged nor dropped.
+`server/tests/it/instance_backup.rs` starts a real server process, replicates a
+second node over WebSockets, invokes the backup CLI, replicates a later change,
+restores the earlier checkpoint and verifies accidental startup is refused.
+
+`lib/tests/check-instance-checkpoint.sh` selects only `atomic_lib` with
+`backup,config`, rejects server/Actix dependencies, runs the core backup tests,
+and tests an originless capture/verify/restore/reopen with persisted identity in
+`lib/tests/instance_checkpoint.rs`. Dagger runs this separately after workspace tests.
+
+Remaining backup coverage gaps: desktop VFS staging drain and native UI restore,
+OS-level disk-full/power-loss injection,
+large (>4 GiB) ZIP64 fixtures and pause-duration benchmarks, and a dedicated
+Iroh disconnect-during-capture test. The gate is shared by both transports;
+these tests do not assert a globally synchronized checkpoint or lifetime history
+retention. See `docs/src/instance-backups.md` for the operational limits.
+
+
 What is tested, at which layer, and — the part that matters — **what is not**.
 
 This exists because the protocol is far better tested than the glue around it,

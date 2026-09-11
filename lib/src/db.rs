@@ -6,6 +6,7 @@ mod encoding;
 #[cfg(feature = "db-redb")]
 pub mod encrypted_backend;
 pub mod kv_store;
+pub mod maintenance;
 #[cfg(feature = "db-sled")]
 mod migrations;
 #[cfg(all(feature = "db-redb", target_arch = "wasm32"))]
@@ -285,6 +286,8 @@ impl DriveFilters {
 /// `Db` should be easily, cheaply clone-able, as users of this library could have one `Db` per connection.
 #[derive(Clone)]
 pub struct Db {
+    /// Shared admission barrier for coherent instance backup.
+    pub maintenance: maintenance::Maintenance,
     /// The key-value store backend. Abstracted behind a trait so different
     /// backends (sled, BTreeMap, etc.) can be used interchangeably.
     pub kv: Arc<dyn KvStore>,
@@ -453,6 +456,7 @@ impl Db {
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
+            maintenance: maintenance::Maintenance::default(),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -492,6 +496,7 @@ impl Db {
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
+            maintenance: maintenance::Maintenance::default(),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -527,6 +532,7 @@ impl Db {
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
+            maintenance: maintenance::Maintenance::default(),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -623,6 +629,7 @@ impl Db {
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
+            maintenance: maintenance::Maintenance::default(),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -775,6 +782,7 @@ impl Db {
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
+            maintenance: maintenance::Maintenance::default(),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -2896,33 +2904,37 @@ impl Storelike for Db {
     /// Validates datatypes and required props presence.
     #[instrument(skip_all)]
     async fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
-        // Start with a nested HashMap, containing only strings.
-        let mut map: HashMap<Subject, Resource> = HashMap::new();
-        for atom in atoms {
-            match map.get_mut(&atom.subject) {
-                // Resource exists in map
-                Some(resource) => {
-                    resource
-                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
-                        .await
-                        .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
+        self.maintenance
+            .run(async {
+                // Start with a nested HashMap, containing only strings.
+                let mut map: HashMap<Subject, Resource> = HashMap::new();
+                for atom in atoms {
+                    match map.get_mut(&atom.subject) {
+                        // Resource exists in map
+                        Some(resource) => {
+                            resource
+                                .set_string(atom.property.clone(), &atom.value.to_string(), self)
+                                .await
+                                .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
+                        }
+                        // Resource does not exist
+                        None => {
+                            let mut resource = Resource::new(atom.subject.to_string());
+                            resource
+                                .set_string(atom.property.clone(), &atom.value.to_string(), self)
+                                .await
+                                .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
+                            map.insert(atom.subject, resource);
+                        }
+                    }
                 }
-                // Resource does not exist
-                None => {
-                    let mut resource = Resource::new(atom.subject.to_string());
-                    resource
-                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
-                        .await
-                        .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
-                    map.insert(atom.subject, resource);
+                for (_subject, resource) in map.iter() {
+                    self.add_resource(resource).await?
                 }
-            }
-        }
-        for (_subject, resource) in map.iter() {
-            self.add_resource(resource).await?
-        }
-        self.kv.flush()?;
-        Ok(())
+                self.kv.flush()?;
+                Ok(())
+            })
+            .await
     }
 
     /// Maps a host (domain/subdomain) to a Drive DID.
@@ -2960,108 +2972,116 @@ impl Storelike for Db {
         update_index: bool,
         overwrite_existing: bool,
     ) -> AtomicResult<()> {
-        // This only works if no external functions rely on using add_resource for atom-like operations!
-        // However, add_atom uses set_propvals, which skips the validation.
-        let subject = self.normalize_subject(resource.get_subject());
-        let subject_str = subject.pure_id();
-        let existing = self.get_propvals(&subject_str).ok();
-        if !overwrite_existing && existing.is_some() {
-            return Err(format!(
-                "Failed to add: '{}', already exists, should not be overwritten.",
-                resource.get_subject()
-            )
-            .into());
-        }
-        if check_required_props {
-            resource.check_required_props(self).await?;
-        }
-        // Build a single transaction for index updates + resource persistence
-        let mut transaction = Transaction::new();
+        self.maintenance
+            .run(async {
+                // This only works if no external functions rely on using add_resource for atom-like operations!
+                // However, add_atom uses set_propvals, which skips the validation.
+                let subject = self.normalize_subject(resource.get_subject());
+                let subject_str = subject.pure_id();
+                let existing = self.get_propvals(&subject_str).ok();
+                if !overwrite_existing && existing.is_some() {
+                    return Err(format!(
+                        "Failed to add: '{}', already exists, should not be overwritten.",
+                        resource.get_subject()
+                    )
+                    .into());
+                }
+                if check_required_props {
+                    resource.check_required_props(self).await?;
+                }
+                // Build a single transaction for index updates + resource persistence
+                let mut transaction = Transaction::new();
 
-        if update_index {
-            // Persist DID routing hint if available
-            if let Subject::Did {
-                drive_hint: Some(hint),
-                ..
-            } = &subject
-            {
+                if update_index {
+                    // Persist DID routing hint if available
+                    if let Subject::Did {
+                        drive_hint: Some(hint),
+                        ..
+                    } = &subject
+                    {
+                        transaction.push(Operation {
+                            tree: Tree::DidMapping,
+                            method: Method::Insert,
+                            key: subject_str.as_bytes().to_vec(),
+                            val: Some(hint.as_bytes().to_vec()),
+                        });
+                    }
+
+                    if let Some(pv) = existing {
+                        let subject = resource.get_subject();
+                        // Evict against the state that is going away, not the one
+                        // replacing it. Whether an entry belongs in a watched query's
+                        // member list — and under which sort key it was filed — are
+                        // facts about the old values. Handing over the new resource
+                        // asks instead whether the *new* values still match, and a row
+                        // edited out of a filtered view answers no, so the entry that
+                        // needs deleting is the one deletion is skipped for. The row
+                        // then stays listed in that view until the index is rebuilt.
+                        let old = Resource::from_propvals(pv.clone(), subject.clone());
+                        for (prop, val) in pv.iter() {
+                            let remove_atom =
+                                crate::Atom::new(subject.clone(), prop.into(), val.clone());
+                            self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
+                                .map_err(|e| {
+                                    format!(
+                                        "Failed to remove atom from index {}. {}",
+                                        remove_atom, e
+                                    )
+                                })?;
+                        }
+                    }
+                    for a in resource.to_atoms() {
+                        self.add_atom_to_index(&a, resource, &mut transaction)
+                            .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
+                    }
+                    crate::search::index_resource(self, resource, &mut transaction)?;
+                }
+                // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
+                // state. Derive and
+                // persist it here UNCONDITIONALLY for every CRDT resource — in the
+                // same transaction as the `Tree::Resources` write — so the invariant
+                // holds that every resource blob is paired with a current snapshot.
+                // (The old code only wrote the snapshot when the propvals lacked a
+                // `loroUpdate`, so any resource that had been through `apply_state_doc`
+                // — i.e. every sync import — had its snapshot write silently skipped.)
+                // The `loroUpdate` propval is stripped from the `Tree::Resources`
+                // blob: that blob is a pure derived projection, not a second home for
+                // the CRDT state. Commits are native (immutable, not CRDT) — they get
+                // no snapshot and keep their `loroUpdate` payload in the blob.
+                let mut propvals = resource.get_propvals().clone();
+                if !subject.is_commit_did() {
+                    let snapshot = resource.build_state_doc()?.export_snapshot();
+                    propvals.remove(crate::urls::LORO_UPDATE);
+                    transaction.push(Operation {
+                        tree: Tree::LoroSnapshots,
+                        method: Method::Insert,
+                        key: subject_str.as_bytes().to_vec(),
+                        val: Some(snapshot),
+                    });
+                }
+
+                // Persist the resource data in the same transaction
+                let resource_bin = encode_propvals(&propvals)?;
                 transaction.push(Operation {
-                    tree: Tree::DidMapping,
+                    tree: Tree::Resources,
                     method: Method::Insert,
                     key: subject_str.as_bytes().to_vec(),
-                    val: Some(hint.as_bytes().to_vec()),
+                    val: Some(resource_bin),
                 });
-            }
-
-            if let Some(pv) = existing {
-                let subject = resource.get_subject();
-                // Evict against the state that is going away, not the one
-                // replacing it. Whether an entry belongs in a watched query's
-                // member list — and under which sort key it was filed — are
-                // facts about the old values. Handing over the new resource
-                // asks instead whether the *new* values still match, and a row
-                // edited out of a filtered view answers no, so the entry that
-                // needs deleting is the one deletion is skipped for. The row
-                // then stays listed in that view until the index is rebuilt.
-                let old = Resource::from_propvals(pv.clone(), subject.clone());
-                for (prop, val) in pv.iter() {
-                    let remove_atom = crate::Atom::new(subject.clone(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom, &old, &mut transaction)
-                        .map_err(|e| {
-                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
-                        })?;
-                }
-            }
-            for a in resource.to_atoms() {
-                self.add_atom_to_index(&a, resource, &mut transaction)
-                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
-            }
-            crate::search::index_resource(self, resource, &mut transaction)?;
-        }
-        // The snapshot in `Tree::LoroSnapshots` is the authoritative CRDT
-        // state. Derive and
-        // persist it here UNCONDITIONALLY for every CRDT resource — in the
-        // same transaction as the `Tree::Resources` write — so the invariant
-        // holds that every resource blob is paired with a current snapshot.
-        // (The old code only wrote the snapshot when the propvals lacked a
-        // `loroUpdate`, so any resource that had been through `apply_state_doc`
-        // — i.e. every sync import — had its snapshot write silently skipped.)
-        // The `loroUpdate` propval is stripped from the `Tree::Resources`
-        // blob: that blob is a pure derived projection, not a second home for
-        // the CRDT state. Commits are native (immutable, not CRDT) — they get
-        // no snapshot and keep their `loroUpdate` payload in the blob.
-        let mut propvals = resource.get_propvals().clone();
-        if !subject.is_commit_did() {
-            let snapshot = resource.build_state_doc()?.export_snapshot();
-            propvals.remove(crate::urls::LORO_UPDATE);
-            transaction.push(Operation {
-                tree: Tree::LoroSnapshots,
-                method: Method::Insert,
-                key: subject_str.as_bytes().to_vec(),
-                val: Some(snapshot),
-            });
-        }
-
-        // Persist the resource data in the same transaction
-        let resource_bin = encode_propvals(&propvals)?;
-        transaction.push(Operation {
-            tree: Tree::Resources,
-            method: Method::Insert,
-            key: subject_str.as_bytes().to_vec(),
-            val: Some(resource_bin),
-        });
-        self.apply_transaction(&mut transaction)?;
-        let _ = self.db_events.send(DbEvent::Changed {
-            subject: resource.get_subject().without_params(),
-            delta: None,
-            // Attributed here, while the importing write is still on the stack:
-            // the live push loop uses it to avoid sending an update straight
-            // back to the peer it came from.
-            source_id: crate::sync::ws_apply::current_import_source(),
-            is_new: false,
-            from_commit: false,
-        });
-        Ok(())
+                self.apply_transaction(&mut transaction)?;
+                let _ = self.db_events.send(DbEvent::Changed {
+                    subject: resource.get_subject().without_params(),
+                    delta: None,
+                    // Attributed here, while the importing write is still on the stack:
+                    // the live push loop uses it to avoid sending an update straight
+                    // back to the peer it came from.
+                    source_id: crate::sync::ws_apply::current_import_source(),
+                    is_new: false,
+                    from_commit: false,
+                });
+                Ok(())
+            })
+            .await
     }
 
     /// Apply a single signed Commit to the Db.
@@ -3074,6 +3094,7 @@ impl Storelike for Db {
         commit: Commit,
         opts: &CommitOpts,
     ) -> AtomicResult<CommitResponse> {
+        self.maintenance.run(async {
         let store = self;
 
         // Persisting a commit is a read-modify-write: `validate_and_build_response`
@@ -3349,6 +3370,7 @@ impl Storelike for Db {
             }
         }
         Ok(commit_response)
+        }).await
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -3369,163 +3391,173 @@ impl Storelike for Db {
 
     #[instrument(skip_all)]
     async fn get_resource(&self, subject: &Subject) -> AtomicResult<Resource> {
-        let normalized = self.normalize_subject(subject);
-        let subject_str = normalized.pure_id();
-        if let Ok(propvals) = self.get_propvals(&subject_str) {
-            let mut res_subject = normalized.clone();
+        self.maintenance
+            .run(async {
+                let normalized = self.normalize_subject(subject);
+                let subject_str = normalized.pure_id();
+                if let Ok(propvals) = self.get_propvals(&subject_str) {
+                    let mut res_subject = normalized.clone();
 
-            // If it's a DID and we don't have a hint in the requested subject,
-            // check if we have one persisted in the did_mapping tree.
-            if let Subject::Did {
-                drive_hint: None, ..
-            } = &res_subject
-            {
-                if let Ok(Some(hint_bin)) = self.kv.get(Tree::DidMapping, subject_str.as_bytes()) {
-                    if let Ok(hint) = std::str::from_utf8(&hint_bin) {
-                        res_subject = res_subject.set_drive_hint(hint.to_string());
-                    }
-                }
-            }
-
-            let mut resource = Resource::from_propvals(propvals, res_subject);
-            // Authoritative merged CRDT state (full oplog) lives in LoroSnapshots.
-            // Propvals may carry a smaller incremental `loroUpdate` from the last commit.
-            if let Ok(Some(snapshot)) = self.kv.get(
-                crate::db::trees::Tree::LoroSnapshots,
-                subject_str.as_bytes(),
-            ) {
-                if let Ok(doc) = crate::loro::AtomicLoroDoc::from_snapshot(&snapshot) {
-                    // We already hold the exact bytes `doc` was just imported
-                    // from — reuse them instead of having `apply_state_doc`
-                    // re-export an equivalent snapshot. This is the hot path
-                    // for every resource read (including once per member of
-                    // a collection query), so the saved export is per-read,
-                    // not one-off.
-                    let _ = resource.apply_state_doc_with_snapshot(doc, snapshot);
-                }
-            }
-            Ok(resource)
-        } else {
-            // Resolve the subject to a full URL for network operations
-            let origin = self
-                .get_base_domain()
-                .unwrap_or_else(|| "http://localhost".to_string());
-            let resolved_url = normalized.resolve(&origin);
-
-            // If the resource is not found, it might be an endpoint.
-            // This is checking if the subject matches one of the endpoints
-            if let Ok(url) = url::Url::parse(&resolved_url) {
-                if self.is_endpoint(&url) {
-                    let agent_opt = self.get_default_agent().ok();
-                    let for_agent = if let Some(agent) = &agent_opt {
-                        ForAgent::from(agent)
-                    } else {
-                        ForAgent::Public
-                    };
-                    return Ok(self
-                        .call_endpoint(&resolved_url, &for_agent)
-                        .await?
-                        .to_single());
-                }
-            }
-            let resolved_url = normalized.resolve(&origin);
-
-            if normalized.is_did() || normalized.path().starts_with("/did") {
-                // If it's an agent DID and not found locally, return a minimal resource
-                // instead of an error. This is important for "just-in-time" agent registration.
-                if normalized.is_agent_did() || normalized.path().starts_with("/did:ad:agent:") {
-                    let lookup = if normalized.path().starts_with('/') {
-                        &normalized.path()[1..]
-                    } else {
-                        &normalized.path()
-                    };
-                    if let Some(pubkey) = lookup.strip_prefix("did:ad:agent:") {
-                        if let Ok(agent) = crate::agents::Agent::new_from_public_key(pubkey) {
-                            if let Ok(resource) = agent.to_resource() {
-                                return Ok(resource);
+                    // If it's a DID and we don't have a hint in the requested subject,
+                    // check if we have one persisted in the did_mapping tree.
+                    if let Subject::Did {
+                        drive_hint: None, ..
+                    } = &res_subject
+                    {
+                        if let Ok(Some(hint_bin)) =
+                            self.kv.get(Tree::DidMapping, subject_str.as_bytes())
+                        {
+                            if let Ok(hint) = std::str::from_utf8(&hint_bin) {
+                                res_subject = res_subject.set_drive_hint(hint.to_string());
                             }
                         }
                     }
+
+                    let mut resource = Resource::from_propvals(propvals, res_subject);
+                    // Authoritative merged CRDT state (full oplog) lives in LoroSnapshots.
+                    // Propvals may carry a smaller incremental `loroUpdate` from the last commit.
+                    if let Ok(Some(snapshot)) = self.kv.get(
+                        crate::db::trees::Tree::LoroSnapshots,
+                        subject_str.as_bytes(),
+                    ) {
+                        if let Ok(doc) = crate::loro::AtomicLoroDoc::from_snapshot(&snapshot) {
+                            // We already hold the exact bytes `doc` was just imported
+                            // from — reuse them instead of having `apply_state_doc`
+                            // re-export an equivalent snapshot. This is the hot path
+                            // for every resource read (including once per member of
+                            // a collection query), so the saved export is per-read,
+                            // not one-off.
+                            let _ = resource.apply_state_doc_with_snapshot(doc, snapshot);
+                        }
+                    }
+                    Ok(resource)
+                } else {
+                    // Resolve the subject to a full URL for network operations
+                    let origin = self
+                        .get_base_domain()
+                        .unwrap_or_else(|| "http://localhost".to_string());
+                    let resolved_url = normalized.resolve(&origin);
+
+                    // If the resource is not found, it might be an endpoint.
+                    // This is checking if the subject matches one of the endpoints
+                    if let Ok(url) = url::Url::parse(&resolved_url) {
+                        if self.is_endpoint(&url) {
+                            let agent_opt = self.get_default_agent().ok();
+                            let for_agent = if let Some(agent) = &agent_opt {
+                                ForAgent::from(agent)
+                            } else {
+                                ForAgent::Public
+                            };
+                            return Ok(self
+                                .call_endpoint(&resolved_url, &for_agent)
+                                .await?
+                                .to_single());
+                        }
+                    }
+                    let resolved_url = normalized.resolve(&origin);
+
+                    if normalized.is_did() || normalized.path().starts_with("/did") {
+                        // If it's an agent DID and not found locally, return a minimal resource
+                        // instead of an error. This is important for "just-in-time" agent registration.
+                        if normalized.is_agent_did()
+                            || normalized.path().starts_with("/did:ad:agent:")
+                        {
+                            let lookup = if normalized.path().starts_with('/') {
+                                &normalized.path()[1..]
+                            } else {
+                                &normalized.path()
+                            };
+                            if let Some(pubkey) = lookup.strip_prefix("did:ad:agent:") {
+                                if let Ok(agent) = crate::agents::Agent::new_from_public_key(pubkey)
+                                {
+                                    if let Ok(resource) = agent.to_resource() {
+                                        return Ok(resource);
+                                    }
+                                }
+                            }
+                        }
+
+                        if normalized.is_did() || resolved_url.starts_with("/did:") {
+                            return Err(AtomicError::not_found(format!(
+                                "DID Resource {} not found locally",
+                                resolved_url
+                            )));
+                        }
+
+                        return self
+                            .handle_not_found(
+                                &resolved_url,
+                                format!("Resource {} not found locally", resolved_url).into(),
+                                self.get_default_agent().ok().as_ref(),
+                            )
+                            .await;
+                    }
+
+                    // Only attempt a network fetch for external subjects.
+                    // Fetching a local URL would cause the server to request itself,
+                    // creating an infinite loop.
+                    //
+                    // `is_local()` alone is not enough: the canonical atomicdata.dev
+                    // vocabulary is deliberately kept `External` even on its own host
+                    // (see `Subject::CANONICAL_VOCABULARY_PREFIXES`), so on
+                    // atomicdata.dev a miss for `/properties/*` would fall through to a
+                    // network fetch of this very server. Anything served from our own
+                    // authority is ours whether or not it is `Internal`, so compare
+                    // authorities too — and ignore the scheme, since a store migrated
+                    // as `https://` must not self-fetch when served over `http://`.
+                    let base_domain = self.get_base_domain();
+                    let resolved_subject_obj =
+                        Subject::from_raw(&resolved_url, base_domain.as_deref());
+                    let is_own_authority = base_domain
+                        .as_deref()
+                        .map(|base| {
+                            let strip = |s: &str| {
+                                s.trim_start_matches("https://")
+                                    .trim_start_matches("http://")
+                                    .trim_end_matches('/')
+                                    .to_string()
+                            };
+                            let base_authority = strip(base);
+                            let resolved = strip(&resolved_url);
+                            resolved == base_authority
+                                || resolved.starts_with(&format!("{}/", base_authority))
+                        })
+                        .unwrap_or(false);
+
+                    if resolved_subject_obj.is_local() || is_own_authority {
+                        return self
+                            .handle_not_found(
+                                &resolved_url,
+                                "Not found in DB".into(),
+                                self.get_default_agent().ok().as_ref(),
+                            )
+                            .await;
+                    }
+
+                    if let Ok(resource) = self
+                        .fetch_resource(&resolved_url, self.get_default_agent().ok().as_ref())
+                        .await
+                    {
+                        // If the resource is external, it's not present in the store.
+                        // However, we did fetch it (because the user probably requested it).
+                        // So we should add it to the store.
+                        // Note that this logic is also in `Store`'s `get_resource`, but it's slightly different there.
+                        // We should probably unify this.
+                        // Also, this might cause issues if we want to get a resource but NOT save it.
+                        self.add_resource_opts(&resource, false, false, true)
+                            .await?;
+                        Ok(resource)
+                    } else {
+                        self.handle_not_found(
+                            &resolved_url,
+                            "Not found in DB".into(),
+                            self.get_default_agent().ok().as_ref(),
+                        )
+                        .await
+                    }
                 }
-
-                if normalized.is_did() || resolved_url.starts_with("/did:") {
-                    return Err(AtomicError::not_found(format!(
-                        "DID Resource {} not found locally",
-                        resolved_url
-                    )));
-                }
-
-                return self
-                    .handle_not_found(
-                        &resolved_url,
-                        format!("Resource {} not found locally", resolved_url).into(),
-                        self.get_default_agent().ok().as_ref(),
-                    )
-                    .await;
-            }
-
-            // Only attempt a network fetch for external subjects.
-            // Fetching a local URL would cause the server to request itself,
-            // creating an infinite loop.
-            //
-            // `is_local()` alone is not enough: the canonical atomicdata.dev
-            // vocabulary is deliberately kept `External` even on its own host
-            // (see `Subject::CANONICAL_VOCABULARY_PREFIXES`), so on
-            // atomicdata.dev a miss for `/properties/*` would fall through to a
-            // network fetch of this very server. Anything served from our own
-            // authority is ours whether or not it is `Internal`, so compare
-            // authorities too — and ignore the scheme, since a store migrated
-            // as `https://` must not self-fetch when served over `http://`.
-            let base_domain = self.get_base_domain();
-            let resolved_subject_obj = Subject::from_raw(&resolved_url, base_domain.as_deref());
-            let is_own_authority = base_domain
-                .as_deref()
-                .map(|base| {
-                    let strip = |s: &str| {
-                        s.trim_start_matches("https://")
-                            .trim_start_matches("http://")
-                            .trim_end_matches('/')
-                            .to_string()
-                    };
-                    let base_authority = strip(base);
-                    let resolved = strip(&resolved_url);
-                    resolved == base_authority
-                        || resolved.starts_with(&format!("{}/", base_authority))
-                })
-                .unwrap_or(false);
-
-            if resolved_subject_obj.is_local() || is_own_authority {
-                return self
-                    .handle_not_found(
-                        &resolved_url,
-                        "Not found in DB".into(),
-                        self.get_default_agent().ok().as_ref(),
-                    )
-                    .await;
-            }
-
-            if let Ok(resource) = self
-                .fetch_resource(&resolved_url, self.get_default_agent().ok().as_ref())
-                .await
-            {
-                // If the resource is external, it's not present in the store.
-                // However, we did fetch it (because the user probably requested it).
-                // So we should add it to the store.
-                // Note that this logic is also in `Store`'s `get_resource`, but it's slightly different there.
-                // We should probably unify this.
-                // Also, this might cause issues if we want to get a resource but NOT save it.
-                self.add_resource_opts(&resource, false, false, true)
-                    .await?;
-                Ok(resource)
-            } else {
-                self.handle_not_found(
-                    &resolved_url,
-                    "Not found in DB".into(),
-                    self.get_default_agent().ok().as_ref(),
-                )
-                .await
-            }
-        }
+            })
+            .await
     }
 
     fn has_stored_resource(&self, subject: &Subject) -> bool {
@@ -3557,98 +3589,106 @@ impl Storelike for Db {
         skip_dynamic: bool,
         for_agent: &ForAgent,
     ) -> AtomicResult<ResourceResponse> {
-        let subject_without_params = subject.without_params();
+        self.maintenance
+            .run(async {
+                let subject_without_params = subject.without_params();
 
-        // Get the inner URL for endpoint checking and extender context
-        let inner_url = match subject {
-            Subject::Internal { url, .. } => url,
-            Subject::External(u) => u,
-            Subject::Did { url, .. } => url,
-        };
+                // Get the inner URL for endpoint checking and extender context
+                let inner_url = match subject {
+                    Subject::Internal { url, .. } => url,
+                    Subject::External(u) => u,
+                    Subject::Did { url, .. } => url,
+                };
 
-        // Check if the subject matches one of the endpoints, if so, call the endpoint.
-        let is_endpoint = self.is_endpoint(inner_url);
+                // Check if the subject matches one of the endpoints, if so, call the endpoint.
+                let is_endpoint = self.is_endpoint(inner_url);
 
-        if is_endpoint {
-            return self.call_endpoint(subject.as_str(), for_agent).await;
-        }
-
-        async move {
-            let mut resource = self.get_resource(&subject_without_params).await?;
-
-            let _explanation = crate::hierarchy::check_read(self, &resource, for_agent).await?;
-
-            let mut root_subject: Option<String> = None;
-
-            let extenders = self
-                .class_extenders
-                .read()
-                .map_err(|e| format!("Failed to read class extenders: {}", e))?
-                .clone();
-            for extender in extenders.iter() {
-                if !extender.can_extend(&resource) {
-                    continue;
+                if is_endpoint {
+                    return self.call_endpoint(subject.as_str(), for_agent).await;
                 }
 
-                if extender.resource_has_extender(&resource)? {
-                    let (is_in_scope, cached_root) =
-                        extender.check_scope(&resource, self, root_subject).await?;
+                async move {
+                    let mut resource = self.get_resource(&subject_without_params).await?;
 
-                    root_subject = cached_root;
+                    let _explanation =
+                        crate::hierarchy::check_read(self, &resource, for_agent).await?;
 
-                    if !is_in_scope {
-                        continue;
-                    }
+                    let mut root_subject: Option<String> = None;
 
-                    if skip_dynamic {
-                        // This lets clients know that the resource may have dynamic properties that are currently not included
-                        resource
-                            .set(
-                                crate::urls::INCOMPLETE.into(),
-                                crate::Value::Boolean(true),
-                                self,
-                            )
-                            .await?;
+                    let extenders = self
+                        .class_extenders
+                        .read()
+                        .map_err(|e| format!("Failed to read class extenders: {}", e))?
+                        .clone();
+                    for extender in extenders.iter() {
+                        if !extender.can_extend(&resource) {
+                            continue;
+                        }
 
-                        return Ok(resource.into());
-                    }
+                        if extender.resource_has_extender(&resource)? {
+                            let (is_in_scope, cached_root) =
+                                extender.check_scope(&resource, self, root_subject).await?;
 
-                    if let Some(handler) = extender.on_resource_get.as_ref() {
-                        let fut = (handler)(GetExtenderContext {
-                            store: self,
-                            url: inner_url,
-                            db_resource: &mut resource,
-                            for_agent,
-                        });
-                        let resource_response = fut.await?;
+                            root_subject = cached_root;
 
-                        // TODO: Check if we actually need this
-                        // make sure the actual subject matches the one requested - It should not be changed in the logic above
-                        match resource_response {
-                            ResourceResponse::Resource(mut resource) => {
-                                resource.set_subject(subject.to_string());
+                            if !is_in_scope {
+                                continue;
+                            }
+
+                            if skip_dynamic {
+                                // This lets clients know that the resource may have dynamic properties that are currently not included
+                                resource
+                                    .set(
+                                        crate::urls::INCOMPLETE.into(),
+                                        crate::Value::Boolean(true),
+                                        self,
+                                    )
+                                    .await?;
+
                                 return Ok(resource.into());
                             }
-                            ResourceResponse::ResourceWithReferenced(mut resource, referenced) => {
-                                resource.set_subject(subject.to_string());
 
-                                return Ok(ResourceResponse::ResourceWithReferenced(
-                                    resource, referenced,
-                                ));
-                            }
-                            ResourceResponse::Redirect(target) => {
-                                return Ok(ResourceResponse::Redirect(target));
+                            if let Some(handler) = extender.on_resource_get.as_ref() {
+                                let fut = (handler)(GetExtenderContext {
+                                    store: self,
+                                    url: inner_url,
+                                    db_resource: &mut resource,
+                                    for_agent,
+                                });
+                                let resource_response = fut.await?;
+
+                                // TODO: Check if we actually need this
+                                // make sure the actual subject matches the one requested - It should not be changed in the logic above
+                                match resource_response {
+                                    ResourceResponse::Resource(mut resource) => {
+                                        resource.set_subject(subject.to_string());
+                                        return Ok(resource.into());
+                                    }
+                                    ResourceResponse::ResourceWithReferenced(
+                                        mut resource,
+                                        referenced,
+                                    ) => {
+                                        resource.set_subject(subject.to_string());
+
+                                        return Ok(ResourceResponse::ResourceWithReferenced(
+                                            resource, referenced,
+                                        ));
+                                    }
+                                    ResourceResponse::Redirect(target) => {
+                                        return Ok(ResourceResponse::Redirect(target));
+                                    }
+                                }
                             }
                         }
                     }
+
+                    resource.set_subject(subject.to_string());
+
+                    Ok(resource.into())
                 }
-            }
-
-            resource.set_subject(subject.to_string());
-
-            Ok(resource.into())
-        }
-        .await
+                .await
+            })
+            .await
     }
 
     fn handle_commit(&self, commit_response: &CommitResponse) {
@@ -3662,27 +3702,31 @@ impl Storelike for Db {
     /// Tries `query_cache`, which you should implement yourself.
     #[instrument(skip_all)]
     async fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
-        // A constraint on a computed value can't come from the index, so it is
-        // applied to the set the index narrows to — which means paging has to
-        // happen after it, not in it.
-        let mut result = if !q.expression_filters.is_empty() {
-            self.query_with_expression_filters(q).await?
-        } else if requires_query_index(q) {
-            self.query_complex(q).await?
-        } else {
-            self.query_basic(q).await?
-        };
+        self.maintenance
+            .run(async {
+                // A constraint on a computed value can't come from the index, so it is
+                // applied to the set the index narrows to — which means paging has to
+                // happen after it, not in it.
+                let mut result = if !q.expression_filters.is_empty() {
+                    self.query_with_expression_filters(q).await?
+                } else if requires_query_index(q) {
+                    self.query_complex(q).await?
+                } else {
+                    self.query_basic(q).await?
+                };
 
-        // Aggregates run over the whole matching set, so they need their own
-        // pass — the one above is limited to the requested page. Only when
-        // asked: a query without aggregates pays nothing for this.
-        if let Some(aggregation) = &q.aggregation {
-            if !aggregation.is_empty() {
-                result.aggregates = self.compute_aggregation(q, aggregation).await?;
-            }
-        }
+                // Aggregates run over the whole matching set, so they need their own
+                // pass — the one above is limited to the requested page. Only when
+                // asked: a query without aggregates pays nothing for this.
+                if let Some(aggregation) = &q.aggregation {
+                    if !aggregation.is_empty() {
+                        result.aggregates = self.compute_aggregation(q, aggregation).await?;
+                    }
+                }
 
-        Ok(result)
+                Ok(result)
+            })
+            .await
     }
 
     async fn search(
@@ -3726,66 +3770,76 @@ impl Storelike for Db {
         body: Vec<u8>,
         for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
-        let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
-        let subj_url = url::Url::try_from(subject)?;
-        for e in endpoints {
-            if let Some(fun) = &e.handle_post {
-                if subj_url.path() == e.path {
-                    let handle_post_context = crate::endpoints::HandlePostContext {
-                        store: self,
-                        body: body.clone(),
-                        for_agent,
-                        subject: subj_url.clone(),
-                    };
-                    let mut resource = fun(handle_post_context).await?.to_single();
-                    resource.set_subject(subject.into());
+        self.maintenance
+            .run(async {
+                let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
+                let subj_url = url::Url::try_from(subject)?;
+                for e in endpoints {
+                    if let Some(fun) = &e.handle_post {
+                        if subj_url.path() == e.path {
+                            let handle_post_context = crate::endpoints::HandlePostContext {
+                                store: self,
+                                body: body.clone(),
+                                for_agent,
+                                subject: subj_url.clone(),
+                            };
+                            let mut resource = fun(handle_post_context).await?.to_single();
+                            resource.set_subject(subject.into());
 
-                    return Ok(resource);
+                            return Ok(resource);
+                        }
+                    }
                 }
-            }
-        }
-        // If we get Class Handlers with POST, this is where the code goes
-        // let mut r = self.get_resource(subject)?;
-        // for class in r.get_classes(self)? {
-        //     match class.subject.as_str() {
-        //         urls::IMPORTER => {
-        //             let query_params = url::Url::try_from(subject)?;
-        //             return crate::plugins::importer::construct_importer(
-        //                 self,
-        //                 query_params.query_pairs(),
-        //                 &mut r,
-        //                 for_agent,
-        //                 Some(body),
-        //             );
-        //         }
-        //         _ => {}
-        //     }
-        // }
-        Err(
-            AtomicError::method_not_allowed("Cannot post here - no Endpoint Post handler found")
-                .set_subject(subject),
-        )
+                // If we get Class Handlers with POST, this is where the code goes
+                // let mut r = self.get_resource(subject)?;
+                // for class in r.get_classes(self)? {
+                //     match class.subject.as_str() {
+                //         urls::IMPORTER => {
+                //             let query_params = url::Url::try_from(subject)?;
+                //             return crate::plugins::importer::construct_importer(
+                //                 self,
+                //                 query_params.query_pairs(),
+                //                 &mut r,
+                //                 for_agent,
+                //                 Some(body),
+                //             );
+                //         }
+                //         _ => {}
+                //     }
+                // }
+                Err(AtomicError::method_not_allowed(
+                    "Cannot post here - no Endpoint Post handler found",
+                )
+                .set_subject(subject))
+            })
+            .await
     }
 
     async fn populate(&self) -> AtomicResult<()> {
-        crate::populate::bootstrap(self).await.map(|_| ())
+        self.maintenance
+            .run(async { crate::populate::bootstrap(self).await.map(|_| ()) })
+            .await
     }
 
     #[instrument(skip_all)]
     async fn remove_resource(&self, subject: &Subject) -> AtomicResult<()> {
-        let mut transaction = Transaction::new();
-        let mut removed = Vec::new();
-        self.recursive_remove(subject, &mut transaction, &mut removed, None)
-            .await?;
-        self.apply_transaction(&mut transaction)?;
-        // Tombstone every removed subject so bulk sync (Iroh / WS `SYNC`)
-        // does not resurrect them from a peer that still holds a stale copy.
-        for s in &removed {
-            crate::sync::tombstones::record_tombstone(self, s);
-        }
-        // TODO: deletion sync — should create a signed destroy commit
-        // and push it through the normal commit pipeline, not a raw DESTROY frame.
-        Ok(())
+        self.maintenance
+            .run(async {
+                let mut transaction = Transaction::new();
+                let mut removed = Vec::new();
+                self.recursive_remove(subject, &mut transaction, &mut removed, None)
+                    .await?;
+                self.apply_transaction(&mut transaction)?;
+                // Tombstone every removed subject so bulk sync (Iroh / WS `SYNC`)
+                // does not resurrect them from a peer that still holds a stale copy.
+                for s in &removed {
+                    crate::sync::tombstones::record_tombstone(self, s);
+                }
+                // TODO: deletion sync — should create a signed destroy commit
+                // and push it through the normal commit pipeline, not a raw DESTROY frame.
+                Ok(())
+            })
+            .await
     }
 
     fn set_default_agent(&self, agent: crate::agents::Agent) {

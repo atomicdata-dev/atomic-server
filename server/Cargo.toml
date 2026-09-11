@@ -83,7 +83,7 @@ html2md = "0.2.15"
 kuchikiki = "0.8.2"
 indexmap = { version = "2.14.0", features = ["std"] }
 lol_html = "2.9"
-zip = { version = "8.6.0", optional = true }
+zip = { version = "8.6.0" }
 reqwest = { version = "0.13.3", default-features = false, features = [
   "rustls",
   "json",
@@ -166,7 +166,7 @@ version = "4.13.0"
 # `db-sled` is included so an in-place upgrade from a pre-redb (sled) store
 # auto-migrates to redb on first boot. It is inert unless a legacy sled DB is
 # present, so it adds no runtime cost for fresh installs.
-features = ["config", "db-redb", "db-sled", "rdf", "discovery", "iroh", "ring", "ws"]
+features = ["backup", "config", "db-redb", "db-sled", "rdf", "discovery", "iroh", "ring", "ws"]
 path = "../lib"
 version = "0.41.0-beta.6"
 
@@ -200,6 +200,7 @@ features = ["env-filter"]
 version = "0.3.23"
 
 [dev-dependencies]
+tempfile = "3"
 actix-rt = "2.11.0"
 assert_cmd = "2.2.2"
 mainline = "6.2.0"
@@ -253,7 +254,7 @@ telemetry = [
 ]
 img = ["webp", "image"]
 https = ["rustls", "instant-acme", "rcgen", "rustls-pemfile"]
-wasm-plugins = ["wasmtime", "wasmtime-wasi", "wasmtime-wasi-http", "zip"]
+wasm-plugins = ["wasmtime", "wasmtime-wasi", "wasmtime-wasi-http"]
 image = ["dep:image"]
 tonic = ["dep:tonic"]
 tracing-opentelemetry = ["dep:tracing-opentelemetry"]
@@ -261,7 +262,7 @@ wasmtime = ["dep:wasmtime"]
 wasmtime-wasi = ["dep:wasmtime-wasi"]
 wasmtime-wasi-http = ["dep:wasmtime-wasi-http"]
 webp = ["dep:webp"]
-zip = ["dep:zip"]
+zip = []
 vector-search = [
   "dep:fastembed",
   "dep:text-splitter",

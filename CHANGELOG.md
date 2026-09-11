@@ -7,6 +7,14 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Instance checkpoint capture, verification and offline restore are available in
+  `atomic_lib` through the optional native `backup` feature, without server/Actix.
+
+- Add opt-in full-instance backups: `--backup-dir`, local authenticated backup
+  control, `backup`/`restore` CLI commands, checksummed ZIP64 archives and an
+  offline restore guard. Writes and incoming sync application pause during
+  capture and resume before compression. See [instance backups](docs/src/instance-backups.md).
+
 - Add drive-scoped authenticated browser peer sessions; subscription-independent signaling and optional temporary TURN credentials are provided by Atomic SaaS ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
 
 ## [v0.41.0-beta.6] - 2026-09-09

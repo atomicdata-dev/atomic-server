@@ -1274,6 +1274,7 @@ dependencies = [
  "sha1 0.11.0",
  "simple-server-timing-header",
  "static-files 0.3.1",
+ "tempfile",
  "text-splitter",
  "tokio",
  "tokio-tungstenite 0.29.0",
@@ -1359,6 +1360,7 @@ dependencies = [
  "bincode",
  "blake3",
  "chacha20poly1305",
+ "chrono",
  "criterion",
  "directories",
  "ed25519-dalek 2.2.0",
@@ -1387,6 +1389,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sled",
+ "tempfile",
  "tokio",
  "tokio-tungstenite 0.29.0",
  "toml 1.1.2+spec-1.1.0",
@@ -1400,6 +1403,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "zip 8.6.0",
 ]
 
 [[package]]

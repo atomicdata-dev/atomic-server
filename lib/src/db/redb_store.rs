@@ -274,6 +274,77 @@ fn prefix_upper_bound(prefix: &[u8]) -> Option<Vec<u8>> {
 }
 
 impl KvStore for RedbStore {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn backup_snapshot(
+        &self,
+        destination: &std::path::Path,
+        capture_files: &mut dyn FnMut() -> AtomicResult<()>,
+    ) -> AtomicResult<()> {
+        use redb::TableHandle;
+        // No raw copy of an open file. A read transaction pins every table to
+        // the same version; the uncommitted write transaction excludes ALL
+        // storage writers, including periodic flush and direct metadata writes.
+        self.flush()?;
+        let buffer = self
+            .batch_buffer
+            .lock()
+            .map_err(|_| "Poisoned batch buffer")?;
+        if buffer.is_some() {
+            return Err("Cannot back up an active buffered batch".into());
+        }
+        // Do not poison the batch mutex if capture code panics. The runtime
+        // reports the worker failure and must still be able to resume writes.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _writers = self
+                .db
+                .begin_write()
+                .map_err(|e| format!("Backup barrier: {e}"))?;
+            let snapshot = self
+                .db
+                .begin_read()
+                .map_err(|e| format!("Backup snapshot: {e}"))?;
+            if snapshot
+                .list_multimap_tables()
+                .map_err(|e| e.to_string())?
+                .next()
+                .is_some()
+            {
+                return Err("Backup does not support multimap tables".into());
+            }
+            // create_new prevents overwriting a database, including through a symlink.
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(destination)?;
+            drop(file);
+            let target =
+                Database::create(destination).map_err(|e| format!("Backup destination: {e}"))?;
+            let mut tx = target.begin_write().map_err(|e| e.to_string())?;
+            tx.set_quick_repair(true);
+            for handle in snapshot.list_tables().map_err(|e| e.to_string())? {
+                let definition: TableDefinition<&[u8], &[u8]> = TableDefinition::new(handle.name());
+                // A future table with other types fails explicitly instead of being skipped.
+                let source = snapshot.open_table(definition).map_err(|e| e.to_string())?;
+                let mut output = tx.open_table(definition).map_err(|e| e.to_string())?;
+                for row in source.iter().map_err(|e| e.to_string())? {
+                    let (key, value) = row.map_err(|e| e.to_string())?;
+                    output
+                        .insert(key.value(), value.value())
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            tx.commit().map_err(|e| e.to_string())?;
+            drop(target);
+            capture_files()?;
+            Ok(())
+        }));
+        drop(buffer);
+        match result {
+            Ok(result) => result,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+
     fn get(&self, tree: Tree, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
         // Read-your-writes: check the batch buffer first
         {
@@ -590,4 +661,24 @@ impl KvStore for RedbStore {
         tx.commit().map_err(|e| format!("redb commit batch: {e}"))?;
         Ok(())
     }
+}
+
+/// Check a closed snapshot without booting a node or contacting any peers.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn verify_snapshot(path: &std::path::Path) -> AtomicResult<()> {
+    use redb::TableHandle;
+    let mut db = Database::open(path).map_err(|e| e.to_string())?;
+    if !db.check_integrity().map_err(|e| e.to_string())? {
+        return Err("Snapshot database failed integrity verification".into());
+    }
+    let tx = db.begin_read().map_err(|e| e.to_string())?;
+    for handle in tx.list_tables().map_err(|e| e.to_string())? {
+        let table = tx
+            .open_table(TableDefinition::<&[u8], &[u8]>::new(handle.name()))
+            .map_err(|e| e.to_string())?;
+        for row in table.iter().map_err(|e| e.to_string())? {
+            row.map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
