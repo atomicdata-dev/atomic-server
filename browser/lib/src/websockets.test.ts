@@ -1,6 +1,6 @@
 import { Resource } from './resource.js';
 import { AtomicError, ErrorType } from './error.js';
-import { describe, it, vi, afterEach } from 'vitest';
+import { describe, it, vi, afterEach, expect as assert } from 'vitest';
 import { testStore } from './test-store.js';
 import { WSClient } from './websockets.js';
 import {
@@ -61,7 +61,9 @@ class FakeWebSocket {
     }
   }
 
-  public close(): void {}
+  public close(): void {
+    this.readyState = 3;
+  }
 
   public fire(type: string, event: unknown): void {
     for (const cb of this.#listeners.get(type) ?? []) cb(event);
@@ -119,6 +121,34 @@ describe('WSClient handshake', () => {
     globalThis.WebSocket = original;
     vi.restoreAllMocks();
     vi.useRealTimers();
+  });
+
+  it('cancels authentication when closed while awaiting the server challenge', async ({
+    expect,
+  }) => {
+    const { client, socket } = await connectedClient();
+    const authentication = client.authenticate();
+    const rejected = expect(authentication).rejects.toThrow(/closed/i);
+    await Promise.resolve();
+    client.close();
+    await rejected;
+    expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(0);
+  });
+
+  it('does not warn or subscribe when closed before index-status authentication completes', async ({
+    expect,
+  }) => {
+    const { client, socket } = await connectedClient();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    client.subscribeIndexStatus('did:ad:drive');
+    client.close();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(
+      socket.sent.some(frame =>
+        new TextDecoder().decode(frame).startsWith('SUBSCRIBE_INDEX_STATUS'),
+      ),
+    ).toBe(false);
+    expect(warning).not.toHaveBeenCalled();
   });
 
   it('a replaced socket cannot mark the new connection offline on its late close', async ({
@@ -288,43 +318,46 @@ describe('WSClient drive sync probe', () => {
     client.close();
   });
 
-  it('stops range reconciliation when the identity changes between replies', async ({
-    expect,
-  }) => {
-    const { client, socket, store } = await connectedClient();
-    socket.receive(encodeChallenge('cancel-sync'));
-    const auth = client.authenticate();
-    await vi.waitFor(() =>
-      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
-    );
-    socket.receive(encodeAuthOk([]));
-    await auth;
-    vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
-      drive: 'did:ad:drive',
-      driveHash: 'hash',
-      peers: [],
-      resources: {},
-    } as never);
-    const internal = client as unknown as {
-      sendReducedSyncState: (drive: string) => Promise<void>;
-      startVVSync: (drive: string) => Promise<void>;
-      rbsrFingerprints: () => Promise<string[]>;
-      rbsrItems: () => Promise<never[]>;
-    };
-    vi.spyOn(internal, 'rbsrFingerprints').mockImplementation(async () => {
-      store.setAgent(undefined);
+  it.each(['identity change', 'disconnect'])(
+    'stops range reconciliation after %s between replies',
+    async reason => {
+      const expect = assert;
+      const { client, socket, store } = await connectedClient();
+      socket.receive(encodeChallenge('cancel-sync'));
+      const auth = client.authenticate();
+      await vi.waitFor(() =>
+        expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+      );
+      socket.receive(encodeAuthOk([]));
+      await auth;
+      vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+        drive: 'did:ad:drive',
+        driveHash: 'hash',
+        peers: [],
+        resources: {},
+      } as never);
+      const internal = client as unknown as {
+        sendReducedSyncState: (drive: string) => Promise<void>;
+        startVVSync: (drive: string) => Promise<void>;
+        rbsrFingerprints: () => Promise<string[]>;
+        rbsrItems: () => Promise<never[]>;
+      };
+      vi.spyOn(internal, 'rbsrFingerprints').mockImplementation(async () => {
+        if (reason === 'disconnect') client.close();
+        else store.setAgent(undefined);
 
-      return ['ff'.repeat(32)];
-    });
-    const items = vi.spyOn(internal, 'rbsrItems').mockResolvedValue([]);
-    const warning = vi.spyOn(console, 'warn');
-    await internal.startVVSync('did:ad:drive');
-    await internal.sendReducedSyncState('did:ad:drive');
-    expect(items).not.toHaveBeenCalled();
-    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(1);
-    expect(warning).not.toHaveBeenCalled();
-    client.close();
-  });
+        return ['ff'.repeat(32)];
+      });
+      const items = vi.spyOn(internal, 'rbsrItems').mockResolvedValue([]);
+      const warning = vi.spyOn(console, 'warn');
+      await internal.startVVSync('did:ad:drive');
+      await internal.sendReducedSyncState('did:ad:drive');
+      expect(items).not.toHaveBeenCalled();
+      expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(1);
+      expect(warning).not.toHaveBeenCalled();
+      client.close();
+    },
+  );
 
   it('probes with a binary SYNC and reconciles on SYNC_RESEND', async ({
     expect,

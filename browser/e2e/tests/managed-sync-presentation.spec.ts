@@ -1,3 +1,4 @@
+import { mockManagedPortal } from './managed-test-utils';
 import { test, expect } from '@playwright/test';
 import { devDrive, FRONTEND_URL } from './test-utils';
 
@@ -6,6 +7,7 @@ for (const localOnly of [true, false]) {
     page,
   }) => {
     await devDrive(page);
+    await mockManagedPortal(page);
     await page.route('**/api/me', route =>
       route.fulfill({ json: { email: 'sync-test@example.com' } }),
     );
@@ -59,6 +61,14 @@ for (const localOnly of [true, false]) {
       );
       await page.evaluate(() =>
         window.store.registerLocalOnlyDrive(window.store.getDrive()!),
+      );
+    }
+
+    if (!localOnly) {
+      // This case checks the expired Vault-session message independently of
+      // the account identity returned by /me.
+      await page.route('**/api/cloud-vault/drives', route =>
+        route.fulfill({ status: 401 }),
       );
     }
 

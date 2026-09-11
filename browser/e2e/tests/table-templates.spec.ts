@@ -66,9 +66,15 @@ test.describe('table templates', () => {
     // afterwards, which left the user on the previous page with no sign that
     // anything was happening.
     await newResource('table', page);
-    await page.getByRole('button', { name: /Project tasks/ }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: /Project tasks/ })
+      .click();
     await page.getByPlaceholder('New Table').fill('Busy check');
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: 'Create', exact: true })
+      .click();
 
     const busy = page.getByRole('button', { name: 'Creating table…' });
     await expect(busy).toBeVisible();

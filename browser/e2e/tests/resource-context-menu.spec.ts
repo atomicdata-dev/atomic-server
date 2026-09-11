@@ -58,9 +58,15 @@ test.describe('resource context menu', () => {
   }) => {
     // A plain table with one row.
     await newResource('table', page);
-    await page.getByRole('button', { name: /Blank/ }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: /Blank/ })
+      .click();
     await page.getByPlaceholder('New Table').fill('Widgets');
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: 'Create', exact: true })
+      .click();
 
     // --- Sidebar link (AtomicLink seam) ---
     const sidebarLink = page
@@ -159,9 +165,15 @@ test.describe('resource context menu', () => {
     expect(driveDid).toBeTruthy();
 
     await newResource('table', page);
-    await page.getByRole('button', { name: /Blank/ }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: /Blank/ })
+      .click();
     await page.getByPlaceholder('New Table').fill('Widgets');
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: 'Create', exact: true })
+      .click();
     await expect(page.getByRole('columnheader').nth(1)).toBeVisible();
     // Leave the table's cell editor — hotkeys are ignored while an input has
     // focus (`pressShortcut` also blurs whatever is left).

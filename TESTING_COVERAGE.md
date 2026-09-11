@@ -675,7 +675,7 @@ Paired SaaS `portal/e2e/recovery-passkey.spec.ts` uses Chromium virtual PRF auth
 ## September 10 SaaS and browser invite regressions
 
 - `browser/lib/src/browser-peer-invite.test.ts`: signed invitation validation, expiry, target and issuer checks, recipient proof, and additive permission grants.
-- `browser/e2e/tests/browser-invite.spec.ts`: distinct signed-in identities join a local drive through the app without the server invite endpoint.
+- `browser/e2e/tests/browser-invite.spec.ts`: distinct signed-in identities create an invitation through the sharing UI and join a local drive using real WebRTC with an in-process signaling relay. Runs against production assets without Vite source imports or a SaaS dependency, and verifies received content and write rights. `store.test.ts` prevents explicit server refreshes from poisoning local-only drives with server errors.
 - `browser/e2e/scripts/verify-peer-sync.mjs` with `ATOMIC_PEER_INVITE=1`: invitation bootstrap and real WebRTC reconciliation with HTTP data access disabled.
 - `browser/e2e/tests/recovery-option.spec.ts`: recovery availability in the managed welcome flow.
 - Existing-drive migration to browser-only storage and fresh-account email onboarding through a peer invitation remain unverified.
@@ -703,3 +703,11 @@ Table loading feedback: `browser/data-browser/src/chunks/TableEditor/TableEditor
 checks that a busy grid with only an entry row renders a visible spinner/status,
 and that settled empty and populated grids remove it. This is a component render
 check; real refresh/query timing remains a browser acceptance check.
+
+## WebSocket disconnect cancellation
+
+`websockets.test.ts` covers closing during authentication and range reconciliation, and index-status subscription cancellation. `file-upload-offline.spec.ts`, `offline-chatroom.spec.ts` and `offline-create-then-online.spec.ts` verify disconnect, local writes, reload and reconnect without unexpected browser diagnostics.
+
+## Profile edit hydration
+
+`store.test.ts` loads an offline profile with nontrivial persisted Loro history, edits it and merges into the original document, verifying the rename survives. `username-live.spec.ts` edits immediately through the enabled profile field and verifies existing remote chat authors update before and after reload. Profile controls stay disabled while the resource is loading. Managed-account E2Es explicitly configure the hosted runtime and API responses; the mocked same-origin dashboard test blocks the app service worker navigation fallback.

@@ -1660,10 +1660,15 @@ export class Store {
     }
 
     try {
-      const jsonAd = await this.clientDb.getResource(subject);
+      const { jsonAd, snapshot } =
+        await this.clientDb.getResourceWithSnapshot(subject);
       if (!jsonAd) return null;
 
-      return this.hydrateOfflineReplay(subject, JSON.parse(jsonAd));
+      return this.hydrateOfflineReplay(
+        subject,
+        JSON.parse(jsonAd),
+        snapshot ?? undefined,
+      );
     } catch {
       return null;
     }
@@ -1676,6 +1681,7 @@ export class Store {
   private hydrateOfflineReplay(
     subject: string,
     parsed: Record<string, unknown>,
+    snapshot?: Uint8Array,
   ): Resource {
     const resource = new Resource(subject);
     resource.applyHydratedValues(
@@ -1684,7 +1690,11 @@ export class Store {
         JSONValue,
       ][],
     );
-    resource.getLoroDoc();
+    // JSON is a read cache, not a replacement for the document's causal
+    // history. Reconstructing it as fresh ops makes later edits lose LWW
+    // against the existing server document (notably agent profile renames).
+    if (snapshot?.length) resource.importLoroUpdate(snapshot, true);
+    else resource.getLoroDoc();
     resource.loading = false;
     this.applyIncoming({
       subject: resource.subject,
@@ -3329,6 +3339,16 @@ export class Store {
     } = {},
   ): Promise<Resource<C>> {
     const normalizedSubject = this.normalizeSubject(subject);
+
+    // A server cannot refresh a browser-only resource. In particular, explicit
+    // refresh callers must not turn a valid local drive into a server 404.
+    if (this.isLocalOnlySubject(normalizedSubject)) {
+      const local = this.resources.get(normalizedSubject);
+      if (local?.isReady()) return local as Resource<C>;
+      const stored = await this.fetchResourceFromClientDb(normalizedSubject);
+      if (stored) return stored as Resource<C>;
+      throw new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport);
+    }
 
     // In-flight dedup. SideBarDrive and DrivePage both call
     // `useResource(drive)` on the same render → two parallel

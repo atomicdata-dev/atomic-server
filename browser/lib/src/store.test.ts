@@ -1,3 +1,4 @@
+import { enableLoro } from './loro-loader.js';
 import { describe, it, vi, afterEach } from 'vitest';
 import { Resource, Store, core, Core, Datatype } from './index.js';
 import { bootstrapCoreVocab } from './test-vocab.js';
@@ -6,6 +7,57 @@ import { testStore } from './test-store.js';
 describe('Store', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('preserves persisted Loro history when getResource loads a profile offline', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const subject = 'did:ad:agent:offline-profile';
+    const serverProfile = new Resource(subject);
+    const doc = serverProfile.getLoroDoc()!;
+
+    for (let i = 0; i < 20; i++) {
+      await serverProfile.set(core.properties.name, `Name ${i}`, false);
+      doc.commit();
+    }
+
+    const snapshot = doc.export({ mode: 'snapshot' });
+    const jsonAd = JSON.stringify({
+      '@id': subject,
+      [core.properties.name]: 'Name 19',
+    });
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setClientDb({
+      isReady: true,
+      isInitialized: true,
+      waitForInit: async () => {},
+      getResource: async () => jsonAd,
+      getResourceWithSnapshot: async () => ({ jsonAd, snapshot }),
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    const profile = await store.getResource(subject);
+    await profile.set(core.properties.name, 'Renamed', false);
+    doc.import(profile.getLoroDoc()!.export({ mode: 'snapshot' }));
+    expect(doc.getMap('properties').get(core.properties.name)).toBe('Renamed');
+  });
+
+  it('keeps a local-only drive ready when a reader requests a server refresh', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const drive = new Resource('did:ad:local-drive');
+    await drive.set(core.properties.name, 'Local drive', false);
+    drive.loading = false;
+    store.addResource(drive);
+    store.registerLocalOnlyDrive(drive.subject);
+    const fetch = vi.fn(async () => new Response('not found', { status: 404 }));
+    store.injectFetch(fetch);
+    const result = await store.fetchResourceFromServer(drive.subject, {
+      setLoading: true,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.isReady()).toBe(true);
+    expect(result.get(core.properties.name)).toBe('Local drive');
   });
 
   it('waits for property data after a loading-placeholder notification', async ({

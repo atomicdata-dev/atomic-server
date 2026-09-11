@@ -535,6 +535,8 @@ export class WSClient {
   // ---- Authentication ----
 
   public async authenticate(fetchAll?: boolean): Promise<void> {
+    if (this._closed)
+      throw new RequestCancelledError('WebSocket closed by client');
     const agent = this.store.getAgent();
 
     if (!agent?.subject) return;
@@ -570,6 +572,12 @@ export class WSClient {
           ? `${this.serverOrigin}#${nonce}`
           : this.serverOrigin;
         const json = await createAuthentication(subject, agent);
+        // Challenge waiting/signing can finish after disconnect(). Never send
+        // on that socket or install a new AUTH_OK waiter after close drained it.
+        if (this._closed || this.readyState !== WebSocket.OPEN)
+          throw new RequestCancelledError(
+            'WebSocket closed during authentication',
+          );
 
         this.sendBinary(encodeAuth(JSON.stringify(json)));
 
@@ -651,20 +659,13 @@ export class WSClient {
 
   /** Subscribe to vector index status updates for a drive root (see server `SUBSCRIBE_INDEX_STATUS`). */
   public subscribeIndexStatus(drive: string): void {
-    this.authPromise
-      .catch(() => {
-        // Authentication errors are handled in authenticate()
-      })
-      .finally(() => {
-        if (this.readyState !== WebSocket.OPEN) {
-          console.warn(
-            'WebSocket is not open, cannot subscribe to index status',
-          );
-
-          return;
-        }
-
+    void this.authenticate()
+      .then(() => {
+        if (this._closed || this.readyState !== WebSocket.OPEN) return;
         this.ws.send('SUBSCRIBE_INDEX_STATUS ' + JSON.stringify({ drive }));
+      })
+      .catch(() => {
+        // The handshake reports failures; disconnect is a normal cancellation.
       });
   }
 
@@ -1615,6 +1616,8 @@ export class WSClient {
     const agent = this.store.getAgent()?.subject;
     const selectedDrive = this.store.getDrive();
     const current = () =>
+      !this._closed &&
+      this.readyState === WebSocket.OPEN &&
       this.store.getAgent()?.subject === agent &&
       this.store.getDrive() === selectedDrive &&
       (!agent || this.authenticatedWith === agent);
