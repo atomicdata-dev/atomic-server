@@ -1,3 +1,4 @@
+import { verifyLocalDriveCopy } from './local-drive-copy.js';
 import {
   encodeCommit as encodePeerCommit,
   encodeEphemeral as encodePeerEphemeral,
@@ -811,14 +812,53 @@ export class Store {
   /** Mark a drive as local-only. Must be called BEFORE the drive's first
    *  `save()` — registration is what routes saves away from the outbox. */
   public registerLocalOnlyDrive(drive: string): void {
-    this.localOnlyDrives.add(drive);
-
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(
         'atomic.localOnlyDrives',
-        JSON.stringify([...this.localOnlyDrives]),
+        JSON.stringify([...new Set([...this.localOnlyDrives, drive])]),
       );
     }
+
+    this.localOnlyDrives.add(drive);
+  }
+
+  /** Switch this client to browser-only sync after verifying its local copy.
+   * Does not delete data from the server or alter other devices' configuration. */
+  public async makeDriveLocal(drive: string): Promise<void> {
+    const db = this.getClientDb();
+    const agent = this.getAgent();
+    const serverUrl = this.serverUrl;
+    const ws = this.getDefaultWebSocket();
+    if (!db?.isReady || !agent || !ws || this.getDrive() !== drive)
+      throw new Error(
+        'Open this drive with local storage available before disconnecting.',
+      );
+
+    const current = () => {
+      const status = this.getSyncStatus();
+      if (
+        this.getClientDb() !== db ||
+        this.getAgent() !== agent ||
+        this.serverUrl !== serverUrl ||
+        this.getDrive() !== drive ||
+        status.syncInProgress ||
+        status.pendingDirtyCount ||
+        status.blockedCount
+      )
+        throw new Error(
+          'Wait for changes to finish syncing before disconnecting.',
+        );
+    };
+
+    current();
+    const inventory = await ws.rbsrItems(drive, '');
+    await verifyLocalDriveCopy(db, drive, inventory);
+    // A second inventory catches changes made while attachment verification ran.
+    await verifyLocalDriveCopy(db, drive, await ws.rbsrItems(drive, ''));
+    current();
+    this.registerLocalOnlyDrive(drive);
+    ws.unsubscribeFromDrive(drive);
+    this.emitSyncStatus();
   }
 
   /** Forget a local-only drive (e.g. after deleting a demo workspace),

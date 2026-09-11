@@ -25,6 +25,7 @@
  * ```
  */
 
+import { versionVectorRecords } from './version-vector-records.js';
 import {
   parseHistoryAttribution,
   type HistoryAttribution,
@@ -818,7 +819,7 @@ export class ClientDbWorker {
   > {
     const r = await this.send({ type: 'getAllVersionVectors' });
 
-    return (r as Record<string, Record<string, number>>) ?? {};
+    return versionVectorRecords(r);
   }
 
   /** Version vectors for one drive's resources only (parent-index walk),
@@ -828,7 +829,7 @@ export class ClientDbWorker {
   ): Promise<Record<string, Record<string, number>>> {
     const r = await this.send({ type: 'getVersionVectorsForDrive', drive });
 
-    return (r as Record<string, Record<string, number>>) ?? {};
+    return versionVectorRecords(r);
   }
 
   /**

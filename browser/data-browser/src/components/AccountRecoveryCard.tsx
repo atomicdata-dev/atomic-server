@@ -3,6 +3,7 @@ import { styled } from 'styled-components';
 import { FaKey } from 'react-icons/fa6';
 import { Agent, useStore } from '@tomic/react';
 import { Button } from './Button';
+import { hasPasskeyApi } from '../helpers/passkeySupport';
 import { Column, Row } from './Row';
 import { CodeBlock } from './CodeBlock';
 import { SecretCodeBlock } from './SecretCodeBlock';
@@ -66,6 +67,7 @@ export function AccountRecoveryCard({
   /** Picks this account's backup out of a device holding several. */
   agentSubject?: string;
 }) {
+  const passkeyAvailable = hasPasskeyApi();
   const [backup, setBackup] = useState<BackupState>({ phase: 'loading' });
   const [secret, setSecret] = useState<string | null>(null);
   const [newCode, setNewCode] = useState<string | null>(null);
@@ -404,6 +406,8 @@ export function AccountRecoveryCard({
   }
 
   async function handleUnifyPasskey() {
+    if (!passkeyAvailable) return;
+
     if (!agentSubject || backup.phase !== 'ready') return;
 
     if (!envelopeWrapperKinds(backup.secret).hasPasskey && !codeInput.trim()) {
@@ -443,6 +447,8 @@ export function AccountRecoveryCard({
   }
 
   async function handleAddPasskey() {
+    if (!passkeyAvailable) return;
+
     if (!codeInput.trim()) {
       setNeedsCode(true);
       setError(undefined);
@@ -576,7 +582,16 @@ export function AccountRecoveryCard({
         </Column>
       ) : null}
 
-      {hasSession &&
+      {!passkeyAvailable && (
+        <Hint role='status'>
+          This browser does not expose passkey support. Open this site directly
+          in a browser with passkey support, such as Chrome or Safari. Sign in
+          there with an email link to add a passkey. An embedded browser may not
+          support this.
+        </Hint>
+      )}
+      {passkeyAvailable &&
+      hasSession &&
       !addingAccountPasskey &&
       backup.secret.format_version === 2 &&
       !backup.secret.wrappers.some(w => w.kdf_params.account_passkey) ? (
@@ -644,7 +659,9 @@ export function AccountRecoveryCard({
                     ? 'Unlock with recovery code'
                     : 'Use recovery code'}
             </Button>
-            {hasSession === true && backup.secret.format_version !== 2 ? (
+            {passkeyAvailable &&
+            hasSession === true &&
+            backup.secret.format_version !== 2 ? (
               <Button
                 subtle
                 disabled={loading || !agentSubject}
@@ -653,7 +670,7 @@ export function AccountRecoveryCard({
               >
                 Add a passkey
               </Button>
-            ) : hasSession !== true && portalUrl ? (
+            ) : passkeyAvailable && hasSession !== true && portalUrl ? (
               <Button
                 subtle
                 onClick={() => window.open(`${portalUrl}/dashboard`, '_blank')}
@@ -664,8 +681,8 @@ export function AccountRecoveryCard({
           </Row>
           {needsCode ? (
             <Hint>
-              Enter your recovery code to show your secret or add a passkey on
-              this device. Your existing recovery code will keep working.
+              Enter your recovery code to unlock your backup. Your existing
+              recovery code will keep working.
             </Hint>
           ) : null}
           {passkeyAdded ? (
