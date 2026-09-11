@@ -1,3 +1,36 @@
+## Reproducible local production run
+
+From `browser/`, run `pnpm test-e2e:local`. It installs locked dependencies,
+builds every JS package and WASM, then builds the native server from this
+checkout. It starts a fresh database and production preview on matching free
+ports, checks both the frontend and its backend proxy, and runs Chromium with
+one worker and zero retries. It stops only its own process groups. Build logs,
+test data and the HTML report remain in the git-ignored `.e2e-runs/` directory.
+
+Prerequisites: the repository's Rust toolchain, `wasm32-unknown-unknown`,
+`cargo-run-bin` (for the pinned wasm-pack), Node and pnpm. The first build may
+be slow; later runs reuse Cargo and pnpm caches while rebuilding changed code.
+Ports 3000 and 4174 must be free for generated Next.js/Svelte template tests.
+The runner refuses an occupied template port before running any tests.
+
+Pass Playwright filters directly, e.g. `pnpm test-e2e:local --grep @smoke`.
+`PLAYWRIGHT_WORKERS` can override concurrency. Cloud Vault integration needs a
+real portal at `ATOMIC_VAULT_PORTAL_URL` (default localhost:3030); those tests
+report skips when it is unavailable. Mocked managed-account tests do not
+require that portal.
+
+### Deployment fixtures
+
+Import `standaloneTest as test` or `managedTest as test` from
+`tests/deployment-fixtures.ts` when a spec depends on deployment behavior.
+Managed mode sets the runtime portal URL and mocks the account API before
+navigation; register endpoint-specific routes afterward. Standalone mode does
+not inject hosted configuration. Use `managedDriveTest` for a fresh dev-drive
+identity followed by hosted mode; the standalone dev-drive route cannot run
+under hosted onboarding. The other fixtures do not create an identity.
+For mocked portal navigation, disable service workers in the spec so routes
+can intercept the dashboard instead of the app's navigation fallback.
+
 # Atomic Data Browser E2E tests
 
 We use `playwright` to run end-to-end tests in the browser.

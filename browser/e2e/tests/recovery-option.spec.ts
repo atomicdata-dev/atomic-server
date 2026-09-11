@@ -1,12 +1,15 @@
-import { mockManagedPortal } from './managed-test-utils';
-import { test, expect } from '@playwright/test';
+import { managedTest as test, expect } from './deployment-fixtures';
 
 // The portal is mocked on this origin; its dashboard must reach page.route
 // rather than the app service worker's navigation fallback.
 test.use({ serviceWorkers: 'block' });
 
-test.beforeEach(async ({ page }) => {
-  await mockManagedPortal(page);
+test.beforeEach(({ browserDiagnostics }) => {
+  browserDiagnostics.expect(
+    'warning',
+    /^Service Worker registration blocked by Playwright$/,
+    'This spec disables the app worker so mocked portal navigation is intercepted.',
+  );
 });
 
 // A portal session is not evidence that an encrypted recovery backup exists.

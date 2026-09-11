@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { standaloneTest as test, expect } from './deployment-fixtures';
 import {
   before,
   newResource,

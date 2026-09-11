@@ -1,13 +1,11 @@
-import { mockManagedPortal } from './managed-test-utils';
-import { test, expect } from '@playwright/test';
-import { devDrive, FRONTEND_URL } from './test-utils';
+import { managedDriveTest as test, expect } from './deployment-fixtures';
+import { FRONTEND_URL } from './test-utils';
 
 for (const localOnly of [true, false]) {
   test(`managed sync keeps server state honest (localOnly=${localOnly})`, async ({
     page,
+    browserDiagnostics,
   }) => {
-    await devDrive(page);
-    await mockManagedPortal(page);
     await page.route('**/api/me', route =>
       route.fulfill({ json: { email: 'sync-test@example.com' } }),
     );
@@ -67,9 +65,17 @@ for (const localOnly of [true, false]) {
     if (!localOnly) {
       // This case checks the expired Vault-session message independently of
       // the account identity returned by /me.
-      await page.route('**/api/cloud-vault/drives', route =>
-        route.fulfill({ status: 401 }),
-      );
+      await page.route('**/api/cloud-vault/drives', route => {
+        browserDiagnostics.expect(
+          'error',
+          /^Failed to load resource:.*401 \(Unauthorized\)/,
+          'This request deliberately returns an expired Vault session.',
+          1,
+          /\/api\/cloud-vault\/drives$/,
+        );
+
+        return route.fulfill({ status: 401 });
+      });
     }
 
     const writes: string[] = [];

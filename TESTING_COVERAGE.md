@@ -715,3 +715,20 @@ check; real refresh/query timing remains a browser acceptance check.
 `store.test.ts` also verifies that a buffered property snapshot materializes before `getProperty` reads its datatype. Computed-column resize, reorder and filter E2Es exercise this during table creation and reload.
 
 `store.test.ts` keeps property readers pending when a delta lacks base history; `sync-import.test.ts` checks the loading-to-error transition if recovery fails. `plugin.spec.ts` verifies installation completes without accessing an unmounted upload input.
+
+## Resource lifecycle and reproducible local E2E
+
+- `browser/lib/src/resource.test.ts`: explicit buffered/loading/recovering/ready/error
+  states, including readable cached values while recovery is in flight.
+- `browser/lib/src/store.test.ts`: local hydration publishes the original causal
+  snapshot in one ingress; immutable status snapshots retain the live mutation handle.
+- `browser/lib/src/websockets.test.ts`: close cancels pending authentication signing;
+  a reconnect to the same account cannot revive an old sync computation.
+- Production `e2e.spec.ts`, `browser-invite.spec.ts`, and `username-live.spec.ts`
+  exercise compiled profile and invitation readiness without a compiler opt-out.
+- `deployment-fixtures.ts` composes the console-diagnostics fixture for standalone,
+  managed, and managed-with-dev-drive modes. Expected mocked 401 responses and the
+  intentional service-worker block are declared only in the tests causing them.
+- `pnpm test-e2e:local` builds JS, WASM and the native backend from the checkout,
+  uses fresh test data and matching free ports, and preserves its report/build logs.
+  Real Cloud Vault integration still requires a separately running portal.
