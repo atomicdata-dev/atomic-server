@@ -4741,7 +4741,6 @@ msgstr "Developer"
 
 #: src/chunks/Conference/ConferenceRoom.tsx src/routes/SyncRoute.tsx
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/SyncRoute.tsx
@@ -8095,24 +8094,19 @@ msgstr "Uses integrations"
 msgid "Compatibility notes"
 msgstr "Compatibility notes"
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Data source ID"
-msgstr "Data source ID"
+#~ msgid "Data source ID"
+#~ msgstr "Data source ID"
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
-msgstr "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
+#~ msgid "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
+#~ msgstr "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Notion connection token"
-msgstr "Notion connection token"
+#~ msgid "Notion connection token"
+#~ msgstr "Notion connection token"
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
-msgstr "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
+#~ msgid "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
+#~ msgstr "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
 
 #: src/chunks/PluginRuns/ConnectNotion.tsx
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
 msgid "Connect Notion"
 msgstr "Connect Notion"
 
@@ -8520,13 +8514,11 @@ msgstr "Automation runs using this action"
 msgid "Remove old action payloads while keeping IDs, outcomes and recovery evidence. Completed results must be at least 30 days old. Automation results also require every consuming run to have finished or been explicitly abandoned at least 30 days ago. Unfinished runs, untracked usage, uncertain or failed writes, and receipts with an unknown completion date are kept."
 msgstr "Remove old action payloads while keeping IDs, outcomes and recovery evidence. Completed results must be at least 30 days old. Automation results also require every consuming run to have finished or been explicitly abandoned at least 30 days ago. Unfinished runs, untracked usage, uncertain or failed writes, and receipts with an unknown completion date are kept."
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Enter a data source ID and connection token to continue."
-msgstr "Enter a data source ID and connection token to continue."
+#~ msgid "Enter a data source ID and connection token to continue."
+#~ msgstr "Enter a data source ID and connection token to continue."
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Connect a Notion database, then review what will sync before making changes."
-msgstr "Connect a Notion database, then review what will sync before making changes."
+#~ msgid "Connect a Notion database, then review what will sync before making changes."
+#~ msgstr "Connect a Notion database, then review what will sync before making changes."
 
 #~ msgid "Enter a repository and token to continue."
 #~ msgstr "Enter a repository and token to continue."

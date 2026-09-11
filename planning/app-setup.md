@@ -8,7 +8,7 @@
 - [ ] Accept full installation against a matching backend and migrate remaining setup execution.
 
 Remaining convergence: migrate installer effects into the sandboxed action lifecycle,
-resumable setup after partial creation, GitHub OAuth/account discovery, Notion migration.
+resumable setup after partial creation, GitHub OAuth/account discovery, and Notion OAuth convergence.
 A registered bundled setup adapter is trusted host code. Do not execute arbitrary
 user-authored setup functions on the frontend origin. Registration is not a sandbox.
 
@@ -22,3 +22,14 @@ installation success from the form tests. The pure setup normalization is curren
 called by a bundled host adapter; exported setup functions in arbitrary stored
 plugin source are not invoked yet. Dynamic dependent account/repository lookup,
 portable setup permissions and translated package metadata remain open.
+
+## Notion manual setup convergence
+
+- [x] Package-owned Notion declaration and UUID normalization, shared with assistant discovery.
+- [x] Replace the bespoke manual form with AppSetupForm; retain the existing OAuth entry point.
+- [x] Verify malformed IDs fail before credential storage and leave the form retryable.
+
+This removes the duplicate manual form, not the legacy installer. Both bundled
+adapters still call host installers. Sandbox setup execution, resumable installation,
+and OAuth discovery remain unchecked above. Package-authored setup labels remain
+English until metadata localization is implemented.

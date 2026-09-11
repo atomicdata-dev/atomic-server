@@ -4730,7 +4730,6 @@ msgstr ""
 
 #: src/chunks/Conference/ConferenceRoom.tsx src/routes/SyncRoute.tsx
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/SyncRoute.tsx
@@ -8084,24 +8083,19 @@ msgstr ""
 msgid "Compatibility notes"
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Data source ID"
-msgstr ""
+#~ msgid "Data source ID"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
-msgstr ""
+#~ msgid "Use the data source UUID from Notion, not a database URL. Share its database with your Notion connection first."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Notion connection token"
-msgstr ""
+#~ msgid "Notion connection token"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
-msgstr ""
+#~ msgid "The token is stored on your AtomicServer. Formatted text, relations, formulas and filtered views need additional mappings. Compatibility notes appear on the connection before you approve any sync."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/ConnectNotion.tsx
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
 msgid "Connect Notion"
 msgstr ""
 
@@ -8509,13 +8503,11 @@ msgstr ""
 msgid "Remove old action payloads while keeping IDs, outcomes and recovery evidence. Completed results must be at least 30 days old. Automation results also require every consuming run to have finished or been explicitly abandoned at least 30 days ago. Unfinished runs, untracked usage, uncertain or failed writes, and receipts with an unknown completion date are kept."
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Enter a data source ID and connection token to continue."
-msgstr ""
+#~ msgid "Enter a data source ID and connection token to continue."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectNotionManual.tsx
-msgid "Connect a Notion database, then review what will sync before making changes."
-msgstr ""
+#~ msgid "Connect a Notion database, then review what will sync before making changes."
+#~ msgstr ""
 
 #~ msgid "Enter a repository and token to continue."
 #~ msgstr ""
