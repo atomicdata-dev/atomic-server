@@ -1,12 +1,8 @@
-import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { preview, project, manifest, type Issue } from './adapter.js';
 import { validateManifest } from '../../browser/lib/src/plugin-manifest.js';
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-const root = fileURLToPath(new URL('../../', import.meta.url));
 const issue = (number: number): Issue => ({
   number,
   title: `Issue ${number}`,
@@ -22,25 +18,19 @@ describe('GitHub package', () => {
   });
   it('ships exactly the artifact tested by the sandbox', async () => {
     const built = execFileSync(
-      existsSync(resolve(root, 'browser/node_modules/.bin/esbuild'))
-        ? resolve(root, 'browser/node_modules/.bin/esbuild')
-        : resolve(root, 'browser/node_modules/.pnpm/node_modules/.bin/esbuild'),
+      './browser/node_modules/.bin/esbuild',
       [
         'integrations/github-issues/plugin.ts',
-        '--preserve-symlinks',
         '--bundle',
         '--format=esm',
         '--platform=neutral',
         '--target=es2022',
       ],
-      { encoding: 'utf8', cwd: root },
+      { encoding: 'utf8' },
     );
-    expect(
-      await readFile(
-        resolve(root, 'integrations/github-issues/plugin.js'),
-        'utf8',
-      ),
-    ).toBe(built);
+    expect(await readFile('integrations/github-issues/plugin.js', 'utf8')).toBe(
+      built,
+    );
   });
   it('reads every page and excludes pull requests', async () => {
     const issues = Array.from({ length: 101 }, (_, i) => issue(i + 1));
@@ -85,7 +75,7 @@ it('keeps the sandbox action manifest fixture current', async () => {
   expect(
     JSON.parse(
       await readFile(
-        resolve(root, 'integrations/github-issues/manifest.fixture.json'),
+        'integrations/github-issues/manifest.fixture.json',
         'utf8',
       ),
     ),

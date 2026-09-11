@@ -273,49 +273,23 @@ export class AtomicServer {
    * Mount shared crates.io + git dependency caches under `cargoHome`, and
    * pin `CARGO_BUILD_JOBS` so rustc doesn't spawn one job per visible host
    * CPU (containers see the full Mancave SMT count). Registry content is
-   * identical across glibc/musl images, so both share dependency volumes
-   * and Cargo cache locks — only the mount path differs.
+   * identical across glibc/musl images, so both share the `cargo` /
+   * `cargo-git` volumes — only the mount path differs.
    */
   private withCargoHomeCache(
     container: Container,
     cargoHome: string,
   ): Container {
-    return (
-      container
-        .withMountedCache(
-          `${cargoHome}/registry`,
-          dag.cacheVolume('cargo-shared-locks-v1'),
-          {
-            sharing: CacheSharingMode.Shared,
-          },
-        )
-        .withMountedCache(
-          `${cargoHome}/git`,
-          dag.cacheVolume('cargo-git-shared-locks-v1'),
-          {
-            sharing: CacheSharingMode.Shared,
-          },
-        )
-        // Cargo locks live in CARGO_HOME, outside registry/git. Sharing only
-        // those directories leaves every container with independent locks and
-        // lets simultaneous downloads race while unpacking the same crate.
-        // Put both lock inodes in the shared registry volume; Cargo still only
-        // serializes downloads/mutations, not the entire parallel build lane.
-        // Fresh volume names keep older jobs with private locks out of this cache.
-        .withExec([
-          'ln',
-          '-sf',
-          'registry/.package-cache',
-          `${cargoHome}/.package-cache`,
-        ])
-        .withExec([
-          'ln',
-          '-sf',
-          'registry/.package-cache-mutate',
-          `${cargoHome}/.package-cache-mutate`,
-        ])
-        .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs)
-    );
+    return container
+      .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
+        // Shared: Locked serialized every parallel CI lane behind whichever
+        // job held the volume. Cargo's own flock handles concurrent writers.
+        sharing: CacheSharingMode.Shared,
+      })
+      .withMountedCache(`${cargoHome}/git`, dag.cacheVolume('cargo-git'), {
+        sharing: CacheSharingMode.Shared,
+      })
+      .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs);
   }
 
   /**
@@ -770,7 +744,7 @@ export class AtomicServer {
           'atomic-server',
           '--no-default-features',
           '--features',
-          'light,wasm-plugins',
+          'light',
         ])
         .withExec([
           'cp',
@@ -1116,19 +1090,10 @@ export class AtomicServer {
       )
       // data-browser/src/helpers/pairing.test.ts reads a repo-root testdata
       // fixture the same way (`../../../../testdata/pairing-request.json`
-      // from /app/data-browser/src/helpers). `/testdata` isn't an OS path
-      // (unlike `/lib` above), so mount the whole directory rather than
-      // picking files one at a time — lib/plugin-plan.fixtures.test.ts also
-      // needs to `readdirSync` the `plugin-plans/` subdirectory, which a
-      // single-file mount can't provide.
-      .withDirectory('/testdata', this.source.directory('testdata'))
-      // lib/src/task-schema.test.ts reads repo-root `lib/defaults/tasks.json`
-      // the same plain-`readFileSync` way as genesis_test_vectors.json above
-      // (`../../../lib/defaults/tasks.json` from /app/lib/src). Mount just
-      // this file, under the same /lib collision caution as above.
+      // from /app/data-browser/src/helpers) — mount just this one file.
       .withFile(
-        '/lib/defaults/tasks.json',
-        this.source.file('lib/defaults/tasks.json'),
+        '/testdata/pairing-request.json',
+        this.source.file('testdata/pairing-request.json'),
       );
 
     // Build all packages since they may depend on each other's built artifacts
@@ -1211,17 +1176,7 @@ export class AtomicServer {
       )
       .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
       .withDirectory('/code/tools', source.directory('tools'))
-      // v3 -> v4: `atomic-server`'s build.rs only declares
-      // `rerun-if-changed` on `plugin-runtime/{src,wit}` and
-      // `ATOMICSERVER_SKIP_PLUGIN_RUNTIME` — it has no way to know "the
-      // wasm32-wasip2 target just became installed". Adding the `rustup
-      // target add` step above changed the container, but every prior CI
-      // run had already fingerprinted build.rs's output (an empty embedded
-      // runtime, from before that target existed) into this cache volume,
-      // so cargo kept trusting the stale fingerprint and never re-ran
-      // build_plugin_runtime() to notice the target was now there. Bumping
-      // the volume forces one full rebuild that actually re-evaluates it.
-      .withMountedCache('/code/target', dag.cacheVolume('rust-target-v4'))
+      .withMountedCache('/code/target', dag.cacheVolume('rust-target-v3'))
       .withExec(TOUCH_WORKSPACE_SOURCES)
       .withWorkdir('/code')
       .withExec(['cargo', 'fetch']);
@@ -1277,10 +1232,11 @@ export class AtomicServer {
     // `rustBuildSlim`'s glibc path (different symptom there — ABI mismatch,
     // not a missing binary — same root cause).
     //
-    // All server builds include `wasm-plugins`: plugin handlers are compiled
-    // unconditionally, and the E2E suite also executes server-side plugins.
-    // `vector-search` remains excluded because of the ort/musl gap above.
-    let wasmPluginsEnabled = false;
+    // E2E exception: `plugin.spec.ts` needs `wasm-plugins` so the test
+    // plugin's `after_commit` can rename folders. `light` is https-only and
+    // silently makes that assertion hang until timeout. Defaults minus
+    // `vector-search` (the ort/musl gap above) is enough — wasmtime builds
+    // fine on this musl-cross image.
     if (target.includes('musl')) {
       if (e2e) {
         buildArgs.push(
@@ -1288,14 +1244,8 @@ export class AtomicServer {
           '--features',
           'https,wasm-plugins',
         );
-        wasmPluginsEnabled = true;
       } else {
-        buildArgs.push(
-          '--no-default-features',
-          '--features',
-          'light,wasm-plugins',
-        );
-        wasmPluginsEnabled = true;
+        buildArgs.push('--no-default-features', '--features', 'light');
       }
     }
     // A named profile lands in `target/<triple>/<profile>/`, not `release/`.
@@ -1305,25 +1255,8 @@ export class AtomicServer {
         ? `/code/target/${target}/release/atomic-server`
         : `/code/target/${target}/debug/atomic-server`;
 
-    // `wasm-plugins`'s build.rs compiles `atomic-plugin-runtime` for
-    // `wasm32-wasip2` as a nested `cargo build`, separate from the rustc
-    // that's already on this image. Without the target's std lib installed,
-    // that nested build fails and build.rs treats it as "plugins are an
-    // optional degradation" — it swallows the failure and ships a server
-    // with an empty embedded runtime instead of erroring the build. Every
-    // e2e test that actually exercises server-side plugin execution
-    // (this one and `plugin.spec.ts`) then hangs until timeout on a 500
-    // from `/plugin-run`, with nothing in the build log to point at why.
-    // `rustTest()` already installs this target for the same reason —
-    // same fix, applied where the e2e server binary is actually built.
-    const containerReadyToBuild = wasmPluginsEnabled
-      ? containerWithAssets
-          .withExec(['rustup', 'target', 'add', 'wasm32-wasip2'])
-          .withEnvVariable('ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME', 'true')
-      : containerWithAssets;
-
     return (
-      containerReadyToBuild
+      containerWithAssets
         .withExec(buildArgs)
         // .withExec([targetPath, "--version"])
         .withExec(['cp', targetPath, '/atomic-server-binary'])
@@ -1441,7 +1374,6 @@ export class AtomicServer {
     return (
       this.rustChecksContainer()
         .withExec(['rustup', 'target', 'add', 'wasm32-wasip2'])
-        .withEnvVariable('ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME', 'true')
         // Persist nextest in the shared cargo-bin volume. Previously the
         // curl install sat *after* the source mount, so every Rust source
         // change re-downloaded it. The `linux-musl` URL is required: the
@@ -1504,11 +1436,12 @@ export class AtomicServer {
     // system OpenSSL we don't ship. Default features are what the release
     // binary already builds with.
     //
-    // `--no-default-features --features light,wasm-plugins`: same
-    // ort/musl/cuda gap as `rustTest` above — `vector-search`'s `ort` dep has
-    // no prebuilt binary for this target, so even a lint-only pass can't
-    // compile it. Vector-search-gated code isn't clippy-checked on this path;
-    // plugin code is included because rustTest uses the same feature set.
+    // `--no-default-features --features light`: same ort/musl/cuda gap as
+    // `rustTest` above — `vector-search`'s `ort` dep has no prebuilt binary
+    // for this target, so even a lint-only pass can't compile it. Means
+    // vector-search-gated code isn't clippy-checked on this path; the
+    // tradeoff was a deliberate call, not an oversight — see rustTest's
+    // comment for the full reasoning.
     return this.rustChecksContainer()
       .withExec([
         'cargo',
@@ -1520,7 +1453,7 @@ export class AtomicServer {
         '--all-targets',
         '--no-default-features',
         '--features',
-        'light,wasm-plugins',
+        'light',
       ])
       .stdout();
   }
@@ -1878,24 +1811,12 @@ export class AtomicServer {
      * guess the git ref. See `ci()` for why this is not named `e2eMode`.
      */
     @argument() playwrightMode: string = 'full',
-    /**
-     * Optional Playwright regular expression for one focused browser journey.
-     * A focused run stays on one server/shard, so an exact test does not run
-     * alongside unrelated E2E failures.
-     */
-    @argument() playwrightGrep: string = '',
   ): Promise<string> {
     // Shards × own atomic-server. Count comes from `--host-profile`
     // (Mancave hot / hosted conservative) plus `--playwright-mode` (light uses
     // fewer shards). Dagger dedupes the shared debug `rustBuild(e2e)` /
     // base-container graph.
     this.e2eRun = e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode));
-    if (playwrightGrep)
-      this.e2eRun = {
-        ...this.e2eRun,
-        shardCount: 1,
-        grep: playwrightGrep,
-      };
     const shardCount = this.e2eRun.shardCount;
     const base = this.e2eBaseContainer();
     const shardIndexes = Array.from({ length: shardCount }, (_, i) => i + 1);

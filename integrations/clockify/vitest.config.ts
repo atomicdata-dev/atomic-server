@@ -1,5 +1,4 @@
 export default {
-  root: new URL('.', import.meta.url).pathname,
   resolve: {
     alias: {
       vitest: new URL(
@@ -8,5 +7,5 @@ export default {
       ).pathname,
     },
   },
-  test: { include: ['*.test.ts'] },
+  test: { include: ['integrations/clockify/*.test.ts'] },
 };

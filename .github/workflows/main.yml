@@ -18,8 +18,6 @@ on:
 # Queue instead of overlap; never cancel a run that is already going.
 concurrency:
   group: main-pipeline
-  # The default keeps only one pending run and replaces it on the next push.
-  queue: max
   cancel-in-progress: false
 
 # Main prefers Mancave (self-hosted) so Dagger cache volumes stay warm.
@@ -237,10 +235,6 @@ jobs:
           token: ${{ secrets.ATOMIC_SAAS_DISPATCH_TOKEN }}
           path: atomic-saas
           clean: false
-          # Nothing below pushes to atomic-saas, so the PAT has no business
-          # staying in atomic-saas/.git/config on the self-hosted runner
-          # (where `clean: false` keeps the checkout around between runs).
-          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.98.1
