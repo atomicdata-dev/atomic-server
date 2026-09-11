@@ -1,4 +1,5 @@
 export default {
+  root: new URL('.', import.meta.url).pathname,
   resolve: {
     alias: {
       vitest: new URL(
@@ -7,5 +8,5 @@ export default {
       ).pathname,
     },
   },
-  test: { include: ['integrations/notion/*.test.ts'] },
+  test: { include: ['*.test.ts'] },
 };

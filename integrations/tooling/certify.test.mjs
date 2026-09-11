@@ -1,10 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+  readFileSync,
+} from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   discover,
+  root,
+  bundleArguments,
   evaluateJs,
   evaluateRust,
   formatFailureSummary,
@@ -142,4 +152,26 @@ test('store evidence rejects partial, failed and changed bundles; labels old evi
     assessEvidence(report, 'test', 'expected', now - 86400000),
     null,
   );
+});
+
+test('bundles are reproducible with CI browser and integration symlinks', () => {
+  const base = mkdtempSync(join(tmpdir(), 'atomic-bundle-paths-'));
+  try {
+    symlinkSync(join(root, 'browser'), join(base, 'browser'));
+    symlinkSync(join(root, 'integrations'), join(base, 'integrations'));
+    for (const provider of discover()) {
+      const generated = execFileSync(
+        join(root, 'browser/node_modules/.bin/esbuild'),
+        bundleArguments(`${provider.path}/plugin.ts`),
+        { cwd: base, encoding: 'utf8' },
+      );
+      assert.equal(
+        generated,
+        readFileSync(join(root, provider.path, 'plugin.js'), 'utf8'),
+        provider.id,
+      );
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

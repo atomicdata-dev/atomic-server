@@ -60,7 +60,7 @@ be blindly retried.
 From the repository root:
 
 ```sh
-./browser/node_modules/.bin/esbuild integrations/notion/plugin.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=integrations/notion/plugin.js
+./browser/node_modules/.bin/esbuild integrations/notion/plugin.ts --preserve-symlinks --bundle --format=esm --platform=neutral --target=es2022 --outfile=integrations/notion/plugin.js
 ./browser/node_modules/.bin/vitest run --config integrations/notion/vitest.config.ts
 ./browser/node_modules/.bin/tsc -p integrations/notion/tsconfig.json
 ATOMICSERVER_SKIP_JS_BUILD=true cargo test -p atomic-server --lib notion_bundle --no-default-features --features light,wasm-plugins

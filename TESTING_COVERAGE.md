@@ -1,5 +1,10 @@
 # Testing coverage map
 
+`integrations/tooling/certify.test.mjs` rebuilds every certified provider through
+a symlinked repository layout and compares the shipped bytes, covering CI mount
+paths and package-manager symlinks. Provider Vitest configurations use explicit
+package roots so certification also works when invoked from `/`.
+
 Local integration resource recovery (#1406):
 `browser/lib/src/local-schema-resource.test.ts` exercises the real Store and
 local installation adapter with a controlled ClientDb. It reproduces a cold

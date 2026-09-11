@@ -11,6 +11,18 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export function bundleArguments(entry) {
+  // CI aliases /browser to /app. Keep source comments relative to the logical
+  // repository paths so the shipped bytes do not depend on mount locations.
+  return [
+    entry,
+    '--preserve-symlinks',
+    '--bundle',
+    '--format=esm',
+    '--platform=neutral',
+    '--target=es2022',
+  ];
+}
 export function discover(base = root) {
   return readdirSync(resolve(base, 'integrations'), { withFileTypes: true })
     .filter(
@@ -187,13 +199,7 @@ export function certify({
     if (layer !== 'sandbox') {
       const bundle = run(
         resolve(root, 'browser/node_modules/.bin/esbuild'),
-        [
-          `${p.path}/plugin.ts`,
-          '--bundle',
-          '--format=esm',
-          '--platform=neutral',
-          '--target=es2022',
-        ],
+        bundleArguments(`${p.path}/plugin.ts`),
         `${p.id}-bundle.log`,
       );
       check(
