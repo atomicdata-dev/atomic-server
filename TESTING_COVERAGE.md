@@ -1274,8 +1274,10 @@ start data, invalid active events, namespace isolation and repeat import/local
 field preservation. `browser/e2e/tests/google-calendar-import.spec.mts` uses the
 shared HTTP mock integration-proxy with a paginated Google Calendar, selected
 platform consent and PKCE redemption. It covers browser WASM fetching, local
-schema/proposal/apply, Calendar display, provider updates, OPFS reload and
-stable identities while AtomicServer HTTP/WebSockets are unavailable. Missing
+one-request validation, immediate folder creation before a held background import,
+automatic schema/application, Calendar display, refresh on reopening, OPFS reload,
+stable identities and local-only notes while AtomicServer HTTP/WebSockets are
+unavailable. A failed refresh retains records and reopening recovers. Missing
 rows in a bounded snapshot are retained, not interpreted as deletions.
 Live-provider browser OAuth and write verification are tracked separately in PR
 and release verification; this fixture intentionally uses no live provider
@@ -1453,3 +1455,20 @@ dependency. `db::app_agent::store_tests::revocation_survives_process_exit_withou
 exercises runtime construction in both the parent and its abruptly exiting child
 with `cargo test -p atomic_lib --features db-redb --lib`, without workspace feature
 unification or an extra Tokio feature on the command line.
+
+
+## Local Thought browser refresh
+
+- `integrations/localthought/browser.test.ts`: one provider request for validation,
+  no pagination/retry or import, credential rotation, and denied/throttled/failed
+  access checks.
+- `browser/data-browser/src/chunks/PluginRuns/localThoughtSync.test.ts`: install
+  without importing, failed validation before folder creation, overlapping refresh
+  exclusion, failure/recovery with last-success preservation, blocked imports and
+  switching accounts during a fetch.
+- `browser/e2e/tests/google-calendar-import.spec.mts`: real WASM and browser OPFS
+  journey for background installation, folder-open and five-minute timer refresh,
+  preserved identities, local edits and notes, failure/recovery, and Calendar
+  instances/series. No live accounts.
+- Online and visibility lifecycle hooks use the same refresh function.
+  Closed-browser execution is intentionally unsupported.

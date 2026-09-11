@@ -31,7 +31,6 @@ export function LocalThoughtCatalog({
     const controller = new AbortController();
     setPlatforms(undefined);
     setError('');
-    setReturned(undefined);
     browserIntegrations(origin)
       .catalog(controller.signal)
       .then(data => {
@@ -42,7 +41,36 @@ export function LocalThoughtCatalog({
       });
 
     return () => controller.abort();
-  }, [store, origin]);
+  }, [origin]);
+  // Removing callback parameters can remount this route before redemption
+  // finishes. A short-lived marker lets the current mount resume setup.
+  useEffect(() => {
+    const restore = () => {
+      try {
+        const completed = JSON.parse(
+          sessionStorage.getItem('localthought-completed') || 'null',
+        );
+
+        if (
+          completed?.drive === drive &&
+          completed.actor === store.getAgent()?.subject &&
+          completed.origin === origin &&
+          completed.expires > Date.now()
+        ) {
+          setReturned(completed.platform);
+        } else {
+          setReturned(undefined);
+        }
+      } catch {
+        /* Ignore an invalid completion marker. */
+      }
+    };
+
+    restore();
+    window.addEventListener('localthought-connected', restore);
+
+    return () => window.removeEventListener('localthought-connected', restore);
+  }, [store, drive, origin]);
   useEffect(() => {
     if (!drive || completing.current) return;
     const url = new URL(location.href);
@@ -106,11 +134,22 @@ export function LocalThoughtCatalog({
           actor,
         }),
       );
+      sessionStorage.setItem(
+        'localthought-completed',
+        JSON.stringify({
+          drive,
+          actor,
+          platform: result.platform,
+          origin: pending.origin ?? origin,
+          expires: Date.now() + 600000,
+        }),
+      );
+      window.dispatchEvent(new Event('localthought-connected'));
       setReturned(result.platform);
     };
 
     void finish().catch(reason => setError(String(reason)));
-  }, [drive, store]);
+  }, [drive, store, origin]);
   const visible = platforms?.filter(id =>
     `${id} ${platformName(id)}`.toLowerCase().includes(search.toLowerCase()),
   );
@@ -143,7 +182,11 @@ function PlatformCard({
   returned: boolean;
   origin: string;
 }) {
-  const [dialog, show, , isOpen] = useDialog();
+  const [dialog, show, , isOpen] = useDialog({
+    onCancel: () => {
+      if (returned) sessionStorage.removeItem('localthought-completed');
+    },
+  });
   useEffect(() => {
     if (returned) show();
   }, [returned, show]);

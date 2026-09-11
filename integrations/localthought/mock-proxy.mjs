@@ -63,6 +63,8 @@ export function mockProxy({
     };
     if (url.pathname === '/catalog')
       return json(200, ['github-issues', 'google-calendar', 'pets']);
+    if (/^\/catalog\/(pets|google-calendar|github-issues)\.selection\.json$/.test(url.pathname))
+      return json(200, { query_overrides: [] });
     if (url.pathname === '/catalog/pets.yaml') {
       res.writeHead(200, { 'Content-Type': 'application/yaml' });
       return res.end(

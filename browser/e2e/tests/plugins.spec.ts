@@ -21,7 +21,7 @@ import {
 test.describe('plugins', () => {
   test.beforeEach(before);
 
-  test('Pets imports from the mock integration proxy after account connection and review', async ({
+  test('Pets imports in the background after account connection', async ({
     page,
   }) => {
     test.skip(
@@ -66,20 +66,14 @@ test.describe('plugins', () => {
       })
       .click();
     await expect(page).not.toHaveURL(/connection_code=/);
-    await page.getByRole('button', { name: 'Fetch and preview' }).click();
-
-    const review = page.locator('dialog[open]');
-    // The browser creates the local ontology, tables and reviewed proposal.
-    // Allow the one-time installation more than the interaction timeout.
+    await page.getByRole('button', { name: 'Complete installation' }).click();
+    await page.getByRole('link', { name: 'Open folder', exact: true }).click();
     await expect(
-      review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
-    ).toBeEnabled({ timeout: 45_000 });
-    await review
-      .getByRole('button', { name: 'Apply 5 changes', exact: true })
-      .click();
-
+      page.getByRole('status').filter({ hasText: 'Last synced' }),
+    ).toBeVisible({ timeout: 60000 });
     await page
-      .getByRole('link', { name: 'Open imported records', exact: true })
+      .locator('[data-test="folder-list"]')
+      .getByRole('link', { name: 'Pets', exact: true })
       .click();
     const main = page.getByRole('main');
     await expect(

@@ -17,7 +17,7 @@ export const calendarDocument = {
       get: {
         parameters: [
           { name: 'calendarId', in: 'path', required: true, schema: string },
-          ...['pageToken', 'timeMin', 'timeMax'].map(name => ({
+          ...['pageToken', 'timeMin', 'timeMax', 'orderBy'].map(name => ({
             name,
             in: 'query',
             schema: string,
@@ -66,6 +66,8 @@ export const calendarDocument = {
           start: dateTime,
           end: dateTime,
           recurringEventId: string,
+          originalStartTime: dateTime,
+          recurrence: { type: 'array', items: string },
           htmlLink: string,
           attendees: {
             type: 'array',

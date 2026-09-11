@@ -403,3 +403,37 @@ it('rejects retry delays beyond the consumer deadline without sleeping', async (
   await expect(client.fetchRecords('drive', 'actor', state, {})).rejects.toThrow('API retry delay exceeds remaining import time');
   expect(sleep).not.toHaveBeenCalled();
 });
+
+
+it('checks exactly one provider request, discards the response and rotates credentials', async () => {
+  const { client, start, http, values, engine } = setup();
+  const { state } = await start();
+  await client.finish('drive', 'actor', state, 'first');
+  http.mockImplementation(async (url, init) => {
+    if (url.includes('/proxy/')) {
+      expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer first');
+      return new Response('{"items":[{"id":"one"}]}', { headers: { 'x-connection-code': 'next' } });
+    }
+    return new Response('{}');
+  });
+  // Real Syncables may collect transport errors and continue other roots.
+  engine.fetchIntegration = async (_t, _p, _c, _s, fetch) => {
+    for (const path of ['/pets', '/other']) {
+      try { await fetch('https://pets.example' + path); } catch { /* expected */ }
+    }
+    throw new Error('Traversal interrupted');
+  };
+  await expect(client.validateConnection('drive', 'actor', state, {})).resolves.toBeUndefined();
+  expect(http.mock.calls.filter(([url]) => url.includes('/proxy/'))).toHaveLength(1);
+  expect(values.get('localthought-browser-v1:' + state)).toContain('"code":"next"');
+});
+
+it.each([401, 429, 500])('fails the access check on HTTP %s without retrying', async status => {
+  const { client, start, http } = setup();
+  const { state } = await start();
+  await client.finish('drive', 'actor', state, 'first');
+  http.mockImplementation(async url => new Response('{}', url.includes('/proxy/')
+    ? { status, headers: { 'x-connection-code': 'next' } } : {}));
+  await expect(client.validateConnection('drive', 'actor', state, {})).rejects.toThrow(`HTTP ${status}`);
+  expect(http.mock.calls.filter(([url]) => url.includes('/proxy/'))).toHaveLength(1);
+});

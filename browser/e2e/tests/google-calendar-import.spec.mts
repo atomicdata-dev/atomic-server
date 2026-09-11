@@ -7,10 +7,11 @@ test.use({ serviceWorkers: 'block' });
 // Reuse the browser transport and HTTP mock from the Devonian integration.
 // No real provider credentials are used.
 for (const keepSeries of [false, true]) {
-  test(`Calendar ${keepSeries ? 'series' : 'instances'} import, refresh and persist without AtomicServer`, async ({
+  test(`Calendar ${keepSeries ? 'series' : 'instances'} installs in background, refreshes on opening and persists without AtomicServer`, async ({
     page,
   }) => {
     test.setTimeout(180_000);
+    await page.clock.install();
     const proxy = mockProxy({ frontendOrigin: new URL(FRONTEND_URL).origin });
     const month = new Date().toISOString().slice(0, 7);
     proxy.calendar.events[0].start = { date: `${month}-10` };
@@ -55,6 +56,11 @@ for (const keepSeries of [false, true]) {
     await page.routeWebSocket('**/*', socket => socket.close());
     const forbidden: string[] = [];
     const providerMethods: string[] = [];
+    let releaseImport!: () => void;
+    const importGate = new Promise<void>(resolve => {
+      releaseImport = resolve;
+    });
+    let failRefresh = false;
     // Forward the configured proxy to this test's isolated HTTP fixture. Consent,
     // PKCE redemption, code rotation, pagination and WASM code remain real.
     await page.route('**/*', async route => {
@@ -68,12 +74,22 @@ for (const keepSeries of [false, true]) {
       }
 
       if (url.origin === configuredProxy) {
-        if (url.pathname.startsWith('/proxy/'))
+        if (url.pathname.startsWith('/proxy/')) {
           providerMethods.push(request.method());
+          if (providerMethods.length > 1) await importGate;
+        }
+
         const response = await route.fetch({
           url: `${proxyOrigin}${url.pathname}${url.search}`,
           maxRedirects: 0,
         });
+
+        if (failRefresh && url.pathname.startsWith('/proxy/'))
+          return route.fulfill({
+            response,
+            status: 503,
+            body: '{"error":"temporarily unavailable"}',
+          });
 
         return route.fulfill({ response });
       }
@@ -112,29 +128,54 @@ for (const keepSeries of [false, true]) {
         })
         .click();
       await expect(
-        page.getByRole('button', { name: 'Fetch and preview', exact: true }),
+        page.getByRole('button', {
+          name: 'Complete installation',
+          exact: true,
+        }),
       ).toBeVisible();
       expect(page.url()).not.toContain('connection_code');
 
-      const apply = async (count: number) => {
+      await page
+        .getByLabel('Keep recurring series (fetch full calendars)')
+        .setChecked(keepSeries);
+      await page
+        .getByRole('button', { name: 'Complete installation', exact: true })
+        .click();
+      // Validation uses one API request; the real import is held until after
+      // installation has completed and the empty folder is already usable.
+      await expect(
+        page.getByText(
+          'Installed. Your records are syncing in the background.',
+        ),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /^Apply .* changes?$/ }),
+      ).toHaveCount(0);
+      await page
+        .getByRole('link', { name: 'Open folder', exact: true })
+        .click();
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Syncing…' }),
+      ).toBeVisible();
+      const folderUrl = page.url();
+      await expect.poll(() => providerMethods.length).toBe(2);
+      releaseImport();
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Last synced' }),
+      ).toBeVisible({ timeout: 60000 });
+
+      const openTable = async () => {
         await page
-          .getByLabel('Keep recurring series (fetch full calendars)')
-          .setChecked(keepSeries);
-        await page
-          .getByRole('button', { name: 'Fetch and preview', exact: true })
-          .click();
-        await page
-          .getByRole('button', {
-            name: new RegExp(`^Apply ${count} changes?$`),
-          })
-          .click();
-        await page
-          .getByRole('link', { name: 'Open imported records', exact: true })
+          .locator('[data-test="folder-list"]')
+          .getByRole('link', { name: 'Google Calendar', exact: true })
           .click();
         await expect(page.getByTestId('calendar-view')).toBeVisible();
+        await expect(
+          page.getByRole('status').filter({ hasText: 'Last synced' }),
+        ).toBeVisible({ timeout: 60000 });
       };
 
-      await apply(keepSeries ? 4 : 2);
+      await openTable();
 
       for (const day of ['10', '11', '12']) {
         await expect(
@@ -180,7 +221,18 @@ for (const keepSeries of [false, true]) {
           limit: 100,
         });
         const subjects = result!.subjects.sort();
-        const row = await store.getResource(subjects[0]);
+        const rows = await Promise.all(
+          subjects.map(subject => store.getResource(subject)),
+        );
+        const row = rows.find(
+          item =>
+            item.get('https://atomicdata.dev/properties/name') ===
+            'Calendar all-day fixture',
+        )!;
+        await row.set(
+          'https://atomicdata.dev/properties/name',
+          'My local event title',
+        );
         await row.set(
           'https://atomicdata.dev/properties/description',
           'Atomic-only notes',
@@ -190,11 +242,14 @@ for (const keepSeries of [false, true]) {
 
         return { subjects, table, annotated: row.subject };
       });
-      await page.reload();
-      await expect(page.getByTestId('calendar-event')).toHaveCount(chipCount);
       proxy.calendar.events[1].summary = 'Calendar refreshed fixture';
-      await setup();
-      await apply(1);
+      // A fresh page restores browser-owned settings. Opening the folder is
+      // enough to import remote changes: no visit to setup or Sync now.
+      await page.goto(folderUrl);
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Last synced' }),
+      ).toBeVisible({ timeout: 60000 });
+      await openTable();
       await expect(
         page
           .getByTestId('calendar-event')
@@ -212,6 +267,9 @@ for (const keepSeries of [false, true]) {
 
         return {
           subjects: result!.subjects.sort(),
+          name: (await store.getResource(saved.annotated)).get(
+            'https://atomicdata.dev/properties/name',
+          ),
           note: (await store.getResource(saved.annotated)).get(
             'https://atomicdata.dev/properties/description',
           ),
@@ -219,12 +277,39 @@ for (const keepSeries of [false, true]) {
       }, original);
       expect(restored.subjects).toEqual(original.subjects);
       expect(restored.note).toBe('Atomic-only notes');
-      expect(providerMethods).toEqual(['GET', 'GET', 'GET', 'GET']);
+      expect(restored.name).toBe('My local event title');
+      proxy.calendar.events[1].summary = 'Calendar scheduled fixture';
+      await page.clock.fastForward(5 * 60 * 1000);
+      await expect(
+        page
+          .getByTestId('calendar-event')
+          .filter({ hasText: 'Calendar scheduled fixture' }),
+      ).toBeVisible({ timeout: 60000 });
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Last synced' }),
+      ).toBeVisible();
+      expect(providerMethods.length).toBeGreaterThan(4);
+      expect(providerMethods.every(method => method === 'GET')).toBe(true);
       expect(
         proxy.calendar.requests.filter(r => r.query.pageToken === 'second'),
-      ).toHaveLength(2);
+      ).not.toHaveLength(0);
+      // A failed refresh leaves the last imported records readable; reopening
+      // retries and recovers without a manual action.
+      failRefresh = true;
+      await page.reload();
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Sync needs attention' }),
+      ).toBeVisible({ timeout: 60000 });
+      await expect(page.getByTestId('calendar-event')).toHaveCount(chipCount);
+      failRefresh = false;
+      await page.reload();
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Last synced' }),
+      ).toBeVisible({ timeout: 60000 });
+      await expect(page.getByTestId('calendar-event')).toHaveCount(chipCount);
       expect(forbidden).toEqual([]);
     } finally {
+      releaseImport();
       await new Promise<void>((resolve, reject) =>
         proxy.close(error => (error ? reject(error) : resolve())),
       );

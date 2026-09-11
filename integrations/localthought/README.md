@@ -2,7 +2,8 @@
 
 The LocalThought flow runs entirely in the browser: catalog discovery, OAuth
 consent, PKCE-protected return handling, paginated Syncables reads, ontology
-creation, proposal review and local Store/OPFS writes. No AtomicServer HTTP
+creation and local Store/OPFS writes. Installation validates access once, creates
+a folder, and starts an automatic inbound import without a proposal dialog. No AtomicServer HTTP
 instance is needed. LocalThought remains the remote OAuth and API proxy.
 
 Open Integrations, select a platform and choose **Install and connect**. The
@@ -11,7 +12,9 @@ the selected platform is shown before you approve access. OAuth returns to the
 same frontend `/app/integrations` page, and the browser redeems the one-time
 handoff with the verifier. No tenant secret is entered in the browser. The
 short-lived return is bound to the agent, drive and proxy; its code is removed
-from the address bar immediately.
+from the address bar immediately. A ten-minute, non-secret session marker resumes
+setup if removing those parameters remounts the page; completing installation or
+closing its setup dialog clears the marker.
 Connection codes are stored in this browser's localStorage, outside the synced
 graph, and may be read by code running on this frontend origin. Clearing site
 data requires reconnecting. Existing server-held connections require reconnecting.
@@ -25,6 +28,43 @@ Syncables is vendored temporarily under `syncables/` with upstream provenance in
 The shipped pure import mapper reads a local snapshot and produces the existing
 reviewed intents; user-edited plugin source is not executed on this path.
 Local edits and repeated imports retain the existing reconciliation behavior.
+
+## Installation and browser refresh
+
+After connecting, choose the scope and select **Complete installation**. The
+browser checks one catalog-selected provider API URL (HTTP success and a JSON
+response), without following pagination or saving that response. This is an
+access check, not a guarantee that every collection can be imported. Catalog
+metadata requests are separate from that one provider request.
+
+Installation immediately creates a normal folder and offers **Open folder**.
+The full, paginated import runs in the background and creates typed tables and
+views inside it. There is no JSON preview or Apply step for inbound records.
+Opening the folder or a table refreshes it automatically, including after a
+reload. While it remains open, a visible, online tab refreshes every five
+minutes; returning to the tab or reconnecting the network also triggers refresh.
+**Sync now** is available alongside **Syncing…**, the last successful sync time,
+and any error. An import already started continues when navigating elsewhere
+within the app. Closing the page stops it; reopening retries from the provider.
+
+Settings, connection identifiers and sync status are saved only in this browser,
+scoped to the installing agent and drive. The folder and imported records are
+normal Atomic data. Another browser can read those records but needs its own
+connection to refresh them. No server runner or closed-tab schedule is created.
+A Web Lock covers the whole fetch/map/apply cycle, so simultaneous folder opens
+across tabs cannot independently import the same snapshot.
+
+Refresh uses the shared import baselines: stable source IDs reuse existing rows,
+Atomic-only fields and local edits are preserved, and conflicts stop application
+with a visible error. Missing rows do not imply deletion. Failed fetches leave
+existing records readable and retain the last success time. A partial local
+write is retried through the same stable identities on the next refresh.
+Provider writes are still explicitly reviewed; opening a folder never sends
+edits back to a provider.
+
+Existing manual installations remain readable. Completing installation with an
+existing connection creates a new browser-refresh folder; it does not move or
+silently take over the old plugin tables.
 
 ## Build and proxy requirements
 
@@ -47,9 +87,9 @@ Local edits and repeated imports retain the existing reconciliation behavior.
   `ATOMIC_INTEGRATION_FRONTEND_ORIGIN` no longer configure this flow. Its
   `/integration-proxy/*` handlers and Syncables dependency have been removed.
 
-Limits remain 200 requests, 5,000 records, 10 MB per page/document and 120
-seconds of network work. Calendar imports require explicit UTC date bounds.
-Imports are manual; closed tabs do not run schedules. Other legacy integrations,
+Consumer limits are 10,000 requests, 5,000 records, 10 MB per page/document
+and 30 minutes per import, with a 30-second timeout per provider request. Calendar imports require explicit UTC date bounds.
+Closed tabs do not run schedules. Other legacy integrations,
 server plugin execution, actions and schedules are outside this migration.
 
 ## Checks
@@ -99,7 +139,7 @@ OpenAPI server base paths. OAuth returned successfully, and a UTC range from
 An unbounded fetch successfully traversed multiple pages but exceeded the
 5,000-record preview limit; the UI now defaults to the next 30 days. Date
 bounds and recurrence expansion are passed to Syncables as collection query
-settings. The importer remains a manual snapshot, not a background sync.
+settings. That historical verification exercised the earlier manual snapshot importer.
 
 ## Calendar view
 
@@ -114,7 +154,7 @@ to install the new exclusive end-date projection. Additional notes identify recu
 reminders and conferencing when those fields are returned by the catalog.
 Recurring instances are expanded by the existing bounded provider fetch.
 
-Use **Fetch and preview** again to refresh, then review and apply changes.
+Open the installed folder or its Calendar table to refresh automatically.
 Existing source identities and import baselines prevent duplicates and preserve
 Atomic-only fields and local edits. Cancellation records are retained with a
 note; absence from a bounded fetch never deletes an Atomic resource. Google
@@ -122,11 +162,10 @@ may omit cancelled events from list results, so this is not a deletion feed.
 Removed optional provider fields are not cleared by the shared snapshot importer.
 ### Reviewed two-way event edits
 
-After importing (or fetching an existing installation), use **Preview edits for
+From the installed folder or table, use **Preview edits for
 Google** and **Apply edits to Google**. Name/Summary, Description, Location,
 Start and End on existing imported events sync back to their original calendar
-and event ID, including individual recurring instances. Use **Fetch and preview**
-to review incoming Google changes as before.
+and event ID, including individual recurring instances. Incoming Google changes refresh automatically when the folder or table opens.
 
 Preview compares the import baseline with a fresh Google event. Conflicts block
 preview. Apply checks local values still match the review and sends only changed
@@ -139,8 +178,8 @@ Google guest notifications are enabled (`sendUpdates=all`).
 New events, deletion, recurrence rules, guests/RSVP, reminders and conferencing
 remain managed in Google. Change Start/End together for timed/all-day conversions;
 projected Calendar day/all-day columns are display fields refreshed on import.
-Atomic-only fields are preserved. This is manual two-way editing of existing
-events, not a background sync or a complete Calendar mirror.
+Atomic-only fields are preserved. Outbound editing of existing events remains manual. Inbound refresh runs in
+the browser; this is not a complete Calendar mirror.
 
 **Deployment requirement:** deploy the companion integration-proxy change in
 `calendar-proxy.patch` (based on proxy main `71115c2`). It requests
@@ -165,9 +204,14 @@ identity and repeated imports with private local fields.
 `browser/e2e/tests/google-calendar-import.spec.mts` starts the shared mock
 integration-proxy with a synthetic Google Calendar. The test selects Calendar,
 completes the mock PKCE consent and redemption, and exercises real browser
-credential rotation, WASM pagination, local schema installation, proposal review,
-OPFS application, and Calendar rendering. It refreshes changed provider data
-and checks that native identities and Atomic-only notes survive reload.
+credential rotation, one-request access validation, WASM pagination, local schema
+installation, automatic OPFS application, and Calendar rendering. It holds the
+initial import until the installed folder is open, refreshes changed provider
+data on reopening without a button, and checks that native identities and
+Atomic-only notes and local title edits survive reload. A browser clock verifies
+the five-minute timer. It also verifies failed refreshes preserve
+records and reopening recovers. Both expanded instances and retained recurring
+series are covered.
 AtomicServer HTTP and all WebSockets are blocked throughout; only GET requests
 are permitted for provider data. The configured LocalThought origin is forwarded
 to the isolated HTTP fixture, so no live provider credentials or data are used.

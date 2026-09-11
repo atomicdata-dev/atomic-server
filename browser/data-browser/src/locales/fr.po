@@ -4697,12 +4697,14 @@ msgid "{0}% used"
 msgstr ""
 
 #: src/chunks/PluginRuns/CalendarSync.tsx
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Syncing…"
 msgstr ""
 
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
 #: src/routes/DevonianDemoRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sync now"
@@ -7985,6 +7987,7 @@ msgstr ""
 msgid "An Atomic write or checkpoint needs inspection. Resume uses saved receipts and stops if a previous write is uncertain."
 msgstr ""
 
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
 #: src/chunks/PluginRuns/SyncRecovery.tsx
 msgid "Sync needs attention"
 msgstr ""
@@ -9803,24 +9806,20 @@ msgstr ""
 #~ msgid "Calendar ID"
 #~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Fetching…"
-msgstr ""
+#~ msgid "Fetching…"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Fetch and preview"
-msgstr ""
+#~ msgid "Fetch and preview"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Connect your personal account through LocalThought, then return here to preview an import."
-msgstr ""
+#~ msgid "Connect your personal account through LocalThought, then return here to preview an import."
+#~ msgstr ""
 
 #~ msgid "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
 #~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Open imported records"
-msgstr ""
+#~ msgid "Open imported records"
+#~ msgstr ""
 
 #~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
 #~ msgstr ""
@@ -10001,10 +10000,8 @@ msgstr ""
 msgid "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
 msgstr ""
 
-#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
-#: src/chunks/PluginRuns/ConnectLocalThought.tsx
-msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
-msgstr ""
+#~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/CalendarSync.tsx
 msgid "Preview edits for Google"
@@ -10297,4 +10294,43 @@ msgstr ""
 
 #: src/components/AppSetup/setupError.ts
 msgid "Unknown setup error"
+msgstr ""
+
+#. 0: new Date(installation.lastSuccess).toLocaleString()
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
+msgid "Last synced {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
+msgid "Waiting to sync"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
+msgid "Open folder"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtSyncPanel.tsx
+msgid "Refreshes every five minutes while open in this browser."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Connect your personal account through LocalThought, then return here to choose what to sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Checking connection…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Complete installation"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Installed. Your records are syncing in the background."
+msgstr ""
+
+#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Imports the collections described by the platform, following pagination. Syncs automatically when you open the folder and every five minutes while it is open. Keep this browser open to finish importing. {0}"
 msgstr ""

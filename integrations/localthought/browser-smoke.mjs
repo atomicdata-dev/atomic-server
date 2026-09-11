@@ -24,15 +24,11 @@ try {
       exact: true,
     })
     .click();
-  console.log('Fetching preview');
-  await page.getByRole('button', { name: 'Fetch and preview' }).click();
-  console.log('Applying preview');
-  await page
-    .getByRole('button', { name: 'Apply 5 changes', exact: true })
-    .click();
-  await page
-    .getByRole('link', { name: 'Open imported records', exact: true })
-    .click();
+  console.log('Installing and opening folder');
+  await page.getByRole('button', { name: 'Complete installation' }).click();
+  await page.getByRole('link', { name: 'Open folder', exact: true }).click();
+  await page.getByRole('status').filter({ hasText: 'Last synced' }).waitFor();
+  await page.locator('[data-test="folder-list"]').getByRole('link', { name: 'Pets', exact: true }).click();
   for (const name of ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'])
     await page
       .getByRole('main')
@@ -47,7 +43,7 @@ try {
       .first()
       .waitFor();
   console.log(
-    'Browser-only OAuth, WASM import, review, OPFS apply and reload passed',
+    'Browser-only OAuth, background WASM import, OPFS apply and reload passed',
   );
 } catch (error) {
   console.error(

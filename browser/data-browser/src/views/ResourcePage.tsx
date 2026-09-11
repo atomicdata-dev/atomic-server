@@ -1,3 +1,4 @@
+import { LocalThoughtSync } from '@chunks/PluginRuns/LocalThoughtSyncPanel';
 import { ImportResolutionNotice } from '@chunks/PluginRuns/ImportResolutionNotice';
 import { useEffect, useState, lazy, Suspense } from 'react';
 import {
@@ -220,6 +221,7 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
           {/* And on the original: the forks proposing changes to it. */}
           <PendingForks resource={resource} />
           <ImportResolutionNotice resource={resource} />
+          <LocalThoughtSync resource={resource} />
           <ReturnComponent resource={resource} />
         </Suspense>
       </ErrorBoundary>

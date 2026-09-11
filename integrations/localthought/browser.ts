@@ -363,12 +363,23 @@ export class BrowserIntegrations {
     this.storage.setItem(key + id, JSON.stringify({ ...current, code: next }));
     return response;
   }
+  /** Check one catalog-selected API URL without importing or following pagination. */
+  async validateConnection(
+    drive: string,
+    actor: string,
+    id: string,
+    constants: Record<string, string>,
+    selection?: unknown,
+  ): Promise<void> {
+    await this.fetchRecords(drive, actor, id, constants, selection, true);
+  }
   async fetchRecords(
     drive: string,
     actor: string,
     id: string,
     constants: Record<string, string>,
     selection?: unknown,
+    validateOnly = false,
   ) {
     // Web Locks serialize rotating credentials across tabs as well as UI actions.
     if (!navigator.locks)
@@ -390,7 +401,11 @@ export class BrowserIntegrations {
       const signal = AbortSignal.timeout(policy.timeoutMs);
       const deadline = Date.now() + policy.timeoutMs;
       let lastRequestAt: number | undefined;
+      let probeAttempted = false;
+      let probeError: unknown;
+      const probeComplete = new Error('Access check complete');
       const transport = async (raw: string) => {
+        if (validateOnly && probeAttempted) throw probeComplete;
         signal.throwIfAborted();
         const target = new URL(raw);
         if (
@@ -400,6 +415,29 @@ export class BrowserIntegrations {
           target.hash
         )
           throw new Error('Pagination left the catalog API origin');
+        if (validateOnly) {
+          probeAttempted = true;
+          try {
+            const response = await this.send(
+              id,
+              drive,
+              actor,
+              `${target.pathname}${target.search}`,
+              {},
+              AbortSignal.any([signal, AbortSignal.timeout(30000)]),
+            );
+            if (!response.ok)
+              throw new Error(`LocalThought returned HTTP ${response.status}`);
+            const body = JSON.parse(await limitedText(response));
+            if (!body || typeof body !== 'object')
+              throw new Error('Expected a JSON collection response');
+          } catch (error) {
+            probeError = error;
+          }
+          // Syncables owns URL expansion. Stop its traversal at the first
+          // request; the access-check response is deliberately never imported.
+          throw probeComplete;
+        }
         if (lastRequestAt !== undefined) {
           const wait = policy.minRequestIntervalMs - (Date.now() - lastRequestAt);
           if (wait > 0) await this.sleep(wait);
@@ -453,15 +491,25 @@ export class BrowserIntegrations {
           body: await limitedText(response),
         });
       };
-      const result = await engine.fetchIntegration(
-        text,
-        c.platform,
-        JSON.stringify(constants),
-        JSON.stringify(mergeQuerySelections(defaults, selection)),
-        transport,
-      );
+      let result: string;
+      try {
+        result = await engine.fetchIntegration(
+          text,
+          c.platform,
+          JSON.stringify(constants),
+          JSON.stringify(mergeQuerySelections(defaults, selection)),
+          transport,
+        );
+      } catch (error) {
+        if (!validateOnly || !probeAttempted) throw error;
+      }
+      if (validateOnly) {
+        if (probeError) throw probeError;
+        if (!probeAttempted) throw new Error('No collection available to check');
+        return;
+      }
       signal.throwIfAborted();
-      return JSON.parse(result);
+      return JSON.parse(result!);
     });
   }
 }
