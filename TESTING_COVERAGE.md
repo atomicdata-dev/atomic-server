@@ -14,7 +14,9 @@ cleanup and the current assistant handoff. External approval transport is stubbe
 # Testing coverage map
 
 Typed app setup: `browser/lib/src/plugin-setup.test.ts` covers shared input validation,
-partial model drafts, forbidden arguments and size limits. `AppSetup/setup.test.ts`
+partial model drafts, forbidden arguments and size limits. It also validates resource JSON
+setup declarations: detached round-trips, supported constraints, malformed schemas,
+choice hints and rejection of unknown keywords before form/model use. `AppSetup/setup.test.ts`
 checks schema parity, repository and Notion UUID validation, and credential-link constraints.
 `browser/e2e/tests/app-setup.spec.ts` exercises the generic GitHub form and an
 assistant tool handoff with a scripted model, plus Notion manual validation before credential storage. Live authentication, installation

@@ -36,5 +36,5 @@ export type {
   ViewRequest,
   ViewResponse,
 } from './viewProtocol.js';
-export { validateSetupArguments } from '@tomic/lib';
+export { parseSetupDeclaration, validateSetupArguments } from '@tomic/lib';
 export type { SetupDeclaration, SetupField, SetupArguments } from '@tomic/lib';

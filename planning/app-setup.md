@@ -71,3 +71,29 @@ not schema discovery alone, is the regression check for this failure.
 Browser acceptance uses synthetic credentials and a stubbed external approval transport; no live GitHub write was performed.
 
 - [ ] Reduce installation round trips: cold GitHub setup can exceed ten seconds; browser acceptance now waits explicitly for installation navigation (30-second bound).
+
+
+## Portable package boundary (September 11)
+
+App packages must ultimately be importable as resources from another repository,
+without adding provider imports to Atomic's frontend. Reuse the existing release
+manifest and importer localIds; installing a package must not import credentials,
+consent, installation identities or running schedules.
+
+- [x] Validate JSON setup declarations through `parseSetupDeclaration`, exported
+  by the library and plugin SDK. The current adapter registry validates before
+  form rendering and assistant discovery; argument validation also validates the
+  declaration, including partial drafts. Unknown schema keywords fail closed.
+- [x] Cover JSON round-trip, detached metadata, invalid required fields, unsupported
+  field constraints, choice hints, prototype keys and size limits with unit tests.
+- [ ] Define the resource graph envelope and import it through the shared importer.
+  Keep immutable package content separate from mutable installation state.
+- [ ] Replace bundled provider discovery with resource-backed package discovery.
+- [ ] Move provider setup effects into the sandbox and existing reviewed effect
+  lifecycle, then remove the trusted host installer adapters.
+- [ ] Demonstrate installation of a package fixture maintained outside Atomic's
+  source tree without rebuilding the frontend or server.
+
+Declaration validation alone does not implement package import or sandbox setup.
+Lookup names remain presentation hints; only the host decides which lookups an
+installation may use. Credentials continue through the separate host flow.
