@@ -744,3 +744,6 @@ check; real refresh/query timing remains a browser acceptance check.
 - `scheduled-save.test.ts` covers coalescing, idempotent cancellation, flushing,
   concurrent in-flight work and failures. `store.test.ts` covers immutable save
   snapshots, identity renaming, offline queueing and direct-save notifications.
+
+- `data-save-state.spec.ts` reproduces a compiled inspector missing an unsaved-edit
+  warning, then verifies the subscribed warning clears after saving/reconnecting.
