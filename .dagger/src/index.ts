@@ -1711,24 +1711,12 @@ export class AtomicServer {
      * guess the git ref. See `ci()` for why this is not named `e2eMode`.
      */
     @argument() playwrightMode: string = 'full',
-    /**
-     * Optional Playwright regular expression for one focused browser journey.
-     * A focused run stays on one server/shard, so an exact test does not run
-     * alongside unrelated E2E failures.
-     */
-    @argument() playwrightGrep: string = '',
   ): Promise<string> {
     // Shards × own atomic-server. Count comes from `--host-profile`
     // (Mancave hot / hosted conservative) plus `--playwright-mode` (light uses
     // fewer shards). Dagger dedupes the shared debug `rustBuild(e2e)` /
     // base-container graph.
     this.e2eRun = e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode));
-    if (playwrightGrep)
-      this.e2eRun = {
-        ...this.e2eRun,
-        shardCount: 1,
-        grep: playwrightGrep,
-      };
     const shardCount = this.e2eRun.shardCount;
     const base = this.e2eBaseContainer();
     const shardIndexes = Array.from({ length: shardCount }, (_, i) => i + 1);

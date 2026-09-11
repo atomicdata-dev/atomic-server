@@ -187,12 +187,6 @@ jobs:
       github.event_name != 'pull_request' &&
       github.event_name != 'pull_request_target'
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '["self-hosted", "Linux", "X64"]') }}
-    # Share the hardware queue with the main Mancave CI job. Queue all refs
-    # here so one branch cannot evict another branch's waiting build.
-    concurrency:
-      group: main-mancave-heavy
-      queue: max
-      cancel-in-progress: false
     timeout-minutes: 30
     permissions:
       contents: read
