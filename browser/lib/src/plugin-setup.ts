@@ -25,6 +25,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
   const fail = (): never => {
     throw new Error('Unsupported setup declaration');
   };
+
   const object = (value: unknown, keys?: string[]): Record<string, unknown> => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail();
     const result = value as Record<string, unknown>;
@@ -44,6 +45,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
 
     return result;
   };
+
   const text = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0;
   const declaration = object(raw, ['title', 'description', 'inputSchema']);
@@ -57,6 +59,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
   if (schema.type !== 'object' || schema.additionalProperties !== false) fail();
   const properties = object(schema.properties);
   if (Object.keys(properties).length > 100) fail();
+
   if (schema.required !== undefined) {
     if (
       !Array.isArray(schema.required) ||
@@ -67,6 +70,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
     )
       fail();
   }
+
   for (const [name, rawField] of Object.entries(properties)) {
     if (!text(name)) fail();
     const field = object(rawField, [
@@ -100,6 +104,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
         new Set(field.enum).size !== field.enum.length)
     )
       fail();
+
     if (field['x-atomic'] !== undefined) {
       const hint = object(field['x-atomic'], [
         'widget',
@@ -115,6 +120,7 @@ export function parseSetupDeclaration(raw: unknown): SetupDeclaration {
         fail();
     }
   }
+
   // Detach validated metadata from the caller; never retain mutable package objects.
   const json = JSON.stringify(raw);
   if (json.length > 65536) fail();

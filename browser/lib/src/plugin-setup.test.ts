@@ -119,6 +119,7 @@ describe('setup declarations from resource JSON', () => {
         parseSetupDeclaration({ ...declaration, inputSchema }),
       ).toThrow();
     }
+
     expect(() =>
       parseSetupDeclaration({ ...declaration, permissions: ['admin'] }),
     ).toThrow();
