@@ -4741,8 +4741,9 @@ msgstr "Developer"
 
 #: src/chunks/Conference/ConferenceRoom.tsx src/routes/SyncRoute.tsx
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
 #: src/chunks/PluginRuns/ConnectNotionManual.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/SyncRoute.tsx
 #: src/views/PeerInvitePage.tsx
 msgid "Connecting…"
@@ -7609,6 +7610,7 @@ msgstr "Create a plugin here. It proposes changes that you review before anythin
 #: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
 #: src/chunks/PluginRuns/PluginView.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Loading…"
 msgstr "Loading…"
@@ -8027,21 +8029,17 @@ msgstr "How you verified the result"
 msgid "Record verified result and resume"
 msgstr "Record verified result and resume"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
-msgstr "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
+#~ msgid "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
+#~ msgstr "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Repository"
-msgstr "Repository"
+#~ msgid "Repository"
+#~ msgstr "Repository"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "GitHub token"
-msgstr "GitHub token"
+#~ msgid "GitHub token"
+#~ msgstr "GitHub token"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Connect GitHub"
-msgstr "Connect GitHub"
+#~ msgid "Connect GitHub"
+#~ msgstr "Connect GitHub"
 
 #: src/chunks/PluginRuns/PluginTrigger.tsx
 msgid "events queued. They remain saved while waiting for review."
@@ -8521,9 +8519,8 @@ msgstr "Enter a data source ID and connection token to continue."
 msgid "Connect a Notion database, then review what will sync before making changes."
 msgstr "Connect a Notion database, then review what will sync before making changes."
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Enter a repository and token to continue."
-msgstr "Enter a repository and token to continue."
+#~ msgid "Enter a repository and token to continue."
+#~ msgstr "Enter a repository and token to continue."
 
 #: src/chunks/PluginRuns/ConnectNotion.tsx
 msgid "Allow pop-ups for Atomic, then try connecting again."
@@ -8621,17 +8618,14 @@ msgstr "Setting up your database…"
 msgid "Continue to sync setup"
 msgstr "Continue to sync setup"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "New issue board"
-msgstr "New issue board"
+#~ msgid "New issue board"
+#~ msgstr "New issue board"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Sync into"
-msgstr "Sync into"
+#~ msgid "Sync into"
+#~ msgstr "Sync into"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
-msgstr "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
+#~ msgid "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
+#~ msgstr "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
 
 #: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
 #: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
@@ -8759,17 +8753,14 @@ msgstr "Manage import"
 msgid "Your import setup is saved. Open the table, or manage this import to review future runs and its schedule."
 msgstr "Your import setup is saved. Open the table, or manage this import to review future runs and its schedule."
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Create GitHub token"
-msgstr "Create GitHub token"
+#~ msgid "Create GitHub token"
+#~ msgstr "Create GitHub token"
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
-msgstr "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
+#~ msgid "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
+#~ msgstr "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
-msgstr "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
+#~ msgid "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
+#~ msgstr "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
 
 #: src/chunks/PluginRuns/NewAutomation.tsx
 msgid "New automation"
@@ -10334,3 +10325,23 @@ msgstr "Use browser sync only on this device"
 #: src/routes/SyncRoute.tsx
 msgid "Could not verify the local copy. The server connection has been kept."
 msgstr "Could not verify the local copy. The server connection has been kept."
+
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Could not load setup choices. Close setup and try again."
+msgstr "Could not load setup choices. Close setup and try again."
+
+#~ msgid "Setup did not finish. Check your integrations for a partially created connection before starting again."
+#~ msgstr "Setup did not finish. Check your integrations for a partially created connection before starting again."
+
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Choose an option"
+msgstr "Choose an option"
+
+#. 0: setupError(e, credential.trim())
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "{0}. Setup did not finish. Check your integrations for a partially created connection before starting again."
+msgstr "{0}. Setup did not finish. Check your integrations for a partially created connection before starting again."
+
+#: src/components/AppSetup/setupError.ts
+msgid "Unknown setup error"
+msgstr "Unknown setup error"

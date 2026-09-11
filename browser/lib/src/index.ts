@@ -271,3 +271,9 @@ export {
 } from './browser-peer-sync.js';
 
 export { decodeBrowserInvite } from './browser-peer-invite.js';
+export { validateSetupArguments } from './plugin-setup.js';
+export type {
+  SetupDeclaration,
+  SetupField,
+  SetupArguments,
+} from './plugin-setup.js';
