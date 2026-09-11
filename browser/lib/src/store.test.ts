@@ -5,6 +5,43 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('publishes local hydration only after restoring the causal snapshot', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const subject = 'did:ad:atomic-hydration';
+    const source = new Resource(subject);
+    await source.set(core.properties.name, 'Persisted', false);
+    const doc = source.getLoroDoc()!;
+    const snapshot = doc.export({ mode: 'snapshot' });
+    const version = doc.oplogVersion().toJSON();
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setClientDb({
+      isReady: true,
+      isInitialized: true,
+      waitForInit: async () => {},
+      getResourceWithSnapshot: async () => ({
+        jsonAd: JSON.stringify({
+          '@id': subject,
+          [core.properties.name]: 'Persisted',
+        }),
+        snapshot,
+      }),
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    const published: unknown[] = [];
+    const apply = store.applyIncoming.bind(store);
+    vi.spyOn(store, 'applyIncoming').mockImplementation(change => {
+      if (change.source === 'offline-replay') {
+        published.push(change.resource?.getLoroDoc()?.oplogVersion().toJSON());
+      }
+
+      return apply(change);
+    });
+    store.getResourceLoading(subject);
+    await vi.waitFor(() => expect(published).toHaveLength(1));
+    expect(published).toEqual([version]);
+  });
+
   it('keeps property readers waiting while a delta with missing history is recovered', async ({
     expect,
   }) => {
