@@ -1,3 +1,4 @@
+import { requireInstallationServer } from '../../browser/lib/src/plugin-installation.js';
 /** Installs schema, kanban, sandbox source and a private connection. */
 import {
   Store,
@@ -43,6 +44,7 @@ export async function install(
     : undefined;
   if (targetTable && !target)
     throw new Error('Choose a compatible task table on this drive');
+  await requireInstallationServer(store, drive);
   const schema = await ensureSchema(store, drive, pluginSchema());
   const plugin = await store.newResource({
     parent: drive,

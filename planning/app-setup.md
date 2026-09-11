@@ -33,3 +33,15 @@ This removes the duplicate manual form, not the legacy installer. Both bundled
 adapters still call host installers. Sandbox setup execution, resumable installation,
 and OAuth discovery remain unchecked above. Package-authored setup labels remain
 English until metadata localization is implemented.
+
+## Installation prerequisite checks
+
+- [x] Reproduce credential failure: `/plugin-secret` returns 404 for the newly created app resource.
+- [x] Check server visibility of the workspace before either bundled installer creates resources.
+- [x] Refuse local-only workspaces without uploading them; leave prerequisite failures retryable.
+- [ ] Diagnose why the hosted install's newly saved app is absent on the server; verify full installation.
+
+The shared preflight prevents starting against an unavailable workspace. It is not
+an installation journal and does not prove the later resources have synced. The
+404 diagnosis does not yet establish whether the underlying cause is save timing,
+sync configuration, or the running backend version.

@@ -1,3 +1,9 @@
+Installation prerequisites: `browser/lib/src/plugin-installation.test.ts` checks
+local-only rejection without a server call, missing server resources, network
+failure and successful server visibility. `app-setup.spec.ts` verifies the local-only
+error clears the credential, stays retryable and does not submit it to the server.
+Full GitHub installation remains failing; the server cannot find the new app.
+
 # Testing coverage map
 
 Typed app setup: `browser/lib/src/plugin-setup.test.ts` covers shared input validation,

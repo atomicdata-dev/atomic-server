@@ -132,8 +132,12 @@ function SetupFormSession({
     setBusy(true);
     setError('');
     const current = session.current;
+    let installationStarted = false;
 
     try {
+      await adapter.preflight?.({ store, drive });
+      if (current !== session.current) return;
+      installationStarted = true;
       const result = await adapter.connect(validated, credential.trim(), {
         store,
         drive,
@@ -146,9 +150,11 @@ function SetupFormSession({
       if (current !== session.current) return;
       // Existing installers may have created resources before an error. Never auto-retry.
       setCredential('');
-      setUncertain(true);
+      setUncertain(installationStarted);
       setError(
-        `${setupError(e, credential.trim())}. Setup did not finish. Check your integrations for a partially created connection before starting again.`,
+        installationStarted
+          ? `${setupError(e, credential.trim())}. Setup did not finish. Check your integrations for a partially created connection before starting again.`
+          : setupError(e, credential.trim()),
       );
     } finally {
       running.current = false;
