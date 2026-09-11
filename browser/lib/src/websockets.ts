@@ -204,6 +204,7 @@ export class WSClient {
   private isAuthenticating = false;
 
   private _closed = false;
+  private connection = new AbortController();
   private _retryDelay = 1000;
   private _retryTimer: ReturnType<typeof setTimeout> | undefined;
   private _onlineListener: (() => void) | undefined;
@@ -351,13 +352,20 @@ export class WSClient {
     this.authPromise = Promise.resolve();
 
     const createSocket = () => {
+      this.connection.abort(new RequestCancelledError('WebSocket replaced'));
+      this.rejectAllPending('WebSocket replaced', true);
+      this.connection = new AbortController();
+      const { signal } = this.connection;
       const ws = new WebSocket(wsURL.toString(), [WS_PROTOCOL]);
       ws.binaryType = 'arraybuffer';
       let opened = false;
 
-      ws.addEventListener('message', this.handleMessage);
+      ws.addEventListener('message', event => {
+        if (!signal.aborted) this.handleMessage(event);
+      });
       ws.addEventListener('error', () => {
-        if (this._closed) return;
+        if (this._closed || ws !== this.ws) return;
+        this.connection.abort(new RequestCancelledError('WebSocket error'));
 
         if (!opened) {
           console.warn('[WS] Connection failed');
@@ -372,7 +380,8 @@ export class WSClient {
       ws.addEventListener('close', (ev: CloseEvent) => {
         // Explicit close already tears down this client synchronously. Its
         // later event must not overwrite a replacement socket's live state.
-        if (this._closed) return;
+        if (this._closed || ws !== this.ws) return;
+        this.connection.abort(new RequestCancelledError('WebSocket closed'));
 
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
@@ -500,6 +509,9 @@ export class WSClient {
 
   public close(): void {
     this._closed = true;
+    this.connection.abort(
+      new RequestCancelledError('WebSocket closed by client'),
+    );
 
     if (this._retryTimer) {
       clearTimeout(this._retryTimer);
@@ -557,21 +569,29 @@ export class WSClient {
       if (this.authenticatedWith === agent.subject && !fetchAll) return;
     }
 
+    const { signal } = this.connection;
+    signal.throwIfAborted();
     this.isAuthenticating = true;
 
     this.authPromise = (async () => {
       try {
-        await this.openPromise;
+        await waitForConnection(this.openPromise, signal);
+        signal.throwIfAborted();
         // The server's CHALLENGE is its first frame; on a current server it
         // has arrived by the time anyone calls `authenticate`. The short wait
         // covers the race, and costs its full length only against a server
         // that predates the frame — which then gets the timestamp-only proof
         // it expects.
-        const nonce = await this.awaitChallenge();
+        const nonce = await waitForConnection(this.awaitChallenge(), signal);
+        signal.throwIfAborted();
         const subject = nonce
           ? `${this.serverOrigin}#${nonce}`
           : this.serverOrigin;
-        const json = await createAuthentication(subject, agent);
+        const json = await waitForConnection(
+          createAuthentication(subject, agent),
+          signal,
+        );
+        signal.throwIfAborted();
         // Challenge waiting/signing can finish after disconnect(). Never send
         // on that socket or install a new AUTH_OK waiter after close drained it.
         if (this._closed || this.readyState !== WebSocket.OPEN)
@@ -579,11 +599,13 @@ export class WSClient {
             'WebSocket closed during authentication',
           );
 
+        const authenticated = this.waitForTag(Tag.AUTH_OK);
         this.sendBinary(encodeAuth(JSON.stringify(json)));
 
         // Wait for AUTH_OK — rejected by the close handler if the socket
         // dies mid-handshake, otherwise waits as long as needed.
-        await this.waitForTag(Tag.AUTH_OK);
+        await waitForConnection(authenticated, signal);
+        signal.throwIfAborted();
 
         this.authenticatedWith = agent.subject;
         recordServerVersionFromWsProtocol(
@@ -1225,8 +1247,9 @@ export class WSClient {
           const clientDb = this.store.getClientDb();
 
           if (clientDb) {
+            const current = this.connectionGuard();
             clientDb.getBlob(hash).then(bytes => {
-              if (bytes) {
+              if (current() && bytes) {
                 this.sendBinary(encodeBlobResponse(hash, bytes));
               }
             });
@@ -1562,14 +1585,7 @@ export class WSClient {
   private async startVVSync(drive: string): Promise<void> {
     if (this.readyState !== WebSocket.OPEN) return;
 
-    const agent = this.store.getAgent()?.subject;
-    const selectedDrive = this.store.getDrive();
-    const authenticatedWith = this.authenticatedWith;
-    const current = () =>
-      this.readyState === WebSocket.OPEN &&
-      this.store.getAgent()?.subject === agent &&
-      this.store.getDrive() === selectedDrive &&
-      this.authenticatedWith === authenticatedWith;
+    const current = this.connectionGuard();
     const close = perfSpan('ws.computeDriveSyncState');
 
     try {
@@ -1614,14 +1630,8 @@ export class WSClient {
    */
   private async sendReducedSyncState(drive: string): Promise<void> {
     const agent = this.store.getAgent()?.subject;
-    const selectedDrive = this.store.getDrive();
-    const current = () =>
-      !this._closed &&
-      this.readyState === WebSocket.OPEN &&
-      this.store.getAgent()?.subject === agent &&
-      this.store.getDrive() === selectedDrive &&
-      (!agent || this.authenticatedWith === agent);
-    if (this.readyState !== WebSocket.OPEN || !current()) return;
+    const current = this.connectionGuard();
+    if (!current() || (agent && this.authenticatedWith !== agent)) return;
 
     // A response to a probe invalidated by a drive switch must not restart it.
     const syncState = this._pendingSyncState.get(drive);
@@ -1779,6 +1789,8 @@ export class WSClient {
     pullFrom?: Record<string, Record<string, number>>;
     removeCommits?: Record<string, string>;
   }) {
+    const current = this.connectionGuard();
+    if (!current()) return;
     const clientDb = this.store.getClientDb();
 
     for (const subject of diff.remove ?? []) {
@@ -1801,6 +1813,7 @@ export class WSClient {
         }
       }
 
+      if (!current()) return;
       this.store.removeResource(subject);
     }
 
@@ -1827,6 +1840,7 @@ export class WSClient {
       if ((!loroBytes || loroBytes.length === 0) && clientDb) {
         try {
           const stored = await clientDb.getLoroSnapshot(subject);
+          if (!current()) return;
 
           if (stored && stored.length > 0) {
             loroBytes = stored;
@@ -1840,6 +1854,8 @@ export class WSClient {
         entries.push({ subject, loroBytes });
       }
     }
+
+    if (!current()) return;
 
     if (entries.length > 0) {
       if (this.readyState !== WebSocket.OPEN) {
@@ -1864,6 +1880,23 @@ export class WSClient {
   }
 
   // ---- Private: helpers ----
+
+  /** A continuation belongs to one socket and identity, including reconnects
+   * to the same server/account. A later OPEN socket cannot revive old work.
+   */
+  private connectionGuard(): () => boolean {
+    const { signal } = this.connection;
+    const agent = this.store.getAgent()?.subject;
+    const drive = this.store.getDrive();
+    const authenticatedWith = this.authenticatedWith;
+
+    return () =>
+      !signal.aborted &&
+      this.readyState === WebSocket.OPEN &&
+      this.store.getAgent()?.subject === agent &&
+      this.store.getDrive() === drive &&
+      this.authenticatedWith === authenticatedWith;
+  }
 
   /** The drive a `SYNC_REJECTED` message is about. The server formats it
    *  as `SYNC_PUSH rejected for drive <drive>: <reason>`; when that shape
@@ -1965,4 +1998,28 @@ function syncStateToItems(state: DriveSyncState): Item[] {
   items.sort((a, b) => (a.subject < b.subject ? -1 : 1));
 
   return items;
+}
+
+/** Retire asynchronous work with its socket, even when the underlying signer
+ * or database operation cannot itself be aborted. Consume late rejections too.
+ */
+function waitForConnection<T>(
+  work: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+    work.then(
+      value => {
+        signal.removeEventListener('abort', abort);
+        resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      },
+    );
+  });
 }

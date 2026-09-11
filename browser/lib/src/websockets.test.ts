@@ -135,6 +135,37 @@ describe('WSClient handshake', () => {
     expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(0);
   });
 
+  it('settles authentication immediately when closed during signing', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('delayed-signature'));
+    let finish!: (signature: string) => void;
+    const signing = vi
+      .spyOn(store.getAgent()!, 'createSignature')
+      .mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finish = resolve;
+          }),
+      );
+    let cancelled = false;
+    const authentication = client.authenticate().catch(() => {
+      cancelled = true;
+    });
+    await vi.waitFor(() => expect(signing).toHaveBeenCalled());
+    client.close();
+
+    try {
+      await vi.waitFor(() => expect(cancelled).toBe(true), { timeout: 200 });
+    } finally {
+      finish('late-signature');
+      await authentication;
+    }
+
+    expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(0);
+  });
+
   it('does not warn or subscribe when closed before index-status authentication completes', async ({
     expect,
   }) => {
@@ -274,6 +305,7 @@ describe('WSClient drive sync probe', () => {
   afterEach(() => {
     globalThis.WebSocket = original;
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('does not send a sync probe computed for a previous identity', async ({
@@ -315,6 +347,42 @@ describe('WSClient drive sync probe', () => {
       client as unknown as { startVVSync: (drive: string) => Promise<void> }
     ).startVVSync('did:ad:drive');
     expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(0);
+    client.close();
+  });
+
+  it('does not revive an old sync computation when the same client reconnects', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+    let finish!: (
+      value: Awaited<ReturnType<typeof store.computeDriveSyncState>>,
+    ) => void;
+    vi.spyOn(store, 'computeDriveSyncState').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
+    const pending = (
+      client as unknown as { startVVSync: (drive: string) => Promise<void> }
+    ).startVVSync('did:ad:drive');
+    socket.close();
+    socket.fire('close', { code: 1006, reason: '', wasClean: false });
+    await vi.advanceTimersByTimeAsync(1000);
+    const replacement = socketOf(client);
+    replacement.open();
+    finish({
+      drive: 'did:ad:drive',
+      driveHash: 'old',
+      peers: [],
+      resources: {},
+    } as never);
+    await pending;
+    expect(replacement).not.toBe(socket);
+    expect(framesWithTag(replacement, Tag.SYNC)).toHaveLength(0);
     client.close();
   });
 
