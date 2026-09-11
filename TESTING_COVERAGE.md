@@ -731,4 +731,5 @@ check; real refresh/query timing remains a browser acceptance check.
   intentional service-worker block are declared only in the tests causing them.
 - `pnpm test-e2e:local` builds JS, WASM and the native backend from the checkout,
   uses fresh test data and matching free ports, and preserves its report/build logs.
-  Real Cloud Vault integration still requires a separately running portal.
+  Failure traces are retained. Real Cloud Vault integration requires an explicitly
+  supplied `ATOMIC_VAULT_PORTAL_URL`; the runner never discovers unrelated portals.

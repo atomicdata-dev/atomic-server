@@ -5,7 +5,7 @@ builds every JS package and WASM, then builds the native server from this
 checkout. It starts a fresh database and production preview on matching free
 ports, checks both the frontend and its backend proxy, and runs Chromium with
 one worker and zero retries. It stops only its own process groups. Build logs,
-test data and the HTML report remain in the git-ignored `.e2e-runs/` directory.
+test data, failure traces and the HTML report remain in the git-ignored `.e2e-runs/` directory.
 
 Prerequisites: the repository's Rust toolchain, `wasm32-unknown-unknown`,
 `cargo-run-bin` (for the pinned wasm-pack), Node and pnpm. The first build may
@@ -15,8 +15,9 @@ The runner refuses an occupied template port before running any tests.
 
 Pass Playwright filters directly, e.g. `pnpm test-e2e:local --grep @smoke`.
 `PLAYWRIGHT_WORKERS` can override concurrency. Cloud Vault integration needs a
-real portal at `ATOMIC_VAULT_PORTAL_URL` (default localhost:3030); those tests
-report skips when it is unavailable. Mocked managed-account tests do not
+real portal explicitly selected with `ATOMIC_VAULT_PORTAL_URL`; this isolated
+runner skips those tests when it is unset or unavailable, and never discovers
+a portal from an unrelated local task. Mocked managed-account tests do not
 require that portal.
 
 ### Deployment fixtures

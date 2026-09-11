@@ -139,6 +139,8 @@ try {
     FRONTEND_URL: frontendURL,
     VITE_ATOMIC_SERVER_URL: serverURL,
     VITE_E2E: 'true',
+    // External services are opt-in: an unrelated portal may occupy :3030.
+    ATOMIC_VAULT_PORTAL_URL: process.env.ATOMIC_VAULT_PORTAL_URL ?? '',
     PLAYWRIGHT_WORKERS: process.env.PLAYWRIGHT_WORKERS ?? '1',
     PLAYWRIGHT_RETRIES: '0',
     PLAYWRIGHT_HTML_OUTPUT_DIR: join(output, 'report'),
@@ -203,7 +205,7 @@ try {
       {
         serverURL,
         frontendURL,
-        vaultPortal: env.ATOMIC_VAULT_PORTAL_URL ?? 'http://localhost:3030',
+        vaultPortal: env.ATOMIC_VAULT_PORTAL_URL || null,
         retries: 0,
       },
       null,
@@ -217,7 +219,7 @@ try {
       'playwright',
       'test',
       '--project=chromium',
-      '--trace=off',
+      '--trace=retain-on-failure',
       `--output=${join(output, 'results')}`,
       '--reporter=line,html',
       ...playwrightArgs,
