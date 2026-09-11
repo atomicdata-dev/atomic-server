@@ -1,5 +1,12 @@
 # Testing coverage map
 
+Typed app setup: `browser/lib/src/plugin-setup.test.ts` covers shared input validation,
+partial model drafts, forbidden arguments and size limits. `AppSetup/setup.test.ts`
+checks schema parity, repository validation and credential-link constraints.
+`browser/e2e/tests/app-setup.spec.ts` exercises the generic GitHub form and an
+assistant tool handoff with a scripted model. Live authentication, installation
+recovery and arbitrary authored setup execution are not covered by these checks.
+
 Local integration resource recovery (#1406):
 `browser/lib/src/local-schema-resource.test.ts` exercises the real Store and
 local installation adapter with a controlled ClientDb. It reproduces a cold

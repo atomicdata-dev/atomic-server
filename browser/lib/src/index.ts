@@ -273,3 +273,9 @@ export {
 } from './calendar-date.js';
 
 export * from './calendar-recurrence.js';
+export { validateSetupArguments } from './plugin-setup.js';
+export type {
+  SetupDeclaration,
+  SetupField,
+  SetupArguments,
+} from './plugin-setup.js';

@@ -106,3 +106,8 @@ These components help with rendering resources in different contexts.
 - `src/components/TeamProfileStep.tsx` — shared collaboration profile review for senders and invitees. Saves full name and optional cropped avatar to the existing Atomic agent before continuing; requires no SaaS account.
 
 - `src/components/OnboardingFeedback.tsx` - Shared bottom-right subtle feedback control; the onboarding Shell reserves bottom space for it.
+
+## App setup
+
+- `src/components/AppSetup/AppSetupForm.tsx` — Renders a registered setup action's typed fields with Atomic controls, dynamic choices and host-owned credential input.
+- `src/components/AppSetup/AppSetupProvider.tsx` — Opens the same form from assistant tools with non-secret arguments. Setup adapters are trusted bundled code; this is not an arbitrary-source execution API.

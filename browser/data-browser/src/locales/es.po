@@ -10290,6 +10290,25 @@ msgstr ""
 msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
 msgstr ""
 
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Could not load setup choices. Close setup and try again."
+msgstr ""
+
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Choose an option"
+msgstr ""
+
+#. 0: setupError(e, credential.trim())
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid ""
+"{0}. Setup did not finish. Check your integrations for a partially created "
+"connection before starting again."
+msgstr ""
+
+#: src/components/AppSetup/setupError.ts
+msgid "Unknown setup error"
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexto compactado"
 
