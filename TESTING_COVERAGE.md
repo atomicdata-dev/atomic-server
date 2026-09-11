@@ -737,7 +737,9 @@ check; real refresh/query timing remains a browser acceptance check.
 ## CI quality and failure evidence
 
 - `failure-state.spec.ts` checks bounded failure metadata and omission of resource
-  values and signed payloads. The diagnostic fixture attaches this before closing pages.
+  values and signed payloads, including real WebSocket metadata retained after page close.
+- `collector-lifecycle.spec.ts` checks idempotent start/disposal, detached context/page/socket
+  listeners, stable captured evidence, exact expectations and the 30-frame metadata cap.
 - CI lint uses installed sources without JS/WASM builds; feature-branch pushes cancel
   superseded runs while develop and tags retain completed validation for deployment.
 

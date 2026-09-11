@@ -367,6 +367,9 @@ with zero retries by default. External Cloud Vault tests require an explicit
 `ATOMIC_VAULT_PORTAL_URL`; managed mocks do not depend on a portal.
 
 Failures also attach bounded resource/save and WebSocket frame metadata before
-page teardown. Extracting the collectors into explicit lifecycles is planned in
-[js-maintainability.md](./js-maintainability.md); retaining payload-free metadata
-and existing diagnostic strictness is part of its acceptance criteria.
+page teardown. `DiagnosticCollector` and `TransportCollector` have explicit,
+idempotent start/snapshot/dispose lifecycles. Disposal detaches socket listeners
+as well as page/context listeners. Closed-page transport evidence is retained
+(up to five closed pages); live state reads remain capped at five pages and two
+seconds each. Lifecycle checks and real open/closed WebSocket checks preserve
+payload-free metadata and diagnostic strictness.

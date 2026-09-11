@@ -6,11 +6,11 @@
 
 This index tracks structural work rather than individual failures. The next bounded
 JS slices and acceptance checks are in [js-maintainability.md](./js-maintainability.md):
-PluginPage subscriptions, E2E diagnostic collectors, then Store save-status coordination.
+PluginPage subscriptions and E2E diagnostic collectors are implemented; Store save-status coordination is next.
 
 | # | Plan | Current state | Next step |
 | --- | --- | --- | --- |
-| 1 | [React Compiler / Resources](./react-compiler-resource-proxy.md) | Partial: stable Resource handles, immutable read/save snapshots and initial UI migrations shipped. | Reproduce and migrate PluginPage rendered getters; continue one flow at a time. |
+| 1 | [React Compiler / Resources](./react-compiler-resource-proxy.md) | Partial: stable Resource handles, immutable read/save snapshots and initial UI migrations shipped. | PluginPage migrated; investigate derived plugin manifest metadata refresh, then continue one flow at a time. |
 | 2 | [Subscription primitives](./unify-subscription-primitives.md) | Server work completed in reduced form; the original filter-scope design was not implemented. | Browser subscription changes belong in the data-layer plan, not a repeat of the server migration. |
 | 3 | Subscription actors | Done: `LoroSyncBroadcaster` folded into `CommitMonitor`; original plan removed. | None in this slice. |
 | 5 | [Resource save state](./unify-resource-dirty-signals.md) | API, scheduler and initial consumers shipped. | Migrate remaining save UIs and extract internal coordination without changing the public API. |

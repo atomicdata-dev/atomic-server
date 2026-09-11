@@ -41,48 +41,53 @@ test('failure state is bounded and excludes values and signed payloads', async (
   expect(JSON.stringify(state)).not.toContain('DO_NOT_ATTACH');
 });
 
-test('failure attachments retain transport metadata without frame payloads', async ({
-  page,
-}) => {
-  test.fail(
-    true,
-    'The synthetic warning triggers diagnostic attachment teardown',
-  );
-  const server = createServer();
-  const sockets = new Set<Duplex>();
-  server.on('upgrade', (request, socket) => {
-    sockets.add(socket);
-    const accept = createHash('sha1')
-      .update(
-        `${request.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`,
-      )
-      .digest('base64');
-    socket.write(
-      `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`,
+for (const closePage of [false, true]) {
+  test(`failure attachments retain transport metadata without frame payloads (closed=${closePage})`, async ({
+    page,
+  }) => {
+    test.fail(
+      true,
+      'The synthetic warning triggers diagnostic attachment teardown',
     );
-    const payload = Buffer.from('DO_NOT_ATTACH');
-    socket.write(Buffer.concat([Buffer.from([0x81, payload.length]), payload]));
+    const server = createServer();
+    const sockets = new Set<Duplex>();
+    server.on('upgrade', (request, socket) => {
+      sockets.add(socket);
+      const accept = createHash('sha1')
+        .update(
+          `${request.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`,
+        )
+        .digest('base64');
+      socket.write(
+        `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`,
+      );
+      const payload = Buffer.from('DO_NOT_ATTACH');
+      socket.write(
+        Buffer.concat([Buffer.from([0x81, payload.length]), payload]),
+      );
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string')
+      throw new Error('Missing test socket');
+
+    try {
+      await page.evaluate(async port => {
+        await new Promise<void>(resolve => {
+          const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+          socket.onopen = () => socket.send('DO_NOT_ATTACH');
+
+          socket.onmessage = () => {
+            console.warn('Synthetic transport failure');
+            socket.close();
+            resolve();
+          };
+        });
+      }, address.port);
+      if (closePage) await page.close();
+    } finally {
+      sockets.forEach(socket => socket.destroy());
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (!address || typeof address === 'string')
-    throw new Error('Missing test socket');
-
-  try {
-    await page.evaluate(async port => {
-      await new Promise<void>(resolve => {
-        const socket = new WebSocket(`ws://127.0.0.1:${port}`);
-        socket.onopen = () => socket.send('DO_NOT_ATTACH');
-
-        socket.onmessage = () => {
-          console.warn('Synthetic transport failure');
-          socket.close();
-          resolve();
-        };
-      });
-    }, address.port);
-  } finally {
-    sockets.forEach(socket => socket.destroy());
-    await new Promise<void>(resolve => server.close(() => resolve()));
-  }
-});
+}

@@ -1,7 +1,7 @@
 # JavaScript maintainability follow-ups
 
 > **Status: in progress, 2026-09-11.** PluginPage subscriptions are implemented;
-> diagnostic collectors and Store coordination remain. Baseline: `develop` at `6045bff3a`, following PRs
+> diagnostic collectors are extracted; Store coordination remains. Baseline: `develop` at `6045bff3a`, following PRs
 > [#1450](https://github.com/ontola/atomic-server/pull/1450) and
 > [#1451](https://github.com/ontola/atomic-server/pull/1451).
 
@@ -59,27 +59,33 @@ subscriptions unless they are demonstrably stale.
 
 ## 2. E2E diagnostic collectors
 
-[fixtures.ts](../browser/e2e/tests/fixtures.ts) currently owns context interception,
-console matching, WebSocket observation, attachments and teardown.
+[fixtures.ts](../browser/e2e/tests/fixtures.ts) now orchestrates context interception,
+attachments and teardown. `DiagnosticCollector` and `TransportCollector` own
+matching and observation with idempotent lifecycle methods.
 [failure-state.ts](../browser/e2e/tests/failure-state.ts) already separates the
 browser-side state snapshot. Extract the remaining collectors without changing
 which diagnostics fail a test.
 
-- [ ] Extract console/error expectations and WebSocket metadata into independent
+- [x] Extract console/error expectations and WebSocket metadata into independent
   collectors with explicit `start`, `snapshot`, and `dispose` lifecycles.
-- [ ] Let the fixture wire collectors to existing/new contexts, attach evidence,
+- [x] Let the fixture wire collectors to existing/new contexts, attach evidence,
   restore `browser.newContext`, and close only contexts it owns.
-- [ ] Make start/dispose idempotent and detach page, context **and socket** listeners.
+- [x] Make start/dispose idempotent and detach page, context **and socket** listeners.
   Preserve evidence collected before a page closes; tolerate crashed pages.
-- [ ] Preserve limits: at most five live pages sampled, two seconds per state read,
+- [x] Preserve limits: at most five live pages sampled, two seconds per state read,
   50 relevant resources, 50 property keys per resource, 20 commits and 30 frame
   metadata records per page. Keep payloads, resource values and secrets excluded.
-- [ ] Exercise unexpected/missing/excess diagnostics, multiple contexts, repeated
+- [x] Exercise unexpected/missing/excess diagnostics, multiple contexts, repeated
   start/dispose, closed pages and bounded attachments. Keep one real WebSocket
   check; mocked routing alone did not emit the transport events being tested.
 
 Acceptance: current diagnostic self-checks and attachment inspection pass; teardown
 cannot replace the original failure with a collector error or leak into the next test.
+
+Validation: all 14 diagnostic/collector checks pass with zero retries. Inspected
+JSON attachments from real open and closed WebSocket pages: frame metadata is
+retained and test payloads are absent. E2E typecheck and lint pass. The full
+production suite will validate this together with the Store coordinator slice.
 
 ## 3. Extract Store save-status coordination
 
