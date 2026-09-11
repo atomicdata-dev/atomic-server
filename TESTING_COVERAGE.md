@@ -1052,8 +1052,12 @@ integration store's bundle-matched evidence.
 server runtime, planner and signed persistence. It verifies invalid-file errors,
 preview/apply, visible transaction amounts, reopening the installed importer,
 and zero-change reimport. `/tmp/mt940-table.png` is the reviewed table screenshot.
-No real bunq bank data has been tested. Installation recovery and exact-decimal
-table aggregation remain uncovered. Shared identity concurrency is tested below.
+The E2E uploads the shared synthetic fixture from disk and covers cold-load
+plugin-schema hydration when reopening the installed importer. A supplied real
+bunq export (272 transactions) also passed preview, apply and zero-change
+reimport locally on 2026-09-11; private bank data is not committed as a fixture.
+Installation recovery and exact-decimal table aggregation remain uncovered.
+Shared identity concurrency is tested below.
 
 ## Shared import identity and source baselines
 
