@@ -1,15 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { before } from './test-utils';
-const statement = `:20:SYNTHETIC
-:25:NL00BUNQ0000000000
-:28C:1/1
-:60F:C260901EUR100,00
-:61:2609020902D12,34NTRFNONREF//TEST-1
-:86:Fixture lunch
-:61:2609030903C20,00NTRFNONREF//TEST-2
-:86:Fixture refund
-:62F:C260903EUR107,66
-`;
+const statementPath = resolve(
+  __dirname,
+  '../../../integrations/mt940/fixtures/synthetic.mt940',
+);
+const statement = readFileSync(statementPath, 'utf8');
+
 test.beforeEach(before);
 test('MT940 rejects unbalanced files, previews in sandbox and skips repeat imports', async ({
   page,
@@ -32,11 +30,7 @@ test('MT940 rejects unbalanced files, previews in sandbox and skips repeat impor
     .getByRole('button', { name: 'Preview import', exact: true })
     .click();
   await expect(page.getByRole('alert')).toContainText('does not reconcile');
-  await upload.setInputFiles({
-    name: 'synthetic.mt940',
-    mimeType: 'text/plain',
-    buffer: Buffer.from(statement),
-  });
+  await upload.setInputFiles(statementPath);
   await page
     .getByRole('button', { name: 'Preview import', exact: true })
     .click();
@@ -53,7 +47,11 @@ test('MT940 rejects unbalanced files, previews in sandbox and skips repeat impor
   ).toBeVisible();
   await expect(page.getByText('-12.34', { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: '/tmp/mt940-table.png', fullPage: true });
+  // A full navigation must rediscover the importer after cold schema hydration.
   await page.goto(new URL('/app/integrations', page.url()).href);
+  await expect(
+    page.getByRole('region', { name: 'Your integrations' }),
+  ).toBeVisible();
   await page
     .getByRole('region', { name: 'Your integrations' })
     .getByRole('link', { name: 'Bank statements' })
@@ -63,11 +61,7 @@ test('MT940 rejects unbalanced files, previews in sandbox and skips repeat impor
   await expect(
     page.getByRole('button', { name: 'Run', exact: true }),
   ).toHaveCount(0);
-  await page.locator('#mt940-file').setInputFiles({
-    name: 'synthetic.mt940',
-    mimeType: 'text/plain',
-    buffer: Buffer.from(statement),
-  });
+  await page.locator('#mt940-file').setInputFiles(statementPath);
   await page
     .getByRole('button', { name: 'Preview import', exact: true })
     .click();
