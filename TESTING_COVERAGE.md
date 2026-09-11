@@ -17,9 +17,14 @@ caught it, and if the answer is "none", that is the row to add.
 
 `creationCatalog.test.ts` covers catalog completeness, multiword search and the
 assistant request's parent context. `new-resource-catalog.spec.ts` covers template
-search, table creation inside a folder, mobile layout and retaining the assistant
-request before a model is connected, plus nested website template creation.
+search, autofocus, outlined arrow-key selection, Enter activation, clearing and
+search-only layout, table creation inside a folder, mobile layout and retaining the assistant
+request from either input before a model is connected, plus nested website template creation.
 Actual model generation is not exercised by these tests.
+
+Local validation (2026-09-11): all 840 data-browser unit tests and all five
+new-resource Chromium E2Es pass, including nested website import. E2Es used
+the existing local backend and WASM assets, not a fresh Rust build.
 
 ## Pre-commit lint gate
 

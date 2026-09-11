@@ -6,9 +6,14 @@ import {
   dataBrowser,
   ai,
 } from '@tomic/react';
-import { useCallback, useState, type FormEvent, type JSX } from 'react';
+import { useCallback, useRef, useState, type FormEvent, type JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaArrowUp, FaGlobe, FaMagnifyingGlass } from 'react-icons/fa6';
+import {
+  FaArrowUp,
+  FaGlobe,
+  FaMagnifyingGlass,
+  FaXmark,
+} from 'react-icons/fa6';
 import toast from 'react-hot-toast';
 import { createRoute } from '@tanstack/react-router';
 import { appRoute } from '../RootRoutes';
@@ -92,6 +97,9 @@ function NewResourceSelector() {
   const showNewResourceUI = useNewResourceUI();
   const { askAI } = useAISidebar();
   const { enableAI, setEnableAI } = useAISettings();
+  const catalogRef = useRef<HTMLDivElement>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [prompt, setPrompt] = useState('');
   const [template, setTemplate] = useState<Template>();
@@ -128,6 +136,7 @@ function NewResourceSelector() {
   const custom = customClasses.filter(
     subject => !BASIC_CREATIONS.some(item => item.subject === subject),
   );
+  const searching = query.trim().length > 0;
   const noMatches =
     basic.length + tables.length + pages.length + custom.length === 0 &&
     !loading;
@@ -163,7 +172,7 @@ function NewResourceSelector() {
   };
 
   return (
-    <CatalogContainer>
+    <CatalogContainer ref={catalogRef}>
       <Column gap='1.75rem'>
         <Column gap='0.4rem'>
           <h1>Create something new</h1>
@@ -172,71 +181,125 @@ function NewResourceSelector() {
             <ResourceInline subject={destination} />
           </Destination>
         </Column>
-        <Column gap='0.5rem'>
-          <label htmlFor='creation-prompt'>
-            Describe your idea and build it with the Atomic assistant.
-          </label>
-          <Composer onSubmit={ask}>
-            <PromptInput
-              id='creation-prompt'
-              aria-label='Describe what you want to create'
-              rows={2}
-              placeholder='A project tracker with tasks, deadlines and a kanban board…'
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              onKeyDown={e => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing
-                ) {
-                  e.preventDefault();
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <SendButton
-              type='submit'
-              disabled={!prompt.trim()}
-              aria-label='Create with assistant'
-              title='Create with assistant'
-            >
-              <FaArrowUp aria-hidden />
-            </SendButton>
-          </Composer>
-        </Column>
         <Column gap='0.75rem'>
           <SearchInput hasPrefix>
             <FaMagnifyingGlass aria-hidden />
             <InputStyled
+              ref={searchRef}
+              autoFocus
               type='search'
               aria-label='Search templates and resource types'
               placeholder='Search templates and resource types…'
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => {
+                setQuery(e.target.value);
+                setSelectedIndex(0);
+              }}
+              onKeyDown={e => {
+                if (e.nativeEvent.isComposing) return;
+                const results = Array.from(
+                  catalogRef.current?.querySelectorAll<HTMLButtonElement>(
+                    '[data-creation-result]',
+                  ) ?? [],
+                );
+                if (!results.length) return;
+                const current = Math.min(selectedIndex, results.length - 1);
+
+                if (
+                  /* @wc-ignore */
+                  ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(
+                    e.key,
+                  )
+                ) {
+                  e.preventDefault();
+                  const delta =
+                    /* @wc-ignore */
+                    e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+                  const next =
+                    (current + delta + results.length) % results.length;
+                  setSelectedIndex(next);
+                  results[next].scrollIntoView({ block: 'nearest' });
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  results[current].click();
+                }
+              }}
             />
-            {query && (
-              <Button subtle onClick={() => setQuery('')}>
-                Clear
+            {searching && (
+              <Button
+                subtle
+                onClick={() => {
+                  if (!enableAI) setEnableAI(true);
+                  askAI(creationAssistantAsk(query, destination));
+                }}
+              >
+                Ask AI
               </Button>
+            )}
+            {query && (
+              <ClearSearch
+                aria-label='Clear search'
+                title='Clear search'
+                onClick={() => {
+                  setQuery('');
+                  setSelectedIndex(0);
+                  searchRef.current?.focus();
+                }}
+              >
+                <FaXmark aria-hidden />
+              </ClearSearch>
             )}
           </SearchInput>
           {noMatches && (
             <p role='status'>
-              No matches. Try another search or describe your idea to the
-              assistant above.
+              No matches. Try another search or ask AI to build it.
             </p>
           )}
         </Column>
+        {!searching && (
+          <Column gap='0.5rem'>
+            <SectionHeading>Build with AI</SectionHeading>
+            <Composer onSubmit={ask}>
+              <PromptInput
+                id='creation-prompt'
+                aria-label='Describe what you want to create'
+                rows={2}
+                placeholder='A project tracker with tasks, deadlines and a kanban board…'
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                onKeyDown={e => {
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <SendButton
+                type='submit'
+                disabled={!prompt.trim()}
+                aria-label='Create with assistant'
+                title='Create with assistant'
+              >
+                <FaArrowUp aria-hidden />
+              </SendButton>
+            </Composer>
+          </Column>
+        )}
         {basic.length > 0 && (
           <section aria-label='Start blank'>
             <SectionHeading>Start blank</SectionHeading>
             <BasicGrid>
-              {basic.map(item => {
+              {basic.map((item, index) => {
                 const Icon = getIconForClass(item.subject);
 
                 return (
                   <BasicChoice
+                    data-creation-result
+                    data-selected={selectedIndex === index}
                     key={item.subject}
                     subtle
                     title={item.description}
@@ -250,12 +313,22 @@ function NewResourceSelector() {
             </BasicGrid>
           </section>
         )}
+        {!searching && (
+          <div>
+            <CompactUpload
+              parentResource={parentResource}
+              onFilesUploaded={onUploadComplete}
+            />
+          </div>
+        )}
         {(tables.length > 0 || pages.length > 0) && (
           <section aria-label='Templates'>
-            <SectionHeading>Start with a template</SectionHeading>
+            <TemplateSectionHeading />
             <TemplateGrid>
-              {tables.map(item => (
+              {tables.map((item, index) => (
                 <TemplateChoice
+                  data-creation-result
+                  data-selected={selectedIndex === basic.length + index}
                   key={item.id}
                   subtle
                   aria-label={`Use ${item.title} template`}
@@ -270,11 +343,14 @@ function NewResourceSelector() {
                     <strong>{item.title}</strong>
                   </CardHeading>
                   <CardDescription>{item.description}</CardDescription>
-                  <Kind>Table template</Kind>
                 </TemplateChoice>
               ))}
-              {pages.map(item => (
+              {pages.map((item, index) => (
                 <TemplateChoice
+                  data-creation-result
+                  data-selected={
+                    selectedIndex === basic.length + tables.length + index
+                  }
                   key={item.id}
                   subtle
                   aria-label={`Use ${item.title} template`}
@@ -302,9 +378,13 @@ function NewResourceSelector() {
           <section aria-label='Your resource types'>
             <SectionHeading>Your resource types</SectionHeading>
             <BasicGrid>
-              {custom.map(subject => (
+              {custom.map((subject, index) => (
                 <CustomChoice
                   key={subject}
+                  selected={
+                    selectedIndex ===
+                    basic.length + tables.length + pages.length + index
+                  }
                   subject={subject}
                   onClick={() => showNewResourceUI(subject, destination)}
                 />
@@ -318,22 +398,20 @@ function NewResourceSelector() {
             available.
           </p>
         )}
-        <details>
-          <summary>Choose a class by URL</summary>
-          <Advanced>
-            <ResourceSelector
-              hideCreateOption
-              setSubject={subject => {
-                if (subject) showNewResourceUI(subject, destination);
-              }}
-              isA={core.classes.class}
-            />
-          </Advanced>
-        </details>
-        <CompactUpload
-          parentResource={parentResource}
-          onFilesUploaded={onUploadComplete}
-        />
+        {!searching && (
+          <details>
+            <ChooseClassSummary />
+            <Advanced>
+              <ResourceSelector
+                hideCreateOption
+                setSubject={subject => {
+                  if (subject) showNewResourceUI(subject, destination);
+                }}
+                isA={core.classes.class}
+              />
+            </Advanced>
+          </details>
+        )}
         <ApplyTemplateDialog
           template={template}
           parent={destination}
@@ -345,10 +423,20 @@ function NewResourceSelector() {
   );
 }
 
+function ChooseClassSummary() {
+  return <summary>Choose a class by URL</summary>;
+}
+
+function TemplateSectionHeading() {
+  return <SectionHeading>Start with a template</SectionHeading>;
+}
+
 function CustomChoice({
+  selected,
   subject,
   onClick,
 }: {
+  selected: boolean;
   subject: string;
   onClick: () => void;
 }) {
@@ -356,7 +444,12 @@ function CustomChoice({
   const Icon = getIconForClass(subject);
 
   return (
-    <BasicChoice subtle onClick={onClick}>
+    <BasicChoice
+      data-creation-result
+      data-selected={selected}
+      subtle
+      onClick={onClick}
+    >
       <Icon aria-hidden />
       {resource.title}
     </BasicChoice>
@@ -364,6 +457,10 @@ function CustomChoice({
 }
 
 const CatalogContainer = styled(ContainerWide)`
+  [data-creation-result][data-selected='true'] {
+    outline: 2px solid ${p => p.theme.colors.main};
+    outline-offset: 2px;
+  }
   max-width: 72rem;
   padding-top: 2rem;
   h1 {
@@ -402,11 +499,47 @@ const SendButton = styled(Button)`
   padding: 0;
   justify-content: center;
 `;
+const ClearSearch = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: ${p => p.theme.radius};
+  background: transparent;
+  color: ${p => p.theme.colors.textLight};
+  cursor: pointer;
+  &:hover {
+    color: ${p => p.theme.colors.main};
+  }
+  &:focus-visible {
+    outline: 2px solid ${p => p.theme.colors.main};
+  }
+`;
 const SearchInput = styled(InputWrapper)`
+  box-sizing: border-box;
+  padding-block: 0.25rem;
+  padding-inline-end: 0.4rem;
+  gap: 0.35rem;
+  > button {
+    flex-shrink: 0;
+    margin: 0;
+    align-self: center;
+  }
+  > svg {
+    flex-shrink: 0;
+  }
   min-height: 2.75rem;
   width: 100%;
   input {
     min-width: 0;
+    &::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+      appearance: none;
+    }
   }
 `;
 const SectionHeading = styled.h2`

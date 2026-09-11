@@ -40,6 +40,7 @@ test('creation catalog searches templates and creates a selected table inside a 
     fullPage: true,
     animations: 'disabled',
   });
+  await expect(search).toBeFocused();
   await search.fill('kanban issue');
   await expect(
     page.getByRole('button', { name: 'Use Issue Tracker template' }),
@@ -50,7 +51,7 @@ test('creation catalog searches templates and creates a selected table inside a 
   await search.fill('zz-no-such-template');
   await expect(page.getByText(/No matches. Try another search/)).toBeVisible();
   await search.fill('Reading list');
-  await page.getByRole('button', { name: 'Use Reading list template' }).click();
+  await search.press('Enter');
   await expect(page.getByPlaceholder('New Table')).toHaveValue('Reading list');
   await page
     .locator('dialog[open]')
@@ -142,4 +143,90 @@ test('website template also installs inside the selected folder', async ({
     ).get('https://atomicdata.dev/properties/parent');
   });
   expect(actual).toBe(parent);
+});
+
+test('search selection follows arrows, resets on edits, and clear restores the catalog', async ({
+  page,
+}) => {
+  await page.goto(new URL('/app/new', page.url()).href);
+  const search = page.getByRole('searchbox', {
+    name: 'Search templates and resource types',
+  });
+  await expect(search).toBeFocused();
+  await search.fill('list');
+  const selected = page.locator('[data-creation-result][data-selected="true"]');
+  await expect(selected).toContainText('Reading list');
+  await expect(selected).toHaveCSS('outline-style', 'solid');
+  await expect(selected).toHaveCSS('outline-width', '2px');
+  await expect(
+    page.getByRole('heading', { name: 'Build with AI' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('Drop files or click here to upload.', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('Choose a class by URL', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Clear search', exact: true }),
+  ).toHaveCount(1);
+  await search.press('ArrowDown');
+  await expect(selected).toContainText('Grocery list');
+  await search.press('ArrowRight');
+  await expect(selected).toContainText('Guest list');
+  await search.press('ArrowUp');
+  await expect(selected).toContainText('Grocery list');
+  await search.press('Enter');
+  await expect(page.getByPlaceholder('New Table')).toHaveValue('Grocery list');
+  await page
+    .locator('dialog[open]')
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
+  // Cancel animates out before the page becomes interactive again.
+  await expect(page.locator('body')).not.toHaveAttribute('inert', '');
+  await search.fill('Reading');
+  await expect(selected).toContainText('Reading list');
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(
+    page.getByRole('heading', { name: 'Build with AI' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Drop files or click here to upload.', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Choose a class by URL', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Ask AI', exact: true }),
+  ).toHaveCount(0);
+});
+
+test('mobile search hands its query to the assistant without overflowing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(new URL('/app/new', page.url()).href);
+  const search = page.getByRole('searchbox', {
+    name: 'Search templates and resource types',
+  });
+  await search.fill('A volunteer rota for our community');
+  await expect(page.getByText(/No matches. Try another search/)).toBeVisible();
+  await search.press('Enter');
+  await expect(search).toHaveValue('A volunteer rota for our community');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+  await expect(
+    page.getByText('Connect a model to use Atomic Assistant', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('[contenteditable="true"]')
+      .filter({ hasText: 'A volunteer rota for our community' }),
+  ).toBeVisible();
 });

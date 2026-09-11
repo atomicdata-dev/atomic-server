@@ -1543,6 +1543,8 @@ msgid "Search settings..."
 msgstr "Rechercher les paramètres..."
 
 #: src/routes/AppSettings.tsx
+#: src/routes/NewResource/NewRoute.tsx
+#: src/routes/NewResource/NewRoute.tsx
 msgid "Clear search"
 msgstr "Effacer la recherche"
 
@@ -2054,7 +2056,6 @@ msgstr "Erreur copiée dans le presse-papier"
 #: src/chunks/TablePage/EditorCells/AtomicURLCell.tsx
 #: src/components/Toaster.tsx
 #: src/components/forms/InputResourceArray.tsx
-#: src/routes/NewResource/NewRoute.tsx
 msgid "Clear"
 msgstr "Effacer"
 
@@ -8024,9 +8025,8 @@ msgstr ""
 msgid "Create with assistant"
 msgstr ""
 
-#: src/routes/NewResource/NewRoute.tsx
-msgid "Describe your idea and build it with the Atomic assistant."
-msgstr ""
+#~ msgid "Describe your idea and build it with the Atomic assistant."
+#~ msgstr ""
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Search templates and resource types"
@@ -8036,18 +8036,16 @@ msgstr ""
 msgid "Search templates and resource types…"
 msgstr ""
 
-#: src/routes/NewResource/NewRoute.tsx
-msgid "No matches. Try another search or describe your idea to the assistant above."
-msgstr ""
+#~ msgid "No matches. Try another search or describe your idea to the assistant above."
+#~ msgstr ""
 
 #: src/routes/NewResource/NewRoute.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Start blank"
 msgstr ""
 
-#: src/routes/NewResource/NewRoute.tsx
-msgid "Table template"
-msgstr ""
+#~ msgid "Table template"
+#~ msgstr ""
 
 #. 0: item.title
 #. 0: item.title
@@ -8075,4 +8073,25 @@ msgstr ""
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Choose a class by URL"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Build with AI"
+msgstr ""
+
+#~ msgid "No matches. Try another search or describe your idea to the assistant below."
+#~ msgstr ""
+
+#~ msgid "ArrowLeft"
+#~ msgstr ""
+
+#~ msgid "ArrowRight"
+#~ msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "No matches. Try another search or ask AI to build it."
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Ask AI"
 msgstr ""
