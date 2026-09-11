@@ -5226,6 +5226,7 @@ msgstr "Local storage is off, so this server is the only data source. Enable loc
 msgid "Could not create the drive."
 msgstr "Could not create the drive."
 
+#: src/chunks/PluginRuns/ConnectCodex.tsx
 #: src/routes/NewDriveRoute.tsx
 msgid "Creating…"
 msgstr "Creating…"
@@ -9594,3 +9595,51 @@ msgstr "Automations act on your data and can use connected services. Sync works 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "This integration creates a new workspace for its imported data."
 msgstr "This integration creates a new workspace for its imported data."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Codex"
+msgstr "Codex"
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Chat with your local Codex agent inside Atomic."
+msgstr "Chat with your local Codex agent inside Atomic."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Save conversations, stream replies, stop work, and approve command or file requests."
+msgstr "Save conversations, stream replies, stop work, and approve command or file requests."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Messages are saved in Atomic before a local worker sends them to Codex."
+msgstr "Messages are saved in Atomic before a local worker sends them to Codex."
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Requires an installed Codex CLI and a local worker. Text conversations only; no attachments or existing-chat import."
+msgstr "Requires an installed Codex CLI and a local worker. Text conversations only; no attachments or existing-chat import."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Create Codex app"
+msgstr "Create Codex app"
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Chat with Codex inside Atomic. Messages are saved here before your local worker sends them to Codex. Replies are saved back into the conversation."
+msgstr "Chat with Codex inside Atomic. Messages are saved here before your local worker sends them to Codex. Replies are saved back into the conversation."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "The worker runs on your computer with your Codex sign-in and a workspace you choose locally. Installing the app does not start it."
+msgstr "The worker runs on your computer with your Codex sign-in and a workspace you choose locally. Installing the app does not start it."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
+msgstr "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Download worker setup"
+msgstr "Download worker setup"
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "The setup file contains a credential scoped to this app. Keep it private. Anyone with write access to the app can submit prompts and answer approvals for the worker."
+msgstr "The setup file contains a credential scoped to this app. Keep it private. Anyone with write access to the app can submit prompts and answer approvals for the worker."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Open Codex"
+msgstr "Open Codex"

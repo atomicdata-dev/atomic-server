@@ -5215,6 +5215,7 @@ msgstr ""
 msgid "Could not create the drive."
 msgstr ""
 
+#: src/chunks/PluginRuns/ConnectCodex.tsx
 #: src/routes/NewDriveRoute.tsx
 msgid "Creating…"
 msgstr ""
@@ -9554,4 +9555,52 @@ msgstr ""
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "This integration creates a new workspace for its imported data."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Codex"
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Chat with your local Codex agent inside Atomic."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Save conversations, stream replies, stop work, and approve command or file requests."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Messages are saved in Atomic before a local worker sends them to Codex."
+msgstr ""
+
+#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "Requires an installed Codex CLI and a local worker. Text conversations only; no attachments or existing-chat import."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Create Codex app"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Chat with Codex inside Atomic. Messages are saved here before your local worker sends them to Codex. Replies are saved back into the conversation."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "The worker runs on your computer with your Codex sign-in and a workspace you choose locally. Installing the app does not start it."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Download worker setup"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "The setup file contains a credential scoped to this app. Keep it private. Anyone with write access to the app can submit prompts and answer approvals for the worker."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Open Codex"
 msgstr ""

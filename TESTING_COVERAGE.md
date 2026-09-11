@@ -1047,3 +1047,20 @@ cancelled on teardown. Old plugin-name grants are deliberately not migrated.
 `store_host::destroy_identity_tests` checks the signer of the persisted destroy
 commit. It failed with the server signer before `Resource::destroy_as` was used;
 installation deletion must use the same selected identity as create/update.
+
+
+## Codex chat catalog and sandbox (2026-09-11)
+
+The Codex example's eight worker/protocol tests cover streaming, approvals,
+cancellation and no-replay recovery. `view.test.mjs` exercises sending, saved
+replies, switching, Stop, approvals and escaping in an iframe without
+`allow-forms`; native submission previously silently failed in the real host.
+`hostStore.test.ts` verifies reads refresh a cached queued turn after an external
+worker completes it.
+
+Manual full Data Browser validation installed Codex from Integrations, downloaded
+its scoped setup, and sent a prompt while the worker was stopped. An independent
+Atomic client verified the queued prompt before starting the real Codex worker;
+the saved response rendered in the hosted view. Screenshots show the actual
+catalog and Atomic shell. This used an existing local server binary, not a full
+Rust rebuild, and does not certify live command/file escalation.

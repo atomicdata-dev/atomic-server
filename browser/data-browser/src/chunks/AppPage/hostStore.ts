@@ -108,6 +108,9 @@ export async function handleRequest(
         required(request.subject, 'subject'),
       );
 
+      // A local worker can update a resource outside this browser's cache.
+      // View reads must observe the persisted state, including after reconnect.
+      await resource.refresh();
       if (resource.error) throw resource.error;
 
       return {

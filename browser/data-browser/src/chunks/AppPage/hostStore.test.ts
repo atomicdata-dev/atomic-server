@@ -42,6 +42,7 @@ function fakeStore(parents: Record<string, string | undefined> = {}) {
     getResource: async (subject: string) => ({
       subject,
       error: undefined,
+      refresh: async () => {},
       get: (property: string) =>
         property === core.properties.parent ? parents[subject] : undefined,
       getPropVals: () => ({ [core.properties.parent]: parents[subject] }),
@@ -193,4 +194,20 @@ describe('isHostRequest', () => {
     expect(isHostRequest({ __atomic: true })).toBe(false);
     expect(isHostRequest({ __atomic: true, id: 1 })).toBe(true);
   });
+});
+
+it('refreshes cached view reads after an external worker writes', async () => {
+  let state = 'queued';
+  const resource = {
+    subject: 'did:ad:turn',
+    title: 'Message',
+    refresh: async () => {
+      state = 'completed';
+    },
+    getPropVals: () => ({ state }),
+  };
+  const store = { getResource: async () => resource } as unknown as Store;
+  await expect(
+    handleRequest(store, APP, DRIVE, req('get', { subject: resource.subject })),
+  ).resolves.toMatchObject({ propVals: { state: 'completed' } });
 });

@@ -7,8 +7,8 @@ ordinary Atomic resources; Codex retains its execution/session state locally.
 
 This is an **Atomic plugin for Codex**, not a plugin installed into the Codex
 marketplace. It uses `createApp`, an exported `view({ root, store })`, scoped
-Atomic agents, and the existing v1 view protocol. No Atomic core changes, new
-iframe RPC operations, public listener, or shell execution inside the view.
+Atomic agents, and the existing v1 view protocol. The browser catalog installs it; the view uses the existing iframe RPC operations.
+The worker needs no public listener or shell execution inside the view.
 
 ## Run
 
@@ -24,7 +24,19 @@ pnpm --dir plugin-examples/codex-chat install
 node plugin-examples/codex-chat/build.mjs
 ```
 
-Set `ATOMIC_SERVER_URL`, `ATOMIC_DRIVE` and `ATOMIC_AGENT_SECRET` in your local
+In the Data Browser, open **Integrations → Codex → Set up connection** and
+choose **Create Codex app**. Download the worker setup before closing the dialog,
+then configure its local workspace and start the worker:
+
+```sh
+node plugin-examples/codex-chat/dist/cli.js connect ~/Downloads/codex-setup.json /absolute/private/connection.json /absolute/workspace
+node plugin-examples/codex-chat/dist/cli.js work /absolute/private/connection.json
+```
+
+The downloaded setup contains the app-scoped secret: keep it private. The
+catalog entry is part of this branch, not a released integration.
+
+Alternatively, install from the CLI. Set `ATOMIC_SERVER_URL`, `ATOMIC_DRIVE` and `ATOMIC_AGENT_SECRET` in your local
 environment. The latter is an Atomic agent secret with permission to create an
 app in the chosen drive. Keep it out of shell history and shared files.
 
@@ -75,7 +87,7 @@ cycle, not every token. Queued prompts wait while the worker is offline.
 
 Not yet included: import of existing desktop chats, attachments, full diff
 review/editor, arbitrary forms or permission-grant requests, multi-worker
-coordination, automatic recovery reconciliation, a store discovery card, or a
+coordination, automatic recovery reconciliation, or a
 standalone distributable package. Polling currently lists app conversations and
 turns; a large archive needs indexed pending-request queries/pagination in the
 view. Atomic storage does not make model inference local.
@@ -104,10 +116,14 @@ ATOMIC_CODEX_LIVE=1 node plugin-examples/codex-chat/dist/live.js /absolute/priva
 This creates a labelled test conversation and checks both saved responses,
 thread identity and retained context. It leaves the conversation for inspection.
 
-Local validation on 2026-09-11: real installation into an isolated AtomicServer,
-a real Codex response persisted in Atomic, and the installed `/plugin-ui` iframe
-rendering that response through v1 RPC under its actual CSP. The iframe check
-used a scoped Store-backed test host, not the complete Data Browser shell.
-The test server used the existing local AtomicServer development binary; the
-entire Rust workspace was not rebuilt. Live command/file escalation and the full
-Data Browser navigation flow have not been certified.
+Local validation on 2026-09-11: installed from the full Data Browser's
+Integrations catalog into an isolated AtomicServer, downloaded the worker setup,
+and opened the hosted chat in Atomic's sidebar. A UI-submitted prompt was read
+back from Atomic as queued while the worker was stopped; starting the worker
+produced a real Codex response persisted in Atomic.
+
+The iframe regression runs with native forms disabled, matching Atomic's
+sandbox. The host refreshes reads so external worker writes do not remain
+stale in the browser cache. The test server used the existing local AtomicServer
+development binary; the Rust workspace was not rebuilt. Live command/file
+escalation has not been certified.

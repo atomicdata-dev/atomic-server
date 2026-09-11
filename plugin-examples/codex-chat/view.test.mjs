@@ -4,9 +4,13 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 850 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
-await page.setContent('<div id="root"></div>');
+// Match Atomic's prohibition on native form submission.
+await page.setContent(
+  `<style>body{margin:0}iframe{border:0;width:100vw;height:100vh}</style><iframe sandbox="allow-scripts allow-same-origin" srcdoc='<div id="root"></div>'></iframe>`,
+);
+const frame = page.frames()[1];
 const source = await readFile(new URL('./view.js', import.meta.url), 'utf8');
-await page.evaluate(async source => {
+await frame.evaluate(async source => {
   const core = 'https://atomicdata.dev/properties/',
     rows = new Map();
   let next = 0;
@@ -70,12 +74,12 @@ await page.evaluate(async source => {
   );
   await mod.view({ root: document.querySelector('#root'), store });
 }, source);
-await page
+await frame
   .getByRole('textbox', { name: 'Message', exact: true })
   .fill('Help me build a local chat interface');
-await page.getByRole('button', { name: 'Send', exact: true }).click();
-await page.getByText('Queued · waiting for the local worker').waitFor();
-await page.evaluate(() => {
+await frame.getByRole('button', { name: 'Send', exact: true }).click();
+await frame.getByText('Queued · waiting for the local worker').waitFor();
+await frame.evaluate(() => {
   const turn = [...window.testRows.values()].find(r => r.get('prompt'));
   turn.set('state', 'completed');
   turn.set('transcript', [
@@ -86,13 +90,13 @@ await page.evaluate(() => {
     },
   ]);
 });
-await page
+await frame
   .getByText('Yes. We can keep the conversations', { exact: false })
   .waitFor();
 await page.screenshot({
   path: new URL('./dist/chat-desktop.png', import.meta.url).pathname,
 });
-await page.evaluate(() => {
+await frame.evaluate(() => {
   const turn = [...window.testRows.values()].find(r => r.get('prompt'));
   turn.set('state', 'running');
   const props = {
@@ -112,31 +116,32 @@ await page.evaluate(() => {
     async save() {},
   });
 });
-await page.getByRole('button', { name: 'Approve once', exact: true }).click();
+await frame.getByRole('button', { name: 'Approve once', exact: true }).click();
 if (
-  (await page.evaluate(() => window.testRows.get('approval').get('answer'))) !==
-  'accept'
+  (await frame.evaluate(() =>
+    window.testRows.get('approval').get('answer'),
+  )) !== 'accept'
 )
   throw new Error('Approval was not saved');
-await page.getByRole('button', { name: 'Stop', exact: true }).click();
+await frame.getByRole('button', { name: 'Stop', exact: true }).click();
 if (
-  !(await page.evaluate(() =>
+  !(await frame.evaluate(() =>
     [...window.testRows.values()].some(r => r.get('cancel') === true),
   ))
 )
   throw new Error('Stop was not saved');
-await page
+await frame
   .getByRole('button', { name: '+ New conversation', exact: true })
   .click();
-await page
+await frame
   .getByRole('textbox', { name: 'Message', exact: true })
   .fill('<img src=x onerror=alert(1)>');
-await page.getByRole('button', { name: 'Send', exact: true }).click();
-await page
+await frame.getByRole('button', { name: 'Send', exact: true }).click();
+await frame
   .getByText('<img src=x onerror=alert(1)>', { exact: true })
   .first()
   .waitFor();
-if (await page.locator('img').count())
+if (await frame.locator('img').count())
   throw new Error('Untrusted prompt became HTML');
 await page.setViewportSize({ width: 390, height: 844 });
 await page.screenshot({

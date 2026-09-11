@@ -1,12 +1,12 @@
-import { readFile, realpath } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { connect, install } from './atomic.ts';
 import { work } from './worker.mjs';
-const [command, inputFile, workspace] = process.argv.slice(2);
+const [command, inputFile, workspace, connectWorkspace] = process.argv.slice(2);
 try {
-  if (!inputFile || !['install', 'work'].includes(command))
+  if (!inputFile || !['install', 'connect', 'work'].includes(command))
     throw new Error(
-      'Usage: node cli.js install connection.json /absolute/workspace | work connection.json',
+      'Usage: node cli.js install connection.json /absolute/workspace | connect setup.json connection.json /absolute/workspace | work connection.json',
     );
   const file = resolve(inputFile);
   if (command === 'install') {
@@ -22,6 +22,35 @@ try {
       file,
       await readFile(new URL('./view.js', import.meta.url), 'utf8'),
       await realpath(workspace),
+    );
+  } else if (command === 'connect') {
+    if (!workspace || !connectWorkspace)
+      throw new Error(
+        'Usage: connect setup.json connection.json /absolute/workspace',
+      );
+    const setup = JSON.parse(await readFile(file, 'utf8'));
+    if (
+      setup.config?.version !== 1 ||
+      !setup.config.app ||
+      !setup.config.properties ||
+      typeof setup.secret !== 'string'
+    )
+      throw new Error('Invalid Codex worker setup');
+    const config = {
+      ...setup.config,
+      workspace: await realpath(connectWorkspace),
+    };
+    const target = resolve(workspace);
+    await writeFile(target, JSON.stringify(config, null, 2) + '\n', {
+      flag: 'wx',
+      mode: 0o600,
+    });
+    await writeFile(target + '.secret', setup.secret, {
+      flag: 'wx',
+      mode: 0o600,
+    });
+    console.log(
+      'Worker configured. Start it with the work command. Keep the downloaded setup private.',
     );
   } else {
     const config = JSON.parse(await readFile(file, 'utf8'));

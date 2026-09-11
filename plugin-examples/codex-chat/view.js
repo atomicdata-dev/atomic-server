@@ -32,14 +32,14 @@ export async function view({ root, store }) {
   top.append(title, status);
   const messages = el('section', undefined, 'messages');
   messages.setAttribute('aria-label', 'Messages');
-  const form = el('form', undefined, 'composer'),
+  const form = el('div', undefined, 'composer'),
     input = el('div', undefined, 'input');
   const textarea = el('textarea');
   textarea.placeholder = 'Ask Codex…';
   textarea.setAttribute('aria-label', 'Message');
   textarea.maxLength = 100000;
   const send = el('button', 'Send', 'send');
-  send.type = 'submit';
+  send.type = 'button';
   const stop = el('button', 'Stop', 'stop');
   stop.type = 'button';
   stop.hidden = true;
@@ -73,9 +73,9 @@ export async function view({ root, store }) {
       ),
     );
   async function create(parent, isA, values) {
-    const resource = await store.newResource({ parent, isA, propVals: values });
-    await resource.save();
-    return resource;
+    // The view protocol's create operation already persists the resource.
+    // Do not re-save a possibly stale host snapshot immediately after creation.
+    return store.newResource({ parent, isA, propVals: values });
   }
   function select(subject) {
     selected = subject;
@@ -250,7 +250,7 @@ export async function view({ root, store }) {
       }
     }
   }
-  form.onsubmit = async event => {
+  const submit = async event => {
     event.preventDefault();
     const prompt = textarea.value.trim();
     if (!prompt || busy || submitting) return;
@@ -286,10 +286,11 @@ export async function view({ root, store }) {
       send.disabled = busy;
     }
   };
+  send.onclick = submit;
   textarea.onkeydown = event => {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
-      form.requestSubmit();
+      void submit(event);
     }
   };
   stop.onclick = async () => {

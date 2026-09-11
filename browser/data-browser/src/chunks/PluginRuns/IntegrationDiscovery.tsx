@@ -20,8 +20,25 @@ const MT940Setup = lazy(() =>
   import('./ImportMT940').then(m => ({ default: m.ImportMT940 })),
 );
 
+const CodexSetup = lazy(() =>
+  import('./ConnectCodex').then(m => ({ default: m.ConnectCodex })),
+);
+
 export function bundledIntegrations() {
   return [
+    {
+      id: 'codex' as const,
+      name: 'Codex',
+      icon: '✳️',
+      description: 'Chat with your local Codex agent inside Atomic.',
+      capabilities:
+        'Save conversations, stream replies, stop work, and approve command or file requests.',
+      events:
+        'Messages are saved in Atomic before a local worker sends them to Codex.',
+      limitation:
+        'Requires an installed Codex CLI and a local worker. Text conversations only; no attachments or existing-chat import.',
+      keywords: 'codex openai chat coding agent local assistant',
+    },
     {
       id: 'mt940' as const,
       name: 'Bank statements',
@@ -106,7 +123,7 @@ export function IntegrationDiscovery({
         {workspace && (entry.id === 'notion' || entry.id === 'mt940') && (
           <p>This integration creates a new workspace for its imported data.</p>
         )}
-        <IntegrationEvidence id={entry.id} />
+        {entry.id !== 'codex' && <IntegrationEvidence id={entry.id} />}
         <Button disabled={!drive} onClick={show}>
           Set up connection
         </Button>
@@ -121,7 +138,9 @@ export function IntegrationDiscovery({
           <Suspense fallback={<p>Loading setup…</p>}>
             {isOpen &&
               drive &&
-              (entry.id === 'mt940' ? (
+              (entry.id === 'codex' ? (
+                <CodexSetup drive={drive} />
+              ) : entry.id === 'mt940' ? (
                 <MT940Setup drive={drive} />
               ) : entry.id === 'clockify' ? (
                 <ClockifySetup drive={drive} workspace={workspace} />
