@@ -47,6 +47,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   inTauri.value = false;
 });
 
@@ -233,5 +235,45 @@ describe('a linked device', () => {
     const api = await freshApi();
 
     expect(api.getLinkedPortalOrigin()).toBeNull();
+  });
+});
+
+describe('browser control-plane routing', () => {
+  beforeEach(() => {
+    inTauri.value = false;
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+    vi.stubEnv('VITE_MANAGED_API_BASE', '');
+    vi.stubEnv('VITE_MANAGED_PORTAL_URL', '');
+  });
+
+  it.each(['localhost', '127.0.0.1'])(
+    'does not infer a SaaS backend from %s',
+    async hostname => {
+      vi.stubGlobal('window', { location: { hostname } });
+      const api = await freshApi();
+      expect(api.hasManagedApi()).toBe(false);
+      expect(api.getManagedApiBase()).toBe('/api');
+    },
+  );
+
+  it('uses an explicitly configured local SaaS backend', async () => {
+    vi.stubEnv('VITE_MANAGED_API_BASE', 'http://localhost:3030/api/');
+    const api = await freshApi();
+    expect(api.hasManagedApi()).toBe(true);
+    expect(api.getManagedApiBase()).toBe('http://localhost:3030/api');
+  });
+
+  it('uses a discovered portal in the browser', async () => {
+    const api = await freshApi();
+    api.rememberManagedPortalUrl(PORTAL);
+    expect(api.hasManagedApi()).toBe(true);
+    expect(api.getManagedApiBase()).toBe(`${PORTAL}/api`);
+  });
+
+  it('uses the build portal in the browser', async () => {
+    vi.stubEnv('VITE_MANAGED_PORTAL_URL', PORTAL);
+    const api = await freshApi();
+    expect(api.hasManagedApi()).toBe(true);
+    expect(api.getManagedApiBase()).toBe(`${PORTAL}/api`);
   });
 });

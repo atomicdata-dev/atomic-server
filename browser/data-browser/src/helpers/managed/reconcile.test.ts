@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   evaluateServerReconciliation,
   localAgentIsDisposable,
@@ -56,6 +56,10 @@ function enrollment(
 }
 
 describe('evaluateServerReconciliation', () => {
+  beforeEach(() =>
+    vi.stubEnv('VITE_MANAGED_API_BASE', 'https://portal.example/api'),
+  );
+  afterEach(() => vi.unstubAllEnvs());
   const realFetch = globalThis.fetch;
 
   afterEach(() => {

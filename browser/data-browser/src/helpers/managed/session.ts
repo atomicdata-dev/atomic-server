@@ -19,7 +19,7 @@ let pendingLogouts = 0;
  * or null when not signed in. 204/401 both mean "no session".
  */
 export async function getManagedAccount(): Promise<ManagedAccount | null> {
-  if (pendingLogouts > 0) return null;
+  if (pendingLogouts > 0 || !hasManagedApi()) return null;
   const generation = sessionGeneration;
   const response = await managedFetch(`/me`, {});
   if (generation !== sessionGeneration) return null;
