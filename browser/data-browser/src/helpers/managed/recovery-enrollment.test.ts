@@ -147,6 +147,7 @@ describe('recovery-code passkey enrollment', () => {
   }, 60000);
 });
 
+// These migration cases derive real Argon2 keys, like the enrollment cases above.
 it('migrates onto an existing account credential while preserving old recovery methods', async () => {
   const original = structuredClone(stored);
   vi.mocked(accountPasskey).mockResolvedValue({
@@ -172,7 +173,7 @@ it('migrates onto an existing account credential while preserving old recovery m
   expect(await decryptEnvelopeV2(saved, code)).toBe('test-agent-secret');
   expect(await decryptEnvelopeWithPasskey(saved)).toBe('test-agent-secret');
   expect(create).toHaveBeenCalledTimes(1); // Only the original recovery credential.
-});
+}, 60000);
 it('failed migration leaves the original backup untouched', async () => {
   const original = structuredClone(stored);
   vi.mocked(accountPasskey).mockRejectedValue(new Error('cancelled'));
@@ -183,7 +184,7 @@ it('failed migration leaves the original backup untouched', async () => {
       .mocked(managedFetch)
       .mock.calls.some(([, options]) => options?.method === 'POST'),
   ).toBe(false);
-});
+}, 60000);
 
 it('keeps the right PRF salt when a credential has both legacy and account wrappers', async () => {
   const old = stored.wrappers.find(w => w.wrapper_type === 'webauthn-prf')!;
@@ -217,7 +218,7 @@ it('offers an explicit compatible-passkey upgrade when the login key has no PRF'
   );
   expect(stored).toEqual(original);
   expect(create).toHaveBeenCalledTimes(1);
-});
+}, 60000);
 
 it('reports a wrong code before attempting account passkey registration', async () => {
   vi.mocked(accountPasskey).mockClear();
@@ -225,4 +226,4 @@ it('reports a wrong code before attempting account passkey registration', async 
     unifyAccountPasskey(subject, 'wrong-recovery-code'),
   ).rejects.toThrow('Wrong recovery code');
   expect(accountPasskey).not.toHaveBeenCalled();
-});
+}, 60000);
