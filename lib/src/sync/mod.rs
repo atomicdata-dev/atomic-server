@@ -30,3 +30,6 @@ pub mod tombstones;
 pub mod transport;
 #[cfg(feature = "db")]
 pub mod ws_apply;
+
+#[cfg(feature = "db")]
+pub mod browser_peer;

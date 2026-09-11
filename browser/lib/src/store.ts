@@ -1,4 +1,12 @@
 import { taskSchema } from './task-schema.js';
+import { verifyLocalDriveCopy } from './local-drive-copy.js';
+import {
+  encodeCommit as encodePeerCommit,
+  encodeEphemeral as encodePeerEphemeral,
+  decodeEphemeral as decodePeerEphemeral,
+  EphemeralKind as PeerEphemeralKind,
+} from './ws-v2.js';
+import { serializeDeterministically as serializePeerCommit } from './commit.js';
 import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
@@ -307,6 +315,8 @@ function searchDebug(...args: unknown[]): void {
 }
 
 export interface CreateDriveOpts {
+  /** Keep a newly created drive local until explicit hosting enrollment. */
+  localOnly?: boolean;
   /** Shown on the drive page. Personal drives default to 'Your personal drive.'. */
   description?: string;
   /** Subdomain to serve the drive on (e.g. 'my-drive'). */
@@ -357,7 +367,8 @@ export type ChangeSource =
   | 'local-pre-push'
   | 'local-acked'
   | 'local-post'
-  | 'offline-replay';
+  | 'offline-replay'
+  | 'peer-sync';
 
 /** One authoritative-or-local resource update. Either `loroBytes`
  * (WS paths) or `resource` (HTTP/local/offline) must be set. */
@@ -807,14 +818,53 @@ export class Store {
   /** Mark a drive as local-only. Must be called BEFORE the drive's first
    *  `save()` — registration is what routes saves away from the outbox. */
   public registerLocalOnlyDrive(drive: string): void {
-    this.localOnlyDrives.add(drive);
-
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(
         'atomic.localOnlyDrives',
-        JSON.stringify([...this.localOnlyDrives]),
+        JSON.stringify([...new Set([...this.localOnlyDrives, drive])]),
       );
     }
+
+    this.localOnlyDrives.add(drive);
+  }
+
+  /** Switch this client to browser-only sync after verifying its local copy.
+   * Does not delete data from the server or alter other devices' configuration. */
+  public async makeDriveLocal(drive: string): Promise<void> {
+    const db = this.getClientDb();
+    const agent = this.getAgent();
+    const serverUrl = this.serverUrl;
+    const ws = this.getDefaultWebSocket();
+    if (!db?.isReady || !agent || !ws || this.getDrive() !== drive)
+      throw new Error(
+        'Open this drive with local storage available before disconnecting.',
+      );
+
+    const current = () => {
+      const status = this.getSyncStatus();
+      if (
+        this.getClientDb() !== db ||
+        this.getAgent() !== agent ||
+        this.serverUrl !== serverUrl ||
+        this.getDrive() !== drive ||
+        status.syncInProgress ||
+        status.pendingDirtyCount ||
+        status.blockedCount
+      )
+        throw new Error(
+          'Wait for changes to finish syncing before disconnecting.',
+        );
+    };
+
+    current();
+    const inventory = await ws.rbsrItems(drive, '');
+    await verifyLocalDriveCopy(db, drive, inventory);
+    // A second inventory catches changes made while attachment verification ran.
+    await verifyLocalDriveCopy(db, drive, await ws.rbsrItems(drive, ''));
+    current();
+    this.registerLocalOnlyDrive(drive);
+    ws.unsubscribeFromDrive(drive);
+    this.emitSyncStatus();
   }
 
   /** Forget a local-only drive (e.g. after deleting a demo workspace),
@@ -2347,6 +2397,7 @@ export class Store {
       subject: personalSubject,
     });
 
+    if (opts.localOnly) this.registerLocalOnlyDrive(drive.subject);
     await drive.save();
 
     if (personal) {
@@ -3748,6 +3799,9 @@ export class Store {
         let timer: ReturnType<typeof setTimeout> | undefined;
 
         const cb: ResourceCallback<C> = res => {
+          // Snapshot notifications can precede hydration. Keep waiting for
+          // data, but let terminal errors reach the caller.
+          if (res.loading && !res.error) return;
           if (timer) clearTimeout(timer);
           this.unsubscribe(subjectRaw, cb);
           resolve(res);
@@ -4974,6 +5028,7 @@ export class Store {
   /** Broadcast a Loro document update to all peers via WebSocket.
    *  Non-persistent real-time; persistence is via commits. */
   public broadcastLoroSyncUpdate(subject: string, update: Uint8Array): void {
+    this.publishPeerEphemeral(subject, update, PeerEphemeralKind.DOC);
     if (!this._serverConnected) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroSyncUpdate(subject, update);
@@ -4996,6 +5051,7 @@ export class Store {
     subject: string,
     update: Uint8Array,
   ): void {
+    this.publishPeerEphemeral(subject, update, PeerEphemeralKind.LORO);
     if (!this._serverConnected) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroEphemeralUpdate(
@@ -5049,6 +5105,7 @@ export class Store {
   /** Broadcast raw presence bytes (Loro EphemeralStore update) to a
    *  drive's presence subscribers. */
   public broadcastPresenceUpdate(drive: string, update: Uint8Array): void {
+    this.publishPeerEphemeral(drive, update, PeerEphemeralKind.PRESENCE);
     if (!this._serverConnected) return;
     // Local-only drives and foreign-origin HTTP drives have no live
     // peers on the home websocket.
@@ -5257,6 +5314,58 @@ export class Store {
    *  drives sign locally). Transitions the `pending`
    *  entry `logPendingCommit` created so the Sync page doesn't show it
    *  as queued forever. */
+  private peerListeners = new Set<
+    (subject: string, frame: Uint8Array) => void
+  >();
+
+  public subscribePeerFrames(
+    listener: (subject: string, frame: Uint8Array) => void,
+  ): () => void {
+    this.peerListeners.add(listener);
+
+    return () => {
+      this.peerListeners.delete(listener);
+    };
+  }
+
+  public async destroyLocalResource(commit: Commit): Promise<void> {
+    if (!this.clientDb)
+      throw new Error('Local storage is required to delete this resource');
+    await this.clientDb.applyPeerCommit(
+      serializePeerCommit({ ...commit }, true),
+    );
+    this.publishPeerCommit(commit);
+    this.removeResource(commit.subject);
+  }
+
+  public publishPeerCommit(commit: Commit): void {
+    const frame = encodePeerCommit(0, serializePeerCommit({ ...commit }, true));
+    for (const listener of this.peerListeners) listener(commit.subject, frame);
+  }
+
+  public receivePeerEphemeral(frame: Uint8Array): void {
+    const message = decodePeerEphemeral(frame.subarray(1));
+    if (!message) return;
+    const map =
+      message.kind === PeerEphemeralKind.DOC
+        ? this.loroSyncSubscribers
+        : message.kind === PeerEphemeralKind.PRESENCE
+          ? this.presenceSubscribers
+          : this.loroEphemeralSubscribers;
+    this.dispatchLoroMessage(map, message.subject, message.payload);
+  }
+
+  private publishPeerEphemeral(
+    subject: string,
+    update: Uint8Array,
+    kind: number,
+  ): void {
+    const agent = this.getAgent()?.subject;
+    if (!agent) return;
+    const frame = encodePeerEphemeral(kind, subject, agent, update);
+    for (const listener of this.peerListeners) listener(subject, frame);
+  }
+
   public logLocalOnlyCommitSettled(commit: Commit): void {
     this.pushCommitLog(this.buildCommitLogEntry(commit, 'outgoing', 'sent'));
   }
@@ -5650,6 +5759,18 @@ export class Store {
         return await ws.postCommit(commit);
       } catch (e) {
         if (e instanceof RequestCancelledError) throw e;
+        // A server refusal is an answer, not a broken transport. Retrying the
+        // same rejected commit over HTTP only duplicates the failed write.
+        const message = e instanceof Error ? e.message : String(e);
+        const code = e instanceof AtomicError ? e.code : undefined;
+
+        if (
+          isUnrecoverableCommitError(message, code) ||
+          isTerminalCommitError(message, code)
+        ) {
+          throw e;
+        }
+
         // Fall through to HTTP — a broken WS shouldn't block saves while
         // the reconnect timer is still backing off. The WS error already
         // surfaced in console; the HTTP path will produce its own.

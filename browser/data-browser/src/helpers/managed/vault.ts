@@ -253,9 +253,15 @@ export type VaultCapableDb = {
   ): Promise<void> | void;
 };
 
+// A plain function uses Wuchale's non-reactive runtime. Translating directly
+// in an Error constructor incorrectly injects a React hook outside a component.
+function vaultSessionEndedMessage(): string {
+  return 'Your account session has ended. Sign in again to resume backup.';
+}
+
 export class VaultSessionEndedError extends Error {
   constructor() {
-    super('Your account session has ended. Sign in again to resume backup.');
+    super(vaultSessionEndedMessage());
     this.name = /* @wc-ignore */ 'VaultSessionEndedError';
   }
 }

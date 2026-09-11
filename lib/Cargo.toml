@@ -10,6 +10,7 @@ version = "0.41.0-beta.6"
 
 
 [dependencies]
+web-time = "1"
 # Argon2id KDF for envelope-v2 recovery wrappers (planning/BACKUP_SECURITY.md
 # in atomic-saas) — deriving a KEK from a recovery code/password. Pure Rust,
 # no OS RNG dependency in the low-level `hash_password_into` API used here,
@@ -78,7 +79,9 @@ lazy_static = "1"
 ntest = "0.9.5"
 tracing-chrome = "0.7.2"
 tracing-subscriber = { version = "0.3.23", features = ["registry"] }
-tokio = { version = "1.52.3", features = ["rt", "macros"] }
+# Native durability tests and benchmarks construct Runtime::new() directly.
+# Keep the multithread runtime test-only so normal/WASM builds stay unchanged.
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 
 [dependencies.opentelemetry]
 optional = true

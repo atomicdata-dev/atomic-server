@@ -58,5 +58,5 @@ offline peers still need collision resolution after synchronization.
 Reference: https://bankrec.westpac.com.au/docs/statements/mt940/
 
 Tests: `./browser/node_modules/.bin/vitest run --config integrations/mt940/vitest.config.ts`
-Bundle: `./browser/node_modules/.bin/esbuild integrations/mt940/plugin.ts --bundle --format=esm --platform=neutral --target=es2022 > integrations/mt940/plugin.js`
+Bundle: `./browser/node_modules/.bin/esbuild integrations/mt940/plugin.ts --preserve-symlinks --bundle --format=esm --platform=neutral --target=es2022 > integrations/mt940/plugin.js`
 Browser: `browser/e2e/tests/mt940.spec.ts` (synthetic file, real runtime/persistence).

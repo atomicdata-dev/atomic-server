@@ -60,11 +60,11 @@ export function isCloudSyncAvailable(info?: ManagedInfo | null): boolean {
 
 /**
  * Whether `drive` already has a live enrollment on the control plane. Returns
- * false without a session or when the control plane is unreachable (both mean
- * "not backed up yet"), so the CTA shows rather than hides on a transient error.
+ * throws when the account or enrollment lookup is unavailable. Callers must
+ * keep that state unknown; it is not evidence that hosting is disabled.
  */
 export async function driveHasCloudEnrollment(drive: string): Promise<boolean> {
-  const enrollments = await getManagedEnrollments();
+  const enrollments = await getManagedEnrollments(true);
 
   return enrollments.some(
     e => e.drive_subject === drive && e.status !== 'Disabled',

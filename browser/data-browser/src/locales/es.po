@@ -931,7 +931,6 @@ msgstr "Menú de la aplicación"
 
 #: src/components/SideBar/SideBarDrive.tsx
 #: src/components/SideBar/SideBarDrive.tsx src/views/ErrorPage.tsx
-#: src/views/ErrorPage.tsx
 msgid "Unauthorized"
 msgstr "No autorizado"
 
@@ -1070,12 +1069,12 @@ msgstr "Copiar secreto para continuar"
 
 #: src/views/ErrorPage.tsx
 #: src/views/ErrorPage.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Retry"
 msgstr "Reintentar"
 
-#: src/views/ErrorPage.tsx
-msgid "You don't have access to this, try signing in:"
-msgstr "No tienes acceso a esto, intenta iniciar sesión:"
+#~ msgid "You don't have access to this, try signing in:"
+#~ msgstr "No tienes acceso a esto, intenta iniciar sesión:"
 
 #. 0: resource.subject
 #: src/views/ErrorPage.tsx
@@ -1712,9 +1711,8 @@ msgstr "Error: Se esperaba {0}<node-id>"
 msgid "This device"
 msgstr "Este dispositivo"
 
-#: src/routes/SyncRoute.tsx
-msgid "Manage account & plan →"
-msgstr ""
+#~ msgid "Manage account & plan →"
+#~ msgstr ""
 
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
@@ -2402,7 +2400,10 @@ msgstr "Nueva etiqueta"
 msgid "Add tag"
 msgstr "Añadir etiqueta"
 
-#. 0: getTitle(resource)
+#~ msgid "Could not update your list: no personal drive is set up for this account yet."
+#~ msgstr ""
+
+#. 0: label
 #. 0: getTitle(resource)
 #: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -3671,6 +3672,7 @@ msgstr "Introduce una URL Atómica o busca (presiona \"/\")"
 msgid "Search"
 msgstr "Buscar"
 
+#: src/components/InviteForm.tsx
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/cloudSync.ts src/helpers/managed/reconcile.test.ts
 #: src/helpers/managed/reconcile.ts
@@ -3908,9 +3910,8 @@ msgstr ""
 msgid "Restore & sign in"
 msgstr ""
 
-#: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Sign in to access this drive"
-msgstr ""
+#~ msgid "Sign in to access this drive"
+#~ msgstr ""
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter your agent secret to unlock this drive on this device."
@@ -4665,9 +4666,8 @@ msgstr ""
 msgid "Setting up your demo…"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Your data lives on this device — it isn’t syncing anywhere yet."
-msgstr ""
+#~ msgid "Your data lives on this device — it isn’t syncing anywhere yet."
+#~ msgstr ""
 
 #. 0: status.lastDriveSync.count.toLocaleString()
 #: src/routes/SyncRoute.tsx
@@ -4733,12 +4733,12 @@ msgstr ""
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/SyncRoute.tsx
+#: src/views/PeerInvitePage.tsx
 msgid "Connecting…"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "This workspace is stored only on this device — it isn’t backed up or synced anywhere."
-msgstr ""
+#~ msgid "This workspace is stored only on this device — it isn’t backed up or synced anywhere."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Sync this workspace"
@@ -5053,7 +5053,7 @@ msgstr ""
 msgid "You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
+#: src/helpers/syncPresentation.ts
 msgid "Your data lives on the device you’re connected to."
 msgstr ""
 
@@ -5090,10 +5090,8 @@ msgstr ""
 msgid "Always-on device"
 msgstr ""
 
-#. 0: connectionCount; 1: connectionCount === 1 ? 'device' \\: 'devices'
-#: src/routes/SyncRoute.tsx
-msgid "Your data lives on this device and syncs with {0} other {1}."
-msgstr ""
+#~ msgid "Your data lives on this device and syncs with {0} other {1}."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Codes only route — your key still decides what syncs. Show yours, or take theirs."
@@ -5503,6 +5501,7 @@ msgstr ""
 msgid "Could not show your secret."
 msgstr ""
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 msgid "Unlocking…"
 msgstr ""
@@ -6272,20 +6271,19 @@ msgstr ""
 msgid "Bearer {0}"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-#: src/routes/SyncRoute.tsx
-msgid "Set up Cloud Server"
-msgstr ""
+#~ msgid "Set up Cloud Server"
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Cloud Server"
 msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/components/Vault/VaultPanel.tsx
-msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
-msgstr ""
+#~ msgid "Timed out connecting to the Cloud Server node."
+#~ msgstr ""
+
+#~ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
+#~ msgstr ""
 
 #: src/components/Vault/VaultPanel.tsx
 #: src/routes/DevonianDemoRoute.tsx
@@ -6332,9 +6330,8 @@ msgstr ""
 msgid "Getting a code…"
 msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "Connect this device"
-msgstr ""
+#~ msgid "Connect this device"
+#~ msgstr ""
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Android"
@@ -6435,14 +6432,11 @@ msgstr ""
 msgid "Turn on Cloud Vault"
 msgstr ""
 
-#: src/components/Vault/VaultPanel.tsx
-msgid "Cloud Vault is on"
-msgstr ""
+#~ msgid "Cloud Vault is on"
+#~ msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "A hosted workspace on {0}: shareable links, search across everything, API access, and no waiting on another device to be awake. Unlike Cloud Vault, our servers process what you put here."
-msgstr ""
+#~ msgid "A hosted workspace on {0}: shareable links, search across everything, API access, and no waiting on another device to be awake. Unlike Cloud Vault, our servers process what you put here."
+#~ msgstr ""
 
 #. 0: missing.join(', ')
 #: src/helpers/managed/useVaultBackup.ts
@@ -6457,6 +6451,7 @@ msgstr ""
 msgid "Reconnect"
 msgstr ""
 
+#: src/helpers/browserPeerSync.ts
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
 msgstr ""
@@ -6564,10 +6559,8 @@ msgstr ""
 msgid "Sign in →"
 msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
-msgstr ""
+#~ msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
+#~ msgstr ""
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
@@ -6579,7 +6572,6 @@ msgstr ""
 msgid "{0}. No recovery backup stored, so losing every device loses this workspace."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Set up email recovery"
 msgstr ""
@@ -6655,20 +6647,16 @@ msgstr ""
 msgid "Store it with {0}"
 msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/components/AccountRecoveryCard.tsx
-msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
-msgstr ""
+#~ msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
+#~ msgstr ""
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in."
 msgstr ""
 
-#. 0: ' '; 1: `${ [hasPasskey && 'your passkey', hasCode && 'your recovery code'] .filter(Boolean) .join(' or ') || 'your recovery password' }${deviceOnly ? ', on this device' \\: ''}.`
-#: src/components/AccountRecoveryCard.tsx
-msgid "You can get back in with:{0} {1}"
-msgstr ""
+#~ msgid "You can get back in with:{0} {1}"
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. One you carry has a code instead, shown below."
@@ -6965,13 +6953,11 @@ msgstr ""
 msgid "Connect to {0}"
 msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
-msgstr ""
+#~ msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
+#~ msgstr ""
 
-#: src/components/Vault/LinkProviderPanel.tsx
-msgid "stores it without being able to read it."
-msgstr ""
+#~ msgid "stores it without being able to read it."
+#~ msgstr ""
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Verified"
@@ -7119,10 +7105,16 @@ msgstr ""
 msgid "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
-msgstr ""
+#~ msgid "Hosting needs a Server plan. After payment, return here to finish setup."
+#~ msgstr ""
 
+#~ msgid "Choose Server plan"
+#~ msgstr ""
+
+#~ msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+#~ msgstr ""
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
 #: src/components/SideBar/FeedbackMenuItem.tsx
 msgid "Feedback"
 msgstr ""
@@ -7386,9 +7378,8 @@ msgstr ""
 #~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
 #~ msgstr ""
 
-#: src/components/InviteForm.tsx
-msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
-msgstr ""
+#~ msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+#~ msgstr ""
 
 #: src/components/AI/LocalOllamaDiscovery.tsx
 msgid "Local Ollama detected"
@@ -7493,7 +7484,7 @@ msgstr ""
 msgid "We found your workspace"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
+#: src/helpers/syncPresentation.ts
 msgid "This device does not have this workspace yet. Fetch it from a device that has it."
 msgstr ""
 
@@ -7501,9 +7492,8 @@ msgstr ""
 msgid "Could not add a passkey."
 msgstr "No se pudo añadir una clave de acceso."
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
-msgstr "Introduce tu código de recuperación para mostrar tu secreto o añadir una clave de acceso en este dispositivo. Tu código de recuperación actual seguirá funcionando."
+#~ msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+#~ msgstr "Introduce tu código de recuperación para mostrar tu secreto o añadir una clave de acceso en este dispositivo. Tu código de recuperación actual seguirá funcionando."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Passkey added. Your recovery code still works."
@@ -7513,6 +7503,7 @@ msgstr "Clave de acceso añadida. Tu código de recuperación sigue funcionando.
 msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
 msgstr ""
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 msgid "Add a passkey"
 msgstr "Añadir una clave de acceso"
@@ -9163,9 +9154,6 @@ msgstr ""
 #~ msgid "<0/> Resource with error"
 #~ msgstr "<0/> Recurso con error"
 
-#~ msgid "Could not update your list: no personal drive is set up for this account yet."
-#~ msgstr ""
-
 #~ msgid "{0} Advanced"
 #~ msgstr "{0} Avanzado"
 
@@ -9348,9 +9336,6 @@ msgstr ""
 #~ msgid "<0/> Start"
 #~ msgstr ""
 
-#~ msgid "Timed out connecting to the Cloud Server node."
-#~ msgstr ""
-
 #~ msgid "<0/> Restore"
 #~ msgstr ""
 
@@ -9391,12 +9376,6 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Existing content stays in this drive. Hosting currently requires an invitation for this drive."
-#~ msgstr ""
-
-#~ msgid "Hosting needs a Server plan. After payment, return here to finish setup."
-#~ msgstr ""
-
-#~ msgid "Choose Server plan"
 #~ msgstr ""
 
 #~ msgid "Never synced"
@@ -9995,6 +9974,25 @@ msgstr ""
 msgid "{0} · Recurring meeting (opens its series or exception)"
 msgstr ""
 
+#~ msgid "Peer sync"
+#~ msgstr ""
+
+#~ msgid "Sync and collaborate between open browsers. No Cloud subscription required. Changes catch up when both devices are online."
+#~ msgstr ""
+
+#~ msgid "Pair another device signed in as you, or someone who already has workspace access. Use Share to manage their permissions."
+#~ msgstr ""
+
+#~ msgid "Create peer link"
+#~ msgstr ""
+
+#~ msgid "Peer link"
+#~ msgstr ""
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect existing account"
+msgstr ""
+
 #: src/routes/SyncRoute.tsx
 msgid "Error: Sign in before syncing with another device"
 msgstr ""
@@ -10050,6 +10048,235 @@ msgstr ""
 
 #: src/components/Settings/IntegrationSettings.tsx
 msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to check recovery"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again."
+msgstr ""
+
+#~ msgid "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
+#~ msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Existing content stays in this drive. Hosting uses the Server plan or invitation for this drive. If a purchase is needed, you will see the price at checkout before paying."
+msgstr ""
+
+#. 0: providerName(portalUrl)
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect this app to your existing {0} account to use your cloud services. Approve a code in the portal to sign this app in. This is free and does not purchase hosting or fetch a workspace."
+msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Creating your account…"
+msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Invite accepted. Finishing setup…"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Checking local storage…"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "This browser could not open local storage"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Open this link in a non-private browser window and allow this site to store data. If you are already in a regular window, close other tabs for this site and try again."
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Reload and try again"
+msgstr ""
+
+#: src/components/TeamProfileStep.tsx
+msgid "Choose profile picture"
+msgstr ""
+
+#: src/helpers/onboardingStorage.ts
+msgid "Local storage is taking too long to initialize."
+msgstr ""
+
+#: src/views/InvitePage.tsx
+msgid "Accepting your invitation…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "This status describes data synchronization. View this drive’s subscription and price in billing."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Manage this drive’s plan →"
+msgstr ""
+
+#: src/helpers/managed/recovery.ts
+msgid "This sign-in passkey cannot unlock backups. Create a compatible account passkey to use for both."
+msgstr ""
+
+#~ msgid "Could not update your passkey."
+#~ msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Create a compatible account passkey"
+msgstr ""
+
+#~ msgid "Use one passkey for sign-in and recovery"
+#~ msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock your backup, then choose your account passkey. Your existing recovery methods keep working."
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Unlock this drive"
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "You’re signed in as"
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid ", but this browser needs your account key to open this private drive. Paste your saved agent secret below. No account recovery backup is available."
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Loading account"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Unlock with recovery code"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Setting up passkey…"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Continue with passkey"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not update your passkey. Please try again."
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "Use another account"
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "This account does not have access"
+msgstr ""
+
+#: src/views/ErrorPage.tsx
+msgid "You’re signed in, but this account cannot read this resource. Open it with the account that owns it, or ask its owner to share it with you."
+msgstr ""
+
+#: src/components/InviteForm.tsx
+msgid "Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server."
+msgstr ""
+
+#: src/routes/InviteRoute.tsx
+msgid "Invalid invitation."
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Could not join this drive."
+msgstr ""
+
+#~ msgid "Connected to"
+#~ msgstr ""
+
+#~ msgid "You're invited to {0} this drive"
+#~ msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Invitation unavailable"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Join drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Looking for the inviter’s browser…"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Sign in to join"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "Open drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "This invitation is invalid or has expired. Ask for a new invitation."
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "This drive syncs between browsers. The person who invited you needs to keep their browser open while you join."
+msgstr ""
+
+#~ msgid "Disconnected"
+#~ msgstr ""
+
+#. 0: status
+#: src/components/BrowserPeerPanel.tsx
+msgid "Browser sync · {0}"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to edit this drive"
+msgstr ""
+
+#: src/views/PeerInvitePage.tsx
+msgid "You're invited to view this drive"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "This browser does not expose passkey support. Open this site directly in a browser with passkey support, such as Chrome or Safari. Sign in there with an email link to add a passkey. An embedded browser may not support this."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to unlock your backup. Your existing recovery code will keep working."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "This drive is still syncing with a server, but Cloud Server hosting has not been confirmed."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device. Cloud Vault is on; browser sync connects your open devices."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device and syncs with a server."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device. Browser sync connects when another browser is available."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Checking local copy…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Use browser sync only on this device"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Could not verify the local copy. The server connection has been kept."
 msgstr ""
 
 #: src/components/AppSetup/AppSetupForm.tsx

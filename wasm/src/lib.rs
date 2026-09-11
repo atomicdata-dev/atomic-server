@@ -54,6 +54,9 @@ const STORAGE_BLOCKED_MARKER: &str = "ATOMIC_DB_STORAGE_BLOCKED";
 #[wasm_bindgen]
 pub struct ClientDb {
     node: AtomicNode,
+    peer_sessions:
+        std::collections::HashMap<u32, atomic_lib::sync::browser_peer::BrowserPeerSession>,
+    next_peer_session: u32,
 }
 
 impl ClientDb {
@@ -116,6 +119,8 @@ impl ClientDb {
         );
         Ok(ClientDb {
             node: AtomicNode::from_db(db),
+            peer_sessions: Default::default(),
+            next_peer_session: 0,
         })
     }
 
@@ -127,7 +132,63 @@ impl ClientDb {
         let db = Db::init_redb(base_url).await.map_err(to_js_err)?;
         Ok(ClientDb {
             node: AtomicNode::from_db(db),
+            peer_sessions: Default::default(),
+            next_peer_session: 0,
         })
+    }
+
+    /// Create a separately authenticated peer ingress, never a cache write.
+    #[wasm_bindgen(js_name = "createPeerSession")]
+    pub fn create_peer_session(
+        &mut self,
+        drive: String,
+        expected_peer: Option<String>,
+        challenge: String,
+    ) -> Result<u32, JsError> {
+        if self.peer_sessions.len() >= 16 {
+            return Err(JsError::new("Too many peer sessions"));
+        }
+        let session = atomic_lib::sync::browser_peer::BrowserPeerSession::new(
+            drive,
+            expected_peer,
+            challenge,
+        )
+        .map_err(to_js_err)?;
+        self.next_peer_session = self
+            .next_peer_session
+            .checked_add(1)
+            .ok_or_else(|| JsError::new("Peer session IDs exhausted"))?;
+        self.peer_sessions.insert(self.next_peer_session, session);
+        Ok(self.next_peer_session)
+    }
+
+    #[wasm_bindgen(js_name = "handlePeerFrame")]
+    pub async fn handle_peer_frame(
+        &mut self,
+        session_id: u32,
+        frame: Vec<u8>,
+    ) -> Result<JsValue, JsError> {
+        let db = self.db().clone();
+        let session = self
+            .peer_sessions
+            .get_mut(&session_id)
+            .ok_or_else(|| JsError::new("Unknown peer session"))?;
+        let result = session.handle(&db, &frame).await.map_err(to_js_err)?;
+        db.flush().map_err(to_js_err)?;
+        serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    }
+
+    #[wasm_bindgen(js_name = "canSendPeerFrame")]
+    pub async fn can_send_peer_frame(&self, session_id: u32, subject: &str) -> bool {
+        match self.peer_sessions.get(&session_id) {
+            Some(session) => session.can_send(self.db(), subject).await,
+            None => false,
+        }
+    }
+
+    #[wasm_bindgen(js_name = "closePeerSession")]
+    pub fn close_peer_session(&mut self, session_id: u32) {
+        self.peer_sessions.remove(&session_id);
     }
 
     /// Persist buffered writes to durable OPFS storage.
@@ -203,6 +264,16 @@ impl ClientDb {
             .await
             .map_err(to_js_err)?;
         Ok(())
+    }
+
+    /// Validate a locally signed mutation (including a durable peer deletion).
+    #[wasm_bindgen(js_name = "applyPeerCommit")]
+    pub async fn apply_peer_commit(&self, json: &str) -> Result<(), JsError> {
+        self.node
+            .apply_commit(json, IngestPolicy::Peer)
+            .await
+            .map_err(to_js_err)?;
+        self.db().flush().map_err(to_js_err)
     }
 
     /// Remove a resource by its subject URL.

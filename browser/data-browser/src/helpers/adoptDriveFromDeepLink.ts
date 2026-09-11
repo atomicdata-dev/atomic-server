@@ -1,4 +1,5 @@
 import { enableLoro, isUnauthorized, server, type Store } from '@tomic/react';
+import { isOriginWithoutNode } from './originNode';
 
 /** Server-managed property stamping every resource with its drive at genesis. */
 const DRIVE_PROP = 'https://atomicdata.dev/properties/drive';
@@ -35,6 +36,10 @@ const DRIVE_PROP = 'https://atomicdata.dev/properties/drive';
  * in sync whether this resolves before or after React mounts.
  */
 export async function adoptDriveFromDeepLink(store: Store): Promise<void> {
+  // An anonymous browser cannot unlock local private storage, and a static
+  // app origin cannot resolve the DID. Let the sign-in guard handle the link.
+  if (!store.getAgent() && isOriginWithoutNode(store.getServerUrl())) return;
+
   if (store.getDrive()) {
     // This browser already has a session drive (freshly restored from
     // `driveStorage` or set earlier this session) — only a driveless

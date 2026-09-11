@@ -1,6 +1,9 @@
 name: Release (github, dockerhub, crates.io)
 
-permissions: write-all
+# Least privilege per job below; nothing here needs more than `contents`.
+# Creating the release and attaching assets need `contents: write`; the
+# crates.io publish authenticates with CARGO_REGISTRY_TOKEN, not GITHUB_TOKEN.
+permissions: {}
 
 on:
   push:
@@ -17,6 +20,8 @@ jobs:
     # reason. Self-hosted is for main.yml, where a warm Dagger cache is worth
     # having and a stall only costs slow CI.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -153,6 +158,8 @@ jobs:
   create-release:
     name: Create Release on GitHub
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2.0.1
@@ -194,6 +201,8 @@ jobs:
     # Deliberately NOT CI_RUNNER, for the same reason the other release jobs
     # avoid it: a release must not wait on one machine being switched on.
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -237,6 +246,8 @@ jobs:
     # cannot serve the macos-latest leg. Pinning the whole matrix to it would
     # silently stop producing macOS binaries.
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 

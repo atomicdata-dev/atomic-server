@@ -17,6 +17,7 @@ export async function generateInviteToken(
   write = false,
   expiresAt?: number,
   description?: string,
+  browserPeer = false,
 ): Promise<string> {
   const expires = expiresAt ?? Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days default
 
@@ -32,6 +33,9 @@ export async function generateInviteToken(
   if (description && description.trim().length > 0) {
     signable[core.properties.description] = description.trim();
   }
+
+  if (browserPeer)
+    signable['https://atomicdata.dev/properties/invite/transport'] = 'webrtc';
 
   const serialized = stringify(signable);
   const signature = await agent.sign(serialized);

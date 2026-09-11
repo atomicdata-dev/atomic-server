@@ -1,3 +1,5 @@
+import { Spinner } from '../../components/Spinner';
+import { resumeInviteUrl } from '../../helpers/inviteSignup';
 import { WorkspaceLoading } from './WorkspaceLoading';
 import {
   PRODUCT_NAME,
@@ -146,7 +148,10 @@ export function GettingStartedFlow({
    * server has answered, which is the state a wiped browser is in. Null on a
    * self-hosted install, where the button stays hidden rather than dead.
    */
-  const [knownPortalUrl, setKnownPortalUrl] = useState<string | null>(null);
+  const [knownPortalUrl, setKnownPortalUrl] = useState<string | null>(
+    () =>
+      safePortalUrl(getManagedPortalUrl() ?? getRememberedProvider()) ?? null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +187,28 @@ export function GettingStartedFlow({
   // A sign-in guard (clicking a drive you're not signed in for) sends the user
   // here with `next` carrying that drive's subject, so we open straight to the
   // sign-in step and return them to that drive afterwards (not their home).
+  const inviteToken = new URLSearchParams(window.location.search).get('invite');
   const nextDrive =
-    new URLSearchParams(window.location.search).get('next') || undefined;
+    new URLSearchParams(window.location.search).get('next') ||
+    new URLSearchParams(window.location.search).get('drive') ||
+    new URLSearchParams(window.location.search).get('subject') ||
+    undefined;
   const [step, setStep] = useState<Step>(
-    fromManaged ? 'create' : nextDrive ? 'signin' : initialStep,
+    fromManaged
+      ? 'create'
+      : inviteToken
+        ? 'restore'
+        : nextDrive
+          ? 'signin'
+          : initialStep,
   );
+  useEffect(() => {
+    // A configured SaaS app uses the portal as its account entry point.
+    // A direct drive URL already starts at the unlock step above.
+    if (step === 'welcome' && knownPortalUrl) {
+      window.location.replace(new URL('/dashboard', knownPortalUrl).toString());
+    }
+  }, [step, knownPortalUrl]);
   const [loading, setLoading] = useState(false);
   const [workspaceStage, setWorkspaceStage] = useState<
     'identity' | 'local' | 'backup'
@@ -324,6 +346,12 @@ export function GettingStartedFlow({
 
   // ─── Restore ("Forgot your secret?") ─────────────────────────────────────
   const [restore, setRestore] = useState<RestoreState>({ phase: 'checking' });
+  const returnToPortal =
+    !!knownPortalUrl &&
+    (fromManaged ||
+      createTarget?.kind === 'portal' ||
+      restore.phase === 'ready' ||
+      restore.phase === 'no-backup');
   const [restoreCodeInput, setRestoreCodeInput] = useState('');
   // Set when a v1 (password-only) backup is lazily upgraded to envelope v2
   // during a restore — the user must save this new code before continuing,
@@ -586,6 +614,12 @@ export function GettingStartedFlow({
         );
       }
 
+      if (inviteToken) {
+        navigate(resumeInviteUrl(inviteToken));
+
+        return;
+      }
+
       // Where this sign-in wants to end up: the drive it came from, or the
       // account's own. One target, so there is one gate below — an early
       // return for the guard case is an early return around the gate.
@@ -778,7 +812,11 @@ export function GettingStartedFlow({
 
   return (
     <Shell>
-      {step === 'opening-workspace' ? (
+      {step === 'welcome' && (!createTarget || knownPortalUrl) ? (
+        <div role='status' aria-label='Loading account'>
+          <Spinner />
+        </div>
+      ) : step === 'opening-workspace' ? (
         <Swap key='opening-workspace'>
           <OnboardingWrap>
             <OnboardingCard>
@@ -896,11 +934,23 @@ export function GettingStartedFlow({
             <OnboardingCard key='card'>
               <Column gap='1rem'>
                 <CardTitle key='title'>
-                  {nextDrive ? 'Sign in to access this drive' : 'Sign in'}
+                  {nextDrive ? 'Unlock this drive' : 'Sign in'}
                 </CardTitle>
                 {nextDrive && !restoreUnlock.showPasskey ? (
                   <CardSubtitle key='subtitle'>
-                    Enter your agent secret to unlock this drive on this device.
+                    {restore.phase === 'no-backup' ? (
+                      <>
+                        You’re signed in as {restore.email}, but this browser
+                        needs your account key to open this private drive. Paste
+                        your saved agent secret below. No account recovery
+                        backup is available.
+                      </>
+                    ) : (
+                      <>
+                        Enter your agent secret to unlock this drive on this
+                        device.
+                      </>
+                    )}
                   </CardSubtitle>
                 ) : null}
 
@@ -1007,13 +1057,12 @@ export function GettingStartedFlow({
                         {secretError ?? error?.message}
                       </CardError>
                     ) : null}
-                    {/* Hidden once accounts are listed above: that picker is
-                        already the "recover via my account" route, and a
-                        second door to the same room just adds a button. Also
-                        hidden when no portal is known — a source build with
-                        nothing to restore from — because the step behind it
-                        can then only say "sign in first" with nowhere to. */}
-                    {knownAccounts.length === 0 && knownPortalUrl ? (
+                    {/* A portal URL or session alone does not mean there is a
+                        backup to restore. Wait for the encrypted backup check;
+                        known accounts already have their own picker above. */}
+                    {knownAccounts.length === 0 &&
+                    knownPortalUrl &&
+                    restore.phase === 'ready' ? (
                       <Button
                         key='forgot'
                         type='button'
@@ -1029,7 +1078,7 @@ export function GettingStartedFlow({
                         {`Forgot it? Restore from ${PRODUCT_NAME}`}
                       </Button>
                     ) : null}
-                    {nextDrive ? (
+                    {nextDrive && !returnToPortal ? (
                       // The sign-in guard (ErrorPage → here with `next`) can't
                       // tell a returning user on a new device from a total
                       // stranger who's never had an account — both hit an
@@ -1075,7 +1124,14 @@ export function GettingStartedFlow({
                 onClick={() => {
                   setError(undefined);
                   setSecretValue('');
-                  setStep('welcome');
+
+                  if (returnToPortal && knownPortalUrl) {
+                    window.location.assign(
+                      new URL('/dashboard', knownPortalUrl).toString(),
+                    );
+                  } else {
+                    setStep('welcome');
+                  }
                 }}
               >
                 <BackLabel>
@@ -1335,6 +1391,7 @@ export function GettingStartedFlow({
                 ) : (
                   <NewIdentitySection
                     autoStart
+                    navigateToDrive={!inviteToken}
                     verifySecret
                     stepIndicatorPortal={stepDotsSlotRef.current}
                     defaultProfileName={managedUsername}
@@ -1347,7 +1404,7 @@ export function GettingStartedFlow({
                       fromManaged ? enableEncryptedBackup : undefined
                     }
                     onDone={() => {
-                      // After verify, NewIdentitySection navigates to privateDrive / home
+                      if (inviteToken) navigate(resumeInviteUrl(inviteToken));
                     }}
                   />
                 )}
@@ -1358,7 +1415,15 @@ export function GettingStartedFlow({
                 key='back'
                 subtle
                 type='button'
-                onClick={() => setStep('welcome')}
+                onClick={() => {
+                  if (knownPortalUrl) {
+                    window.location.assign(
+                      new URL('/dashboard', knownPortalUrl).toString(),
+                    );
+                  } else {
+                    setStep('welcome');
+                  }
+                }}
               >
                 <BackLabel>
                   <FaArrowLeft key='icon' aria-hidden />

@@ -38,21 +38,23 @@ pub async fn handle_download(
         return Err("Put `/download` in front of an File URL to download it.".into());
     };
 
-    // Content-addressed shortcut: `/download/files/<64-hex>` serves the blob
-    // directly from Tree::Blobs without requiring a resource to live at
-    // `<origin>/files/<hash>`. Only fires for raw fetches — image-processing
-    // params still go through the File-resource path so we can read mimetype.
-    if params.q.is_none() && params.w.is_none() && params.f.is_none() {
-        if let Some(hash_hex) = subject_path.strip_prefix("/files/") {
-            if let Some(bytes) = blob_by_hash_hex(hash_hex, &appstate)? {
+    // Content-addressed URLs identify blob bytes, not a File resource at
+    // `/files/<hash>`. This remains true when requesting an image rendition:
+    // uploads have DID resources, and peers can hold the blob without metadata.
+    if let Some(hash_hex) = subject_path.strip_prefix("/files/") {
+        if hash_hex.len() == 64 && hex::decode(hash_hex).is_ok() {
+            let bytes = match blob_by_hash_hex(hash_hex, &appstate)? {
+                Some(bytes) => Some(bytes),
+                None => chunked_file_by_internal_id(hash_hex, &appstate).await?,
+            };
+            let bytes = bytes.ok_or_else(|| {
+                atomic_lib::errors::AtomicError::not_found(format!("Blob not found: {hash_hex}"))
+            })?;
+            if params.q.is_none() && params.w.is_none() && params.f.is_none() {
                 return Ok(user_blob_response("application/octet-stream", bytes));
             }
-
-            // No whole-file blob under this hash: it may be a chunked file whose
-            // `internalId` is this hash. Find it and reconstruct from its chunks.
-            if let Some(bytes) = chunked_file_by_internal_id(hash_hex, &appstate).await? {
-                return Ok(user_blob_response("application/octet-stream", bytes));
-            }
+            let hash_bytes = hex::decode(hash_hex).expect("validated hash");
+            return serve_processed_image(&bytes, &hash_bytes, &params, &appstate);
         }
     }
 
@@ -118,9 +120,7 @@ fn blob_by_hash_hex(hash_hex: &str, appstate: &AppState) -> AtomicServerResult<O
     Ok(appstate
         .store
         .kv
-        .get(atomic_lib::db::trees::Tree::Blobs, &hash_bytes)
-        .ok()
-        .flatten())
+        .get(atomic_lib::db::trees::Tree::Blobs, &hash_bytes)?)
 }
 
 /// The bytes of a File: concatenated chunk blobs when it is chunked (its `chunks`

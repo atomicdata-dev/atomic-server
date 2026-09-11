@@ -1,10 +1,12 @@
 // @wc-ignore-file
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
+import { accountPasskey } from './accountPasskey';
 import { managedFetch } from './api';
 import { getManagedAccount } from './session';
 import {
   addPasskeyWrapper,
+  unifyAccountPasskey,
   buildEnvelopeWithPasskeyAndCode,
   decryptEnvelopeV2,
   decryptEnvelopeWithPasskey,
@@ -12,6 +14,9 @@ import {
   type RecoverySecret,
 } from './recovery';
 
+vi.mock('./accountPasskey', () => ({
+  accountPasskey: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('./session', () => ({ getManagedAccount: vi.fn() }));
 vi.mock('./api', () => ({ managedFetch: vi.fn() }));
 vi.mock('../wasmUrls', () => ({
@@ -43,6 +48,7 @@ function credential(n: number) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.mocked(accountPasskey).mockResolvedValue(null);
   vi.stubGlobal('crypto', webcrypto);
   vi.stubGlobal('navigator', { credentials: { create, get } });
   credentialNumber = 0;
@@ -140,3 +146,84 @@ describe('recovery-code passkey enrollment', () => {
     ).toBe(false);
   }, 60000);
 });
+
+// These migration cases derive real Argon2 keys, like the enrollment cases above.
+it('migrates onto an existing account credential while preserving old recovery methods', async () => {
+  const original = structuredClone(stored);
+  vi.mocked(accountPasskey).mockResolvedValue({
+    credential: credential(2) as unknown as PublicKeyCredential,
+    rpId: 'localhost',
+    existing: true,
+  });
+  selectedCredential = 2;
+  vi.mocked(managedFetch).mockImplementation(async (path, options) => {
+    if (path.endsWith('/wrappers')) {
+      const body = JSON.parse(options!.body as string);
+      expect(body.encrypted_secret).toBe(original.encrypted_secret);
+      stored.wrappers.push({ ...body.wrapper, created_at: 2 });
+    }
+
+    return Response.json(stored);
+  });
+  const saved = await unifyAccountPasskey(subject, code);
+  expect(saved.wrappers.slice(0, original.wrappers.length)).toEqual(
+    original.wrappers,
+  );
+  expect(saved.encrypted_secret).toBe(original.encrypted_secret);
+  expect(await decryptEnvelopeV2(saved, code)).toBe('test-agent-secret');
+  expect(await decryptEnvelopeWithPasskey(saved)).toBe('test-agent-secret');
+  expect(create).toHaveBeenCalledTimes(1); // Only the original recovery credential.
+}, 60000);
+it('failed migration leaves the original backup untouched', async () => {
+  const original = structuredClone(stored);
+  vi.mocked(accountPasskey).mockRejectedValue(new Error('cancelled'));
+  await expect(unifyAccountPasskey(subject, code)).rejects.toThrow('cancelled');
+  expect(stored).toEqual(original);
+  expect(
+    vi
+      .mocked(managedFetch)
+      .mock.calls.some(([, options]) => options?.method === 'POST'),
+  ).toBe(false);
+}, 60000);
+
+it('keeps the right PRF salt when a credential has both legacy and account wrappers', async () => {
+  const old = stored.wrappers.find(w => w.wrapper_type === 'webauthn-prf')!;
+  const newer = {
+    ...old,
+    salt: btoa('a-different-salt'),
+    kdf_params: { account_passkey: true, rp_id: 'localhost' },
+  };
+  stored.wrappers.push(newer);
+  selectedCredential = 1;
+  expect(await decryptEnvelopeWithPasskey(stored)).toBe('test-agent-secret');
+  const options = get.mock.calls.at(-1)![0].publicKey;
+  expect(options.allowCredentials).toHaveLength(1);
+  expect(options.extensions.prf.evalByCredential.AQ.first).toEqual(
+    new TextEncoder().encode('a-different-salt'),
+  );
+});
+it('offers an explicit compatible-passkey upgrade when the login key has no PRF', async () => {
+  const original = structuredClone(stored);
+  const unsupported = {
+    ...credential(2),
+    getClientExtensionResults: () => ({}),
+  };
+  vi.mocked(accountPasskey).mockResolvedValue({
+    credential: unsupported as unknown as PublicKeyCredential,
+    rpId: 'localhost',
+    existing: true,
+  });
+  await expect(unifyAccountPasskey(subject, code)).rejects.toThrow(
+    'Create a compatible account passkey',
+  );
+  expect(stored).toEqual(original);
+  expect(create).toHaveBeenCalledTimes(1);
+}, 60000);
+
+it('reports a wrong code before attempting account passkey registration', async () => {
+  vi.mocked(accountPasskey).mockClear();
+  await expect(
+    unifyAccountPasskey(subject, 'wrong-recovery-code'),
+  ).rejects.toThrow('Wrong recovery code');
+  expect(accountPasskey).not.toHaveBeenCalled();
+}, 60000);

@@ -32,15 +32,35 @@ export type ManagedEnrollmentSummary = {
  * there is no session or the control plane is unreachable (callers treat "no
  * enrollments" as "nothing to reconcile").
  */
-export async function getManagedEnrollments(): Promise<
-  ManagedEnrollmentSummary[]
-> {
-  if (!(await getManagedAccount())) return [];
+export async function getManagedEnrollments(
+  strict = false,
+): Promise<ManagedEnrollmentSummary[]> {
+  if (!(await getManagedAccount())) {
+    if (strict) throw new Error('Sign in to check Cloud Server hosting.');
+
+    return [];
+  }
+
   const response = await managedFetch(`/sync-enrollments`, {});
 
-  if (!response.ok) return [];
+  if (!response.ok) {
+    if (strict) throw new Error('Could not check Cloud Server hosting.');
+
+    return [];
+  }
 
   const body = (await response.json()) as unknown;
+
+  if (
+    strict &&
+    !Array.isArray(body) &&
+    !(
+      body &&
+      typeof body === 'object' &&
+      Array.isArray((body as { enrollments?: unknown }).enrollments)
+    )
+  )
+    throw new Error('Invalid Cloud Server hosting response.');
 
   const list = Array.isArray(body)
     ? body

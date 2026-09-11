@@ -28,8 +28,6 @@ export function getRuntimeManagedPortalUrl(): string | null {
 // `/api/recovery-secret`). The dev portal URL mirrors `managedServer.ts`.
 // VERIFY the production base against your real deployment.
 
-import { isRunningInTauri } from '../tauri';
-
 const PORTAL_URL_STORAGE_KEY = 'atomic-managed-portal-url';
 /** The portal the device token was issued by. See {@link getLinkedPortalOrigin}. */
 const LINKED_PORTAL_STORAGE_KEY = 'atomic-managed-portal-origin-linked';
@@ -216,34 +214,12 @@ export function getManagedApiBase(): string {
 
   if (fromEnv) return trimTrailingSlashes(fromEnv);
 
-  // Checked BEFORE the localhost branch below, deliberately: the desktop
-  // webview's origin is `tauri://localhost`, whose hostname is literally
-  // `localhost`. Falling through would point every desktop build — shipped
-  // ones included — at whatever happens to run on a dev machine's :3030.
-  // There is no same-origin `/api` here either, so the real answers are the
-  // control plane the connected managed node named, or the one the build was
-  // compiled against (the store apps; see tauri-release.yml). Before either
-  // (pure self-hosted, or nothing fetched yet) these fetches just fail, which
-  // every caller already treats as "no control plane".
-  if (isRunningInTauri()) {
-    const portalUrl = getRememberedManagedPortalUrl() ?? portalFromEnv();
+  // Localhost alone does not imply a SaaS backend. Browser and desktop
+  // clients use the discovered or configured portal; local SaaS development
+  // can explicitly set VITE_MANAGED_API_BASE=http://localhost:3030/api.
+  const portalUrl = getRememberedManagedPortalUrl() ?? portalFromEnv();
 
-    return portalUrl ? `${portalUrl}/api` : '/api';
-  }
-
-  if (typeof window !== 'undefined') {
-    const { hostname } = window.location;
-
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Local dev: the control-plane backend (`cargo run` binds
-      // 0.0.0.0:3030 and serves /api/*; its CORS allows :6747/:49237/:6747).
-      // The portal (:49237) is only the frontend and has no /api.
-      return 'http://localhost:3030/api';
-    }
-  }
-
-  // Same-origin deployment fallback.
-  return '/api';
+  return portalUrl ? `${portalUrl}/api` : '/api';
 }
 
 /**

@@ -1,3 +1,4 @@
+import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
 import { FormEvent, useEffect, useState, type JSX } from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { useStore } from '@tomic/react';
@@ -59,7 +60,10 @@ function NewDrivePage(): JSX.Element {
     setError(undefined);
 
     try {
-      const resource = await store.createDrive(trimmed, { personal: false });
+      const resource = await store.createDrive(trimmed, {
+        personal: false,
+        localOnly: !!getManagedPortalUrl(),
+      });
       store.notifyResourceManuallyCreated(resource);
       setDrive(resource.subject);
 

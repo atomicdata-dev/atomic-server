@@ -372,3 +372,64 @@ the work is hardening and consolidation the codebase needs anyway.
    confirm is P3.
 4. **Drive enrollment on pairing** — pair grants which drives? All of the
    agent's, or picked at pair time (`KnownPeer.drives`)?
+
+## Unhosted browser invitations (2026-09-10, active)
+
+- [x] Reproduce and test invite validation at the client-library layer.
+- [x] Authenticate the issuer before releasing a bearer invite; grant the
+  recipient access with an ordinary issuer-signed commit before peer sync.
+- [x] Route new local-only drive invites through the app and SaaS discovery, without
+  invoking the managed data-node invite endpoint.
+- [ ] Preserve invitations through account onboarding and use existing sync UI.
+- [x] Verify a new identity joins, edits and reconnects with data HTTP disabled;
+  reject expired/forged/wrong-drive invites and unauthorized peers.
+- [ ] Audit managed-node admission and source placement separately from billing
+  labels. Do not hide a real node connection or drop existing drive data.
+
+The issuer must currently be online to redeem an unhosted invitation. Discovery
+only locates peers; no private snapshots travel before authentication and grant.
+
+Implementation notes: new SaaS identities and additional drives now stay local
+from their first save, including when the app is served from a node origin.
+The issuer grants a signed invitation through an ordinary signed ACL commit;
+the recipient releases the bearer token only after verifying the pinned issuer
+on the WebRTC channel. Browser invites require the issuer online. Old server
+invite links do not gain this protocol retroactively.
+
+Remaining legacy migration: an unsubscribed drive may already have data on a
+managed node, admitted under its 600-second bootstrap grace. Do not treat a
+root-resource snapshot or the account's enrollment list as proof of a complete
+local copy. Invite creation refuses browser-only conversion of such drives
+unless the user completes the checked per-device transition below.
+Keep the actual connection visible and existing copies intact. Need staging
+inspection to establish the reported drive's placement and deployed policy;
+the local policy default is evidence of a possible path, not proof of that
+specific staging node's configuration. No managed admission defaults changed.
+
+Validation: client-library negative invite tests, real WebRTC/OPFS invite
+acceptance with all AtomicServer data fetches disabled, and a two-identity app
+route test without `/invites` requests. Account creation/email roundtrip for a
+brand-new invited SaaS user remains a separate acceptance check.
+
+
+## Existing server connections (2026-09-11)
+
+- [x] Reproduce saved-but-disconnected and active-server states locally against
+  a real node, with a successful empty account enrollment response.
+- [x] Hide unrelated saved nodes and server pairing codes in managed local mode;
+  keep real active server connections visible, including unconfirmed hosting.
+- [x] Account enrollment failures remain unknown instead of implying no hosting.
+  An account list is not proof that nobody else pays for a shared drive.
+- [x] Offer an explicit browser-only transition for the current device. Check
+  authenticated server inventories against durable local version vectors and
+  snapshots, verify referenced blob bytes and hashes, recheck the inventory,
+  refuse pending writes/identity changes, then unsubscribe and persist routing.
+- [x] Normalize nested WASM Maps at the ClientDb boundary; otherwise history
+  inventory consumers see an empty record despite durable snapshots.
+- [x] Verify refusal on missing local history and preservation of edits and an
+  attachment across reload, with no HTTP or WebSocket data writes after switching.
+- [ ] Deploy and verify the reported staging drive with its actual subscription
+  and node admission policy. No automatic deletion of existing server copies,
+  subscription cancellation, or migration of other devices is performed.
+- [ ] Review bootstrap grace/admission separately so old data placement cannot
+  be mistaken for a paid hosting entitlement. New SaaS drives already start local.
