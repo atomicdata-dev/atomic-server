@@ -1,6 +1,8 @@
 import { TeamProfileStep } from './TeamProfileStep';
 import {
   useResource,
+  useResourceSnapshot,
+  useString,
   useBoolean,
   useStore,
   Resource,
@@ -40,20 +42,25 @@ interface InviteFormProps {
  */
 export function InviteForm({ target, inDialog }: InviteFormProps) {
   const [agent] = useCurrentAgent();
-  const profile = useResource(agent?.subject);
+  const {
+    resource: profile,
+    ready,
+    error,
+  } = useResourceSnapshot(agent?.subject);
+  const [icon] = useString(profile, dataBrowser.properties.icon);
 
-  if (agent?.subject && profile.error) {
-    return <ErrorLook>{profile.error.message}</ErrorLook>;
+  if (agent?.subject && error) {
+    return <ErrorLook>{error.message}</ErrorLook>;
   }
 
-  if (agent?.subject && !profile.isReady()) return null;
+  if (agent?.subject && !ready) return null;
 
   return (
     <InviteFormContent
       key={agent?.subject}
       target={target}
       inDialog={inDialog}
-      skipProfile={!!profile.get(dataBrowser.properties.icon)}
+      skipProfile={!!icon}
     />
   );
 }

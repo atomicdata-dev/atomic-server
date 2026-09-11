@@ -1,4 +1,4 @@
-import { urls, useResource } from '@tomic/react';
+import { urls, useResourceSnapshot } from '@tomic/react';
 import { FaGlobe } from 'react-icons/fa6';
 import styled from 'styled-components';
 import { CardRow } from '../../components/Card';
@@ -22,8 +22,8 @@ export function AgentRights({
   write,
 }: AgentRightsProps): JSX.Element {
   const isPublicRight = agentSubject === urls.instances.publicAgent;
-  const resource = useResource(agentSubject);
-  const disabled = !resource.isReady() || !handleSetRight;
+  const { ready } = useResourceSnapshot(agentSubject);
+  const disabled = !ready || !handleSetRight;
 
   return (
     <CardRow>

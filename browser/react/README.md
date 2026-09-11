@@ -56,3 +56,19 @@ const SomeComponent = () => {
 
 There are a lot more hooks and helpers available.
 See the [docs](https://docs.atomicdata.dev/usecases/react) for more information.
+
+### Resource status and React Compiler
+
+`useResource(subject)` returns a stable, mutable handle. Use property hooks
+(`useString`, `useArray`, etc.) for render-time values. For readiness and errors,
+use `useResourceSnapshot(subject)`:
+
+```tsx
+const { resource, ready, error, readState } = useResourceSnapshot(subject);
+const [name, setName] = useString(resource, core.properties.name);
+```
+
+The status fields are captured in an immutable snapshot that changes on store
+notifications. Do not memoize `resource.isReady()` or property getters by the
+Resource reference. `recovering` can retain readable content; `ready` says
+whether reads are usable, independently of the outbox/saving state.

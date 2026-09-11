@@ -1,5 +1,10 @@
 import { useEffect, useState, type JSX } from 'react';
-import { core, ResourceEvents, useCanWrite, useResource } from '@tomic/react';
+import {
+  core,
+  ResourceEvents,
+  useCanWrite,
+  useResourceSnapshot,
+} from '@tomic/react';
 import { ContainerNarrow } from '../../components/Containers';
 import { Card, CardInsideFull } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -37,7 +42,7 @@ export const ShareRoute = createRoute({
 /** Form for managing and viewing rights for this resource */
 function SharePage(): JSX.Element {
   const { subject } = ShareRoute.useSearch();
-  const resource = useResource(subject);
+  const { resource, ready } = useResourceSnapshot(subject);
   const canWrite = useCanWrite(resource);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [err, setErr] = useState<Error | undefined>(undefined);
@@ -103,9 +108,7 @@ function SharePage(): JSX.Element {
                     key={JSON.stringify(right)}
                     {...right}
                     handleSetRight={
-                      canWrite && resource.isReady()
-                        ? updateResourceRights
-                        : undefined
+                      canWrite && ready ? updateResourceRights : undefined
                     }
                   />
                 ))}

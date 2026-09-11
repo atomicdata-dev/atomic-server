@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   core,
   dataBrowser,
-  useResource,
+  useResourceSnapshot,
   useStore,
   useString,
 } from '@tomic/react';
@@ -25,7 +25,7 @@ export function TeamProfileStep({
   onContinue: () => void | Promise<void>;
 }) {
   const store = useStore();
-  const resource = useResource(subject);
+  const { resource, ready } = useResourceSnapshot(subject);
   const [name] = useString(resource, core.properties.name);
   const [draft, setDraft] = useState<string>();
   const [source, setSource] = useState<File>();
@@ -136,7 +136,7 @@ export function TeamProfileStep({
         <ErrorLook>{(error || resource.error)?.message}</ErrorLook>
       )}
       <Button
-        disabled={busy || !resource.isReady() || !(draft ?? name ?? '').trim()}
+        disabled={busy || !ready || !(draft ?? name ?? '').trim()}
         onClick={() => void save()}
       >
         {busy ? 'Saving…' : 'Save and continue'}

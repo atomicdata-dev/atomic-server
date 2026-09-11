@@ -38,7 +38,11 @@ import { core } from './ontologies/core.js';
 import { server, type Server } from './ontologies/server.js';
 import type { OptionalClass, UnknownClass } from './ontology.js';
 import { JSONADParser } from './parse.js';
-import { Resource, unknownSubject } from './resource.js';
+import {
+  Resource,
+  unknownSubject,
+  type ResourceReadState,
+} from './resource.js';
 import {
   type SearchOpts,
   type SemanticSearchOpts,
@@ -5870,13 +5874,8 @@ export class Store {
     return url;
   }
 
-  /** Per-subject snapshot wrappers for `useSyncExternalStore`. Each
-   * snapshot's `resource` field is a fresh Proxy of the cached
-   * Resource, so `R.foo` reads stay reactive (Resource is mutated
-   * in place, but the Proxy identity changes per notify). The
-   * snapshot tuple identity changes too, which is what
-   * `useSyncExternalStore` checks. */
-  private snapshots = new Map<string, { resource: Resource }>();
+  /** Immutable read status and a stable mutation handle, replaced on notify. */
+  private snapshots = new Map<string, ResourceSnapshot>();
 
   /** Subject → content stamp of the last state written to the local DB, so
    *  `addResource` can skip re-writing state that is already there. Entries are
@@ -5888,7 +5887,7 @@ export class Store {
   public getResourceSnapshot(
     subject: string,
     opts: FetchOpts = {},
-  ): { resource: Resource } {
+  ): ResourceSnapshot {
     let r: Resource;
     this.snapshotReadDepth++;
 
@@ -5902,7 +5901,7 @@ export class Store {
     let snap = this.snapshots.get(key);
 
     if (!snap || snap.resource !== r.__internalObject) {
-      snap = { resource: r.__internalObject };
+      snap = captureResourceSnapshot(r);
       this.snapshots.set(key, snap);
     }
 
@@ -5968,7 +5967,7 @@ export class Store {
     // outer `{resource}` object is `!== ` the previous one, which is
     // all `Object.is` needs.
     const key = this.normalizeSubject(resource.subject);
-    this.snapshots.set(key, { resource: resource.__internalObject });
+    this.snapshots.set(key, captureResourceSnapshot(resource));
 
     this.eventManager.emit(StoreEvents.ResourceUpdated, resource);
 
@@ -6076,4 +6075,23 @@ function hashPersistedState(jsonAd: string, snapshot?: Uint8Array): number {
     Math.imul(h1 ^ (h1 >>> 13), 3266489909);
 
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
+/** Captured scalar read state; `resource` remains the live mutation handle. */
+export interface ResourceSnapshot<C extends OptionalClass = UnknownClass> {
+  readonly resource: Resource<C>;
+  readonly readState: ResourceReadState;
+  readonly ready: boolean;
+  readonly loading: boolean;
+  readonly error: Error | undefined;
+}
+
+function captureResourceSnapshot(resource: Resource): ResourceSnapshot {
+  return Object.freeze({
+    resource: resource.__internalObject,
+    readState: resource.readState,
+    ready: resource.isReady(),
+    loading: resource.loading,
+    error: resource.error,
+  });
 }

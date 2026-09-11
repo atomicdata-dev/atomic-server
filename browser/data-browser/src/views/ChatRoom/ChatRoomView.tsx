@@ -10,6 +10,7 @@ import {
   useCreatedAt,
   useCreatedBy,
   useResource,
+  useResourceSnapshot,
   useStore,
   useString,
   useSubject,
@@ -517,13 +518,13 @@ const MESSAGE_LINE_MAX_LEN = 50;
 
 /** Small single line preview of a message, useful in replies */
 function MessageLine({ subject }: MessageLineProps) {
-  const resource = useResource(subject);
+  const { resource, ready } = useResourceSnapshot(subject);
   const [description] = useString(resource, core.properties.description);
   // Author from the resource's own genesis metadata (createdBy) — not a commit
   // fetch, so it survives a refresh.
   const author = useCreatedBy(resource);
 
-  if (!resource.isReady()) {
+  if (!ready) {
     return <MessageLineStyled>loading...</MessageLineStyled>;
   }
 

@@ -5,6 +5,27 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('captures immutable read status while retaining the stable mutation handle', ({
+    expect,
+  }) => {
+    const store = new Store();
+    const resource = new Resource('did:ad:status-snapshot');
+    resource.loading = true;
+    store.addResource(resource);
+    const before = store.getResourceSnapshot(resource.subject);
+    expect(before.ready).toBe(false);
+    expect(before.readState).toBe('loading');
+    expect(store.getResourceSnapshot(resource.subject)).toBe(before);
+    resource.loading = false;
+    store.notifyResourceUpdated(resource);
+    const after = store.getResourceSnapshot(resource.subject);
+    expect(after).not.toBe(before);
+    expect(after.ready).toBe(true);
+    expect(before.ready).toBe(false);
+    expect(after.resource).toBe(before.resource);
+    expect(Object.isFrozen(after)).toBe(true);
+  });
+
   it('publishes local hydration only after restoring the causal snapshot', async ({
     expect,
   }) => {
