@@ -143,6 +143,16 @@ export enum ResourceEvents {
   LoadingChange = 'loading-change',
 }
 
+/** Read lifecycle, independent of saving and the durable outbox.
+ * `recovering` can retain readable content; use `isReady()` before reads.
+ */
+export type ResourceReadState =
+  | 'loading'
+  | 'buffered'
+  | 'recovering'
+  | 'ready'
+  | 'error';
+
 type ResourceEventHandlers = {
   [ResourceEvents.LocalChange]: (prop: string, value: JSONValue) => void;
   [ResourceEvents.LoadingChange]: (loading: boolean) => void;
@@ -184,6 +194,7 @@ export class Resource<C extends OptionalClass = any> {
   public appliedCommitSignatures: Set<string> = new Set();
 
   private _loading = false;
+  private _recovering = false;
   private _dirty = false;
 
   #commitBuilder: CommitBuilder;
@@ -1741,6 +1752,28 @@ export class Resource<C extends OptionalClass = any> {
   /** Checks if the resource is both loaded and free from errors */
   public isReady(): boolean {
     return !this.loading && this.error === undefined;
+  }
+
+  public get readState(): ResourceReadState {
+    if (this.error !== undefined) return 'error';
+    if (this._recovering) return 'recovering';
+
+    if (
+      !this._loroDoc &&
+      this._loroSnapshotBytes?.length &&
+      !LoroLoader.isLoaded()
+    ) {
+      return 'buffered';
+    }
+
+    return this.loading ? 'loading' : 'ready';
+  }
+
+  /** @internal The Store owns missing-history recovery. */
+  public setRecovering(recovering: boolean): void {
+    if (this._recovering === recovering) return;
+    this._recovering = recovering;
+    this.eventManager.emit(ResourceEvents.LoadingChange, this.loading);
   }
 
   /** Get a Value by its property

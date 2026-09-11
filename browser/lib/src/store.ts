@@ -1854,6 +1854,7 @@ export class Store {
     if (this._gapRecoveries.has(subject)) return;
 
     this._gapRecoveries.add(subject);
+    this.getResolved(subject)?.setRecovering(true);
     console.info(
       `[Store] incomplete Loro import for ${subject.slice(0, 60)} ` +
         `(source: ${source ?? 'unknown'}) — missing base state, fetching a full ` +
@@ -1876,6 +1877,12 @@ export class Store {
       })
       .finally(() => {
         this._gapRecoveries.delete(subject);
+        const resource = this.getResolved(subject);
+
+        if (resource) {
+          resource.setRecovering(false);
+          this.notify(resource);
+        }
       });
   }
 

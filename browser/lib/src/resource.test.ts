@@ -9,8 +9,49 @@ import {
 import type { JSONValue } from './value.js';
 import { testStore } from './test-store.js';
 import { core } from './index.js';
+import { LoroLoader } from './loro-loader.js';
 
 describe('resource.ts', () => {
+  it('reports buffered snapshots separately until WASM can materialize them', ({
+    expect,
+  }) => {
+    const resource = new Resource('https://example.com/buffered');
+    const loaded = vi.spyOn(LoroLoader, 'isLoaded').mockReturnValue(false);
+
+    try {
+      resource.applyHydratedValues([
+        ['https://atomicdata.dev/properties/loroUpdate', new Uint8Array([1])],
+      ]);
+      expect(resource.readState).toBe('buffered');
+      expect(resource.isReady()).toBe(false);
+      resource.applyHydratedValues([[core.properties.name, 'Cached title']]);
+      expect(resource.readState).toBe('buffered');
+      expect(resource.isReady()).toBe(true);
+    } finally {
+      loaded.mockRestore();
+    }
+  });
+
+  it('distinguishes recovery from loading without hiding readable state', ({
+    expect,
+  }) => {
+    const resource = new Resource('https://example.com/read-state');
+    resource.loading = true;
+    expect(resource.readState).toBe('loading');
+    resource.setRecovering(true);
+    expect(resource.readState).toBe('recovering');
+    expect(resource.isReady()).toBe(false);
+    resource.loading = false;
+    expect(resource.readState).toBe('recovering');
+    expect(resource.isReady()).toBe(true);
+    resource.setError(new Error('Recovery failed'));
+    resource.setRecovering(false);
+    expect(resource.readState).toBe('error');
+    expect(resource.isReady()).toBe(false);
+    resource.error = undefined;
+    expect(resource.readState).toBe('ready');
+  });
+
   it('push propvals', ({ expect }) => {
     const resource = new Resource('test');
     const testsubject = 'https://example.com/testsubject';
