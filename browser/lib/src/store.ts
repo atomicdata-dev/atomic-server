@@ -3017,68 +3017,23 @@ export class Store {
       try {
         const { jsonAd, snapshot } =
           await this.clientDb.getResourceWithSnapshot(subject);
-        const hasSnapshot = !!(snapshot && snapshot.length > 0);
 
         if (jsonAd) {
           hasLocalData = this.hydrateResourceFromJson(
             subject,
             JSON.parse(jsonAd),
+            snapshot ?? undefined,
           );
         }
 
-        let importComplete = true;
-
-        if (hasLocalData && hasSnapshot) {
-          const resource = this.resources.get(subject);
-
-          if (resource && !resource.hasUnsavedChanges()) {
-            // Capture `complete`: the snapshot may be an unapplyable delta
-            // (missing base ops, buffered by Loro as pending → nothing
-            // materialises). The WS path (`applyIncoming`) already acts on this
-            // signal; the OPFS path used to drop it on the floor.
-            // OPFS snapshots are authoritative full state — replace, don't
-            // merge into the JSON-AD-seeded doc. Merging minted a second
-            // LoroList per array and flashed table/sidebar order on open.
-            ({ complete: importComplete } = resource.importLoroUpdate(
-              snapshot,
-              true,
-            ));
-          }
-        }
-
-        // An OPFS hit is only authoritative if it actually hydrated to
-        // something RENDERABLE. Otherwise we'd render a contentless resource
-        // (bare subject as title, no body) with NO error that never recovers —
-        // the "deeply broken folder" bug. There are several routes into that
-        // contentless state, so we guard on the OUTCOME (is the resource
-        // renderable?) rather than on any single cause:
-        //   - nothing hydrated at all (`getEntries().length === 0`);
-        //   - a skeleton JSON-AD with no snapshot (only the server-managed
-        //     props survive, and no import ran to add a class);
-        //   - an unapplyable-delta snapshot (`!importComplete`) that buffers as
-        //     pending and materialises nothing, leaving only the skeleton.
-        // In all of these the resource carries at most the server-managed
-        // skeleton props that `rebuildCacheFromLoro` preserves
-        // (drive/parent/lastCommit/createdAt) — `length` is > 0, so the old
-        // `length === 0` guard missed it.
-        //
-        // Renderable ⇔ it has a class (`isA`) — covers commit-detail
-        // (`isA: Commit`, whose delta `loroUpdate` legitimately leaves
-        // `!importComplete`, mirroring the `applyIncoming` guard) — OR it has
-        // real content beyond the skeleton AND that content actually applied
-        // (a clean import). Anything else is treated as a miss: keep `loading`
-        // so the UI shows a spinner, drop `hasLocalData` so the server GET
-        // below repopulates it — or, offline, fails it with a real error
-        // instead of leaving it silently broken. The slow (cache-cold) reload
-        // dodges this naturally (ClientDb not initialized yet ⇒ OPFS skipped);
-        // the fast service-worker reload is what hits it.
+        // Hydration publishes JSON and causal state together. A skeleton-only
+        // record still needs a server fetch; commit-detail resources may carry
+        // a partial delta but remain renderable from their class metadata.
         if (hasLocalData) {
           const resource = this.resources.get(subject);
           const hasClass = !!resource?.get(core.properties.isA);
           const renderable =
-            !!resource &&
-            (hasClass ||
-              (importComplete && this.hasRenderableContent(resource)));
+            !!resource && (hasClass || this.hasRenderableContent(resource));
 
           if (!renderable) {
             hasLocalData = false;
@@ -3272,6 +3227,7 @@ export class Store {
   private hydrateResourceFromJson(
     subject: string,
     parsed: Record<string, unknown>,
+    snapshot?: Uint8Array,
   ): boolean {
     const existing = this.getResolved(subject);
 
@@ -3279,7 +3235,8 @@ export class Store {
     if (
       existing &&
       existing.get(commits.properties.loroUpdate) &&
-      !parsed[commits.properties.loroUpdate]
+      !parsed[commits.properties.loroUpdate] &&
+      !snapshot?.length
     ) {
       return true;
     }
@@ -3304,7 +3261,7 @@ export class Store {
       return true;
     }
 
-    this.hydrateOfflineReplay(subject, parsed);
+    this.hydrateOfflineReplay(subject, parsed, snapshot);
 
     // If the outbox holds a dirty bit for this subject (offline edit
     // restored from localStorage), kick a drain now that the resource
