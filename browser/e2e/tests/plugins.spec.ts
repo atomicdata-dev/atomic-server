@@ -1,3 +1,4 @@
+import { enableIntegrationDiscovery } from './integration-settings-utils';
 import { test, expect } from '@playwright/test';
 import {
   before,
@@ -20,6 +21,9 @@ import {
  */
 test.describe('plugins', () => {
   test.beforeEach(before);
+  test.beforeEach(async ({ page }) => {
+    await enableIntegrationDiscovery(page, true);
+  });
 
   test('Pets imports from the mock integration proxy after account connection and review', async ({
     page,

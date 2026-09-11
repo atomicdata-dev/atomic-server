@@ -1,5 +1,7 @@
 import { styled } from 'styled-components';
 import { useState } from 'react';
+import { Checkbox, CheckboxLabel } from '@components/forms/Checkbox';
+import { useIntegrationVisibility } from '@hooks/useIntegrationVisibility';
 import { Column, Row } from '@components/Row';
 import {
   InputStyled,
@@ -16,13 +18,46 @@ import {
 
 export function IntegrationSettings() {
   const proxy = useIntegrationProxy();
+  const {
+    showApiPlugins,
+    showExperimentalPlugins,
+    ready,
+    saving,
+    error,
+    setVisibility,
+  } = useIntegrationVisibility();
 
   return (
     <SettingsSection
       label='Integration'
-      childSearchKeywords='proxy server url localthought'
+      childSearchKeywords='proxy server url localthought api experimental plugins'
     >
-      <ProxyForm key={proxy} proxy={proxy} />
+      <Column gap='1rem'>
+        <CheckboxLabel>
+          <Checkbox
+            checked={showApiPlugins}
+            disabled={!ready || saving}
+            onChange={value => void setVisibility('show-api-plugins', value)}
+          />
+          Show API plugins
+        </CheckboxLabel>
+        <CheckboxLabel>
+          <Checkbox
+            checked={showExperimentalPlugins}
+            disabled={!ready || saving}
+            onChange={value =>
+              void setVisibility('show-experimental-plugins', value)
+            }
+          />
+          Show experimental plugins
+        </CheckboxLabel>
+        <Description>
+          These preferences are saved in your private Atomic drive. Existing
+          connections remain available.
+        </Description>
+        {error && <ErrMessage role='alert'>{error}</ErrMessage>}
+        <ProxyForm key={proxy} proxy={proxy} />
+      </Column>
     </SettingsSection>
   );
 }

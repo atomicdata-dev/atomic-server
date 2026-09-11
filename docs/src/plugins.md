@@ -55,3 +55,23 @@ All `.wasm` files in that folder are loaded on startup. Errors are logged but do
 See `wasm-plugins/examples/random-folder-extender` for a minimal Rust project that implements the `class-extender` WIT interface. It appends a random suffix to the `name` property of every `https://atomicdata.dev/classes/Folder` resource whenever it is fetched. Build it with `cargo component build --release -p random-folder-extender --target wasm32-wasip2` and copy the resulting `.wasm` into your `wasm-class-extenders/` directory to try it out. -->
 
 
+
+## Integration discovery preferences
+
+Open **Settings → Integration** to choose which plugins appear on the
+**Integrations** page:
+
+- **Show API plugins** displays the LocalThought API catalog.
+- **Show experimental plugins** displays bundled experimental integrations and
+  unverified community plugins.
+
+Both options are unchecked by default and work independently. When a category
+is hidden, the Integrations page links to Settings so you can consider enabling
+it. Hidden catalogs are not fetched.
+
+These preferences are saved as boolean properties on your private Atomic drive,
+using its ontology, and follow that drive through normal Atomic sync. They are
+personal preferences, not settings on the currently open shared workspace.
+Turning them off hides discovery listings; it does not remove existing
+connections or stop their automations. Enabling a category does not certify its
+plugins or grant permission to run them.

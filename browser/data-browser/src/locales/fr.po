@@ -10298,3 +10298,23 @@ msgstr ""
 #: src/components/AppSetup/setupError.ts
 msgid "Unknown setup error"
 msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "<0/> Show API plugins"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "<0/> Show experimental plugins"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "These preferences are saved in your private Atomic drive. Existing connections remain available."
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Consider enabling API plugins in Settings → Integration."
+msgstr ""
+
+#: src/routes/IntegrationStore.tsx
+msgid "Consider enabling experimental plugins in Settings → Integration."
+msgstr ""

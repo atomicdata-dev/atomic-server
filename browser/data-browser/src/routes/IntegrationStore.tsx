@@ -6,7 +6,8 @@ import {
   bundledIntegrations,
 } from '../chunks/PluginRuns/IntegrationDiscovery';
 import { ConnectedIntegration } from '../chunks/PluginRuns/ConnectedIntegration';
-import { createRoute } from '@tanstack/react-router';
+import { useIntegrationVisibility } from '@hooks/useIntegrationVisibility';
+import { createRoute, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { FaPlug } from 'react-icons/fa6';
@@ -59,6 +60,8 @@ function IntegrationStore(): React.JSX.Element {
   const { workspace } = IntegrationStoreRoute.useSearch();
   const store = useStore();
   const { drive } = useSettings();
+  const { showApiPlugins, showExperimentalPlugins } =
+    useIntegrationVisibility();
   // The ontology can hydrate after this page mounts on a full navigation.
   const pluginClass = usePluginClass(drive);
   const navigate = useNavigateWithTransition();
@@ -66,6 +69,7 @@ function IntegrationStore(): React.JSX.Element {
   const [installed, setInstalled] = useState<string[]>([]);
   const [automations, setAutomations] = useState<string[]>([]);
   const [error, setError] = useState<string>();
+  const [catalogError, setCatalogError] = useState<string>();
   useEffect(() => {
     let active = true;
 
@@ -115,18 +119,27 @@ function IntegrationStore(): React.JSX.Element {
   const [creating, setCreating] = useState<string>();
   const server = store.getServerUrl();
   useEffect(() => {
+    setCatalogError(undefined);
+
+    if (!showExperimentalPlugins) {
+      setListings(undefined);
+
+      return;
+    }
+
     const controller = new AbortController();
     void fetch(`${server}/plugin-catalog`, { signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error(await response.text());
-        setListings(await response.json());
+        const entries = await response.json();
+        if (!controller.signal.aborted) setListings(entries);
       })
       .catch(reason => {
-        if (!controller.signal.aborted) setError(String(reason));
+        if (!controller.signal.aborted) setCatalogError(String(reason));
       });
 
     return () => controller.abort();
-  }, [server]);
+  }, [server, showExperimentalPlugins]);
 
   const createDraft = async (entry: Listing['metadata']) => {
     if (!drive) return;
@@ -165,16 +178,18 @@ function IntegrationStore(): React.JSX.Element {
   };
 
   const query = search.trim().toLocaleLowerCase();
-  const bundled = bundledIntegrations().filter(entry =>
-    `${entry.name} ${entry.description} ${entry.capabilities} ${entry.events} ${entry.keywords}`
-      .toLocaleLowerCase()
-      .includes(query),
+  const bundled = (showExperimentalPlugins ? bundledIntegrations() : []).filter(
+    entry =>
+      `${entry.name} ${entry.description} ${entry.capabilities} ${entry.events} ${entry.keywords}`
+        .toLocaleLowerCase()
+        .includes(query),
   );
-  const visible = listings?.filter(({ metadata: entry }) =>
-    [entry.name, entry.description, ...entry.domains, ...entry.standards]
-      .join(' ')
-      .toLocaleLowerCase()
-      .includes(query),
+  const visible = (showExperimentalPlugins ? listings : [])?.filter(
+    ({ metadata: entry }) =>
+      [entry.name, entry.description, ...entry.domains, ...entry.standards]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(query),
   );
 
   return (
@@ -229,9 +244,18 @@ function IntegrationStore(): React.JSX.Element {
             onChange={event => setSearch(event.target.value)}
           />
           {error && <Card role='alert'>{error}</Card>}
-          {!listings && !error && <p>Loading integrations…</p>}
+          {showExperimentalPlugins && catalogError && (
+            <Card role='alert'>{catalogError}</Card>
+          )}
+          {showExperimentalPlugins && !listings && !catalogError && (
+            <p>Loading integrations…</p>
+          )}
+          {!showApiPlugins && <ApiPluginsPrompt />}
+          {!showExperimentalPlugins && <ExperimentalPluginsPrompt />}
           <Grid>
-            <LocalThoughtCatalog drive={drive} search={search} />
+            {showApiPlugins && (
+              <LocalThoughtCatalog drive={drive} search={search} />
+            )}
             {bundled.map(entry => (
               <IntegrationDiscovery
                 key={entry.id}
@@ -373,6 +397,26 @@ function AutomationEmptyState() {
     <p>
       No automations yet. Create one to respond to events from your connected
       apps.
+    </p>
+  );
+}
+
+function ApiPluginsPrompt() {
+  return (
+    <p>
+      <Link to='/app/settings'>
+        Consider enabling API plugins in Settings → Integration.
+      </Link>
+    </p>
+  );
+}
+
+function ExperimentalPluginsPrompt() {
+  return (
+    <p>
+      <Link to='/app/settings'>
+        Consider enabling experimental plugins in Settings → Integration.
+      </Link>
     </p>
   );
 }

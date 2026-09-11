@@ -1,3 +1,4 @@
+import { enableIntegrationDiscovery } from './integration-settings-utils';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
@@ -9,6 +10,9 @@ const statementPath = resolve(
 const statement = readFileSync(statementPath, 'utf8');
 
 test.beforeEach(before);
+test.beforeEach(async ({ page }) => {
+  await enableIntegrationDiscovery(page);
+});
 test('MT940 rejects unbalanced files, previews in sandbox and skips repeat imports', async ({
   page,
 }) => {
