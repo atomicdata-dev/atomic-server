@@ -451,7 +451,7 @@ export class AtomicServer {
 
   @func()
   async jsLint(): Promise<string> {
-    const depsContainer = this.jsBuild();
+    const depsContainer = this.jsSource();
 
     return depsContainer
       .withWorkdir('/app')
@@ -962,8 +962,8 @@ export class AtomicServer {
       .stdout();
   }
 
-  @func()
-  private jsBuild(e2e: boolean = false): Container {
+  /** Installed workspace sources; deliberately has no build or WASM dependency. */
+  private jsSource(): Container {
     const browser = this.source.directory('browser');
     // Create a container with PNPM installed
     const pnpmContainer = dag
@@ -1015,11 +1015,6 @@ export class AtomicServer {
     const sourceContainer = workspaceContainer
       .withDirectory('/app', browser)
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
-      // Provide the prebuilt WASM artifacts so data-browser's `build` can skip
-      // wasm-pack when `SKIP_WASM_BUILD=1` (`wasm-pack` isn't available in this
-      // Node-only container, and mounting the Rust toolchain just for this would
-      // bloat the JS image significantly).
-      .withDirectory('/app/data-browser/public/wasm', this.wasmBuild())
       // data-browser imports the repo-root logo from `../../../../logo.svg`
       // and `../../../../../logo.svg`. Browser mount sits at /app, so those
       // resolve to /logo.svg. Place the asset there.
@@ -1042,11 +1037,15 @@ export class AtomicServer {
         this.source.file('testdata/pairing-request.json'),
       );
 
-    // Build all packages since they may depend on each other's built artifacts
-    let buildContainer = sourceContainer.withEnvVariable(
-      'SKIP_WASM_BUILD',
-      '1',
-    );
+    return sourceContainer;
+  }
+
+  @func()
+  private jsBuild(e2e: boolean = false): Container {
+    // Only builds depend on WASM. Static lint must not wait for Rust compilation.
+    let buildContainer = this.jsSource()
+      .withDirectory('/app/data-browser/public/wasm', this.wasmBuild())
+      .withEnvVariable('SKIP_WASM_BUILD', '1');
 
     if (e2e) {
       // Surfaces /app/dev-drive and /app/prunetests in the production
