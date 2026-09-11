@@ -7391,11 +7391,11 @@ msgstr "Référencez les ressources par sujet plutôt que par nom."
 
 #: src/components/forms/FilePicker/FilePicker.tsx
 msgid "Preparing file…"
-msgstr ""
+msgstr "Préparation du fichier…"
 
 #: src/components/forms/FilePicker/FilePicker.tsx
 msgid "Could not prepare file. Select it again to retry."
-msgstr ""
+msgstr "Impossible de préparer le fichier. Sélectionnez-le à nouveau pour réessayer."
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Restore"
@@ -7437,11 +7437,11 @@ msgstr "Ce champ est calculé côté serveur."
 
 #: src/views/CodeUsage/ResourceCodeUsage.tsx
 msgid "Read a property:"
-msgstr "Lire une propriété :"
+msgstr "Lire une propriété :"
 
 #: src/views/CodeUsage/ResourceCodeUsage.tsx
 msgid "Typescript"
-msgstr "Typescript"
+msgstr "TypeScript"
 
 #: src/routes/AppSettings.tsx
 msgid "Colorful mode"

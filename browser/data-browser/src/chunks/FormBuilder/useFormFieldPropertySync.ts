@@ -36,6 +36,7 @@ interface CreateFieldOpts {
   type: AddableFieldType;
   label: string;
   existingProperty?: Resource;
+  choices?: string[];
 }
 
 /** The shortname a field falls back to when its label slugifies to nothing
@@ -111,6 +112,92 @@ export function isDerivedShortname(shortname: string, label: string): boolean {
   return shortname === base || new RegExp(`^${base}-\\d+$`).test(shortname);
 }
 
+/** Shared resource creation for the builder and AI tool. */
+export async function createFormField(
+  store: Store,
+  dataClass: Resource,
+  ownsSchema: boolean,
+  page: Resource,
+  opts: CreateFieldOpts,
+): Promise<Resource> {
+  let field: Resource;
+
+  if (isLayoutType(opts.type)) {
+    field = await store.newResource({
+      parent: page.subject,
+      isA: LAYOUT_TYPE_CLASS[opts.type],
+      // A heading _is_ its title; a paragraph and an info box are their
+      // body text. The info box's own (optional) title is left unset —
+      // an untitled callout is a perfectly good one.
+      propVals:
+        opts.type === 'heading'
+          ? { [core.properties.name]: opts.label }
+          : opts.type === 'info-box'
+            ? {
+                [core.properties.description]: opts.label,
+                [forms.properties.formInfoBoxStyle]: DEFAULT_INFO_BOX_STYLE,
+              }
+            : { [core.properties.description]: opts.label },
+    });
+    await field.save();
+  } else if (opts.existingProperty) {
+    field = await createMappedField(
+      store,
+      page,
+      dataClass,
+      opts.existingProperty,
+    );
+  } else {
+    if (!ownsSchema) throw new Error('Add a column on the table first');
+    const shortname = uniqueShortname(
+      stringToSlug(opts.label),
+      await takenShortnames(store, dataClass),
+    );
+
+    // A choice question's column is an ordinary enum column: a
+    // SelectProperty whose `allowsOnly` Tags *are* the question's options.
+    // That is what gives form answers tag pills, colors and kanban
+    // grouping, and what lets renaming an option leave past submissions
+    // reading correctly.
+    const propertySubject = isChoiceFieldType(opts.type)
+      ? (
+          await createSelectPropertyOnClass(store, dataClass, {
+            shortname,
+            tags: (opts.choices ?? DEFAULT_CHOICE_TAGS).map(name => ({ name })),
+            max: SINGLE_CHOICE_FIELD_TYPES.includes(opts.type) ? 1 : undefined,
+          })
+        ).subject
+      : await createPropertyOnClass(store, dataClass, {
+          shortname,
+          datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
+        });
+
+    field = await store.newResource({
+      parent: page.subject,
+      isA: forms.classes.formField,
+      propVals: {
+        [core.properties.name]: opts.label,
+        [forms.properties.formMapsTo]: propertySubject,
+        [forms.properties.formFieldType]: opts.type,
+        [forms.properties.required]: false,
+        [forms.properties.formFieldOptions]:
+          FIELD_TYPE_DEFAULT_OPTIONS[opts.type],
+      },
+    });
+    await field.save();
+  }
+
+  const currentFields =
+    (page.get(forms.properties.formFields) as string[] | undefined) ?? [];
+  await page.set(forms.properties.formFields, [
+    ...currentFields,
+    field.subject,
+  ]);
+  await page.save();
+
+  return field;
+}
+
 /**
  * Keeps a Form's questions in sync with the generated data class: adding an
  * input field creates the mapped Property (via the same primitive Tables use
@@ -132,84 +219,7 @@ export function useFormFieldPropertySync(
 
   const createField = useCallback(
     async (page: Resource, opts: CreateFieldOpts): Promise<Resource> => {
-      let field: Resource;
-
-      if (isLayoutType(opts.type)) {
-        field = await store.newResource({
-          parent: page.subject,
-          isA: LAYOUT_TYPE_CLASS[opts.type],
-          // A heading _is_ its title; a paragraph and an info box are their
-          // body text. The info box's own (optional) title is left unset —
-          // an untitled callout is a perfectly good one.
-          propVals:
-            opts.type === 'heading'
-              ? { [core.properties.name]: opts.label }
-              : opts.type === 'info-box'
-                ? {
-                    [core.properties.description]: opts.label,
-                    [forms.properties.formInfoBoxStyle]: DEFAULT_INFO_BOX_STYLE,
-                  }
-                : { [core.properties.description]: opts.label },
-        });
-        await field.save();
-      } else if (opts.existingProperty) {
-        field = await createMappedField(
-          store,
-          page,
-          dataClass,
-          opts.existingProperty,
-        );
-      } else {
-        if (!ownsSchema) throw new Error('Add a column on the table first');
-        const shortname = uniqueShortname(
-          stringToSlug(opts.label),
-          await takenShortnames(store, dataClass),
-        );
-
-        // A choice question's column is an ordinary enum column: a
-        // SelectProperty whose `allowsOnly` Tags *are* the question's options.
-        // That is what gives form answers tag pills, colors and kanban
-        // grouping, and what lets renaming an option leave past submissions
-        // reading correctly.
-        const propertySubject = isChoiceFieldType(opts.type)
-          ? (
-              await createSelectPropertyOnClass(store, dataClass, {
-                shortname,
-                tags: DEFAULT_CHOICE_TAGS.map(name => ({ name })),
-                max: SINGLE_CHOICE_FIELD_TYPES.includes(opts.type)
-                  ? 1
-                  : undefined,
-              })
-            ).subject
-          : await createPropertyOnClass(store, dataClass, {
-              shortname,
-              datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
-            });
-
-        field = await store.newResource({
-          parent: page.subject,
-          isA: forms.classes.formField,
-          propVals: {
-            [core.properties.name]: opts.label,
-            [forms.properties.formMapsTo]: propertySubject,
-            [forms.properties.formFieldType]: opts.type,
-            [forms.properties.required]: false,
-            [forms.properties.formFieldOptions]:
-              FIELD_TYPE_DEFAULT_OPTIONS[opts.type],
-          },
-        });
-        await field.save();
-      }
-
-      const currentFields =
-        (page.get(forms.properties.formFields) as string[] | undefined) ?? [];
-      await page.set(forms.properties.formFields, [
-        ...currentFields,
-        field.subject,
-      ]);
-      await page.save();
-
-      return field;
+      return createFormField(store, dataClass, ownsSchema, page, opts);
     },
     [store, dataClass, ownsSchema],
   );

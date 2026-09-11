@@ -7366,7 +7366,7 @@ msgstr "Descargar"
 
 #: src/views/OntologyPage/NewClassButton.tsx
 msgid "Add class"
-msgstr "Agregar clase"
+msgstr "Añadir clase"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "Edited"
@@ -7391,11 +7391,11 @@ msgstr "Referencia los recursos por tema en lugar de por nombre."
 
 #: src/components/forms/FilePicker/FilePicker.tsx
 msgid "Preparing file…"
-msgstr ""
+msgstr "Preparando archivo…"
 
 #: src/components/forms/FilePicker/FilePicker.tsx
 msgid "Could not prepare file. Select it again to retry."
-msgstr ""
+msgstr "No se pudo preparar el archivo. Selecciónelo de nuevo para reintentar."
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Restore"
@@ -7403,7 +7403,7 @@ msgstr "Restaurar"
 
 #: src/views/OntologyPage/NewPropertyButton.tsx
 msgid "Add property"
-msgstr "Agregar propiedad"
+msgstr "Añadir propiedad"
 
 #: src/chunks/TablePage/PropertyForm/DatePropertyForm.tsx
 msgid "Include Time"
@@ -7441,7 +7441,7 @@ msgstr "Leer una propiedad:"
 
 #: src/views/CodeUsage/ResourceCodeUsage.tsx
 msgid "Typescript"
-msgstr "Typescript"
+msgstr "TypeScript"
 
 #: src/routes/AppSettings.tsx
 msgid "Colorful mode"

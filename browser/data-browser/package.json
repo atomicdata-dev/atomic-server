@@ -117,7 +117,7 @@
     "gh-pages": "^6.3.0",
     "lint-staged": "^17.0.5",
     "loro-prosemirror": "^0.4.3",
-    "oxc-transform-react": "0.145.0",
+    "oxc-transform-react": "^0.149.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.14",
     "vite-plugin-prismjs": "^0.0.11",

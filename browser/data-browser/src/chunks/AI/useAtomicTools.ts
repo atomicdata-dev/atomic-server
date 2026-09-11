@@ -11,6 +11,19 @@ import {
   type Store,
 } from '@tomic/react';
 import { tool } from 'ai';
+import {
+  describeForm,
+  configureForm,
+  configureFormSchema,
+  configureFormPage,
+  configureFormPageSchema,
+  configureFormField,
+  configureFormFieldSchema,
+} from '../FormBuilder/formOps';
+import {
+  buildFormFromSpec,
+  formSpecSchema,
+} from '../FormBuilder/createFormFromSpec';
 import { z } from 'zod';
 import { useSettings } from '@helpers/AppSettings';
 import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
@@ -71,6 +84,11 @@ export const TOOL_NAMES = {
   NAVIGATE_TO_RESOURCE: 'navigate_to_resource',
   CREATE_RESOURCE: 'create_resource',
   CREATE_TABLE: 'create_table',
+  CREATE_FORM: 'create_form',
+  DESCRIBE_FORM: 'describe_form',
+  CONFIGURE_FORM: 'configure_form',
+  CONFIGURE_FORM_PAGE: 'configure_form_page',
+  CONFIGURE_FORM_FIELD: 'configure_form_field',
   DESCRIBE_TABLE: 'describe_table',
   LIST_TABLE_TEMPLATES: 'list_table_templates',
   CREATE_TABLE_FROM_TEMPLATE: 'create_table_from_template',
@@ -1372,6 +1390,128 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
           }
         },
         strict: true,
+      }),
+      [TOOL_NAMES.DESCRIBE_FORM]: tool({
+        description:
+          'Read a complete form in one call: settings, styling, response table/class, available columns, ordered pages and questions, option Tags with stable subjects, and conditions. Use before editing a form. Names can be ambiguous; subjects uniquely identify pages, fields and Tags.',
+        inputSchema: z.object({
+          form: z.string().describe('Form subject or #ref.'),
+        }),
+        execute: async ({ form }) => {
+          try {
+            return shortenRefsDeep(
+              await describeForm(store, expandSubject(form)),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM]: tool({
+        description:
+          'Edit form name, description, settings, appearance, custom CSS or page order. Only supplied values change; JSON patches merge keys and null removes a key. Read describe_form first. Does not change publishing, access rights, response table or schema.',
+        inputSchema: configureFormSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureForm(store, {
+                ...config,
+                form: expandSubject(config.form),
+                pageOrder: config.pageOrder?.map(ref =>
+                  ref.startsWith('#') ? expandSubject(ref) : ref,
+                ),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM_PAGE]: tool({
+        description:
+          'Add a page (omit page), edit its name/description, reorder its fields, or remove an empty page. Read describe_form first. Order lists must contain every current item exactly once; conditional questions must stay after their dependencies.',
+        inputSchema: configureFormPageSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureFormPage(store, {
+                ...config,
+                form: expandSubject(config.form),
+                page: config.page?.startsWith('#')
+                  ? expandSubject(config.page)
+                  : config.page,
+                fieldOrder: config.fieldOrder?.map(ref =>
+                  ref.startsWith('#') ? expandSubject(ref) : ref,
+                ),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM_FIELD]: tool({
+        description:
+          'Add a question/layout block (omit field), edit label, required flag, compatible presentation, options, or form-owned choice Tags, or remove it. Read describe_form first. Reuse Tag subjects when renaming choices to preserve past answers. Removal preserves Properties, Tags and response data. Shared table columns are never changed. Conditions/options sources are inspected here but edited in the builder.',
+        inputSchema: configureFormFieldSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureFormField(store, {
+                ...config,
+                form: expandSubject(config.form),
+                page: config.page.startsWith('#')
+                  ? expandSubject(config.page)
+                  : config.page,
+                field: config.field?.startsWith('#')
+                  ? expandSubject(config.field)
+                  : config.field,
+                column: config.column?.startsWith('#')
+                  ? expandSubject(config.column)
+                  : config.column,
+                choices: config.choices?.map(choice => ({
+                  ...choice,
+                  subject: choice.subject
+                    ? expandSubject(choice.subject)
+                    : undefined,
+                })),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CREATE_FORM]: tool({
+        description:
+          'Create a complete editable form in ONE call: response table and class, properties and choice tags, ordered pages and fields. Or reuse an existing table with column mappings. Prefer this over manually creating form resources. Creates a draft; publishing and public access are configured separately in the form builder. Returns subjects for follow-up editing and navigation.',
+        inputSchema: formSpecSchema,
+        execute: async spec => {
+          try {
+            return shortenRefsDeep(
+              await buildFormFromSpec(
+                store,
+                {
+                  ...spec,
+                  parent: spec.parent ? expandSubject(spec.parent) : undefined,
+                  table: spec.table ? expandSubject(spec.table) : undefined,
+                  pages: spec.pages.map(page => ({
+                    ...page,
+                    fields: page.fields.map(field => ({
+                      ...field,
+                      column: field.column?.startsWith('#')
+                        ? expandSubject(field.column)
+                        : field.column,
+                    })),
+                  })),
+                },
+                { driveSubject: drive, addToOntology },
+              ),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
       }),
       [TOOL_NAMES.CREATE_TABLE]: tool({
         description:

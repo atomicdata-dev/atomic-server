@@ -600,6 +600,8 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 
 ## Forms
 
+AI `create_form` resource graphs (standalone pages, typed properties and choice tags; existing-table schema preservation; invalid mappings rejected before writes) are covered by `browser/data-browser/src/chunks/FormBuilder/createFormFromSpec.test.ts`. `formOps.test.ts` covers inspection, partial JSON patches, page/field additions, ordering and deletion, choice Tag identity preservation, shared-schema protection, membership checks, and conditional-order validation. `formFieldSettings.test.ts` covers explicit option schemas in both creation/editing, persisted type-specific settings, numeric bounds enforced by renderer validation, clearing bounds, invalid patches rejected before writes, and shared-column selection limits. Model tool selection and live AI-to-published-form submission are not covered by these unit tests.
+
 | Flow | Where |
 |---|---|
 | Existing table → form checklist → unused-column menu → label rename preserves Property → publish → anonymous submit → original table row | `browser/e2e/tests/forms-from-tables.spec.ts` |
