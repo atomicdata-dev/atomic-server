@@ -1,4 +1,4 @@
-import { useResource, type DataBrowser } from '@tomic/react';
+import { useResourceSnapshot, type DataBrowser } from '@tomic/react';
 import { Column } from '../Row';
 import { styled } from 'styled-components';
 import type { TagWithTitle } from './SearchbarInput';
@@ -91,7 +91,7 @@ const TagSuggestionRow: React.FC<TagSuggestionRowProps> = ({
   onClick,
 }) => {
   const ref = useRef<HTMLButtonElement>(null);
-  const resource = useResource<DataBrowser.Tag>(subject);
+  const { resource, ready } = useResourceSnapshot<DataBrowser.Tag>(subject);
 
   useEffect(() => {
     if (selected && !blockAutoscroll) {
@@ -99,7 +99,7 @@ const TagSuggestionRow: React.FC<TagSuggestionRowProps> = ({
     }
   }, [selected, blockAutoscroll]);
 
-  if (!resource.isReady()) return <div>Loading...</div>;
+  if (!ready) return <div>Loading...</div>;
 
   return (
     <TagRow

@@ -26,6 +26,7 @@ import {
   JSONArray,
   OptionalClass,
   type Core,
+  type ResourceSnapshot,
   ResourceEvents,
   LoroLoader,
   core,
@@ -39,17 +40,23 @@ const asError = (error: unknown): Error =>
 
 export type UseResourceOptions = FetchOpts;
 
-/**
- * Hook for getting a Resource in a React component. Wraps the
- * Store's per-subject snapshot via `useSyncExternalStore`: each
- * notify replaces the snapshot tuple, the Resource itself is
- * mutated in place, and reads like `resource.props.x` see the
- * latest values without us having to invalidate them.
+/** Stable live handle for mutation and property hooks. For render-time
+ * readiness/error checks use `useResourceSnapshot`'s captured scalar fields.
  */
 export function useResource<C extends OptionalClass = never>(
   subject: string = unknownSubject,
   opts: UseResourceOptions = {},
 ): Resource<C> {
+  return useResourceSnapshot<C>(subject, opts).resource;
+}
+
+/** Immutable status changes identity on store notifications. The contained
+ * Resource stays stable; read properties with useString/useArray/etc.
+ */
+export function useResourceSnapshot<C extends OptionalClass = never>(
+  subject: string = unknownSubject,
+  opts: UseResourceOptions = {},
+): ResourceSnapshot<C> {
   const store = useStore();
   const memoizedOpts = useMemoizedOpts(opts);
 
@@ -62,8 +69,11 @@ export function useResource<C extends OptionalClass = never>(
     [store, subject, memoizedOpts],
   );
 
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-    .resource as Resource<C>;
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot,
+  ) as ResourceSnapshot<C>;
 }
 
 const stableEmptyArray: string[] = [];
