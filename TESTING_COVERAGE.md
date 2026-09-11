@@ -15,6 +15,14 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## How to read this
 
+Codex chat example: `plugin-examples/codex-chat/test.mjs` checks stdio RPC,
+streaming projection, approve-once/decline, the worker approval and cancellation
+flows, and restart no-replay behavior. `view.test.mjs` checks the source view in
+Chromium with a fixture Store. `dist/live.js` is an opt-in two-turn real Codex
+check. Installed iframe/CSP/scoped Store reads were checked locally; full Data
+Browser navigation, live escalations, attachments and multi-worker operation
+remain uncovered. See the example README for the exact scope.
+
 Clockify: `integrations/clockify/plugin.test.ts` covers linked proposals, time
 instants, repeat imports, pagination and failure handling.
 `plugins::clockify_tests::completed_entries_are_proposals_in_the_real_sandbox`

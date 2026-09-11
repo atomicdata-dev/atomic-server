@@ -1,0 +1,21 @@
+{
+  "name": "atomic-codex-chat-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test.mjs",
+    "test:view": "node view.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "loro-crdt": "^1.12.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^6.0.3",
+    "@types/node": "^22.0.0"
+  }
+}

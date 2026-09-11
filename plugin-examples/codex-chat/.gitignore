@@ -1,0 +1,6 @@
+dist/
+node_modules/
+*.secret
+*.journal
+*.lock
+connection.json
