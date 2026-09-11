@@ -48,6 +48,13 @@ impl Error for AtomicServerError {}
 
 impl ResponseError for AtomicServerError {
     fn status_code(&self) -> StatusCode {
+        // A managed node refusing enrollment/quota is an expected admission
+        // decision, not an internal failure or a request to sign in again.
+        if atomic_lib::sync::protocol::classify_commit_error(&self.message)
+            == atomic_lib::sync::protocol::error_code::SYNC_REJECTED
+        {
+            return StatusCode::FORBIDDEN;
+        }
         match self.error_type {
             AppErrorType::NotFound => StatusCode::NOT_FOUND,
             AppErrorType::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
@@ -187,6 +194,26 @@ impl From<actix_web::Error> for AtomicServerError {
             message: error.to_string(),
             error_type: AppErrorType::Other,
             error_resource: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod admission_error_tests {
+    use super::*;
+
+    #[test]
+    fn managed_commit_errors_carry_a_blocking_code() {
+        for message in [
+            "Drive did:ad:private is not enrolled for sync on this node.",
+            "Drive did:ad:private has reached its storage quota on this node.",
+        ] {
+            let error: AtomicServerError = message.into();
+            assert_eq!(error.status_code(), StatusCode::FORBIDDEN);
+            assert_eq!(
+                atomic_lib::sync::protocol::classify_commit_error(&error.message),
+                atomic_lib::sync::protocol::error_code::SYNC_REJECTED
+            );
         }
     }
 }

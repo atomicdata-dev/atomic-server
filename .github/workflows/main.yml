@@ -11,13 +11,10 @@ on:
           - full
         default: auto
 
-# One pipeline at a time on the shared runner. Mancave picks up several jobs
-# at once, and a full suite is 4 shards x 2 browsers plus four debug servers
-# next to clippy and nextest; two of those overlapping is what turns the e2e
-# suite red run to run (reload-heavy specs time out waiting for the server).
-# Queue instead of overlap; never cancel a run that is already going.
+# Keep the newest pending run per ref. A push to a feature branch must not
+# replace develop's pending run. Already-started workflows finish normally.
 concurrency:
-  group: main-pipeline
+  group: main-pipeline-${{ github.ref }}
   cancel-in-progress: false
 
 # Main prefers Mancave (self-hosted) so Dagger cache volumes stay warm.
@@ -235,6 +232,10 @@ jobs:
           token: ${{ secrets.ATOMIC_SAAS_DISPATCH_TOKEN }}
           path: atomic-saas
           clean: false
+          # Nothing below pushes to atomic-saas, so the PAT has no business
+          # staying in atomic-saas/.git/config on the self-hosted runner
+          # (where `clean: false` keeps the checkout around between runs).
+          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.98.1

@@ -7,6 +7,7 @@
  * use, keep `ClientDbWorker`.
  */
 
+import { versionVectorRecords } from './version-vector-records.js';
 import {
   parseHistoryAttribution,
   type HistoryAttribution,
@@ -278,7 +279,7 @@ export class NodeClientDb {
   > {
     const r = this.requireDb().getAllVersionVectors();
 
-    return (r as Record<string, Record<string, number>>) ?? {};
+    return versionVectorRecords(r);
   }
 
   async getVersionVectorsForDrive(
@@ -286,7 +287,7 @@ export class NodeClientDb {
   ): Promise<Record<string, Record<string, number>>> {
     const r = await this.requireDb().getVersionVectorsForDrive(drive);
 
-    return (r as Record<string, Record<string, number>>) ?? {};
+    return versionVectorRecords(r);
   }
 
   private requireDb(): WasmModule {

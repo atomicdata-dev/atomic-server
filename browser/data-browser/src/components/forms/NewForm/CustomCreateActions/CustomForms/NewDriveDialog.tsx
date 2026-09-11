@@ -1,3 +1,4 @@
+import { getManagedPortalUrl } from '../../../../../helpers/managed/cloudSync';
 import { useStore } from '@tomic/react';
 import { useState, useCallback, FormEvent, FC, useEffect, useId } from 'react';
 import { styled } from 'styled-components';
@@ -39,6 +40,7 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
         // An ADDITIONAL drive: linked into the switcher list, but it does not
         // replace the agent's personal/home drive.
         personal: false,
+        localOnly: !!getManagedPortalUrl(),
       });
 
       store.notifyResourceManuallyCreated(resource);

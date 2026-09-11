@@ -3,6 +3,7 @@ import { styled } from 'styled-components';
 import { FaKey } from 'react-icons/fa6';
 import { Agent, useStore } from '@tomic/react';
 import { Button } from './Button';
+import { hasPasskeyApi } from '../helpers/passkeySupport';
 import { Column, Row } from './Row';
 import { CodeBlock } from './CodeBlock';
 import { SecretCodeBlock } from './SecretCodeBlock';
@@ -19,6 +20,8 @@ import {
 import {
   addRecoveryCodeWrapper,
   addPasskeyWrapper,
+  unifyAccountPasskey,
+  AccountPasskeyUnsupportedError,
   buildEnvelopeV2,
   buildEnvelopeWithPasskeyAndCode,
   envelopeWrapperKinds,
@@ -64,12 +67,15 @@ export function AccountRecoveryCard({
   /** Picks this account's backup out of a device holding several. */
   agentSubject?: string;
 }) {
+  const passkeyAvailable = hasPasskeyApi();
   const [backup, setBackup] = useState<BackupState>({ phase: 'loading' });
   const [secret, setSecret] = useState<string | null>(null);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
   const [passkeyAdded, setPasskeyAdded] = useState(false);
+  const [needsCompatiblePasskey, setNeedsCompatiblePasskey] = useState(false);
+  const [addingAccountPasskey, setAddingAccountPasskey] = useState(false);
   /**
    * The secret being enrolled, typed by the user.
    *
@@ -399,8 +405,51 @@ export function AccountRecoveryCard({
     }
   }
 
+  async function handleUnifyPasskey() {
+    if (!passkeyAvailable) return;
+
+    if (!agentSubject || backup.phase !== 'ready') return;
+
+    if (!envelopeWrapperKinds(backup.secret).hasPasskey && !codeInput.trim()) {
+      setAddingAccountPasskey(true);
+      setNeedsCode(true);
+      setError(undefined);
+
+      return;
+    }
+
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const saved = await unifyAccountPasskey(
+        agentSubject,
+        codeInput.trim() || undefined,
+        needsCompatiblePasskey,
+      );
+      setBackup({ phase: 'ready', secret: saved, onServer: true });
+      setCodeInput('');
+      setNeedsCode(false);
+      setNeedsCompatiblePasskey(false);
+      setAddingAccountPasskey(false);
+      setPasskeyAdded(true);
+    } catch (e) {
+      if (e instanceof AccountPasskeyUnsupportedError)
+        setNeedsCompatiblePasskey(true);
+      setError(
+        e instanceof Error && e.message.trim()
+          ? e.message
+          : 'Could not update your passkey. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleAddPasskey() {
-    if (!needsCode || !codeInput.trim()) {
+    if (!passkeyAvailable) return;
+
+    if (!codeInput.trim()) {
       setNeedsCode(true);
       setError(undefined);
 
@@ -499,6 +548,7 @@ export function AccountRecoveryCard({
 
   return (
     <Column gap='0.75rem'>
+      {error && <ErrorLook role='alert'>{error}</ErrorLook>}
       <Protections>
         {/* One expression, because JSX turns the newline between two of them
             into a space and the sentence read "your passkey ." */}
@@ -532,6 +582,37 @@ export function AccountRecoveryCard({
         </Column>
       ) : null}
 
+      {!passkeyAvailable && (
+        <Hint role='status'>
+          This browser does not expose passkey support. Open this site directly
+          in a browser with passkey support, such as Chrome or Safari. Sign in
+          there with an email link to add a passkey. An embedded browser may not
+          support this.
+        </Hint>
+      )}
+      {passkeyAvailable &&
+      hasSession &&
+      !addingAccountPasskey &&
+      backup.secret.format_version === 2 &&
+      !backup.secret.wrappers.some(w => w.kdf_params.account_passkey) ? (
+        <Column gap='0.5rem'>
+          <Button
+            disabled={loading || !agentSubject}
+            onClick={handleUnifyPasskey}
+            data-test='unify-passkey'
+          >
+            {loading
+              ? 'Setting up passkey…'
+              : needsCompatiblePasskey
+                ? 'Create a compatible account passkey'
+                : 'Add a passkey'}
+          </Button>
+          <Hint>
+            Unlock your backup, then choose your account passkey. Your existing
+            recovery methods keep working.
+          </Hint>
+        </Column>
+      ) : null}
       {needsCode ? (
         <InputWrapper hasPrefix>
           <FaKey />
@@ -541,6 +622,15 @@ export function AccountRecoveryCard({
             type='password'
             placeholder='Recovery code'
             aria-label='Recovery code'
+            autoFocus
+            onKeyDown={event => {
+              if (event.key === 'Enter' && codeInput.trim() && !loading) {
+                event.preventDefault();
+                void (addingAccountPasskey
+                  ? handleUnifyPasskey()
+                  : handleReveal());
+              }
+            }}
           />
         </InputWrapper>
       ) : null}
@@ -549,15 +639,29 @@ export function AccountRecoveryCard({
           <Row gap='1rem' wrapItems>
             <Button
               subtle
-              disabled={loading}
+              disabled={loading || (needsCode && !codeInput.trim())}
               onClick={() => {
-                setNeedsCode(true);
-                setError(undefined);
+                if (needsCode) {
+                  void (addingAccountPasskey
+                    ? handleUnifyPasskey()
+                    : handleReveal());
+                } else {
+                  setNeedsCode(true);
+                  setError(undefined);
+                }
               }}
             >
-              Use recovery code
+              {loading
+                ? 'Unlocking…'
+                : addingAccountPasskey
+                  ? 'Continue with passkey'
+                  : needsCode
+                    ? 'Unlock with recovery code'
+                    : 'Use recovery code'}
             </Button>
-            {hasSession === true ? (
+            {passkeyAvailable &&
+            hasSession === true &&
+            backup.secret.format_version !== 2 ? (
               <Button
                 subtle
                 disabled={loading || !agentSubject}
@@ -566,7 +670,7 @@ export function AccountRecoveryCard({
               >
                 Add a passkey
               </Button>
-            ) : portalUrl ? (
+            ) : passkeyAvailable && hasSession !== true && portalUrl ? (
               <Button
                 subtle
                 onClick={() => window.open(`${portalUrl}/dashboard`, '_blank')}
@@ -577,8 +681,8 @@ export function AccountRecoveryCard({
           </Row>
           {needsCode ? (
             <Hint>
-              Enter your recovery code to show your secret or add a passkey on
-              this device. Your existing recovery code will keep working.
+              Enter your recovery code to unlock your backup. Your existing
+              recovery code will keep working.
             </Hint>
           ) : null}
           {passkeyAdded ? (
@@ -598,7 +702,7 @@ export function AccountRecoveryCard({
           <SecretCodeBlock className='revealed-agent-secret' content={secret} />
           <Row>
             <Button subtle onClick={() => setSecret(null)}>
-              Hide
+              {'Hide'}
             </Button>
           </Row>
         </Column>
@@ -661,8 +765,6 @@ export function AccountRecoveryCard({
           />
         </Column>
       ) : null}
-
-      {error && <ErrorLook>{error}</ErrorLook>}
     </Column>
   );
 }

@@ -1,5 +1,11 @@
 import { test, expect } from './fixtures';
-import { before, newDrive, openConfigureDrive } from './test-utils';
+import {
+  before,
+  newDrive,
+  openConfigureDrive,
+  FRONTEND_URL,
+  currentDriveTitle,
+} from './test-utils';
 
 /**
  * A drive you make is one of your drives.
@@ -13,6 +19,34 @@ import { before, newDrive, openConfigureDrive } from './test-utils';
  */
 test.describe('saved drives', () => {
   test.beforeEach(before);
+
+  test('a portal Open link selects its drive and consumes the instruction', async ({
+    page,
+  }) => {
+    const original = await page.evaluate(() => window.store.getDrive());
+    const originalTitle = await currentDriveTitle(page).textContent();
+    const { driveURL } = await newDrive(page);
+    const search = new URLSearchParams({
+      subject: original!,
+      drive: original!,
+    });
+    await page.goto(`${FRONTEND_URL}/app/show?${search}`);
+    await expect
+      .poll(() => page.evaluate(() => window.store?.getDrive()))
+      .toBe(original);
+    await expect(currentDriveTitle(page)).toHaveText(originalTitle!);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.has('drive'))
+      .toBe(false);
+    // Ordinary resource links do not silently replace the selected workspace.
+    await page.goto(
+      `${FRONTEND_URL}/app/show?${new URLSearchParams({ subject: driveURL })}`,
+    );
+    await expect(
+      page.getByRole('button', { name: 'Set as current drive', exact: true }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => window.store.getDrive())).toBe(original);
+  });
 
   test('a drive you create is listed among your drives', async ({ page }) => {
     const { driveTitle } = await newDrive(page);

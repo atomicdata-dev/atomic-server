@@ -1,0 +1,64 @@
+.atomic-service-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  cursor: auto;
+}
+.atomic-service-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.atomic-service-title {
+  margin: 0;
+  font-size: 1em;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.atomic-service-description {
+  margin: 0;
+  color: var(--service-muted, var(--color-text-light, #666));
+  font-size: 0.875em;
+  line-height: 1.65;
+}
+.atomic-service-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: var(--service-neutral, var(--color-bg-1, #eee));
+  color: var(--service-text, var(--color-text, #111));
+}
+.atomic-service-icon[data-active='true'] {
+  background: var(--service-accent, var(--color-main, #204ce4));
+  color: white;
+}
+.atomic-service-group {
+  border: 1px solid var(--service-accent, var(--color-main, #204ce4));
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--service-accent, var(--color-main, #204ce4)) 4%,
+    var(--color-bg, transparent)
+  );
+  overflow: hidden;
+}
+.atomic-service-primary {
+  background: var(--service-accent, var(--color-main, #204ce4));
+  color: white;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.atomic-service-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

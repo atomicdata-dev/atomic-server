@@ -62,6 +62,43 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## Pre-commit lint gate
+
+`node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint
+in a temporary repository: initial commits, staged errors hidden by unstaged
+fixes, clean staged files with unstaged errors, filenames with spaces,
+documentation-only commits, missing dependencies, and preservation of the index
+and working tree. A stub Cargo command verifies Clippy dispatch, staged input,
+and failure propagation; this fixture does not compile the Rust workspace.
+
+## Browser WebRTC transport (issue #1396)
+
+`browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,
+backpressure and cancellation, bounded queues, caller buffer ownership, malformed
+input and close behavior. `browser/e2e/scripts/verify-webrtc.mjs` establishes real
+WebRTC channels between isolated browser contexts in Chromium and Firefox and
+checks bidirectional 1 MiB transfers and disconnects without an AtomicServer.
+The harness is loaded through Playwright routing; ICE and data transfer are real.
+`lib/src/sync/browser_peer.rs` tests authentication, replay, drive isolation,
+unauthorized snapshot writes, forged commits and outgoing permission revocation.
+`browser/e2e/scripts/verify-peer-sync.mjs` uses distinct agents, real signaling,
+WebRTC and OPFS with HTTP data access disabled: initial sync, concurrent edits,
+presence, attachments, offline reconciliation, reload and signed deletion.
+`browser-peer-sync.test.ts` covers parallel negotiation, isolated retries,
+departure, membership checks and the per-browser connection bound.
+`verify-peer-mesh.mjs` uses eight distinct Chromium agents: full mesh, ninth-member
+rejection, concurrent creations, group presence, attachment replication, creator
+departure, offline reconciliation and signed deletion. Rust regressions cover
+late snapshots and delayed pulls after deletion (unknown pulls still fail), and concurrent blob replies across independent edges.
+`browserPeerSync.test.ts` checks that another member can mint an invitation for
+the existing room without restarting its connection.
+`verify-peer-ui.mjs` checks invitation creation and disconnect in the Sync page.
+These scripts require built WASM and `ATOMIC_PEER_SIGNALING_URL` pointing to the
+SaaS signaling handler; neither starts an AtomicServer data process. The UI script requires
+a running app at its configured test URL. They are not wired into CI yet.
+Still uncovered: two physical devices, forced TURN, full Firefox drive sync,
+public deployment, and interactive rich-text editor/cursor acceptance.
+
 ## How to read this
 
 Clockify: `integrations/clockify/plugin.test.ts` covers linked proposals, time
@@ -528,8 +565,14 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   and failed connection without local-drive promotion.
 - `data-browser/src/helpers/managed/reconcile.test.ts`: pending/empty placements
   do not switch the app away from its source.
-- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup opens the selected
-  existing drive, never creates a content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/server-setup.spec.ts`: setup checks the selected
+  drive's subscription before opening hosting in the app; it never creates a
+  content-free enrollment in the portal.
+- Paired `atomic-saas/portal/e2e/drive-billing-ux.spec.ts`: billing has no fake
+  account-wide free plan, named drives survive selection/reload/Back, and a
+  paid drive's price and quota do not leak into an unsubscribed drive.
+- `data-browser/src/helpers/driveBillingUrl.test.ts`: Sync links preserve the
+  exact drive and portal, or open the picker when no drive is selected.
 - Paired `atomic-saas/portal/e2e/server-hosting-live.spec.ts`: opt-in real sign-in,
   grant, signed enrollment, setup UI, source replication and destination HTTP
   read. Requires two isolated nodes and dev magic links (`ATOMIC_HOSTING_LIVE=1`).
@@ -625,7 +668,19 @@ verify subsequent shared access. The chatroom journey also checks the named
 personal drive. Browser warnings/errors fail these tests, including localization
 render warnings. The authorization journey also covers cropped avatar upload, metadata and image
 download from the recipient account, and existing-agent acceptance. SaaS
-email-to-drive acceptance still needs dedicated flow coverage.
+`portal/e2e/invite-signup.spec.ts` covers a real invitation through email signup,
+recovery-code backup, automatic acceptance, and workspace reload. It also restores
+the existing identity in a second browser before accepting the invitation again.
+The test injects the standalone node's managed/portal metadata and declines
+automatic workspace-vault enrollment (no S3 service). Invitation, email login,
+encrypted identity recovery, and workspace operations use real local services.
+The invite journey also rejects transient duplicate acceptance buttons, opens the
+avatar file picker from the person button, and checks Feedback in the secret
+backup dialog. `onboarding-storage.spec.ts` injects a failed ClientDb initialization
+and verifies that signup controls stay hidden while recovery advice and Feedback
+remain available. `onboardingStorage.test.ts` covers initialization readiness,
+failure, missing attachment, and timeout. Actual private-window storage policies
+across browsers remain outside the injected-failure test.
 `ollama-feedback.spec.ts` checks sidebar feedback hover, local Ollama discovery
 only after expanding AI settings, one-click URL acceptance and persistence after
 reload. Its default run stubs the model-list endpoint; `TEST_REAL_OLLAMA=1` ran
@@ -647,10 +702,13 @@ the reader's active drive to receive live updates.
 
 `driveSyncStatus.test.ts` rejects another drive's sync timestamp and scopes
 asynchronous hosting/usage results to the selected drive and server. It covers
-unenrolled/local drives and shared drives confirmed directly by their node.
-`sync-devices.spec.ts` renders a managed connection with zero data for the selected
-drive, injects another drive's completed sync, and verifies that Cloud Server
-stays off with its setup action visible.
+unenrolled/local drives, unknown enrollment, and the requirement for both enrollment and remote data before claiming hosted service. Node synchronization remains a separate status.
+`sync-devices.spec.ts` renders a managed connection with data but no enrollment,
+injects another drive's completed sync, and verifies that Cloud Server does not
+claim hosting. It checks unknown recovery wording, account refresh on window focus,
+and missing translation markers. `saved-drives.spec.ts` checks that a portal Open
+link selects the requested drive, consumes the drive parameter, and preserves
+current-drive behavior for ordinary resource links.
 
 - Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
   present only in local storage, as well as rename/emoji refresh. Manual enable
@@ -1284,3 +1342,83 @@ with an explicit incomplete-import error rather than silently truncating.
 `IntegrationDiscovery.test.ts` verifies that all four bundled plugins remain
 discoverable without contacting an integration proxy. The original Notion auth
 and Clockify upgrade tests remain alongside it.
+
+Drive changes and reauthentication on an already-open WebSocket: `browser/lib/src/websockets.test.ts` verifies a fresh SYNC is sent without reconnecting, including local-only drive exclusion. This covers the Sync page remaining at Connecting after sign-in or drive switching; live staging acceptance remains separate.
+
+### Pending fork banner
+
+`PendingForks.test.tsx` rejects ordinary resources, proposals for another subject,
+and loading candidates even if a query page lists them. `forks.spec.ts` checks
+ordinary resources after reload and real proposals on their original resource.
+The reported Safari query contamination is not reproduced locally: WebKit test
+setup currently fails opening OPFS before it can create its dev drive.
+
+### Managed admission retries and content-addressed image downloads
+
+- `local-outbox.test.ts`: enrollment/quota refusals stop after bounded retries,
+  retain dirty edits, and can be re-armed by a new edit; legacy messages and
+  structured `SYNC_REJECTED` classification are covered.
+- `store-commit-fallback.test.ts`: a WebSocket enrollment refusal is not
+  duplicated over HTTP; a transport failure still falls back.
+- Server `errors::admission_error_tests`: enrollment/quota refusals carry a
+  blocking code and HTTP 403 rather than an internal-error response.
+- Server `tests::content_addressed_image_download`: raw, WebP and AVIF downloads
+  work for a blob with no File resource at its hash URL; missing hashes return
+  404, and attachment/nosniff headers are retained for renditions.
+
+Staging triage verified that the two reported hashes still returned HTTP 200
+without resize parameters. Deployment acceptance must recheck their resized
+URLs and confirm the rejected-write rate falls after clients update.
+
+Automatic browser discovery: `browser/data-browser/src/helpers/browserPeerSync.test.ts` verifies deterministic per-drive rooms, automatic startup for locally snapshotted drives, duplicate prevention, and skipping unknown snapshots. `ATOMIC_PEER_AUTOMATIC=1` with `verify-peer-mesh.mjs` verifies eight browsers rediscover trusted local drives without saved invitations, then sync creations, presence, attachments, reconnects and deletion. Full app UI acceptance remains separate.
+
+The WebSocket unit suite also covers a socket closing while an asynchronous version-vector probe is computed: no SYNC is sent on the closed connection. General UI tests stub public discovery with an empty room; the separate peer mesh acceptance script still exercises real signaling and authenticated sync.
+
+## Account drive catalog
+
+`helpers/managed/driveCatalog.test.ts` covers union/deduplication, removal precedence,
+offline retry/cache isolation, and stale results after logout or account switching.
+`e2e/tests/drive-catalog.spec.ts` renders an account-only drive without a local
+saved pointer, publishes the local drive, and applies a removal after reconnect
+(real app/node, mocked account API). Existing saved-drive tests remain separate.
+SaaS handler tests cover authenticated additive registration, account isolation,
+service-backed discovery and removal versus stale upload. Catalog entries confer
+no access to resource content. A live cross-app deployment acceptance is separate.
+
+## Unified account passkey
+
+`helpers/managed/accountPasskey.test.ts` checks account-credential reuse, server-challenge registration, PRF-output exclusion from API payloads, cancellation and standalone fallback. `recovery-enrollment.test.ts` covers additive migration, old recovery-code preservation, failed upgrades, unsupported login credentials and duplicate-credential PRF-salt selection. These use simulated authenticators and real WebCrypto/Argon2id.
+
+Paired SaaS `portal/e2e/recovery-passkey.spec.ts` uses Chromium virtual PRF authenticators with the real control plane to verify app enrollment followed by portal login using one credential, reuse of a portal-created credential, and account-settings migration without replacing ciphertext or old wrappers. Physical Safari/iCloud, Android/password-manager and native-shell behavior remain device acceptance checks.
+
+## September 10 SaaS and browser invite regressions
+
+- `browser/lib/src/browser-peer-invite.test.ts`: signed invitation validation, expiry, target and issuer checks, recipient proof, and additive permission grants.
+- `browser/e2e/tests/browser-invite.spec.ts`: distinct signed-in identities join a local drive through the app without the server invite endpoint.
+- `browser/e2e/scripts/verify-peer-sync.mjs` with `ATOMIC_PEER_INVITE=1`: invitation bootstrap and real WebRTC reconciliation with HTTP data access disabled.
+- `browser/e2e/tests/recovery-option.spec.ts`: recovery availability in the managed welcome flow.
+- Existing-drive migration to browser-only storage and fresh-account email onboarding through a peer invitation remain unverified.
+
+- `browser/data-browser/src/helpers/passkeySupport.test.ts` checks secure-context and credential API availability. `browser/e2e/tests/passkey-unavailable.spec.ts` removes WebAuthn from the browser and verifies that account settings explain the limitation, hide passkey setup, and preserve recovery-code access. Native credential-provider failures with the API present remain outside this check.
+
+
+## Managed sync presentation and local transition
+
+`syncPresentation.test.ts` covers Vault-aware summaries and hiding unrelated
+saved managed nodes. `enrollmentApi.test.ts` distinguishes unknown hosting from a
+successful empty enrollment list. `client-db.test.ts` covers nested WASM Map
+normalization, and `local-drive-copy.test.ts` rejects incomplete history and
+missing/corrupt attachments.
+
+`managed-sync-presentation.spec.ts` uses a real local node and OPFS with mocked
+account/enrollment/Vault responses. It reproduces both reported connection states,
+checks refusal when local history cannot be read, switches to browser-only sync,
+and verifies an edit plus attachment survive reload without HTTP/WS data writes.
+It also exercises the compiled Vault session error path (no React hook in an
+error constructor). Actual staging billing/admission and multi-device migration
+remain separate acceptance checks.
+
+Merge integration regression: `IntegrationDiscovery.test.ts` imports the bundled
+integration UI and catches a Dialog → Feedback → file-picker initialization cycle.
+Dialog loads its onboarding feedback lazily so its exported content component is
+initialized before feedback-dependent dialogs are imported.

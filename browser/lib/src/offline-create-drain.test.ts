@@ -1,7 +1,7 @@
 import { describe, it, vi, expect as assert } from 'vitest';
 import { server } from './ontologies/server.js';
 import { testStore } from './test-store.js';
-import type { ClientDb } from './client-db.js';
+import type { ClientDbWorker } from './client-db.js';
 
 /**
  * Reproduces the develop full-e2e failure of
@@ -98,10 +98,10 @@ describe('offline create drain', () => {
       const getResourceWithSnapshot = vi
         .fn()
         .mockResolvedValue({ snapshot: available ? snapshot : undefined });
-      (store as unknown as { clientDb: ClientDb }).clientDb = {
+      (store as unknown as { clientDb: ClientDbWorker }).clientDb = {
         isReady: true,
         getResourceWithSnapshot,
-      } as unknown as ClientDb;
+      } as unknown as ClientDbWorker;
       postCommitSpy.mockClear();
       await store.syncDirtyResources();
       assert(getResourceWithSnapshot).toHaveBeenCalledWith(agentDID);

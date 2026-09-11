@@ -493,59 +493,30 @@ async function enterSecret(page: Page, secret: string) {
 }
 
 export async function signIn(page: Page, secret: string = SECRET) {
-  // Wait for one of the three states to actually render. Without this, a
-  // freshly-navigated page may not yet have the welcome gate or sidebar
-  // mounted — visibility checks then time out and we wrongly assume
-  // already-signed-in (state 1) when really we just hit the page too early.
-  await page
-    .locator(
-      'button:has-text("Sign in"), a:has-text("Login / New User"), a:has-text("User Settings")',
-    )
-    .first()
-    .waitFor({ state: 'visible', timeout: 10_000 })
-    .catch(() => undefined);
-
-  // State 2: welcome gate. The "Sign in" button (exact match, not "Sign in with Google" etc.)
-  // is the fast check — if it's there, we're on the gate and need to sign in.
+  const input = page.getByLabel('Agent secret');
   const signInButton = page.getByRole('button', {
     name: 'Sign in',
     exact: true,
   });
+  const settings = page
+    .locator('a[href$="/app/agent"]')
+    .filter({ hasNotText: 'Login / New User' });
+  const login = page.getByRole('link', { name: 'Login / New User' });
+  await expect(
+    input.or(signInButton).or(settings).or(login).first(),
+  ).toBeVisible();
+  if (await settings.isVisible()) return;
 
-  if (await signInButton.isVisible({ timeout: 1500 }).catch(() => false)) {
+  if (!(await input.isVisible())) {
+    // Navigate directly: the sidebar login link opens a new tab and may
+    // unmount while onboarding takes over the initial route.
+    if (!(await signInButton.isVisible()))
+      await page.goto(`${FRONTEND_URL}/app/welcome`);
     await signInButton.click();
-    await enterSecret(page, secret);
-    // Wait for the signed-in sidebar to appear. Without this, callers
-    // (e.g. `openSubject`) may navigate before the auth cookie + localStorage
-    // are written, leaving the next page anonymous (the sidebar then renders
-    // a "Login / New User" link instead of "User Settings").
-    await page
-      .getByRole('link', { name: 'User Settings' })
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .catch(() => undefined);
-
-    return;
   }
 
-  // State 3: sidebar login link (rare — shown when on a drive but not signed in).
-  const loginLink = page.getByRole('link', { name: 'Login / New User' });
-
-  if (await loginLink.isVisible({ timeout: 1500 }).catch(() => false)) {
-    await loginLink.click();
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await enterSecret(page, secret);
-    // Sign-in has to have landed before navigating away: goBack() during the
-    // in-flight sign-in leaves the previous page anonymous.
-    await page
-      .getByRole('link', { name: 'User Settings' })
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .catch(() => undefined);
-    await page.goBack();
-
-    return;
-  }
-
-  // State 1: already signed in. Nothing to do.
+  await enterSecret(page, secret);
+  await expect(settings).toBeVisible({ timeout: 20000 });
 }
 
 /**
@@ -1668,7 +1639,8 @@ export async function openNewSubjectWindow(
 ) {
   const context2 = await browser.newContext();
   const page = await context2.newPage();
-  await page.goto(FRONTEND_URL);
+
+  await page.goto(secret ? `${FRONTEND_URL}/app/welcome` : FRONTEND_URL);
 
   if (secret) {
     if (secret.length < 1) throw new Error('Secret must be provided');
@@ -2055,6 +2027,15 @@ export async function acceptInvite(page: Page) {
     name: 'Create account and accept',
   });
   await expect(acceptBtn).toBeVisible({ timeout: 15000 });
+  // Record even a transient duplicate acceptance CTA during agent creation.
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[data-test="accept-existing"]')) {
+        document.documentElement.dataset.duplicateInviteAcceptance = 'true';
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
   await acceptBtn.click();
 
   await page
@@ -2077,6 +2058,20 @@ export async function acceptInvite(page: Page) {
         dialog.getByRole('heading', { name: 'Agent created!' }),
       ).toBeVisible();
       await expect(dialog.getByLabel('Agent Name')).toHaveCount(0);
+      await dialog
+        .getByRole('button', { name: 'Feedback', exact: true })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: 'Send feedback' }),
+      ).toBeVisible();
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Agent created!' }),
+      ).toBeVisible();
+      await expect(page.locator('html')).not.toHaveAttribute(
+        'data-duplicate-invite-acceptance',
+        'true',
+      );
       await dialog.getByRole('button', { name: 'Copy to clipboard' }).click();
       await closeDialog('Continue');
     },

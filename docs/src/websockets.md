@@ -418,7 +418,7 @@ Everything else is open to an anonymous socket and gated per subject by
 | `3` | `UNAUTHORIZED_WRITE` | The signer has no write right on the target or its parents. Blocking, not terminal. |
 | `4` | `MISSING_CLASS` | The commit names a class this node does not hold, so validation cannot run. Blocking, not terminal: the class may still arrive. |
 | `5` | `AUTH_REQUIRED` | The frame needs an authenticated session. `request_id = 0`. |
-| `6` | `SYNC_REJECTED` | A `SYNC_PUSH` was refused as a whole and nothing from it landed. `request_id = 0`. Message: `SYNC_PUSH rejected for drive <drive>: <reason>`. |
+| `6` | `SYNC_REJECTED` | A commit was refused by node enrollment/quota policy, or a `SYNC_PUSH` was refused as a whole. Keep local edits; stop unbounded retries. Commits carry their request ID; `SYNC_PUSH` uses `request_id = 0` and message `SYNC_PUSH rejected for drive <drive>: <reason>`. |
 | `7` | `UNAUTHORIZED_READ` | A subscription or a read-side reconcile frame was refused. `request_id = 0`. Message: `<FRAME> refused for <subject>: <reason>`. |
 | `8` | `AUTH_FAILED` | An `AUTH` frame was refused. `request_id = 0`. |
 | `9` | `INVALID_SIGNATURE` | A `COMMIT` whose signature does not verify against its signer's key, or that has none. Terminal for that envelope: sign again. |
@@ -1041,3 +1041,20 @@ Corrections to what this page previously claimed:
 - `UNSUB` was said to work. It did not, until this revision.
 - `SYNC_DIFF.remove` was said to be optional. The encoder always emits it;
   only decoders tolerate its absence.
+
+### Browser invitation bootstrap over WebRTC
+
+Browser-only drive invitations are signed JSON-AD invite tokens with
+`https://atomicdata.dev/properties/invite/transport` set to `webrtc`. The
+transport marker is included in the signature. These are not redeemed at a
+data node's `/invites` endpoint.
+
+The recipient pins the token issuer as its expected peer for the unknown drive.
+After verifying that issuer's channel-bound AUTH, it sends its own channel-bound
+AUTH with an optional `browserInvite` string carrying the signed token. This
+field is sent only over the authenticated WebRTC connection, never signaling.
+The issuer validates its own token, expiry, target and recipient proof, checks
+its current write authority, and saves a normal signed ACL commit granting the
+requested access. Ordinary peer AUTH/ACL checks then run before any sync data is
+sent. Other peers cannot redeem an issuer's token. Reconnecting after a trusted
+local snapshot exists uses normal ACL authentication without re-redeeming it.

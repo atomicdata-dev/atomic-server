@@ -1,4 +1,20 @@
 import {
+  ServiceGroup,
+  ServiceSection,
+  ServiceIcon,
+  ServiceBody,
+  ServiceTitle,
+  ServiceDescription,
+  CLOUD_SERVER_DESCRIPTION,
+  CLOUD_SERVER_PLAN_DESCRIPTION,
+  CLOUD_SERVER_SETUP,
+} from '@tomic/service-ui';
+import '@tomic/service-ui/styles.css';
+import { Column } from '../components/Row';
+import { resumePeerLinks } from '../helpers/browserPeerSync';
+import { syncSummary, showSavedServer } from '../helpers/syncPresentation';
+import { driveBillingUrl } from '../helpers/driveBillingUrl';
+import {
   deriveNodeStatuses,
   currentDriveSync,
   currentDriveValue,
@@ -6,6 +22,7 @@ import {
   type ScopedDriveValue,
   type NodeStatus,
 } from '../helpers/driveSyncStatus';
+import { BrowserPeerPanel } from '../components/BrowserPeerPanel';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import { DiscoverWorkspace } from '../views/getting-started/DiscoverWorkspace';
 import {
@@ -379,15 +396,11 @@ function ServerCard({
       footer={
         isCloud && managedInfo.portalUrl ? (
           <ManagedLink
-            // The dashboard, not the portal root: signed-in visitors get the
-            // marketing page at `/`, so the link landed on a sales pitch
-            // rather than the account it promises to manage.
-            //
-            // `externalLinkProps` rather than a raw target/rel: in the desktop
-            // app the plain form opens nothing at all.
-            {...externalLinkProps(`${managedInfo.portalUrl}/dashboard`)}
+            {...externalLinkProps(
+              driveBillingUrl(managedInfo.portalUrl, status.drive),
+            )}
           >
-            {'Manage account & plan →'}
+            {'Manage this drive’s plan →'}
           </ManagedLink>
         ) : !isActive ? (
           // Removing the server you're using would strand the app.
@@ -397,6 +410,12 @@ function ServerCard({
         ) : undefined
       }
     >
+      {isCloud && (
+        <ConnMeta>
+          This status describes data synchronization. View this drive’s
+          subscription and price in billing.
+        </ConnMeta>
+      )}
       {/* Status details belong to the server actually in use. */}
       {isActive && !status.serverConnected && status.serverConnectionError && (
         <ConnError role='alert'>
@@ -553,6 +572,11 @@ function SyncPage() {
   const { setServer, setDrive, baseURL } = useSettings();
   const { drive: requestedDrive } = SyncRoute.useSearch();
   const [confirmCloud, setConfirmCloud] = useState(false);
+  const [localizing, setLocalizing] = useState(false);
+  const [localizeError, setLocalizeError] = useState<{
+    drive: string;
+    message: string;
+  } | null>(null);
   const [hostedCopy, setHostedCopy] = useState<{
     drive: string;
     origin: string;
@@ -703,12 +727,21 @@ function SyncPage() {
    * none", and telling someone their recovery is missing when the control
    * plane was merely unreachable is the one wrong answer this row can give.
    */
-  const [recoveryBackup, setRecoveryBackup] = useState<
-    'stored' | 'passkey-only' | 'device-only' | 'none' | null
-  >(null);
+  const [recoveryState, setRecoveryState] = useState<{
+    account: ManagedAccount;
+    value: 'stored' | 'passkey-only' | 'device-only' | 'none' | null;
+  } | null>(null);
+  const recoveryBackup =
+    recoveryState?.account === managedAccount
+      ? (recoveryState?.value ?? null)
+      : null;
 
   useEffect(() => {
     if (!managedAccount) return;
+
+    const setRecoveryBackup = (
+      value: NonNullable<typeof recoveryState>['value'],
+    ) => setRecoveryState({ account: managedAccount, value });
 
     let cancelled = false;
 
@@ -750,7 +783,10 @@ function SyncPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void (async () => {
+    let generation = 0;
+
+    const refreshAccount = async () => {
+      const requestGeneration = ++generation;
       // Asked even when this device is already linked. The link only settles
       // *how* this client authenticates; it says nothing about who, and the
       // portal link needs the account itself.
@@ -759,7 +795,7 @@ function SyncPage() {
       try {
         const account = await getManagedAccount();
 
-        if (cancelled) return;
+        if (cancelled || requestGeneration !== generation) return;
 
         setManagedAccount(account);
         setNeedsProviderLink(!linked && account === null);
@@ -767,14 +803,25 @@ function SyncPage() {
         // Unreachable control plane. Offering to link is the useful answer —
         // the alternative is a Sync page that silently omits backup with no
         // way to ask for it.
-        if (!cancelled) setNeedsProviderLink(!linked);
+        if (!cancelled && requestGeneration === generation) {
+          setManagedAccount(null);
+          setNeedsProviderLink(!linked);
+        }
       }
-    })();
+    };
+
+    const onFocus = () => void refreshAccount();
+
+    void refreshAccount();
+    window.addEventListener('focus', onFocus);
+    const unsubscribe = store.on(StoreEvents.AgentChanged, onFocus);
 
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.removeEventListener('focus', onFocus);
     };
-  }, []);
+  }, [status.drive, store]);
 
   useEffect(() => {
     const serverUrl = status.serverUrl;
@@ -873,7 +920,7 @@ function SyncPage() {
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, store]);
+  }, [status.drive, status.serverUrl, status.lastDriveSync?.timestamp, store]);
 
   // Plan quota — managed nodes only, from the control plane. Billing stays a
   // managed concern; the usage numbers above are generic to every node.
@@ -939,14 +986,13 @@ function SyncPage() {
           setCloudEnrollment({ drive, server: status.serverUrl, value: has });
       })
       .catch(() => {
-        if (!cancelled)
-          setCloudEnrollment({ drive, server: status.serverUrl, value: false });
+        if (!cancelled) setCloudEnrollment(null);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, managedInfo]);
+  }, [status.drive, status.serverUrl, managedInfo, managedAccount]);
 
   useEffect(() => {
     const refresh = () => setStatus(store.getSyncStatus());
@@ -1013,7 +1059,8 @@ function SyncPage() {
   // server it reads from can — and reports who, over `/server`. So a phone
   // paired with your server shows up here, as the server sees it. These are
   // display-only: reaching them is the server's job, not this tab's.
-  const serverPeers = isNode ? [] : (managedInfo.peers ?? []);
+  const serverPeers =
+    !isNode && showServerConn ? (managedInfo.peers ?? []) : [];
   const connectionCount =
     (showServerConn ? 1 : 0) + pairedPeers.length + serverPeers.length;
 
@@ -1083,25 +1130,14 @@ function SyncPage() {
   const cloudServerBlocked = cloudServerBlocker();
 
   function summaryLine(): string {
-    if (driveMissing) {
-      return 'This device does not have this workspace yet. Fetch it from a device that has it.';
-    }
-
-    if (localOnlyDrive) {
-      return 'This workspace is stored only on this device — it isn’t backed up or synced anywhere.';
-    }
-
-    if (!isNode && !clientDbOn) {
-      return 'Your data lives on the device you’re connected to.';
-    }
-
-    if (connectionCount === 0) {
-      return 'Your data lives on this device — it isn’t syncing anywhere yet.';
-    }
-
-    return `Your data lives on this device and syncs with ${connectionCount} other ${
-      connectionCount === 1 ? 'device' : 'devices'
-    }.`;
+    return syncSummary({
+      missing: driveMissing,
+      local: hasWorkingLocalStore,
+      serverSync: showServerConn,
+      hosting: cloudEnrolled,
+      managed: isCloudSyncAvailable(managedInfo),
+      vaultOn: vault.status.state === 'on',
+    });
   }
 
   const cloudHosted = hasHostedDriveConnection(
@@ -1434,6 +1470,44 @@ function SyncPage() {
       <ContainerNarrow>
         <h1>Sync</h1>
         <Lead>{summaryLine()}</Lead>
+        {showServerConn &&
+          cloudEnrolled === false &&
+          isCloudSyncAvailable(managedInfo) &&
+          !isNode && (
+            <Column>
+              <Button
+                subtle
+                disabled={localizing || !hasWorkingLocalStore}
+                onClick={async () => {
+                  if (!status.drive) return;
+                  setLocalizing(true);
+                  setLocalizeError(null);
+
+                  try {
+                    await store.makeDriveLocal(status.drive);
+                    resumePeerLinks(store);
+                  } catch (error) {
+                    setLocalizeError({
+                      drive: status.drive,
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : 'Could not verify the local copy. The server connection has been kept.',
+                    });
+                  } finally {
+                    setLocalizing(false);
+                  }
+                }}
+              >
+                {localizing
+                  ? 'Checking local copy…'
+                  : 'Use browser sync only on this device'}
+              </Button>
+              {localizeError && localizeError.drive === status.drive && (
+                <p role='alert'>{localizeError.message}</p>
+              )}
+            </Column>
+          )}
 
         {/* Everything our paid services own, in one card.
 
@@ -1516,7 +1590,7 @@ function SyncPage() {
                 <ConnTitle>Email recovery</ConnTitle>
                 <ConnSub>
                   {!managedAccount
-                    ? `Not set up. With an account on ${PRODUCT_NAME} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace.`
+                    ? `Sign in to your ${PRODUCT_NAME} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account.`
                     : recoveryBackup === null
                       ? `Signed in as ${managedAccount.email}.`
                       : recoveryBackup === 'stored'
@@ -1546,7 +1620,7 @@ function SyncPage() {
                     <LearnMore
                       {...externalLinkProps(`${accountPortalUrl}/signin`)}
                     >
-                      Set up email recovery
+                      Sign in to check recovery
                     </LearnMore>
                   </ConnActions>
                 ) : recoveryBackup === 'none' ||
@@ -1609,19 +1683,20 @@ function SyncPage() {
                     one of ours, but the reader scans this column to find out
                     what they have, and the header above already says whose
                     services these are. */}
-                <CardIcon $tone={hostedCopyOrigin ? 'provider' : 'neutral'}>
-                  <FaCloud />
-                </CardIcon>
-                <ConnBody>
-                  <ConnTitle>
+                <ServiceIcon kind='server' active={!!hostedCopyOrigin} />
+                <ServiceBody>
+                  <ServiceTitle>
                     {hostedCopyOrigin ? 'Cloud Server is on' : 'Cloud Server'}
-                  </ConnTitle>
-                  <ConnSub>
-                    A hosted workspace on {PRODUCT_NAME}: shareable links,
-                    search across everything, API access, and no waiting on
-                    another device to be awake. Unlike Cloud Vault, our servers
-                    process what you put here.
-                  </ConnSub>
+                  </ServiceTitle>
+                  <ServiceDescription>
+                    {CLOUD_SERVER_DESCRIPTION}
+                  </ServiceDescription>
+                  <ConnMeta>
+                    {subscriptionStatus === 'active' ||
+                    subscriptionStatus === 'trialing'
+                      ? 'This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again.'
+                      : CLOUD_SERVER_PLAN_DESCRIPTION}
+                  </ConnMeta>
                   {hostedCopyOrigin && (
                     <ConnMeta>
                       This workspace has been copied to Cloud Server. You’re
@@ -1648,7 +1723,7 @@ function SyncPage() {
                             ? 'Sync again'
                             : cloudEnrolled
                               ? 'Finish Cloud Server setup'
-                              : 'Set up Cloud Server'}
+                              : CLOUD_SERVER_SETUP}
                       </Button>
                     )}
                     {/* This tier costs money and reads our copy of your data,
@@ -1668,14 +1743,14 @@ function SyncPage() {
                       See plans
                     </LearnMore>
                   </ConnActions>
-                </ConnBody>
+                </ServiceBody>
               </ProviderService>
             )}
           </ProviderCard>
         )}
 
         <ConfirmationDialog
-          title='Set up Cloud Server'
+          title={CLOUD_SERVER_SETUP}
           confirmLabel='Agree and enable Cloud Server'
           show={confirmCloud}
           bindShow={setConfirmCloud}
@@ -1699,8 +1774,9 @@ function SyncPage() {
             sharing permissions still control other users’ access.
           </p>
           <p>
-            Existing content stays in this drive. Hosting requires a Server plan
-            or an invitation for this drive.
+            Existing content stays in this drive. Hosting uses the Server plan
+            or invitation for this drive. If a purchase is needed, you will see
+            the price at checkout before paying.
           </p>
         </ConfirmationDialog>
 
@@ -1795,6 +1871,7 @@ function SyncPage() {
             spacious
             icon={<FaLaptop />}
             title='This device'
+            footer={<BrowserPeerPanel drive={status.drive ?? undefined} />}
             subtitle={
               isNode
                 ? status.lastDriveSync
@@ -1851,7 +1928,15 @@ function SyncPage() {
               this drive live" are different questions and it was answering the
               second while looking like the first. */}
           {connectionServers
-            .filter(server => !isManagedServer(server))
+            .filter(
+              server =>
+                !isManagedServer(server) &&
+                showSavedServer({
+                  managed: isCloudSyncAvailable(managedInfo),
+                  activeForDrive:
+                    showServerConn && sameOrigin(server, status.serverUrl),
+                }),
+            )
             .map(server => (
               <ServerCard
                 key={server}
@@ -2038,44 +2123,48 @@ function SyncPage() {
         {/* Pairing is the point of this page on a peer node, so it's shown
             outright rather than hidden behind a button: the code is routing
             only, and safe to leave on screen. */}
-        {pairNodeId && (
-          <Section>
-            <SectionTitle>Sync a device</SectionTitle>
-            {/* One line, not three: the card above already said what
+        {pairNodeId &&
+          (isNode ||
+            (showServerConn &&
+              (!isCloudSyncAvailable(managedInfo) ||
+                cloudEnrolled === true))) && (
+            <Section>
+              <SectionTitle>Sync a device</SectionTitle>
+              {/* One line, not three: the card above already said what
                 `localhost:9883` is, and a paragraph on how keys work belongs
                 where someone asks — not over a QR they came here to scan. */}
-            <ConnNote>
-              {isNode
-                ? 'Codes only route — your key still decides what syncs. Show yours, or take theirs.'
-                : `Scan from your other device to sync with ${serverLabel(status.serverUrl ?? '')}. Safe to show: a code only routes.`}
-            </ConnNote>
-            <PairCard>
-              <PairSide>
-                {isNode && <PairLabel>Show this code</PairLabel>}
-                <QrCentered>
-                  <PairingCode nodeDid={rawToNodeDid(pairNodeId)} />
-                </QrCentered>
-              </PairSide>
+              <ConnNote>
+                {isNode
+                  ? 'Codes only route — your key still decides what syncs. Show yours, or take theirs.'
+                  : `Scan from your other device to sync with ${serverLabel(status.serverUrl ?? '')}. Safe to show: a code only routes.`}
+              </ConnNote>
+              <PairCard>
+                <PairSide>
+                  {isNode && <PairLabel>Show this code</PairLabel>}
+                  <QrCentered>
+                    <PairingCode nodeDid={rawToNodeDid(pairNodeId)} />
+                  </QrCentered>
+                </PairSide>
 
-              {/* Taking someone else's code needs a node to dial from, which a
+                {/* Taking someone else's code needs a node to dial from, which a
                   browser tab is not. */}
-              {isNode && (
-                <>
-                  <PairDivider aria-hidden />
+                {isNode && (
+                  <>
+                    <PairDivider aria-hidden />
 
-                  <PairSide>
-                    <PairLabel>
-                      {isMobileTauri() ? 'Or scan theirs' : 'Or paste theirs'}
-                    </PairLabel>
-                    {/* Same path a scanned deep link takes (PairingLinkHandler):
+                    <PairSide>
+                      <PairLabel>
+                        {isMobileTauri() ? 'Or scan theirs' : 'Or paste theirs'}
+                      </PairLabel>
+                      {/* Same path a scanned deep link takes (PairingLinkHandler):
                         validate, persist the peer, start a sync. */}
-                    <ConnectToDeviceForm onCode={deliverDeepLink} />
-                  </PairSide>
-                </>
-              )}
-            </PairCard>
-          </Section>
-        )}
+                      <ConnectToDeviceForm onCode={deliverDeepLink} />
+                    </PairSide>
+                  </>
+                )}
+              </PairCard>
+            </Section>
+          )}
 
         {/* Developer: diagnostics + advanced toggles, tucked away. */}
         <DevDetails>
@@ -2355,7 +2444,11 @@ const Lead = styled.p`
  * reads blue, so a glance separates "this is yours and local" from "this
  * involves your account".
  */
-const ProviderCard = styled.div`
+const ProviderCard = styled(ServiceGroup)`
+  --service-accent: ${p => p.theme.colors.main};
+  --service-muted: ${p => p.theme.colors.textLight};
+  --service-text: ${p => p.theme.colors.text};
+  --service-neutral: ${p => p.theme.colors.bg1};
   ${cardSurface}
   flex-direction: column;
   align-items: stretch;
@@ -2380,7 +2473,7 @@ const ProviderHeader = styled.div`
  * account above them, and whitespace alone made them read as neighbours of it
  * instead of contents.
  */
-const ProviderService = styled.div`
+const ProviderService = styled(ServiceSection)`
   display: flex;
   align-items: flex-start;
   gap: 0.9rem;

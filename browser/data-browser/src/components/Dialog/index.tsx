@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useRootWelcomeLayout } from '../../context/RootWelcomeLayoutContext';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaXmark } from 'react-icons/fa6';
@@ -19,8 +27,17 @@ import { DIALOG_CONTENT_CONTAINER } from '../../helpers/containers';
 import { CurrentBackgroundColor } from '../../globalCssVars';
 import { timeoutEffect } from '@helpers/timeoutEffect';
 
+// Feedback uses Dialog itself; defer its module to avoid a static import cycle.
+const FeedbackMenuItem = lazy(() =>
+  import('../SideBar/FeedbackMenuItem').then(module => ({
+    default: module.FeedbackMenuItem,
+  })),
+);
+
 export interface InternalDialogProps {
   show: boolean;
+  /** Avoid offering another feedback dialog inside feedback itself. */
+  hideOnboardingFeedback?: boolean;
   onClose: (success: boolean) => void;
   onClosed: () => void;
   /** Skip the exit animation (e.g. after a successful form save). */
@@ -85,12 +102,14 @@ export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
 const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   children,
   show,
+  hideOnboardingFeedback = false,
   width,
   instantClose = false,
   disableLightDismiss = false,
   onClose,
   onClosed,
 }) => {
+  const { rootWelcomeChromeHidden } = useRootWelcomeLayout();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const innerDialogRef = useRef<HTMLDivElement>(null);
   const { hasOpenInnerPopup } = useDialogTreeContext();
@@ -230,6 +249,13 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
               </CloseButtonSlot>
             )}
             {children}
+            {show && rootWelcomeChromeHidden && !hideOnboardingFeedback && (
+              <FeedbackCorner>
+                <Suspense fallback={null}>
+                  <FeedbackMenuItem floating />
+                </Suspense>
+              </FeedbackCorner>
+            )}
           </DropdownContainer>
         </PopoverContainer>
       </StyledInnerDialog>
@@ -410,4 +436,10 @@ const TitleSlot = styled(Slot)`
     margin: 0;
     line-height: 1.25;
   }
+`;
+
+const FeedbackCorner = styled.div`
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
 `;

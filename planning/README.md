@@ -33,6 +33,13 @@ now live in [`completed/`](./completed/):
 
 Remaining work, not "this file exists."
 
+Cross-repository account recovery: the canonical active plan is
+`atomic-saas/planning/BACKUP_SECURITY.md`, section “SaaS password sign-in and
+assisted recovery — September 10 direction”. Product direction is agreed;
+password authentication and server-assisted recovery are not implemented.
+It owns the security review, migration and acceptance checklist for the managed
+browser flow; standalone recovery remains self-managed.
+
 | Document | Status |
 | --- | --- |
 | [`google-calendar-import-gaps.md`](./google-calendar-import-gaps.md) | **Active audit.** All-day ranges implemented; remaining Google import fidelity work, formats and recurrence integration checklist. |

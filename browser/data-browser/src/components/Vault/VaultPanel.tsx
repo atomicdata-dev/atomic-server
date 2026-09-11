@@ -1,8 +1,17 @@
+import {
+  ServiceSection,
+  ServiceIcon,
+  ServiceBody,
+  ServiceTitle,
+  ServiceDescription,
+  CLOUD_VAULT_DESCRIPTION,
+  CLOUD_VAULT_ON,
+} from '@tomic/service-ui';
+import '@tomic/service-ui/styles.css';
 import { styled } from 'styled-components';
-import { FaLock, FaRotateLeft, FaCloudArrowUp } from 'react-icons/fa6';
+import { FaRotateLeft, FaCloudArrowUp } from 'react-icons/fa6';
 import {
   cardSurface,
-  CardIcon,
   CARD_ACTIONS_GAP,
   CARD_BODY_GAP,
   CARD_SUB_FONT,
@@ -66,9 +75,7 @@ export function VaultPanel({
         data-vault-state='loading'
         $embedded={embedded}
       >
-        <CardIcon>
-          <FaLock />
-        </CardIcon>
+        <ServiceIcon kind='vault' />
         <Body>
           <Title>Cloud Vault</Title>
           <Sub>Checking this workspace’s backup…</Sub>
@@ -91,9 +98,7 @@ export function VaultPanel({
         data-vault-state='unavailable'
         $embedded={embedded}
       >
-        <CardIcon>
-          <FaLock />
-        </CardIcon>
+        <ServiceIcon kind='vault' />
         <Body>
           <Title>Cloud Vault</Title>
           <Sub data-testid='vault-unavailable-reason'>{status.reason}</Sub>
@@ -118,15 +123,10 @@ export function VaultPanel({
         {/* Neutral: an offer is not a service. Blue on this page means "on",
             so a vault that is off must not wear it, or the row's own answer
             contradicts its glyph. */}
-        <CardIcon>
-          <FaLock />
-        </CardIcon>
+        <ServiceIcon kind='vault' />
         <Body>
           <Title>Cloud Vault</Title>
-          <Sub>
-            Keep an encrypted copy of this workspace in {PRODUCT_NAME}. It is
-            sealed on this device, so we store it without being able to read it.
-          </Sub>
+          <Sub>{CLOUD_VAULT_DESCRIPTION}</Sub>
           {error && <ErrorText data-testid='vault-error'>{error}</ErrorText>}
           <Actions>
             <Button
@@ -167,11 +167,9 @@ export function VaultPanel({
       $accent={!embedded}
       $embedded={embedded}
     >
-      <CardIcon $tone='provider'>
-        <FaLock />
-      </CardIcon>
+      <ServiceIcon kind='vault' active={!suspended} />
       <Body>
-        <Title>Cloud Vault is on</Title>
+        <Title>{CLOUD_VAULT_ON}</Title>
         {/* The object count is an attribute as well as prose: a test asserting
             that a second backup actually stored something should read the
             number, not parse a sentence that is free to be reworded. */}
@@ -274,7 +272,10 @@ function formatWhen(unixSeconds: number): string {
 // from `theme.size(2)` (8px) while the cards around it used 0.9rem (14.4px),
 // and left its body text at the inherited 1rem against their 0.82rem — close
 // enough to look like a mistake rather than a distinction.
-const Panel = styled.div<{ $accent?: boolean; $embedded?: boolean }>`
+const Panel = styled(ServiceSection)<{
+  $accent?: boolean;
+  $embedded?: boolean;
+}>`
   ${cardSurface}
   border-color: ${p => (p.$accent ? p.theme.colors.main : undefined)};
   background: ${p => (p.$accent ? `${p.theme.colors.main}0a` : undefined)};
@@ -291,20 +292,20 @@ const Panel = styled.div<{ $accent?: boolean; $embedded?: boolean }>`
     `}
 `;
 
-const Body = styled.div`
+const Body = styled(ServiceBody)`
   display: flex;
   flex-direction: column;
   gap: ${CARD_BODY_GAP};
   min-width: 0;
 `;
 
-const Title = styled.h3`
+const Title = styled(ServiceTitle)`
   margin: 0;
   font-size: ${CARD_TITLE_FONT};
   font-weight: 600;
 `;
 
-const Sub = styled.p`
+const Sub = styled(ServiceDescription)`
   margin: 0;
   color: ${p => p.theme.colors.textLight};
   font-size: ${CARD_SUB_FONT};

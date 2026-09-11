@@ -1,11 +1,5 @@
 import { test, expect } from './fixtures';
-import {
-  before,
-  getDevDriveSecret,
-  signIn,
-  FRONTEND_URL,
-  smoke,
-} from './test-utils';
+import { before, getDevDriveSecret, FRONTEND_URL, smoke } from './test-utils';
 
 /**
  * A second device (or a fresh/cleared OPFS) must load an existing drive's
@@ -61,11 +55,17 @@ test(
 
     const ctx2 = await browser.newContext(); // brand-new context ⇒ empty OPFS
     const p2 = await ctx2.newPage();
-    await p2.goto(FRONTEND_URL);
-    await signIn(p2, secret);
     await p2.goto(
       `${FRONTEND_URL}/app/show?subject=${encodeURIComponent(drive)}`,
     );
+
+    // Open the private drive as a returning device actually would. The
+    // generic root-page helper can mistake a public sidebar for a signed-in
+    // session and return without ever entering the secret.
+    await expect(
+      p2.getByRole('heading', { name: 'Sign in to access this drive' }),
+    ).toBeVisible();
+    await p2.getByLabel('Agent secret').fill(secret);
 
     await expect(p2.getByText('SecondDeviceChild').first()).toBeVisible({
       timeout: 12000,

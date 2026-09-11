@@ -2,6 +2,7 @@ import * as React from 'react';
 import { type JSX, useMemo } from 'react';
 import { styled } from 'styled-components';
 
+import { FeedbackMenuItem } from './SideBar/FeedbackMenuItem';
 import { SideBar } from './SideBar';
 import { OverlayContainer } from './OverlayContainer';
 import { CalculatedPageHeight } from '../globalCssVars';
@@ -21,7 +22,7 @@ import NavBarContent from './NavBar';
 import { useLocation } from '@tanstack/react-router';
 import { useSettings } from '../helpers/AppSettings';
 import { ChromeTheme } from '../styling';
-import { paths } from '../routes/paths';
+import { paths, pathNames } from '../routes/paths';
 import { useRootWelcomeLayout } from '../context/RootWelcomeLayoutContext';
 import { isHostedDistribution } from '../helpers/managedServer';
 
@@ -61,6 +62,7 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
     onboardingOrChild ||
     welcomeOrChild ||
     demoSplash ||
+    pathname === `${pathNames.app}${pathNames.invite}` ||
     signedOutHosted;
 
   const search = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
@@ -103,6 +105,11 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
               </HideInPrint>
             )}
           </SideBarWrapper>
+          {hideGlobalChrome && (
+            <OnboardingFeedback>
+              <FeedbackMenuItem floating />
+            </OnboardingFeedback>
+          )}
           <OverlayContainer />
         </AppVerifierProvider>
       </AISidebarContextProvider>
@@ -196,4 +203,11 @@ const SideBarWrapper = styled.div<{
     position: static;
     display: block;
   }
+`;
+
+const OnboardingFeedback = styled.div`
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: ${p => p.theme.zIndex.sidebar};
 `;

@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from '@tanstack/react-router';
 import { ContainerWide } from '../components/Containers';
 import { ErrorBlock } from '../components/ErrorLook';
 import { Button } from '../components/Button';
-import { SignInButton } from '../components/SignInButton';
 import { useSettings } from '../helpers/AppSettings';
 import { ResourcePageProps } from './ResourcePage';
 import { Column, Row } from '../components/Row';
@@ -73,26 +72,30 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
     return (
       <ContainerWide>
         <Column>
-          <h1>Unauthorized</h1>
-          {agent ? (
-            <>
-              <ErrorBlock error={resource.error!} />
-              <span>
-                <Button
-                  onClick={() =>
-                    store.fetchResourceFromServer(resource.subject)
-                  }
-                >
-                  Retry
-                </Button>
-              </span>
-            </>
-          ) : (
-            <>
-              <p>{"You don't have access to this, try signing in:"}</p>
-              <SignInButton />
-            </>
-          )}
+          <h1>This account does not have access</h1>
+          <p>
+            You’re signed in, but this account cannot read this resource. Open
+            it with the account that owns it, or ask its owner to share it with
+            you.
+          </p>
+          <Row wrapItems>
+            <Button
+              onClick={() =>
+                navigate({
+                  to: paths.welcome,
+                  search: { next: resource.subject, from_portal: undefined },
+                })
+              }
+            >
+              Use another account
+            </Button>
+            <Button
+              subtle
+              onClick={() => store.fetchResourceFromServer(resource.subject)}
+            >
+              Retry
+            </Button>
+          </Row>
         </Column>
       </ContainerWide>
     );

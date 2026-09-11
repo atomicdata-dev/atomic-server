@@ -3,11 +3,62 @@
 // "connect a device" screen. Lives apart from GettingStartedFlow so a step it
 // renders can use the chrome without importing its parent.
 
+import { useEffect, useState, type ComponentProps } from 'react';
+import { useStore } from '@tomic/react';
+import { checkOnboardingStorage } from '../../helpers/onboardingStorage';
 import { styled, css } from 'styled-components';
 import { Button } from '../../components/Button';
 import { welcomeBackgroundCss } from './welcomeBackground';
 
-export const Shell = styled.div`
+export function Shell({ children, ...props }: ComponentProps<'div'>) {
+  const store = useStore();
+  const [state, setState] = useState<'checking' | 'ready' | 'failed'>(
+    'checking',
+  );
+  useEffect(() => {
+    let active = true;
+    void checkOnboardingStorage(store).then(
+      () => {
+        if (active) setState('ready');
+      },
+      () => {
+        if (active) setState('failed');
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [store]);
+
+  return (
+    <ShellSurface {...props}>
+      {state === 'ready' ? (
+        children
+      ) : (
+        <Card>
+          {state === 'checking' ? (
+            <p role='status'>Checking local storage…</p>
+          ) : (
+            <>
+              <CardTitle>This browser could not open local storage</CardTitle>
+              <p>
+                Open this link in a non-private browser window and allow this
+                site to store data. If you are already in a regular window,
+                close other tabs for this site and try again.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Reload and try again
+              </Button>
+            </>
+          )}
+        </Card>
+      )}
+    </ShellSurface>
+  );
+}
+
+const ShellSurface = styled.div`
   /* A concrete viewport height (not 100%): nothing in the html/body/#root
      chain sets a height, so 100% would collapse to content height and,
      because body is overflow:hidden, tall content (the welcome pitch on a

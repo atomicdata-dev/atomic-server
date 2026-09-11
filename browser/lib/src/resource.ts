@@ -2486,6 +2486,13 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     const commit = await newCommitBuilder.sign(agent);
+
+    if (this.store.isLocalOnlySubject(this.subject)) {
+      await this.store.destroyLocalResource(commit);
+
+      return;
+    }
+
     await this.store.postCommit(commit, this.getCommitEndpoint());
     this.store.removeResource(this.subject);
   }
@@ -3372,6 +3379,7 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     await this.persistToClientDb();
+    for (const commit of settled) this.store.publishPeerCommit(commit);
 
     this.commitError = undefined;
     this.loading = false;

@@ -208,6 +208,15 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
  * rights change or the user abandoning the edit — neither helped by hammering.
  */
 export function isUnrecoverableCommitErrorMessage(message: string): boolean {
+  // Managed nodes refuse writes until enrollment/quota changes. Keep the edit,
+  // but park it after bounded retries rather than flooding the node forever.
+  if (
+    message.includes('is not enrolled for sync on this node') ||
+    message.includes('has reached its storage quota on this node')
+  ) {
+    return true;
+  }
+
   // Server emits: "No https://atomicdata.dev/properties/write right has been found..."
   if (message.includes('/properties/write right has been found')) {
     return true;
@@ -246,6 +255,7 @@ const KNOWN_ERROR_CODES: ReadonlySet<number> = new Set([
   ErrorCode.MISSING_REQUIRED_PROPERTY,
   ErrorCode.UNAUTHORIZED_WRITE,
   ErrorCode.MISSING_CLASS,
+  ErrorCode.SYNC_REJECTED,
 ]);
 
 /**
@@ -275,7 +285,9 @@ export function isUnrecoverableCommitError(
 ): boolean {
   if (code !== undefined && KNOWN_ERROR_CODES.has(code)) {
     return (
-      code === ErrorCode.UNAUTHORIZED_WRITE || code === ErrorCode.MISSING_CLASS
+      code === ErrorCode.UNAUTHORIZED_WRITE ||
+      code === ErrorCode.MISSING_CLASS ||
+      code === ErrorCode.SYNC_REJECTED
     );
   }
 
