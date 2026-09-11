@@ -41,6 +41,8 @@ test.describe('capability links', () => {
     expect(link).toBeTruthy();
     expect(link).toContain('/app/open?');
     expect(link).toContain('cap=');
+    // The drive rides along so a browser can find a node through pkarr.
+    expect(link).toContain('drive=did%3Aad%3A');
 
     // The link's agent and its grant have to reach the server before a
     // stranger asks for the resource with it.
