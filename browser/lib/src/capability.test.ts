@@ -16,6 +16,7 @@ const link: CapabilityLink = {
   v: 1,
   subject: SUBJECT,
   cap: CAP,
+  drive: 'did:ad:0m9m3mZ4Hn7rY2jvbVQ5Wf8k1PpX9dY6c2Q0sLQ3OzC0m9m3mZ4Hn7rY2jvbVQ5Wf8k1PpX9dY6c2Q0s',
   url: 'https://node.example.org',
 };
 
@@ -69,12 +70,23 @@ describe('capability links', () => {
     expect(decodeCapabilityLink(encodeCapabilityLink(awkward)).cap).toBe(awkward.cap);
   });
 
-  it('omits url when there is none', () => {
-    const { url: _url, ...bare } = link;
+  it('omits drive and url when there are none', () => {
+    const { url: _url, drive: _drive, ...bare } = link;
     const encoded = encodeCapabilityLink(bare);
 
     expect(encoded).not.toContain('url=');
-    expect(decodeCapabilityLink(encoded)).toEqual({ ...bare, url: undefined });
+    expect(encoded).not.toContain('drive=');
+    expect(decodeCapabilityLink(encoded)).toEqual({
+      ...bare,
+      drive: undefined,
+      url: undefined,
+    });
+  });
+
+  it('refuses a drive that is not a did:ad DID', () => {
+    expect(codeOf(() => encodeCapabilityLink({ ...link, drive: 'https://x.example.org/drive' }))).toBe(
+      'malformed',
+    );
   });
 
   it('refuses an unknown version rather than guessing', () => {

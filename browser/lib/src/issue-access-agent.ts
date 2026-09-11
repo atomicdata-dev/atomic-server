@@ -2,7 +2,7 @@ import { Agent } from './agent.js';
 import { core } from './ontologies/core.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import type { Store } from './store.js';
-import { instances } from './urls.js';
+import { classes, instances } from './urls.js';
 import {
   encodeCapabilityLink,
   encodeCapabilityWebLink,
@@ -384,6 +384,12 @@ export interface IssueCapabilityLinkOpts {
    * origin. Routing only; the node still checks the link's rights.
    */
   url?: string;
+  /**
+   * The drive the target lives in, so a client can find a node for it
+   * through pkarr when `url` is absent or stale. Read from the target when
+   * not given.
+   */
+  drive?: string;
   /** App keys folder, or any private parent to own the key's registry row. */
   parent?: string;
 }
@@ -423,6 +429,7 @@ export async function issueCapabilityLink(
     v: 1,
     subject: opts.target,
     cap: issued.secret,
+    drive: opts.drive ?? (await driveOf(store, opts.target)),
     url: opts.url,
   };
 
@@ -434,4 +441,26 @@ export async function issueCapabilityLink(
         : encodeCapabilityWebLink(link, appOrigin),
     agentSubject: issued.subject,
   };
+}
+
+const DRIVE_PROP = 'https://atomicdata.dev/properties/drive';
+
+/** The drive a resource lives in, or the resource itself when it is a drive. */
+async function driveOf(store: Store, subject: string): Promise<string | undefined> {
+  try {
+    const resource = await store.getResource(subject);
+    const drive = resource.get(DRIVE_PROP);
+
+    if (typeof drive === 'string' && drive.startsWith('did:ad:')) {
+      return drive;
+    }
+
+    if (resource.hasClasses(classes.drive)) {
+      return subject.startsWith('did:ad:') ? subject : undefined;
+    }
+  } catch {
+    // No drive is only a lost routing hint; the link still carries the right.
+  }
+
+  return undefined;
 }

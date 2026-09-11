@@ -15,37 +15,81 @@
 //! the moment the client checks commit signatures.
 //!
 //! Addressing (relay URL, direct addresses) is handled by Iroh's
-//! `discovery_n0()`. Pkarr only maps: drive_did → [NodeID, NodeID, ...].
+//! `discovery_n0()`. Pkarr maps: drive_did → [NodeID, NodeID, ...] in the
+//! `_atomic_nodes` TXT record, and drive_did → [http origin, ...] in the
+//! `_atomic_http` TXT record, for clients that speak HTTP but not Iroh, such
+//! as a browser opening a capability link that names only the drive.
 
 use crate::errors::AtomicResult;
 
 /// The pkarr relay URL to use for publishing and resolving.
 const RELAY_URL: &str = "https://dns.iroh.link/pkarr";
 
+/// TXT record holding the JSON array of Iroh NodeIDs serving a drive.
+const NODES_RECORD: &str = "_atomic_nodes";
+/// TXT record holding the JSON array of http(s) origins serving a drive.
+const HTTP_RECORD: &str = "_atomic_http";
+
 /// Publish an Iroh NodeID for a drive via the pkarr relay.
 /// The record is keyed by a pkarr keypair derived from the drive's DID.
 /// Multiple NodeIDs (one per replica) are stored as a JSON array in a TXT record.
 pub async fn publish_node_id(drive_did: &str, iroh_node_id: &str) -> AtomicResult<()> {
+    publish(drive_did, Some(iroh_node_id), None).await
+}
+
+/// Publish what this node offers for a drive: its Iroh NodeID, its http(s)
+/// origin, or both. Existing entries in the record are kept, so replicas add
+/// themselves rather than overwrite each other.
+pub async fn publish(
+    drive_did: &str,
+    iroh_node_id: Option<&str>,
+    http_origin: Option<&str>,
+) -> AtomicResult<()> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
 
-    // Resolve existing record to merge NodeIDs
     let client = build_client()?;
-    let existing_node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
+    let existing = client.resolve(&keypair.public_key()).await;
+    let mut node_ids = existing
+        .as_ref()
+        .map(|p| txt_json_list(p, NODES_RECORD))
+        .unwrap_or_default();
+    let mut origins = existing
+        .as_ref()
+        .map(|p| txt_json_list(p, HTTP_RECORD))
+        .unwrap_or_default();
 
-    let mut node_ids = existing_node_ids;
-    if !node_ids.iter().any(|id| id == iroh_node_id) {
-        node_ids.push(iroh_node_id.to_string());
+    if let Some(id) = iroh_node_id {
+        if !node_ids.iter().any(|x| x == id) {
+            node_ids.push(id.to_string());
+        }
+    }
+    if let Some(origin) = http_origin {
+        if !origins.iter().any(|x| x == origin) {
+            origins.push(origin.to_string());
+        }
     }
 
-    let value = serde_json::to_string(&node_ids)
-        .map_err(|e| format!("Failed to serialize NodeID list: {e}"))?;
-
-    let packet = pkarr::SignedPacket::builder()
-        .txt(
-            "_atomic_nodes".try_into().unwrap(),
+    let mut builder = pkarr::SignedPacket::builder();
+    if !node_ids.is_empty() {
+        let value = serde_json::to_string(&node_ids)
+            .map_err(|e| format!("Failed to serialize NodeID list: {e}"))?;
+        builder = builder.txt(
+            NODES_RECORD.try_into().unwrap(),
             value.as_str().try_into().unwrap(),
             300,
-        )
+        );
+    }
+    if !origins.is_empty() {
+        let value = serde_json::to_string(&origins)
+            .map_err(|e| format!("Failed to serialize origin list: {e}"))?;
+        builder = builder.txt(
+            HTTP_RECORD.try_into().unwrap(),
+            value.as_str().try_into().unwrap(),
+            300,
+        );
+    }
+
+    let packet = builder
         .build(&keypair)
         .map_err(|e| format!("Failed to build signed packet: {e}"))?;
 
@@ -55,12 +99,23 @@ pub async fn publish_node_id(drive_did: &str, iroh_node_id: &str) -> AtomicResul
         .map_err(|e| format!("Failed to publish to pkarr relay: {e}"))?;
 
     tracing::debug!(
-        "Discovery: published NodeID {} for drive {} (total: {} peers)",
-        iroh_node_id,
+        "Discovery: published for drive {} ({} peers, {} http origins)",
         drive_did,
-        node_ids.len()
+        node_ids.len(),
+        origins.len()
     );
     Ok(())
+}
+
+/// Resolve the http(s) origins that serve a drive, via the pkarr relay.
+pub async fn resolve_http_origins(drive_did: &str) -> AtomicResult<Vec<String>> {
+    let keypair = drive_did_to_pkarr_keypair(drive_did)?;
+    let client = build_client()?;
+    Ok(client
+        .resolve(&keypair.public_key())
+        .await
+        .map(|p| txt_json_list(&p, HTTP_RECORD))
+        .unwrap_or_default())
 }
 
 /// Resolve Iroh NodeIDs for a drive via the pkarr relay.
@@ -117,28 +172,28 @@ async fn resolve_node_ids_raw(
     client: &pkarr::Client,
     public_key: &pkarr::PublicKey,
 ) -> Vec<String> {
-    match client.resolve(public_key).await {
-        Some(packet) => {
-            for record in packet.all_resource_records() {
-                if !record.name.to_string().contains("_atomic_nodes") {
-                    continue;
-                }
-                let raw = format!("{:?}", record.rdata);
-                if let Some(data_start) = raw.find("data: \"") {
-                    let after = &raw[data_start + 7..];
-                    if let Some(data_end) = after.find("\" }") {
-                        let content = &after[..data_end];
-                        let unescaped = content.replace("\\\"", "\"");
-                        if let Ok(ids) = serde_json::from_str::<Vec<String>>(&unescaped) {
-                            return ids;
-                        }
-                    }
+    client
+        .resolve(public_key)
+        .await
+        .map(|p| txt_json_list(&p, NODES_RECORD))
+        .unwrap_or_default()
+}
+
+/// The JSON string array stored in the TXT record called `name`, or empty.
+fn txt_json_list(packet: &pkarr::SignedPacket, name: &str) -> Vec<String> {
+    for record in packet.all_resource_records() {
+        if !record.name.to_string().contains(name) {
+            continue;
+        }
+        if let pkarr::dns::rdata::RData::TXT(txt) = &record.rdata {
+            if let Ok(text) = String::try_from(txt.clone()) {
+                if let Ok(list) = serde_json::from_str::<Vec<String>>(&text) {
+                    return list;
                 }
             }
-            vec![]
         }
-        None => vec![],
     }
+    vec![]
 }
 
 /// Derive a pkarr keypair from a drive DID.
@@ -210,6 +265,18 @@ mod tests {
         assert_eq!(k1.public_key().to_string(), k2.public_key().to_string());
     }
 
+    /// Pinned so the browser library's derivation (`pkarr.ts`) can be checked
+    /// against this one: same DID, same relay key.
+    #[test]
+    fn keypair_matches_browser_vector() {
+        let did = fake_drive_did(0x42);
+        let k = drive_did_to_pkarr_keypair(&did).unwrap();
+        assert_eq!(
+            k.public_key().to_string(),
+            "rfjxtwc5xrq1etj1emoi6mimp15h96u5pjxpgyrz1a8ypgrb5cjy"
+        );
+    }
+
     #[test]
     fn rejects_non_drive_dids() {
         assert!(drive_did_to_pkarr_keypair("did:ad:agent:foo").is_err());
@@ -234,6 +301,19 @@ mod tests {
             .expect("resolve should find the published NodeID");
 
         assert_eq!(resolved, node_id);
+
+        // A second replica adds its http origin; the NodeID stays.
+        publish(&drive_did, None, Some("https://drive.example.org"))
+            .await
+            .expect("publish origin should succeed via pkarr relay");
+        let origins = resolve_http_origins(&drive_did)
+            .await
+            .expect("resolve origins");
+        assert!(origins.contains(&"https://drive.example.org".to_string()));
+        assert_eq!(
+            resolve_node_id_filtered(&drive_did, None).await.unwrap(),
+            node_id
+        );
         println!("SUCCESS: pkarr relay publish + resolve works");
     }
 }

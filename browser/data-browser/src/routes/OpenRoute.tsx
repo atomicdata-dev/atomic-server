@@ -5,6 +5,7 @@ import { Agent, useCurrentAgent, useStore } from '@tomic/react';
 import {
   CapabilityLinkError,
   decodeCapabilityLink,
+  resolveDriveOrigins,
   type CapabilityLink,
 } from '@tomic/lib';
 import { pathNames } from './paths';
@@ -19,14 +20,19 @@ import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
 
 export type OpenRouteSearch = {
   v?: string;
-  s?: string;
+  subject?: string;
   cap?: string;
+  drive?: string;
   url?: string;
 };
 
 /**
- * `/app/open?v=1&s=…&cap=…&url=…`: opens a resource with the right carried in
- * a capability link (`@tomic/lib` `capability.ts`).
+ * `/app/open?v=1&subject=…&cap=…&drive=…&url=…`: opens a resource with the
+ * right carried in a capability link (`@tomic/lib` `capability.ts`).
+ *
+ * Where to fetch from: the link's `url` when it has one. Otherwise its
+ * `drive` is looked up through pkarr, which names the nodes serving that
+ * drive (`@tomic/lib` `pkarr.ts`). With neither, the current node is tried.
  *
  * With nobody signed in, the link's agent becomes this browser's session, a
  * guest identity like the demo's: kept in IndexedDB so a reload still opens
@@ -41,8 +47,9 @@ export const OpenRoute = createRoute({
   getParentRoute: () => appRoute,
   validateSearch: (search): OpenRouteSearch => ({
     v: search.v as string | undefined,
-    s: search.s as string | undefined,
+    subject: search.subject as string | undefined,
     cap: search.cap as string | undefined,
+    drive: search.drive as string | undefined,
     url: search.url as string | undefined,
   }),
 });
@@ -75,8 +82,10 @@ function OpenPage(): JSX.Element {
 
   const openWithLink = async (target: CapabilityLink) => {
     try {
-      if (target.url && target.url !== store.getServerUrl()) {
-        store.setServerUrl(target.url);
+      const origin = target.url ?? (await originByPkarr(target.drive));
+
+      if (origin && origin !== store.getServerUrl()) {
+        store.setServerUrl(origin);
       }
 
       const linkAgent = Agent.fromSecret(target.cap, 'js');
@@ -147,6 +156,27 @@ function OpenPage(): JSX.Element {
       </Center>
     </Main>
   );
+}
+
+/**
+ * The first origin the drive's pkarr record lists, or nothing when the link
+ * names no drive or nobody has announced one. A failed lookup is not an
+ * error: the resource may well be on the node this app already talks to.
+ */
+async function originByPkarr(drive: string | undefined): Promise<string | undefined> {
+  if (!drive) {
+    return undefined;
+  }
+
+  try {
+    const [origin] = await resolveDriveOrigins(drive);
+
+    return origin;
+  } catch (e) {
+    console.warn('pkarr lookup failed for', drive, e);
+
+    return undefined;
+  }
 }
 
 const Center = styled.div`

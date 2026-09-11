@@ -12,18 +12,23 @@
  * Wire form, readable and copyable, the same `atomic:open?subject=…` link the
  * desktop app already opens resources with, plus the capability:
  *
- *     atomic:open?v=1&subject=<subject>&cap=<secret>&url=<node>
+ *     atomic:open?v=1&subject=<subject>&cap=<secret>&drive=<drive>&url=<node>
  *
  * or, so that a plain browser can open it, the same query under an app's
  * `/app/open` path:
  *
- *     https://example.org/app/open?v=1&subject=<subject>&cap=<secret>&url=<node>
+ *     https://example.org/app/open?v=1&subject=<subject>&cap=<secret>&drive=<drive>&url=<node>
  *
  * No `//` after the scheme: there is no authority part, and Atomic's
  * identifiers (`did:ad:…`) have none either. `subject` is the resource to
  * open. `cap` is the agent secret, the capability.
- * `url` is a routing hint: where the resource can be fetched from by a client
- * that does not have it. It grants nothing on its own; the node still checks
+ *
+ * `drive` and `url` are routing hints for a client that does not have the
+ * resource. `url` is an http(s) origin to fetch from directly. `drive` is the
+ * DID of the drive the resource lives in; from it, a client derives the
+ * drive's pkarr key and asks the relay which nodes serve the drive
+ * (`pkarr.ts`), so the link keeps working when the node moves and needs no
+ * origin at all. Neither grants anything on its own; the node still checks
  * the agent's rights on the resource.
  *
  * Contrast with `pairing.ts`: a pairing code is routing only and carries no
@@ -37,6 +42,8 @@ export type CapabilityLink = {
   subject: string;
   /** The agent secret that carries the right. Base64 JSON, see `Agent.buildSecret`. */
   cap: string;
+  /** The drive the resource lives in, for pkarr lookup. Routing only. */
+  drive?: string;
   /** Optional http(s) origin the resource can be fetched from. Routing only. */
   url?: string;
 };
@@ -80,6 +87,10 @@ function queryOf(link: CapabilityLink): string {
   params.set('subject', link.subject);
   params.set('cap', link.cap);
 
+  if (link.drive !== undefined) {
+    params.set('drive', link.drive);
+  }
+
   if (link.url !== undefined) {
     params.set('url', link.url);
   }
@@ -101,6 +112,13 @@ function validate(link: CapabilityLink): void {
 
   if (!link.cap) {
     throw new CapabilityLinkError('malformed', 'Missing capability secret');
+  }
+
+  if (
+    link.drive !== undefined &&
+    (!link.drive.startsWith('did:ad:') || /[\s<>"?]/.test(link.drive))
+  ) {
+    throw new CapabilityLinkError('malformed', 'drive must be a did:ad DID');
   }
 
   if (link.url !== undefined && !isHttpOrigin(link.url)) {
@@ -187,6 +205,7 @@ export function decodeCapabilityLink(input: string): CapabilityLink {
     v: 1,
     subject: params.get('subject') ?? '',
     cap: params.get('cap') ?? '',
+    drive: params.get('drive') ?? undefined,
     url: params.get('url') ?? undefined,
   };
 

@@ -119,10 +119,11 @@ async fn clear_remote_cache(appstate: &crate::appstate::AppState) -> AtomicServe
 /// avoid broadcasting throwaway test drives to the DHT.
 const DEV_DRIVE_MARKER: &str = "[atomic-data:dev-drive]";
 
-/// Publish this server's Iroh NodeID to the pkarr DHT, one record per drive
-/// it hosts. Pkarr keys the record by a keypair derived from the drive's DID
-/// (see `atomic_lib::discovery::publish_node_id`), so clients resolving a
-/// `?drive=did:ad:...` hint can find the node(s) hosting that specific drive.
+/// Publish this server's Iroh NodeID and http origin to the pkarr DHT, one
+/// record per drive it hosts. Pkarr keys the record by a keypair derived from
+/// the drive's DID (see `atomic_lib::discovery::publish`), so clients
+/// resolving a `?drive=did:ad:...` hint can find the node(s) hosting that
+/// specific drive.
 ///
 /// Dev-drives are skipped (they accumulate by the hundreds during
 /// development and publishing each is pure noise).
@@ -132,6 +133,9 @@ async fn announce_drives_pkarr(
 ) -> Result<(), String> {
     use atomic_lib::Storelike;
 
+    // The http origin lets a client that has no Iroh, such as a browser that
+    // was handed a capability link naming only the drive, find this node.
+    let origin = appstate.config.get_origin();
     let mut published = 0;
     let mut skipped_dev = 0;
     for resource in appstate.store.all_resources(false) {
@@ -167,7 +171,7 @@ async fn announce_drives_pkarr(
             continue;
         }
 
-        match atomic_lib::discovery::publish_node_id(drive_did, node_id).await {
+        match atomic_lib::discovery::publish(drive_did, Some(node_id), Some(&origin)).await {
             Ok(_) => published += 1,
             Err(e) => tracing::warn!("Pkarr: failed for drive {drive_did}: {e}"),
         }
