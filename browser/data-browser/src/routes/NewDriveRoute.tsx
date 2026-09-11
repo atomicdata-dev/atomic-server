@@ -1,4 +1,4 @@
-import { server, useStore } from '@tomic/react';
+import { server, useResource, useStore } from '@tomic/react';
 import { createRoute } from '@tanstack/react-router';
 import toast from 'react-hot-toast';
 import { appRoute } from './RootRoutes';
@@ -14,7 +14,7 @@ import { readDemoDrive } from '../components/DemoExitButton';
 import { Row } from '../components/Row';
 import { styled } from 'styled-components';
 import { DriveTemplateSetup } from '../chunks/Templates/DriveTemplateSetup';
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, type JSX } from 'react';
 
 let previewIdentity: Promise<unknown> | undefined;
 
@@ -41,40 +41,18 @@ export const NewDriveRoute = createRoute({
 function NewDrivePage(): JSX.Element {
   const { agent, drive, setDrive, setAgent } = useSettings();
   const store = useStore();
-  const [verifiedReturn, setVerifiedReturn] = useState<{
-    drive: string;
-    agent: string;
-  }>();
+  const currentDrive = useResource(drive || undefined);
   const isDemo =
     drive === readTemplateDemo()?.drive || drive === readDemoDrive();
   const closeTarget =
+    agent &&
+    drive &&
     !isDemo &&
-    verifiedReturn?.drive === drive &&
-    verifiedReturn?.agent === agent?.subject
+    !currentDrive.error &&
+    currentDrive.isReady() &&
+    currentDrive.hasClasses(server.classes.drive)
       ? drive
       : undefined;
-  useEffect(() => {
-    let active = true;
-
-    if (drive && agent?.subject && !isDemo) {
-      void store
-        .getResource(drive)
-        .then(resource => {
-          if (
-            active &&
-            !resource.error &&
-            resource.hasClasses(server.classes.drive)
-          ) {
-            setVerifiedReturn({ drive, agent: agent.subject! });
-          }
-        })
-        .catch(() => {});
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [store, drive, agent, isDemo]);
   // Only the isolated preview build permits anonymous gallery entry.
   const preview =
     import.meta.env.VITE_E2E === 'true' &&

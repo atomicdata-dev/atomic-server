@@ -564,7 +564,10 @@ export async function newDrive(page: Page) {
   await waitForCurrentDialog(page);
 
   const dialog = currentDialog(page);
-  await dialog.getByLabel('Name').fill(driveTitle);
+  await dialog
+    .getByRole('button', { name: 'Create a blank drive', exact: true })
+    .click();
+  await dialog.getByLabel('Drive name').fill(driveTitle);
 
   const createButton = dialog.locator('button', { hasText: 'Create' });
   await createButton.waitFor({ state: 'attached' });
