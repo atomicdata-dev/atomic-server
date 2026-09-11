@@ -36,6 +36,13 @@ jobs:
   ci:
     name: CI
     runs-on: ${{ fromJSON(inputs.runner) }}
+    # Serialize heavy work on Mancave, including downstream-saas in main.yml.
+    # Hosted runners have separate machines and need no shared hardware lock.
+    # This group must differ from the caller's per-ref workflow group.
+    concurrency:
+      group: ${{ inputs.host-profile == 'mancave' && 'main-mancave-heavy' || format('main-hosted-{0}-{1}', github.run_id, github.run_attempt) }}
+      queue: max
+      cancel-in-progress: false
     env:
       NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
     steps:
