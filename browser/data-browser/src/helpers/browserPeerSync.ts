@@ -1,3 +1,4 @@
+import { readTemplateDemo } from '../chunks/Templates/demoSession';
 import {
   BrowserPeerSync,
   randomPeerToken,
@@ -208,6 +209,7 @@ export async function discoverPeerDrives(store: Store): Promise<void> {
       const drive = resource.subject;
       const id = `automatic:${drive}`;
       if (
+        readTemplateDemo()?.drive === drive ||
         !drive.startsWith('did:ad:') ||
         !resource.isReady() ||
         resource.error ||

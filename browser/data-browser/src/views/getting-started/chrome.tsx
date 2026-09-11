@@ -8,7 +8,7 @@ import { useStore } from '@tomic/react';
 import { checkOnboardingStorage } from '../../helpers/onboardingStorage';
 import { styled, css } from 'styled-components';
 import { Button } from '../../components/Button';
-import { welcomeBackgroundCss } from './welcomeBackground';
+import '@tomic/service-ui/background.css';
 
 export function Shell({ children, ...props }: ComponentProps<'div'>) {
   const store = useStore();
@@ -58,7 +58,10 @@ export function Shell({ children, ...props }: ComponentProps<'div'>) {
   );
 }
 
-const ShellSurface = styled.div`
+const ShellSurface = styled.div.attrs(({ theme }) => ({
+  className: 'atomic-product-background',
+  'data-product-theme': theme.darkMode ? 'dark' : 'light',
+}))`
   /* A concrete viewport height (not 100%): nothing in the html/body/#root
      chain sets a height, so 100% would collapse to content height and,
      because body is overflow:hidden, tall content (the welcome pitch on a
@@ -80,24 +83,20 @@ const ShellSurface = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Center via auto margins on the child, NOT justify-content: center — a
-     centered flex item that overflows its scroll container can't be scrolled
-     to (Chromium clips it and pins the scroll origin), which left the welcome
-     buttons unreachable on a phone. Auto margins collapse to 0 when content
-     overflows, so it top-aligns and scrolls; they center it when it fits. */
+  /* Every onboarding step begins at the top; short forms must not float
+     halfway down the viewport. Leave room to scroll the last action above
+     the shared fixed Feedback control. */
   & > * {
-    margin-block: auto;
+    margin-block: 0;
   }
   /* The Android (Tauri) webview draws edge-to-edge under the system status
      and navigation bars — 100dvh includes those strips, so centered content
      ends up half-hidden behind the nav bar (the welcome buttons were
      unreachable on a phone). The safe-area insets (needs viewport-fit=cover,
      set in index.html) pad the content back into the visible region. */
-  padding: calc(${p => p.theme.size(7)} + env(safe-area-inset-top, 0px))
-    ${p => p.theme.size(5)}
-    calc(${p => p.theme.size(7)} + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.5rem + env(safe-area-inset-top, 0px)) ${p => p.theme.size(5)}
+    calc(5.5rem + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
-  ${welcomeBackgroundCss}
 `;
 
 const cardSurface = css`

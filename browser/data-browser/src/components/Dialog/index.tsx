@@ -1,4 +1,4 @@
-import { FeedbackMenuItem } from '../SideBar/FeedbackMenuItem';
+import { OnboardingFeedback } from '../OnboardingFeedback';
 import { useRootWelcomeLayout } from '../../context/RootWelcomeLayoutContext';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -237,9 +237,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             )}
             {children}
             {show && rootWelcomeChromeHidden && !hideOnboardingFeedback && (
-              <FeedbackCorner>
-                <FeedbackMenuItem floating />
-              </FeedbackCorner>
+              <OnboardingFeedback />
             )}
           </DropdownContainer>
         </PopoverContainer>
@@ -421,10 +419,4 @@ const TitleSlot = styled(Slot)`
     margin: 0;
     line-height: 1.25;
   }
-`;
-
-const FeedbackCorner = styled.div`
-  position: fixed;
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  left: max(1rem, env(safe-area-inset-left));
 `;

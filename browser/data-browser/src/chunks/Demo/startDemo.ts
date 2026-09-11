@@ -93,7 +93,10 @@ async function cleanupAllDemoDrives(store: Store): Promise<void> {
  * breadth-first parent-queries — deep enough to reach messages
  * (drive→chatroom→message) and board cards (drive→table→row).
  */
-async function cleanupDemoDrive(store: Store, drive: string): Promise<void> {
+export async function cleanupDemoDrive(
+  store: Store,
+  drive: string,
+): Promise<void> {
   try {
     const doomed = new Set<string>([drive]);
     let frontier = [drive];

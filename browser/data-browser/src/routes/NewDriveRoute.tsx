@@ -1,19 +1,22 @@
-import { getManagedPortalUrl } from '../helpers/managed/cloudSync';
-import { FormEvent, useEffect, useState, type JSX } from 'react';
+import { server, useStore } from '@tomic/react';
 import { createRoute } from '@tanstack/react-router';
-import { useStore } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { appRoute } from './RootRoutes';
 import { pathNames, paths } from './paths';
 import { useSettings } from '../helpers/AppSettings';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../helpers/navigation';
-import { Main } from '../components/Main';
-import { ContainerNarrow } from '../components/Containers';
+import { Shell } from '../views/getting-started/chrome';
+import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
-import { Column } from '../components/Row';
-import Field from '../components/forms/Field';
-import { InputWrapper, InputStyled } from '../components/forms/InputStyles';
+import { readTemplateDemo } from '../chunks/Templates/demoSession';
+import { readDemoDrive } from '../components/DemoExitButton';
+import { Row } from '../components/Row';
+import { styled } from 'styled-components';
+import { DriveTemplateSetup } from '../chunks/Templates/DriveTemplateSetup';
+import { useEffect, useState, type JSX } from 'react';
+
+let previewIdentity: Promise<unknown> | undefined;
 
 export const NewDriveRoute = createRoute({
   path: pathNames.newDrive,
@@ -36,73 +39,104 @@ export const NewDriveRoute = createRoute({
 // enforced it fails again with a 402 for anyone without a subscription. Neither
 // has anything to do with making a drive.
 function NewDrivePage(): JSX.Element {
+  const { agent, drive, setDrive, setAgent } = useSettings();
   const store = useStore();
-  const { agent, setDrive } = useSettings();
-  const navigate = useNavigateWithTransition();
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<Error | undefined>();
-
+  const [verifiedReturn, setVerifiedReturn] = useState<{
+    drive: string;
+    agent: string;
+  }>();
+  const isDemo =
+    drive === readTemplateDemo()?.drive || drive === readDemoDrive();
+  const closeTarget =
+    !isDemo &&
+    verifiedReturn?.drive === drive &&
+    verifiedReturn?.agent === agent?.subject
+      ? drive
+      : undefined;
   useEffect(() => {
-    if (!agent) {
+    let active = true;
+
+    if (drive && agent?.subject && !isDemo) {
+      void store
+        .getResource(drive)
+        .then(resource => {
+          if (
+            active &&
+            !resource.error &&
+            resource.hasClasses(server.classes.drive)
+          ) {
+            setVerifiedReturn({ drive, agent: agent.subject! });
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [store, drive, agent, isDemo]);
+  // Only the isolated preview build permits anonymous gallery entry.
+  const preview =
+    import.meta.env.VITE_E2E === 'true' &&
+    new URLSearchParams(window.location.search).has('template_preview');
+  const navigate = useNavigateWithTransition();
+  useEffect(() => {
+    if (agent) return;
+
+    if (!preview) {
       navigate(paths.welcome);
+
+      return;
     }
-  }, [agent, navigate]);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    const agentSubject = agent?.subject;
-
-    if (!trimmed || busy || !agentSubject) return;
-
-    setBusy(true);
-    setError(undefined);
-
-    try {
-      const resource = await store.createDrive(trimmed, {
-        personal: false,
-        localOnly: !!getManagedPortalUrl(),
+    let active = true;
+    previewIdentity ??= import('../chunks/Demo/guestAgent')
+      .then(({ ensureAgentForDemo }) => ensureAgentForDemo(store))
+      .finally(() => {
+        previewIdentity = undefined;
       });
-      store.notifyResourceManuallyCreated(resource);
-      setDrive(resource.subject);
+    previewIdentity
+      .then(() => {
+        const guest = store.getAgent();
+        if (active && guest) setAgent(guest);
+      })
+      .catch(() => toast.error('Could not open the preview. Please refresh.'));
 
-      toast.success('Drive created');
-      navigate(constructOpenURL(resource.subject));
-    } catch (err) {
-      const asError =
-        err instanceof Error ? err : new Error('Could not create the drive.');
-      store.notifyError(asError);
-      setError(asError);
-    } finally {
-      setBusy(false);
-    }
-  }
+    return () => {
+      active = false;
+    };
+  }, [agent, navigate, preview, setAgent, store]);
+  if (!agent) return <Shell />;
 
   return (
-    <Main>
-      <ContainerNarrow>
-        <Column gap='1.5rem'>
-          <h1>New drive</h1>
-          <form onSubmit={handleSubmit}>
-            <Column gap='1rem'>
-              <Field required label='Name' error={error}>
-                <InputWrapper>
-                  <InputStyled
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder='My Drive'
-                    autoFocus
-                  />
-                </InputWrapper>
-              </Field>
-              <Button type='submit' disabled={busy || !name.trim()}>
-                {busy ? 'Creating…' : 'Create drive'}
-              </Button>
-            </Column>
-          </form>
-        </Column>
-      </ContainerNarrow>
-    </Main>
+    <Shell>
+      <SetupContent>
+        <Row justify='space-between'>
+          <Logo style={{ width: '14rem', maxWidth: '55%' }} />
+          {closeTarget && (
+            <Button
+              subtle
+              onClick={() => navigate(constructOpenURL(closeTarget))}
+            >
+              Close
+            </Button>
+          )}
+        </Row>
+        <DriveTemplateSetup
+          onCreated={resource => {
+            setDrive(resource.subject);
+            toast.success('Drive created');
+            navigate(constructOpenURL(resource.subject));
+          }}
+        />
+      </SetupContent>
+    </Shell>
   );
 }
+
+const SetupContent = styled.main`
+  width: min(100%, 65rem);
+  display: flex;
+  flex-direction: column;
+  gap: ${p => p.theme.size(6)};
+`;
