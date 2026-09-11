@@ -293,3 +293,11 @@ export type {
   SetupField,
   SetupArguments,
 } from './plugin-setup.js';
+
+export {
+  appPackageSchema,
+  parseAppPackage,
+  readAppPackage,
+  prepareAppPackageImport,
+} from './app-package.js';
+export type { AppPackage } from './app-package.js';

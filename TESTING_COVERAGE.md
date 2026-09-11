@@ -1714,3 +1714,12 @@ with an explicit incomplete-import error rather than silently truncating.
 `IntegrationDiscovery.test.ts` verifies that all four bundled plugins remain
 discoverable without contacting an integration proxy. The original Notion auth
 and Clockify upgrade tests remain alongside it.
+
+
+Portable app definitions: `browser/lib/src/app-package.test.ts` loads a standalone
+JSON fixture through the shared importer, planner and apply engine with in-memory
+storage. It verifies nested placement, native localId, repeat import, conflicting
+revision reuse, opaque source/setup text, and refusal of installation fields or
+unsupported declarations. This is library coverage: marketplace UI, real-server
+package persistence, schema/template graph import and sandbox activation remain
+unverified/unimplemented by this slice.

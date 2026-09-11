@@ -86,8 +86,14 @@ consent, installation identities or running schedules.
   declaration, including partial drafts. Unknown schema keywords fail closed.
 - [x] Cover JSON round-trip, detached metadata, invalid required fields, unsupported
   field constraints, choice hints, prototype keys and size limits with unit tests.
-- [ ] Define the resource graph envelope and import it through the shared importer.
-  Keep immutable package content separate from mutable installation state.
+- [x] Import an inert package definition as a resource through the shared importer,
+  planner and apply path. `app-package.ts` preserves the existing release payload
+  and optional setup declaration; it rejects installation fields. The resource's
+  native localId is the author-owned revision URI, scoped to the host-chosen parent.
+  Reusing a revision URI for changed content produces an append-only conflict.
+- [ ] Extend distribution to bundled schema/template resource graphs. Current
+  release schema bindings reference external resources; they are not copied.
+  Package import alone does not establish an immutable/verified runtime release.
 - [ ] Replace bundled provider discovery with resource-backed package discovery.
 - [ ] Move provider setup effects into the sandbox and existing reviewed effect
   lifecycle, then remove the trusted host installer adapters.
@@ -97,3 +103,11 @@ consent, installation identities or running schedules.
 Declaration validation alone does not implement package import or sandbox setup.
 Lookup names remain presentation hints; only the host decides which lookups an
 installation may use. Credentials continue through the separate host flow.
+
+The package content property stores canonical JSON **text** rather than a nested
+JSON value. Existing importer/planner reference rewriting must not rewrite literal
+`local:` strings inside code or setup metadata. The new class is `app-package`,
+not `app` or `plugin-script`; copying it never enrolls an installation. Activation
+must still extract/validate the code manifest in the sandbox, pin the release and
+obtain fresh host consent. The package-supplied manifest is not evidence of what
+its code exports. This step has library tests, not a browser installation flow.

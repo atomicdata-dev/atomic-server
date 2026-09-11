@@ -99,3 +99,42 @@ No recurring live jobs or automatic releases are enabled by this command.
 Shared provider sign-in supports direct and managed deployments; see
 [authorization service setup](AUTHORIZATION.md) for the common FOSS transport,
 per-server provisioning, credential handling and current limits.
+
+## Portable package resources (initial library API)
+
+`@tomic/lib` can import an app definition from a standalone JSON document. See
+[`app-package.json`](../browser/lib/src/fixtures/app-package.json) for the format:
+metadata, a revision URI, the existing `PluginRelease` payload, and optional
+validated setup metadata. No provider module needs to be imported by the host.
+
+```ts
+import {
+  appPackageSchema, ensureSchema, prepareAppPackageImport,
+  planVerdict, planHostFromStore,
+} from '@tomic/lib';
+
+const schema = await ensureSchema(store, drive, appPackageSchema());
+const verdict = prepareAppPackageImport(importHost, json, packageFolder, schema);
+const plan = await planVerdict(verdict, planHostFromStore(store));
+// Show this plan for review, then use the existing applyPlan path.
+```
+
+`importHost` must read authoritative destination resources, as with other shared
+imports; an incomplete UI collection is not sufficient for duplicate detection.
+`readAppPackage(resource.getPropVals(), schema)` reads back the portable document.
+The content uses canonical JSON text so generic graph-reference rewriting cannot
+alter code or literal setup text. Top-level display labels reserve the `local:`
+prefix, matching the importer. The document limit is 4 MiB.
+
+Import produces an inert `app-package` resource under the host-chosen parent.
+Repeated imports reuse its native localId. Use a new revision URI for changed
+content; reusing one causes a conflict. That URI is an import identity, not a
+verified signature or server release hash. Metadata is untrusted, and importing
+never executes source. Package authors must not embed secrets in source/data.
+
+The package-supplied manifest must still be compared with the sandbox-extracted
+manifest during activation. Fresh installation identity, host-held credentials,
+consent and schedule activation belong to installation, never the distributed
+document. Imported packages are not yet exposed in the store UI or installable
+through a generic sandbox setup. Schema bindings currently refer to external
+resources; bundled schema/template graphs remain future work.
