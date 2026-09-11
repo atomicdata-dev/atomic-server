@@ -3799,6 +3799,9 @@ export class Store {
         let timer: ReturnType<typeof setTimeout> | undefined;
 
         const cb: ResourceCallback<C> = res => {
+          // Snapshot notifications can precede hydration. Keep waiting for
+          // data, but let terminal errors reach the caller.
+          if (res.loading && !res.error) return;
           if (timer) clearTimeout(timer);
           this.unsubscribe(subjectRaw, cb);
           resolve(res);
