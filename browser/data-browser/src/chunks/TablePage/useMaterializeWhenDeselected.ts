@@ -1,5 +1,5 @@
 import { Resource, useStore } from '@tomic/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   CursorMode,
   useTableEditorContext,
@@ -58,102 +58,36 @@ export function useMaterializeWhenDeselected(
 ): void {
   const { selectedRow, cursorMode } = useTableEditorContext();
   const store = useStore();
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const counted = useRef(false);
-  const unmounted = useRef(false);
-
-  // Declared before the effect below so that on unmount its cleanup runs
-  // first — React destroys effects in the order they were created — and the
-  // cleanup there can tell "my dependencies changed" from "this row is gone".
-  useEffect(
-    () => () => {
-      unmounted.current = true;
-    },
-    [],
+  const scheduler = useMemo(
+    () =>
+      store.createSaveScheduler(resource, {
+        shouldSave: () =>
+          resource.subject.startsWith('_new:') &&
+          resource.getEntries().length > 2,
+        onError: () => undefined,
+      }),
+    [store, resource],
   );
 
+  // Flush before the following effect cancels its slot on unmount. Virtualized
+  // rows can leave the screen while their last edit exists only in memory.
+  useEffect(
+    () => () => {
+      void scheduler.flush();
+    },
+    [scheduler],
+  );
   useEffect(() => {
-    // The row's only copy lives in this timer until it fires, so the store has
-    // to count it as pending work — `pendingDirtyCount === 0` is documented to
-    // mean "safe to reload/navigate — nothing will be lost", and a row waiting
-    // on `setTimeout` is neither in the outbox nor saving. `useDebouncedSave`
-    // reports its own window the same way; this path had no equivalent, so a
-    // reload during it dropped the row while sync status read as settled.
-    const stopCounting = () => {
-      if (counted.current) {
-        counted.current = false;
-        store.finishScheduledSave();
-      }
-    };
-
-    // Actively editing THIS row — keep it virtual and cancel any pending
-    // materialize (the user came back to it before the timer fired).
     if (selectedRow === index && cursorMode === CursorMode.Edit) {
-      if (timer.current !== undefined) {
-        clearTimeout(timer.current);
-        timer.current = undefined;
-      }
-
-      stopCounting();
+      scheduler.cancel();
 
       return;
     }
 
-    // Leaving Edit mode is the calm "done" signal → flush promptly. Moving
-    // between rows while still editing is the rapid-entry path → debounce.
-    const delay =
-      cursorMode === CursorMode.Edit ? MATERIALIZE_DEBOUNCE : MATERIALIZE_FLUSH;
+    scheduler.schedule(
+      cursorMode === CursorMode.Edit ? MATERIALIZE_DEBOUNCE : MATERIALIZE_FLUSH,
+    );
 
-    if (!counted.current) {
-      counted.current = true;
-      store.startScheduledSave();
-    }
-
-    timer.current = setTimeout(() => {
-      timer.current = undefined;
-
-      // Already materialized (subject renamed on a prior save), or an empty
-      // placeholder (only the seeded `isA` + `parent`) — nothing to persist.
-      if (
-        !resource.subject.startsWith('_new:') ||
-        resource.getEntries().length <= 2
-      ) {
-        stopCounting();
-
-        return;
-      }
-
-      void resource
-        .save()
-        .catch(() => undefined)
-        .then(stopCounting);
-    }, delay);
-
-    return () => {
-      if (timer.current === undefined) {
-        return;
-      }
-
-      // The row is gone, not merely deselected: the grid is virtualized, so
-      // scrolling a row past the fold unmounts it. Cancelling here would be
-      // the last word — nothing re-arms a timer for a row that no longer
-      // renders — so the pending save is left to fire. `setTimeout` does not
-      // belong to React and does not care that the component went away, and
-      // the resource it closes over is the store's, which outlives the row.
-      //
-      // Leaving it counted matters just as much: a row cancelled this way was
-      // dropped from `pendingDirtyCount` too, so the app reported "nothing
-      // pending, safe to reload" while rows existed in this tab and nowhere
-      // else. Under fast entry that silently lost 7 rows in 40.
-      if (unmounted.current) {
-        return;
-      }
-
-      // Only release what this cleanup actually cancels: a save already in
-      // flight releases itself when it settles.
-      clearTimeout(timer.current);
-      timer.current = undefined;
-      stopCounting();
-    };
-  }, [selectedRow, cursorMode, index, resource, store]);
+    return () => scheduler.cancel();
+  }, [selectedRow, cursorMode, index, scheduler]);
 }

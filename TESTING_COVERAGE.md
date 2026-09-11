@@ -740,3 +740,7 @@ check; real refresh/query timing remains a browser acceptance check.
   values and signed payloads. The diagnostic fixture attaches this before closing pages.
 - CI lint uses installed sources without JS/WASM builds; feature-branch pushes cancel
   superseded runs while develop and tags retain completed validation for deployment.
+
+- `scheduled-save.test.ts` covers coalescing, idempotent cancellation, flushing,
+  concurrent in-flight work and failures. `store.test.ts` covers immutable save
+  snapshots, identity renaming, offline queueing and direct-save notifications.

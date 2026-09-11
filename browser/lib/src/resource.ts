@@ -141,6 +141,7 @@ function nextEditToken(): string {
 export enum ResourceEvents {
   LocalChange = 'local-change',
   LoadingChange = 'loading-change',
+  SaveStateChange = 'save-state-change',
 }
 
 /** Read lifecycle, independent of saving and the durable outbox.
@@ -154,6 +155,7 @@ export type ResourceReadState =
   | 'error';
 
 type ResourceEventHandlers = {
+  [ResourceEvents.SaveStateChange]: () => void;
   [ResourceEvents.LocalChange]: (prop: string, value: JSONValue) => void;
   [ResourceEvents.LoadingChange]: (loading: boolean) => void;
 };
@@ -3246,6 +3248,7 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     this._saveDepth++;
+    this.eventManager.emit(ResourceEvents.SaveStateChange);
     const closeSave = perfSpan('resource.save');
 
     try {
@@ -3253,6 +3256,7 @@ export class Resource<C extends OptionalClass = any> {
     } finally {
       closeSave();
       this._saveDepth--;
+      this.eventManager.emit(ResourceEvents.SaveStateChange);
     }
   }
 
