@@ -16,11 +16,15 @@ caught it, and if the answer is "none", that is the row to add.
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint
-in a temporary repository: initial commits, staged errors hidden by unstaged
+in a temporary repository using real pnpm 11.10.0 (via Corepack):
+initial commits, staged errors hidden by unstaged
 fixes, clean staged files with unstaged errors, filenames with spaces,
 documentation-only commits, missing dependencies, and preservation of the index
-and working tree. A stub Cargo command verifies Clippy dispatch, staged input,
-and failure propagation; this fixture does not compile the Rust workspace.
+and working tree. Noninteractive recursive lint runs with symlinked dependencies
+and incompatible pnpm metadata reproduce issue #1437; the fixture checks that
+installed metadata and a dependency sentinel remain untouched. Corepack must
+have this pnpm version cached or be able to download it. A stub Cargo command
+verifies Clippy dispatch, staged input, and failure propagation; this fixture does not compile the Rust workspace.
 
 ## Browser WebRTC transport (issue #1396)
 
