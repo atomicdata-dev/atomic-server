@@ -1,49 +1,34 @@
-# Structural problems audit (2026-05-28)
+# Structural problems audit
 
-> **Status:** Live index (audit 2026-05-28). #4, #9 and #10 done and their docs deleted; #7 largely landed; #6 (browser `Resource` cache dual) largely shipped, see `unify-resource-representations.md`. Still open: #1 React Compiler / Resource proxy (audit not started while the compiler is on), #2 / #3 subscription unification (server side done 2026-09-04, actors not folded), #5 dirty signals, #8 subject types.
+> **Status: live index, reconciled 2026-09-11.** Original audit: 2026-05-28.
+> Read/save subscription boundaries and scheduled-save ownership have shipped.
+> Consumer migration, metadata representation cleanup and subject-brand adoption remain.
 
-Working list of structural issues surfaced during the QUERY_UPDATE /
-canvas-genesis-save / outbox / live-Loro debugging arc of late May 2026.
-Ranked by load-bearing impact (1 = most bugs traced back to it).
+This index tracks structural work rather than individual failures. The next bounded
+JS slices and acceptance checks are in [js-maintainability.md](./js-maintainability.md):
+PluginPage subscriptions, E2E diagnostic collectors, then Store save-status coordination.
 
-Items #4 (opfs-double-rehydrate), #9 (connection-close-cleanup), and
-#10 (dev-cargo-lock-contention) have been fully implemented and their
-plan docs removed.
+| # | Plan | Current state | Next step |
+| --- | --- | --- | --- |
+| 1 | [React Compiler / Resources](./react-compiler-resource-proxy.md) | Partial: stable Resource handles, immutable read/save snapshots and initial UI migrations shipped. | Reproduce and migrate PluginPage rendered getters; continue one flow at a time. |
+| 2 | [Subscription primitives](./unify-subscription-primitives.md) | Server work completed in reduced form; the original filter-scope design was not implemented. | Browser subscription changes belong in the data-layer plan, not a repeat of the server migration. |
+| 3 | Subscription actors | Done: `LoroSyncBroadcaster` folded into `CommitMonitor`; original plan removed. | None in this slice. |
+| 5 | [Resource save state](./unify-resource-dirty-signals.md) | API, scheduler and initial consumers shipped. | Migrate remaining save UIs and extract internal coordination without changing the public API. |
+| 6 | [Resource representations](./unify-resource-representations.md) | Mostly shipped: browser `Resource#cache` derives from Loro. | Review `_auxValues` and preserved server-managed metadata; preserve causal hydration. |
+| 7 | [Actor payloads](./arc-actor-message-payloads.md) | Encode-once and zero-copy WS frames shipped; `CommitMessage` Arc wrapping deferred. | Measure a remaining high-fanout cost before further work. |
+| 8 | [Subject types](./subject-types-end-to-end.md) | Rust `DidKind` and browser branding helpers shipped. | Browser consumer migration remains. |
 
-Several open items overlap with broader existing plans:
+Items #4 (double hydration), #9 (connection-close cleanup) and #10 (Cargo lock
+contention) were closed and their original plan documents removed. Recent lifecycle
+work additionally restores snapshot-backed hydration before publication and cancels
+asynchronous socket work across reconnects; that does not imply all sync work is done.
 
-- **#2, #5, #6** are slices of [`unified-data-layer.md`](./unified-data-layer.md)
-  — the browser data-layer redesign. Doing those three in isolation
-  risks landing partial layouts that the bigger plan then has to undo.
-- **#6** has a Rust/Flutter dual in [`loro-source-of-truth.md`](./loro-source-of-truth.md).
-  The sparse `datatypes` map and `Tree::Resources` derived cache shipped on
-  the Rust side. The browser `Resource._cache` dual
-  ([unify-resource-representations.md](./unify-resource-representations.md))
-  is still open.
+## Ownership and order
 
-The remaining standalone items (#1 react-compiler, #3 subscription
-actors, #7 arc-wrap, #8 subject types) don't overlap with the broader
-plans and can be tackled independently.
-
-| # | Plan | Class | Risk | First step |
-|---|---|---|---|---|
-| 1 | [react-compiler-resource-proxy.md](./react-compiler-resource-proxy.md) | Correctness | High | 🔴 **Still open as of 2026-08.** The compiler is now *on* in data-browser (`224bd4816`, 2026-08-19, via `oxc-transform-react` in `vite.config.ts`), and a live instance of the class was hit in the field on 2026-08-16 — [`pairing-ux-field-test.md`](./completed/pairing-ux-field-test.md) M15a, a table not re-rendering after a peer row arrived. The audit of `.props.X` / `.isReady()` / `.loading` reads in render has not started. |
-| 2 | [unify-subscription-primitives.md](./unify-subscription-primitives.md) | Cleanup | Medium | Single `Subscription` shape with `Match::{Subject, Drive, Filter}` |
-| 3 | Unify subscription actors | Cleanup | Done 2026-09-05 | Folded `LoroSyncBroadcaster` into `CommitMonitor`; planning doc removed |
-| 5 | [unify-resource-dirty-signals.md](./unify-resource-dirty-signals.md) | Correctness | Medium | Single `getSaveState(subject)` enum |
-| 6 | [unify-resource-representations.md](./unify-resource-representations.md) | Correctness | High | 🟡 Rust `datatypes` map + derived `Tree::Resources` cache shipped. Browser `_cache` dual still open. |
-| 7 | [arc-actor-message-payloads.md](./arc-actor-message-payloads.md) | Performance | Low | ✅ Stretch landed — `SendFrame` + encode-once + `Bytes::from_owner` zero-copy at WS write. `MembershipNotification` already Arc-wrapped. `CommitMessage` Arc-wrap (`atomic_lib` change) deferred. |
-| 8 | [subject-types-end-to-end.md](./subject-types-end-to-end.md) | Correctness | High | 🟡 Started — `Subject` brand + `asSubject`/`tryAsSubject`/`isValidSubject` in `browser/lib/src/subject.ts`. Rust `DidKind` classifier shipped. Consumer migration not started. |
-
-## Suggested execution order
-
-**Highest leverage** — 1 (React Compiler) is the highest bug density
-in the codebase (~280 suspect sites) and won't get easier as the
-codebase ages.
-
-**Opportunistic cleanups** — 2 and 3 reduce mental overhead but are
-not blocking anything. 7 remaining (CommitMessage Arc-wrap) is a
-small perf win for high-fanout drives.
-
-**Defer the invasive ones** — 5, 6, 8 need design alignment before
-implementation. Each warrants its own RFC-style discussion.
+- #2, #5 and #6 share constraints with [unified-data-layer.md](./unified-data-layer.md).
+  #6 also shares the Rust/Flutter direction in [loro-source-of-truth.md](./loro-source-of-truth.md).
+- Start with the regression-driven UI slice, then diagnostics, then the narrow Store
+  extraction. Do not replace every Resource identity or rewrite Store wholesale.
+- Treat representation changes and subject-brand migration as separate work with
+  explicit compatibility and persistence tests. Completed server subscription work
+  is not a prerequisite to redo before starting these browser slices.

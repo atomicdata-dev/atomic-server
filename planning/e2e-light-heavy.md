@@ -1,6 +1,6 @@
 # Light vs heavy E2E, and where unit tests should grow
 
-**Status: landing.** Tags, `test-e2e:light`, Dagger `--playwright-mode`, and
+**Status: partial, updated 2026-09-11.** Tags, `test-e2e:light`, Dagger `--playwright-mode`, and
 `main.yml` gating are in. Remaining: grow `jsTestIntegration`, stop adding
 heavy-only variants as Playwright, then drop redundant heavy specs.
 
@@ -34,7 +34,7 @@ browser.
 
 ---
 
-## What is expensive today
+## Earlier timing baseline (re-measure before tuning)
 
 Playwright is the slow lane. Counts from this tree (2026-08-20):
 
@@ -113,7 +113,7 @@ integration tests.
 
 ---
 
-## Proposed model
+## Implemented model
 
 Three layers. **Only Playwright splits.** Lint, Rust, vitest, JS integration,
 and Flutter stay on every run.
@@ -134,11 +134,11 @@ later: `@perf` excluded from both default jobs and run on a schedule.
 
 **Partial by default. Full when we are about to ship, or when someone asks.**
 
-Today every origin push runs the full Playwright suite (`main.yml` is
-`on: [push, workflow_dispatch]`; there is no `pull_request` trigger). That
-is why Mancave queues: agent branches and feature branches compete with
-`develop` for the same box. The split only pays off if feature-branch
-pushes stop launching 8 browsers.
+Feature-branch pushes now run the light suite; develop and release validation
+use the full suite according to the policy below. Superseded feature-branch
+runs cancel within their ref; develop and tag runs finish because deployment
+consumes their results. `jsLint` uses installed sources without JS or WASM builds.
+Full Dagger execution and queue timing must still be measured in CI.
 
 | Trigger | Unit / integration / lint | Playwright |
 |---|---|---|
@@ -303,18 +303,19 @@ that can fail.
 
 ---
 
-## CI / Dagger shape (when building)
+## CI / Dagger shape
 
 Today `ci()` takes `--playwright-mode light|full` and passes it to `endToEnd`.
 The workflow decides the mode; Dagger does not guess the branch.
 
 - `endToEnd` / `ci` take `--playwright-mode light|full` (not `--e2e-mode`:
   Dagger camelCases that to `e2EMode` and the call fails).
-- `main.yml` passes `full` when `github.ref == develop` or the ref is a
-  stable `v*` tag, or when dispatch / a `full-e2e` label (or boolean
-  input) asks. Everything else passes `light`.
-- Light: `--grep @smoke`, 1–2 shards, `PLAYWRIGHT_RETRIES=1`,
-  `PLAYWRIGHT_WORKERS=2` on Mancave.
+- `main.yml` defaults to `full` on `refs/heads/develop` and all `v*` tags.
+  Feature branches use `light` unless `[full-e2e]` in the commit message or a
+  `full-e2e` PR label requests full. An explicit workflow-dispatch `e2e_mode`
+  overrides the default; release validation still needs the full suite.
+- Light: `--grep @smoke`, two Mancave shards or one hosted shard,
+  `PLAYWRIGHT_RETRIES=1`; workers follow the selected Dagger host profile.
 - Full: current command, current shards/retries.
 - `pnpm` scripts: `test-e2e:light` / keep `test-e2e` = full.
 - Do not grep-exclude by filename forever; tags survive file splits.
@@ -357,3 +358,15 @@ Optional later, not required for the split to pay off:
 
 Step 1–3 is the split (landed). Step 4–6 is how the heavy suite stops growing
 faster than the product.
+
+## Local reproduction and diagnostics
+
+`pnpm test-e2e:local` builds JS, WASM and the native backend from the checkout,
+uses fresh data on matching free ports, and retains failure traces. It runs
+with zero retries by default. External Cloud Vault tests require an explicit
+`ATOMIC_VAULT_PORTAL_URL`; managed mocks do not depend on a portal.
+
+Failures also attach bounded resource/save and WebSocket frame metadata before
+page teardown. Extracting the collectors into explicit lifecycles is planned in
+[js-maintainability.md](./js-maintainability.md); retaining payload-free metadata
+and existing diagnostic strictness is part of its acceptance criteria.
