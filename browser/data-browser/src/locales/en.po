@@ -8129,3 +8129,7 @@ msgstr "No matches. Try another search or ask AI to build it."
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Ask AI"
 msgstr "Ask AI"
+
+#: src/chunks/TableEditor/TableEditor.tsx
+msgid "<0/> Loading"
+msgstr "<0/> Loading"

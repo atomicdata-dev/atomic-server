@@ -8095,3 +8095,7 @@ msgstr ""
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Ask AI"
 msgstr ""
+
+#: src/chunks/TableEditor/TableEditor.tsx
+msgid "<0/> Loading"
+msgstr ""

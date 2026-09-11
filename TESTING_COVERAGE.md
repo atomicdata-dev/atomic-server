@@ -698,3 +698,8 @@ and verifies an edit plus attachment survive reload without HTTP/WS data writes.
 It also exercises the compiled Vault session error path (no React hook in an
 error constructor). Actual staging billing/admission and multi-device migration
 remain separate acceptance checks.
+
+Table loading feedback: `browser/data-browser/src/chunks/TableEditor/TableEditor.test.tsx`
+checks that a busy grid with only an entry row renders a visible spinner/status,
+and that settled empty and populated grids remove it. This is a component render
+check; real refresh/query timing remains a browser acceptance check.
