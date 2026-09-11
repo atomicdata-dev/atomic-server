@@ -1,11 +1,139 @@
+import { enableLoro } from './loro-loader.js';
 import { describe, it, vi, afterEach } from 'vitest';
 import { Resource, Store, core, Core, Datatype } from './index.js';
 import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('keeps property readers waiting while a delta with missing history is recovered', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const source = new Resource('did:ad:partial-property');
+    await source.set(core.properties.isA, [core.classes.property], false);
+    const doc = source.getLoroDoc()!;
+    doc.commit();
+    const base = doc.oplogVersion();
+    await source.set(core.properties.datatype, Datatype.STRING, false);
+    await source.set(core.properties.shortname, 'title', false);
+    await source.set(core.properties.description, 'Title', false);
+    doc.commit();
+    const placeholder = new Resource(source.subject);
+    placeholder.loading = true;
+    store.addResource(placeholder);
+    let recover!: () => void;
+    vi.spyOn(store, 'fetchResourceFromServer').mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        recover = resolve;
+      });
+      store.applyIncoming({
+        subject: source.subject,
+        resource: source,
+        source: 'http-fetch',
+      });
+
+      return source;
+    });
+    const settled = vi.fn();
+    const result = store.getProperty(source.subject).then(
+      value => {
+        settled();
+
+        return value;
+      },
+      error => {
+        settled();
+
+        return error;
+      },
+    );
+    store.applyIncoming({
+      subject: source.subject,
+      loroBytes: doc.export({ mode: 'update', from: base }),
+      source: 'ws-sub-push',
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const early = settled.mock.calls.length;
+    recover();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await result).toMatchObject({ datatype: Datatype.STRING });
+    expect(early).toBe(0);
+  });
+
+  it('materializes a buffered property snapshot before returning its datatype', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const store = new Store();
+    const source = new Resource('did:ad:buffered-property');
+    await source.set(core.properties.datatype, Datatype.STRING, false);
+    await source.set(core.properties.shortname, 'title', false);
+    await source.set(core.properties.description, 'Title', false);
+    const snapshot = source.getLoroDoc()!.export({ mode: 'snapshot' });
+    const loaded = new Resource(source.subject);
+    loaded.applyHydratedValues([
+      ['https://atomicdata.dev/properties/loroUpdate', snapshot],
+    ]);
+    store.addResource(loaded);
+    expect(await store.getProperty(source.subject)).toMatchObject({
+      datatype: Datatype.STRING,
+    });
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('preserves persisted Loro history when getResource loads a profile offline', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const subject = 'did:ad:agent:offline-profile';
+    const serverProfile = new Resource(subject);
+    const doc = serverProfile.getLoroDoc()!;
+
+    for (let i = 0; i < 20; i++) {
+      await serverProfile.set(core.properties.name, `Name ${i}`, false);
+      doc.commit();
+    }
+
+    const snapshot = doc.export({ mode: 'snapshot' });
+    const jsonAd = JSON.stringify({
+      '@id': subject,
+      [core.properties.name]: 'Name 19',
+    });
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setClientDb({
+      isReady: true,
+      isInitialized: true,
+      waitForInit: async () => {},
+      getResource: async () => jsonAd,
+      getResourceWithSnapshot: async () => ({ jsonAd, snapshot }),
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    const profile = await store.getResource(subject);
+    await profile.set(core.properties.name, 'Renamed', false);
+    doc.import(profile.getLoroDoc()!.export({ mode: 'snapshot' }));
+    expect(doc.getMap('properties').get(core.properties.name)).toBe('Renamed');
+  });
+
+  it('keeps a local-only drive ready when a reader requests a server refresh', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const drive = new Resource('did:ad:local-drive');
+    await drive.set(core.properties.name, 'Local drive', false);
+    drive.loading = false;
+    store.addResource(drive);
+    store.registerLocalOnlyDrive(drive.subject);
+    const fetch = vi.fn(async () => new Response('not found', { status: 404 }));
+    store.injectFetch(fetch);
+    const result = await store.fetchResourceFromServer(drive.subject, {
+      setLoading: true,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.isReady()).toBe(true);
+    expect(result.get(core.properties.name)).toBe('Local drive');
   });
 
   it('waits for property data after a loading-placeholder notification', async ({

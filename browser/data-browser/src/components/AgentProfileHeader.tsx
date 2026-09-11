@@ -30,6 +30,9 @@ const valueOpts = { commit: true, validate: false } as const;
  * need a trip to a separate edit form.
  */
 export function AgentProfileHeader({ subject }: { subject: string }) {
+  'use no memo';
+  // Resources mutate in place; compiler memoization by reference would
+  // freeze isReady() at the initial loading state.
   const resource = useResource(subject);
   const [name, setName] = useString(resource, core.properties.name, valueOpts);
   const [, setIcon] = useSubject(
@@ -115,6 +118,7 @@ export function AgentProfileHeader({ subject }: { subject: string }) {
         type='button'
         onClick={() => inputRef.current?.click()}
         title={hasPicture ? 'Change your picture' : 'Add a picture'}
+        disabled={!resource.isReady()}
         data-test='change-avatar'
       >
         {hasPicture ? (
@@ -137,6 +141,7 @@ export function AgentProfileHeader({ subject }: { subject: string }) {
         <NameInput
           id='agent-display-name'
           data-test='agent-name-input'
+          disabled={!resource.isReady()}
           value={draft}
           placeholder='Add your name'
           onChange={e => setDraft(e.target.value)}

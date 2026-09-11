@@ -1,4 +1,13 @@
+import { mockManagedPortal } from './managed-test-utils';
 import { test, expect } from '@playwright/test';
+
+// The portal is mocked on this origin; its dashboard must reach page.route
+// rather than the app service worker's navigation fallback.
+test.use({ serviceWorkers: 'block' });
+
+test.beforeEach(async ({ page }) => {
+  await mockManagedPortal(page);
+});
 
 // A portal session is not evidence that an encrypted recovery backup exists.
 test('does not offer account recovery when the signed-in account has no backup', async ({

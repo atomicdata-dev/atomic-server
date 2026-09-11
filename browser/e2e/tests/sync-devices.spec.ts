@@ -73,12 +73,12 @@ test.describe('sync page devices', () => {
     await expect(recovery).toContainText('Sign in to your');
     await expect(recovery).not.toContainText('Not set up');
     await expect(page.locator('body')).not.toContainText('[i18n-404:');
-    await expect(
-      cloud.getByRole('button', { name: 'Set up Cloud Server', exact: true }),
-    ).toBeVisible();
     accountConnected = true;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect(recovery).toContainText('sync-account@example.com');
+    await expect(
+      cloud.getByRole('button', { name: 'Set up Cloud Server', exact: true }),
+    ).toBeVisible();
     await expect(page.getByTestId('link-provider-panel')).not.toBeVisible();
   });
 

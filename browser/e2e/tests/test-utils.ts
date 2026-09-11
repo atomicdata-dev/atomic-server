@@ -1041,6 +1041,7 @@ export async function newResource(klass: string, page: Page) {
   };
 
   if (klass.startsWith('https://')) {
+    await page.getByText('Choose a class by URL', { exact: true }).click();
     await fillSearchBox(page, 'Search for a class or enter a URL', klass);
     await page.keyboard.press('Enter');
     await waitForResourceForm();
@@ -1052,7 +1053,13 @@ export async function newResource(klass: string, page: Page) {
     // click times out. Gate on the button's visibility explicitly — its
     // appearance IS the "class is searchable" readiness signal — with a budget
     // that tolerates a slow index flush instead of a blind pre-sleep.
-    const classButton = page.locator(`button:has-text("${klass}")`);
+    const classLabel = klass.toLowerCase() === 'chatroom' ? 'Chat room' : klass;
+    const classButton = page.getByRole('main').getByRole('button', {
+      name: new RegExp(
+        `^${classLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+        'i',
+      ),
+    });
     await classButton.waitFor({ state: 'visible', timeout: 30000 });
     await classButton.click();
     // Wait for any of: URL leaves /app/new (basic-instance handlers), a
@@ -1123,14 +1130,16 @@ export async function createTableFromDialog(
   await newResource('table', page);
 
   if (template) {
-    await page.getByRole('button', { name: template }).click();
+    await currentDialog(page).getByRole('button', { name: template }).click();
   }
 
   if (name !== undefined) {
     await page.getByPlaceholder('New Table').fill(name);
   }
 
-  await page.getByRole('button', { name: 'Create' }).click();
+  await currentDialog(page)
+    .getByRole('button', { name: 'Create', exact: true })
+    .click();
   await waitForTableBuild(page);
 }
 
