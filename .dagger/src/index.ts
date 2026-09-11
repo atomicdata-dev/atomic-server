@@ -1088,12 +1088,13 @@ export class AtomicServer {
         '/lib/src/genesis_test_vectors.json',
         this.source.file('lib/src/genesis_test_vectors.json'),
       )
-      // data-browser/src/helpers/pairing.test.ts reads a repo-root testdata
-      // fixture the same way (`../../../../testdata/pairing-request.json`
-      // from /app/data-browser/src/helpers) — mount just this one file.
+      // Tests read shared fixtures directly from the repository-root paths.
+      // Include the manifest and planner corpus as well as pairing fixtures.
+      .withDirectory('/testdata', this.source.directory('testdata'))
+      // Mount only the required file under /lib to preserve OS libraries.
       .withFile(
-        '/testdata/pairing-request.json',
-        this.source.file('testdata/pairing-request.json'),
+        '/lib/defaults/tasks.json',
+        this.source.file('lib/defaults/tasks.json'),
       );
 
     // Build all packages since they may depend on each other's built artifacts
