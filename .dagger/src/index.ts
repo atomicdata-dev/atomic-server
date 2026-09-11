@@ -275,27 +275,49 @@ export class AtomicServer {
    * Mount shared crates.io + git dependency caches under `cargoHome`, and
    * pin `CARGO_BUILD_JOBS` so rustc doesn't spawn one job per visible host
    * CPU (containers see the full Mancave SMT count). Registry content is
-   * identical across glibc/musl images, so both share the `cargo` /
-   * `cargo-git` volumes — only the mount path differs.
+   * identical across glibc/musl images, so both share dependency volumes
+   * and Cargo cache locks — only the mount path differs.
    */
   private withCargoHomeCache(
     container: Container,
     cargoHome: string,
   ): Container {
-    return container
-      .withMountedCache(`${cargoHome}/registry`, dag.cacheVolume('cargo'), {
-        // Cargo locks live outside this registry mount, so separate containers
-        // cannot coordinate extraction. Lock the mount to prevent concurrent
-        // unpack failures (including bzip2-sys .cargo-ok collisions).
-        sharing: CacheSharingMode.Locked,
-      })
-      .withMountedCache(`${cargoHome}/git`, dag.cacheVolume('cargo-git'), {
-        sharing: CacheSharingMode.Shared,
-      })
-      .withEnvVariable(
-        'CARGO_BUILD_JOBS',
-        this.hostKnobs.cargoBuildJobs,
-      );
+    return (
+      container
+        .withMountedCache(
+          `${cargoHome}/registry`,
+          dag.cacheVolume('cargo-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        .withMountedCache(
+          `${cargoHome}/git`,
+          dag.cacheVolume('cargo-git-shared-locks-v1'),
+          {
+            sharing: CacheSharingMode.Shared,
+          },
+        )
+        // Cargo locks live in CARGO_HOME, outside registry/git. Sharing only
+        // those directories leaves every container with independent locks and
+        // lets simultaneous downloads race while unpacking the same crate.
+        // Put both lock inodes in the shared registry volume; Cargo still only
+        // serializes downloads/mutations, not the entire parallel build lane.
+        // Fresh volume names keep older jobs with private locks out of this cache.
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache',
+          `${cargoHome}/.package-cache`,
+        ])
+        .withExec([
+          'ln',
+          '-sf',
+          'registry/.package-cache-mutate',
+          `${cargoHome}/.package-cache-mutate`,
+        ])
+        .withEnvVariable('CARGO_BUILD_JOBS', this.hostKnobs.cargoBuildJobs)
+    );
   }
 
   /**
