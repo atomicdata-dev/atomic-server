@@ -1427,3 +1427,9 @@ Merge integration regression: `IntegrationDiscovery.test.ts` imports the bundled
 integration UI and catches a Dialog → Feedback → file-picker initialization cycle.
 Dialog loads its onboarding feedback lazily so its exported content component is
 initialized before feedback-dependent dialogs are imported.
+
+Standalone Rust library tests enable Tokio’s multithread runtime through a dev
+dependency. `db::app_agent::store_tests::revocation_survives_process_exit_without_destructors`
+exercises runtime construction in both the parent and its abruptly exiting child
+with `cargo test -p atomic_lib --features db-redb --lib`, without workspace feature
+unification or an extra Tokio feature on the command line.
