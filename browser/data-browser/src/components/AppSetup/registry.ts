@@ -5,6 +5,10 @@ import {
   credentialLink,
 } from '../../../../../integrations/github-issues/setup';
 import type { SetupAdapter } from './types';
+import {
+  setup as notionSetup,
+  setupDeclaration as notionDeclaration,
+} from '../../../../../integrations/notion/setup';
 
 /** Explicit migration adapter: the legacy installer remains host code until its effects migrate. */
 const github: SetupAdapter = {
@@ -48,7 +52,29 @@ const github: SetupAdapter = {
     return { subject: result.table };
   },
 };
-const adapters = [github];
+const notion: SetupAdapter = {
+  id: 'notion',
+  icon: '📓',
+  declaration: notionDeclaration,
+  choices: async () => {
+    throw new Error('Unknown setup lookup');
+  },
+  prepare: notionSetup,
+  credential: {
+    label: 'Notion connection token',
+    description:
+      'Stored on your AtomicServer, outside setup arguments. Compatibility notes appear before you approve any sync.',
+  },
+  connect: async (raw, token, { store, drive }) => {
+    const args = notionSetup(raw);
+    const { installNotion } =
+      await import('../../chunks/PluginRuns/notionInstaller');
+    const result = await installNotion(store, drive, args.dataSource, token);
+
+    return { subject: result.table };
+  },
+};
+const adapters = [github, notion];
 
 export function listAppSetups() {
   return adapters.map(({ id, declaration }) => ({ id, ...declaration }));
