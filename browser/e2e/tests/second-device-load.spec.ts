@@ -63,7 +63,7 @@ test(
     // generic root-page helper can mistake a public sidebar for a signed-in
     // session and return without ever entering the secret.
     await expect(
-      p2.getByRole('heading', { name: 'Sign in to access this drive' }),
+      p2.getByRole('heading', { name: 'Unlock this drive' }),
     ).toBeVisible();
     await p2.getByLabel('Agent secret').fill(secret);
 

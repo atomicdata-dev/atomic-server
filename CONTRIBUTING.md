@@ -123,6 +123,23 @@ tags as production.
 - Open a PR against `develop`.
 - Make sure all relevant tests / lint pass.
 
+### Pre-commit checks
+
+Run `cd browser && pnpm install` to install dependencies and activate the Husky
+pre-commit hook (or `pnpm run prepare` there for an existing installation).
+The hook checks a temporary copy of the Git index, so partially staged files
+are checked as they will be committed. It leaves your working tree and staging
+area untouched and blocks the commit if a check fails or a required tool is missing.
+
+Browser changes run `pnpm run lint`, including the existing formatting checks.
+Rust source, manifests, lockfile, and Cargo/toolchain configuration changes run
+the main workspace's CI Clippy command with warnings treated as errors. This
+uses the `light` feature and excludes the separate desktop and Flutter toolchains.
+Installed browser dependencies and the Cargo target cache are reused. Other
+changes, such as documentation alone, skip these checks.
+
+Local Git hooks can be bypassed; CI remains the shared enforcement gate.
+
 ### Branching
 
 Create new branches off `develop`. When an issue is ready for PR, open PR against `develop`.

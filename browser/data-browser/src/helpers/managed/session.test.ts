@@ -32,3 +32,10 @@ it('does not call the SaaS logout endpoint on a FOSS server', async () => {
   // The local token still goes, so a stale link cannot outlive the sign-out.
   expect(setTokenMock).toHaveBeenCalledWith(null);
 });
+
+it('does not probe for an account without a configured control plane', async () => {
+  configured.mockReturnValueOnce(false);
+  fetchMock.mockClear();
+  expect(await getManagedAccount()).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
