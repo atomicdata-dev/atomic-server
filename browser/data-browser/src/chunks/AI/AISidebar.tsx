@@ -47,7 +47,15 @@ const AISidebar: React.FC = () => {
   const store = useStore();
   const [rerenderKey, updateRenderKey] = useReducer(prev => prev + 1, 0);
   const { shouldGenerateTitles } = useAISettings();
-  const { isOpen, contextItems, setContextItems, setIsOpen } = useAISidebar();
+  const {
+    isOpen,
+    contextItems,
+    setContextItems,
+    setIsOpen,
+    pendingAsk,
+    clearPendingAsk,
+  } = useAISidebar();
+  const [autoSubmitMessage, setAutoSubmitMessage] = useState<string>();
   const { privateDrive } = usePrivateDrive();
 
   const [messages, setMessages] = useState<AtomicUIMessage[]>([]);
@@ -263,7 +271,7 @@ const AISidebar: React.FC = () => {
     setMessages(nextMessages);
   };
 
-  const startNewChat = () => {
+  const startNewChat = useCallback(() => {
     // The user explicitly wants a fresh chat — don't immediately re-open the
     // existing chat for the resource they're viewing.
     reopenAttemptRef.current = currentSubject;
@@ -282,7 +290,31 @@ const AISidebar: React.FC = () => {
     autoContextSubjectRef.current = undefined;
     setContextItems([]);
     updateRenderKey();
-  };
+    // Everything above is a ref or a setState, both stable — so this identity
+    // only changes with the subject, and the effect below can depend on it.
+  }, [currentSubject, setContextItems]);
+
+  // A request handed off from another screen. Always a NEW chat: auto-submit only fires on
+  // an empty one, and a new request does not belong in the middle of whatever
+  // conversation happened to be open.
+  //
+  // An effect rather than an event handler because the ask can be made while
+  // this component is unmounted (the panel was closed), which is why it waits
+  // in the context provider at all. Arriving here IS the external event.
+  useEffect(() => {
+    if (!pendingAsk) return;
+
+    startNewChat();
+
+    if (pendingAsk.context?.length) {
+      // After startNewChat, which clears them.
+      setContextItems(pendingAsk.context);
+    }
+
+    setAutoSubmitMessage(pendingAsk.prompt);
+    // Consume the handoff once, including when the panel was initially closed.
+    clearPendingAsk();
+  }, [pendingAsk, startNewChat, setContextItems, clearPendingAsk]);
 
   const onRegenerateMessage = async (message: AtomicUIMessage) => {
     const isHistorical = compactedMessages.some(m => m.id === message.id);
@@ -402,6 +434,7 @@ const AISidebar: React.FC = () => {
     // auto-inserted context item.
     // When the user opens the AI sidebar and the chat is completely empty, we add the current subject to the context.
     if (
+      !pendingAsk &&
       isOpen &&
       currentSubject &&
       messages.length === 0 &&
@@ -421,6 +454,7 @@ const AISidebar: React.FC = () => {
     currentSubject,
     messages.length,
     contextItems.length,
+    pendingAsk,
     setContextItems,
   ]);
 
@@ -432,6 +466,7 @@ const AISidebar: React.FC = () => {
     <React.Fragment key={rerenderKey}>
       {/* When resetting the chat it is better to refresh the whole component because the useChat hook keeps internal state that is not easy to reset. */}
       <RealAIChat
+        autoSubmitMessage={autoSubmitMessage}
         initialMessages={messages}
         historicalMessages={compactedMessages}
         onNewMessage={addNewMessage}

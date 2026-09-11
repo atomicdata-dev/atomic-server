@@ -3,16 +3,33 @@ import React, { useCallback, useContext, useState, createContext } from 'react';
 import type { AIMessageContext } from '../../chunks/AI/types';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
 
+/**
+ * A request handed to the assistant from another screen, with resource context.
+ */
+export interface AIAsk {
+  /** Sent as the first message of a new chat. */
+  prompt: string;
+  /** Attached to it, so the assistant can read what the question is about. */
+  context?: AIMessageContext[];
+}
+
 export const AISidebarContext = createContext<{
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   contextItems: AIMessageContext[];
   setContextItems: React.Dispatch<React.SetStateAction<AIMessageContext[]>>;
+  /** Opens the panel on a new chat and asks. */
+  askAI: (ask: AIAsk) => void;
+  pendingAsk: AIAsk | undefined;
+  clearPendingAsk: () => void;
 }>({
   isOpen: false,
   setIsOpen: () => {},
   contextItems: [],
   setContextItems: () => {},
+  askAI: () => {},
+  pendingAsk: undefined,
+  clearPendingAsk: () => {},
 });
 
 export const useAISidebar = () => {
@@ -36,10 +53,31 @@ export const AISidebarContextProvider: React.FC<React.PropsWithChildren> = ({
   );
 
   const [contextItems, setContextItems] = useState<AIMessageContext[]>([]);
+  // Held here rather than delivered directly, because the sidebar may not be
+  // mounted yet when the ask is made — the caller opens it in the same breath.
+  const [pendingAsk, setPendingAsk] = useState<AIAsk>();
+
+  const askAI = useCallback(
+    (ask: AIAsk) => {
+      setPendingAsk(ask);
+      setPanelOpen('ai', true);
+    },
+    [setPanelOpen],
+  );
+
+  const clearPendingAsk = useCallback(() => setPendingAsk(undefined), []);
 
   return (
     <AISidebarContext.Provider
-      value={{ isOpen, setIsOpen, contextItems, setContextItems }}
+      value={{
+        isOpen,
+        setIsOpen,
+        contextItems,
+        setContextItems,
+        askAI,
+        pendingAsk,
+        clearPendingAsk,
+      }}
     >
       {children}
     </AISidebarContext.Provider>

@@ -20,6 +20,7 @@ import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransit
 export interface CustomResourceDialogProps {
   parent: string;
   onClose: () => void;
+  initialTemplateId?: string;
   skipNavigation?: boolean;
   onCreated?: (resource: Resource) => void;
 }
@@ -39,6 +40,7 @@ interface NewResourceUIContextType {
     classType: string,
     parent: string,
     options?: {
+      initialTemplateId?: string;
       skipNavigation?: boolean;
       onCreated?: (resource: Resource) => void;
     },
@@ -94,6 +96,7 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
       isA: string,
       parent: string,
       options?: {
+        initialTemplateId?: string;
         skipNavigation?: boolean;
         onCreated?: (resource: Resource) => void;
       },
@@ -108,6 +111,7 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
         setDialog(
           <Comp
             parent={parent}
+            initialTemplateId={options?.initialTemplateId}
             onClose={onClose}
             skipNavigation={options?.skipNavigation}
             onCreated={options?.onCreated}

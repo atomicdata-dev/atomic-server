@@ -1954,7 +1954,6 @@ msgstr "Vista de lista"
 msgid "Grid View"
 msgstr "Vista de cuadrícula"
 
-#: src/routes/NewResource/NewRoute.tsx
 #: src/views/FolderPage/GridView.tsx
 msgid "Create new resource"
 msgstr "Crear nuevo recurso"
@@ -2055,6 +2054,7 @@ msgstr "Error copiado al portapapeles"
 #: src/chunks/TablePage/EditorCells/AtomicURLCell.tsx
 #: src/components/Toaster.tsx
 #: src/components/forms/InputResourceArray.tsx
+#: src/routes/NewResource/NewRoute.tsx
 msgid "Clear"
 msgstr "Borrar"
 
@@ -2343,7 +2343,6 @@ msgid "Ok"
 msgstr "Aceptar"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
-#: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 #: src/views/OntologyPage/Class/NewClassInstanceButton.tsx
 msgid "Table"
@@ -4053,7 +4052,6 @@ msgstr ""
 
 #: src/chunks/TablePage/Kanban/KanbanView.tsx
 #: src/chunks/TablePage/createTableFromSpec.ts
-#: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Row"
 msgstr ""
@@ -7386,9 +7384,8 @@ msgstr "Copiar enlace"
 msgid "Advanced"
 msgstr "Avanzado"
 
-#: src/routes/NewResource/NewRoute.tsx
-msgid "under"
-msgstr ""
+#~ msgid "under"
+#~ msgstr ""
 
 #: src/routes/Share/ShareRoute.tsx
 msgid "Read more about permissions in the"
@@ -8000,4 +7997,82 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Could not verify the local copy. The server connection has been kept."
+msgstr ""
+
+#: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
+msgid "Change template"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "In"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Create something new"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Describe what you want to create"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "A project tracker with tasks, deadlines and a kanban board…"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Create with assistant"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Describe your idea and build it with the Atomic assistant."
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Search templates and resource types"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Search templates and resource types…"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "No matches. Try another search or describe your idea to the assistant above."
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Start blank"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Table template"
+msgstr ""
+
+#. 0: item.title
+#. 0: item.title
+#: src/routes/NewResource/NewRoute.tsx
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Use {0} template"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Loading…"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Website template"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Start with a template"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Your resource types"
+msgstr ""
+
+#: src/routes/NewResource/NewRoute.tsx
+msgid "Choose a class by URL"
 msgstr ""

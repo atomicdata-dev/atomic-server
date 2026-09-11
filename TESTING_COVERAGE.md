@@ -13,6 +13,14 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## New-resource catalog
+
+`creationCatalog.test.ts` covers catalog completeness, multiword search and the
+assistant request's parent context. `new-resource-catalog.spec.ts` covers template
+search, table creation inside a folder, mobile layout and retaining the assistant
+request before a model is connected, plus nested website template creation.
+Actual model generation is not exercised by these tests.
+
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint

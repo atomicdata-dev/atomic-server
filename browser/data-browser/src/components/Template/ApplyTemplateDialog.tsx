@@ -22,12 +22,14 @@ import type { Template } from './template';
 
 interface ApplyTemplateDialogProps {
   template?: Template;
+  parent?: string;
   open: boolean;
   bindOpen: (open: boolean) => void;
 }
 
 export function ApplyTemplateDialog({
   template,
+  parent,
   bindOpen,
   open = false,
 }: ApplyTemplateDialogProps): React.JSX.Element {
@@ -35,6 +37,7 @@ export function ApplyTemplateDialog({
   const navigate = useNavigateWithTransition();
   const [dialogProps, show, close, isOpen] = useDialog({ bindShow: bindOpen });
   const { drive } = useSettings();
+  const destination = parent ?? drive;
   const [error, setError] = useState<string>();
   const [applying, setApplying] = useState(false);
   const [existingRootSubject, setExistingRootSubject] = useState<string>();
@@ -49,14 +52,17 @@ export function ApplyTemplateDialog({
     if (!rootLocalId) return undefined;
 
     const [subject] = await store.search('', {
-      parents: drive,
-      filters: { [core.properties.localId]: rootLocalId },
+      parents: destination,
+      filters: {
+        [core.properties.localId]: rootLocalId,
+        [core.properties.parent]: destination,
+      },
       include: true,
       limit: 1,
     });
 
     return subject;
-  }, [drive, store, template]);
+  }, [destination, store, template]);
 
   const alreadyApplied = existingRootSubject !== undefined;
 
@@ -69,7 +75,7 @@ export function ApplyTemplateDialog({
       // The imported resources set `parent`; children are resolved via the
       // `parent=` query, so no explicit child list needs maintaining.
       await store.importJsonAD(JSON.stringify(template.resources), {
-        parent: drive,
+        parent: destination,
       });
       const rootSubject = await findRootSubject();
 
@@ -113,7 +119,7 @@ export function ApplyTemplateDialog({
             {error && <InlineErrMessage>{error}</InlineErrMessage>}
             {alreadyApplied && (
               <InlineErrMessage>
-                This template has already been applied to this drive
+                This template has already been applied here
               </InlineErrMessage>
             )}
             <Button
