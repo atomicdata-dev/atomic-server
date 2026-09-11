@@ -35,6 +35,7 @@ import { useClearCommands } from './hooks/useClearCommands';
 import { usePasteCommand } from './hooks/usePasteCommand';
 import { DndWrapper } from './DndWrapper';
 import { VisuallyHidden } from '@components/VisuallyHidden';
+import { Spinner } from '@components/Spinner';
 import { useClickAwayListener } from '../../hooks/useClickAwayListener';
 import { KeyboardInteraction } from './helpers/keyboardHandlers';
 import { useAvailableHeight } from './hooks/useAvailableHeight';
@@ -52,7 +53,7 @@ interface FancyTableProps<T> {
   columnToKey: (column: T) => string;
   labelledBy: string;
   /**
-   * The rows are still being fetched. Rendered as `aria-busy` on the grid so
+   * The rows are still being fetched. Shows a spinner and `aria-busy` so
    * assistive tech, and tests, can tell a loading grid from a settled one:
    * the placeholder row is drawn before the collection answers, so "a row is
    * visible" no longer means "the data has arrived".
@@ -361,6 +362,16 @@ function FancyTableInner<T>({
             />
           </PercentageInsanityFix>
         </RelativeScrollArea>
+        {busy && (
+          <div role='row'>
+            <LoadingCell role='gridcell' aria-colspan={columns.length + 2}>
+              <span role='status'>
+                <Spinner size='20px' />
+                Loading
+              </span>
+            </LoadingCell>
+          </div>
+        )}
       </Table>
     </DndWrapper>
   );
@@ -406,6 +417,17 @@ const Table = styled.div.attrs<TableProps>(p => ({
   &:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px ${p => p.theme.colors.main};
+  }
+`;
+
+const LoadingCell = styled.div`
+  padding: ${p => p.theme.size()};
+
+  > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: ${p => p.theme.size()};
   }
 `;
 

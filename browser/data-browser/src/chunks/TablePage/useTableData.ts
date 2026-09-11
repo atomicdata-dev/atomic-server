@@ -98,7 +98,7 @@ export function useTableData(
     queryFilters: queryFilter.filters,
     queryExpressionFilters: expressionFilters,
     collection,
-    ready,
+    ready: classReady && ready,
     invalidateCollection,
     mapAll,
   };
