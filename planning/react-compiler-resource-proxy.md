@@ -13,6 +13,10 @@ the snapshot fields. AgentProfileHeader no longer needs `use no memo`; productio
 E2E verifies profile editing, invitations, and live username updates. Library
 tests check stable mutation identity and immutable status across notifications.
 
+The data inspector also uses `useSaveState`: a production regression verifies
+its warning appears for an offline edit and clears after synchronization without
+replacing the Resource. Save status remains independent of read readiness.
+
 ## Remaining audit
 
 A direct `resource.get(...)`, `resource.props.foo`, or `resource.isReady()` read

@@ -63,7 +63,7 @@ browser flow; standalone recovery remains self-managed.
 | [`content-i18n.md`](./content-i18n.md) | **LocalizedText + template locales shipped.** Remaining: TranslationsBar, `useTranslation`, `/query` `lang`, search language filter. |
 | [`website-templates.md`](./website-templates.md) | Template repair complete (DID). Remaining CMS product: drafts-from-site, i18n tooling, canonical paths. |
 | [`structural-problems-index.md`](./structural-problems-index.md) | **Live index.** Highest remaining: React Compiler / Resource proxy (#1), audit not started while the compiler is on. #6 mostly shipped; #2/#3 server side done 2026-09-04. |
-| [`react-compiler-resource-proxy.md`](./react-compiler-resource-proxy.md) | **Planned, audit not started.** Stale UI from Compiler memoizing Resource proxy reads; compiler on since 2026-08-19, field instance M15a. |
+| [`react-compiler-resource-proxy.md`](./react-compiler-resource-proxy.md) | **Partial.** Immutable read/save status hooks and the data-inspector subscription shipped; remaining render-time property getters need incremental regression-driven migration. |
 | [`canvas-undo-consolidation.md`](./canvas-undo-consolidation.md) | Phase A + C landed (browser). Phase B (Flutter action-stack removal) open. |
 | [`index-performance.md`](./index-performance.md) | First tranche shipped. Structural permission-check fix is `zones.md`, not built. |
 | [`disk-storage-and-persistence-optimization.md`](./disk-storage-and-persistence-optimization.md) | **Proposal.** Full-snapshot writes, no auto-compaction, O(file) open fsync. |
