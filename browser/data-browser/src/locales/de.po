@@ -7820,6 +7820,17 @@ msgstr ""
 msgid "Team chat"
 msgstr ""
 
+#: src/routes/NewResource/NewRoute.tsx
+msgid "under"
+msgstr ""
+
+#. 0: ' '
+#: src/chunks/Templates/DriveTemplateSetup.tsx
+msgid ""
+"Start with a template,{0} <0>create a blank drive</0> , or describe a space "
+"of your own."
+msgstr ""
+
 #~ msgid ""
 #~ "Enter your recovery code to show your secret or add a passkey on this "
 #~ "device. Your existing recovery code will keep working."

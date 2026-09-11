@@ -7960,6 +7960,17 @@ msgstr ""
 msgid "Team chat"
 msgstr ""
 
+#: src/routes/NewResource/NewRoute.tsx
+msgid "under"
+msgstr ""
+
+#. 0: ' '
+#: src/chunks/Templates/DriveTemplateSetup.tsx
+msgid ""
+"Start with a template,{0} <0>create a blank drive</0> , or describe a space "
+"of your own."
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexto compactado"
 

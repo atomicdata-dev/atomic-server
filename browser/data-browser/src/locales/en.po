@@ -8153,6 +8153,15 @@ msgstr "Board"
 msgid "Team chat"
 msgstr "Team chat"
 
+#. 0: ' '
+#: src/chunks/Templates/DriveTemplateSetup.tsx
+msgid ""
+"Start with a template,{0} <0>create a blank drive</0> , or describe a space "
+"of your own."
+msgstr ""
+"Start with a template,{0} <0>create a blank drive</0> , or describe a space "
+"of your own."
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Context compacted"
 
