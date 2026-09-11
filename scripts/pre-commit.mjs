@@ -91,7 +91,14 @@ try {
     console.log('pre-commit: linting staged browser snapshot');
     execFileSync('pnpm', ['run', 'lint'], {
       cwd: join(snapshot, 'browser'),
-      env,
+      env: {
+        ...env,
+        // This snapshot borrows node_modules through symlinks. Never let pnpm
+        // repair/install them. Export both names for nested `pnpm run` calls:
+        // pnpm 11 reads pnpm_config_*; older versions use npm_config_*.
+        pnpm_config_verify_deps_before_run: 'false',
+        npm_config_verify_deps_before_run: 'false',
+      },
       stdio: 'inherit',
     });
   }
