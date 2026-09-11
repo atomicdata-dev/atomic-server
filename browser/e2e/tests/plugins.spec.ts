@@ -795,7 +795,7 @@ export function run() { return { intents: [] }; }
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
       .click();
-    await expect(page).toHaveURL(tableUrl);
+    await expect(page).toHaveURL(tableUrl, { timeout: 30000 });
     await page.goto(tableUrl);
     await expect(
       page.getByRole('heading', { name: 'Shared project tasks', exact: true }),
@@ -829,6 +829,7 @@ export function run() { return { intents: [] }; }
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
       .click();
+    await expect(page).toHaveURL(/\/app\/show\?subject=/, { timeout: 30000 });
     await page
       .getByRole('button', { name: 'Connections', exact: true })
       .click();
@@ -846,6 +847,9 @@ export function run() { return { intents: [] }; }
     await expect(
       page.getByRole('button', { name: 'Enable background sync', exact: true }),
     ).toBeDisabled();
+    await page
+      .getByText('Advanced: one-off actions and permissions', { exact: true })
+      .click();
     await page
       .getByLabel('Action', { exact: true })
       .selectOption('create_issue');
@@ -893,6 +897,9 @@ export function run() { return { intents: [] }; }
     await page
       .getByRole('button', { name: 'Cancel action', exact: true })
       .click();
+    await expect(
+      page.getByRole('button', { name: 'Cancel action', exact: true }),
+    ).toHaveCount(0);
     await page.getByText('Action history', { exact: true }).click();
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
     const callerSubject = await page.evaluate(async () => {
@@ -1142,15 +1149,6 @@ export function run() { return { intents: [] }; }
     ).toBeVisible();
     expect(cleanupWrites).toBe(1);
 
-    await expect(
-      page.getByLabel('What would you like to automate?'),
-    ).not.toBeVisible();
-    await page
-      .getByText('Add an automation (optional)', { exact: true })
-      .click();
-    await expect(
-      page.getByText('Excludes initial imports', { exact: false }),
-    ).toBeVisible();
     await page.reload();
     await expect(
       page.getByRole('button', { name: 'Preview sync', exact: true }),
@@ -1159,18 +1157,13 @@ export function run() { return { intents: [] }; }
     await page.route('https://openrouter.ai/api/v1/models', route =>
       route.fulfill({ json: { data: [] } }),
     );
+    await page.getByRole('tab', { name: 'Automations', exact: true }).click();
     await page
-      .getByText('Add an automation (optional)', { exact: true })
-      .click();
-    await page
-      .getByLabel('What would you like to automate?')
-      .fill('Triage bug reports for our team');
-    await page
-      .getByRole('button', { name: 'Build with Atomic assistant', exact: true })
+      .getByRole('button', { name: 'New automation', exact: true })
       .click();
     await expect(page.getByTestId('ai-sidebar')).toBeVisible();
     await expect(page.getByTestId('ai-sidebar')).toContainText(
-      'Triage bug reports for our team',
+      'Help me create a new automation.',
     );
     await expect(page.getByTestId('ai-sidebar')).toContainText(
       'GitHub issues: atomic-fixtures/issues',

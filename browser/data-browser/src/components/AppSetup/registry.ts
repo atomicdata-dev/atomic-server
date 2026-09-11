@@ -38,15 +38,12 @@ const github: SetupAdapter = {
   prepare: setup,
   connect: async (raw, token, { store, drive }) => {
     const args = setup(raw);
-    const [{ install }, { default: source }] = await Promise.all([
-      import('../../../../../integrations/github-issues/atomic'),
-      import('../../../../../integrations/github-issues/plugin.js?raw'),
-    ]);
-    const result = await install(
+    const { installGitHub } =
+      await import('../../chunks/PluginRuns/githubInstaller');
+    const result = await installGitHub(
       store,
       drive,
       args.repository,
-      source,
       token,
       args.destination || undefined,
     );

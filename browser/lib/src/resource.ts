@@ -92,10 +92,9 @@ export const unknownSubject = 'unknown-subject';
 
 /**
  * Outcome of {@link Resource.save}:
- *  - `'persisted'` — the server acknowledged the commit.
- *  - `'offline'`   — server unreachable; saved locally, drain retries
- *                    on reconnect (also returned for a child queued
- *                    behind an unsaved parent).
+ *  - `'persisted'` — server acknowledged, or saved in an explicitly local-only drive.
+ *  - `'offline'`   — not acknowledged; queued for sync (including failed or
+ *                    backed-off attempts and children awaiting an unsaved parent).
  *  - `'noop'`      — nothing to save.
  */
 export type SaveResult = 'persisted' | 'offline' | 'noop';
@@ -3119,9 +3118,8 @@ export class Resource<C extends OptionalClass = any> {
   /**
    * Persist this resource. Resolves once the change is durable:
    *
-   *  - `'persisted'` — the server acknowledged the commit.
-   *  - `'offline'`   — server unreachable; saved to clientDb, the drain
-   *                    retries on reconnect.
+   *  - `'persisted'` — server acknowledged, or saved in an explicitly local-only drive.
+   *  - `'offline'`   — queued for sync; no server acknowledgement yet.
    *  - `'noop'`      — nothing to save (no unsaved changes, nothing
    *                    pending).
    *
@@ -3367,7 +3365,11 @@ export class Resource<C extends OptionalClass = any> {
       // too (for example a dashboard block renamed in its config dialog).
       await this.persistToClientDb();
 
-      return 'persisted';
+      // Draining attempts queued writes; retryable failures/backoff leave them
+      // pending without throwing. Local durability is not a server acknowledgement.
+      return this.store.outbox.hasPending(this.subject)
+        ? 'offline'
+        : 'persisted';
     } catch (e) {
       if (isNetworkError(e)) {
         this.store.setServerConnected(false);

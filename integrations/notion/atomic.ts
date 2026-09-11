@@ -55,7 +55,10 @@ export async function install(
         `${source}\nexport const manifest=${JSON.stringify(manifest(id))};`,
     },
   });
-  await plugin.save();
+  if ((await plugin.save()) === 'offline')
+    throw new Error(
+      'The app has not synced to AtomicServer yet. Check workspace sync before continuing.',
+    );
   const secretUrl = `${store.getServerUrl()}/${typeof token === 'string' ? 'plugin-secret' : 'integration-oauth/notion/bind'}`;
   const response = await fetch(secretUrl, {
     method: 'POST',

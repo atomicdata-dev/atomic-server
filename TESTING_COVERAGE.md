@@ -1,8 +1,15 @@
+Save acknowledgement: `browser/lib/src/save-acknowledgement.test.ts` reproduces
+an online genesis POST failure reported as persisted. It verifies pending/backoff
+saves return offline and a later acknowledged retry preserves the subject.
+
 Installation prerequisites: `browser/lib/src/plugin-installation.test.ts` checks
 local-only rejection without a server call, missing server resources, network
 failure and successful server visibility. `app-setup.spec.ts` verifies the local-only
 error clears the credential, stays retryable and does not submit it to the server.
-Full GitHub installation remains failing; the server cannot find the new app.
+The missing-app failure was traced to a failed database write and mismatched
+server executable. Both GitHub installation browser flows pass after recovery: existing-table views
+are preserved, and the new-board flow covers action review, permissions, history
+cleanup and the current assistant handoff. External approval transport is stubbed.
 
 # Testing coverage map
 

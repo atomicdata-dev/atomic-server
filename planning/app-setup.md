@@ -5,7 +5,8 @@
 - [x] Migrate GitHub's form; retain its installer as an explicit legacy adapter.
 - [x] Assistant discovery and prefilled setup handoff, without credentials in model context.
 - [x] Verify validation, credential isolation, and browser setup handoff.
-- [ ] Accept full installation against a matching backend and migrate remaining setup execution.
+- [x] Accept GitHub installation against a matching backend, including reuse of existing task views.
+- [ ] Migrate remaining setup execution into the sandbox and make installation resumable.
 
 Remaining convergence: migrate installer effects into the sandboxed action lifecycle,
 resumable setup after partial creation, GitHub OAuth/account discovery, and Notion OAuth convergence.
@@ -14,11 +15,11 @@ user-authored setup functions on the frontend origin. Registration is not a sand
 
 
 Validation: shared validator tests (3), package/schema/error tests (4), and browser
-form/assistant-handoff tests (2) pass. Typecheck passes. End-to-end installation
-is not accepted: the broader tests could not discover a newly created shared task
-table, and credential storage returned "Could not store GitHub credential on
-AtomicServer". Investigate these against a matching healthy backend; do not infer
-installation success from the form tests. The pure setup normalization is currently
+form/assistant-handoff tests (2) pass. Typecheck passes. The earlier installation failures were traced to a database latched after an I/O
+error and a server executable without plugin routes. Reopening the database and
+building the branch restored compatible-table discovery and credential storage. The
+existing-table browser test now passes; the longer action-flow test also passes, including action review, permissions,
+history cleanup and the assistant handoff. The pure setup normalization is currently
 called by a bundled host adapter; exported setup functions in arbitrary stored
 plugin source are not invoked yet. Dynamic dependent account/repository lookup,
 portable setup permissions and translated package metadata remain open.
@@ -39,9 +40,34 @@ English until metadata localization is implemented.
 - [x] Reproduce credential failure: `/plugin-secret` returns 404 for the newly created app resource.
 - [x] Check server visibility of the workspace before either bundled installer creates resources.
 - [x] Refuse local-only workspaces without uploading them; leave prerequisite failures retryable.
-- [ ] Diagnose why the hosted install's newly saved app is absent on the server; verify full installation.
+- [x] Diagnose missing resources: the running database rejected writes after an I/O error, while save() incorrectly reported retained outbox writes as persisted.
+- [x] Verify installation, action review/permissions/history, and assistant handoff against the rebuilt plugin-branch server.
 
 The shared preflight prevents starting against an unavailable workspace. It is not
 an installation journal and does not prove the later resources have synced. The
-404 diagnosis does not yet establish whether the underlying cause is save timing,
-sync configuration, or the running backend version.
+server was reopened without deleting its data. The executable on disk also lacked
+plugin routes, so a matching branch build is needed for full acceptance.
+
+## Save acknowledgement
+
+- [x] Reproduce a failed genesis returning `persisted` while still queued.
+- [x] Return `offline` for retained outbox entries, including backoff; retry keeps the same subject.
+- [x] GitHub and Notion stop immediately when the app's initial save is pending.
+- [x] Client-library suite: 695 tests pass after rebasing onto the updated branch; frontend typecheck and library build pass.
+
+This fixes acknowledgement reporting, not resumable multi-resource installation.
+
+## Bundled GitHub source loading
+
+- [x] Replace dynamic raw-module destructuring with a lazy installer module that statically imports the bundle, matching Notion.
+- [x] Reject missing source before any GitHub installation writes.
+- [x] Update the browser action test to open the Advanced disclosure.
+
+The previous dynamic raw import yielded an undefined default in development;
+the resulting release contained only `undefined` and its manifest, so discovery
+worked but action execution reported a missing run export. Full action execution,
+not schema discovery alone, is the regression check for this failure.
+
+Browser acceptance uses synthetic credentials and a stubbed external approval transport; no live GitHub write was performed.
+
+- [ ] Reduce installation round trips: cold GitHub setup can exceed ten seconds; browser acceptance now waits explicitly for installation navigation (30-second bound).
