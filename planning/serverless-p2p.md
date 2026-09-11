@@ -400,7 +400,7 @@ Remaining legacy migration: an unsubscribed drive may already have data on a
 managed node, admitted under its 600-second bootstrap grace. Do not treat a
 root-resource snapshot or the account's enrollment list as proof of a complete
 local copy. Invite creation refuses browser-only conversion of such drives
-until an authenticated full-drive + attachment verification/migration exists.
+unless the user completes the checked per-device transition below.
 Keep the actual connection visible and existing copies intact. Need staging
 inspection to establish the reported drive's placement and deployed policy;
 the local policy default is evidence of a possible path, not proof of that
@@ -410,3 +410,26 @@ Validation: client-library negative invite tests, real WebRTC/OPFS invite
 acceptance with all AtomicServer data fetches disabled, and a two-identity app
 route test without `/invites` requests. Account creation/email roundtrip for a
 brand-new invited SaaS user remains a separate acceptance check.
+
+
+## Existing server connections (2026-09-11)
+
+- [x] Reproduce saved-but-disconnected and active-server states locally against
+  a real node, with a successful empty account enrollment response.
+- [x] Hide unrelated saved nodes and server pairing codes in managed local mode;
+  keep real active server connections visible, including unconfirmed hosting.
+- [x] Account enrollment failures remain unknown instead of implying no hosting.
+  An account list is not proof that nobody else pays for a shared drive.
+- [x] Offer an explicit browser-only transition for the current device. Check
+  authenticated server inventories against durable local version vectors and
+  snapshots, verify referenced blob bytes and hashes, recheck the inventory,
+  refuse pending writes/identity changes, then unsubscribe and persist routing.
+- [x] Normalize nested WASM Maps at the ClientDb boundary; otherwise history
+  inventory consumers see an empty record despite durable snapshots.
+- [x] Verify refusal on missing local history and preservation of edits and an
+  attachment across reload, with no HTTP or WebSocket data writes after switching.
+- [ ] Deploy and verify the reported staging drive with its actual subscription
+  and node admission policy. No automatic deletion of existing server copies,
+  subscription cancellation, or migration of other devices is performed.
+- [ ] Review bootstrap grace/admission separately so old data placement cannot
+  be mistaken for a paid hosting entitlement. New SaaS drives already start local.

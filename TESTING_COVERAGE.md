@@ -648,3 +648,22 @@ Paired SaaS `portal/e2e/recovery-passkey.spec.ts` uses Chromium virtual PRF auth
 - `browser/e2e/scripts/verify-peer-sync.mjs` with `ATOMIC_PEER_INVITE=1`: invitation bootstrap and real WebRTC reconciliation with HTTP data access disabled.
 - `browser/e2e/tests/recovery-option.spec.ts`: recovery availability in the managed welcome flow.
 - Existing-drive migration to browser-only storage and fresh-account email onboarding through a peer invitation remain unverified.
+
+- `browser/data-browser/src/helpers/passkeySupport.test.ts` checks secure-context and credential API availability. `browser/e2e/tests/passkey-unavailable.spec.ts` removes WebAuthn from the browser and verifies that account settings explain the limitation, hide passkey setup, and preserve recovery-code access. Native credential-provider failures with the API present remain outside this check.
+
+
+## Managed sync presentation and local transition
+
+`syncPresentation.test.ts` covers Vault-aware summaries and hiding unrelated
+saved managed nodes. `enrollmentApi.test.ts` distinguishes unknown hosting from a
+successful empty enrollment list. `client-db.test.ts` covers nested WASM Map
+normalization, and `local-drive-copy.test.ts` rejects incomplete history and
+missing/corrupt attachments.
+
+`managed-sync-presentation.spec.ts` uses a real local node and OPFS with mocked
+account/enrollment/Vault responses. It reproduces both reported connection states,
+checks refusal when local history cannot be read, switches to browser-only sync,
+and verifies an edit plus attachment survive reload without HTTP/WS data writes.
+It also exercises the compiled Vault session error path (no React hook in an
+error constructor). Actual staging billing/admission and multi-device migration
+remain separate acceptance checks.

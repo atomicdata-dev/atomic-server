@@ -251,6 +251,9 @@ importers:
       '@tomic/react':
         specifier: workspace:*
         version: link:../react
+      '@tomic/service-ui':
+        specifier: workspace:*
+        version: link:../service-ui
       '@uiw/codemirror-theme-github':
         specifier: ^4.25.10
         version: 4.25.10(@codemirror/language@6.12.3)(@codemirror/state@6.7.4)(@codemirror/view@6.43.0)
@@ -580,6 +583,18 @@ importers:
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@microsoft/api-extractor@7.58.7(@types/node@25.9.1))(@swc/core@1.15.40)(jiti@2.7.0)(postcss@8.5.28)(typescript@6.0.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  service-ui:
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.5
+        version: 19.2.15
+      react:
+        specifier: ^19.2.0
+        version: 19.2.6
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

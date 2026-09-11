@@ -74,3 +74,21 @@ describe('ClientDbWorker cold initialization', () => {
     }
   });
 });
+
+describe('ClientDbWorker version vectors', () => {
+  it('converts the nested Rust maps for drive and database inventories', async () => {
+    const db = new ClientDbWorker('wasm-url', 'worker-url');
+    const transport = db as unknown as {
+      send(message: unknown): Promise<unknown>;
+    };
+    vi.spyOn(transport, 'send').mockResolvedValue(
+      new Map([['did:ad:drive', new Map([['12345678901234567890', 42]])]]),
+    );
+    const expected = { 'did:ad:drive': { '12345678901234567890': 42 } };
+    expect(await db.getVersionVectorsForDrive('did:ad:drive')).toEqual(
+      expected,
+    );
+    expect(await db.getAllVersionVectors()).toEqual(expected);
+    vi.restoreAllMocks();
+  });
+});

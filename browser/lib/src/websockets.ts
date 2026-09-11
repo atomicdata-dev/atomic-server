@@ -1729,7 +1729,7 @@ export class WSClient {
   }
 
   /** Send an RBSR range-items query and await the server's items. */
-  private rbsrItems(drive: string, lo: string, hi?: string): Promise<Item[]> {
+  public rbsrItems(drive: string, lo: string, hi?: string): Promise<Item[]> {
     return new Promise<Item[]>((resolve, reject) => {
       if (this.readyState !== WebSocket.OPEN) {
         reject(new Error('WebSocket is not open'));

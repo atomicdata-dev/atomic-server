@@ -4786,9 +4786,8 @@ msgstr ""
 msgid "Setting up your demo…"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Your data lives on this device — it isn’t syncing anywhere yet."
-msgstr ""
+#~ msgid "Your data lives on this device — it isn’t syncing anywhere yet."
+#~ msgstr ""
 
 #. 0: status.lastDriveSync.count.toLocaleString()
 #: src/routes/SyncRoute.tsx
@@ -4856,9 +4855,8 @@ msgstr ""
 msgid "Connecting…"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "This workspace is stored only on this device — it isn’t backed up or synced anywhere."
-msgstr ""
+#~ msgid "This workspace is stored only on this device — it isn’t backed up or synced anywhere."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Sync this workspace"
@@ -5184,7 +5182,7 @@ msgstr ""
 msgid "You’re signed in, but this device doesn’t have your workspace yet. Scan the code below with the device that has it."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
+#: src/helpers/syncPresentation.ts
 msgid "Your data lives on the device you’re connected to."
 msgstr ""
 
@@ -5221,10 +5219,8 @@ msgstr ""
 msgid "Always-on device"
 msgstr ""
 
-#. 0: connectionCount; 1: connectionCount === 1 ? 'device' \\: 'devices'
-#: src/routes/SyncRoute.tsx
-msgid "Your data lives on this device and syncs with {0} other {1}."
-msgstr ""
+#~ msgid "Your data lives on this device and syncs with {0} other {1}."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Codes only route — your key still decides what syncs. Show yours, or take theirs."
@@ -6460,10 +6456,8 @@ msgstr ""
 msgid "Bearer {0}"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-#: src/routes/SyncRoute.tsx
-msgid "Set up Cloud Server"
-msgstr ""
+#~ msgid "Set up Cloud Server"
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
@@ -6473,10 +6467,8 @@ msgstr ""
 #~ msgid "Timed out connecting to the Cloud Server node."
 #~ msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/components/Vault/VaultPanel.tsx
-msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
-msgstr ""
+#~ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
+#~ msgstr ""
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Working…"
@@ -6643,14 +6635,11 @@ msgstr ""
 msgid "Turn on Cloud Vault"
 msgstr ""
 
-#: src/components/Vault/VaultPanel.tsx
-msgid "Cloud Vault is on"
-msgstr ""
+#~ msgid "Cloud Vault is on"
+#~ msgstr ""
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "A hosted workspace on {0}: shareable links, search across everything, API access, and no waiting on another device to be awake. Unlike Cloud Vault, our servers process what you put here."
-msgstr ""
+#~ msgid "A hosted workspace on {0}: shareable links, search across everything, API access, and no waiting on another device to be awake. Unlike Cloud Vault, our servers process what you put here."
+#~ msgstr ""
 
 #. 0: missing.join(', ')
 #: src/helpers/managed/useVaultBackup.ts
@@ -7717,7 +7706,7 @@ msgstr ""
 msgid "We found your workspace"
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
+#: src/helpers/syncPresentation.ts
 msgid "This device does not have this workspace yet. Fetch it from a device that has it."
 msgstr ""
 
@@ -7725,9 +7714,8 @@ msgstr ""
 msgid "Could not add a passkey."
 msgstr "No se pudo añadir una clave de acceso."
 
-#: src/components/AccountRecoveryCard.tsx
-msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
-msgstr "Introduce tu código de recuperación para mostrar tu secreto o añadir una clave de acceso en este dispositivo. Tu código de recuperación actual seguirá funcionando."
+#~ msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+#~ msgstr "Introduce tu código de recuperación para mostrar tu secreto o añadir una clave de acceso en este dispositivo. Tu código de recuperación actual seguirá funcionando."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Passkey added. Your recovery code still works."
@@ -7798,9 +7786,8 @@ msgstr ""
 msgid "This drive already has a Server plan. Connecting it uses that plan; you do not need to buy it again."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
-msgid "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
-msgstr ""
+#~ msgid "Server plans apply to one drive. If this drive needs a plan, checkout shows the price before you pay. Connecting your account is free."
+#~ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Existing content stays in this drive. Hosting uses the Server plan or invitation for this drive. If a purchase is needed, you will see the price at checkout before paying."
@@ -7977,4 +7964,40 @@ msgstr ""
 
 #: src/views/PeerInvitePage.tsx
 msgid "You're invited to view this drive"
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "This browser does not expose passkey support. Open this site directly in a browser with passkey support, such as Chrome or Safari. Sign in there with an email link to add a passkey. An embedded browser may not support this."
+msgstr ""
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to unlock your backup. Your existing recovery code will keep working."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "This drive is still syncing with a server, but Cloud Server hosting has not been confirmed."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device. Cloud Vault is on; browser sync connects your open devices."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device and syncs with a server."
+msgstr ""
+
+#: src/helpers/syncPresentation.ts
+msgid "Your data lives on this device. Browser sync connects when another browser is available."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Checking local copy…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Use browser sync only on this device"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Could not verify the local copy. The server connection has been kept."
 msgstr ""
