@@ -6,7 +6,8 @@ test('workspace owns its views and links to separate connection settings', async
   page,
 }) => {
   const installed = await page.evaluate(async () => {
-    await import('/src/chunks/PluginRuns/ConnectGitHub.tsx');
+    const setupPath = '/src/chunks/PluginRuns/ConnectGitHub.tsx';
+    await import(/* @vite-ignore */ setupPath);
     // Vite serves the installer after loading its owning UI module.
     const ui = await fetch('/src/chunks/PluginRuns/ConnectGitHub.tsx').then(r =>
       r.text(),
@@ -188,8 +189,8 @@ test('workspace starts automation chat without requiring a connection', async ({
   ).toBeVisible();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   const automation = await page.evaluate(async workspace => {
-    const { createPlugin } =
-      await import('/src/chunks/PluginRuns/runScript.ts');
+    const scriptPath = '/src/chunks/PluginRuns/runScript.ts';
+    const { createPlugin } = await import(/* @vite-ignore */ scriptPath);
 
     return createPlugin(
       window.store!,

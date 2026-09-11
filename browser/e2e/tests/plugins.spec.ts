@@ -21,6 +21,103 @@ import {
 test.describe('plugins', () => {
   test.beforeEach(before);
 
+  test('Pets imports from the mock integration proxy after account connection and review', async ({
+    page,
+  }) => {
+    test.skip(
+      !process.env.ATOMIC_MOCK_INTEGRATION_PROXY,
+      'Run with the documented mock integration-proxy server configuration',
+    );
+
+    // CI's browser and server are in different containers. Forward the mock's
+    // loopback address to the server container before catalog loading starts.
+    if (process.env.ATOMIC_SERVICE_URL)
+      await page.route('http://127.0.0.1:19090/**', async route => {
+        const target = new URL(route.request().url());
+        target.hostname = new URL(process.env.ATOMIC_SERVICE_URL!).hostname;
+        const response = await route.fetch({
+          url: target.href,
+          maxRedirects: 0,
+        });
+        await route.fulfill({ response });
+      });
+    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+    const pets = page.locator('[data-integration="proxy:pets"]');
+    await expect(
+      pets.getByRole('heading', { name: 'Pets', exact: true }),
+    ).toBeVisible();
+    await pets.getByRole('button', { name: 'Set up connection' }).click();
+
+    const setup = page.locator('dialog[open]');
+    await expect(
+      setup.getByRole('button', { name: 'Install and connect', exact: true }),
+    ).toBeVisible();
+    await setup
+      .getByRole('button', { name: 'Install and connect', exact: true })
+      .click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Mock integration proxy' }),
+    ).toBeVisible();
+    await page
+      .getByRole('button', {
+        name: 'Use LocalThought to sync Pets with your Atomic Data Hub',
+        exact: true,
+      })
+      .click();
+    await expect(page).not.toHaveURL(/connection_code=/);
+    await page.getByRole('button', { name: 'Fetch and preview' }).click();
+
+    const review = page.locator('dialog[open]');
+    // The browser creates the local ontology, tables and reviewed proposal.
+    // Allow the one-time installation more than the interaction timeout.
+    await expect(
+      review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
+    ).toBeEnabled({ timeout: 45_000 });
+    await review
+      .getByRole('button', { name: 'Apply 5 changes', exact: true })
+      .click();
+
+    await page
+      .getByRole('link', { name: 'Open imported records', exact: true })
+      .click();
+    const main = page.getByRole('main');
+    await expect(
+      main.getByRole('heading', { name: 'Pets', exact: true }),
+    ).toBeVisible();
+    for (const name of ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'])
+      await expect(main.getByText(name, { exact: true }).first()).toBeVisible();
+    // Numeric and boolean properties must retain their Atomic datatype, not become JSON blobs.
+    const datatypes = await page.evaluate(async () => {
+      const store = window.store!;
+      const table = await store.getResource(
+        new URL(location.href).searchParams.get('subject')!,
+      );
+      const klass = await store.getResource(
+        table.get('https://atomicdata.dev/properties/classtype') as string,
+      );
+      const fields = klass.get(
+        'https://atomicdata.dev/properties/recommends',
+      ) as string[];
+      const properties = await Promise.all(
+        fields.map(s => store.getResource(s)),
+      );
+
+      return Object.fromEntries(
+        properties.map(p => [
+          p.get('https://atomicdata.dev/properties/name'),
+          p.get('https://atomicdata.dev/properties/datatype'),
+        ]),
+      );
+    });
+    expect(datatypes).toMatchObject({
+      age: 'https://atomicdata.dev/datatypes/integer',
+      vaccinated: 'https://atomicdata.dev/datatypes/boolean',
+      weight: 'https://atomicdata.dev/datatypes/float',
+      'updated at': 'https://atomicdata.dev/datatypes/timestamp',
+    });
+  });
+
   test('a published release is discoverable and creates an independent draft', async ({
     page,
   }) => {
@@ -799,9 +896,9 @@ export function run() { return { intents: [] }; }
     await page.getByText('Action history', { exact: true }).click();
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
     const callerSubject = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const connection = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const drive = await store.getResource(
         connection.get('https://atomicdata.dev/properties/parent'),
@@ -821,7 +918,7 @@ export function run() { return { intents: [] }; }
       const term = (n: string) =>
         terms.find(
           r => r.get('https://atomicdata.dev/properties/shortname') === n,
-        ).subject;
+        )!.subject;
       const caller = await store.newResource({
         parent: drive.subject,
         isA: [term('plugin-script')],
@@ -1121,11 +1218,11 @@ export async function run(ctx) {
     ).toBeVisible();
     await page.evaluate(
       async ({ release }) => {
-        const store = (window as any).store;
+        const store = window.store;
         if (!(await store.waitForServerConnected(10000)))
           throw new Error('Test server did not connect');
         const plugin = await store.getResource(
-          new URL(location.href).searchParams.get('subject'),
+          new URL(location.href).searchParams.get('subject')!,
         );
         const drive = await store.getResource(
           plugin.get('https://atomicdata.dev/properties/parent'),
@@ -1137,7 +1234,7 @@ export async function run(ctx) {
         );
         const properties = await Promise.all(
           ontology
-            .get('https://atomicdata.dev/properties/properties')
+            .get('https://atomicdata.dev/properties/properties')!
             .map((p: string) => store.getResource(p)),
         );
         const property = properties.find(
@@ -1145,6 +1242,7 @@ export async function run(ctx) {
             p.get('https://atomicdata.dev/properties/shortname') ===
             'plugin-connection',
         );
+        if (!property) throw new Error('Missing plugin-connection property');
         const room = await store.newResource({
           parent: drive.subject,
           isA: ['https://atomicdata.dev/classes/ChatRoom'],
@@ -1215,9 +1313,9 @@ export async function run(ctx) {
       fullPage: true,
     });
     const target = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const plugin = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
 
       return {
@@ -1251,9 +1349,9 @@ export async function run(ctx) {
     ).toBeVisible();
     const automationSubject = new URL(page.url()).searchParams.get('subject')!;
     const relationship = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const script = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const values = script.getPropVals();
 

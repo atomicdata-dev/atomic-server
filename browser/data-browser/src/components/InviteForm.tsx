@@ -172,6 +172,17 @@ function InviteFormContent({
     );
   }
 
+  if (agent?.subject && !profileReviewed) {
+    return (
+      <InviteFormLayout inDialog={inDialog}>
+        <TeamProfileStep
+          subject={agent.subject}
+          onContinue={() => setProfileReviewed(true)}
+        />
+      </InviteFormLayout>
+    );
+  }
+
   if (!saved) {
     return (
       <InviteFormLayout

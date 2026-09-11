@@ -102,3 +102,6 @@ mod clockify_tests;
 #[cfg(test)]
 #[path = "mt940_tests.rs"]
 mod bank_statement_tests;
+
+#[cfg(test)]
+mod pets_tests;

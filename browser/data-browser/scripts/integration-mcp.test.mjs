@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { Agent } from '@tomic/lib';
 import { main } from './integration-mcp.mjs';
+
+const { Agent } = createRequire(import.meta.url)('@tomic/lib');
 
 test('real stdio handshake, discovery and signed calls; no approval tool', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'atomic-mcp-'));

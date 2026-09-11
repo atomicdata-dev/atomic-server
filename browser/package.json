@@ -2,6 +2,7 @@
   "devDependencies": {
     "@stylistic/eslint-plugin": "^4.4.1",
     "@types/node": "^25.9.1",
+    "esbuild": ">=0.28.1 <0.29.0",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "netlify-cli": "26.0.2",

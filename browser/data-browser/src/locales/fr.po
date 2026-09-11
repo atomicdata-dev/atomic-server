@@ -10040,6 +10040,277 @@ msgstr ""
 msgid "This integration creates a new workspace for its imported data."
 msgstr ""
 
+#: src/components/InviteForm.tsx
+msgid ""
+"Viewers are free. Allowing edits requires a team editor seat for Cloud "
+"Server."
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Reinstall demo pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Install demo pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid ""
+"Installs five trivial demo pets into a Pets table. No external account, API "
+"key or network call is used."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Open Pets"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading LocalThought platforms…"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid ""
+"Connect your account through LocalThought and import records into your drive."
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading setup…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Reconnect account"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Install and connect"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetching…"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetch and preview"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid ""
+"Connect your personal account through LocalThought, then return here to "
+"preview an import."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Open imported records"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "LocalThought tenant secret"
+msgstr ""
+
+#. 0: count
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Synchronized {0} issues and comments."
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Integration proxy URL"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "GitHub repository (owner/repo)"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect a real GitHub repository"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Devonian issue tracker demo"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid ""
+"Sync issues and comments in both directions. Devonian runs in this browser; "
+"the Atomic tracker is stored on this device."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Try sample data"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid ""
+"Sample mode: the GitHub side below is a browser fixture. No requests are "
+"sent to GitHub."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid ""
+"Live mode: Sync now creates and updates real GitHub issues and comments. "
+"Keep this tab open to sync."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Open Atomic kanban"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "New issue title or comment"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add Atomic comment"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic tracker"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic issues"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add sample GitHub comment"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create sample GitHub issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create Atomic issue"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub tracker"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub issues"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid ""
+"Connect through LocalThought. The tenant secret is used in this tab to start "
+"the connection and is never saved."
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
+msgstr ""
+
+#. 0: error instanceof Error ? error.message \\: String(error)
+#: src/chunks/TablePage/Calendar/CalendarView.tsx
+msgid "Could not display recurring meetings: {0}"
+msgstr ""
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "Recurring meeting"
+msgstr ""
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr ""
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "All day"
+msgstr ""
+
+#. 0: title || subject
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "{0} · Recurring meeting (opens its series or exception)"
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid ""
+"LocalThought will ask you to sign in and authorize this connection. "
+"Connection credentials stay in this browser."
+msgstr ""
+
+#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid ""
+"Imports the collections described by the platform, following pagination. "
+"Review changes before applying them. No background sync. {0}"
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Preview edits for Google"
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "No supported local edits to send."
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Edits synced. Fetch and preview to receive the latest Google changes."
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid ""
+"Send edits to imported events back to Google: Name or Summary, Description, "
+"Location, Start and End. Edit Start and End together to change duration or "
+"all-day dates. Calendar day and all-day display columns are derived on "
+"import. New events, deletion, recurrence rules, guests and RSVP stay in "
+"Google. Reconnect with Calendar write access before your first sync."
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Applying these edits updates Google Calendar and notifies event guests."
+msgstr ""
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Apply edits to Google"
+msgstr ""
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Via integration proxy"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration proxy"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid ""
+"Connect accounts and import records using a LocalThought integration-proxy "
+"server. This setting is saved in this browser."
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Reset to default"
+msgstr ""
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexte compacté"
 

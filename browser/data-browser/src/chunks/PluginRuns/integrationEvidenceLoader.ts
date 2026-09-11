@@ -3,10 +3,11 @@ import github from '../../../../../integrations/github-issues/plugin.js?raw';
 import notion from '../../../../../integrations/notion/plugin.js?raw';
 import clockify from '../../../../../integrations/clockify/plugin.js?raw';
 import mt940 from '../../../../../integrations/mt940/plugin.js?raw';
+import pets from '../../../../../integrations/pets/plugin.js?raw';
 import report from '../../../../../integrations/evidence.json';
 import { assessEvidence } from '../../../../../integrations/tooling/evidence.mjs';
 
-const sources = { 'github-issues': github, notion, clockify, mt940 };
+const sources = { 'github-issues': github, notion, clockify, mt940, pets };
 
 export type BundledEvidenceId = keyof typeof sources;
 export async function loadEvidence(id: BundledEvidenceId) {

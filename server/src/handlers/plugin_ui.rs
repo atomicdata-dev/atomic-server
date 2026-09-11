@@ -362,6 +362,10 @@ pub async fn handle_plugin_ui(
 
         return serve_drive_plugin(&appstate, plugin_name, format, req.query_string()).await;
     }
+    let (namespace, name) = match split_plugin_name(plugin_name) {
+        Ok(parts) => parts,
+        Err(e) => return Ok(HttpResponse::BadRequest().body(e.message)),
+    };
 
     let (namespace, name) = match split_plugin_name(plugin_name) {
         Ok(parts) => parts,

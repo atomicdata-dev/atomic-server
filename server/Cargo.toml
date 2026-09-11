@@ -35,6 +35,7 @@ walkdir = "2"
 
 [dependencies]
 object_store = { version = "0.12", features = ["aws"] }
+tempfile = "3"
 async-trait = "0.1.89"
 actix = "0.13.5"
 actix-cors = "0.7.1"
