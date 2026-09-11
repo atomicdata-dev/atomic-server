@@ -1,0 +1,23 @@
+{
+  "organization": "ontola",
+  "codex_command": "/Applications/Codex.app/Contents/Resources/codex",
+  "installation_uuid": "REPLACE_WITH_SENTRY_INSTALLATION_UUID",
+  "state_dir": "/private/tmp/atomic-sentry-codex-state",
+  "repositories": {
+    "atomic-server": {
+      "source": "/Users/joep/dev/atomic-server",
+      "github": "ontola/atomic-server",
+      "base": "develop"
+    },
+    "atomic-saas": {
+      "source": "/Users/joep/dev/atomic-saas",
+      "github": "ontola/atomic-saas",
+      "base": "main"
+    }
+  },
+  "projects": {
+    "atomic-server": "atomic-server",
+    "atomic-browser": "atomic-server",
+    "atomic-saas": "atomic-saas"
+  }
+}

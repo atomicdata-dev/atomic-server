@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "summary", "tests"],
+  "properties": {
+    "status": {"type": "string", "enum": ["fixed", "blocked", "no-fix"]},
+    "summary": {"type": "string"},
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "outcome"],
+        "properties": {
+          "command": {"type": "string"},
+          "outcome": {"type": "string", "enum": ["passed", "failed", "not-run"]}
+        }
+      }
+    }
+  }
+}

@@ -13,6 +13,14 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## Sentry to Codex automation
+
+`python3 -m unittest discover -s scripts/sentry-codex -v` covers authenticated
+issue routing, installation checks, concurrent deduplication/claim, terminal
+deduplication, failure retention, existing PR/branch reconciliation and mocked
+draft publication. Live webhook delivery, real Codex MCP investigation, actual
+bug-fix validation, GitHub publication and supervised restart are not verified.
+
 ## Browser WebRTC transport (issue #1396)
 
 `browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,
