@@ -83,7 +83,8 @@ html2md = "0.2.15"
 kuchikiki = "0.8.2"
 indexmap = { version = "2.14.0", features = ["std"] }
 lol_html = "2.9"
-zip = { version = "8.6.0", optional = true }
+zip = { version = "8.6.0" }
+tempfile = "3"
 reqwest = { version = "0.13.3", default-features = false, features = [
   "rustls",
   "json",
@@ -200,6 +201,7 @@ features = ["env-filter"]
 version = "0.3.23"
 
 [dev-dependencies]
+redb = "4.1.0"
 actix-rt = "2.11.0"
 assert_cmd = "2.2.2"
 mainline = "6.2.0"
@@ -253,7 +255,7 @@ telemetry = [
 ]
 img = ["webp", "image"]
 https = ["rustls", "instant-acme", "rcgen", "rustls-pemfile"]
-wasm-plugins = ["wasmtime", "wasmtime-wasi", "wasmtime-wasi-http", "zip"]
+wasm-plugins = ["wasmtime", "wasmtime-wasi", "wasmtime-wasi-http"]
 image = ["dep:image"]
 tonic = ["dep:tonic"]
 tracing-opentelemetry = ["dep:tracing-opentelemetry"]
@@ -261,7 +263,7 @@ wasmtime = ["dep:wasmtime"]
 wasmtime-wasi = ["dep:wasmtime-wasi"]
 wasmtime-wasi-http = ["dep:wasmtime-wasi-http"]
 webp = ["dep:webp"]
-zip = ["dep:zip"]
+zip = []
 vector-search = [
   "dep:fastembed",
   "dep:text-splitter",

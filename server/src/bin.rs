@@ -4,6 +4,7 @@ use std::{fs::File, io::Write};
 
 mod actor_messages;
 mod appstate;
+pub mod backup;
 mod commit_monitor;
 pub mod config;
 mod content_types;
@@ -43,6 +44,20 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
         .map_err(|e| format!("Initialization failed: {}", e))?;
 
     match &config.opts.command {
+        Some(config::Command::Backup { server, token_file }) => {
+            backup::request_backup(
+                server,
+                &token_file
+                    .clone()
+                    .unwrap_or_else(|| config.config_dir.join("backup.token")),
+            )
+            .await
+        }
+        Some(config::Command::Restore { archive, target }) => {
+            backup::restore(archive, target)?;
+            println!("Restored offline into {}", target.display());
+            Ok(())
+        }
         Some(config::Command::Export(e)) => {
             let path = match e.path.clone() {
                 Some(p) => std::path::Path::new(&p).to_path_buf(),

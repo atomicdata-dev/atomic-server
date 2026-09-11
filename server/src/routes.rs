@@ -234,6 +234,7 @@ mod node_id_tests {
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
+    crate::backup::routes(app);
     app.service(
         web::resource("/upload")
             .guard(guard::Method(Method::POST))

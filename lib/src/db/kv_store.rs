@@ -48,6 +48,18 @@ pub trait KvStore: Send + Sync {
     /// Flush all pending writes to durable storage. No-op for in-memory backends.
     fn flush(&self) -> AtomicResult<()>;
 
+    /// Copy all persisted tables at one transaction boundary while excluding
+    /// storage writers. The callback captures associated files under that same
+    /// barrier. It must not access this store. Call from a blocking worker.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn backup_snapshot(
+        &self,
+        _destination: &std::path::Path,
+        _capture_files: &mut dyn FnMut() -> AtomicResult<()>,
+    ) -> AtomicResult<()> {
+        Err("Instance backup requires the redb backend".into())
+    }
+
     /// Start buffering writes. All `insert`, `remove`, and `apply_batch` calls
     /// will be accumulated until `commit_batch()` is called.
     fn begin_batch(&self) {}

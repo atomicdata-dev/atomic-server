@@ -20,6 +20,42 @@ struct Dirs {
 }
 
 fn main() -> std::io::Result<()> {
+    // Git worktrees keep HEAD/refs outside the checkout. Track their actual
+    // paths so the manifest revision refreshes after a commit or branch move.
+    for name in [
+        "HEAD".to_owned(),
+        std::process::Command::new("git")
+            .args(["symbolic-ref", "-q", "HEAD"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .unwrap_or_default()
+            .trim()
+            .to_owned(),
+    ] {
+        if name.is_empty() {
+            continue;
+        }
+        if let Ok(output) = std::process::Command::new("git")
+            .args(["rev-parse", "--git-path", &name])
+            .output()
+        {
+            if output.status.success() {
+                println!(
+                    "cargo:rerun-if-changed={}",
+                    String::from_utf8_lossy(&output.stdout).trim()
+                );
+            }
+        }
+    }
+    let revision = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_else(|| "unknown".into());
+    println!("cargo:rustc-env=ATOMIC_BACKUP_REVISION={}", revision.trim());
     let start_total = Instant::now();
     // Uncomment this line if you want faster builds during development
     // return Ok(());

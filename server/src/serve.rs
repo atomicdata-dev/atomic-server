@@ -44,12 +44,18 @@ async fn rebuild_indexes(
         actix_web::rt::spawn(async move {
             appstate_clone
                 .store
-                .clear_index()
-                .expect("Failed to clear value index");
-            appstate_clone
-                .store
-                .build_index(true)
-                .expect("Failed to build value index");
+                .maintenance
+                .run(async {
+                    appstate_clone
+                        .store
+                        .clear_index()
+                        .expect("Failed to clear value index");
+                    appstate_clone
+                        .store
+                        .build_index(true)
+                        .expect("Failed to build value index");
+                })
+                .await;
         });
     }
 
@@ -386,6 +392,8 @@ where
     // server passes a no-op (see `serve`), so it never phones home.
     on_ready(&appstate);
 
+    #[cfg(feature = "https")]
+    let maintenance = appstate.store.maintenance.clone();
     let server = HttpServer::new(move || {
         let cors = Cors::permissive().expose_headers([SERVER_VERSION_HEADER]);
 
@@ -393,6 +401,7 @@ where
             .app_data(web::PayloadConfig::new(PAYLOAD_MAX))
             .app_data(web::Data::new(appstate.clone()))
             .wrap(cors)
+            .wrap(middleware::from_fn(crate::backup::admission))
             // Attaches the request (method, url, headers) to any Sentry event
             // raised while handling it, and reports handler panics and 5xx
             // errors. No-op without a bound Sentry client.
@@ -481,7 +490,7 @@ where
                 }
                 let https_config = crate::https::get_https_config(&config)
                     .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
-                spawn_cert_renewal_task(config.clone());
+                spawn_cert_renewal_task(config.clone(), maintenance.clone());
                 let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
                 tracing::info!("Binding HTTPS server to endpoint {}", endpoint);
                 println!("{}", message);
@@ -527,7 +536,10 @@ const TIMEOUT: u64 = 15;
 /// keeps serving the old one, so the server has to be restarted to pick it
 /// up. Before this, a long-running server never renewed at all.
 #[cfg(feature = "https")]
-fn spawn_cert_renewal_task(config: crate::config::Config) {
+fn spawn_cert_renewal_task(
+    config: crate::config::Config,
+    maintenance: atomic_lib::db::maintenance::Maintenance,
+) {
     actix_web::rt::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
         // The first tick completes at once; the certificates were checked
@@ -535,6 +547,7 @@ fn spawn_cert_renewal_task(config: crate::config::Config) {
         interval.tick().await;
         loop {
             interval.tick().await;
+            maintenance.run(async {
             match crate::https::should_renew_certs_check(&config) {
                 Ok(false) => {}
                 Ok(true) => match crate::https::request_cert(&config).await {
@@ -546,6 +559,7 @@ fn spawn_cert_renewal_task(config: crate::config::Config) {
                 },
                 Err(e) => tracing::error!("Could not check the HTTPS certificate age: {}", e),
             }
+            }).await;
         }
     });
 }
