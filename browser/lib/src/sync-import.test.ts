@@ -83,8 +83,9 @@ describe('applyIncoming — incomplete Loro import surfaces an error', () => {
     // be a loaded-but-empty resource.
     const r = store.resources.get(subject);
     expect(r).toBeDefined();
-    expect(r!.loading).toBe(false);
+    expect(r!.loading).toBe(true);
     await vi.waitFor(() => expect(r!.error).toBeDefined());
+    expect(r!.loading).toBe(false);
     expect(r!.error?.message).toMatch(/incomplete update|missing base state/i);
 
     // Crucially: it did NOT silently materialize as an empty resource.

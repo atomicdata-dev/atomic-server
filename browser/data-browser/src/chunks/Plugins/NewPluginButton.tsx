@@ -35,7 +35,7 @@ const NewPluginButton: React.FC<NewPluginButtonProps> = ({ drive }) => {
     setMetadata(undefined);
     setConfig(undefined);
     setConfigValid(true);
-    fileInputRef.current!.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const [dialogProps, show, hide] = useDialog({

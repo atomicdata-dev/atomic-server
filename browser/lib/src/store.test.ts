@@ -5,6 +5,62 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('keeps property readers waiting while a delta with missing history is recovered', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const source = new Resource('did:ad:partial-property');
+    await source.set(core.properties.isA, [core.classes.property], false);
+    const doc = source.getLoroDoc()!;
+    doc.commit();
+    const base = doc.oplogVersion();
+    await source.set(core.properties.datatype, Datatype.STRING, false);
+    await source.set(core.properties.shortname, 'title', false);
+    await source.set(core.properties.description, 'Title', false);
+    doc.commit();
+    const placeholder = new Resource(source.subject);
+    placeholder.loading = true;
+    store.addResource(placeholder);
+    let recover!: () => void;
+    vi.spyOn(store, 'fetchResourceFromServer').mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        recover = resolve;
+      });
+      store.applyIncoming({
+        subject: source.subject,
+        resource: source,
+        source: 'http-fetch',
+      });
+
+      return source;
+    });
+    const settled = vi.fn();
+    const result = store.getProperty(source.subject).then(
+      value => {
+        settled();
+
+        return value;
+      },
+      error => {
+        settled();
+
+        return error;
+      },
+    );
+    store.applyIncoming({
+      subject: source.subject,
+      loroBytes: doc.export({ mode: 'update', from: base }),
+      source: 'ws-sub-push',
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const early = settled.mock.calls.length;
+    recover();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await result).toMatchObject({ datatype: Datatype.STRING });
+    expect(early).toBe(0);
+  });
+
   it('materializes a buffered property snapshot before returning its datatype', async ({
     expect,
   }) => {

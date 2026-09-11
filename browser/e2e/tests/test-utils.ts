@@ -1054,7 +1054,7 @@ export async function newResource(klass: string, page: Page) {
     // appearance IS the "class is searchable" readiness signal — with a budget
     // that tolerates a slow index flush instead of a blind pre-sleep.
     const classLabel = klass.toLowerCase() === 'chatroom' ? 'Chat room' : klass;
-    const classButton = page.getByRole('button', {
+    const classButton = page.getByRole('main').getByRole('button', {
       name: new RegExp(
         `^${classLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
         'i',
