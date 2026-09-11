@@ -5,6 +5,67 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('tracks immutable save status across cancellation and offline queueing', async ({
+    expect,
+  }) => {
+    vi.useFakeTimers();
+
+    try {
+      const store = new Store();
+      const resource = new Resource('_new:save-state');
+      resource.setStore(store);
+      const idle = store.getSaveState(resource);
+      const changed = vi.fn();
+      const unsubscribe = store.subscribeSaveState(resource, changed);
+      const scheduler = store.createSaveScheduler(resource);
+      scheduler.schedule(100);
+      const queuedTimer = store.getSaveState(resource);
+      expect(queuedTimer.kind).toBe('scheduled');
+      expect(store.getSaveState(resource)).toBe(queuedTimer);
+      expect(idle.kind).toBe('idle');
+      expect(Object.isFrozen(queuedTimer)).toBe(true);
+      // A temporary row keeps the same owner after acquiring its DID.
+      resource.setSubject('did:ad:saved-row');
+      expect(store.getSaveState(resource).scheduledCount).toBe(1);
+      scheduler.cancel();
+      expect(store.getSyncStatus().pendingDirtyCount).toBe(0);
+      store.outbox.markDirty(resource.subject);
+      expect(store.getSaveState(resource)).toMatchObject({
+        kind: 'queued',
+        reason: 'offline',
+      });
+      expect(changed).toHaveBeenCalled();
+      unsubscribe();
+      changed.mockClear();
+      scheduler.schedule(100);
+      scheduler.cancel();
+      expect(changed).not.toHaveBeenCalled();
+      store.outbox.clearDirty(resource.subject);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('publishes direct save start and finish without changing read readiness', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    const resource = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Folder',
+      propVals: { [core.properties.name]: 'Save status' },
+      parent: 'https://example.com/drive',
+    });
+    const states: string[] = [];
+    const unsubscribe = store.subscribeSaveState(resource, () =>
+      states.push(store.getSaveState(resource).kind),
+    );
+    await resource.save();
+    expect(states).toContain('saving');
+    expect(store.getSaveState(resource).kind).toBe('idle');
+    expect(resource.isReady()).toBe(true);
+    unsubscribe();
+  });
+
   it('captures immutable read status while retaining the stable mutation handle', ({
     expect,
   }) => {

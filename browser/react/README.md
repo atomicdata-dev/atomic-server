@@ -72,3 +72,9 @@ The status fields are captured in an immutable snapshot that changes on store
 notifications. Do not memoize `resource.isReady()` or property getters by the
 Resource reference. `recovering` can retain readable content; `ready` says
 whether reads are usable, independently of the outbox/saving state.
+
+`useSaveState(resource)` returns a stable immutable persistence snapshot with
+`kind` (`idle`, `dirty`, `scheduled`, `saving`, `queued`, `error`),
+`scheduledCount`, `error`, and queued `reason`. It is independent of read status.
+`useDebouncedSave` and committed `useValue` edits flush their scheduled work when
+the owning component unmounts; pending data is not silently cancelled.
