@@ -791,3 +791,8 @@ page, never payload contents. A real local WebSocket exercises this collection.
 - `save-status-coordinator.test.ts` exercises narrow injected dependencies without a
   Store: overlapping owners, idempotent observer disposal, resource renaming, cached
   immutable snapshots, current outbox/connection state and failure accounting.
+## Signed-out local drive opened from the portal
+
+`browser/data-browser/src/helpers/isDriveSignInError.test.ts` covers a local-only missing-resource error with no app agent, including origins with a configured node. Signed-in users and unrelated transport failures retain their error handling.
+
+Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creation, passkey enrollment, recovery-code acknowledgement, completed app sign-out, portal passkey sign-in, and the Open link reaching the app unlock screen. It then unlocks and verifies the original drive title. Chromium virtual PRF state is tied to the original CDP target, so the unlock portion runs there after verifying the real popup handoff. Unlocking within the popup itself remains a physical-browser acceptance check.
