@@ -11,6 +11,18 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export function bundleArguments(entry) {
+  // CI aliases /browser to /app. Keep source comments relative to the logical
+  // repository paths so the shipped bytes do not depend on mount locations.
+  return [
+    entry,
+    '--preserve-symlinks',
+    '--bundle',
+    '--format=esm',
+    '--platform=neutral',
+    '--target=es2022',
+  ];
+}
 export function discover(base = root) {
   return readdirSync(resolve(base, 'integrations'), { withFileTypes: true })
     .filter(
@@ -79,6 +91,22 @@ export function evaluateJs(report) {
 export function evaluateRust(output) {
   return /test result: ok\. 1 passed; 0 failed; 0 ignored;/.test(output);
 }
+export function summarizeFailure({ error, stderr, stdout }) {
+  const line = [error, stderr, stdout]
+    .flatMap(value => String(value ?? '').split(/\r?\n/))
+    .map(value => value.trim())
+    .find(Boolean);
+  if (!line) return 'command failed without output';
+  return line.length > 240 ? `${line.slice(0, 237)}...` : line;
+}
+export function formatFailureSummary(checks) {
+  return checks
+    .filter(check => check.status === 'failed')
+    .map(check =>
+      check.detail ? `${check.name}: ${check.detail}` : check.name,
+    )
+    .join('; ');
+}
 export function certify({
   layer = 'all',
   output = resolve(root, 'artifacts/integration-certification'),
@@ -132,7 +160,13 @@ export function certify({
     });
     const text = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? '\n' + r.error.message : ''}\nexit=${r.status} signal=${r.signal ?? 'none'}`;
     writeFileSync(resolve(output, log), text);
-    return { ok: r.status === 0, text, stdout: r.stdout };
+    return {
+      ok: r.status === 0,
+      text,
+      stdout: r.stdout,
+      stderr: r.stderr,
+      error: r.error?.message,
+    };
   };
   for (const p of packages.filter(p => !only || p.id === only)) {
     const shipped = readFileSync(resolve(root, p.path, 'plugin.js'));
@@ -148,24 +182,31 @@ export function certify({
       status: 'pending',
     };
     report.integrations.push(item);
-    const check = (name, r, extra = true) =>
-      item.checks.push({ name, status: r.ok && extra ? 'passed' : 'failed' });
+    const check = (name, r, extra = true, failedValidation) => {
+      const passed = r.ok && extra;
+      item.checks.push({
+        name,
+        status: passed ? 'passed' : 'failed',
+        ...(passed
+          ? {}
+          : {
+              detail: r.ok
+                ? failedValidation || 'validation failed'
+                : summarizeFailure(r),
+            }),
+      });
+    };
     if (layer !== 'sandbox') {
       const bundle = run(
         resolve(root, 'browser/node_modules/.bin/esbuild'),
-        [
-          `${p.path}/plugin.ts`,
-          '--bundle',
-          '--format=esm',
-          '--platform=neutral',
-          '--target=es2022',
-        ],
+        bundleArguments(`${p.path}/plugin.ts`),
         `${p.id}-bundle.log`,
       );
       check(
         'reproducible-bundle',
         bundle,
         bundle.stdout === shipped.toString(),
+        'generated bundle differs from committed plugin.js',
       );
       check(
         'typecheck',
@@ -192,7 +233,12 @@ export function certify({
       try {
         counts = JSON.parse(readFileSync(resultPath, 'utf8'));
       } catch {}
-      check('fixtures', tests, evaluateJs(counts));
+      check(
+        'fixtures',
+        tests,
+        evaluateJs(counts),
+        'test report did not contain a successful executed test',
+      );
       item.fixtureCounts = {
         passed: counts.numPassedTests ?? 0,
         skipped: counts.numPendingTests ?? 0,
@@ -217,7 +263,12 @@ export function certify({
           ],
           `${p.id}-${test.split('::').at(-1)}.log`,
         );
-        check(test, r, evaluateRust(r.text));
+        check(
+          test,
+          r,
+          evaluateRust(r.text),
+          'sandbox output did not report exactly one passing test',
+        );
       }
     item.status = item.checks.every(c => c.status === 'passed')
       ? 'passed'
@@ -226,7 +277,10 @@ export function certify({
       resolve(output, 'report.json'),
       JSON.stringify({ ...report, status: 'running' }, null, 2) + '\n',
     );
-    console.log(`${p.id}: ${item.status} (${layer}; live not run)`);
+    const failures = formatFailureSummary(item.checks);
+    console.log(
+      `${p.id}: ${item.status} (${layer}; live not run)${failures ? ` — ${failures}` : ''}`,
+    );
   }
   report.status =
     report.integrations.length &&

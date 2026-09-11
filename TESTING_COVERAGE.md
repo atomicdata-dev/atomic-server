@@ -1,5 +1,10 @@
 # Testing coverage map
 
+`integrations/tooling/certify.test.mjs` rebuilds every certified provider through
+a symlinked repository layout and compares the shipped bytes, covering CI mount
+paths and package-manager symlinks. Provider Vitest configurations use explicit
+package roots so certification also works when invoked from `/`.
+
 What is tested, at which layer, and — the part that matters — **what is not**.
 
 This exists because the protocol is far better tested than the glue around it,

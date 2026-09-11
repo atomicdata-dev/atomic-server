@@ -1,9 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+  readFileSync,
+} from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { discover, evaluateJs, evaluateRust } from './certify.mjs';
+import {
+  discover,
+  root,
+  bundleArguments,
+  evaluateJs,
+  evaluateRust,
+  formatFailureSummary,
+  summarizeFailure,
+} from './certify.mjs';
 test('zero executed tests cannot certify an integration', () => {
   assert.equal(
     evaluateJs({ success: true, numPassedTests: 0, numFailedTests: 0 }),
@@ -39,6 +55,28 @@ test('new packages cannot silently escape certification', () => {
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+test('failed certification checks surface a concise useful diagnostic', () => {
+  assert.equal(
+    summarizeFailure({
+      error: 'spawnSync /browser/node_modules/.bin/esbuild ENOENT',
+      stderr: 'ignored stderr',
+      stdout: 'ignored stdout',
+    }),
+    'spawnSync /browser/node_modules/.bin/esbuild ENOENT',
+  );
+  assert.equal(
+    formatFailureSummary([
+      { name: 'typecheck', status: 'passed' },
+      {
+        name: 'reproducible-bundle',
+        status: 'failed',
+        detail: 'generated bundle differs from committed plugin.js',
+      },
+      { name: 'fixtures', status: 'failed' },
+    ]),
+    'reproducible-bundle: generated bundle differs from committed plugin.js; fixtures',
+  );
 });
 test('both current providers are discovered with exact sandbox tests', () => {
   const ids = discover().map(p => p.id);
@@ -114,4 +152,26 @@ test('store evidence rejects partial, failed and changed bundles; labels old evi
     assessEvidence(report, 'test', 'expected', now - 86400000),
     null,
   );
+});
+
+test('bundles are reproducible with CI browser and integration symlinks', () => {
+  const base = mkdtempSync(join(tmpdir(), 'atomic-bundle-paths-'));
+  try {
+    symlinkSync(join(root, 'browser'), join(base, 'browser'));
+    symlinkSync(join(root, 'integrations'), join(base, 'integrations'));
+    for (const provider of discover()) {
+      const generated = execFileSync(
+        join(root, 'browser/node_modules/.bin/esbuild'),
+        bundleArguments(`${provider.path}/plugin.ts`),
+        { cwd: base, encoding: 'utf8' },
+      );
+      assert.equal(
+        generated,
+        readFileSync(join(root, provider.path, 'plugin.js'), 'utf8'),
+        provider.id,
+      );
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });
