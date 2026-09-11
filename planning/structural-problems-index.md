@@ -4,16 +4,16 @@
 > Read/save subscription boundaries and scheduled-save ownership have shipped.
 > Consumer migration, metadata representation cleanup and subject-brand adoption remain.
 
-This index tracks structural work rather than individual failures. The next bounded
-JS slices and acceptance checks are in [js-maintainability.md](./js-maintainability.md):
-PluginPage subscriptions and E2E diagnostic collectors are implemented; Store save-status coordination is next.
+This index tracks structural work rather than individual failures. PluginPage
+subscriptions, E2E diagnostic collector lifecycles and Store save-status coordination
+are implemented. Their remaining follow-ups live in the owning plans below.
 
 | # | Plan | Current state | Next step |
 | --- | --- | --- | --- |
 | 1 | [React Compiler / Resources](./react-compiler-resource-proxy.md) | Partial: stable Resource handles, immutable read/save snapshots and initial UI migrations shipped. | PluginPage migrated; investigate derived plugin manifest metadata refresh, then continue one flow at a time. |
 | 2 | [Subscription primitives](./unify-subscription-primitives.md) | Server work completed in reduced form; the original filter-scope design was not implemented. | Browser subscription changes belong in the data-layer plan, not a repeat of the server migration. |
 | 3 | Subscription actors | Done: `LoroSyncBroadcaster` folded into `CommitMonitor`; original plan removed. | None in this slice. |
-| 5 | [Resource save state](./unify-resource-dirty-signals.md) | API, scheduler and initial consumers shipped. | Migrate remaining save UIs and extract internal coordination without changing the public API. |
+| 5 | [Resource save state](./unify-resource-dirty-signals.md) | API, scheduler and initial consumers shipped. | Internal coordination extracted; migrate remaining save UIs without changing the public API. |
 | 6 | [Resource representations](./unify-resource-representations.md) | Mostly shipped: browser `Resource#cache` derives from Loro. | Review `_auxValues` and preserved server-managed metadata; preserve causal hydration. |
 | 7 | [Actor payloads](./arc-actor-message-payloads.md) | Encode-once and zero-copy WS frames shipped; `CommitMessage` Arc wrapping deferred. | Measure a remaining high-fanout cost before further work. |
 | 8 | [Subject types](./subject-types-end-to-end.md) | Rust `DidKind` and browser branding helpers shipped. | Browser consumer migration remains. |

@@ -35,8 +35,9 @@ see `unify-resource-dirty-signals.md`.
 
 PluginPage now subscribes to metadata and save status. A production test reproduced
 valid config leaving Save disabled and covers save completion, client metadata updates,
-draft preservation and offline recovery. Remaining JS work lives in
-[js-maintainability.md](./js-maintainability.md).
+draft preservation and offline recovery. This is the legacy WASM PluginPage,
+which remains present on `feat/plugin-model`; its separate `PluginRuns/PluginPage`
+for the new plugin model has not been validated by this regression.
 
 ### Plugin manifest metadata follow-up
 

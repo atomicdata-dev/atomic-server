@@ -7,8 +7,8 @@
 
 This is the browser cache/reactivity layer. The binding runtime is owned by
 [atomic-lib-runtime.md](./atomic-lib-runtime.md); transport and multi-device sync by
-[unified-sync.md](./unified-sync.md). The next small implementation slices are in
-[js-maintainability.md](./js-maintainability.md).
+[unified-sync.md](./unified-sync.md). Consumer migration is tracked in
+[react-compiler-resource-proxy.md](./react-compiler-resource-proxy.md).
 
 ## Current implementation
 
@@ -62,12 +62,13 @@ scheduled, saving, queued and error states independently of loading/read errors.
 `ScheduledSave` owns debounce slots and in-flight completion; hooks and virtual table
 rows use `Store.createSaveScheduler`. Unmount flushes pending edits rather than
 silently discarding them. Legacy start/finish accounting also covers non-save writes.
+The internal `SaveStatusCoordinator` owns scheduler integration, cached immutable
+save snapshots and subscription cleanup. Store delegates through its existing API;
+the coordinator reads current outbox entries and never signs or drains commits.
 See [unify-resource-dirty-signals.md](./unify-resource-dirty-signals.md).
 
 ## Remaining work
 
-- [ ] Extract Store save-status coordination behind the existing public API after
-  the focused UI and diagnostic cleanups in [js-maintainability.md](./js-maintainability.md).
 - [ ] Migrate additional rendered getters and bespoke save indicators with a failing
   regression before each flow change. Keep read and persistence state separate.
 - [ ] Audit direct `addResource` producers before further ingress consolidation.
