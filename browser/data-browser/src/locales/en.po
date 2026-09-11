@@ -10337,3 +10337,23 @@ msgstr "{0}. Setup did not finish. Check your integrations for a partially creat
 #: src/components/AppSetup/setupError.ts
 msgid "Unknown setup error"
 msgstr "Unknown setup error"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "<0/> Show API plugins"
+msgstr "<0/> Show API plugins"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "<0/> Show experimental plugins"
+msgstr "<0/> Show experimental plugins"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "These preferences are saved in your private Atomic drive. Existing connections remain available."
+msgstr "These preferences are saved in your private Atomic drive. Existing connections remain available."
+
+#: src/routes/IntegrationStore.tsx
+msgid "Consider enabling API plugins in Settings → Integration."
+msgstr "Consider enabling API plugins in Settings → Integration."
+
+#: src/routes/IntegrationStore.tsx
+msgid "Consider enabling experimental plugins in Settings → Integration."
+msgstr "Consider enabling experimental plugins in Settings → Integration."

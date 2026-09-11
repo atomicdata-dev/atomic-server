@@ -1459,3 +1459,11 @@ dependency. `db::app_agent::store_tests::revocation_survives_process_exit_withou
 exercises runtime construction in both the parent and its abruptly exiting child
 with `cargo test -p atomic_lib --features db-redb --lib`, without workspace feature
 unification or an extra Tokio feature on the command line.
+
+Integration discovery preferences: `integrationVisibility.test.ts` covers absent
+or malformed values and all four independent boolean combinations.
+`integration-visibility.spec.ts` covers default-hidden discovery, settings links,
+Atomic persistence across reloads, independent toggles, visible existing connections
+and no community catalog fetch while disabled. Existing plugin/setup/MT940 browser tests explicitly opt in
+through Settings. Cross-device preference sync uses normal private-drive sync;
+a dedicated multi-device preference test is not yet present.

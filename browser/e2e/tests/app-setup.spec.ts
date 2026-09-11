@@ -1,7 +1,11 @@
+import { enableIntegrationDiscovery } from './integration-settings-utils';
 import { enableAIForTesting, setupScriptedToolCallMocks } from './ai-mock';
 import { test, expect } from '@playwright/test';
 import { before } from './test-utils';
 test.beforeEach(before);
+test.beforeEach(async ({ page }) => {
+  await enableIntegrationDiscovery(page);
+});
 
 test('GitHub setup renders its declared inputs and host-owned credential without installing', async ({
   page,
