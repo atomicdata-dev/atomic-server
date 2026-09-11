@@ -733,3 +733,10 @@ check; real refresh/query timing remains a browser acceptance check.
   uses fresh test data and matching free ports, and preserves its report/build logs.
   Failure traces are retained. Real Cloud Vault integration requires an explicitly
   supplied `ATOMIC_VAULT_PORTAL_URL`; the runner never discovers unrelated portals.
+
+## CI quality and failure evidence
+
+- `failure-state.spec.ts` checks bounded failure metadata and omission of resource
+  values and signed payloads. The diagnostic fixture attaches this before closing pages.
+- CI lint uses installed sources without JS/WASM builds; feature-branch pushes cancel
+  superseded runs while develop and tags retain completed validation for deployment.
