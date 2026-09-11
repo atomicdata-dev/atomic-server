@@ -264,6 +264,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [userInput, setUserInput] = useState('');
+  const [handoffDraft, setHandoffDraft] = useState<string>();
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const { defaultChatModel, setDefaultChatModel } = useAISettings();
   const [selectedAgent, setSelectedAgent] = useState<AIAgent>(
@@ -633,6 +634,16 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
     if (messages.length > 0) return;
 
     autoSubmittedRef.current = true;
+
+    if (!canUseInput) {
+      // Keep an app handoff editable while the user configures a provider.
+      // Do not discard the request or attempt a generation without one.
+      setUserInput(autoSubmitMessage);
+      setHandoffDraft(autoSubmitMessage);
+
+      return;
+    }
+
     handleSubmit(autoSubmitMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSubmitMessage]);
@@ -806,6 +817,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
                   </ContextItemRow>
                 )}
                 <AIChatInput
+                  prefill={handoffDraft}
                   large={isEmptyChat && fullView}
                   focusSignal={inputFocusSignal}
                   // Never block typing — only the SEND is gated on an available

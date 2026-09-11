@@ -13,6 +13,19 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## New-resource catalog
+
+`creationCatalog.test.ts` covers catalog completeness, multiword search and the
+assistant request's parent context. `new-resource-catalog.spec.ts` covers template
+search, autofocus, outlined arrow-key selection, Enter activation, clearing and
+search-only layout, table creation inside a folder, mobile layout and retaining the assistant
+request from either input before a model is connected, plus nested website template creation.
+Actual model generation is not exercised by these tests.
+
+Local validation (2026-09-11): all 840 data-browser unit tests and all five
+new-resource Chromium E2Es pass, including nested website import. E2Es used
+the existing local backend and WASM assets, not a fresh Rust build.
+
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint

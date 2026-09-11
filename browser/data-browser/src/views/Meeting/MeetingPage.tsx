@@ -64,7 +64,7 @@ export function MeetingPage({
               withDecorations
             />
           </Column>
-          <Row gap='0.5rem' center>
+          <MeetingActions gap='0.5rem' center>
             <Button subtle onClick={() => openMeetingPanel(resource.subject)}>
               Open chat
             </Button>
@@ -78,7 +78,7 @@ export function MeetingPage({
                 End meeting
               </Button>
             )}
-          </Row>
+          </MeetingActions>
         </MeetingHeader>
 
         {doc ? (
@@ -101,16 +101,36 @@ export function MeetingPage({
 const Page = styled(Column)`
   width: min(100%, ${p => p.theme.containerWidthWide});
   margin: auto;
-  padding: ${p => p.theme.size(7)};
+  box-sizing: border-box;
+  min-width: 0;
+  padding: clamp(1rem, 4vw, ${p => p.theme.size(7)});
+  container-type: inline-size;
   gap: ${p => p.theme.size(4)};
 `;
 
 const MeetingHeader = styled(Row)`
   align-items: flex-start;
   justify-content: space-between;
+  > :first-child {
+    min-width: 0;
+  }
+  @container (max-width: 36rem) {
+    flex-direction: column;
+    align-items: stretch;
+  }
   gap: ${p => p.theme.size(3)};
   padding-bottom: ${p => p.theme.size(3)};
   border-bottom: 2px solid ${p => p.theme.colors.main};
+`;
+
+const MeetingActions = styled(Row)`
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-height: 2.75rem;
+  }
 `;
 
 const Phase = styled.span`
