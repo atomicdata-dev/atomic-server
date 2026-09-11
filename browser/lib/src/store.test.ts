@@ -8,6 +8,59 @@ describe('Store', () => {
     vi.clearAllMocks();
   });
 
+  it('waits for property data after a loading-placeholder notification', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const resource = new Resource('did:ad:loading-property');
+    resource.loading = true;
+    store.addResource(resource);
+    const settled = vi.fn();
+    const result = store.getProperty(resource.subject).then(
+      value => {
+        settled();
+
+        return value;
+      },
+      error => {
+        settled();
+
+        return error;
+      },
+    );
+    // Mounted readers can notify subscribers before hydration finishes.
+    store.notifyResourceUpdated(resource);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const settledWhileLoading = settled.mock.calls.length;
+    await resource.set(core.properties.datatype, Datatype.STRING, false);
+    await resource.set(core.properties.shortname, 'title', false);
+    await resource.set(core.properties.description, 'Title', false);
+    resource.loading = false;
+    store.notifyResourceUpdated(resource);
+    const loaded = await result;
+    expect(settledWhileLoading).toBe(0);
+    expect(loaded).toMatchObject({
+      shortname: 'title',
+      datatype: Datatype.STRING,
+    });
+  });
+
+  it('reports a failed property load without waiting for the loading flag to clear', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const resource = new Resource('did:ad:failed-property');
+    resource.loading = true;
+    store.addResource(resource);
+    const result = store.getProperty(resource.subject);
+    const rejected = expect(result).rejects.toThrow(
+      'cannot be loaded: Error: unavailable',
+    );
+    resource.error = new Error('unavailable');
+    store.notifyResourceUpdated(resource);
+    await rejected;
+  });
+
   it('does not notify mounted readers while another reader takes its first snapshot', async ({
     expect,
   }) => {

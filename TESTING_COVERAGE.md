@@ -197,6 +197,7 @@ Not covered: table `contains`; Playwright search overlay on the KV path; Flutter
 | Sync page status renders | `browser/e2e/tests/sync.spec.ts` |
 | Offline edits persist and sync on reconnect | `sync.spec.ts` |
 | Second device cold-loads a drive from the server | `second-device-load.spec.ts` |
+| Property reads stay pending through loading-placeholder notifications until hydration completes | `browser/lib/src/store.test.ts` |
 
 ---
 
