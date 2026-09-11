@@ -9623,3 +9623,11 @@ msgstr ""
 #: src/chunks/PluginRuns/ConnectCodex.tsx
 msgid "4. Keep that terminal running. When it says \"Codex worker ready\", open Codex below and send a message. Press Ctrl+C in the terminal to stop the worker. To restart it later, run the same work command; you do not need to configure it again."
 msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Worker exits with \"spawn codex ENOENT\"? Codex is missing from your terminal's PATH."
+msgstr ""
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "Setup guide and macOS PATH instructions on GitHub"
+msgstr ""

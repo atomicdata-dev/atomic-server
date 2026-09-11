@@ -87,6 +87,63 @@ entrypoint source (keep its injected CONFIG bindings). Reinstalling creates a
 separate app. Failed installation can leave a partial app and reserved config
 file; inspect those before installing to a new filename.
 
+## Troubleshooting: Codex is not on PATH
+
+The worker should stay running. If it exits with `spawn codex ENOENT`, it could
+not find the Codex executable. The preceding Node warning about `localStorage`
+is not the cause of that error.
+
+Check in the same terminal:
+
+```sh
+command -v codex
+```
+
+If this prints nothing, add the directory containing the executable to your
+PATH, or set `CODEX_BIN` for the worker.
+
+### macOS with the bundled executable in ChatGPT.app
+
+On the Mac used to test this integration, the executable was bundled at
+`/Applications/ChatGPT.app/Contents/Resources/codex`. This location may differ
+between installations. Check that it exists and runs first:
+
+```sh
+"/Applications/ChatGPT.app/Contents/Resources/codex" --version
+```
+
+If that works, add its directory to PATH for zsh (the usual macOS shell).
+Run the first line only once; it adds the setting for future terminals:
+
+```sh
+echo 'export PATH="/Applications/ChatGPT.app/Contents/Resources:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+codex --version
+```
+
+Then, from your AtomicServer checkout, restart the worker:
+
+```sh
+node plugin-examples/codex-chat/dist/cli.js work ./codex-connection.json
+```
+
+You do not need to run `connect` again. Keep the terminal running once you see
+**Codex worker ready**.
+
+### Use an explicit executable path instead
+
+If you prefer not to change PATH, use this command for the verified bundle
+location above:
+
+```sh
+CODEX_BIN="/Applications/ChatGPT.app/Contents/Resources/codex" \
+node plugin-examples/codex-chat/dist/cli.js work ./codex-connection.json
+```
+
+If that file does not exist, use the actual path to your installed Codex CLI
+instead. Installing the desktop app does not guarantee this bundle path exists
+or that `codex` is on your terminal's PATH.
+
 ## Recovery and current scope
 
 Run exactly one worker per app, using the same connection file. A local `.lock`

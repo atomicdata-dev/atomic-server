@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '@tomic/react';
 import { Button } from '@components/Button';
+import { ExternalLink } from '@components/ExternalLink';
 import { Column } from '@components/Row';
 import { CodeBlock } from '@components/CodeBlock';
 import { ErrMessage } from '@components/forms/InputStyles';
@@ -108,6 +109,13 @@ export function ConnectCodex({ drive }: { drive: string }) {
           </Button>
         </>
       )}
+      <p>
+        Worker exits with "spawn codex ENOENT"? Codex is missing from your
+        terminal's PATH.
+      </p>
+      <ExternalLink to='https://github.com/ontola/atomic-server/blob/codex-chat/plugin-examples/codex-chat/README.md#troubleshooting-codex-is-not-on-path'>
+        Setup guide and macOS PATH instructions on GitHub
+      </ExternalLink>
       {error && <ErrMessage>{error}</ErrMessage>}
     </Column>
   );
