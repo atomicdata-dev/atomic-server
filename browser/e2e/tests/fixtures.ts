@@ -1,96 +1,27 @@
-import {
-  test as base,
-  expect,
-  type BrowserContext,
-  type Page,
-} from '@playwright/test';
+import { test as base, expect, type BrowserContext } from '@playwright/test';
 
 import { collectFailureState } from './failure-state';
+import { DiagnosticCollector } from './diagnostic-collector';
+import { TransportCollector } from './transport-collector';
 
 export * from '@playwright/test';
 
-type Kind = 'warning' | 'error' | 'pageerror';
-type Entry = { kind: Kind; message: string; url: string };
-type Expected = {
-  kind: Kind;
-  message: RegExp;
-  reason: string;
-  count: number;
-  seen: number;
-  url?: RegExp;
-};
-
 /** No global allowlist: expected failures belong to the test that causes them. */
 export const test = base.extend<{
-  browserDiagnostics: {
-    expect: (
-      kind: Kind,
-      message: RegExp,
-      reason: string,
-      count?: number,
-      url?: RegExp,
-    ) => void;
-  };
+  browserDiagnostics: Pick<DiagnosticCollector, 'expect'>;
 }>({
   browserDiagnostics: [
     async ({ browser, context: defaultContext }, use, testInfo) => {
-      const entries: (Entry & { expected: boolean })[] = [];
-      const expected: Expected[] = [];
-      const cleanups: (() => void)[] = [];
+      const diagnostics = new DiagnosticCollector();
+      const transport = new TransportCollector();
       const watched = new Set<BrowserContext>();
       const ownedContexts = new Set<BrowserContext>();
-      const transportEvents = new Map<Page, unknown[]>();
-
-      const watchPage = (page: Page) => {
-        if (transportEvents.has(page)) return;
-        const events: unknown[] = [];
-        transportEvents.set(page, events);
-
-        const recordFrame = (direction: string, payload: string | Buffer) => {
-          events.push({
-            at: Date.now(),
-            direction,
-            bytes: Buffer.byteLength(payload),
-            tag: typeof payload === 'string' ? 'text' : payload[0],
-          });
-          if (events.length > 30) events.shift();
-        };
-
-        const onSocket = (socket: import('@playwright/test').WebSocket) => {
-          // Payloads can contain signed edits or authentication. Keep only frame metadata.
-          socket.on('framesent', ({ payload }) => recordFrame('sent', payload));
-          socket.on('framereceived', ({ payload }) =>
-            recordFrame('received', payload),
-          );
-          socket.on('close', () => recordFrame('closed', ''));
-        };
-
-        page.on('websocket', onSocket);
-        cleanups.push(() => page.off('websocket', onSocket));
-      };
-
-      const record = (entry: Entry) => {
-        const match = expected.find(rule => {
-          rule.message.lastIndex = 0;
-          if (rule.url) rule.url.lastIndex = 0;
-
-          return (
-            rule.kind === entry.kind &&
-            rule.seen < rule.count &&
-            rule.message.test(entry.message) &&
-            (!rule.url || rule.url.test(entry.url))
-          );
-        });
-        if (match) match.seen++;
-        entries.push({ ...entry, expected: !!match });
-      };
 
       const watch = async (context: BrowserContext) => {
         if (watched.has(context)) return;
         watched.add(context);
-        context.pages().forEach(watchPage);
-        context.on('page', watchPage);
-        cleanups.push(() => context.off('page', watchPage));
+        diagnostics.start(context);
+        transport.start(context);
 
         // General UI tests use an empty discovery room, independent of public
         // service availability. verify-peer-mesh.mjs separately exercises real
@@ -110,29 +41,6 @@ export const test = base.extend<{
             });
           },
         );
-
-        const onConsole = (msg: import('@playwright/test').ConsoleMessage) => {
-          const kind = msg.type();
-
-          if (kind === 'warning' || kind === 'error') {
-            record({ kind, message: msg.text(), url: msg.location().url });
-          }
-        };
-
-        const onError = (event: import('@playwright/test').WebError) => {
-          record({
-            kind: 'pageerror',
-            message: event.error().stack ?? event.error().message,
-            url: event.page()?.url() ?? '',
-          });
-        };
-
-        context.on('console', onConsole);
-        context.on('weberror', onError);
-        cleanups.push(() => {
-          context.off('console', onConsole);
-          context.off('weberror', onError);
-        });
       };
 
       // Depend on context so assertions run BEFORE Playwright closes it. The
@@ -148,32 +56,40 @@ export const test = base.extend<{
         return context;
       };
 
-      await watch(defaultContext);
-      await Promise.all(browser.contexts().map(watch));
-
       try {
+        await watch(defaultContext);
+        await Promise.all(browser.contexts().map(watch));
         await use({
-          expect(kind, message, reason, count = 1, url) {
-            if (!reason.trim() || !Number.isInteger(count) || count < 1) {
-              throw new Error(
-                'Expected diagnostics require a reason and a positive integer count',
-              );
-            }
-
-            expected.push({ kind, message, reason, count, url, seen: 0 });
-          },
+          expect: (...args) => diagnostics.expect(...args),
         });
       } finally {
         browser.newContext = newContext;
-        cleanups.forEach(cleanup => cleanup());
-        const unexpected = entries.filter(entry => !entry.expected);
-        const missing = expected.filter(rule => rule.seen !== rule.count);
+        diagnostics.dispose();
+        transport.dispose();
+        const { entries, expectations, unexpected, missing } =
+          diagnostics.snapshot();
 
         if (
           testInfo.status !== testInfo.expectedStatus ||
           unexpected.length ||
           missing.length
         ) {
+          const closedPages = transport
+            .pages()
+            .filter(page => page.isClosed())
+            .slice(0, 5);
+
+          if (closedPages.length) {
+            await testInfo.attach('closed-page-transports', {
+              body: JSON.stringify(
+                closedPages.map(page => ({
+                  transportEvents: transport.snapshot(page),
+                })),
+              ),
+              contentType: 'application/json',
+            });
+          }
+
           for (const [index, page] of [...watched]
             .flatMap(c => c.pages())
             .slice(0, 5)
@@ -193,7 +109,7 @@ export const test = base.extend<{
               ]);
               await testInfo.attach(`failure-state-${index}`, {
                 body: JSON.stringify(
-                  { state, transportEvents: transportEvents.get(page) ?? [] },
+                  { state, transportEvents: transport.snapshot(page) },
                   null,
                   2,
                 ),
@@ -209,18 +125,18 @@ export const test = base.extend<{
 
         // Match Playwright's default-context teardown for extra test-owned
         // contexts. Otherwise their live tabs leak into the next test.
-        await Promise.all([...ownedContexts].map(context => context.close()));
+        await Promise.all(
+          [...ownedContexts].map(context =>
+            context.close().catch(() => undefined),
+          ),
+        );
 
-        if (entries.length || expected.length) {
+        if (entries.length || expectations.length) {
           await testInfo.attach('browser-diagnostics', {
             body: JSON.stringify(
               {
                 entries,
-                expectations: expected.map(rule => ({
-                  ...rule,
-                  message: rule.message.source,
-                  url: rule.url?.source,
-                })),
+                expectations,
               },
               null,
               2,
