@@ -1015,9 +1015,12 @@ export class WSClient {
           // push we sent without (enough) identity. The socket stays
           // open and every other pending request is unaffected, so
           // neither `rejectAllPending` nor a toast is right — an
-          // anonymous viewer of a shared page would see one on every
-          // navigation. Logged so it is diagnosable.
-          console.warn('[WS] refused:', msg.message);
+          // anonymous viewer of a shared page, or a guest holding a
+          // capability link on one resource, gets one for the drive on
+          // every navigation. That is the server doing its job, not a
+          // fault, so it is logged below warning level: diagnosable, but
+          // not something a clean run should be flagged for.
+          console.info('[WS] refused:', msg.message);
         } else {
           this.rejectAllPending(msg.message);
           this.store.notifyError(msg.message);
