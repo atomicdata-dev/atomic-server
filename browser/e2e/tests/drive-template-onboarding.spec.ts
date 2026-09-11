@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { devDrive, FRONTEND_URL } from './test-utils';
+
 for (const keepEdits of [false, true]) {
   test(`template adoption ${keepEdits ? 'keeps edited content' : 'starts fresh without samples'}`, async ({
     page,
@@ -37,6 +38,7 @@ for (const keepEdits of [false, true]) {
     await expect(tabs).toHaveCSS('overflow-x', 'auto');
     const tabScroll = await tabs.evaluate(el => {
       el.scrollLeft = el.scrollWidth;
+
       return el.scrollLeft;
     });
     expect(tabScroll).toBeGreaterThan(0);
@@ -49,6 +51,7 @@ for (const keepEdits of [false, true]) {
     expect(previewBar!.y + previewBar!.height).toBeLessThanOrEqual(
       navigation!.y,
     );
+
     for (const name of ['Use this template', 'Back']) {
       const box = await page
         .getByRole('button', { name, exact: true })
@@ -56,6 +59,7 @@ for (const keepEdits of [false, true]) {
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(390);
     }
+
     const demo = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('atomic.templateDemo')!),
     );
@@ -72,8 +76,10 @@ for (const keepEdits of [false, true]) {
         property: 'https://atomicdata.dev/properties/parent',
         value: drive,
       });
+
       for (const subject of children?.subjects ?? []) {
         const resource = await store.getResource(subject);
+
         if (
           resource.get('https://atomicdata.dev/properties/name') ===
           'Lecture notes'
@@ -117,6 +123,7 @@ for (const keepEdits of [false, true]) {
       });
       const names = [];
       let sampleRows = 0;
+
       for (const subject of children?.subjects ?? []) {
         names.push(
           (await store.getResource(subject)).get(
@@ -127,6 +134,7 @@ for (const keepEdits of [false, true]) {
           property: 'https://atomicdata.dev/properties/parent',
           value: subject,
         });
+
         for (const child of nested?.subjects ?? []) {
           const name = (await store.getResource(child)).get(
             'https://atomicdata.dev/properties/name',
@@ -135,6 +143,7 @@ for (const keepEdits of [false, true]) {
             sampleRows++;
         }
       }
+
       return {
         drive,
         names,
@@ -149,6 +158,7 @@ for (const keepEdits of [false, true]) {
       keepEdits ? 'My temporary demo edit' : 'Lecture notes',
     );
     expect(result.demo).toBeNull();
+
     if (keepEdits) expect(result.sampleRows).toBeGreaterThan(0);
     else {
       expect(result.names).not.toContain('My temporary demo edit');
@@ -156,6 +166,7 @@ for (const keepEdits of [false, true]) {
     }
   });
 }
+
 test('blank drive remains a short path without feedback covering it on mobile', async ({
   page,
 }) => {
@@ -208,6 +219,7 @@ test('AI setup can be dismissed and reopened without trapping the gallery', asyn
   await devDrive(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`${FRONTEND_URL}/app/new-drive`);
+
   for (const method of ['outside', 'escape', 'close']) {
     await page.getByRole('button', { name: 'Set up AI', exact: true }).click();
     const title = page.getByRole('heading', {
