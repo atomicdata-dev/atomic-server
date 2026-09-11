@@ -1,7 +1,7 @@
 # JavaScript maintainability follow-ups
 
-> **Status: planned, 2026-09-11.** None of the three refactors below is implemented
-> by this document. Baseline: `develop` at `6045bff3a`, following PRs
+> **Status: in progress, 2026-09-11.** PluginPage subscriptions are implemented;
+> diagnostic collectors and Store coordination remain. Baseline: `develop` at `6045bff3a`, following PRs
 > [#1450](https://github.com/ontola/atomic-server/pull/1450) and
 > [#1451](https://github.com/ontola/atomic-server/pull/1451).
 
@@ -26,23 +26,32 @@ in [unified-data-layer.md](./unified-data-layer.md),
 ## 1. PluginPage subscriptions
 
 Start in [PluginPage.tsx](../browser/data-browser/src/views/Plugin/PluginPage.tsx).
-Name, namespace, config and permissions already use hooks. Version, author,
-description, JSON schema and parent still come from `resource.props`; the Save
-button reads `hasUnsavedChanges()` during render. These are audit candidates,
-not individually confirmed bugs.
+Version, author, description and JSON schema now use property hooks; Save uses
+`useSaveState`. Parent is read when uninstall starts, before destruction. The
+production regression reproduced valid config leaving Save disabled on the
+previous implementation. JSONEditor keeps its mounted draft; metadata changes
+do not reset it. Save enables for valid dirty state or a new config edit since the previous Save,
+including a later offline draft. In-flight and scheduled saves stay disabled;
+a queued/failed write alone does not enable another Save. A separate attempted real plugin-update regression still showed the old version
+on the updating client after refresh. Manifest metadata is GET enrichment; its
+interaction with Loro hydration and cross-client invalidation needs investigation
+in a separate change. The retained test mutates the mounted client resource and
+verifies metadata subscriptions and preservation of an active config draft.
 
-- [ ] Reproduce a stale render or Save-button transition while retaining the same
+- [x] Reproduce a stale render or Save-button transition while retaining the same
   Resource object. Use the cheapest failing layer; verify compiler behavior in a
   production Playwright build when a helper/unit test cannot exercise it.
-- [ ] Replace rendered scalar reads with `useString` and structured reads with
+- [x] Replace rendered scalar reads with `useString` and structured reads with
   `useValue`; use the existing save-state subscription for persistence status.
-- [ ] Define the Save-button policy explicitly: invalid JSON cannot save; in-flight
+- [x] Define the Save-button policy explicitly: invalid JSON cannot save; in-flight
   saving cannot submit twice; queued/offline/failed writes remain distinguishable
   from new unsaved config. Do not assume every non-idle state should enable Save.
-- [ ] Check `JSONEditor`'s `initialValue` behavior before changing schema/config
+- [x] Check `JSONEditor`'s `initialValue` behavior before changing schema/config
   subscriptions. A remote update must not reset an active local edit.
-- [ ] Verify remote metadata updates, valid/invalid config, save completion and
-  offline retry. Keep uninstall/update permissions unchanged.
+- [x] Verify client metadata updates, valid/invalid config, save completion and
+  repeated offline saves. Keep uninstall/update permissions unchanged.
+- [ ] Follow up on remote manifest metadata refresh in `react-compiler-resource-proxy.md`;
+  the real Update flow did not display its new version on the updating client.
 
 Acceptance: the reproduced failure passes without a compiler opt-out or replacing
 Resource identity. Limit the PR to this flow; event-handler reads need not become

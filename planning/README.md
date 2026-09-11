@@ -63,7 +63,7 @@ browser flow; standalone recovery remains self-managed.
 | [`content-i18n.md`](./content-i18n.md) | **LocalizedText + template locales shipped.** Remaining: TranslationsBar, `useTranslation`, `/query` `lang`, search language filter. |
 | [`website-templates.md`](./website-templates.md) | Template repair complete (DID). Remaining CMS product: drafts-from-site, i18n tooling, canonical paths. |
 | [`structural-problems-index.md`](./structural-problems-index.md) | **Live index.** React subscription audit is partial; save-state APIs shipped. Browser metadata cleanup and subject-brand consumers remain; server subscription work is complete. |
-| [`js-maintainability.md`](./js-maintainability.md) | **Planned.** PluginPage subscriptions, diagnostic collector lifecycles, then Store save-status coordination; three separately validated PRs. |
+| [`js-maintainability.md`](./js-maintainability.md) | **In progress.** PluginPage subscriptions implemented; diagnostic collector lifecycles and Store save-status coordination remain. |
 | [`react-compiler-resource-proxy.md`](./react-compiler-resource-proxy.md) | **Partial.** Immutable read/save status hooks and the data-inspector subscription shipped; remaining render-time property getters need incremental regression-driven migration. |
 | [`canvas-undo-consolidation.md`](./canvas-undo-consolidation.md) | Phase A + C landed (browser). Phase B (Flutter action-stack removal) open. |
 | [`index-performance.md`](./index-performance.md) | First tranche shipped. Structural permission-check fix is `zones.md`, not built. |
