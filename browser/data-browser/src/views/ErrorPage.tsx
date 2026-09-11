@@ -58,7 +58,10 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
     resource.subject,
   ]);
 
-  if (isRootWelcomeResourceError(resource, agent, baseURL)) {
+  if (
+    shouldGoToWelcome ||
+    isRootWelcomeResourceError(resource, agent, baseURL)
+  ) {
     // Redirect effect above will handle the URL; render something safe meanwhile.
     return <RootWelcomeGate subject={baseURL || resource.subject} />;
   }
