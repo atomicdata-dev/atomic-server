@@ -9628,9 +9628,8 @@ msgstr "Chat with Codex inside Atomic. Messages are saved here before your local
 msgid "The worker runs on your computer with your Codex sign-in and a workspace you choose locally. Installing the app does not start it."
 msgstr "The worker runs on your computer with your Codex sign-in and a workspace you choose locally. Installing the app does not start it."
 
-#: src/chunks/PluginRuns/ConnectCodex.tsx
-msgid "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
-msgstr "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
+#~ msgid "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
+#~ msgstr "Codex app created. Download its worker setup, then run these commands from your AtomicServer checkout after building the Codex example."
 
 #: src/chunks/PluginRuns/ConnectCodex.tsx
 msgid "Download worker setup"
@@ -9643,3 +9642,23 @@ msgstr "The setup file contains a credential scoped to this app. Keep it private
 #: src/chunks/PluginRuns/ConnectCodex.tsx
 msgid "Open Codex"
 msgstr "Open Codex"
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "1. Download the worker setup before closing this dialog."
+msgstr "1. Download the worker setup before closing this dialog."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "2. Open a terminal in your AtomicServer checkout, where you built the Codex example. Configure the worker once with this command:"
+msgstr "2. Open a terminal in your AtomicServer checkout, where you built the Codex example. Configure the worker once with this command:"
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "The last argument is the project folder Codex will work in. This command uses your current AtomicServer checkout. To work on another project, replace the last argument with its full folder path in quotes, for example \"/Users/you/projects/my-app\". Adjust the download path if you saved the setup elsewhere."
+msgstr "The last argument is the project folder Codex will work in. This command uses your current AtomicServer checkout. To work on another project, replace the last argument with its full folder path in quotes, for example \"/Users/you/projects/my-app\". Adjust the download path if you saved the setup elsewhere."
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "3. When you see \"Worker configured\", run this separate command in the same terminal directory to start the worker:"
+msgstr "3. When you see \"Worker configured\", run this separate command in the same terminal directory to start the worker:"
+
+#: src/chunks/PluginRuns/ConnectCodex.tsx
+msgid "4. Keep that terminal running. When it says \"Codex worker ready\", open Codex below and send a message. Press Ctrl+C in the terminal to stop the worker. To restart it later, run the same work command; you do not need to configure it again."
+msgstr "4. Keep that terminal running. When it says \"Codex worker ready\", open Codex below and send a message. Press Ctrl+C in the terminal to stop the worker. To restart it later, run the same work command; you do not need to configure it again."

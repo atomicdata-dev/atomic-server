@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { connect, install } from './atomic.ts';
 import { work } from './worker.mjs';
 const [command, inputFile, workspace, connectWorkspace] = process.argv.slice(2);
+const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 try {
   if (!inputFile || !['install', 'connect', 'work'].includes(command))
     throw new Error(
@@ -50,7 +51,7 @@ try {
       mode: 0o600,
     });
     console.log(
-      'Worker configured. Start it with the work command. Keep the downloaded setup private.',
+      `Worker configured for project folder: ${config.workspace}\n\nStart the worker with:\nnode ${shellQuote(resolve(process.argv[1]))} work ${shellQuote(target)}\n\nKeep that terminal running. When it says \"Codex worker ready\", open Codex in Atomic and send a message.\nPress Ctrl+C to stop. Run the same work command to restart; configuration is only needed once.\nKeep the downloaded setup and connection credential private.`,
     );
   } else {
     const config = JSON.parse(await readFile(file, 'utf8'));

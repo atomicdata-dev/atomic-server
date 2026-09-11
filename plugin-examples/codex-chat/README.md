@@ -24,14 +24,36 @@ pnpm --dir plugin-examples/codex-chat install
 node plugin-examples/codex-chat/build.mjs
 ```
 
-In the Data Browser, open **Integrations → Codex → Set up connection** and
-choose **Create Codex app**. Download the worker setup before closing the dialog,
-then configure its local workspace and start the worker:
+### Connect from Atomic
 
-```sh
-node plugin-examples/codex-chat/dist/cli.js connect ~/Downloads/codex-setup.json /absolute/private/connection.json /absolute/workspace
-node plugin-examples/codex-chat/dist/cli.js work /absolute/private/connection.json
-```
+1. Open **Integrations → Codex → Set up connection → Create Codex app**.
+   Click **Download worker setup** before closing the dialog.
+2. Open a terminal in the **AtomicServer checkout where you ran the build above**.
+   Configure the worker once:
+
+   ```sh
+   node plugin-examples/codex-chat/dist/cli.js connect ~/Downloads/codex-setup.json ./codex-connection.json "$(pwd)"
+   ```
+
+   The final argument is the **project folder Codex will work in**. `"$(pwd)"`
+   uses your current AtomicServer checkout. For a different project, replace it
+   with the full folder path in quotes, such as `"/Users/you/projects/my-app"`.
+   You can run `pwd` in any project's terminal to find that folder's full path.
+   Adjust `~/Downloads/codex-setup.json` if you saved the download elsewhere.
+   `./codex-connection.json` is the new local configuration file, not the project
+   folder; keep it and its companion files for future starts.
+3. After **Worker configured**, start the worker from the **same directory**:
+
+   ```sh
+   node plugin-examples/codex-chat/dist/cli.js work ./codex-connection.json
+   ```
+
+   Configuration alone does not start the worker. Wait for **Codex worker ready**,
+   and keep this terminal running.
+4. Click **Open Codex** in Atomic (or select it in the drive sidebar), then send
+   a message. Press **Ctrl+C** in the terminal to stop the worker. To restart it
+   later, return to this checkout and run the same `work` command; do not rerun
+   `connect`. Messages submitted while the worker is stopped remain queued.
 
 The downloaded setup contains the app-scoped secret: keep it private. The
 catalog entry is part of this branch, not a released integration.

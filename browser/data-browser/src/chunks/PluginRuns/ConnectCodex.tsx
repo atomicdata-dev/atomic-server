@@ -61,23 +61,46 @@ export function ConnectCodex({ drive }: { drive: string }) {
         </Button>
       ) : (
         <>
-          <p>
-            Codex app created. Download its worker setup, then run these
-            commands from your AtomicServer checkout after building the Codex
-            example.
-          </p>
+          <p>1. Download the worker setup before closing this dialog.</p>
           <Button onClick={download}>Download worker setup</Button>
           <p>
             The setup file contains a credential scoped to this app. Keep it
             private. Anyone with write access to the app can submit prompts and
             answer approvals for the worker.
           </p>
+          <p>
+            2. Open a terminal in your AtomicServer checkout, where you built
+            the Codex example. Configure the worker once with this command:
+          </p>
           <CodeBlock
             content={
-              /* @wc-ignore */ 'node plugin-examples/codex-chat/dist/cli.js connect ~/Downloads/codex-setup.json ./codex-connection.json /absolute/workspace\nnode plugin-examples/codex-chat/dist/cli.js work ./codex-connection.json'
+              /* @wc-ignore */ 'node plugin-examples/codex-chat/dist/cli.js connect ~/Downloads/codex-setup.json ./codex-connection.json "$(pwd)"'
             }
             wordWrap
           />
+          <p>
+            The last argument is the project folder Codex will work in. This
+            command uses your current AtomicServer checkout. To work on another
+            project, replace the last argument with its full folder path in
+            quotes, for example "/Users/you/projects/my-app". Adjust the
+            download path if you saved the setup elsewhere.
+          </p>
+          <p>
+            3. When you see "Worker configured", run this separate command in
+            the same terminal directory to start the worker:
+          </p>
+          <CodeBlock
+            content={
+              /* @wc-ignore */ 'node plugin-examples/codex-chat/dist/cli.js work ./codex-connection.json'
+            }
+            wordWrap
+          />
+          <p>
+            4. Keep that terminal running. When it says "Codex worker ready",
+            open Codex below and send a message. Press Ctrl+C in the terminal to
+            stop the worker. To restart it later, run the same work command; you
+            do not need to configure it again.
+          </p>
           <Button
             onClick={() => navigate(constructOpenURL(installed.config.app))}
           >
