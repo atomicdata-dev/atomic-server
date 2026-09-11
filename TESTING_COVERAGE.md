@@ -13,6 +13,29 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## HTTP-optional native node lifecycle
+
+`server/tests/it/http_optional.rs` reserves the configured HTTP port, starts
+`serve::run_node`, creates and queries a document through the native store/runtime,
+and explicitly attempts HTTP binding. After that bind fails, native reads,
+edits and change events still work. A second test keeps the hosted embedder
+ready hook before HTTP binding. `runtime::durable_flush::tests` in atomic_lib
+verifies that
+ending the owned flush worker releases redb and preserves its final write.
+These are Rust glue tests, not desktop UI acceptance. Tauri still starts the
+HTTP/WS adapter for its frontend. Missing: native frontend reads/commits/events,
+attachment bytes, restore and peer sync through Tauri with no HTTP listener;
+process-global Iroh teardown/restart is also not covered by this extraction.
+
+`lib/tests/native_runtime.rs` runs on plain Tokio with only `db-redb,config`:
+originless storage + identity + signed creation survive close/reopen, a retained
+config recreates an identity in a replacement database, legacy secrets resolve
+to the same key-derived DID, and malformed existing config is not overwritten.
+`lib/tests/check-native-runtime.sh` rejects atomic-server/Actix in the normal
+core dependency graph and compiles/runs those tests outside workspace feature
+unification. `rustTest` runs this isolation gate after the workspace suite.
+The gate is not a claim that the Tauri dependency graph is already server-free.
+
 ## Browser WebRTC transport (issue #1396)
 
 `browser/lib/src/webrtc-transport.test.ts` covers frame fragmentation/order,

@@ -202,6 +202,29 @@ pub async fn serve_with_hook<F>(
 where
     F: FnOnce(&crate::appstate::AppState),
 {
+    run_node(config, |appstate| async move {
+        on_ready(&appstate);
+        serve_http(appstate).await
+    })
+    .await
+}
+
+/// Run the embedded node without binding HTTP. The adapter owns the future's
+/// lifetime: keep it pending while handling native commands.
+/// Storage, plugins, indexing, flushes and peer transport are initialized once
+/// and kept alive until `run` finishes. Call [`serve_http`] inside `run` only
+/// when an HTTP/WS listener is wanted.
+///
+/// Transitional boundary: bootstrap still uses `AppState` and Actix actors.
+/// Native operations bind to `appstate.node()` (`AtomicNode`); moving the
+/// remaining server-owned services into atomic_lib is a separate migration.
+/// Must run inside an Actix system, like `serve_with_hook`. Peer transport still
+/// has process-global state; this is not a restartable/multi-node host API.
+pub async fn run_node<F, Fut>(config: crate::config::Config, run: F) -> AtomicServerResult<()>
+where
+    F: FnOnce(crate::appstate::AppState) -> Fut,
+    Fut: std::future::Future<Output = AtomicServerResult<()>>,
+{
     println!(
         "Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/atomicdata-dev/atomic-server for more info.",
         env!("CARGO_PKG_VERSION")
@@ -320,24 +343,9 @@ where
         });
     }
 
-    // Durable-flush tick. Per-commit writes use Durability::None (no fsync)
-    // for throughput; this background flush makes them durable on a fixed
-    // cadence (100ms), bounding crash data-loss to the interval while
-    // amortizing a single fsync across every commit in the window. Runs on a
-    // dedicated OS thread because the flush blocks on fsync, which would stall
-    // a tokio worker.
-    {
-        let store = appstate.store.clone();
-        std::thread::Builder::new()
-            .name("durable-flush".into())
-            .spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                if let Err(e) = store.flush() {
-                    tracing::warn!("periodic durable flush failed: {e}");
-                }
-            })
-            .expect("spawn durable-flush thread");
-    }
+    // Native adapters need durability even when no HTTP listener runs.
+    // Own the worker so returning/cancelling this lifecycle stops and joins it.
+    let _flush_worker = appstate.node().start_durable_flush()?;
 
     // Start Iroh peer-to-peer transport
     let _iroh_router = {
@@ -379,13 +387,19 @@ where
         crate::plugins::replicate::reconcile_replication_targets(&replication_store).await;
     });
 
-    // Embedder hook: the store, indexes and transports are up, but the HTTP
-    // server hasn't started accepting connections yet. A managed-node wrapper
-    // (atomic-saas/managed-node) uses this to flip the `managed` flag, install
-    // its sync admission policy, and spawn its control-plane tasks. The open
-    // server passes a no-op (see `serve`), so it never phones home.
-    on_ready(&appstate);
+    let result = run(appstate).await;
+    tracing::info!("Node adapter stopped");
+    if let Some(guard) = tracing_chrome_flush_guard {
+        guard.flush();
+    }
+    result
+}
 
+/// Optional HTTP/WS adapter for an already initialized node. A bind failure
+/// does not invalidate other clones of the native node handle. The caller
+/// keeps `run_node` alive for as long as any adapter needs its services.
+pub async fn serve_http(appstate: crate::appstate::AppState) -> AtomicServerResult<()> {
+    let config = appstate.config.clone();
     let server = HttpServer::new(move || {
         let cors = Cors::permissive().expose_headers([SERVER_VERSION_HEADER]);
 
@@ -505,13 +519,6 @@ where
             .shutdown_timeout(TIMEOUT)
             .run()
             .await?;
-    }
-
-    tracing::info!("Cleaning up");
-    // Cleanup, runs when server is stopped
-    // Note that more cleanup code is in Appstate::exit
-    if let Some(guard) = tracing_chrome_flush_guard {
-        guard.flush()
     }
 
     tracing::info!("Server stopped");

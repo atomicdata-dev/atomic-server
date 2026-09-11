@@ -89,7 +89,7 @@ const PAIR_LINK_RETRY_WINDOW: std::time::Duration = std::time::Duration::from_se
 /// A handle on the embedded node, captured once it has booted.
 #[derive(Default)]
 struct EmbeddedNode {
-  store: std::sync::OnceLock<atomic_lib::Db>,
+  runtime: std::sync::OnceLock<atomic_lib::runtime::AtomicNode>,
   config_file: std::sync::OnceLock<std::path::PathBuf>,
   /// Why the node never came up, if it didn't. The server runs on its own
   /// thread, so a boot failure there used to be an unwind into nothing: the
@@ -102,8 +102,8 @@ struct EmbeddedNode {
 impl EmbeddedNode {
   /// The store, or an explanation of why there isn't one.
   fn require_store(&self) -> Result<atomic_lib::Db, String> {
-    if let Some(store) = self.store.get() {
-      return Ok(store.clone());
+    if let Some(node) = self.runtime.get() {
+      return Ok(node.db().clone());
     }
 
     Err(match self.startup_error.get() {
@@ -310,11 +310,7 @@ mod vault_ipc {
   }
 
   pub fn store_of(node: &std::sync::Arc<super::EmbeddedNode>) -> Result<atomic_lib::Db, String> {
-    node
-      .store
-      .get()
-      .ok_or_else(|| "The local node has not finished starting up.".to_string())
-      .cloned()
+    node.require_store()
   }
 
   /// Run vault work on a thread of its own.
@@ -709,12 +705,21 @@ pub fn run() {
           .expect("TLS verifier initialization did not complete");
 
         let rt = actix_rt::Runtime::new().unwrap();
-        // The hook hands us the store once it's up, so `adopt_agent` can point
-        // the node's identity at the signed-in user.
-        let result = rt.block_on(atomic_server_lib::serve::serve_with_hook(
+        // Native commands receive the shared runtime before the HTTP adapter
+        // starts, so `adopt_agent` can set the node's signed-in identity.
+        let result = rt.block_on(atomic_server_lib::serve::run_node(
           config_clone,
-          |appstate| {
-            let _ = node_for_server.store.set(appstate.store.clone());
+          |appstate| async {
+            let _ = node_for_server.runtime.set(appstate.node());
+            // The current webview still needs HTTP/WS. It is an adapter,
+            // explicitly started after native access is ready; replacing the
+            // frontend's transport will let this call become optional.
+            if let Err(error) = atomic_server_lib::serve::serve_http(appstate).await {
+              eprintln!("[node] the HTTP adapter stopped: {error}");
+            }
+            // The window and native commands outlive the HTTP adapter. Keep
+            // peer tasks and durable flushing alive even if its port is busy.
+            std::future::pending().await
           },
         ));
 
@@ -731,7 +736,7 @@ pub fn run() {
       {
         let menu = crate::menu::build(app.handle())?;
         app.handle().set_menu(menu)?;
-        system_tray::setup(app, &config)?;
+        system_tray::setup(app, &config.get_origin(), &config.config_dir)?;
       }
 
       Ok(())

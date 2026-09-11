@@ -10,8 +10,8 @@
 //! with a storage config, `get`, `mutate`, `subscribe`, `sync_with_peer`.
 //! Three days later nothing but the WASM binding had bound to it, and the
 //! WASM binding used four methods. The surface was cut down to those on
-//! 2026-09-04; the seam stays, and grows again when a second adapter binds
-//! to it (`planning/atomic-lib-runtime.md`).
+//! 2026-09-04. Native startup and durability were added in September 2026
+//! when the server/Tauri adapter began consuming them.
 
 use crate::{
     agents::Agent,
@@ -62,8 +62,32 @@ pub struct AtomicNode {
 }
 
 impl AtomicNode {
+    /// Open durable native storage and bootstrap the bundled models/search
+    /// index. An origin is only needed for legacy URL resources or a hosted
+    /// adapter; native DID-only nodes pass `None`. Does not start listeners,
+    /// create an identity, or contact peers.
+    #[cfg(all(feature = "db-redb", not(target_arch = "wasm32")))]
+    pub async fn open_local(
+        data_path: &std::path::Path,
+        blobs_path: &std::path::Path,
+        origin: Option<String>,
+    ) -> AtomicResult<Self> {
+        Ok(Self::from_db(
+            Db::init_redb_file(data_path, origin, blobs_path).await?,
+        ))
+    }
+
+    /// Start the shared 100ms fsync worker. Keep the guard alive while this
+    /// node is running; dropping it joins the worker after a final flush.
+    /// Start one guard per store, not one per adapter or node clone.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn start_durable_flush(&self) -> AtomicResult<super::DurableFlush> {
+        Ok(super::DurableFlush::start(self.db.clone())?)
+    }
+
     /// Wrap an already-opened store. Adapters construct `Db` themselves
-    /// (the WASM `ClientDb`, the server's `AppState`) and bind here.
+    /// (such as the WASM `ClientDb`) and bind here; native hosts can use
+    /// `open_local` instead.
     pub fn from_db(db: Db) -> Self {
         Self { db }
     }

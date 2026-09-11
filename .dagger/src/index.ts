@@ -1319,6 +1319,9 @@ export class AtomicServer {
             `--test-threads ${this.hostKnobs.nextestTestThreads} ` +
             `--retries ${this.hostKnobs.nextestRetries}`,
         ])
+        // Compile the native runtime separately: workspace feature unification
+        // must not hide a dependency on the hosted server/Actix adapter.
+        .withExec(['sh', 'lib/tests/check-native-runtime.sh'])
         .stdout()
     );
   }
