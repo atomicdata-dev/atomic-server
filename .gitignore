@@ -14,6 +14,7 @@ artifact
 # Store for the e2e server (`browser/e2e/scripts/e2e-server.sh`) — test data
 # only, kept out of the dev store on purpose.
 /.e2e-store
+/.e2e-runs
 server/assets_tmp
 server/js-build.log
 .netlify

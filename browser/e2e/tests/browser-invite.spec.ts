@@ -1,4 +1,5 @@
-import { test, expect, type WebSocketRoute } from '@playwright/test';
+import type { WebSocketRoute } from '@playwright/test';
+import { standaloneTest as test, expect } from './deployment-fixtures';
 import { devDrive, FRONTEND_URL, topBarShareButton } from './test-utils';
 
 // Relay only discovery and SDP in-process. Authentication, invite redemption,
