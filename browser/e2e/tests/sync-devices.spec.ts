@@ -92,7 +92,7 @@ test.describe('sync page devices', () => {
     await expect(code).toBeVisible();
 
     const uri = (await code.textContent())?.trim() ?? '';
-    const params = new URL(uri.replace('atomic://', 'https://')).searchParams;
+    const params = new URL(uri).searchParams;
 
     // A second device parses exactly these three fields. A code that renders
     // but does not carry them is a QR that scans and then does nothing.
@@ -116,7 +116,7 @@ test.describe('sync page devices', () => {
     // LAN/WS fast-path hint — present when the server isn't localhost (e.g.
     // dagger's `atomic.localhost`), absent for a loopback server.
     const keys = new Set([
-      ...new URL(uri.replace('atomic://', 'https://')).searchParams.keys(),
+      ...new URL(uri).searchParams.keys(),
     ]);
     expect([...keys].sort()).toEqual(
       keys.has('url')

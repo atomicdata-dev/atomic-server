@@ -8,7 +8,7 @@ import { initSentry } from './helpers/sentry';
 // before any route mounts. CanvasPage uses it to ignore momentum-scroll
 // tails carried over from the previous view (see the file's doc-comment).
 import './helpers/wheelSession';
-// Side-effect import: queues atomic:// deep links forwarded by the Tauri
+// Side-effect import: queues atomic: deep links forwarded by the Tauri
 // shell so a link that launched the app isn't lost before React mounts.
 import './helpers/deepLinkQueue';
 

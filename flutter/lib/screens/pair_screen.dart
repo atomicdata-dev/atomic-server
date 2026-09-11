@@ -10,10 +10,14 @@ import '../atomic/session.dart';
 /// DID prefix for Iroh node identifiers.
 const _nodeDidPrefix = 'did:ad:node:';
 
-/// The `atomic://pair` URI the data-browser and the Tauri apps put in their QR
+/// The `atomic:pair` URI the data-browser and the Tauri apps put in their QR
 /// codes. See `planning/device-pairing.md` and `browser/lib/src/pairing.ts` —
 /// this parser must accept what those produce.
-const _pairingUriPrefix = 'atomic://pair?';
+const _pairingUriPrefix = 'atomic:pair?';
+
+/// The form codes had before the double slash was dropped. A QR printed
+/// before then must keep scanning.
+const _legacyPairingUriPrefix = 'atomic://pair?';
 
 enum _Step { loading, showQr, syncing, done, error }
 
@@ -61,7 +65,8 @@ class PairScreen extends StatefulWidget {
   static PeerInfo? parsePeerInfo(String input) {
     final trimmed = input.trim();
 
-    if (trimmed.startsWith(_pairingUriPrefix)) {
+    if (trimmed.startsWith(_pairingUriPrefix) ||
+        trimmed.startsWith(_legacyPairingUriPrefix)) {
       return _parsePairingUri(trimmed);
     }
 
@@ -83,14 +88,16 @@ class PairScreen extends StatefulWidget {
     return null;
   }
 
-  /// Reads an `atomic://pair?…` envelope.
+  /// Reads an `atomic:pair?…` envelope (or the older `atomic://pair?…`).
   ///
   /// An unknown version is refused rather than read as far as it parses: a
   /// newer code may mean something this app would get wrong, and dialing the
   /// wrong node on a half-understood code is worse than saying no.
   static PeerInfo? _parsePairingUri(String uri) {
-    final params =
-        Uri.splitQueryString(uri.substring(_pairingUriPrefix.length));
+    final prefix = uri.startsWith(_pairingUriPrefix)
+        ? _pairingUriPrefix
+        : _legacyPairingUriPrefix;
+    final params = Uri.splitQueryString(uri.substring(prefix.length));
 
     final version = params['v'];
 

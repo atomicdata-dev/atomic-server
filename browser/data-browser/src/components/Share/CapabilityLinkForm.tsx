@@ -93,7 +93,7 @@ export function CapabilityLinkForm({
         {result.webLink && (
           <Muted key='deep'>
             <span>Deep-link form, for apps that register </span>
-            <code>atomic://</code>
+            <code>atomic:</code>
             <CodeBlock content={result.link} />
           </Muted>
         )}

@@ -213,7 +213,7 @@ describe('runPairing', () => {
 
   it('reports an unreadable code as a value, not a throw', async () => {
     const result = await runPairing(
-      'atomic://pair?v=1&node=nonsense',
+      'atomic:pair?v=1&node=nonsense',
       DRIVE,
       AGENT,
     );
@@ -223,7 +223,7 @@ describe('runPairing', () => {
 
   it('explains an unsupported version rather than best-effort parsing it', async () => {
     const result = await runPairing(
-      `atomic://pair?v=99&node=${NODE}&drives=*`,
+      `atomic:pair?v=99&node=${NODE}&drives=*`,
       DRIVE,
       AGENT,
     );

@@ -1,4 +1,4 @@
-// Deep links (atomic://…) reach the webview as 'atomic-deep-link' DOM events,
+// Deep links (atomic:…) reach the webview as 'atomic-deep-link' DOM events,
 // dispatched by the Tauri shell (desktop/src/lib.rs). This module's listener
 // is registered at module scope from the app entry — before React mounts — so
 // a link that launched the app (system camera scanning a pairing QR) is

@@ -31,7 +31,7 @@ function codeOf(fn: () => unknown): string {
 }
 
 describe('capability links', () => {
-  it('round-trips the atomic:// form', () => {
+  it('round-trips the atomic: form', () => {
     const encoded = encodeCapabilityLink(link);
 
     expect(encoded.startsWith(CAPABILITY_URI_PREFIX)).toBe(true);
@@ -43,6 +43,17 @@ describe('capability links', () => {
 
     expect(encoded.startsWith(`https://app.example.org${CAPABILITY_APP_PATH}?`)).toBe(true);
     expect(decodeCapabilityLink(encoded)).toEqual(link);
+  });
+
+  it('has no double slash, like every other atomic identifier', () => {
+    expect(encodeCapabilityLink(link).startsWith('atomic:open?')).toBe(true);
+    expect(encodeCapabilityLink(link)).not.toContain('//');
+  });
+
+  it('still decodes the older double-slash form', () => {
+    const legacy = encodeCapabilityLink(link).replace('atomic:open?', 'atomic://open?');
+
+    expect(decodeCapabilityLink(legacy)).toEqual(link);
   });
 
   it('decodes a bare query string, which is what a route handler holds', () => {
@@ -67,7 +78,7 @@ describe('capability links', () => {
   });
 
   it('refuses an unknown version rather than guessing', () => {
-    expect(codeOf(() => decodeCapabilityLink(`${CAPABILITY_URI_PREFIX}v=2&s=${SUBJECT}&cap=${CAP}`))).toBe(
+    expect(codeOf(() => decodeCapabilityLink(`${CAPABILITY_URI_PREFIX}v=2&subject=${SUBJECT}&cap=${CAP}`))).toBe(
       'unsupported-version',
     );
     expect(codeOf(() => encodeCapabilityLink({ ...link, v: 2 as 1 }))).toBe('unsupported-version');
@@ -75,7 +86,7 @@ describe('capability links', () => {
 
   it('refuses a link with no subject or no secret', () => {
     expect(codeOf(() => decodeCapabilityLink(`${CAPABILITY_URI_PREFIX}v=1&cap=${CAP}`))).toBe('malformed');
-    expect(codeOf(() => decodeCapabilityLink(`${CAPABILITY_URI_PREFIX}v=1&s=${SUBJECT}`))).toBe('malformed');
+    expect(codeOf(() => decodeCapabilityLink(`${CAPABILITY_URI_PREFIX}v=1&subject=${SUBJECT}`))).toBe('malformed');
   });
 
   it('refuses a routing url that is not a bare origin', () => {
@@ -86,7 +97,7 @@ describe('capability links', () => {
   });
 
   it('refuses a web link under the wrong path', () => {
-    expect(codeOf(() => decodeCapabilityLink(`https://app.example.org/app/share?v=1&s=${SUBJECT}&cap=${CAP}`))).toBe(
+    expect(codeOf(() => decodeCapabilityLink(`https://app.example.org/app/share?v=1&subject=${SUBJECT}&cap=${CAP}`))).toBe(
       'malformed',
     );
   });

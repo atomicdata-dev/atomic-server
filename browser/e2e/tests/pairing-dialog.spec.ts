@@ -29,7 +29,7 @@ import {
  */
 
 const NODE = `did:ad:node:${'a'.repeat(64)}`;
-const VALID_CODE = `atomic://pair?v=1&node=${NODE}&drives=*`;
+const VALID_CODE = `atomic:pair?v=1&node=${NODE}&drives=*`;
 
 /**
  * Make the page believe it is the desktop/mobile app.
@@ -137,7 +137,7 @@ test.describe('pairing by pasting a code', () => {
     // dropped earlier still, by `PairingLinkHandler`, and reports nothing.
     await pasteCode(
       page,
-      `atomic://pair?v=1&node=did:ad:node:tooshort&drives=*`,
+      `atomic:pair?v=1&node=did:ad:node:tooshort&drives=*`,
     );
 
     await expect(

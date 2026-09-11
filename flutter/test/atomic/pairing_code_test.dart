@@ -6,11 +6,19 @@ const _hex =
     '959866605fedfbc79d3890579d587410bfb05329f48cfe5186297ac8cf51888f';
 
 void main() {
-  group('atomic://pair codes (what the data-browser and Tauri apps show)', () {
+  group('atomic:pair codes (what the data-browser and Tauri apps show)', () {
+    test('still reads the older double-slash form', () {
+      final peer = PairScreen.parsePeerInfo(
+        'atomic://pair?v=1&node=did:ad:node:$_hex&drives=*',
+      );
+      expect(peer, isNotNull);
+      expect(peer!.nodeId, _hex);
+    });
+
     test('reads the code a browser shows for the server its drives live on', () {
       // Copied from the Sync page, verbatim.
       final peer = PairScreen.parsePeerInfo(
-        'atomic://pair?v=1&node=did:ad:node:$_hex&drives=*',
+        'atomic:pair?v=1&node=did:ad:node:$_hex&drives=*',
       );
 
       expect(peer, isNotNull);

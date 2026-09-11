@@ -239,7 +239,7 @@ launching the app) and `IdentityReconcileGate`. Anything that genuinely calls
 `invoke` needs a real desktop harness, not a faked global.
 
 **Known wart, not a test gap:** `PairingLinkHandler` drops input that does not
-start with `atomic://` or `did:ad:node:`, so pasting something that is not a
+start with `atomic:` or `did:ad:node:`, so pasting something that is not a
 URI reports *nothing at all* — no dialog, no error. Only malformed input that
 is URI-shaped reaches the flow and gets a message.
 

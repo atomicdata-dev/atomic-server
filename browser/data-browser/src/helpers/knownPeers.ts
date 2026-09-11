@@ -1,6 +1,6 @@
 // The local list of paired peer nodes ('atomic-peers' in localStorage) — the
 // capability records auto-dial uses. Written by explicit user action only:
-// the Sync page's peer flow, a scanned/pasted atomic://pair link, or the
+// the Sync page's peer flow, a scanned/pasted atomic:pair link, or the
 // account device directory. The Sync page renders and syncs these.
 
 const KNOWN_PEERS_KEY = 'atomic-peers';

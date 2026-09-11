@@ -998,21 +998,21 @@ fn is_file(resource: &Resource) -> bool {
 
 /// A resource that is neither a File nor a container (Folder/Drive). These are
 /// surfaced as macOS "internet location" files: opening one hands off to Atomic
-/// desktop via the `atomic://` deep link instead of downloading bytes.
+/// desktop via the `atomic:` deep link instead of downloading bytes.
 fn is_link_resource(resource: &Resource) -> bool {
   !is_dir(resource) && !is_file(resource)
 }
 
 /// macOS location-file extension. `.inetloc` (unlike `.webloc`, which only
-/// resolves http/https) opens custom URL schemes like `atomic://`.
+/// resolves http/https) opens custom URL schemes like `atomic:`.
 const LINK_EXT: &str = "inetloc";
 
 /// The `.inetloc` (plist) bytes that open `subject` in Atomic desktop. The OS
-/// resolves the embedded `atomic://` URL to the registered desktop app, whose
+/// resolves the embedded `atomic:` URL to the registered desktop app, whose
 /// deep-link handler forwards it to the frontend to navigate to the resource.
 fn link_file_bytes(subject: &str) -> Vec<u8> {
   let url = xml_escape(&format!(
-    "atomic://open?subject={}",
+    "atomic:open?subject={}",
     percent_encode(subject)
   ));
   format!(
@@ -1024,7 +1024,7 @@ fn link_file_bytes(subject: &str) -> Vec<u8> {
   .into_bytes()
 }
 
-/// Percent-encode a subject so it survives as an `atomic://…?subject=` query
+/// Percent-encode a subject so it survives as an `atomic:…?subject=` query
 /// value (its `:`, `/`, `?` etc. would otherwise break the URL).
 fn percent_encode(input: &str) -> String {
   let mut out = String::with_capacity(input.len());
@@ -1741,7 +1741,7 @@ mod tests {
     // Its content is the deep link that opens the resource in Atomic desktop.
     let (bytes, _eof) = fs.read(link.fileid, 0, 4096).await.unwrap();
     let content = String::from_utf8(bytes).unwrap();
-    assert!(content.contains("atomic://open?subject="));
+    assert!(content.contains("atomic:open?subject="));
     assert!(content.contains(&percent_encode(&table_subject)));
 
     // Lookup resolves the link by its `.inetloc` name.

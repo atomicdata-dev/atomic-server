@@ -9,16 +9,19 @@
  * agent (`revokeAccessAgent`), and it shows up in the App keys list like any
  * other key, named after the resource it opens.
  *
- * Wire form, readable and copyable:
+ * Wire form, readable and copyable, the same `atomic:open?subject=…` link the
+ * desktop app already opens resources with, plus the capability:
  *
- *     atomic://open?v=1&s=<subject>&cap=<secret>&url=<node>
+ *     atomic:open?v=1&subject=<subject>&cap=<secret>&url=<node>
  *
  * or, so that a plain browser can open it, the same query under an app's
  * `/app/open` path:
  *
- *     https://example.org/app/open?v=1&s=<subject>&cap=<secret>&url=<node>
+ *     https://example.org/app/open?v=1&subject=<subject>&cap=<secret>&url=<node>
  *
- * `s` is the resource to open. `cap` is the agent secret, the capability.
+ * No `//` after the scheme: there is no authority part, and Atomic's
+ * identifiers (`did:ad:…`) have none either. `subject` is the resource to
+ * open. `cap` is the agent secret, the capability.
  * `url` is a routing hint: where the resource can be fetched from by a client
  * that does not have it. It grants nothing on its own; the node still checks
  * the agent's rights on the resource.
@@ -38,7 +41,10 @@ export type CapabilityLink = {
   url?: string;
 };
 
-export const CAPABILITY_URI_PREFIX = 'atomic://open?';
+export const CAPABILITY_URI_PREFIX = 'atomic:open?';
+
+/** Accepted on decode only, for links minted before the double slash went. */
+const LEGACY_CAPABILITY_URI_PREFIX = 'atomic://open?';
 
 /** Path under an app origin that opens a capability link in a plain browser. */
 export const CAPABILITY_APP_PATH = '/app/open';
@@ -71,7 +77,7 @@ const isHttpOrigin = (value: string): boolean => {
 function queryOf(link: CapabilityLink): string {
   const params = new URLSearchParams();
   params.set('v', String(link.v));
-  params.set('s', link.subject);
+  params.set('subject', link.subject);
   params.set('cap', link.cap);
 
   if (link.url !== undefined) {
@@ -105,7 +111,7 @@ function validate(link: CapabilityLink): void {
   }
 }
 
-/** The `atomic://open?…` form. */
+/** The `atomic:open?…` form. */
 export function encodeCapabilityLink(link: CapabilityLink): string {
   validate(link);
 
@@ -130,8 +136,9 @@ export function encodeCapabilityWebLink(
 }
 
 /**
- * Parses either form, or a bare query string (`v=1&s=…`), which is what a
- * route handler holds after the router has stripped the path.
+ * Parses either form (and the older `atomic://open?…`), or a bare query
+ * string (`v=1&subject=…`), which is what a route handler holds after the
+ * router has stripped the path.
  */
 export function decodeCapabilityLink(input: string): CapabilityLink {
   const trimmed = input.trim();
@@ -139,6 +146,8 @@ export function decodeCapabilityLink(input: string): CapabilityLink {
 
   if (trimmed.startsWith(CAPABILITY_URI_PREFIX)) {
     query = trimmed.slice(CAPABILITY_URI_PREFIX.length);
+  } else if (trimmed.startsWith(LEGACY_CAPABILITY_URI_PREFIX)) {
+    query = trimmed.slice(LEGACY_CAPABILITY_URI_PREFIX.length);
   } else if (/^https?:\/\//.test(trimmed)) {
     let parsed: URL;
 
@@ -176,7 +185,7 @@ export function decodeCapabilityLink(input: string): CapabilityLink {
 
   const link: CapabilityLink = {
     v: 1,
-    subject: params.get('s') ?? '',
+    subject: params.get('subject') ?? '',
     cap: params.get('cap') ?? '',
     url: params.get('url') ?? undefined,
   };

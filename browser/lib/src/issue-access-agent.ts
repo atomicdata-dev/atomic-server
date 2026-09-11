@@ -389,7 +389,7 @@ export interface IssueCapabilityLinkOpts {
 }
 
 export interface IssuedCapabilityLink {
-  /** The `atomic://open?…` form. */
+  /** The `atomic:open?…` form. */
   link: string;
   /** The same link under an app origin, when one was given. */
   webLink?: string;
