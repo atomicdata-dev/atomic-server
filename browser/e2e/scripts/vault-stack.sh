@@ -275,4 +275,4 @@ fi
 
 echo
 echo "The SPA reaches the control plane at http://localhost:$SAAS_PORT"
-echo "(hardcoded for localhost origins in helpers/managed/api.ts — no vite env needed)."
+echo "Start Vite with VITE_MANAGED_API_BASE=http://localhost:$SAAS_PORT/api to enable SaaS requests."

@@ -581,6 +581,10 @@ current-drive behavior for ordinary resource links.
 - Managed Vault display metadata: `vaultAutoBackup.test.ts` now covers a drive
   present only in local storage, as well as rename/emoji refresh. Manual enable
   and automatic backup share `driveDisplayMetadata`; only name and emoji are sent.
+- Standalone account probes: `helpers/managed/session.test.ts` verifies that
+  no `/api/me` request is made without a configured control plane.
+  `helpers/managed/api.test.ts` covers localhost/127.0.0.1 without implicit SaaS
+  routing, explicit local API configuration, and discovered/build portal routing.
 - FOSS logout: `helpers/managed/session.test.ts` verifies that an installation
   with no configured control plane makes no SaaS logout request (the CI smoke
   test exposed a 405 at `/api/logout`).
