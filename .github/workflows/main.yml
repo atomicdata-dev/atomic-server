@@ -11,11 +11,12 @@ on:
           - full
         default: auto
 
-# Keep the newest pending run per ref. A push to a feature branch must not
-# replace develop's pending run. Already-started workflows finish normally.
+# Superseded feature-branch runs can stop immediately. Keep develop and tag
+# validation running to completion because deployments consume their results.
+# Per-ref groups keep a feature push from replacing develop validation.
 concurrency:
   group: main-pipeline-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref_type == 'branch' && github.ref_name != 'develop' }}
 
 # Main prefers Mancave (self-hosted) so Dagger cache volumes stay warm.
 # GitHub-hosted runs ONLY when Mancave is unavailable — never as a retry
