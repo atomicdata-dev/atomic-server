@@ -752,3 +752,7 @@ check; real refresh/query timing remains a browser acceptance check.
 
 Failure attachments include up to 30 recent WebSocket frame metadata records per
 page, never payload contents. A real local WebSocket exercises this collection.
+
+- `save-status-coordinator.test.ts` exercises narrow injected dependencies without a
+  Store: overlapping owners, idempotent observer disposal, resource renaming, cached
+  immutable snapshots, current outbox/connection state and failure accounting.
