@@ -181,7 +181,7 @@ async fn announce_drives_pkarr(
 }
 
 // Increase the maximum payload size (for POSTing a body, for example) to 50MB
-const PAYLOAD_MAX: usize = 50_242_880;
+pub(crate) const PAYLOAD_MAX: usize = 50_242_880;
 const SERVER_VERSION_HEADER: &str = "X-Atomic-Server-Version";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -423,9 +423,11 @@ where
                 }
             })
             .configure(crate::routes::config_routes)
-            .default_service(web::to(|| {
-                tracing::error!("Wrong route, should not happen with normal requests");
-                actix_web::HttpResponse::NotFound()
+            // Anything no route claims: a wrong method on a known path, a
+            // typo, a scanner. Normal traffic, so no `error!`.
+            .default_service(web::to(|req: actix_web::HttpRequest| async move {
+                tracing::debug!("No route for {} {}", req.method(), req.path());
+                actix_web::HttpResponse::NotFound().finish()
             }))
             .app_data(
                 web::JsonConfig::default()
@@ -500,6 +502,7 @@ where
                 }
                 let https_config = crate::https::get_https_config(&config)
                     .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
+                spawn_cert_renewal_task(config.clone());
                 let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
                 tracing::info!("Binding HTTPS server to endpoint {}", endpoint);
                 println!("{}", message);
@@ -538,6 +541,35 @@ where
 
 /// Amount of seconds before server shuts down connections after SIGTERM signal
 const TIMEOUT: u64 = 15;
+
+/// Once a day, checks whether the Let's Encrypt certificate is due for
+/// renewal (`should_renew_certs_check`: older than four weeks) and requests a
+/// new one. The certificate only lands on disk: the running rustls config
+/// keeps serving the old one, so the server has to be restarted to pick it
+/// up. Before this, a long-running server never renewed at all.
+#[cfg(feature = "https")]
+fn spawn_cert_renewal_task(config: crate::config::Config) {
+    actix_web::rt::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+        // The first tick completes at once; the certificates were checked
+        // right before the server started, so skip it.
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            match crate::https::should_renew_certs_check(&config) {
+                Ok(false) => {}
+                Ok(true) => match crate::https::request_cert(&config).await {
+                    Ok(()) => tracing::warn!(
+                        "Renewed the HTTPS certificate; it is on disk in {:?}, but the running server still serves the old one. Restart atomic-server to use the new certificate.",
+                        config.https_path
+                    ),
+                    Err(e) => tracing::error!("HTTPS certificate renewal failed: {}", e),
+                },
+                Err(e) => tracing::error!("Could not check the HTTPS certificate age: {}", e),
+            }
+        }
+    });
+}
 
 const BANNER: &str = r#"
          __                  _

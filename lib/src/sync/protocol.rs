@@ -293,7 +293,12 @@ pub fn classify_commit_error(message: &str) -> u16 {
         return error_code::MISSING_REQUIRED_PROPERTY;
     }
 
-    if message.contains("/properties/write right has been found") {
+    // `hierarchy.rs` — no write right on the resource, or (for a create) no
+    // append right on the parent. Both are the client trying to write where
+    // it may not.
+    if message.contains("/properties/write right has been found")
+        || message.contains("/properties/append right has been found")
+    {
         return error_code::UNAUTHORIZED_WRITE;
     }
 

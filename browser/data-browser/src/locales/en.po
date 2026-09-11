@@ -1054,13 +1054,11 @@ msgstr "I already have an account"
 msgid "Agent created!"
 msgstr "Agent created!"
 
-#: src/views/InvitePage.tsx
-msgid "Enter a name"
-msgstr "Enter a name"
+#~ msgid "Enter a name"
+#~ msgstr "Enter a name"
 
-#: src/views/InvitePage.tsx
-msgid "Agent Name"
-msgstr "Agent Name"
+#~ msgid "Agent Name"
+#~ msgstr "Agent Name"
 
 #: src/views/InvitePage.tsx
 msgid "Agent Secret"
@@ -1280,6 +1278,7 @@ msgstr "Canvas"
 msgid "Save failed: {0}"
 msgstr "Save failed: {0}"
 
+#: src/components/TeamProfileStep.tsx
 #: src/chunks/PluginRuns/AutomationWorkspace.tsx
 #: src/chunks/PluginRuns/IntegrationConnection.tsx
 #: src/views/Canvas/CanvasPage.tsx
@@ -1544,6 +1543,7 @@ msgstr "Textual Description <0/>"
 #: src/chunks/TablePage/RowActionDialog.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx src/components/AvatarCropper.tsx
 #: src/components/AvatarCropper.tsx
+#: src/components/Settings/IntegrationSettings.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/OntologyPage/NewClassButton.tsx
@@ -2625,9 +2625,8 @@ msgstr "Allow edits"
 msgid "Invite text (optional)"
 msgstr "Invite text (optional)"
 
-#: src/components/InviteForm.tsx
-msgid "Limit Usages (optional)"
-msgstr "Limit Usages (optional)"
+#~ msgid "Limit Usages (optional)"
+#~ msgstr "Limit Usages (optional)"
 
 #: src/components/InviteForm.tsx
 msgid "Invite created and copied to clipboard! 🚀"
@@ -4331,7 +4330,6 @@ msgid "as a classtype."
 msgstr "as a classtype."
 
 #: src/components/Share/ShareDialog.tsx
-#: src/components/Share/ShareDialog.tsx
 #: src/components/Share/ShareDialog.tsx src/routes/Share/ShareRoute.tsx
 #: src/routes/Share/ShareRoute.tsx
 msgid "Create Invite"
@@ -4709,12 +4707,14 @@ msgstr "{0}% of storage used"
 msgid "{0}% used"
 msgstr "{0}% used"
 
+#: src/chunks/PluginRuns/CalendarSync.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Syncing…"
 msgstr "Syncing…"
 
+#: src/routes/DevonianDemoRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sync now"
 msgstr "Sync now"
@@ -4885,6 +4885,7 @@ msgstr "Your workspace hasn’t opened here yet. It may still be settling — re
 msgid "No {0} portal is configured for this server."
 msgstr "No {0} portal is configured for this server."
 
+#: src/chunks/PluginRuns/ConnectPets.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultPanel.tsx
@@ -5478,6 +5479,7 @@ msgstr "Waiting for your passkey…"
 msgid "Use a recovery code instead"
 msgstr "Use a recovery code instead"
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Atomic account"
@@ -6297,6 +6299,7 @@ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this dev
 msgstr "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
 
 #: src/components/Vault/VaultPanel.tsx
+#: src/routes/DevonianDemoRoute.tsx
 msgid "Working…"
 msgstr "Working…"
 
@@ -6770,6 +6773,7 @@ msgstr "Only your passkey opens this account. If it isn't on this device, unlock
 msgid "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 msgstr "{0}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would."
 
+#: src/components/AccountRecoveryCard.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Add a recovery code"
 msgstr "Add a recovery code"
@@ -7339,6 +7343,210 @@ msgstr "Resource with error"
 #: src/views/Plugin/AssignRights.tsx
 msgid "Assign Rights"
 msgstr "Assign Rights"
+
+#: src/helpers/managed/vault.ts
+msgid "Your account session has ended. Sign in again to resume backup."
+msgstr "Your account session has ended. Sign in again to resume backup."
+
+#: src/components/TeamProfileStep.tsx
+msgid "Full name"
+msgstr "Full name"
+
+#~ msgid "Profile picture (optional) <0/>"
+#~ msgstr "Profile picture (optional) <0/>"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Save and continue"
+msgstr "Save and continue"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Picture ready to save."
+msgstr "Picture ready to save."
+
+#: src/components/TeamProfileStep.tsx
+msgid "How your colleagues see you"
+msgstr "How your colleagues see you"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+msgstr "Use your full name and a picture so people recognize you. This updates your Atomic profile wherever you collaborate."
+
+#: src/components/TeamProfileStep.tsx
+msgid "You can add or change your picture later in your profile."
+msgstr "You can add or change your picture later in your profile."
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server subscription is active"
+msgstr "Your Cloud Server subscription is active"
+
+#: src/routes/SyncRoute.tsx
+msgid "Your Cloud Server trial is active"
+msgstr "Your Cloud Server trial is active"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Profile picture (optional)"
+msgstr "Profile picture (optional)"
+
+#~ msgid "Your selected profile picture"
+#~ msgstr "Your selected profile picture"
+
+#: src/components/TeamProfileStep.tsx
+msgid "Your selected avatar"
+msgstr "Your selected avatar"
+
+#~ msgid "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+#~ msgstr "Cloud Server: each new team editor needs one seat. Existing team editors count once across drives. Viewers are free."
+
+#: src/components/InviteForm.tsx
+msgid "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+msgstr "Viewers are free. Allowing edits requires a team editor seat for Cloud Server."
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama detected"
+msgstr "Local Ollama detected"
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Looking for local Ollama…"
+msgstr "Looking for local Ollama…"
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Local Ollama could not be reached. Start Ollama and connect."
+msgstr "Local Ollama could not be reached. Start Ollama and connect."
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Use local Ollama"
+msgstr "Use local Ollama"
+
+#: src/components/AI/LocalOllamaDiscovery.tsx
+msgid "Connect local Ollama"
+msgstr "Connect local Ollama"
+
+#: src/components/InviteForm.tsx
+msgid "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
+msgstr "Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free."
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Find your workspace"
+msgstr "Find your workspace"
+
+#~ msgid "Looking for your workspace on your other devices…"
+#~ msgstr "Looking for your workspace on your other devices…"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We couldn’t find a reachable device with your workspace."
+msgstr "We couldn’t find a reachable device with your workspace."
+
+#~ msgid "We found your workspace on {0}."
+#~ msgstr "We found your workspace on {0}."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Fetch a copy to this device so you can open it here."
+msgstr "Fetch a copy to this device so you can open it here."
+
+#~ msgid "Fetching workspace…"
+#~ msgstr "Fetching workspace…"
+
+#~ msgid "Fetch workspace"
+#~ msgstr "Fetch workspace"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Look here"
+msgstr "Look here"
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Address where your workspace lives"
+msgstr "Address where your workspace lives"
+
+#~ msgid "We found your workspace on {0} ."
+#~ msgstr "We found your workspace on {0} ."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "A device was found, but this account cannot read the workspace there."
+msgstr "A device was found, but this account cannot read the workspace there."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We could not check your workspace. Try again or enter its address below."
+msgstr "We could not check your workspace. Try again or enter its address below."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "Connection details"
+msgstr "Connection details"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Your secret was accepted. Preparing this device…"
+msgstr "Your secret was accepted. Preparing this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking for your workspace on this device…"
+msgstr "Checking for your workspace on this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Checking whether your account has a backup to restore…"
+msgstr "Checking whether your account has a backup to restore…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Looking for a device that has your workspace…"
+msgstr "Looking for a device that has your workspace…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Fetching your workspace to this device…"
+msgstr "Fetching your workspace to this device…"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Opening your workspace"
+msgstr "Opening your workspace"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "This may take a little while. Please keep this window open."
+msgstr "This may take a little while. Please keep this window open."
+
+#: src/views/getting-started/DiscoverWorkspace.tsx
+msgid "We found your workspace"
+msgstr "We found your workspace"
+
+#: src/routes/SyncRoute.tsx
+msgid "This device does not have this workspace yet. Fetch it from a device that has it."
+msgstr "This device does not have this workspace yet. Fetch it from a device that has it."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not add a passkey."
+msgstr "Could not add a passkey."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+msgstr "Enter your recovery code to show your secret or add a passkey on this device. Your existing recovery code will keep working."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Passkey added. Your recovery code still works."
+msgstr "Passkey added. Your recovery code still works."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+msgstr "A recovery code is a spare key for when your passkey isn't available. You'll need your email to use it, so it's safe to keep on paper."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Add a passkey"
+msgstr "Add a passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a passkey"
+msgstr "Sign in to add a passkey"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Use recovery code"
+msgstr "Use recovery code"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Sign in to add a recovery code"
+msgstr "Sign in to add a recovery code"
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+msgstr "<0>Save this recovery code.</0> It gets you back in on a new device, and you will need your email with it. We cannot show it again, but you can generate a new one here any time, which retires this one."
+
+#: src/components/AccountRecoveryCard.tsx
+msgid "Could not unlock with a passkey. Use your recovery code instead."
+msgstr "Could not unlock with a passkey. Use your recovery code instead."
 
 #~ msgid "Last Modified"
 #~ msgstr "Last Modified"
@@ -8014,6 +8222,7 @@ msgid "Supported scope"
 msgstr "Supported scope"
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
 msgid "Set up connection"
 msgstr "Set up connection"
 
@@ -9458,8 +9667,9 @@ msgstr "Describe your idea and build it with the Atomic assistant."
 #~ msgid "Connect an integration with automation events first. Close this dialog and choose one under Discover integrations."
 #~ msgstr "Connect an integration with automation events first. Close this dialog and choose one under Discover integrations."
 
-#~ msgid "Integration"
-#~ msgstr "Integration"
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration"
+msgstr "Integration"
 
 #~ msgid "Choose an integration"
 #~ msgstr "Choose an integration"
@@ -9594,3 +9804,306 @@ msgstr "Automations act on your data and can use connected services. Sync works 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "This integration creates a new workspace for its imported data."
 msgstr "This integration creates a new workspace for its imported data."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Pets"
+msgstr "Pets"
+
+#~ msgid "A trivial demo collection, useful for trying plugins out."
+#~ msgstr "A trivial demo collection, useful for trying plugins out."
+
+#~ msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+#~ msgstr "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+
+#~ msgid "A one-off, on-demand import. Nothing runs in the background."
+#~ msgstr "A one-off, on-demand import. Nothing runs in the background."
+
+#~ msgid "No external account, API key or network call. Static sample data only, not a live provider."
+#~ msgstr "No external account, API key or network call. Static sample data only, not a live provider."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Reinstall demo pets"
+msgstr "Reinstall demo pets"
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Install demo pets"
+msgstr "Install demo pets"
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Installs five trivial demo pets into a Pets table. No external account, API key or network call is used."
+msgstr "Installs five trivial demo pets into a Pets table. No external account, API key or network call is used."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+msgid "Open Pets"
+msgstr "Open Pets"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading LocalThought platforms…"
+msgstr "Loading LocalThought platforms…"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Connect your account through LocalThought and import records into your drive."
+msgstr "Connect your account through LocalThought and import records into your drive."
+
+#~ msgid "Use a direct GitHub token instead"
+#~ msgstr "Use a direct GitHub token instead"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading setup…"
+msgstr "Loading setup…"
+
+#~ msgid "Provider data"
+#~ msgstr "Provider data"
+
+#~ msgid "Original JSON returned by the connected platform."
+#~ msgstr "Original JSON returned by the connected platform."
+
+#~ msgid "API record"
+#~ msgstr "API record"
+
+#~ msgid "A record imported from a connected platform."
+#~ msgstr "A record imported from a connected platform."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Reconnect account"
+msgstr "Reconnect account"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Install and connect"
+msgstr "Install and connect"
+
+#~ msgid "Repository (owner/repository)"
+#~ msgstr "Repository (owner/repository)"
+
+#~ msgid "Calendar ID"
+#~ msgstr "Calendar ID"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetching…"
+msgstr "Fetching…"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetch and preview"
+msgstr "Fetch and preview"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Connect your personal account through LocalThought, then return here to preview an import."
+msgstr "Connect your personal account through LocalThought, then return here to preview an import."
+
+#~ msgid "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
+#~ msgstr "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Open imported records"
+msgstr "Open imported records"
+
+#~ msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+#~ msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+
+#~ msgid "Events from (UTC)"
+#~ msgstr "Events from (UTC)"
+
+#~ msgid "Events before (UTC)"
+#~ msgstr "Events before (UTC)"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "LocalThought tenant secret"
+msgstr "LocalThought tenant secret"
+
+#~ msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+#~ msgstr "The tenant secret is used in this tab. Connection credentials stay in this browser."
+
+#. 0: count
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Synchronized {0} issues and comments."
+msgstr "Synchronized {0} issues and comments."
+
+#: src/components/Settings/IntegrationSettings.tsx
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Integration proxy URL"
+msgstr "Integration proxy URL"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "GitHub repository (owner/repo)"
+msgstr "GitHub repository (owner/repo)"
+
+#~ msgid "Connection code"
+#~ msgstr "Connection code"
+
+#~ msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+#~ msgstr "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+
+#~ msgid "Open live tracker"
+#~ msgstr "Open live tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect a real GitHub repository"
+msgstr "Connect a real GitHub repository"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Devonian issue tracker demo"
+msgstr "Devonian issue tracker demo"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+msgstr "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Try sample data"
+msgstr "Try sample data"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+msgstr "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+msgstr "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Open Atomic kanban"
+msgstr "Open Atomic kanban"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "New issue title or comment"
+msgstr "New issue title or comment"
+
+#~ msgid "Done"
+#~ msgstr "Done"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen Atomic issue"
+msgstr "Reopen Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close Atomic issue"
+msgstr "Close Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add Atomic comment"
+msgstr "Add Atomic comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic tracker"
+msgstr "Atomic tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic issues"
+msgstr "Atomic issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen sample GitHub issue"
+msgstr "Reopen sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close sample GitHub issue"
+msgstr "Close sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add sample GitHub comment"
+msgstr "Add sample GitHub comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create sample GitHub issue"
+msgstr "Create sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create Atomic issue"
+msgstr "Create Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub tracker"
+msgstr "Sample GitHub tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub issues"
+msgstr "Sample GitHub issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+msgstr "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
+msgstr "Connect GitHub tracker"
+
+#. 0: error instanceof Error ? error.message \\: String(error)
+#: src/chunks/TablePage/Calendar/CalendarView.tsx
+msgid "Could not display recurring meetings: {0}"
+msgstr "Could not display recurring meetings: {0}"
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "Recurring meeting"
+msgstr "Recurring meeting"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr "Connect another tracker"
+
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "All day"
+msgstr "All day"
+
+#. 0: title || subject
+#: src/chunks/TablePage/Calendar/CalendarDay.tsx
+msgid "{0} · Recurring meeting (opens its series or exception)"
+msgstr "{0} · Recurring meeting (opens its series or exception)"
+
+#: src/routes/SyncRoute.tsx
+msgid "Error: Sign in before syncing with another device"
+msgstr "Error: Sign in before syncing with another device"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
+msgstr "LocalThought will ask you to sign in and authorize this connection. Connection credentials stay in this browser."
+
+#. 0: writable ? ' After importing, preview supported edits to send changes back.' \\: ' No provider writes.'
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
+msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync. {0}"
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Preview edits for Google"
+msgstr "Preview edits for Google"
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "No supported local edits to send."
+msgstr "No supported local edits to send."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Edits synced. Fetch and preview to receive the latest Google changes."
+msgstr "Edits synced. Fetch and preview to receive the latest Google changes."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Send edits to imported events back to Google: Name or Summary, Description, Location, Start and End. Edit Start and End together to change duration or all-day dates. Calendar day and all-day display columns are derived on import. New events, deletion, recurrence rules, guests and RSVP stay in Google. Reconnect with Calendar write access before your first sync."
+msgstr "Send edits to imported events back to Google: Name or Summary, Description, Location, Start and End. Edit Start and End together to change duration or all-day dates. Calendar day and all-day display columns are derived on import. New events, deletion, recurrence rules, guests and RSVP stay in Google. Reconnect with Calendar write access before your first sync."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Applying these edits updates Google Calendar and notifies event guests."
+msgstr "Applying these edits updates Google Calendar and notifies event guests."
+
+#: src/chunks/PluginRuns/CalendarSync.tsx
+msgid "Apply edits to Google"
+msgstr "Apply edits to Google"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Via integration proxy"
+msgstr "Via integration proxy"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Integration proxy"
+msgstr "Integration proxy"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Connect accounts and import records using a LocalThought integration-proxy server. This setting is saved in this browser."
+msgstr "Connect accounts and import records using a LocalThought integration-proxy server. This setting is saved in this browser."
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Reset to default"
+msgstr "Reset to default"
+
+#: src/components/Settings/IntegrationSettings.tsx
+msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
+msgstr "Enter an HTTPS server URL or a localhost HTTP URL, without a path."

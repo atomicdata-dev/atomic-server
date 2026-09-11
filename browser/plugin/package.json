@@ -1,7 +1,7 @@
 {
   "name": "@tomic/plugin",
   "type": "module",
-  "version": "0.41.0-beta.5",
+  "version": "0.41.0-beta.6",
   "description": "Utils for building UI plugins for AtomicServer",
   "author": "Polle Pas <polle@ontola.io>",
   "license": "MIT",

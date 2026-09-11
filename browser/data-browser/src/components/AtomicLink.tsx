@@ -1,4 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef } from 'react';
+import { isSafeHref } from '@tomic/react';
 import { styled } from 'styled-components';
 import { constructOpenURL, pathToURL } from '../helpers/navigation';
 import { FaArrowUpRightFromSquare } from 'react-icons/fa6';
@@ -48,6 +49,10 @@ export const AtomicLink: React.FC<React.PropsWithChildren<AtomicLinkProps>> = ({
   const isInRTE = useIsInRTE();
   const { openResourceMenu } = useResourceContextMenu();
 
+  // An `href` is whatever a resource said it was. `javascript:` and friends
+  // never reach the anchor: the link still renders, just without a target.
+  const safeHref = href !== undefined && isSafeHref(href) ? href : undefined;
+
   const handleContextMenu = (e: React.MouseEvent<HTMLElement>) => {
     // Right-clicking a resource link opens the resource context menu (the same
     // actions as the navbar "More" menu) at the cursor. Only for atomic
@@ -85,8 +90,9 @@ export const AtomicLink: React.FC<React.PropsWithChildren<AtomicLinkProps>> = ({
   };
 
   const constructHref = useCallback(
-    () => href || subject || pathToURL(path!),
-    [href, subject, path],
+    () =>
+      safeHref || subject || (path !== undefined ? pathToURL(path) : undefined),
+    [safeHref, subject, path],
   );
 
   let hrefConstructed: string | undefined = constructHref();
@@ -103,7 +109,9 @@ export const AtomicLink: React.FC<React.PropsWithChildren<AtomicLinkProps>> = ({
 
     // HACK: Because we remove the href from the links in the RTE we need to restore them when printing.
     const handleBeforePrint = () => {
-      innerRef.current?.setAttribute('href', constructHref());
+      const restored = constructHref();
+
+      if (restored) innerRef.current?.setAttribute('href', restored);
     };
 
     const handleAfterPrint = () => {

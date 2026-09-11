@@ -54,7 +54,7 @@ impl<T: Into<String>> From<T> for ForAgent {
 
 /// An Agent can be thought of as a User. Agents are used for authentication and authorization.
 /// The private key of the Agent is used to sign [crate::Commit]s.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Agent {
     /// Private key for signing commits
     pub private_key: Option<String>,
@@ -66,6 +66,24 @@ pub struct Agent {
     pub name: Option<String>,
     /// The DID of the drive that should be opened by default for this agent.
     pub initial_drive: Option<crate::Subject>,
+}
+
+/// Hand-written so the private key never reaches a log line or an error
+/// message through `{:?}`.
+impl std::fmt::Debug for Agent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Agent")
+            .field(
+                "private_key",
+                &self.private_key.as_ref().map(|_| "[redacted]"),
+            )
+            .field("public_key", &self.public_key)
+            .field("subject", &self.subject)
+            .field("created_at", &self.created_at)
+            .field("name", &self.name)
+            .field("initial_drive", &self.initial_drive)
+            .finish()
+    }
 }
 
 impl Agent {
@@ -342,6 +360,24 @@ pub fn migrate_legacy_agent_subject(subject: &str) -> String {
     subject.to_string()
 }
 
+/// The public key a legacy HTTP agent subject (`https://host/agents/{pubkey}`
+/// or `internal:/agents/{pubkey}`) names, or `None` for any other subject.
+///
+/// Every rights check treats such a subject as `did:ad:agent:{pubkey}` (see
+/// [`migrate_legacy_agent_subject`]), so the key in the path IS the identity
+/// being claimed. Authentication and signature checks must therefore bind that
+/// key to the key that actually signed, rather than trust whatever `publicKey`
+/// a stored (or, worse, fetched) resource at that URL happens to carry.
+pub fn legacy_agent_pubkey(subject: &str) -> Option<String> {
+    let migrated = migrate_legacy_agent_subject(subject);
+    if migrated == subject {
+        return None;
+    }
+    migrated
+        .strip_prefix(crate::subject::DID_AD_AGENT_PREFIX)
+        .map(|k| k.to_string())
+}
+
 impl From<Agent> for ForAgent {
     fn from(agent: Agent) -> Self {
         ForAgent::AgentSubject(agent.subject)
@@ -358,6 +394,23 @@ impl<'a> From<&'a Agent> for ForAgent {
 mod test {
     #[cfg(test)]
     use super::*;
+
+    /// `{:?}` on an Agent must never print the private key: agents end up in
+    /// log lines and error messages.
+    #[test]
+    fn debug_output_redacts_the_private_key() {
+        // A fresh key rather than a fixture: a literal here is exactly what
+        // secret scanners (rightly) flag.
+        let agent = Agent::new(Some("me")).unwrap();
+        let private_key = agent
+            .private_key
+            .clone()
+            .expect("a new agent has a private key");
+        let debug = format!("{agent:?}");
+        assert!(!debug.contains(&private_key), "{debug}");
+        assert!(debug.contains("[redacted]"), "{debug}");
+        assert!(debug.contains(&agent.public_key), "{debug}");
+    }
 
     #[test]
     fn keypair() {

@@ -5,7 +5,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { useStore } from '@tomic/react';
+import { signRequest, type Store, useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
 import { useRegisterAppCreation } from '@chunks/AppPage/useRegisterAppCreation';
 
@@ -65,15 +65,19 @@ function parsePluginList(data: UIPluginListItem[]): PluginListResult {
 }
 
 const fetchPluginList = async (
-  serverUrl: string,
+  store: Store,
   drive: string,
 ): Promise<PluginListResult> => {
   // Drive subjects (DIDs) often contain `+`. Without explicit encoding the
   // server's form-urlencoded query parser would decode `+` as space, so the
   // ClassExtenderScope::Drive comparison fails and plugin-list returns [].
-  const response = await fetch(
-    `${serverUrl}/plugin-list?drive=${encodeURIComponent(drive)}`,
-  );
+  const url = `${store.getServerUrl()}/plugin-list?drive=${encodeURIComponent(drive)}`;
+  // The server lists only the plugins this agent may read, so the request
+  // is signed like any other resource fetch; the cookie covers the
+  // same-origin case.
+  const agent = store.getAgent();
+  const headers = agent ? await signRequest(url, agent, {}) : {};
+  const response = await fetch(url, { headers, credentials: 'include' });
   const data = await response.json();
 
   return parsePluginList(data);
@@ -98,7 +102,7 @@ export function CustomViewProvider({ children }: PropsWithChildren) {
   const serverUrl = store.getServerUrl();
 
   const refresh = async () => {
-    const [list, newManifests] = await fetchPluginList(serverUrl, drive);
+    const [list, newManifests] = await fetchPluginList(store, drive);
     setCustomViews(list);
     setUIPluginDataMap(newManifests);
   };
@@ -112,7 +116,7 @@ export function CustomViewProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
-    fetchPluginList(serverUrl, drive)
+    fetchPluginList(store, drive)
       .then(([views, manifests]) => {
         setCustomViews(views);
         setUIPluginDataMap(manifests);

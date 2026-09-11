@@ -65,10 +65,7 @@ pub async fn web_socket_handler(
     // The origin this socket was opened on, as the client sees it (scheme
     // and `Host`, honouring forwarded headers the way the rest of the server
     // does). The browser signs exactly this as `AUTH.requestedSubject`.
-    let request_origin = {
-        let info = req.connection_info();
-        Some(format!("{}://{}", info.scheme(), info.host()))
-    };
+    let request_origin = Some(crate::context::RequestContext::new(&req, &appstate).origin);
 
     let result = WsResponseBuilder::new(
         WebSocketConnection {
@@ -501,8 +498,11 @@ impl WebSocketConnection {
             }
 
             // Live collaboration: an edit in progress (`DOC`), cursors
-            // (`LORO`) or drive presence (`PRESENCE`), relayed without
-            // inspection. The frame's own `agent` field is ignored on the
+            // (`LORO`) or drive presence (`PRESENCE`). The payload itself is
+            // not inspected; the commit monitor only fans it out when this
+            // connection is a current subscriber of that subject (a writer,
+            // for `DOC`), which is where the access check lives. The frame's
+            // own `agent` field is ignored on the
             // way in: the broadcaster attributes it to the identity this
             // connection proved, and stamps that on the way out. Until
             // 2026-09-04 these were the text frames `LORO_SYNC_UPDATE`,

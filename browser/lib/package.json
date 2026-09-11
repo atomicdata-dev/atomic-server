@@ -1,6 +1,6 @@
 {
   "name": "@tomic/lib",
-  "version": "0.41.0-beta.5",
+  "version": "0.41.0-beta.6",
   "author": "Joep Meindertsma",
   "homepage": "https://docs.atomicdata.dev/js",
   "repository": {
@@ -11,9 +11,11 @@
     "url": "https://github.com/atomicdata-dev/atomic-server/issues"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@noble/ed25519": "3.1.0",
     "@noble/hashes": "^2.2.0",
     "fast-json-stable-stringify": "^2.1.0",
+    "rrule": "2.8.1",
     "ulidx": "^2.4.1"
   },
   "description": "The Atomic Data library for typescript/javascript",

@@ -18,17 +18,52 @@
  *     be opened, and the cache silently empties even though the server still
  *     has everything. That is exactly what "the content is gone" looks like.
  */
-import { test, expect, type Page } from './fixtures';
+import { test as base, expect, type Page, webkit } from './fixtures';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   before,
   getCurrentSubject,
   getDevDriveSecret,
   newResource,
-  openAgentPage,
-  openSubject,
   setTitle,
   timestamp,
 } from './test-utils';
+
+// WebKit's ephemeral contexts on macOS reject OPFS even though regular
+// profiles support it. These tests assert persistence, so use an isolated
+// regular profile rather than exercising private-browsing storage policy.
+const test = base.extend({
+  context: async (
+    { browserName, context, headless, viewport, locale, timezoneId },
+    use,
+  ) => {
+    if (browserName !== 'webkit' || process.platform !== 'darwin') {
+      await use(context);
+
+      return;
+    }
+
+    const profile = await mkdtemp(join(tmpdir(), 'atomic-webkit-storage-'));
+    const persistent = await webkit.launchPersistentContext(profile, {
+      headless,
+      viewport,
+      locale,
+      timezoneId,
+    });
+    await persistent.addInitScript(() => {
+      localStorage.setItem('viewTransitionsDisabled', 'true');
+    });
+
+    try {
+      await use(persistent);
+    } finally {
+      await persistent.close();
+      await rm(profile, { recursive: true, force: true });
+    }
+  },
+});
 
 const SESSION_KEY_PREFIX = 'atomic.clientdb.session-key.';
 const WRAPPED_KEY_PREFIX = 'atomic.clientdb.wrapped-key.';
@@ -104,7 +139,7 @@ async function signOut(page: Page) {
     dialog.accept();
   });
 
-  await openAgentPage(page);
+  await page.locator('a[href$="/app/agent"]').click();
   await page.click('[data-test="sign-out"]');
   await expect(
     page.getByRole('button', { name: 'Create account' }),
@@ -128,7 +163,6 @@ async function signInAgain(page: Page, secret: string) {
 
   const field = page.getByLabel('Agent secret');
   await field.fill(secret);
-  await field.blur();
 
   // The whole point of this spec. This device made the workspace moments ago
   // and is still talking to the same server, so "your data is elsewhere" is
@@ -137,6 +171,8 @@ async function signInAgain(page: Page, secret: string) {
   await expect(
     page.getByRole('heading', { name: 'Your data is on another device' }),
   ).toBeHidden({ timeout: 15000 });
+  await expect(page.locator('a[href$="/app/agent"]')).toBeVisible();
+  await expect(page).toHaveURL(/did(?:%3A|:)ad(?:%3A|:)/);
 }
 
 test.describe('sign-out / sign-in round trip', () => {
@@ -155,15 +191,16 @@ test.describe('sign-out / sign-in round trip', () => {
     await newResource('folder', page);
     await setTitle(page, folderTitle);
 
-    // Capture the subject rather than relying on the sidebar after sign-in:
-    // sign-out clears the active drive on purpose, so the sidebar legitimately
-    // starts empty. What must survive is the resource.
+    // Keep the subject so reopening the folder proves it is the same resource.
     const folderSubject = await getCurrentSubject(page);
 
     await signOut(page);
     await signInAgain(page, secret);
 
-    await openSubject(page, folderSubject);
+    await page.locator(`a[about="${folderSubject}"]`).first().click();
+    await expect(
+      page.locator(`main[about="${folderSubject}"]`).first(),
+    ).toBeVisible();
     await expect(page.locator(`text=${folderTitle}`).first()).toBeVisible({
       timeout: 15000,
     });

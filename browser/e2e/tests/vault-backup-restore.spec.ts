@@ -43,7 +43,7 @@ const PORTAL_URL =
  * the page back on the welcome gate, which reads like an onboarding bug and
  * is not one.
  */
-const uniqueEmail = () => `vault-${randomUUID()}@localhost`;
+const uniqueEmail = () => `vault-${randomUUID()}@example.com`;
 
 /**
  * The control plane answers `/api/me` with 401 when nobody is signed in, which
@@ -300,7 +300,7 @@ test.describe('Cloud Vault backup and restore', () => {
     // makes "it came back" mean "it came back from the vault".
     await page.evaluate(() => {
       const store = window.store;
-      store.registerLocalOnlyDrive(store.getDrive());
+      store.registerLocalOnlyDrive(store.getDrive()!);
       store.getDefaultWebSocket()?.close();
     });
 

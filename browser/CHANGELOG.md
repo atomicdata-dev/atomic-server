@@ -4,6 +4,20 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+## [v0.41.0-beta.6] - 2026-09-09
+
+- An older server response no longer rolls back the local cache after an edit, fixing dashboard configuration reverting on reload.
+
+- Private plugin views load authenticated assets through the parent while retaining their sandbox.
+- Idempotent offline saves no longer leave the sync queue retrying an empty update.
+- Navigating to sign-in no longer fetches the welcome screen as a data resource.
+
+- Account recovery: reveal the agent secret with a recovery code when passkey authentication is unavailable, and enroll an additional passkey.
+- Desktop onboarding explains workspace discovery with a dedicated loading screen, offers discovered sources and a manual server address, and retries while waiting for another device.
+- Sync and Cloud Server status now describe the selected drive; linking a cloud account does not imply that its workspace has been transferred.
+- Cloud Vault backups preserve drive names and emoji, run incrementally, and retry transient failures.
+- Security fixes bind managed account tokens to their portal and validate links and uploaded content.
+
 - Right-clicking a resource (sidebar link, table cell, kanban card) opens the same searchable action menu as Cmd+M: the filter input is focused, typing narrows the actions, Enter runs one.
 - Fix: `Store.applyIncoming` imports the echo of this client's own commit before deduping it, so the server's `lastCommit` stamp lands locally and a collaborator's next edit applies instead of triggering a catch-up fetch that remounted the editor.
 - Fix: an own commit's echo is recognised by signature (registered at sign time), not only by the `lastCommit` the ack stamps, so an echo that lands before the ack no longer re-renders the page mid-edit (the tag picker in the tables e2e closed under load).

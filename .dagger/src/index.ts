@@ -442,15 +442,21 @@ export class AtomicServer {
       depsContainer
         .withWorkdir('/app')
         .withExec(['pnpm', 'run', 'test'])
+        // jsBuild mounts external integration tests at /integrations and
+        // exposes the installed browser workspace at /browser.
+        .withExec([
+          '/app/node_modules/.bin/vitest',
+          'run',
+          '--config',
+          '/integrations/localthought/vitest.config.ts',
+        ])
+        .withWorkdir('/app')
         .withExec([
           'node',
           '--test',
           'data-browser/scripts/integration-mcp.test.mjs',
         ])
-        // Provider packages stay outside core/browser bundles, but their fixture
-        // tests run in the same JS gate. Mirror the repo layout for SDK imports.
-        .withDirectory('/integrations', this.source.directory('integrations'))
-        .withExec(['ln', '-s', '/app', '/browser'])
+        // Provider certification shares the integration and browser mounts.
         .withWorkdir('/')
         .withExec(['node', '--test', '/integrations/tooling/certify.test.mjs'])
         .withExec([
@@ -610,6 +616,10 @@ export class AtomicServer {
           this.source.directory('plugin-runtime'),
         )
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory('/code/server', this.source.directory('server'))
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
@@ -687,6 +697,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', this.source.directory('cli'))
         .withDirectory('/code/desktop', this.source.directory('desktop'))
         .withDirectory('/code/wasm', this.source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          this.source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           this.source.directory('plugin-examples'),
@@ -1046,6 +1060,14 @@ export class AtomicServer {
     // (it overwrites OS /lib). Mount alongside browser and resolve via alias in vite.config.
     const sourceContainer = workspaceContainer
       .withDirectory('/app', browser)
+      // Integration sources live at the repository root. The browser mounts at
+      // /app, and its raw imports resolve these paths from /integrations.
+      .withDirectory('/integrations', this.source.directory('integrations'))
+      // Each integrations/*/tsconfig.json extends the repo-root-relative
+      // `../../browser/tsconfig.build.json`. Same fix jsTest()/
+      // integrationCertificationReport() already use for this: alias /browser
+      // to the /app mount so those relative paths resolve.
+      .withExec(['ln', '-s', '/app', '/browser'])
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
       // Provide the prebuilt WASM artifacts so data-browser's `build` can skip
       // wasm-pack when `SKIP_WASM_BUILD=1` (`wasm-pack` isn't available in this
@@ -1066,12 +1088,13 @@ export class AtomicServer {
         '/lib/src/genesis_test_vectors.json',
         this.source.file('lib/src/genesis_test_vectors.json'),
       )
-      // data-browser/src/helpers/pairing.test.ts reads a repo-root testdata
-      // fixture the same way (`../../../../testdata/pairing-request.json`
-      // from /app/data-browser/src/helpers) — mount just this one file.
+      // Tests read shared fixtures directly from the repository-root paths.
+      // Include the manifest and planner corpus as well as pairing fixtures.
+      .withDirectory('/testdata', this.source.directory('testdata'))
+      // Mount only the required file under /lib to preserve OS libraries.
       .withFile(
-        '/testdata/pairing-request.json',
-        this.source.file('testdata/pairing-request.json'),
+        '/lib/defaults/tasks.json',
+        this.source.file('lib/defaults/tasks.json'),
       );
 
     // Build all packages since they may depend on each other's built artifacts
@@ -1084,7 +1107,12 @@ export class AtomicServer {
       // Surfaces /app/dev-drive and /app/prunetests in the production
       // build the e2e tests run against. See `devRoutesEnabled()` in
       // data-browser/src/config.ts.
-      buildContainer = buildContainer.withEnvVariable('VITE_E2E', 'true');
+      buildContainer = buildContainer
+        .withEnvVariable('VITE_E2E', 'true')
+        .withEnvVariable(
+          'VITE_INTEGRATION_PROXY_URL',
+          'http://127.0.0.1:19090',
+        );
     }
 
     return buildContainer.withExec(['pnpm', 'run', 'build']);
@@ -1139,6 +1167,10 @@ export class AtomicServer {
       .withDirectory('/code/cli', source.directory('cli'))
       .withDirectory('/code/desktop', source.directory('desktop'))
       .withDirectory('/code/wasm', source.directory('wasm'))
+      .withDirectory(
+        '/code/integrations/localthought/syncables',
+        source.directory('integrations/localthought/syncables'),
+      )
       .withDirectory(
         '/code/plugin-examples',
         source.directory('plugin-examples'),
@@ -1308,6 +1340,10 @@ export class AtomicServer {
         .withDirectory('/code/cli', source.directory('cli'))
         .withDirectory('/code/desktop', source.directory('desktop'))
         .withDirectory('/code/wasm', source.directory('wasm'))
+        .withDirectory(
+          '/code/integrations/localthought/syncables',
+          source.directory('integrations/localthought/syncables'),
+        )
         .withDirectory(
           '/code/plugin-examples',
           source.directory('plugin-examples'),
@@ -1594,23 +1630,43 @@ export class AtomicServer {
       e2e,
     ).file('/atomic-server-binary');
 
-    return (
-      dag
-        .container()
-        .from('alpine:latest')
-        .withFile('/atomic-server-bin', atomicServerBinary, {
-          permissions: 0o755,
-        })
-        .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
-        // First-run flag — sets up the bootstrap agent + public drive +
-        // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
-        // Without this, every test's `before()` hook times out fetching it.
-        .withEnvVariable('ATOMIC_INITIALIZE', 'true')
-        .withExposedPort(9883)
-        .withEntrypoint(['/atomic-server-bin'])
-        .asService()
-        .withHostname(ATOMIC_DOMAIN)
-    );
+    let service = dag
+      .container()
+      .from(e2e ? 'node:22-alpine' : 'alpine:latest')
+      .withFile('/atomic-server-bin', atomicServerBinary, {
+        permissions: 0o755,
+      })
+      .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
+      // First-run flag — sets up the bootstrap agent + public drive +
+      // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
+      // Without this, every test's `before()` hook times out fetching it.
+      .withEnvVariable('ATOMIC_INITIALIZE', 'true')
+      .withExposedPort(9883)
+      .withEntrypoint(['/atomic-server-bin']);
+    if (e2e)
+      service = service
+        .withDirectory(
+          '/mock-proxy',
+          this.source.directory('integrations/localthought'),
+        )
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_PROXY_URL',
+          'http://127.0.0.1:19090',
+        )
+        .withEnvVariable('TENANT_SECRET', 'bW9jay10ZW5hbnQ.mock-signature')
+        .withEnvVariable(
+          'ATOMIC_INTEGRATION_FRONTEND_ORIGIN',
+          'http://atomic.localhost:9883',
+        )
+        .withEnvVariable('MOCK_FRONTEND_ORIGIN', 'http://atomic.localhost:9883')
+        .withEnvVariable('MOCK_PROXY_HOST', '0.0.0.0')
+        .withExposedPort(19090)
+        .withEntrypoint([
+          'sh',
+          '-c',
+          'node /mock-proxy/mock-proxy.mjs & exec /atomic-server-bin',
+        ]);
+    return service.asService().withHostname(ATOMIC_DOMAIN);
   }
 
   /**
@@ -1738,6 +1794,7 @@ export class AtomicServer {
         // It sits after the service binding and the setup probe, so the build
         // layers above stay cached; only the Playwright exec is unique.
         .withEnvVariable('E2E_RUN_NONCE', this.e2eRunNonce)
+        .withEnvVariable('ATOMIC_MOCK_INTEGRATION_PROXY', '1')
         .withExec([
           '/bin/bash',
           '-c',

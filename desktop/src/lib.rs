@@ -180,6 +180,42 @@ async fn adopt_agent(
   Ok(())
 }
 
+/// Look up and inspect a workspace without importing it or starting live sync.
+#[tauri::command]
+async fn discover_workspace(
+  drive: String,
+  node_id: Option<String>,
+  node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
+) -> Result<atomic_lib::sync::discover::WorkspacePeer, String> {
+  let store = node.require_store()?;
+  let peer = match node_id {
+    Some(id) => id.trim_start_matches("did:ad:node:").to_string(),
+    None => tokio::time::timeout(
+      std::time::Duration::from_secs(10),
+      atomic_lib::discovery::resolve_node_id(&drive),
+    )
+    .await
+    .map_err(|_| "Peer lookup timed out")?
+    .map_err(|e| e.to_string())?,
+  };
+  atomic_lib::sync::peer::inspect_workspace_peer(&peer, &drive, &store)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn fetch_workspace(
+  drive: String,
+  node_id: String,
+  node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
+) -> Result<usize, String> {
+  let store = node.require_store()?;
+  atomic_lib::sync::peer::sync_drive_with_peer_outcome(&node_id, &drive, &store)
+    .await
+    .map(|outcome| outcome.count)
+    .map_err(|e| e.to_string())
+}
+
 /// Cloud Vault, against the embedded node's own store.
 ///
 /// In a browser the vault runs inside the WASM ClientDb, because that *is* the
@@ -528,6 +564,8 @@ pub fn run() {
     .manage(std::sync::Arc::new(vfs::VfsController::default()))
     .invoke_handler(tauri::generate_handler![
       adopt_agent,
+      discover_workspace,
+      fetch_workspace,
       vault_export,
       vault_commit_segment,
       vault_import,
@@ -539,6 +577,8 @@ pub fn run() {
   #[cfg(not(all(desktop, unix)))]
   let builder = builder.invoke_handler(tauri::generate_handler![
     adopt_agent,
+    discover_workspace,
+    fetch_workspace,
     vault_export,
     vault_commit_segment,
     vault_import
@@ -626,6 +666,11 @@ pub fn run() {
           config_dir.to_str().unwrap(),
           "--cache-dir",
           cache_dir.to_str().unwrap(),
+          // Loopback only: the server's default is `::` (every interface),
+          // which would expose the user's node to the whole network. Peers
+          // reach this device over Iroh, never over this HTTP port.
+          "--ip",
+          "127.0.0.1",
         ]);
         // `serve` persists this, so peers see the device rather than "localhost".
         if opts.device_name.is_none() {
@@ -638,7 +683,15 @@ pub fn run() {
 
       #[cfg(not(target_os = "android"))]
       let config = {
-        let opts = atomic_server_lib::config::read_opts();
+        let mut opts = atomic_server_lib::config::read_opts();
+        // Loopback only unless the user asked otherwise: the server's default
+        // is `::` (every interface), which would expose the node to the LAN.
+        // Peers reach this device over Iroh, never over this HTTP port.
+        if std::env::var_os("ATOMIC_IP").is_none()
+          && !std::env::args().any(|a| a == "--ip" || a.starts_with("--ip="))
+        {
+          opts.ip = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+        }
         atomic_server_lib::config::build_config(opts)
           .map_err(|e| format!("Initialization failed: {}", e))
           .expect("failed init config")

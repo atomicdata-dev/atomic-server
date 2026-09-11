@@ -1,3 +1,10 @@
+## Browser-only Devonian demo
+
+Open `/app/devonian-demo` for a browser-side issue/comment sync demo using
+Devonian and this integration's mappings. It uses a local-only Atomic drive and
+direct integration-proxy requests, with an explicit sample mode. See
+[setup, source and the current live proxy CORS limitation](devonian/README.md).
+
 ## Connect in the app
 
 Open **Integrations**, enter `owner/repository` and a repository-scoped GitHub

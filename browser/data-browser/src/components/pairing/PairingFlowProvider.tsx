@@ -122,7 +122,7 @@ export function PairingFlowProvider({
       setPhase({ kind: 'connecting' });
 
       const drive = options?.drive ?? store.getSyncStatus().drive;
-      const result = await runPairing(code, drive);
+      const result = await runPairing(code, drive, store.getAgent());
 
       if (stale()) return;
 

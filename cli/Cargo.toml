@@ -6,11 +6,11 @@ license = "MIT"
 name = "atomic-cli"
 readme = "README.md"
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.41.0-beta.5"
+version = "0.41.0-beta.6"
 
 [dependencies]
 async-recursion = "1.1.1"
-atomic_lib = { version = "0.41.0-beta.5", path = "../lib", features = [
+atomic_lib = { version = "0.41.0-beta.6", path = "../lib", features = [
     "config",
     "rdf",
 ] }

@@ -52,6 +52,8 @@ export * from './commit.js';
 export * from './error.js';
 export * from './withDeadline.js';
 export * from './datatypes.js';
+export * from './safeHref.js';
+export { EventManager } from './EventManager.js';
 export * from './parse.js';
 export * from './search.js';
 export * from './resource.js';
@@ -248,3 +250,13 @@ export * from './import-reference-review.js';
 
 export { pluginWorkspace, workspaceConnections } from './plugin-workspace.js';
 export type { WorkspaceConnection } from './plugin-workspace.js';
+
+export {
+  calendarFields,
+  isCalendarDate,
+  isAllDayOnDate,
+  nextCalendarDate,
+  matchesCalendarField,
+} from './calendar-date.js';
+
+export * from './calendar-recurrence.js';

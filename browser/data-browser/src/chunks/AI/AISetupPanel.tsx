@@ -1,3 +1,4 @@
+import { LocalOllamaDiscovery } from '@components/AI/LocalOllamaDiscovery';
 import React, { Suspense, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Column, Row } from '@components/Row';
@@ -242,6 +243,7 @@ export const AISetupPanel: React.FC = () => {
           </OutlinedSection>
           <OutlinedSection title='Ollama'>
             <ProviderSection>
+              {!ollamaUrl && <LocalOllamaDiscovery />}
               <ProviderStatus
                 connected={ollamaAvailable}
                 configured={Boolean(ollamaUrl)}

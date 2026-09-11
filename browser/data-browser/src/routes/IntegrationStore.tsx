@@ -1,3 +1,4 @@
+import { LocalThoughtCatalog } from '../chunks/PluginRuns/LocalThoughtCatalog';
 import { NewAutomation } from '../chunks/PluginRuns/NewAutomation';
 import {
   IntegrationDiscovery,
@@ -227,13 +228,8 @@ function IntegrationStore(): React.JSX.Element {
           />
           {error && <Card role='alert'>{error}</Card>}
           {!listings && !error && <p>Loading integrations…</p>}
-          {listings && visible?.length === 0 && bundled.length === 0 && (
-            <p>
-              No matching integrations. Try an app name or a task such as
-              kanban.
-            </p>
-          )}
           <Grid>
+            <LocalThoughtCatalog drive={drive} search={search} />
             {bundled.map(entry => (
               <IntegrationDiscovery
                 key={entry.id}

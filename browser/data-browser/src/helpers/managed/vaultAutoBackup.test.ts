@@ -16,7 +16,11 @@ import {
   watchForVaultBackups,
   type VaultAutoBackupDeps,
 } from './vaultAutoBackup';
-import type { VaultEnrollment, VaultKeyOps } from './vault';
+import {
+  VaultSessionEndedError,
+  type VaultEnrollment,
+  type VaultKeyOps,
+} from './vault';
 
 /**
  * Cloud Vault is on for everyone, without a button. These cover the three
@@ -113,6 +117,25 @@ afterEach(() => {
 });
 
 describe('ensureVaultBackup', () => {
+  it('shares display metadata when the drive is only in local storage', async () => {
+    const store = await signedInStore();
+    vi.spyOn(store, 'getClientDb').mockReturnValue({
+      getResource: vi.fn(async () =>
+        JSON.stringify({
+          [core.properties.name]: 'Personal notes',
+          [dataBrowser.properties.emoji]: '📒',
+        }),
+      ),
+    } as unknown as ReturnType<Store['getClientDb']>);
+    const deps = fakeDeps();
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.setUpVaultForDrive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { name: 'Personal notes', emoji: '📒' },
+      }),
+    );
+  });
+
   it('shares the drive name and emoji and refreshes them after edits', async () => {
     const store = await signedInStore();
     const drive = new Resource(DRIVE);
@@ -202,6 +225,34 @@ describe('ensureVaultBackup', () => {
       status: 'skipped',
     });
     expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels before upload if the account signed out during encryption', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps();
+    vi.mocked(deps.runVaultBackup).mockImplementation(async args => {
+      vi.mocked(deps.hasAccount).mockResolvedValue(false);
+      await args.beforeNetworkWrite!();
+      throw new Error('Must not upload after sign-out');
+    });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const outcome = await ensureVaultBackup(store, DRIVE, deps);
+    expect(outcome.status).toBe('skipped');
+    expect(warning).not.toHaveBeenCalled();
+    warning.mockRestore();
+  });
+
+  it('quietly skips a backup when its request loses the account session', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      runVaultBackup: vi.fn(async () => {
+        throw new VaultSessionEndedError();
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it('cancels an in-flight backup when the agent changes', async () => {

@@ -1,4 +1,14 @@
 import {
+  calendarRecurrenceShortname,
+  type CalendarRecord,
+  type CalendarOccurrence,
+} from '@tomic/lib';
+import {
+  calendarOccurrenceBuckets,
+  calendarPropertyMatches,
+} from './calendarOccurrences';
+import { WarningBlock } from '@components/WarningBlock';
+import {
   Collection,
   Datatype,
   JSONValue,
@@ -19,6 +29,7 @@ import { Button } from '@components/Button';
 import { ExpandedRowDialog } from '../ExpandedRowDialog';
 import { useCalendarDateProp } from './useCalendarDateProp';
 import { CalendarDay } from './CalendarDay';
+import { calendarFields, isAllDayOnDate, nextCalendarDate } from '@tomic/lib';
 
 interface CalendarViewProps {
   /** The Table resource; new items are created as its children. */
@@ -129,28 +140,6 @@ export function CalendarView({
 
   const rows = useResources(memberSubjects);
 
-  // Bucket each row onto its day. Reactive: `useResources` re-snapshots when a
-  // row's date changes, so the grid recomputes.
-  const buckets = useMemo(() => {
-    const map = new Map<string, string[]>();
-
-    if (!dateProp) {
-      return map;
-    }
-
-    for (const subject of memberSubjects) {
-      const resource = rows.get(subject);
-      const value = resource?.get(dateProp.subject) as JSONValue | undefined;
-      const key = valueToDayKey(value, dateProp.datatype);
-
-      if (key) {
-        map.set(key, [...(map.get(key) ?? []), subject]);
-      }
-    }
-
-    return map;
-  }, [memberSubjects, rows, dateProp]);
-
   // The month's grid: whole weeks (Monday-first) covering the cursor month.
   const gridDays = useMemo(() => {
     const first = new Date(cursor.year, cursor.month, 1);
@@ -169,6 +158,98 @@ export function CalendarView({
       };
     });
   }, [cursor]);
+
+  // Imported ranges are opt-in: unrelated table date columns stay single-day.
+  const calendarDate = calendarPropertyMatches(
+    dateProp?.shortname,
+    calendarFields.day,
+  );
+  const allDayProp = allColumns.find(p =>
+    calendarPropertyMatches(p.shortname, calendarFields.allDay),
+  );
+  const endDayProp = allColumns.find(p =>
+    calendarPropertyMatches(p.shortname, calendarFields.endDay),
+  );
+  const allDaySubjects = new Set(
+    memberSubjects.filter(
+      subject =>
+        calendarDate &&
+        allDayProp &&
+        rows.get(subject)?.get(allDayProp.subject) === true,
+    ),
+  );
+
+  const recurrenceProp = allColumns.find(p =>
+    calendarPropertyMatches(p.shortname, calendarRecurrenceShortname),
+  );
+  const recurringRows = new Set<string>();
+  const recurrenceRecords: CalendarRecord[] = [];
+
+  if (calendarDate && recurrenceProp) {
+    for (const subject of memberSubjects) {
+      const payload = rows.get(subject)?.get(recurrenceProp.subject);
+
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        !Array.isArray(payload) &&
+        'event' in payload
+      ) {
+        recurringRows.add(subject);
+        recurrenceRecords.push({
+          ...payload,
+          subject,
+        } as unknown as CalendarRecord);
+      }
+    }
+  }
+
+  let recurrenceError = '';
+  let occurrenceBuckets = new Map<string, CalendarOccurrence[]>();
+
+  try {
+    occurrenceBuckets = calendarOccurrenceBuckets(
+      recurrenceRecords,
+      gridDays.map(day => day.dayKey),
+    );
+  } catch (error) {
+    recurrenceError = `Could not display recurring meetings: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  // Bucket each row onto its day. Reactive: `useResources` re-snapshots when a
+  // row's date changes, so the grid recomputes.
+  const buckets = (() => {
+    const map = new Map<string, string[]>();
+
+    if (!dateProp) {
+      return map;
+    }
+
+    for (const subject of memberSubjects) {
+      if (recurringRows.has(subject)) continue;
+      const resource = rows.get(subject);
+      const value = resource?.get(dateProp.subject) as JSONValue | undefined;
+      const key = valueToDayKey(value, dateProp.datatype);
+
+      const isAllDay =
+        calendarDate &&
+        allDayProp &&
+        resource?.get(allDayProp.subject) === true;
+      const end = endDayProp && resource?.get(endDayProp.subject);
+
+      for (const day of gridDays) {
+        if (
+          isAllDay && end !== undefined
+            ? isAllDayOnDate(key, end, day.dayKey)
+            : key === day.dayKey
+        ) {
+          map.set(day.dayKey, [...(map.get(day.dayKey) ?? []), subject]);
+        }
+      }
+    }
+
+    return map;
+  })();
 
   const todayKey = toDayKey(new Date());
 
@@ -190,33 +271,35 @@ export function CalendarView({
   // Create a new item already placed on a day: a row of the table's class with
   // its date property preset. `createdAt` is required for it to appear in the
   // table. Timestamps are set to local noon so timezone shifts can't flip days.
-  const handleAddItem = useCallback(
-    async (dayKey: string, name: string) => {
-      const trimmed = name.trim();
+  const handleAddItem = async (dayKey: string, name: string) => {
+    const trimmed = name.trim();
 
-      if (!trimmed || !dateProp) {
-        return;
-      }
+    if (!trimmed || !dateProp) {
+      return;
+    }
 
-      const propVals: Record<string, JSONValue> = {
-        [core.properties.name]: trimmed,
-        [commits.properties.createdAt]: Date.now(),
-        [dateProp.subject]:
-          dateProp.datatype === Datatype.TIMESTAMP
-            ? new Date(`${dayKey}T12:00:00`).getTime()
-            : dayKey,
-      };
+    const propVals: Record<string, JSONValue> = {
+      [core.properties.name]: trimmed,
+      [commits.properties.createdAt]: Date.now(),
+      [dateProp.subject]:
+        dateProp.datatype === Datatype.TIMESTAMP
+          ? new Date(`${dayKey}T12:00:00`).getTime()
+          : dayKey,
+    };
 
-      const row = await store.newResource({
-        parent: tableSubject,
-        isA: tableClass.subject,
-        propVals,
-      });
-      await row.save();
-      store.notifyResourceManuallyCreated(row);
-    },
-    [store, tableSubject, tableClass, dateProp],
-  );
+    if (calendarDate && allDayProp && endDayProp) {
+      propVals[allDayProp.subject] = true;
+      propVals[endDayProp.subject] = nextCalendarDate(dayKey);
+    }
+
+    const row = await store.newResource({
+      parent: tableSubject,
+      isA: tableClass.subject,
+      propVals,
+    });
+    await row.save();
+    store.notifyResourceManuallyCreated(row);
+  };
 
   if (status === 'creating' || (!ready && memberSubjects.length === 0)) {
     return (
@@ -232,6 +315,7 @@ export function CalendarView({
 
   return (
     <>
+      {recurrenceError && <WarningBlock>{recurrenceError}</WarningBlock>}
       <CalendarWrapper data-testid='calendar-view'>
         <Toolbar>
           <MonthLabel>{monthLabel}</MonthLabel>
@@ -269,6 +353,8 @@ export function CalendarView({
               inMonth={day.inMonth}
               isToday={day.dayKey === todayKey}
               eventSubjects={buckets.get(day.dayKey) ?? []}
+              occurrences={occurrenceBuckets.get(day.dayKey) ?? []}
+              allDaySubjects={allDaySubjects}
               readOnly={readOnly}
               onAddItem={handleAddItem}
               onOpenItem={handleOpenItem}

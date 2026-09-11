@@ -125,6 +125,42 @@ export default defineConfig(({ mode }) => {
         // bundler-build `loro-prosemirror` fails `instanceof` checks and
         // the two WASM memories diverge. Exact-match regex so the
         // `loro-crdt/web` subpath import in `LoroLoader` is left alone.
+        {
+          find: '@localthought/atomic-integrations',
+          replacement: 'devonian/platform-lenses/atomic-integrations',
+        },
+        {
+          find: '@integration-host/import-records',
+          replacement: path.resolve(__dirname, '../lib/src/import-records.ts'),
+        },
+        {
+          find: '@integration-host/plugin-connection',
+          replacement: path.resolve(__dirname, '../lib/src/plugin-connection.ts'),
+        },
+        {
+          find: '@integration-host/plugin-reconcile',
+          replacement: path.resolve(__dirname, '../lib/src/plugin-reconcile.ts'),
+        },
+        {
+          find: '@integration-host/navigation',
+          replacement: path.resolve(__dirname, 'src/helpers/navigation.tsx'),
+        },
+        {
+          find: '@integration-host/runScript',
+          replacement: path.resolve(__dirname, 'src/chunks/PluginRuns/runScript.ts'),
+        },
+        {
+          find: '@integration-host/RunPluginDialog',
+          replacement: path.resolve(__dirname, 'src/chunks/PluginRuns/RunPluginDialog.tsx'),
+        },
+        {
+          find: '@integration-host/table/createTableFromSpec',
+          replacement: path.resolve(__dirname, 'src/chunks/TablePage/createTableFromSpec.ts'),
+        },
+        {
+          find: '@integration-host/table/tableTemplates',
+          replacement: path.resolve(__dirname, 'src/chunks/TablePage/tableTemplates.ts'),
+        },
         { find: /^loro-crdt$/, replacement: 'loro-crdt/web' },
         {
           find: '@components',
