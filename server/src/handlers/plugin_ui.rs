@@ -318,6 +318,7 @@ window.addEventListener('unhandledrejection', function (e) {{
 }});
 
 window.addEventListener('message', function (e) {{
+  if (e.source !== window.parent) return;
   if (e.data && e.data.type === '__atomic_style') {{
     var s = document.getElementById('__atomic_theme');
     if (s) s.textContent = e.data.css;
