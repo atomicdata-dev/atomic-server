@@ -30,6 +30,19 @@ adapter needs it: `Db::init_*`, `get_resource_extended`, `save_locally` /
 `Replica` (the hub-relayed text `COMMIT` profile) went with that frame the
 same day.
 
+Native persisted-instance checkpoint operations now live in `atomic_lib::backup`
+behind the optional `backup` feature. The server control adapter calls these with
+explicit paths; it owns no archive/restore implementation. The standalone
+`lib/tests/check-instance-checkpoint.sh` gate rejects server/Actix dependencies.
+This is independent of the native startup extraction in #1416 and can be consumed
+by its runtime without importing server configuration.
+
+Remaining checkpoint adapter work:
+
+- [ ] Desktop: stop and flush VFS staging before capture; gate external file writers.
+- [ ] Native startup: enforce the offline restore marker before reconnecting identities.
+- [ ] Verify desktop capture/restore with no HTTP listener.
+
 Next:
 
 1. `server/src/handlers/commit.rs` → `node.apply_commit(_, Hub { source_id,

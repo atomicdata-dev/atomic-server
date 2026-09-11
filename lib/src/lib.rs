@@ -66,6 +66,8 @@ pub mod agents;
 pub mod aggregate;
 pub mod atoms;
 pub mod authentication;
+#[cfg(all(feature = "backup", not(target_arch = "wasm32")))]
+pub mod backup;
 #[cfg(feature = "db")]
 pub mod class_extender;
 pub mod client;

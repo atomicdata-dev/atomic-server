@@ -106,3 +106,36 @@ inspect it and choose a fresh destination for retry.
 Test a restore before relying on the first archive, then repeat periodically.
 Take an extra checkpoint before risky experiments. Nightly retention accepts up
 to a day of data loss; it does not retain every intermediate edit.
+
+## Shared native checkpoint API
+
+Capture, ZIP verification, and offline restore live in `atomic_lib::backup`,
+behind the optional native `backup` feature. `CheckpointOptions` supplies explicit
+data, configuration and output roots plus the caller's build revision. The server
+provides only operator authentication, HTTP/CLI control, status, and server cache
+configuration checks. Native callers invoke the same `create`, `verify`, `restore`
+and `check_restore_activation` functions without an HTTP listener or Actix.
+The v1 layout remains `data/store/atomic.redb` plus data files and
+`config/config.toml`. The legacy manifest key `server_version` now records the
+core package version; v1 archives remain readable at that same package version.
+
+These mechanisms serve different recovery needs:
+
+| Mechanism | Purpose | Restore behavior |
+| --- | --- | --- |
+| Desktop virtual filesystem (`desktop/src/vfs.rs`) | Read/write projection of graph folders and files; writes become ordinary signed commits | Filesystem operations edit live graph state; the projection does not contain all instance metadata or history |
+| Encrypted vault (`atomic_lib::vault`) | Portable drive-level encrypted segments using `VaultObjectStore`, including its filesystem backend | Imports and merges drive data into a node |
+| Instance checkpoint (`atomic_lib::backup`) | Consistent persisted database plus local configuration and files | Restores a complete local instance into a new offline directory |
+
+Checkpoint creation uses the existing `Db` and its maintenance gate; it does not
+introduce a second sync engine. A checkpoint is a streamed full-instance ZIP, so
+it does not use the vault's in-memory sealed-object interface or its merge format.
+A future destination abstraction should preserve streaming and these distinct
+restore semantics.
+
+The checkpoint boundary covers **persisted state**. Desktop VFS writes are staged
+in memory before becoming commits. A desktop adapter must stop new staging,
+flush pending writes before `create`, and coordinate external file writers with
+`Db::maintenance`. It must check the restored-offline marker before starting sync
+or integrations. This PR provides the native API, not a desktop backup UI or a
+verified desktop staging/restore integration.

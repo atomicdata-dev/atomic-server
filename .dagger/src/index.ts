@@ -1341,6 +1341,8 @@ export class AtomicServer {
             `--test-threads ${this.hostKnobs.nextestTestThreads} ` +
             `--retries ${this.hostKnobs.nextestRetries}`,
         ])
+        // Select the core alone so server dependencies cannot mask missing features.
+        .withExec(['sh', 'lib/tests/check-instance-checkpoint.sh'])
         .stdout()
     );
   }
