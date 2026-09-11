@@ -747,3 +747,6 @@ check; real refresh/query timing remains a browser acceptance check.
 
 - `data-save-state.spec.ts` reproduces a compiled inspector missing an unsaved-edit
   warning, then verifies the subscribed warning clears after saving/reconnecting.
+
+Failure attachments include up to 30 recent WebSocket frame metadata records per
+page, never payload contents. A real local WebSocket exercises this collection.

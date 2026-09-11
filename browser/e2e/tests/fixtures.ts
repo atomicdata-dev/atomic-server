@@ -1,4 +1,9 @@
-import { test as base, expect, type BrowserContext } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 
 import { collectFailureState } from './failure-state';
 
@@ -34,6 +39,35 @@ export const test = base.extend<{
       const cleanups: (() => void)[] = [];
       const watched = new Set<BrowserContext>();
       const ownedContexts = new Set<BrowserContext>();
+      const transportEvents = new Map<Page, unknown[]>();
+
+      const watchPage = (page: Page) => {
+        if (transportEvents.has(page)) return;
+        const events: unknown[] = [];
+        transportEvents.set(page, events);
+
+        const recordFrame = (direction: string, payload: string | Buffer) => {
+          events.push({
+            at: Date.now(),
+            direction,
+            bytes: Buffer.byteLength(payload),
+            tag: typeof payload === 'string' ? 'text' : payload[0],
+          });
+          if (events.length > 30) events.shift();
+        };
+
+        const onSocket = (socket: import('@playwright/test').WebSocket) => {
+          // Payloads can contain signed edits or authentication. Keep only frame metadata.
+          socket.on('framesent', ({ payload }) => recordFrame('sent', payload));
+          socket.on('framereceived', ({ payload }) =>
+            recordFrame('received', payload),
+          );
+          socket.on('close', () => recordFrame('closed', ''));
+        };
+
+        page.on('websocket', onSocket);
+        cleanups.push(() => page.off('websocket', onSocket));
+      };
 
       const record = (entry: Entry) => {
         const match = expected.find(rule => {
@@ -54,6 +88,9 @@ export const test = base.extend<{
       const watch = async (context: BrowserContext) => {
         if (watched.has(context)) return;
         watched.add(context);
+        context.pages().forEach(watchPage);
+        context.on('page', watchPage);
+        cleanups.push(() => context.off('page', watchPage));
 
         // General UI tests use an empty discovery room, independent of public
         // service availability. verify-peer-mesh.mjs separately exercises real
@@ -139,6 +176,7 @@ export const test = base.extend<{
         ) {
           for (const [index, page] of [...watched]
             .flatMap(c => c.pages())
+            .slice(0, 5)
             .entries()) {
             // A broken page must not mask the original failure or stall teardown.
             let timer: ReturnType<typeof setTimeout> | undefined;
@@ -154,7 +192,11 @@ export const test = base.extend<{
                 }),
               ]);
               await testInfo.attach(`failure-state-${index}`, {
-                body: JSON.stringify(state, null, 2),
+                body: JSON.stringify(
+                  { state, transportEvents: transportEvents.get(page) ?? [] },
+                  null,
+                  2,
+                ),
                 contentType: 'application/json',
               });
             } catch {

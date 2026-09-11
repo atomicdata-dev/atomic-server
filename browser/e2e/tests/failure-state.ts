@@ -26,6 +26,8 @@ export async function collectFailureState(page: Page): Promise<unknown> {
         dirty: r.hasUnsavedChanges(),
         saving: r.isSaving,
         pending: r.hasPendingCommits,
+        saveState: store.getSaveState(r).kind,
+        scheduledCount: store.getSaveState(r).scheduledCount,
         readError: r.error?.name,
         saveError: r.commitError?.name,
         properties: r
