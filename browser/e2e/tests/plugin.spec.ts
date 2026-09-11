@@ -11,6 +11,7 @@ import {
   sidebarDriveButtonId,
   signIn,
   testFilePath,
+  waitForSynced,
 } from './test-utils';
 
 const BIRD =
@@ -19,7 +20,7 @@ const BIRD =
 test.describe('Plugins', () => {
   test.beforeEach(before);
 
-  test('install a plugin', async ({ page }) => {
+  test('install a plugin', async ({ page, context }) => {
     // Two upload + commit + plugin-install chains, a full bird-creation
     // form, an iframe-driven picker, plus a reload-and-verify. The test
     // routinely needs 40-50s on a dev machine even when nothing is wrong.
@@ -184,6 +185,92 @@ test.describe('Plugins', () => {
     // Plugins section state can collapse after reloads; expand it again.
     await page.getByRole('main').getByText('Plugins', { exact: true }).click();
     await page.getByRole('link', { name: 'ontola/test-plugin' }).click();
+
+    // Keep the mounted resource identity while changing metadata and saving config.
+    const saveConfig = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(saveConfig).toBeDisabled();
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix":"Draft"}');
+    await expect(saveConfig).toBeEnabled();
+    await page.getByLabel('Config', { exact: true }).fill('{');
+    await expect(saveConfig).toBeDisabled();
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix":"Draft"}');
+    await expect(saveConfig).toBeEnabled();
+    await page.evaluate(async () => {
+      const subject = new URL(location.href).searchParams.get('subject')!;
+      const resource = window.store.getResourceLoading(subject);
+      await resource.set(
+        'https://atomicdata.dev/properties/version',
+        '1.0.1',
+        false,
+      );
+      await resource.set(
+        'https://atomicdata.dev/properties/pluginAuthor',
+        'Updated author',
+        false,
+      );
+      await resource.set(
+        'https://atomicdata.dev/properties/description',
+        'Updated description',
+        false,
+      );
+    });
+    await expect(page.getByText('v1.0.1', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('by Updated author', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Plugin Description')).toHaveText(
+      'Updated description',
+    );
+    await expect(page.getByLabel('Config', { exact: true })).toContainText(
+      'Draft',
+    );
+    await saveConfig.click();
+    await expect(saveConfig).toBeDisabled();
+    await waitForSynced(page);
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix": 5}');
+    await expect(saveConfig).toBeDisabled();
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix":"Final"}');
+    await expect(saveConfig).toBeEnabled();
+    await saveConfig.click();
+    await expect(saveConfig).toBeDisabled();
+    await waitForSynced(page);
+
+    await page.evaluate(() => window.store.disconnect());
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.store.getSyncStatus().serverConnected),
+      )
+      .toBe(false);
+    await context.setOffline(true);
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix":"Offline"}');
+    await expect(saveConfig).toBeEnabled();
+    await saveConfig.click();
+    await expect(saveConfig).toBeDisabled();
+    // A queued save must not prevent saving a later offline draft.
+    await page
+      .getByLabel('Config', { exact: true })
+      .fill('{"folderPrefix":"Offline latest"}');
+    await expect(saveConfig).toBeEnabled();
+    await saveConfig.click();
+    await expect(saveConfig).toBeDisabled();
+    await context.setOffline(false);
+    await page.evaluate(() => window.store.reconnect());
+    await waitForSynced(page);
+    await page.reload();
+    await expect(page.getByLabel('Config', { exact: true })).toContainText(
+      'Offline latest',
+    );
+    await expect(saveConfig).toBeDisabled();
 
     // Uninstall the plugin
     await page.getByRole('button', { name: 'Uninstall' }).click();

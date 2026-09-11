@@ -33,6 +33,16 @@ render-time property getters incrementally, with a reproduced stale-UI test
 before migrating each flow. Saving/outbox state is separate from read readiness;
 see `unify-resource-dirty-signals.md`.
 
-Next bounded slice: PluginPage metadata and Save-button subscriptions, with a
-reproduction before migration. Its checklist and delivery order live in
+PluginPage now subscribes to metadata and save status. A production test reproduced
+valid config leaving Save disabled and covers save completion, client metadata updates,
+draft preservation and offline recovery. Remaining JS work lives in
 [js-maintainability.md](./js-maintainability.md).
+
+### Plugin manifest metadata follow-up
+
+- [ ] Investigate real plugin Update leaving the old version on the updating client
+  after refresh (observed during the subscription work). `on_resource_get` enriches
+  manifest fields in `server/src/plugins/plugin.rs`; check how the response and
+  Loro snapshot are reconciled before deciding where metadata should be persisted.
+- [ ] Add a real two-client plugin-update regression, including active config drafts.
+  Client-store mutation coverage alone does not verify remote manifest refresh.
