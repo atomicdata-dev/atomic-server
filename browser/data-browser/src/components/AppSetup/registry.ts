@@ -1,4 +1,5 @@
 // @wc-ignore-file
+import { requireInstallationServer } from '../../../../../browser/lib/src/plugin-installation';
 import {
   setup,
   setupDeclaration,
@@ -15,6 +16,7 @@ const github: SetupAdapter = {
   id: 'github-issues',
   icon: '🐙',
   declaration: setupDeclaration,
+  preflight: ({ store, drive }) => requireInstallationServer(store, drive),
   defaults: workspace => ({ destination: workspace ?? '' }),
   choices: async (lookup, { store, drive }) => {
     if (lookup !== 'destinations') throw new Error('Unknown setup lookup');
@@ -56,6 +58,7 @@ const notion: SetupAdapter = {
   id: 'notion',
   icon: '📓',
   declaration: notionDeclaration,
+  preflight: ({ store, drive }) => requireInstallationServer(store, drive),
   choices: async () => {
     throw new Error('Unknown setup lookup');
   },

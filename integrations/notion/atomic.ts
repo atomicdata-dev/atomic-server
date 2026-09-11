@@ -1,3 +1,4 @@
+import { requireInstallationServer } from '../../browser/lib/src/plugin-installation.js';
 // @wc-ignore-file
 /** Shared installer for browser/CLI. Only the host contacts Notion. */
 import {
@@ -42,6 +43,7 @@ export async function install(
     throw new Error('A Notion connection token is required');
   if (typeof source !== 'string' || !source.trim())
     throw new Error('Notion provider bundle did not load');
+  await requireInstallationServer(store, drive);
   const schema = await ensureSchema(store, drive, pluginSchema());
   const plugin = await store.newResource({
     parent: drive,
