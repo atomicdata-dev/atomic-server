@@ -5,6 +5,26 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('materializes a buffered property snapshot before returning its datatype', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const store = new Store();
+    const source = new Resource('did:ad:buffered-property');
+    await source.set(core.properties.datatype, Datatype.STRING, false);
+    await source.set(core.properties.shortname, 'title', false);
+    await source.set(core.properties.description, 'Title', false);
+    const snapshot = source.getLoroDoc()!.export({ mode: 'snapshot' });
+    const loaded = new Resource(source.subject);
+    loaded.applyHydratedValues([
+      ['https://atomicdata.dev/properties/loroUpdate', snapshot],
+    ]);
+    store.addResource(loaded);
+    expect(await store.getProperty(source.subject)).toMatchObject({
+      datatype: Datatype.STRING,
+    });
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });

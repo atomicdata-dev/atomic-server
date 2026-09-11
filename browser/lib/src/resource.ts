@@ -736,6 +736,8 @@ export class Resource<C extends OptionalClass = any> {
 
   /** Returns all property entries (cache + binary aux values) as a flat array. */
   public getEntries(): [string, AtomicValue][] {
+    this.materializeBufferedSnapshot();
+
     if (this.#cacheDirty && this._loroDoc) {
       this.rebuildCacheFromLoro();
       this.#cacheDirty = false;
@@ -1751,6 +1753,8 @@ export class Resource<C extends OptionalClass = any> {
   public get<Prop extends string, Returns = InferTypeOfValueInTriple<C, Prop>>(
     propUrl: Prop,
   ): Returns {
+    this.materializeBufferedSnapshot();
+
     if (this.#cacheDirty && this._loroDoc) {
       this.rebuildCacheFromLoro();
       this.#cacheDirty = false;
@@ -1765,6 +1769,8 @@ export class Resource<C extends OptionalClass = any> {
    * The returned object is a copy; mutating it does not change the resource.
    */
   public getPropVals(): Record<string, AtomicValue> {
+    this.materializeBufferedSnapshot();
+
     if (this.#cacheDirty && this._loroDoc) {
       this.rebuildCacheFromLoro();
       this.#cacheDirty = false;
@@ -1774,6 +1780,14 @@ export class Resource<C extends OptionalClass = any> {
       ...this.#cache,
       ...Object.fromEntries(this._auxValues.entries()),
     };
+  }
+
+  private materializeBufferedSnapshot(): void {
+    // Hydration can supply bytes before a document exists. Once WASM is
+    // ready, reads must materialize them rather than expose the empty cache.
+    if (!this._loroDoc && this._loroSnapshotBytes && LoroLoader.isLoaded()) {
+      this.getLoroDoc();
+    }
   }
 
   /**
