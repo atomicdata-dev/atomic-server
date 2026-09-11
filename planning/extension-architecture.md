@@ -464,3 +464,13 @@ universal provider schema or total rewrite is required for this consolidation.
 Store scale and richer schema compatibility remain separate plans. The first
 implementation should reduce two existing UI bridges to one contract, not create
 a framework that every existing path must immediately be rewritten to use.
+
+
+### Typed setup checkpoint
+
+GitHub setup now has a package-owned declaration and pure `setup` normalization.
+A shared form renders its fields; assistant tools discover the same schema and
+open the form with validated non-secret arguments. Credentials remain host-owned.
+The existing installer is behind an explicitly trusted adapter, not exposed as
+arbitrary frontend JS execution. This does not complete the setup/action lifecycle
+migration. Remaining work and verification are in [app-setup.md](app-setup.md).

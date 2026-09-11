@@ -104,3 +104,8 @@ These components help with rendering resources in different contexts.
 - `src/globalCssVars.ts` - Typed CSS variable helpers used by layout and global surfaces.
 
 - `src/components/TeamProfileStep.tsx` — shared collaboration profile review for senders and invitees. Saves full name and optional cropped avatar to the existing Atomic agent before continuing; requires no SaaS account.
+
+## App setup
+
+- `src/components/AppSetup/AppSetupForm.tsx` — Renders a registered setup action's typed fields with Atomic controls, dynamic choices and host-owned credential input.
+- `src/components/AppSetup/AppSetupProvider.tsx` — Opens the same form from assistant tools with non-secret arguments. Setup adapters are trusted bundled code; this is not an arbitrary-source execution API.

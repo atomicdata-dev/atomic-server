@@ -1,4 +1,6 @@
 // @wc-ignore-file
+import { useAppSetup } from '../../components/AppSetup/AppSetupProvider';
+import { listAppSetups } from '../../components/AppSetup/registry';
 import { previewEventSchema, previewTrigger } from './previewTrigger';
 import {
   Client,
@@ -104,6 +106,8 @@ export const TOOL_NAMES = {
   OPEN_SHARE_SETTINGS: 'open_share_settings',
   SHOW_HISTORY: 'show_history',
   CREATE_PLUGIN: 'create_plugin',
+  LIST_APP_SETUPS: 'list_app_setups',
+  SETUP_APP: 'setup_app',
   DISCOVER_INTEGRATIONS: 'discover_integrations',
   LIST_INTEGRATION_ACTIONS: 'list_integration_actions',
   CALL_INTEGRATION_ACTION: 'call_integration_action',
@@ -449,6 +453,7 @@ export function useAtomicMCPTools({
   editModel,
 }: UseAtomicMCPToolsProps) {
   const store = useStore();
+  const openAppSetup = useAppSetup();
   const navigate = useNavigateWithTransition();
   const addToOntology = useAddToOntology();
   const { drive } = useSettings();
@@ -1551,6 +1556,29 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             };
           } catch (e) {
             return { error: (e as Error).message };
+          }
+        },
+      }),
+      [TOOL_NAMES.LIST_APP_SETUPS]: tool({
+        description:
+          'List registered app setup actions and their JSON Schema inputs. These configure new connections. Credentials are deliberately excluded. Use setup_app to open the declared form with known arguments; never ask for tokens in chat.',
+        inputSchema: z.object({}),
+        execute: async () => listAppSetups(),
+      }),
+      [TOOL_NAMES.SETUP_APP]: tool({
+        description:
+          'Open an app setup form using a declaration returned by list_app_setups. Supply only known non-secret arguments; missing fields and authentication are completed by the user. This opens review UI, does not install, import or enable synchronization. Never include passwords or tokens. Never claim setup completed from this result.',
+        inputSchema: z.object({
+          app: z.string(),
+          arguments: z.record(z.string(), z.unknown()),
+        }),
+        execute: async ({ app, arguments: args }) => {
+          try {
+            openAppSetup(app, args);
+
+            return { status: 'needs_user_setup', app };
+          } catch (error) {
+            return { error: String(error) };
           }
         },
       }),

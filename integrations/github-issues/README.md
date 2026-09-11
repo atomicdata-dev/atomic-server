@@ -174,3 +174,25 @@ Todo, Doing and Done map to GitHub; Blocked is intentionally not mapped and
 must be resolved before sync. Old tables are not automatically migrated.
 The vocabulary is an embedded HTTP-identity pilot, not the planned frozen
 schema catalog or a claim of external standards conformance.
+
+## Typed setup (migration)
+
+`setup.ts` owns `setupDeclaration` (the bounded action JSON Schema) and a pure
+`setup(arguments)` validator/normalizer. Atomic renders the declaration with its
+normal form controls. The assistant discovers it through `list_app_setups` and
+uses `setup_app` to open that same form with known arguments. No setup tool
+accepts a credential, installs resources or starts synchronization.
+
+The host-owned credential input stays separate from the setup function's arguments.
+`AppSetup/registry.ts` currently adapts this package to the existing `install()`;
+its dynamic destination lookup preserves shared-task-schema compatibility checks.
+Provider code is lazy-loaded when needed. This is an explicit transitional host
+adapter, not sandbox execution of arbitrary setup exports. The stored sync source
+still executes through the existing plugin runtime.
+
+Open: replace `install()` with resumable reviewed setup effects, invoke user-authored
+setup through the common sandbox, migrate Notion and add GitHub OAuth discovery.
+After an installation error the form blocks repeated submission because the legacy
+installer may have created some resources. Inspect the connection before retrying.
+Setup metadata currently uses package-authored labels, like template metadata;
+package-localized labels remain future work.

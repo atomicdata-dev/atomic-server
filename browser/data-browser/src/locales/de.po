@@ -4730,8 +4730,9 @@ msgstr ""
 
 #: src/chunks/Conference/ConferenceRoom.tsx src/routes/SyncRoute.tsx
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
 #: src/chunks/PluginRuns/ConnectNotionManual.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Connecting…"
 msgstr ""
@@ -7607,6 +7608,7 @@ msgstr ""
 #: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
 #: src/chunks/PluginRuns/PluginView.tsx
+#: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Loading…"
 msgstr ""
@@ -8025,21 +8027,17 @@ msgstr ""
 msgid "Record verified result and resume"
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
-msgstr ""
+#~ msgid "Sync issue titles, descriptions and status with a kanban board. Review the first import before enabling background sync."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Repository"
-msgstr ""
+#~ msgid "Repository"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "GitHub token"
-msgstr ""
+#~ msgid "GitHub token"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Connect GitHub"
-msgstr ""
+#~ msgid "Connect GitHub"
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/PluginTrigger.tsx
 msgid "events queued. They remain saved while waiting for review."
@@ -8519,9 +8517,8 @@ msgstr ""
 msgid "Connect a Notion database, then review what will sync before making changes."
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Enter a repository and token to continue."
-msgstr ""
+#~ msgid "Enter a repository and token to continue."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/ConnectNotion.tsx
 msgid "Allow pop-ups for Atomic, then try connecting again."
@@ -8619,17 +8616,14 @@ msgstr ""
 msgid "Continue to sync setup"
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "New issue board"
-msgstr ""
+#~ msgid "New issue board"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Sync into"
-msgstr ""
+#~ msgid "Sync into"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
-msgstr ""
+#~ msgid "Existing tables appear when they use the shared task schema. GitHub supports Todo, Doing and Done; Blocked cards must be resolved before syncing. Existing cards are included in the preview."
+#~ msgstr ""
 
 #: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
 #: src/chunks/AI/AIChatMessageParts/IntegrationActionReview.tsx
@@ -8757,17 +8751,14 @@ msgstr ""
 msgid "Your import setup is saved. Open the table, or manage this import to review future runs and its schedule."
 msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Create GitHub token"
-msgstr ""
+#~ msgid "Create GitHub token"
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
-msgstr ""
+#~ msgid "Name, Issues read/write access and a 30-day expiry are prefilled. Check the resource owner, choose Only select repositories and select your repository. Generate the token, then paste it below."
+#~ msgstr ""
 
-#: src/chunks/PluginRuns/ConnectGitHub.tsx
-msgid "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
-msgstr ""
+#~ msgid "Your token is stored on your AtomicServer. Create the atomic:doing label in GitHub to use the Doing column."
+#~ msgstr ""
 
 #: src/chunks/PluginRuns/NewAutomation.tsx
 msgid "New automation"
@@ -10067,4 +10058,24 @@ msgstr ""
 
 #: src/components/Settings/IntegrationSettings.tsx
 msgid "Enter an HTTPS server URL or a localhost HTTP URL, without a path."
+msgstr ""
+
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Could not load setup choices. Close setup and try again."
+msgstr ""
+
+#~ msgid "Setup did not finish. Check your integrations for a partially created connection before starting again."
+#~ msgstr ""
+
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "Choose an option"
+msgstr ""
+
+#. 0: setupError(e, credential.trim())
+#: src/components/AppSetup/AppSetupForm.tsx
+msgid "{0}. Setup did not finish. Check your integrations for a partially created connection before starting again."
+msgstr ""
+
+#: src/components/AppSetup/setupError.ts
+msgid "Unknown setup error"
 msgstr ""
