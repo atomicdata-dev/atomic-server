@@ -1,5 +1,7 @@
 import { test as base, expect, type BrowserContext } from '@playwright/test';
 
+import { collectFailureState } from './failure-state';
+
 export * from '@playwright/test';
 
 type Kind = 'warning' | 'error' | 'pageerror';
@@ -127,6 +129,42 @@ export const test = base.extend<{
       } finally {
         browser.newContext = newContext;
         cleanups.forEach(cleanup => cleanup());
+        const unexpected = entries.filter(entry => !entry.expected);
+        const missing = expected.filter(rule => rule.seen !== rule.count);
+
+        if (
+          testInfo.status !== testInfo.expectedStatus ||
+          unexpected.length ||
+          missing.length
+        ) {
+          for (const [index, page] of [...watched]
+            .flatMap(c => c.pages())
+            .entries()) {
+            // A broken page must not mask the original failure or stall teardown.
+            let timer: ReturnType<typeof setTimeout> | undefined;
+
+            try {
+              const state = await Promise.race([
+                collectFailureState(page),
+                new Promise(resolve => {
+                  timer = setTimeout(
+                    () => resolve({ unavailable: 'page did not respond' }),
+                    2000,
+                  );
+                }),
+              ]);
+              await testInfo.attach(`failure-state-${index}`, {
+                body: JSON.stringify(state, null, 2),
+                contentType: 'application/json',
+              });
+            } catch {
+              // Closed/crashed pages are already represented in the trace.
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+        }
+
         // Match Playwright's default-context teardown for extra test-owned
         // contexts. Otherwise their live tabs leak into the next test.
         await Promise.all([...ownedContexts].map(context => context.close()));
@@ -149,8 +187,6 @@ export const test = base.extend<{
           });
         }
 
-        const unexpected = entries.filter(entry => !entry.expected);
-        const missing = expected.filter(rule => rule.seen !== rule.count);
         expect(
           unexpected.slice(0, 20),
           `Unexpected browser warnings/errors (${unexpected.length}); first 20 shown, full browser-diagnostics attached`,
