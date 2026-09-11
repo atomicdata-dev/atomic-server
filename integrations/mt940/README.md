@@ -46,8 +46,10 @@ offline peers still need collision resolution after synchronization.
 - No live bank access, payments, CSV/PDF, counterparty extraction or categorization.
 - Amount columns cannot yet use numeric table aggregation; an exact decimal
   datatype/table formatter is a follow-up.
-- No real bunq statement supplied yet. Synthetic fixtures test format behavior;
-  they do not establish compatibility with every bank's dialect.
+- A supplied real bunq statement with 272 transactions passed preview, apply and
+  zero-change reimport locally on 2026-09-11. Private bank data is not committed. Synthetic fixtures
+  test format behavior; this does not establish compatibility with every bank's
+  dialect.
 - The default importer, table and view reuse durable setup identities after lost
   responses. Shared ontology/schema creation still needs resumable installation.
 - File importer metadata/UI dispatch is currently MT940-specific; generalize this

@@ -1,3 +1,4 @@
+import { usePluginClass } from '../chunks/PluginRuns/runScript';
 import { LocalThoughtCatalog } from '../chunks/PluginRuns/LocalThoughtCatalog';
 import { NewAutomation } from '../chunks/PluginRuns/NewAutomation';
 import {
@@ -58,6 +59,8 @@ function IntegrationStore(): React.JSX.Element {
   const { workspace } = IntegrationStoreRoute.useSearch();
   const store = useStore();
   const { drive } = useSettings();
+  // The ontology can hydrate after this page mounts on a full navigation.
+  const pluginClass = usePluginClass(drive);
   const navigate = useNavigateWithTransition();
   const [listings, setListings] = useState<Listing[]>();
   const [installed, setInstalled] = useState<string[]>([]);
@@ -74,13 +77,12 @@ function IntegrationStore(): React.JSX.Element {
 
     void findSchema(store, drive, pluginSchema())
       .then(async schema => {
-        const klass = schema.classes?.['plugin-script'];
-        const subjects = klass
+        const subjects = pluginClass
           ? await readConnectionSubjects(
               store,
               drive,
               core.properties.isA,
-              klass,
+              pluginClass,
             )
           : [];
         const resources = await Promise.all(
@@ -108,7 +110,7 @@ function IntegrationStore(): React.JSX.Element {
     return () => {
       active = false;
     };
-  }, [store, drive]);
+  }, [store, drive, pluginClass]);
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState<string>();
   const server = store.getServerUrl();
