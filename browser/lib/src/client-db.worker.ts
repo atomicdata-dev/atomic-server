@@ -428,10 +428,13 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
     case 'vaultCommitSegment': {
       await ensureInit();
       db!.vaultCommitSegment(msg.drivePseudonym, msg.devicePubkey, msg.segment);
-      // Lane bookkeeping is a normal write behind `Durability::None`; without
-      // this the next tick's flush is what persists it, and a reload in between
-      // would re-report an already-committed segment as pending.
+      // Backup completion must survive an immediate reload. Waiting for the
+      // periodic tick loses the cursor and uploads the same data again.
+      // Keep the retry armed if flush fails, but propagate that failure so
+      // the caller cannot report a durably completed backup.
       dirty = true;
+      db!.flush();
+      dirty = false;
 
       return undefined;
     }
