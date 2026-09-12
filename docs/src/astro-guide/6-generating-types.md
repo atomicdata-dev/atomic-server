@@ -24,18 +24,22 @@ A config file called `atomic.config.json` has been generated, it should look som
 {
   "outputFolder": "./src/ontologies",
   "moduleAlias": "@tomic/lib",
+  "serverUrl": "http://localhost:9883",
   "ontologies": []
 }
 ```
 
 Now let's add the subject of our ontology to the `ontologies` list.
-To get the subject, go to your ontology in the browser and copy the URL from the address bar or the navigation/search bar at the bottom.
-Paste the URL as a string in the ontologies array like so:
+To get the subject, open the ontology in the Atomic Data browser and copy the `did:ad:…` identifier from the search bar at the bottom (or from `?subject=` in the address bar) — not the `https://…/did:ad:…` URL.
+Set `serverUrl` to the origin of your Atomic Server.
 
 ```json
-"ontologies": [
-	"<insert my-ontology url>"
-]
+{
+  "outputFolder": "./src/ontologies",
+  "moduleAlias": "@tomic/lib",
+  "serverUrl": "http://localhost:9883",
+  "ontologies": ["did:ad:<your-ontology-id>"]
+}
 ```
 
 We're ready to generate the types, Run the following command:

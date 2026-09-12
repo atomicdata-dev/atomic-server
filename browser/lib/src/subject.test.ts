@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   asSubject,
+  extractDidSubject,
   InvalidSubjectError,
   isDidSubject,
   isHttpSubject,
   isValidSubject,
+  subjectsReferToSameResource,
   tryAsSubject,
   type Subject,
 } from './subject.js';
@@ -60,6 +62,63 @@ describe('subject', () => {
       expect(isHttpSubject(did)).toBe(false);
       expect(isDidSubject(http)).toBe(false);
       expect(isHttpSubject(http)).toBe(true);
+    });
+  });
+
+  describe('extractDidSubject / subjectsReferToSameResource', () => {
+    it('returns a DID unchanged, stripping query and fragment', () => {
+      expect(extractDidSubject('did:ad:abc')).toBe('did:ad:abc');
+      expect(extractDidSubject('did:ad:abc?drive=did:ad:drive')).toBe(
+        'did:ad:abc',
+      );
+    });
+
+    it('extracts a DID from the HTTP path form and the /did endpoint', () => {
+      expect(extractDidSubject('https://example.com/did:ad:abc')).toBe(
+        'did:ad:abc',
+      );
+      expect(
+        extractDidSubject(
+          'https://example.com/did?subject=' + encodeURIComponent('did:ad:abc'),
+        ),
+      ).toBe('did:ad:abc');
+    });
+
+    it('does not treat ordinary HTTP resources as DIDs', () => {
+      expect(
+        extractDidSubject('https://atomicdata.dev/ontology/core'),
+      ).toBeUndefined();
+      expect(extractDidSubject('/relative')).toBeUndefined();
+    });
+
+    it('treats https://host/did:ad:x and did:ad:x as the same resource', () => {
+      expect(
+        subjectsReferToSameResource(
+          'https://example.com/did:ad:abc',
+          'did:ad:abc',
+        ),
+      ).toBe(true);
+      expect(
+        subjectsReferToSameResource(
+          'did:ad:abc',
+          'https://example.com/did:ad:abc',
+        ),
+      ).toBe(true);
+    });
+
+    it('still rejects a genuine subject mismatch', () => {
+      expect(
+        subjectsReferToSameResource(
+          'https://example.com/did:ad:aaa',
+          'did:ad:bbb',
+        ),
+      ).toBe(false);
+      expect(
+        subjectsReferToSameResource(
+          'https://example.com/foo',
+          'https://example.com/bar',
+        ),
+      ).toBe(false);
     });
   });
 });
