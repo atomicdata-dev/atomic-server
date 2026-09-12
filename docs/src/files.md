@@ -104,3 +104,8 @@ node replacements, and use an S3-capable binary for rollback after migration.
 This is primary storage for hosted files. It does not provide client-encrypted
 Vault backups, and the server still buffers file contents in memory while
 proxying requests.
+
+Drive usage counts each referenced blob once within that drive. When two drives
+reference identical content, each drive counts its full size toward its quota,
+while the shared S3 namespace stores one object. Account/drive usage totals
+therefore describe logical usage, not the physical size of the bucket.

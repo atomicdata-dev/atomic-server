@@ -170,6 +170,81 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shared_files_count_once_per_drive_independently_of_other_owners() {
+        use atomic_lib::{urls, Storelike, Value};
+        use futures::TryStreamExt;
+        let objects = Arc::new(object_store::memory::InMemory::new());
+        let mut db = Db::init_redb(None).await.unwrap();
+        db.blob_backend = Some(Arc::new(
+            ObjectBlobBackend::new(objects.clone(), "files").unwrap(),
+        ));
+        let bytes = b"the same file uploaded by two different users";
+        let hash = blake3::hash(bytes);
+        let blob = format!("did:ad:blob:{}", hash.to_hex());
+        let mut drives = Vec::new();
+        let mut references = Vec::new();
+        for (owner, copies) in [("alice", 2), ("bob", 1)] {
+            let (_, drive) = db.setup(owner).await.unwrap();
+            for copy in 0..copies {
+                db.put_blob(hash.as_bytes(), bytes).await.unwrap();
+                let subject = db
+                    .create_resource(urls::FILE, &drive, &format!("copy-{copy}"), None)
+                    .await
+                    .unwrap();
+                let mut file = db.get_resource(&subject.as_str().into()).await.unwrap();
+                file.set_unsafe(urls::BLOB.into(), Value::AtomicUrl(blob.as_str().into()))
+                    .unwrap();
+                db.add_resource_opts(&file, false, true, true)
+                    .await
+                    .unwrap();
+                references.push(file.get_subject().clone());
+            }
+            drives.push(drive);
+        }
+        assert_ne!(drives[0], drives[1]);
+        // Actual storage contains one object despite three file references.
+        let stored: Vec<_> = objects.list(None).try_collect().await.unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].size, bytes.len() as u64);
+        assert_eq!(db.kv.len(Tree::Blobs).unwrap(), 0);
+        // Co-location, report order and reporting just one hosted drive must
+        // never change either owner's quota usage.
+        for report in [
+            drives.clone(),
+            vec![drives[1].clone(), drives[0].clone()],
+            vec![drives[0].clone()],
+            vec![drives[1].clone()],
+        ] {
+            let usage = db.per_drive_usage(&report).await.unwrap();
+            assert_eq!(usage.len(), report.len());
+            for row in usage {
+                assert_eq!(row.blob_bytes, bytes.len() as u64, "{}", row.drive_subject);
+            }
+        }
+        // Removing Alice's two references must not transfer any usage to Bob.
+        for reference in &references[..2] {
+            db.remove_resource(reference).await.unwrap();
+        }
+        let usage = db.per_drive_usage(&drives).await.unwrap();
+        assert_eq!(
+            usage
+                .iter()
+                .find(|r| r.drive_subject == drives[0])
+                .unwrap()
+                .blob_bytes,
+            0
+        );
+        assert_eq!(
+            usage
+                .iter()
+                .find(|r| r.drive_subject == drives[1])
+                .unwrap()
+                .blob_bytes,
+            bytes.len() as u64
+        );
+    }
+
+    #[tokio::test]
     async fn peer_sync_uses_remote_storage_and_reports_failed_writes() {
         use atomic_lib::{
             agents::ForAgent,

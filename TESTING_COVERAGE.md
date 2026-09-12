@@ -774,3 +774,8 @@ stays empty. Standalone local storage still runs through the original tests.
 
 Not covered here: live Hetzner rollout, arbitrary large-file memory limits,
 blob garbage collection, or encrypted Vault attachment recovery.
+
+`shared_files_count_once_per_drive_independently_of_other_owners` proves that
+one physical object shared by two owners counts once in each drive, repeated
+references within one drive do not inflate usage, and report ordering,
+co-location and removal of another owner's references do not change attribution.
