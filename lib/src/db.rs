@@ -3441,7 +3441,23 @@ impl Storelike for Db {
                     };
                     if let Some(pubkey) = lookup.strip_prefix("did:ad:agent:") {
                         if let Ok(agent) = crate::agents::Agent::new_from_public_key(pubkey) {
-                            if let Ok(resource) = agent.to_resource() {
+                            if let Ok(mut resource) = agent.to_resource() {
+                                // A lookup is not creation of an agent. There is
+                                // no known creation date or signed history yet.
+                                // Seed the same fallback ops on every read and
+                                // device, otherwise a refresh replaces the cached
+                                // profile with new ops and grows its vault backup.
+                                resource.remove_propval(crate::urls::CREATED_AT)?;
+                                let doc = crate::loro::AtomicLoroDoc::new();
+                                doc.set_peer_id(0)?;
+                                let ordered: std::collections::BTreeMap<_, _> =
+                                    resource.get_propvals().iter().collect();
+                                for (property, value) in ordered {
+                                    doc.set_property(property, value)?;
+                                }
+                                doc.doc()
+                                    .commit_with(loro::CommitOptions::new().timestamp(0));
+                                resource.apply_state_doc(doc)?;
                                 return Ok(resource);
                             }
                         }

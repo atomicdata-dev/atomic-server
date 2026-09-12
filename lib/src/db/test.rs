@@ -15,6 +15,24 @@ use tokio::sync::OnceCell;
 
 static DB: OnceCell<Mutex<Db>> = OnceCell::const_new();
 
+#[tokio::test]
+async fn synthetic_agent_reads_have_stable_history_without_persisting() {
+    let db = Db::init_temp("synthetic_agent_read").await.unwrap();
+    let agent = crate::agents::Agent::new(None).unwrap();
+    let first = db.get_resource(&agent.subject).await.unwrap();
+    let second = db.get_resource(&agent.subject).await.unwrap();
+    assert!(first.get(urls::CREATED_AT).is_err());
+    assert_eq!(
+        serde_json::to_value(first.get_propvals()).unwrap(),
+        serde_json::to_value(second.get_propvals()).unwrap()
+    );
+    assert_eq!(
+        first.build_state_doc().unwrap().doc().oplog_vv(),
+        second.build_state_doc().unwrap().doc().oplog_vv()
+    );
+    assert!(!db.has_stored_resource(&agent.subject));
+}
+
 /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk and throw errors.
 /// Note that not all behavior can be properly tested with a shared database.
 /// If you need a clean one, juts call init("someId").

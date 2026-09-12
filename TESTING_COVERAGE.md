@@ -513,6 +513,12 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `client-db.worker.test.ts` requires vault cursor commits to flush before the
+  worker acknowledges backup completion, and propagates flush failures. The
+  SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.
+- `synthetic_agent_reads_have_stable_history_without_persisting` checks that
+  fallback agent lookups neither invent creation timestamps nor generate new
+  CRDT history or persist a resource merely by reading it.
 - `client-db.test.ts` verifies that cold worker initialization does not steal
   its own Web Lock or emit a false ghost-leader warning.
 - `store.private-drive.test.ts` verifies that linking a private drive on a
