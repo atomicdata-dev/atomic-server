@@ -885,3 +885,5 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `e2e.spec.ts` verify Continue remains clickable while feedback is offered.
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
+
+`prepareDriveSharing.test.ts` covers verified local transition before peer invitation, rejection on failed verification, preservation of an enrolled drive connection, and isolation from another drive enrollment. `local-drive-copy.test.ts` covers missing history, incomplete inventory, and missing or corrupt attachments. Full sharing UI acceptance remains pending.
