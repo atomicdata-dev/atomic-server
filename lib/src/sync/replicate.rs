@@ -470,7 +470,7 @@ mod tests {
                 protocol::encode_sync_diff(
                     &drive,
                     &[],
-                    &[drive.clone()],
+                    std::slice::from_ref(&drive),
                     &[],
                     &Default::default(),
                     &Default::default(),
