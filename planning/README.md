@@ -59,6 +59,7 @@ browser flow; standalone recovery remains self-managed.
 | [`device-pairing.md`](./device-pairing.md) | **Proposal.** One-scan pairing; QR is routing only (no secret). C0 and M6 closed. Remaining: extra-workspace inventory, M4 (carried over from the field test). |
 | [`json-ad-compact.md`](./json-ad-compact.md) | **Phase 1–2 shipped** (resolver, tool I/O, context providers). Remaining: rebase `create_table.rows` on `fromCompact`; server `format=compact`. |
 | [`table-view-filters.md`](./table-view-filters.md) | **Views shipped** — Default View (filters, sort, columns, operators) and the multi-view switcher (`TableViewTabs`, `?view=`). Remaining: index-accelerated range scans. |
+| [`unified-templates.md`](./unified-templates.md) | **Proposal.** One resource-template model for tables, drive onboarding, real demos, AI and vertical marketing. |
 | [`table-templates-and-mini-apps.md`](./table-templates-and-mini-apps.md) | **Partial.** Steps 3–6 shipped (computed columns, aggregates, assistant tools, catalogue). Remaining: derived columns in filters/aggregates. |
 | [`dashboards.md`](./dashboards.md) | **First slice shipped.** Remaining: the sixth action verb, parameters, reaching a dashboard from its table. |
 | [`content-i18n.md`](./content-i18n.md) | **LocalizedText + template locales shipped.** Remaining: TranslationsBar, `useTranslation`, `/query` `lang`, search language filter. |

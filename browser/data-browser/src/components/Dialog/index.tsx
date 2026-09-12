@@ -237,9 +237,9 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             )}
             {children}
             {show && rootWelcomeChromeHidden && !hideOnboardingFeedback && (
-              <FeedbackCorner>
+              <DialogFeedback>
                 <FeedbackMenuItem floating />
-              </FeedbackCorner>
+              </DialogFeedback>
             )}
           </DropdownContainer>
         </PopoverContainer>
@@ -276,6 +276,13 @@ export const DialogActions: DialogSlotComponent = ({ children, ...props }) => (
 Dialog.Title = DialogTitle;
 Dialog.Content = DialogContent;
 Dialog.Actions = DialogActions;
+
+// Keep feedback in layout: transformed dialogs establish a containing block
+// for fixed descendants, which otherwise overlap the primary footer action.
+const DialogFeedback = styled.div`
+  grid-column: 1 / -1;
+  justify-self: end;
+`;
 
 const CloseButtonSlot = styled(Slot)`
   align-self: center;
@@ -421,10 +428,4 @@ const TitleSlot = styled(Slot)`
     margin: 0;
     line-height: 1.25;
   }
-`;
-
-const FeedbackCorner = styled.div`
-  position: fixed;
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  left: max(1rem, env(safe-area-inset-left));
 `;

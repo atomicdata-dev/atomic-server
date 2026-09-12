@@ -1,6 +1,8 @@
 import { createLazyRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
+import { useSettings } from '../helpers/AppSettings';
+import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { useStore } from '@tomic/react';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../helpers/navigation';
@@ -23,6 +25,7 @@ let inFlight: Promise<void> | null = null;
  */
 const DemoRoute: React.FC = () => {
   const store = useStore();
+  const { setSideBarLocked } = useSettings();
   const navigate = useNavigateWithTransition();
   const [error, setError] = useState<Error | undefined>();
   const startedRef = useRef(false);
@@ -50,6 +53,7 @@ const DemoRoute: React.FC = () => {
     inFlight = (async () => {
       const { startDemoWorkspace } = await import('../chunks/Demo/startDemo');
       const manifest = await startDemoWorkspace(store);
+      if (window.innerWidth < SIDEBAR_TOGGLE_WIDTH) setSideBarLocked(true);
       navigate(constructOpenURL(manifest.welcomeDoc));
     })()
       .catch(e => {

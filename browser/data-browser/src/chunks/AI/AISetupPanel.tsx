@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, useDialog } from '@components/Dialog';
 import { LocalOllamaDiscovery } from '@components/AI/LocalOllamaDiscovery';
 import React, { Suspense, useEffect, useState } from 'react';
 import styled from 'styled-components';
@@ -62,7 +63,10 @@ const getInitialStep = (hasProvider: boolean): SetupStep => {
   return 'providers';
 };
 
-export const AISetupPanel: React.FC = () => {
+export const AISetupPanel: React.FC<{ onDismiss?: () => void }> = ({
+  onDismiss,
+}) => {
+  const [dismissed, setDismissed] = useState(false);
   const {
     openRouterApiKey,
     setOpenRouterApiKey,
@@ -130,7 +134,7 @@ export const AISetupPanel: React.FC = () => {
     isProviderAvailable,
   ]);
 
-  if (setupComplete) {
+  if (setupComplete || dismissed) {
     return null;
   }
 
@@ -164,7 +168,12 @@ export const AISetupPanel: React.FC = () => {
 
   if (step === 'model') {
     return (
-      <Overlay>
+      <SetupDialog
+        onDismiss={() => {
+          setDismissed(true);
+          onDismiss?.();
+        }}
+      >
         <Panel>
           <Title>Choose a default model</Title>
           <Subtle>
@@ -201,12 +210,17 @@ export const AISetupPanel: React.FC = () => {
             </Button>
           </ActionsRow>
         </Panel>
-      </Overlay>
+      </SetupDialog>
     );
   }
 
   return (
-    <Overlay>
+    <SetupDialog
+      onDismiss={() => {
+        setDismissed(true);
+        onDismiss?.();
+      }}
+    >
       <Panel>
         <Title>Connect a model to use Atomic Assistant</Title>
         <Subtle>
@@ -265,33 +279,31 @@ export const AISetupPanel: React.FC = () => {
           Continue
         </Button>
       </Panel>
-    </Overlay>
+    </SetupDialog>
   );
 };
 
-const Overlay = styled.div`
-  position: absolute;
-  inset: 0;
-  backdrop-filter: blur(4px);
-  background-color: ${p =>
-    p.theme.darkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)'};
-  border-radius: ${p => p.theme.radius};
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  overflow-y: auto;
-`;
+/** Use the app-wide portal, backdrop, focus management and dismissal rules. */
+function SetupDialog({
+  children,
+  onDismiss,
+}: React.PropsWithChildren<{ onDismiss: () => void }>) {
+  const [dialogProps, showDialog] = useDialog({ onCancel: onDismiss });
+  useEffect(() => {
+    showDialog();
+  }, [showDialog]);
+
+  return (
+    <Dialog {...dialogProps} width='36rem'>
+      <DialogContent>{children}</DialogContent>
+    </Dialog>
+  );
+}
 
 const Panel = styled(Column)`
-  max-width: 34rem;
   width: 100%;
+  min-width: 0;
   gap: 1rem;
-  background-color: ${p => p.theme.colors.bg};
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  padding: 1.25rem;
-  box-shadow: ${p => p.theme.boxShadowSoft};
 `;
 
 const ActionsRow = styled(Row)`

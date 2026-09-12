@@ -1,0 +1,54 @@
+/* Shared SaaS and onboarding surface. Explicit app theme overrides system theme. */
+.atomic-product-background {
+  --shell-gradient: linear-gradient(
+    135deg,
+    #fafafa 0%,
+    #f2f4f8 46%,
+    #eef1f6 100%
+  );
+  --shell-grid-line: rgba(0, 0, 0, 0.045);
+  --shell-vignette: rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow-x: hidden;
+  background:
+    linear-gradient(180deg, var(--shell-vignette), transparent 280px),
+    var(--shell-gradient);
+}
+@media (prefers-color-scheme: dark) {
+  .atomic-product-background:not([data-product-theme='light']) {
+    --shell-gradient: linear-gradient(
+      135deg,
+      #030406 0%,
+      #0b1118 46%,
+      #090909 100%
+    );
+    --shell-grid-line: rgba(255, 255, 255, 0.05);
+    --shell-vignette: rgba(255, 255, 255, 0.045);
+  }
+}
+.atomic-product-background[data-product-theme='dark'] {
+  --shell-gradient: linear-gradient(
+    135deg,
+    #030406 0%,
+    #0b1118 46%,
+    #090909 100%
+  );
+  --shell-grid-line: rgba(255, 255, 255, 0.05);
+  --shell-vignette: rgba(255, 255, 255, 0.045);
+}
+.atomic-product-background::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(var(--shell-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--shell-grid-line) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black, transparent 76%);
+}
+.atomic-product-background > * {
+  position: relative;
+  z-index: 1;
+}
