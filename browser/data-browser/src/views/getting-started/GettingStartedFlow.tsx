@@ -17,6 +17,7 @@ import { useSettings } from '../../helpers/AppSettings';
 import { saveAgentToIDB } from '../../helpers/agentStorage';
 import { beat } from '../../helpers/deviceLock';
 import { fetchPrivateDriveSubject } from '../../helpers/privateDrive';
+import { connectHostedDrive } from '../../helpers/managed/reconcile';
 import { deviceHasDriveData } from '../../helpers/driveData';
 import { withDeadline } from '../../helpers/withDeadline';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -129,7 +130,7 @@ export function GettingStartedFlow({
   useWelcomeLayoutEffect();
   const store = useStore();
   const navigate = useNavigateWithTransition();
-  const { setAgent, setDrive, baseURL } = useSettings();
+  const { setAgent, setDrive, setServer, baseURL } = useSettings();
   // When the connected node is "managed" (reports a dashboard/portal URL via
   // /node-info), account creation goes through the portal (email
   // verification). Self-hosted / FOSS nodes report nothing here, so we keep the
@@ -643,6 +644,11 @@ export function GettingStartedFlow({
           undefined,
         ));
 
+      // Resolve hosting before a failed read sends this device to Cloud Vault.
+      const hosted = target
+        ? await connectHostedDrive(store, target, setServer)
+        : false;
+
       // A secret restores who you are, not what you have. So the app only
       // opens once the workspace is here to read: opening one we cannot read
       // shows an empty shell wearing its name, which reads as data loss.
@@ -650,9 +656,9 @@ export function GettingStartedFlow({
       // Asked before anything writes the drive, deliberately. Materializing it
       // first — which is what this flow used to do — makes every "do I have my
       // data?" check answer yes about data the device does not have.
-      const canRead = (subject: string) =>
+      const canRead = (subject: string, refresh = hosted) =>
         withDeadline(
-          deviceHasDriveData(store, subject),
+          deviceHasDriveData(store, subject, { refresh }),
           SIGN_IN_LOOKUP_TIMEOUT_MS,
           false,
         );
@@ -696,7 +702,7 @@ export function GettingStartedFlow({
         );
 
         if (restored.status === 'restored') {
-          hasData = await canRead(target);
+          hasData = await canRead(target, false);
         } else if (restored.status === 'no-backup') {
           vaultReason = restored.reason;
         } else {

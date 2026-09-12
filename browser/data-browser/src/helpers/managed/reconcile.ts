@@ -1,4 +1,5 @@
 import { core } from '@tomic/react';
+import { withDeadline } from '../withDeadline';
 import { PRODUCT_NAME } from './product';
 import {
   clearManagedAccountBinding,
@@ -156,14 +157,13 @@ export type ServerReconcileResult =
  * stale). `enrollment.http_origin` is the source of truth for "where does
  * this drive actually live right now."
  */
-export async function evaluateServerReconciliation(
-  currentServerUrl: string,
+async function resolveHostedDriveOrigin(
   currentDriveSubject: string | undefined,
-): Promise<ServerReconcileResult> {
+): Promise<string | undefined> {
   const managedAccount = await getManagedAccount().catch(() => null);
 
   if (!managedAccount) {
-    return { ok: true };
+    return undefined;
   }
 
   const enrollments = await getManagedEnrollments().catch(
@@ -189,15 +189,59 @@ export async function evaluateServerReconciliation(
       ? withOrigin[0]
       : undefined;
 
-  if (!match?.http_origin) {
-    return { ok: true };
+  if (!match?.http_origin) return undefined;
+
+  try {
+    const url = new URL(match.http_origin);
+
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : undefined;
+  } catch {
+    return undefined;
   }
+}
+
+/** Connect before sign-in checks data, rather than waiting for the app gate. */
+export async function connectHostedDrive(
+  store: {
+    setServerUrl(url: string): void;
+    unregisterLocalOnlyDrive(drive: string): void;
+    waitForServerConnected(timeoutMs: number): Promise<boolean>;
+  },
+  drive: string,
+  persistServer: (url: string) => void,
+  lookupTimeoutMs = 8_000,
+): Promise<boolean> {
+  // Only race the read: a late lookup must never switch an already restored session.
+  const origin = await withDeadline(
+    resolveHostedDriveOrigin(drive),
+    lookupTimeoutMs,
+    undefined,
+  );
+
+  if (!origin) return false;
+
+  store.unregisterLocalOnlyDrive(drive);
+  store.setServerUrl(origin);
+  persistServer(origin);
+  // Let the first resource/query use WS; HTTP remains available if WS cannot connect.
+  await store.waitForServerConnected(3_000);
+
+  return true;
+}
+
+export async function evaluateServerReconciliation(
+  currentServerUrl: string,
+  currentDriveSubject: string | undefined,
+): Promise<ServerReconcileResult> {
+  const origin = await resolveHostedDriveOrigin(currentDriveSubject);
+
+  if (!origin) return { ok: true };
 
   let expectedOrigin: string;
   let actualOrigin: string;
 
   try {
-    expectedOrigin = new URL(match.http_origin).origin;
+    expectedOrigin = new URL(origin).origin;
     actualOrigin = new URL(currentServerUrl).origin;
   } catch {
     // A malformed URL on either side isn't this function's problem to fix.

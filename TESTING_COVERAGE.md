@@ -895,6 +895,12 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
 
+Session restore routing: `helpers/managed/reconcile.test.ts` covers connecting the
+exact hosted drive before availability checks, clearing local-only routing,
+skipping Pending/Disabled placements and other drives, and ignoring discovery
+that completes after its deadline. Staging phone restore latency and end-to-end
+WebSocket query delivery remain unverified.
+
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
 responses open to verify concurrent downloads are bounded at four and that
 reverse completion preserves listing order at import. Existing progress and
