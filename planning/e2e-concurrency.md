@@ -292,3 +292,27 @@ passes. The default stays false until full-suite acceptance. Worker and retry
 defaults also stay unchanged. Mancave's runner service is active. The earlier
 12-worker run was interrupted for the requested merge before completing and is
 not a valid performance result. No maximum reliable worker count is established.
+
+
+## Harness simplification
+
+User requested less permanent harness complexity. Earlier measurements remain
+historical evidence; retained artifacts are not deleted.
+
+- [x] Replace local matrix scheduling with one stack and Playwright arguments.
+- [x] Remove custom build hashes, host reporter and acceptance summarizer.
+- [x] Keep process ownership, checkout locking, fresh data and private binaries.
+- [x] Document explicit --skip-build and native reports/shell-loop comparisons.
+- [x] Verify the simplified launcher with a real server/browser and Node checks.
+
+Local builds use normal Cargo/pnpm behavior. --skip-build explicitly reuses
+artifacts without claiming freshness. Dagger owns container caching and isolated
+server shards. Deleted benchmark helpers remain available in Git history.
+
+Refactor validation: all eight remaining Node harness checks pass; E2E typecheck,
+lint and formatting pass (existing lint warnings remain). The simplified launcher
+ran all seven dashboard tests with two workers and zero retries in 1.3 minutes,
+using the existing optimized binary through explicit --skip-build. This validates
+launcher/reporting/teardown, not a rebuilt full-suite acceptance result.
+Artifacts: Mancave .e2e-runs/2026-09-12T08-40-34.904Z-VO9ZNy.
+The new cold-build and separate-origin preview paths have not been rerun.

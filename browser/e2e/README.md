@@ -1,97 +1,65 @@
-## Reproducible local production run
+## Local production E2E
 
-From `browser/`, run `pnpm test-e2e:local`. It installs locked dependencies,
-builds every JS package and WASM, then builds the native server from this
-checkout. A private binary copy lives in each run directory, avoiding shared
-`target/debug` process-name cleanup from other jobs. It serves the embedded production app and API from the same
-`atomic.localhost` origin on a free port, matching CI, with a fresh database.
-Use `--preview` to exercise the separate-origin Vite preview instead. It runs Chromium with
-a conservative hardware-aware budget (at most two workers by default) and zero retries. It stops only its own process groups. Build logs,
-test data, failure traces and the HTML report remain in the git-ignored `.e2e-runs/` directory.
-
-Prerequisites: the repository's Rust toolchain, `wasm32-unknown-unknown`,
-`cargo-run-bin` (for the pinned wasm-pack), Node and pnpm. The first build may
-be slow. Later runs check a build cache keyed by product file contents (including
-untracked files), Node/pnpm/Rust versions and build environment.
-Reusing a build also requires matching checksums for the server binary, package
-outputs, frontend and WASM. Spec-only edits can reuse those artifacts; changed
-or missing artifacts require a rebuild. WASM has a narrower Rust-input cache,
-so frontend-only changes rebuild JS without rerunning wasm-pack/wasm-opt.
-The runner only sets `SKIP_WASM_BUILD=1` after building or verifying that WASM.
-Dependency installation still validates
-the workspace lockfile. Generated sites use pnpm's package cache with
-`--prefer-offline` and retain separate install/build directories. Generated build
-processes default to at most two workers (`ATOMIC_TEMPLATE_BUILD_WORKERS` overrides).
-The editor disconnects after its saves settle while the generated site builds.
-Generated Next.js/Svelte sites use unique temporary directories and OS-assigned
-ports. Teardown terminates their owned process groups; worker IPC disconnect
-also shuts them down after an interrupted test. No port-owner lookup is used.
-
-Pass Playwright filters directly, e.g. `pnpm test-e2e:local --grep @smoke`.
-`PLAYWRIGHT_WORKERS` can override concurrency. Cloud Vault integration needs a
-real portal explicitly selected with `ATOMIC_VAULT_PORTAL_URL`; this isolated
-runner skips those tests when it is unset or unavailable, and never discovers
-a portal from an unrelated local task. Mocked managed-account tests do not
-require that portal.
-
-### Worker/shard experiments
+From `browser/`, run `pnpm test-e2e:local`. The launcher installs locked packages,
+builds the app/WASM and optimized server, starts a fresh isolated stack, invokes
+Playwright, and stops its owned processes. Cargo and pnpm keep their standard
+caches; container CI uses Dagger caching. There is no custom build-hash cache.
 
 ```sh
-# One build, fresh server/data per setting and repetition; no test filters.
-pnpm test-e2e:local --matrix=1,2,4,8,12,2x4 --repeat=5
-node e2e/scripts/summarize-matrix.mjs ../.e2e-runs/<run-directory>
+pnpm test-e2e:local --workers=4
+# Explicitly reuse artifacts for test-only edits:
+pnpm test-e2e:local --skip-build dashboard.spec.ts --workers=2
 ```
 
-Entries are `workers` or `workers x shards`: `8` shares one server among eight
-workers, while `2x4` runs two workers against each of four isolated servers.
-Separate-origin preview supports one server per run. Counts are positive integers;
-`PLAYWRIGHT_WORKERS` overrides the conservative automatic default for ordinary
-runs. Matrix mode rejects test filters and overrides, and always disables retries.
-This matrix covers the complete **Chromium project**, like the local runner;
-it does not establish Firefox/WebKit support. Opt-in tests remain listed with
-their skip annotations, including real portal and profiling requirements.
+`--skip-build` skips builds and dependency installation. Rebuild after product,
+lockfile, toolchain or build-environment changes. It makes no freshness guarantee.
+Browser installation still uses `--no-remove` to preserve other jobs' versions.
 
-`run.json` separates install/build, service startup, test time and total elapsed
-time. Each shard retains HTML/JSON reports, complete expected/executed test IDs,
-per-test initialization durations and the slowest tests. Host samples include
-CPU use, free/available memory, Linux pressure stalls, process CPU/RSS snapshots,
-reporter event-loop delay and `/server` latency. Failure attachments also include
-recent host samples and bounded renderer long-task/timer-delay observations.
-In containers, process snapshots describe that container's visible processes;
-server latency measures the service but is not a server CPU profile.
+The embedded app/API share an `atomic.localhost` origin on a free port.
+`--preview` uses Vite on another free port. Preview builds embed the API port,
+so preview must rebuild; it cannot use --skip-build. `ATOMIC_E2E_CARGO_PROFILE`
+accepts `dev`, `e2e` (default) or `release`. Prerequisites: the repository Rust
+toolchain, wasm32-unknown-unknown, cargo-run-bin, Node and pnpm.
 
-The summary requires five complete zero-retry passes with matching test accounting
-and the same clean source commit at the start, after each run and at the end
-before marking a setting accepted. Inspect all skip
-reasons; a green summary alone does not excuse lost coverage or unexplained skips.
-Record concurrent builds/CI work when interpreting saturation and speedup.
-A checkout lease prevents one local runner from rebuilding package outputs while
-another run uses them; use separate worktrees for concurrent local runs.
+Each invocation retains separate data/config/cache, a private server binary and
+logs in `.e2e-runs/`. A checkout lock prevents overlapping local runs; use separate
+worktrees for concurrent builds. Generated Next/Svelte projects retain unique
+paths, ephemeral ports and owned process groups. Their builds default to two
+workers (`ATOMIC_TEMPLATE_BUILD_WORKERS` overrides). No global process killing.
 
-High-worker defaults remain **unvalidated** pending issue #1461's repeated matrix.
-CI keeps its explicit aggregate budget: Mancave full uses 4 shards × 2 workers,
-hosted uses 2 × 1; other build/unit jobs run concurrently. Dagger `ci` and `end-to-end` accept
-`--playwright-workers`, `--playwright-shards`, `--playwright-retries` and
-`--playwright-clone-sessions` for
-controlled experiments; 0 workers/shards retain the profile and -1 retries
-retains its retry policy. Use `--playwright-retries=0` for acceptance and include
-all simultaneous build/unit jobs when interpreting the printed aggregate budget. Do not interpret the
-ability to request 8 or 12 workers as evidence those settings are reliable.
-The active experiments and caching decisions live in
+Playwright owns worker counts, filters, repetitions, sharding and reports. The
+launcher defaults to Chromium, zero retries, failure traces and line/HTML/JSON
+reporters; normal Playwright arguments can override these. `run.json` retains
+build/startup/test phase durations, and `report.json` contains test outcomes,
+skips and step timings. Cloud Vault tests need an explicit
+`ATOMIC_VAULT_PORTAL_URL`; unrelated local portals are never discovered.
+
+### Comparing concurrency
+
+Use ordinary shell loops for independent runs:
+
+```sh
+pnpm test-e2e:local --workers=1 --retries=0
+for workers in 2 4 8 12; do
+  for repetition in 1 2 3 4 5; do
+    pnpm test-e2e:local --skip-build --workers="$workers" --retries=0 || exit
+  done
+done
+```
+
+Keep source and artifacts unchanged. Each invocation starts a fresh server.
+Playwright's `--repeat-each=5` repeats within one server lifetime instead, useful
+for reproducing flakes. Review expected test counts, failures and skips in native
+reports. No custom script declares acceptance. Record host load with standard
+tools such as vmstat/pidstat; #1461 still requires repeated clean full-suite runs.
+
+Dagger owns isolated server shards and shared container builds. Its `ci` and
+`end-to-end` commands accept `--playwright-workers`, `--playwright-shards`,
+`--playwright-retries=0` and optional `--playwright-clone-sessions`. Mancave's CI
+budget remains 4 shards × 2 workers; hosted uses 2 × 1. Other CI jobs share the
+host. Check Pick runner: repository overrides may force hosted even when Mancave
+is online. High-worker reliability remains unvalidated. See
 [`planning/e2e-concurrency.md`](../../planning/e2e-concurrency.md).
-
-The isolated local runner builds with Cargo's optimized `e2e` profile, matching
-CI while preserving debug assertions and overflow checks. Its first native build
-costs more than a debug build; subsequent runs reuse verified artifacts.
-`ATOMIC_E2E_CARGO_PROFILE=dev` explicitly selects the slower debug server for
-iteration, and `release` selects the production profile. Profile changes
-invalidate the native build cache without invalidating the WASM cache.
-
-Each Dagger shard has a unique runtime identity and hostname so Dagger cannot
-deduplicate its writable server state with another shard. The server binary
-build remains shared. Profile cloning defaults to false; opt in explicitly for
-comparisons. Repository runner overrides can still force hosted execution even
-when Mancave is online; check the Pick runner job before interpreting CI timings.
 
 ### Cloned-session experiment
 
@@ -108,7 +76,6 @@ database and IndexedDB signing keys, a distinct device ID, and a fresh project
 drive. Copy-on-write is requested where the filesystem supports it; hard links
 are never used. Profiles are removed during teardown and live under the run's
 output directory so interrupted runs do not scatter state into global temp paths.
-Seed timings are retained separately from per-test restore/drive setup timings.
 Do not use this fixture for account settings, personal-drive lists, authorization,
 backup/discovery identity, or cold-start/storage tests: those contracts need a
 fresh identity or fresh disk. Global account searches can also see prior drives.

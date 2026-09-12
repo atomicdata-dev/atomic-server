@@ -34,16 +34,14 @@ Enter retains its explicit handoff into page content.
 `node --experimental-strip-types --test browser/e2e/scripts/*.node.mjs`
 checks process-group ownership with concurrent real HTTP servers, ephemeral
 ports, unrelated-service preservation, startup failure and worker disconnect
-cleanup. It also checks hardware budget validation, build-cache invalidation
-(product/untracked inputs, environment and artifact changes), and rejects
-acceptance summaries with missing executions, failures, retries or dirty sources.
-`browser/e2e` typecheck includes the process fixture and load reporter.
-The harness tests also run through the e2e package's `test` script in the normal
-recursive JS test job; they need Node and Git, not Rust or a browser install.
+cleanup. Additional Node checks cover hardware budgets and checkout locking.
+These run through the E2E package test script in recursive JS tests.
+Playwright provides accounting, reports and step timings. Custom build caches,
+host sampling and matrix-acceptance scripts were removed to simplify maintenance.
 `node --experimental-strip-types --test scripts/e2e-budget.test.mjs` validates
-CI overrides without mutating the profile or its coverage selection.
-`initClientDb.handoff.test.ts` checks that dev-drive can defer anonymous startup
-while still attaching the fresh identity, alongside the identity-handoff guard.
+CI overrides without mutating the profile or coverage selection.
+`initClientDb.handoff.test.ts` checks the deferred anonymous startup and identity
+handoff guard.
 The ontology E2E test gates an earlier instance save's completion while the next
 form is open, catching stale cleanup that empties the new form.
 The existing browser diagnostic/failure-state tests cover bounded retained
