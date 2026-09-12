@@ -885,3 +885,9 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `e2e.spec.ts` verify Continue remains clickable while feedback is offered.
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
+
+Session restore routing: `helpers/managed/reconcile.test.ts` covers connecting the
+exact hosted drive before availability checks, clearing local-only routing,
+skipping Pending/Disabled placements and other drives, and ignoring discovery
+that completes after its deadline. Staging phone restore latency and end-to-end
+WebSocket query delivery remain unverified.
