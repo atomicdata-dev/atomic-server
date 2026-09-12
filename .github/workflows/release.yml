@@ -10,6 +10,13 @@ on:
     tags:
       - v*
 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag whose missing crates should be published
+        required: true
+        type: string
+
 jobs:
   crates:
     name: Publish crates to crates.io
@@ -24,6 +31,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -102,60 +111,34 @@ jobs:
       # visible forever. The 15 version sites share no single source of truth,
       # so nothing else in this pipeline compares them to the tag.
       - name: Version sites must match the tag
-        run: node scripts/bump-version.mjs --check "${GITHUB_REF_NAME#v}"
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node scripts/bump-version.mjs --check "${RELEASE_TAG#v}"
 
-      # Note the ordering risk this job carries: publish-crates walks the
-      # dependency graph, so atomic_lib and atomic-cli go out before
-      # atomic-server. A failure on the last one leaves the first two published
-      # at a version that can never be reused — crates.io only yanks, it does
-      # not delete. Anything that can fail the whole job belongs above this
-      # step, not inside it.
-      - name: publish crates
-        uses: katyo/publish-crates@v1
-        with:
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          # `--allow-dirty` is required by the assets step above, not sloppiness.
-          #
-          # server/assets_tmp is gitignored, and cargo refuses to package a file
-          # that `include` names but git does not track — it reports the whole
-          # tree as having uncommitted changes and aborts. Since the assets are
-          # a build output that must nevertheless ship inside the crate, the two
-          # rules cannot both hold, and this is the one to relax.
-          #
-          # It does mean the .crate is not byte-reproducible from the tag alone;
-          # it is the tag plus a frontend build. That was already true of the
-          # 0.40.1 crate on crates.io, just implicitly.
-          #
-          # The blast radius is contained: the only untracked thing in the tree
-          # is assets_tmp, because this job builds nothing else. Anything that
-          # starts writing into the working tree before this step widens that,
-          # and should be looked at rather than waved through.
-          args: --allow-dirty
-          # publish-crates' repo check cannot work on an annotated tag, and
-          # this workflow only ever runs on one.
-          #
-          # For any crate already published at the current version it asks the
-          # GraphQL API for the last commit touching that crate's directory,
-          # via `repository.ref(qualifiedName: $ref).target`, matching
-          # `... on Commit`. On a tag push $ref is refs/tags/vX -- and an
-          # annotated tag's target is a Tag object, not a Commit. The fragment
-          # does not match, `history` comes back undefined, and the action dies
-          # destructuring it. (A lightweight tag would resolve straight to a
-          # commit and slip through, which is a poor reason to stop annotating
-          # release tags.)
-          #
-          # Nothing is lost. The check exists to catch "you changed the code but
-          # forgot to bump the version", which the `--check` step above already
-          # does properly: it compares every declared version against the tag
-          # being released, rather than inferring intent from commit dates.
-          #
-          # This only bites once something IS published at this version, so it
-          # stays invisible until a release partially completes and gets re-run
-          # -- which is exactly when you least want a new failure mode.
-          check-repo: false
+      # Publish directly: katyo/publish-crates@v1 runs cargo update between
+      # crates, replacing the dependency graph that passed CI. Retain the lock
+      # and skip existing versions so a partial release can safely resume.
+      - name: Publish missing crates with the validated dependency lock
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          for crate in atomic_lib atomic-cli atomic-server; do
+            curl --fail --silent --show-error --retry 3 \
+              "https://index.crates.io/at/om/$crate" -o /tmp/release-crate-index
+            if python3 -c 'import json,sys; sys.exit(not any(json.loads(line)["vers"] == sys.argv[1] for line in open(sys.argv[2])))' "$version" /tmp/release-crate-index; then
+              echo "$crate $version is already published; skipping"
+              continue
+            fi
+            cargo publish -p "$crate" --locked --allow-dirty
+          done
 
   # I'd like to skip this one, as the publish-tauri action already creates a release
   create-release:
+    if: github.event_name == 'push'
     name: Create Release on GitHub
     runs-on: ubuntu-latest
     permissions:
@@ -195,6 +178,7 @@ jobs:
   # Separate job rather than another matrix leg: one Dagger invocation emits all
   # three targets, and it needs no Node/Rust toolchain on the runner.
   upload-musl-assets:
+    if: github.event_name == 'push'
     name: Cross-compile and upload the static musl binaries
     # Needs the release to exist before anything can be attached to it.
     needs: create-release
@@ -234,6 +218,7 @@ jobs:
           gh release upload "${GITHUB_REF_NAME}" ./release-assets/* --clobber
 
   upload-assets:
+    if: github.event_name == 'push'
     strategy:
       matrix:
         os:
