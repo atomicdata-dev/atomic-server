@@ -1,5 +1,10 @@
 import { test, expect, type Page } from './fixtures';
-import { before, FRONTEND_URL, SERVER_URL } from './test-utils';
+import {
+  before,
+  FRONTEND_URL,
+  SERVER_URL,
+  nodeReachableServerUrl,
+} from './test-utils';
 
 /**
  * The Sync page's device-facing surface: the pairing code a user scans, and
@@ -33,7 +38,9 @@ test.describe('sync page devices', () => {
     let managedInfoRequests = 0;
     let accountConnected = false;
     await page.route('**/server', async route => {
-      const response = await route.fetch();
+      const response = await route.fetch({
+        url: nodeReachableServerUrl(route.request().url()),
+      });
       const body = await response.json();
       managedInfoRequests += 1;
       await route.fulfill({

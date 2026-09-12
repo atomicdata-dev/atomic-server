@@ -362,7 +362,9 @@ faster than the product.
 ## Local reproduction and diagnostics
 
 `pnpm test-e2e:local` builds JS, WASM and the native backend from the checkout,
-uses fresh data on matching free ports, and retains failure traces. It runs
+serves the embedded SPA and API at one `atomic.localhost` origin on a free port,
+uses fresh data, and retains failure traces. `--preview` opts into separate-origin
+Vite preview; it previously missed the managed-portal CI regression. It runs
 with zero retries by default. External Cloud Vault tests require an explicit
 `ATOMIC_VAULT_PORTAL_URL`; managed mocks do not depend on a portal.
 

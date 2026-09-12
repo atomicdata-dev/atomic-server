@@ -730,9 +730,20 @@ check; real refresh/query timing remains a browser acceptance check.
   managed, and managed-with-dev-drive modes. Expected mocked 401 responses and the
   intentional service-worker block are declared only in the tests causing them.
 - `pnpm test-e2e:local` builds JS, WASM and the native backend from the checkout,
-  uses fresh test data and matching free ports, and preserves its report/build logs.
+  serves the embedded app and API from one `atomic.localhost` origin with fresh data
+  on a free port, and preserves its report/build logs. `--preview` opts into Vite.
   Failure traces are retained. Real Cloud Vault integration requires an explicitly
   supplied `ATOMIC_VAULT_PORTAL_URL`; the runner never discovers unrelated portals.
+
+## Boolean reads and managed development origins
+
+- `reactBoolean.test.ts` runs actual hook renders and mount effects, checking that
+  missing Boolean values remain absent while loading and after loading. Reads must
+  not create Loro writes that can race incoming snapshots.
+- `managed/api.test.ts` accepts loopback `*.localhost` portal URLs while rejecting
+  lookalike public hosts. Recovery and managed-sync E2Es exercise that CI origin.
+- Device-status route interception uses the Node-reachable service URL, since
+  Chromium host-resolver rules do not configure Node DNS.
 
 ## CI quality and failure evidence
 
