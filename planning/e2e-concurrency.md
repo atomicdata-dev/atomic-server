@@ -425,7 +425,8 @@ Eight-worker reliability and the full acceptance matrix remain open in #1461.
 - [x] Verify E2E-only changes reuse the frontend/embedded-server build. Keep the
   E2E workspace manifest in build inputs, but mount specs only in test consumers.
   Reuse the E2E frontend build for both server assets and test workspace packages.
-- [ ] Repeat any successful candidate before changing CI defaults.
+- [x] Repeat the candidate before considering CI defaults. The repeat failed;
+  defaults remain unchanged and concurrency acceptance remains open.
 
 The first cache probe disproved the initial directory-removal approach: a
 comment-only spec edit rebuilt the frontend and embedded server. Testing a
@@ -436,3 +437,22 @@ mutation probe: frontend and Rust build execs are cached, and the embedded
 server digest stays `b988095c5ae7e117ce3b5369372b3fbe925c36e78fdbd67be3ec3fed132e60ad`.
 Logs: Mancave `/tmp/e2e-cache-final-{baseline,probe}.log`. Temporary spec edits
 were restored. The manifest remains an installation input; lint uses full sources.
+
+Final implementation 6c64e0ec1, repeat with the same four-worker configuration:
+217 passed, one failed, eight existing skips, zero retries. Shards: 12.0m and
+12.9m; complete warm-cache Dagger invocation: 828 seconds (13m48s). Exit codes
+0 and 1. Reports: Mancave `.e2e-runs/four-cloned-2/{3199,3201}/`.
+The pairing-dialog browser/device gate test opened Sync in browser mode, then
+stayed on the splash screen after injecting the simulated Tauri environment and
+reloading. Its unchanged 10-second heading assertion failed. Root cause is not
+established; do not dismiss it as contention or increase the timeout. Trace:
+`.e2e-runs/four-cloned-2/e2e-performance-pairing-trace.zip` on Mancave.
+
+The first successful run and failed repeat establish promising speed, not a
+supported four-worker default. Keep #1461 open. Next work: reproduce the pairing
+reload stall, then complete the fixed-commit reliability matrix under recorded
+host load. Fresh initialization remains a large cost: the first run's clone
+shard had 56 cloned setups (median 3.716s) and 36 fresh setups (median 7.16s),
+while the other shard had 94 fresh setups totaling 636.8s. These are different
+test populations, not a controlled causal comparison. Keep authentication,
+account, personal-drive and cold-storage contracts on fresh contexts.
