@@ -325,3 +325,12 @@ dependency/compiler caches were retained. The full Dagger run exposed a startup
 failure: custom nonce hostnames plus Dagger DNS suffix exceeded the runtime's
 hostname limit. Shards now use Dagger-generated names and retain the stable
 consumer alias. Runtime identity still prevents service deduplication.
+
+
+Full Dagger validation on adb66378b failed three tests: both generated templates
+blocked on the unbundled i18n language property, and the discussion test asserted
+its badge while the post-reload app was still on the startup splash. A bootstrap
+unit reproducer fails before bundling i18n.json and passes after (3/3 tests);
+app typecheck passes. Discussion alone passed five times (39.4s, two workers),
+then was updated to the existing reloadReconnected helper so the badge's unchanged
+15-second assertion starts after reconnect. Full Dagger rerun is required.

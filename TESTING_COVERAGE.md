@@ -15,6 +15,10 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## E2E isolation and performance harness (#1461)
 
+`bootstrap.test.ts` verifies website language properties are ready from bundled
+definitions without fetching atomicdata.dev. The discussion badge test uses the
+shared reconnecting reload helper before asserting device-local unseen state.
+
 A live Dagger service probe confirmed identical definitions share a process,
 while a per-instance runtime environment variable starts a distinct process.
 Shards now vary runtime identity while sharing binary builds. This probe does

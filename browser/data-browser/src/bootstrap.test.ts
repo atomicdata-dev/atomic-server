@@ -23,6 +23,25 @@ describe('bootstrap', () => {
     expect(container?.get(core.properties.incomplete)).toBe(true);
   });
 
+  it('makes website language properties available before network access', () => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    bootstrap(store);
+
+    for (const name of [
+      'language',
+      'translationOf',
+      'defaultLanguage',
+      'languages',
+    ]) {
+      const property = store.resources.get(
+        `https://atomicdata.dev/properties/${name}`,
+      );
+      expect(property, name).toBeDefined();
+      expect(property?.isReady(), name).toBe(true);
+      expect(property?.get(core.properties.datatype), name).toBeDefined();
+    }
+  });
+
   it('leaves the public agent usable without a fetch', () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     bootstrap(store);
