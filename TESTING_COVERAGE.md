@@ -745,6 +745,9 @@ check; real refresh/query timing remains a browser acceptance check.
 - Device-status route interception uses the Node-reachable service URL, since
   Chromium host-resolver rules do not configure Node DNS.
 
+- `e2e.spec.ts` opens two real local drives by URL; switching does not depend
+  on public `atomicdata.dev` hosting or its `/server` discovery endpoint.
+
 ## CI quality and failure evidence
 
 - `failure-state.spec.ts` checks bounded failure metadata and omission of resource
