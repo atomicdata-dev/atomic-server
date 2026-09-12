@@ -43,6 +43,9 @@ export interface OutboxEntry {
   baseVersion?: string;
   lastAttemptAt?: number;
   lastAttemptError?: string;
+  /** In-memory cause, retained on this entry even if a terminal failure drops
+   * it from the queue. Explicit saves hold the entry across a drain. */
+  lastAttemptFailure?: { cause: unknown };
   /** Consecutive failed drain attempts. Drives exponential backoff so a
    *  persistently-failing commit (e.g. a parent not yet synced) stops
    *  hammering the server. Reset to 0 on success. */
@@ -652,12 +655,15 @@ export class LocalOutbox {
 
       try {
         await ctx.drainSubject(live.subject);
+        live.lastAttemptFailure = undefined;
+        live.lastAttemptError = undefined;
         // Success — clear the failure counter. The entry itself is usually
         // already removed by `drainSubject`; this handles the genesis-acked-
         // but-still-dirty leftover case.
         const stillLive = this.entries.get(entry.subject);
         if (stillLive) stillLive.failures = 0;
       } catch (e) {
+        live.lastAttemptFailure = { cause: e };
         // Explicit disconnect cancels the attempt, not the durable write.
         // Keep it queued for reconnect without escalating retry failures.
         if (e instanceof RequestCancelledError) return;
