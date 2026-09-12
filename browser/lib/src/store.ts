@@ -3204,6 +3204,8 @@ export class Store {
         await this.fetchResourceFromServer(subject, opts);
       }
     } catch (e) {
+      if (e instanceof RequestCancelledError) return;
+
       // Server fetch failed with no local data. Surface the actual server
       // error (e.g. 401 Unauthorized) so callers (ErrorPage, GettingStartedFlow)
       // can react correctly. Only fall back to a generic offline message when
@@ -3441,8 +3443,12 @@ export class Store {
           serverURL: this.getServerUrl(),
         });
 
-      if (cancelled)
-        return this.resources.get(normalizedSubject) as Resource<C>;
+      if (cancelled) {
+        const cached = this.resources.get(normalizedSubject);
+        if (cached?.isReady()) return cached as Resource<C>;
+
+        throw new RequestCancelledError(`Resource fetch cancelled: ${subject}`);
+      }
 
       // `fetchResourceHTTP` reports failure by returning an EMPTY resource
       // carrying the error. Applying that when the server was merely
@@ -3688,7 +3694,11 @@ export class Store {
         if (resolved.startsWith('did:ad:agent:')) {
           this.fetchResourceWithLocalFallback(resolved, opts);
         } else {
-          this.fetchResourceFromServer(resolved, opts);
+          this.fetchResourceFromServer(resolved, opts).catch(error => {
+            if (!(error instanceof RequestCancelledError)) {
+              this.failResource(resolved, error);
+            }
+          });
         }
       }
     }
@@ -5888,9 +5898,14 @@ export class Store {
       return Promise.allSettled(promises.flat());
     };
 
-    const resource = await this.getResource(subject);
-
-    await loadResourceTreeInner(resource, treeTemplate);
+    try {
+      const resource = await this.getResource(subject);
+      await loadResourceTreeInner(resource, treeTemplate);
+    } catch (error) {
+      // Preloading is optional work for a page that may already be leaving.
+      // Keep real fetch failures visible, but stop a cancelled traversal.
+      if (!(error instanceof RequestCancelledError)) throw error;
+    }
   }
 
   /** Creates a random HTTP subject under the given parent URL. */

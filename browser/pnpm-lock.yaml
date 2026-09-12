@@ -29,6 +29,9 @@ overrides:
   markdown-it: '>=14.2.0 <15.0.0'
 
 patchedDependencies:
+  loro-prosemirror@0.4.3:
+    hash: 3fdf214b600605f94f0bc24c2e9e77ac5896e2aec1263e6f318a39044511680e
+    path: patches/loro-prosemirror.patch
   '@reactflow/core':
     hash: 935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e
     path: patches/@reactflow__core.patch
@@ -428,7 +431,7 @@ importers:
         version: 17.0.5
       loro-prosemirror:
         specifier: ^0.4.3
-        version: 0.4.3(loro-crdt@1.12.1)
+        version: 0.4.3(patch_hash=3fdf214b600605f94f0bc24c2e9e77ac5896e2aec1263e6f318a39044511680e)(loro-crdt@1.12.1)
       oxc-transform-react:
         specifier: 0.145.0
         version: 0.145.0
@@ -17004,7 +17007,7 @@ snapshots:
 
   loro-crdt@1.12.1: {}
 
-  loro-prosemirror@0.4.3(loro-crdt@1.12.1):
+  loro-prosemirror@0.4.3(patch_hash=3fdf214b600605f94f0bc24c2e9e77ac5896e2aec1263e6f318a39044511680e)(loro-crdt@1.12.1):
     dependencies:
       lib0: 0.2.117
       loro-crdt: 1.12.1

@@ -17,7 +17,7 @@ import { CollectionBuilder } from './collectionBuilder.js';
 import { CommitBuilder, Commit } from './commit.js';
 import { perfSpan } from './perf-trace.js';
 import { validateDatatype, datatypeTag, Datatype } from './datatypes.js';
-import { isUnauthorized } from './error.js';
+import { isUnauthorized, RequestCancelledError } from './error.js';
 import { commits } from './ontologies/commits.js';
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
@@ -3544,7 +3544,11 @@ export class Resource<C extends OptionalClass = any> {
       closePersist();
     } catch (e) {
       closePersist({ err: e instanceof Error ? e.message : String(e) });
-      console.error('[persistToClientDb] failed:', e);
+
+      if (!(e instanceof RequestCancelledError)) {
+        console.error('[persistToClientDb] failed:', e);
+      }
+
       throw e;
     }
   }

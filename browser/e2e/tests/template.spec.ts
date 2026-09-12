@@ -9,10 +9,13 @@ import {
   openNewResourcePage,
 } from './test-utils';
 import fs from 'node:fs';
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import path from 'node:path';
-import kill from 'kill-port';
-import { log } from 'node:console';
+import {
+  freeTemplatePort,
+  startTemplateProcess,
+  stopTemplateProcess,
+} from './template-process';
 import os from 'node:os';
 
 const EXEC_DIR = path.join(os.tmpdir(), 'atomic-data-template-tests');
@@ -178,17 +181,15 @@ async function setupTemplateSite(
   await execAsync('pnpm update-ontologies', siteType);
 }
 
-function startServer(siteType: string) {
+async function startServer(siteType: string) {
+  const port = await freeTemplatePort();
   // Adjust runtime commands per template
   const command =
     siteType === 'nextjs-site'
-      ? 'pnpm build && pnpm start --port 3000'
-      : 'pnpm run build && NO_COLOR=1 pnpm preview --port 4174';
+      ? `pnpm build && pnpm start --port ${port}`
+      : `pnpm run build && NO_COLOR=1 pnpm preview --port ${port} --strictPort`;
 
-  return spawn(command, {
-    cwd: path.join(EXEC_DIR, siteType),
-    shell: true,
-  });
+  return startTemplateProcess(command, path.join(EXEC_DIR, siteType));
 }
 
 const waitForServer = (
@@ -197,7 +198,6 @@ const waitForServer = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      childProcess.kill(); // Kill the process if it times out
       reject(new Error('Server took too long to start.'));
     }, timeout);
 
@@ -300,9 +300,9 @@ test.describe('Test create-template package', () => {
       'nextjs-site',
     );
 
+    const child = await startServer('nextjs-site');
+
     try {
-      //start server
-      const child = startServer('nextjs-site');
       const url = await waitForServer(child);
 
       // check if the server is running
@@ -324,13 +324,7 @@ test.describe('Test create-template package', () => {
 
       await assertTwoLocaleSite(page, url, false);
     } finally {
-      try {
-        await kill(3000);
-        log('Next.js server shut down successfully');
-        expect(true).toBe(true);
-      } catch (err) {
-        console.error('Failed to shut down Next.js server:', err);
-      }
+      await stopTemplateProcess(child);
     }
   });
 
@@ -354,9 +348,9 @@ test.describe('Test create-template package', () => {
       'sveltekit-site',
     );
 
+    const child = await startServer('sveltekit-site');
+
     try {
-      const child = startServer('sveltekit-site');
-      //start server
       const url = await waitForServer(child);
 
       // check if the server is running
@@ -377,14 +371,7 @@ test.describe('Test create-template package', () => {
 
       await assertTwoLocaleSite(page, url, true);
     } finally {
-      try {
-        await kill(4174);
-        log('SvelteKit server shut down successfully');
-        // We need to wait for the process to be killed and playwright does not wait unless there is another expect coming.
-        expect(true).toBe(true);
-      } catch (err) {
-        console.error('Failed to shut down SvelteKit server:', err);
-      }
+      await stopTemplateProcess(child);
     }
   });
 

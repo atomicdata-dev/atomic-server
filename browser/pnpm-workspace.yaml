@@ -47,3 +47,4 @@ overrides:
 # React 19 replays memo initializers; warn only when the types object changes.
 patchedDependencies:
   '@reactflow/core': patches/@reactflow__core.patch
+  'loro-prosemirror@0.4.3': patches/loro-prosemirror.patch

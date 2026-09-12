@@ -521,6 +521,17 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `template-process.spec.ts` starts a real shell child TCP server and verifies
+  that process-group cleanup releases its port; generated-site tests use
+  independent ports to avoid retry and concurrent-run collisions.
+- `cancelled-lifecycle.test.ts` covers cold-fetch cancellation, optional tree
+  preload cancellation, pending worker destruction, and persistence rejection
+  without misreporting cancellation as a storage fault. Real storage failures
+  still reject and log errors.
+- `loroSelection.test.ts` drives real ProseMirror transactions and Loro imports
+  to verify that resource metadata arriving between keystrokes cannot reorder
+  text. It guards the synchronous-selection patch to `loro-prosemirror` 0.4.3.
+
 - `client-db.worker.test.ts` requires vault cursor commits to flush before the
   worker acknowledges backup completion, and propagates flush failures. The
   SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.

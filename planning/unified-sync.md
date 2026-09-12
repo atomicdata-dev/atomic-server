@@ -305,6 +305,20 @@ that turned out to be already done, or blocked by a finding, say so inline.
 
 ## Outbox modernization
 
+### Full-suite lifecycle regressions (September 12)
+
+- [x] Reproduce cold-fetch cancellation returning an undefined resource and
+  sign-out worker teardown being reported as a storage failure; preserve
+  rejecting save semantics while treating cancellation distinctly.
+- [x] Reproduce text reordering from delayed Loro-ProseMirror cursor restoration
+  (`a|d`, remote metadata, then typing `b` and `c` becoming `acdb`). Patch 0.4.3 to
+  restore selection synchronously; remove the package patch when an upstream
+  release passes `loroSelection.test.ts` without it.
+- [x] Give generated-site tests independent ports and clean up their owned
+  process groups, including descendants after the shell exits. A real-process
+  regression verifies that cleanup releases the listening port.
+- [ ] Verify the document, sign-out and generated-site browser cases in full CI.
+
 The dirty-bit sign-at-drain core is the right design — keep it. What needs work is the
 plumbing around it, which still carries HTTP-era shapes:
 
