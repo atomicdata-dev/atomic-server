@@ -387,11 +387,15 @@ menus, and stale tag-list updates. Drive URL switching now uses real local drive
 search click retries recognize successful overlay closure.
 
 - [x] Reproduce fixes before changing behavior, using unit tests and slowed E2Es.
-- [x] Verify 455 library tests, 853 app tests, and workspace type checks.
+- [x] Verify 457 library tests, 853 app tests, and workspace type checks.
 - [x] Repeat query, menu, and drive switching three times at 4x CPU slowdown;
       repeat the final tag-search fix five times at the same slowdown.
 - [x] Complete embedded-server Chromium run at `a2df542f3`: 212 passed,
       8 skipped, zero retries (15.9 minutes).
+- [x] Integrate develop `424f0a026` and rebuild JS, WASM and server: all 12
+      affected account/cache/managed/tag E2Es pass, as do library units, the
+      synthetic-agent Rust regression, workspace types and full lint. Fix three
+      missing blank lines in the new upstream worker test to restore lint.
 - [ ] Confirm the full hosted suite on PR #1456; a feature-branch smoke pass is
       insufficient to establish that develop's full suite is green.
 - [ ] Retain diagnostics for every failing test in CI. The current 20k log tail
