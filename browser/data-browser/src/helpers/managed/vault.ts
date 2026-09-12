@@ -765,29 +765,46 @@ export async function restoreDrive({
   // Preserve the server's ordering: `download-urls` answers per request and is
   // not required to echo the order back.
   const urlByKey = new Map(downloads.map(d => [d.object_key, d.url]));
-  const fetched: { objectKey: string; sealed: Uint8Array }[] = [];
+  const fetched = new Array<{ objectKey: string; sealed: Uint8Array }>(
+    objects.length,
+  );
+  let next = 0;
+  let completed = 0;
+  let failed = false;
 
-  for (const [index, object] of objects.entries()) {
-    const url = urlByKey.get(object.object_key);
+  // Hide per-object network latency without opening unbounded requests on a
+  // phone. Write by listing index, never completion order.
+  await Promise.all(
+    Array.from({ length: Math.min(4, objects.length) }, async () => {
+      while (!failed && next < objects.length) {
+        const index = next++;
+        const object = objects[index];
 
-    if (!url) {
-      throw new Error(`No download URL issued for ${object.object_key}`);
-    }
+        try {
+          const url = urlByKey.get(object.object_key);
+          if (!url)
+            throw new Error(`No download URL issued for ${object.object_key}`);
+          const response = await fetch(url);
 
-    const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(
+              `Vault download failed for ${object.object_key} (${response.status})`,
+            );
+          }
 
-    if (!response.ok) {
-      throw new Error(
-        `Vault download failed for ${object.object_key} (${response.status})`,
-      );
-    }
-
-    fetched.push({
-      objectKey: object.object_key,
-      sealed: new Uint8Array(await response.arrayBuffer()),
-    });
-    onProgress?.(index + 1, objects.length);
-  }
+          fetched[index] = {
+            objectKey: object.object_key,
+            sealed: new Uint8Array(await response.arrayBuffer()),
+          };
+          completed++;
+          if (!failed) onProgress?.(completed, objects.length);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    }),
+  );
 
   // Every lane, not just this device's: each device appends only to its own,
   // so importing one would silently drop the rest of the drive's history.

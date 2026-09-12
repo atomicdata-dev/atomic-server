@@ -559,6 +559,15 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `collection-page-assemble.test.ts` holds a local query in flight while a
+  member is deleted, then releases the stale result. It checks membership,
+  counts, skipped hydration, optimistic additions, and subsequent readmission.
+- The `delete resource` smoke E2E requires a known sidebar link to disappear
+  before reload; a success toast no longer substitutes for this assertion.
+  Local Chromium verification passed using the existing Rust/WASM builds.
+  One run timed out at the separate child-cascade store-removal barrier;
+  a subsequent run passed, so cascade timing remains an intermittent gap.
+
 - `client-db.worker.test.ts` requires vault cursor commits to flush before the
   worker acknowledges backup completion, and propagates flush failures. The
   SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.
@@ -891,3 +900,8 @@ exact hosted drive before availability checks, clearing local-only routing,
 skipping Pending/Disabled placements and other drives, and ignoring discovery
 that completes after its deadline. Staging phone restore latency and end-to-end
 WebSocket query delivery remain unverified.
+
+Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
+responses open to verify concurrent downloads are bounded at four and that
+reverse completion preserves listing order at import. Existing progress and
+failure checks also pass. Actual staging phone restore latency remains unmeasured.

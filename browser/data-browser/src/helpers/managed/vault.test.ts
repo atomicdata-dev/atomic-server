@@ -548,6 +548,65 @@ describe('backupDrive', () => {
 });
 
 describe('restoreDrive', () => {
+  it('downloads concurrently with a bound and preserves listing order', async () => {
+    const objects = Array.from({ length: 9 }, (_, i) => ({
+      object_id: String(i),
+      object_key: `pack-${i}`,
+    }));
+    let active = 0;
+    let peak = 0;
+    const releases: (() => void)[] = [];
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn(),
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/objects'))
+        return new Response(JSON.stringify(objects));
+      if (url.endsWith('/download-urls'))
+        return new Response(
+          JSON.stringify({
+            downloads: objects.map(o => ({
+              ...o,
+              url: `https://s3.test/${o.object_id}`,
+            })),
+          }),
+        );
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise<void>(resolve => releases.push(resolve));
+      active--;
+
+      return new Response(new Uint8Array([1]));
+    });
+    const restoring = restoreDrive({
+      db,
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+    });
+    await vi.waitFor(() => expect(releases.length).toBeGreaterThan(1));
+
+    while (releases.length < objects.length || active > 0) {
+      releases
+        .splice(0)
+        .reverse()
+        .forEach(release => release());
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (db.vaultImport.mock.calls.length) break;
+    }
+
+    await restoring;
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(
+      db.vaultImport.mock.calls[0][4].map(
+        (o: { objectKey: string }) => o.objectKey,
+      ),
+    ).toEqual(objects.map(o => o.object_key));
+  });
+
   it('reports nothing when the vault is empty', async () => {
     const db: VaultCapableDb = {
       vaultExport: vi.fn(),
