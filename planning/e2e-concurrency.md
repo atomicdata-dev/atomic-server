@@ -388,3 +388,39 @@ at the selected position. Use the existing waitForGridMounted after reload befor
 selecting the row. Keyboard assertions and timeouts are unchanged. E2E typecheck
 passes; focused browser validation and the complete comparison remain pending.
 Trace: Mancave /tmp/e2e-1465-shift-enter-trace.zip.
+
+## Refactor merged: final validation
+
+PR #1465 merged into develop as a608c3308 on 2026-09-12. Final PR head
+e4b8b2570 passed GitHub CI run 34691447496. The complete rebuilt Chromium suite
+on Mancave passed 218 tests with eight existing skips and zero retries, using
+two isolated shards with one worker each and fresh sessions. Both shard exit
+codes were zero; durations were 27.9m and 21.9m, excluding the rebuild.
+Reports and exit codes: Mancave .e2e-runs/dagger-e4b8b2570-hosted/.
+The local wrapper's optional upload failed because the invocation supplied a
+placeholder report token instead of an empty token; test results are separate.
+Future local Dagger runs should supply an empty report token when not uploading.
+
+The corrected positional-insertion spec passed six focused repetitions in
+41.9s with two workers and zero retries, reusing the existing native binary.
+A temporary merge with develop ff545134d passed 109 targeted bootstrap, vault,
+reconciliation, search, store and collection tests. Its tree matches the actual
+merge commit; the full E2E run above tested the PR head. The temporary checkout
+was removed after validation.
+
+Remaining work: separate E2E sources from Dagger build inputs, profile repeated
+ClientDb persistence/initialization, and establish repeatable worker budgets.
+Eight-worker reliability and the full acceptance matrix remain open in #1461.
+
+## Performance follow-up: codex/e2e-performance-1461
+
+- [x] Start an isolated branch from merged develop and preserve final validation.
+- [x] Extract step timings from retained native Playwright reports: 186 fresh
+  setups accumulated 1040.9s. Nested step totals overlap and must not be summed.
+- [ ] Measure two shards x two workers with cloned sessions, zero retries.
+  Four workers may avoid eight-worker CPU contention while retaining seed reuse;
+  this is a hypothesis until the complete suite passes within 15 minutes.
+- [ ] Verify E2E-only changes reuse the frontend/embedded-server build. Keep the
+  E2E workspace manifest in build inputs, but mount specs only in test consumers.
+  Reuse the E2E frontend build for both server assets and test workspace packages.
+- [ ] Repeat any successful candidate before changing CI defaults.
