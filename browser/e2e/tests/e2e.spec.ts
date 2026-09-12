@@ -680,6 +680,19 @@ test.describe('data-browser', async () => {
 
   test('delete resource', smoke, async ({ page }) => {
     await newResource('folder', page);
+    await setTitle(page, 'Deletion parent');
+    await expect(
+      page.getByTestId('sidebar').getByText('Deletion parent', { exact: true }),
+    ).toBeVisible();
+    const parentHref = await page
+      .getByTestId('sidebar')
+      .getByText('Deletion parent', { exact: true })
+      .locator('xpath=ancestor::a[1]')
+      .getAttribute('href');
+    expect(parentHref).toBeTruthy();
+    const sidebarParent = page
+      .getByTestId('sidebar')
+      .locator(`a[href=${JSON.stringify(parentHref)}]`);
     const parentResource = await getCurrentSubject(page);
     // Empty-folder quick-create now renders dedicated "New Folder" / "New
     // Document" buttons instead of a generic "New Resource" + class picker.
@@ -707,39 +720,13 @@ test.describe('data-browser', async () => {
     // some renders before it unmounts, leading to flaky no-ops.
     await page.locator('dialog[open] button:has-text("Delete")').click();
 
-    // Wait for the destroy to actually land before reloading. The reload is
-    // what makes this a barrier and not a nicety: it abandons whatever the
-    // page still had in flight, so returning too early cancels the destroy and
-    // the resource is simply still there afterwards.
-    //
-    // This used to wait on the "Resource deleted" toast alone, which is why
-    // the test was marked flaky. A success toast expires after about two
-    // seconds, so under suite load it can be raised and gone before the first
-    // poll — the delete having worked perfectly — and the assertion then waits
-    // out its timeout on an element that will never come back.
-    //
-    // So accept either signal: the toast if we catch it, or the sidebar having
-    // dropped the folder, which is the same fact in a form that does not
-    // expire. Whichever arrives first, the destroy has been applied.
-    await expect
-      .poll(
-        async () => {
-          const toast = await page.locator('text=Resource deleted').count();
-          const listed = await page
-            .getByTestId('sidebar')
-            .getByText('Folder')
-            .count();
+    // A success toast proves the command completed, not that the UI updated.
+    // Require removal from the mounted sidebar before any reload.
+    await expect(sidebarParent).toHaveCount(0);
 
-          return toast > 0 || listed === 0;
-        },
-        { timeout: 15000, message: 'Destroy never landed' },
-      )
-      .toBe(true);
-
-    // Neither signal above says anything about the child. `destroy()` posts the
-    // parent's commit and awaits it, so the toast means the server applied
-    // THAT; the child is removed by the server's cascade, and this client only
-    // learns of it when that removal arrives over its drive subscription.
+    // Sidebar removal says nothing about the child. `destroy()` posts the
+    // parent's commit and awaits it; the server cascades to the child. This
+    // client learns of that removal through its drive subscription.
     // Until then the child is still in the store, still in the local database,
     // and a reload brings it back.
     await page.waitForFunction(
@@ -755,6 +742,7 @@ test.describe('data-browser', async () => {
     await waitForSynced(page);
 
     await page.reload();
+    await expect(sidebarParent).toHaveCount(0);
     await openSubject(page, nestedResource);
 
     // ErrorPage renders `Could not open <subject>` for missing resources.
