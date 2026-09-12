@@ -153,9 +153,14 @@ const config: PlaywrightTestConfig = {
   // `pnpm test-e2e` and develop/tag CI run the unfiltered suite.
   // Worker count:
   // - local (no CI): 2
-  // - CI without override: 1 (safe for 2-vCPU hosted runners)
-  // - dagger Main on Mancave (12c/64GB WSL): PLAYWRIGHT_WORKERS=3 per
-  //   shard, 4 shards in `.dagger/src/index.ts` (≈12 browsers total)
+  // - CI without override: 1 (safe on the smallest hosted runner)
+  // - dagger Main on Mancave (24 cores / 31GB WSL): PLAYWRIGHT_WORKERS=2 per
+  //   shard, 4 shards in `.dagger/src/index.ts` (≈8 browsers total)
+  //
+  // The figures above were stale in both directions: the box reports 24 cores
+  // and 31GB (not 12c/64GB), and the per-shard width was walked back from 3
+  // to 2 after 12 browsers starved the host. `.dagger/src/index.ts` is the
+  // source of truth for both — see HOST_PROFILES there.
   //
   // Per-shard limit is contention on that shard's atomic-server. Raise
   // via the env var rather than changing the hosted-runner default.
