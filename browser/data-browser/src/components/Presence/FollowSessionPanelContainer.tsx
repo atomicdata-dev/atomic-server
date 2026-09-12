@@ -3,6 +3,7 @@ import { useCurrentAgent, useDrivePresence, useResource } from '@tomic/react';
 import { styled, css } from 'styled-components';
 import { FaNoteSticky, FaVideo } from 'react-icons/fa6';
 import { RightPanel } from '../RightPanel/RightPanel';
+import { useContextualPanel } from '../RightPanel/useContextualPanel';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
 import { useFollow } from './FollowContext';
 import { PresenceAvatarMenu } from './PresenceAvatarMenu';
@@ -23,30 +24,19 @@ const ConferenceRoom = lazy(
  * joined (following its leader) or the one you're leading.
  */
 export const FollowSessionPanelContainer: React.FC = () => {
-  const { activePanel } = useRightPanel();
-  const isOpen = activePanel === 'followSession';
+  const { followedSession, activeMeeting } = useFollow();
+  const { selectedMeeting } = useRightPanel();
+  const subject = selectedMeeting ?? followedSession ?? activeMeeting;
+  const isOpen = useContextualPanel('followSession', subject);
 
   return (
     <RightPanel isOpen={isOpen} testId='follow-session-panel'>
-      {isOpen && <FollowSessionPanel />}
+      {isOpen && subject && (
+        <FollowSessionChat subject={subject} key={subject} />
+      )}
     </RightPanel>
   );
 };
-
-function FollowSessionPanel() {
-  const { followedSession, activeMeeting } = useFollow();
-  const { selectedMeeting } = useRightPanel();
-  const liveSubject = followedSession ?? activeMeeting;
-  const chatroomSubject = selectedMeeting ?? liveSubject;
-
-  if (!chatroomSubject) {
-    return null;
-  }
-
-  // Keyed so per-meeting state (like an ongoing call) resets when the
-  // panel switches to a different meeting.
-  return <FollowSessionChat subject={chatroomSubject} key={chatroomSubject} />;
-}
 
 function FollowSessionChat({ subject }: { subject: string }) {
   const chatroom = useResource(subject);

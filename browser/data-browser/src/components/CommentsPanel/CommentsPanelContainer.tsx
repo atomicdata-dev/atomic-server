@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { dataBrowser, useResource, useStore } from '@tomic/react';
 import { styled } from 'styled-components';
 import { RightPanel } from '../RightPanel/RightPanel';
-import { useRightPanel } from '../RightPanel/RightPanelContext';
+import { useContextualPanel } from '../RightPanel/useContextualPanel';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useLastSeenComments } from '../../hooks/useLastSeenComments';
 import { getResourcesDrive } from '../../helpers/getResourcesDrive';
@@ -21,8 +21,8 @@ import { Column } from '../Row';
  * is just a regular client-signed commit.
  */
 export const CommentsPanelContainer: React.FC = () => {
-  const { activePanel } = useRightPanel();
-  const isOpen = activePanel === 'comments';
+  const [subject] = useCurrentSubject();
+  const isOpen = useContextualPanel('comments', subject);
 
   return (
     <RightPanel isOpen={isOpen} testId='comments-panel'>
