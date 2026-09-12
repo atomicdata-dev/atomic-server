@@ -375,3 +375,26 @@ as well as page/context listeners. Closed-page transport evidence is retained
 (up to five closed pages); live state reads remain capped at five pages and two
 seconds each. Lifecycle checks and real open/closed WebSocket checks preserve
 payload-free metadata and diagnostic strictness.
+
+
+### Develop CI regression follow-up (2026-09-12, PR #1456)
+
+The separate-origin preview pass did not cover CI's embedded `atomic.localhost`
+deployment. The local runner now uses that deployment by default. Reproduction
+also found Boolean read mutations, snapshot ingress starting duplicate fetches,
+collections racing expected database attachment, delayed title autofocus closing
+menus, and stale tag-list updates. Drive URL switching now uses real local drives;
+search click retries recognize successful overlay closure.
+
+- [x] Reproduce fixes before changing behavior, using unit tests and slowed E2Es.
+- [x] Verify 455 library tests, 853 app tests, and workspace type checks.
+- [x] Repeat query, menu, and drive switching three times at 4x CPU slowdown;
+      repeat the final tag-search fix five times at the same slowdown.
+- [x] Complete embedded-server Chromium run at `a2df542f3`: 212 passed,
+      8 skipped, zero retries (15.9 minutes).
+- [ ] Confirm the full hosted suite on PR #1456; a feature-branch smoke pass is
+      insufficient to establish that develop's full suite is green.
+- [ ] Retain diagnostics for every failing test in CI. The current 20k log tail
+      and first 12 error-context files per shard can lose later failures when
+      retries consume the file budget. Preserve bounded metadata without logging
+      resource values or signed payloads.
