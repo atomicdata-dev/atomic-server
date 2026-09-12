@@ -78,7 +78,7 @@ browser flow; standalone recovery remains self-managed.
 | [`social-apps.md`](./social-apps.md) | Requirements for social-network-shaped apps. Companion to `zones.md`. |
 | [`android-data-reuse.md`](./android-data-reuse.md) | **Draft.** One store/agent/Iroh node per Android device. Supersedes `on-device-atomic-daemon.md` (deleted 2026-09-01; desktop remainder is a note in `virtual-drive.md`). |
 | [`nextgraph-interop.md`](./nextgraph-interop.md) | **Proposal.** `did:ng:` via a scheme-routed Store backend. |
-| [`s3-blob-storage.md`](./s3-blob-storage.md) | Pluggable blob backend (redb/S3/hybrid). |
+| [`s3-blob-storage.md`](./s3-blob-storage.md) | **Partial.** Server-wide S3, verified migration and SaaS enforcement implemented. Streaming, GC, per-tenant configuration and encrypted Vault attachments remain. |
 | [`atomic-assistant-browser-extension.md`](./atomic-assistant-browser-extension.md) | **Proposal.** Local-first Chromium extension. |
 | [`tours.md`](./tours.md) | Design, not built. |
 | [`local-search.md`](./local-search.md) | **Landed.** KV inverted index in `atomic_lib` (redb/OPFS/sled): BM25 + prefix + 1-edit prefix-fuzzy + PropValSub filters. Hosted `/search` is the same engine; Tantivy is gone. |

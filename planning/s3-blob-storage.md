@@ -1,3 +1,39 @@
+# Implementation status — September 12
+
+Server-wide S3 file storage is implemented; the original roadmap below contains
+future phases and is not an as-built specification.
+
+- [x] Async blob backend, default local database for standalone/browser use.
+- [x] S3 backend for all server upload/download, preview, plugin and peer-sync paths.
+- [x] Fail startup on invalid S3 config or failed read/write readiness.
+- [x] Verified, resumable migration of local blobs at startup, one blob in memory
+  at a time, before serving requests. No local fallback/cache in S3 mode.
+- [x] Remote HEAD for size accounting instead of downloading file contents.
+- [x] SaaS requires S3; deployment and provisioning share a hosted-blobs namespace.
+- [x] Tests for HTTP upload/download, image previews, peer frames, node replacement,
+  migration verification, and storage failure without local writes.
+- [ ] Streaming/proxy range requests and direct presigned downloads.
+- [ ] Blob garbage collection and per-tenant buckets.
+- [ ] Encrypted Vault attachment backup/recovery (separate from hosted primary storage).
+
+Configuration: `ATOMIC_BLOB_BACKEND=redb|s3` (default redb), `ATOMIC_S3_BUCKET`,
+`ATOMIC_S3_REGION`, `ATOMIC_S3_ENDPOINT`, paired `ATOMIC_S3_ACCESS_KEY_ID` /
+`ATOMIC_S3_SECRET_ACCESS_KEY`, optional `ATOMIC_S3_PREFIX` (default blobs),
+`ATOMIC_S3_PATH_STYLE=true|false`, `ATOMIC_S3_ALLOW_HTTP=true|false` (test only).
+Credentials may be omitted for the object store instance credential provider.
+No hybrid mode or disk cache is implemented. Files remain normal hosted bytes;
+this is not client-side Vault encryption. Keep hosted prefixes outside Vault GC.
+
+When migration removes local rows, redb can reuse the pages; physical file
+shrinking and old filesystem backups require separate operator maintenance.
+New large uploads and downloads still buffer one object in RAM.
+
+The ignored `s3_files_survive_node_replacement` test takes the above environment
+pointing to a scratch S3 bucket. Standard tests use an in-memory object service;
+SaaS representative CI runs the real S3-compatible test against MinIO.
+
+---
+
 # S3-compatible Blob Storage
 
 **Status:** Proposal. Nothing built.

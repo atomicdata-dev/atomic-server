@@ -762,3 +762,15 @@ page, never payload contents. A real local WebSocket exercises this collection.
 - `save-status-coordinator.test.ts` exercises narrow injected dependencies without a
   Store: overlapping owners, idempotent observer disposal, resource renaming, cached
   immutable snapshots, current outbox/connection state and failure accounting.
+
+## S3 hosted file storage
+
+`server/src/blob_storage.rs` tests node replacement with no local blob copies,
+verified/resumable migration, storage failures with no fallback, peer BLOB frames,
+and invalid configuration. Its ignored S3 round-trip runs against a scratch
+bucket; SaaS representative CI supplies MinIO. `server/src/tests.rs` checks
+remote multipart upload/download and image renditions, asserting Tree::Blobs
+stays empty. Standalone local storage still runs through the original tests.
+
+Not covered here: live Hetzner rollout, arbitrary large-file memory limits,
+blob garbage collection, or encrypted Vault attachment recovery.

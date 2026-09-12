@@ -1,6 +1,7 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
+pub mod blob_backend;
 pub mod btreemap_store;
 mod encoding;
 #[cfg(feature = "db-redb")]
@@ -288,6 +289,8 @@ pub struct Db {
     /// The key-value store backend. Abstracted behind a trait so different
     /// backends (sled, BTreeMap, etc.) can be used interchangeably.
     pub kv: Arc<dyn KvStore>,
+    /// Optional remote file storage. Configure before sharing this Db.
+    pub blob_backend: Option<Arc<dyn blob_backend::BlobBackend>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
@@ -440,6 +443,7 @@ impl Db {
 
         let store = Db {
             path: path.into(),
+            blob_backend: None,
             kv: Arc::new(sled_store),
             default_agent: Arc::new(Mutex::new(None)),
             endpoints: vec![],
@@ -479,6 +483,7 @@ impl Db {
     pub async fn init_memory(base_domain: Option<String>) -> AtomicResult<Db> {
         let store = Db {
             path: std::path::PathBuf::new(),
+            blob_backend: None,
             kv: Arc::new(btreemap_store::BTreeMapStore::new()),
             default_agent: Arc::new(Mutex::new(None)),
             endpoints: vec![],
@@ -514,6 +519,7 @@ impl Db {
 
         let store = Db {
             path: std::path::PathBuf::new(),
+            blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
             endpoints: vec![],
@@ -610,6 +616,7 @@ impl Db {
 
         let store = Db {
             path: path.to_path_buf(),
+            blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
             endpoints: vec![],
@@ -762,6 +769,7 @@ impl Db {
 
         let store = Db {
             path: std::path::PathBuf::new(),
+            blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
             endpoints: vec![],
@@ -1245,8 +1253,8 @@ impl Db {
             if !seen_blobs.insert(hash) {
                 continue;
             }
-            if let Ok(Some(bytes)) = self.kv.get(Tree::Blobs, &hash) {
-                row.blob_bytes += bytes.len() as u64;
+            if let Some(size) = self.blob_size(&hash).await? {
+                row.blob_bytes += size;
             }
         }
 

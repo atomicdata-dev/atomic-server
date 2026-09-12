@@ -19,7 +19,7 @@ pub struct UploadQuery {
 /// A parent Query parameter is required for checking rights and for placing the file in a Hierarchy.
 /// Creates new File resources for every submitted file.
 /// Submission is done using multipart/form-data.
-/// The file is stored in the `/uploads` directory.
+/// File bytes go to the configured blob backend (S3 or local database).
 #[tracing::instrument(skip(appstate, req, body))]
 pub async fn upload_handler(
     mut body: Multipart,
@@ -99,12 +99,10 @@ async fn save_file_and_create_resource(
     let hash_str = hash.to_hex().to_string();
     let hash_bytes = hash.as_bytes();
 
-    // Bytes are stored content-addressed in Tree::Blobs. The capability to
+    // Bytes are stored content-addressed in the configured blob backend. The capability to
     // fetch them is the hash itself; no filesystem copy is needed. See
     // docs/src/files.md.
-    store
-        .kv
-        .insert(atomic_lib::db::trees::Tree::Blobs, hash_bytes, &buffer)?;
+    store.put_blob(hash_bytes, &buffer).await?;
 
     let byte_count: i64 = buffer.len() as i64;
 

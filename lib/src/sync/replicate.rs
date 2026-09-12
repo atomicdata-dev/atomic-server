@@ -28,7 +28,7 @@
 use crate::{
     agents::{Agent, ForAgent},
     client::ws::{WsClient, WsMessage},
-    db::{trees::Tree, Db},
+    db::Db,
     errors::{AtomicError, AtomicResult},
     sync::{engine, protocol},
     Storelike,
@@ -222,7 +222,7 @@ async fn drive_exchange(
                 // The remote imported a resource referencing a blob it lacks.
                 // Blobs are only ever served on request — it will not accept an
                 // unsolicited one.
-                match store.kv.get(Tree::Blobs, &hash) {
+                match store.get_blob(&hash).await {
                     Ok(Some(bytes)) => {
                         client
                             .send_binary(protocol::encode_blob_response(&hash, &bytes))

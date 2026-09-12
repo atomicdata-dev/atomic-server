@@ -543,6 +543,17 @@ fn get_body(resp: ServiceResponse) -> String {
 #[cfg(feature = "img")]
 #[actix_rt::test]
 async fn content_addressed_image_download() {
+    content_addressed_image_with_storage(false).await;
+}
+
+#[cfg(feature = "img")]
+#[actix_rt::test]
+async fn remote_image_renditions_never_write_local_blobs() {
+    content_addressed_image_with_storage(true).await;
+}
+
+#[cfg(feature = "img")]
+async fn content_addressed_image_with_storage(remote: bool) {
     use clap::Parser;
     let dir = std::path::PathBuf::from(format!("./.temp/{}", atomic_lib::utils::random_string(10)));
     let opts = Opts::parse_from([
@@ -556,7 +567,17 @@ async fn content_addressed_image_download() {
     let mut config = config::build_config(opts).unwrap();
     config.search_index_path = dir.join("search");
     config.vector_search_index_path = dir.join("vectors");
-    let appstate = AppState::init(config).await.unwrap();
+    let mut appstate = AppState::init(config).await.unwrap();
+    if remote {
+        appstate.store.blob_backend = Some(std::sync::Arc::new(
+            crate::blob_storage::ObjectBlobBackend::new(
+                std::sync::Arc::new(object_store::memory::InMemory::new()),
+                "files",
+            )
+            .unwrap(),
+        ));
+    }
+    let store = appstate.store.clone();
     let mut png = std::io::Cursor::new(Vec::new());
     image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
         2,
@@ -569,8 +590,8 @@ async fn content_addressed_image_download() {
     let hash = blake3::hash(&bytes);
     appstate
         .store
-        .kv
-        .insert(atomic_lib::db::trees::Tree::Blobs, hash.as_bytes(), &bytes)
+        .put_blob(hash.as_bytes(), &bytes)
+        .await
         .unwrap();
     let app = test::init_service(
         App::new()
@@ -631,10 +652,29 @@ async fn content_addressed_image_download() {
             "missing blobs must not become HTTP 500"
         );
     }
+    if remote {
+        assert_eq!(store.kv.len(atomic_lib::db::trees::Tree::Blobs).unwrap(), 0);
+    }
 }
 
 #[actix_rt::test]
 async fn upload_download_test() {
+    upload_download_with_backend(None).await;
+}
+
+#[actix_rt::test]
+async fn remote_upload_download_never_stores_bytes_locally() {
+    let backend = crate::blob_storage::ObjectBlobBackend::new(
+        std::sync::Arc::new(object_store::memory::InMemory::new()),
+        "files",
+    )
+    .unwrap();
+    upload_download_with_backend(Some(std::sync::Arc::new(backend))).await;
+}
+
+async fn upload_download_with_backend(
+    backend: Option<std::sync::Arc<dyn atomic_lib::db::blob_backend::BlobBackend>>,
+) {
     let unique_string = atomic_lib::utils::random_string(10);
     use clap::Parser;
     let opts = Opts::parse_from([
@@ -651,10 +691,14 @@ async fn upload_download_test() {
     // server tests set this; without it, parallel runs share the default
     // search-index dir and trip Tantivy's `LockBusy` on the second test.
     config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
-    let appstate = crate::appstate::AppState::init(config.clone())
+    let mut appstate = crate::appstate::AppState::init(config.clone())
         .await
         .expect("failed init appstate");
 
+    if backend.is_some() {
+        appstate.store.blob_backend = backend;
+    }
+    let remote = appstate.store.blob_backend.is_some();
     let data = Data::new(appstate.clone());
     let app = test::init_service(
         App::new()
@@ -708,11 +752,21 @@ async fn upload_download_test() {
     let hash_bytes = blake3::hash(test_content);
     let blob = appstate
         .store
-        .kv
-        .get(atomic_lib::db::trees::Tree::Blobs, hash_bytes.as_bytes())
+        .get_blob(hash_bytes.as_bytes())
+        .await
         .unwrap()
         .unwrap();
     assert_eq!(blob, test_content);
+    if remote {
+        assert_eq!(
+            appstate
+                .store
+                .kv
+                .len(atomic_lib::db::trees::Tree::Blobs)
+                .unwrap(),
+            0
+        );
+    }
 
     // 3. Download
     let req = build_request_authenticated(&format!("/download/files/{}", expected_hash), &appstate)
