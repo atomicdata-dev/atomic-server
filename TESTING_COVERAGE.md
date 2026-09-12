@@ -577,9 +577,9 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
-- `template-process.spec.ts` starts a real shell child TCP server and verifies
-  that process-group cleanup releases its port; generated-site tests use
-  independent ports to avoid retry and concurrent-run collisions.
+- `scripts/owned-process.node.mjs` exercises the template runner process lifecycle,
+  including independent ephemeral ports and descendant cleanup. The superseded
+  template-process helper and its standalone Playwright regression were removed.
 - `cancelled-lifecycle.test.ts` covers cold-fetch cancellation, optional tree
   preload cancellation, pending worker destruction, and persistence rejection
   without misreporting cancellation as a storage fault. Real storage failures
