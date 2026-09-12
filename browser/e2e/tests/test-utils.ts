@@ -1576,19 +1576,22 @@ export async function reloadGrid(page: Page) {
  * present and empty, and the failure surfaces later as a total with nothing
  * to add or a row missing after a reload.
  *
- * There is no "grid is ready" flag to await, but focus landing inside the
- * grid is observable and is the precondition that actually matters.
+ * Wait for this cell to own focus. Focus elsewhere in the grid is insufficient
+ * and a forced click can hit its old position while layout is still moving.
  */
 export async function focusCell(page: Page, cell: Locator) {
-  await expect(async () => {
-    await cell.click({ force: true });
+  await cell.click();
+  await expect
+    .poll(
+      () =>
+        cell.evaluate(element => {
+          const target = element.closest('[aria-colindex]');
 
-    const inGrid = await page.evaluate(
-      () => !!document.activeElement?.closest('[role="grid"]'),
-    );
-
-    expect(inGrid, 'click did not give the grid focus').toBe(true);
-  }).toPass({ timeout: 15_000 });
+          return !!target && target.contains(document.activeElement);
+        }),
+      { message: 'click did not focus the requested cell', timeout: 15_000 },
+    )
+    .toBe(true);
 }
 
 /**

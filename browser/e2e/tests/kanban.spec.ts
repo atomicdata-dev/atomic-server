@@ -1,10 +1,6 @@
-import { test, expect, type Page, type Locator } from './fixtures';
-import {
-  before,
-  createTableFromDialog,
-  reloadReconnected,
-  smoke,
-} from './test-utils';
+import { before } from './session-fixtures';
+import { test, expect, type Page, type Locator } from './session-fixtures';
+import { createTableFromDialog, reloadReconnected, smoke } from './test-utils';
 
 const NAME_PROP = 'https://atomicdata.dev/properties/name';
 

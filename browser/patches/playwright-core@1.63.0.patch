@@ -1,0 +1,14 @@
+diff --git a/lib/coreBundle.js b/lib/coreBundle.js
+index 8ed8bb5de1b12c7c050191123b22a119298826bb..a84b968ba5a1cedb89ad2ecf2404459703707d63 100644
+--- a/lib/coreBundle.js
++++ b/lib/coreBundle.js
+@@ -34819,6 +34819,9 @@ var init_chromiumSwitches = __esm({
+   "packages/playwright-core/src/server/chromium/chromiumSwitches.ts"() {
+     "use strict";
+     disabledFeatures = [
++      // Chromium 153 confuses null and MainWorld() in SW preload matching.
++      // Remove when the bundled browser includes chromium/chromium@4df9ee2790a4.
++      "PreventCrossWorldServiceWorkerResourceReuse",
+       // See https://github.com/microsoft/playwright/issues/14047
+       "AvoidUnnecessaryBeforeUnloadCheckSync",
+       "DestroyProfileOnBrowserClose",

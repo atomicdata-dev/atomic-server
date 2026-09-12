@@ -1,5 +1,6 @@
-import { test, expect, type Page } from './fixtures';
-import { before, createTableFromDialog, reloadReconnected } from './test-utils';
+import { before } from './session-fixtures';
+import { test, expect, type Page } from './session-fixtures';
+import { createTableFromDialog, reloadReconnected } from './test-utils';
 
 /** Local YYYY-MM-DD key, same derivation the CalendarDay cells use. */
 function localDayKey(d: Date): string {

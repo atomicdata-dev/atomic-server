@@ -1,7 +1,7 @@
+import { before } from './session-fixtures';
 // oxlint-disable no-await-in-loop
-import { test, expect } from './fixtures';
+import { test, expect } from './session-fixtures';
 import {
-  before,
   editableTitle,
   FRONTEND_URL,
   newResource,
@@ -20,7 +20,7 @@ import {
  * phantom row accumulates.
  */
 test.describe('table refresh', () => {
-  // Each test owns its browser storage and fresh agent/drive.
+  // Each test owns its browser storage and drive; cloned sessions are opt-in.
   test.beforeEach(before);
 
   test('reloading a table does not add empty rows', async ({ page }) => {

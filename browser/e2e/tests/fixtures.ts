@@ -54,21 +54,7 @@ export const test = base.extend<{
         // General UI tests use an empty discovery room, independent of public
         // service availability. verify-peer-mesh.mjs separately exercises real
         // signaling, authenticated WebRTC, persistence and reconciliation.
-        await context.routeWebSocket(
-          /^wss:\/\/(?:staging\.)?atomicserver\.eu\/webrtc-signal$/,
-          socket => {
-            socket.onMessage(message => {
-              if (
-                typeof message === 'string' &&
-                JSON.parse(message).type === 'join'
-              ) {
-                socket.send(
-                  JSON.stringify({ type: 'joined', peers: [], iceServers: [] }),
-                );
-              }
-            });
-          },
-        );
+        await installEmptyDiscoveryRoom(context);
       };
 
       // Depend on context so assertions run BEFORE Playwright closes it. The
@@ -185,3 +171,22 @@ export const test = base.extend<{
 });
 
 export default test;
+
+/** Isolated UI fixtures do not depend on the public discovery service. */
+export async function installEmptyDiscoveryRoom(context: BrowserContext) {
+  await context.routeWebSocket(
+    /^wss:\/\/(?:staging\.)?atomicserver\.eu\/webrtc-signal$/,
+    socket => {
+      socket.onMessage(message => {
+        if (
+          typeof message === 'string' &&
+          JSON.parse(message).type === 'join'
+        ) {
+          socket.send(
+            JSON.stringify({ type: 'joined', peers: [], iceServers: [] }),
+          );
+        }
+      });
+    },
+  );
+}

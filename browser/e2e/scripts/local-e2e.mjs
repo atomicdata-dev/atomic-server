@@ -350,7 +350,7 @@ try {
 
   await run(
     'pnpm',
-    ['exec', 'playwright', 'install', 'chromium'],
+    ['exec', 'playwright', 'install', 'chromium', '--no-remove'],
     'install-chromium',
     join(browser, 'e2e'),
     env,
@@ -438,6 +438,7 @@ try {
                 vaultPortal: env.ATOMIC_VAULT_PORTAL_URL || null,
                 deployment: sameOrigin ? 'embedded' : 'preview',
                 cpuThrottle: env.ATOMIC_TEST_CPU_THROTTLE ?? null,
+                clonedSessions: env.ATOMIC_E2E_CLONE_SESSION === '1',
                 browserPlatformOverride:
                   env.PLAYWRIGHT_HOST_PLATFORM_OVERRIDE ?? null,
                 workers,

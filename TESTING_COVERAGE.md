@@ -33,6 +33,15 @@ form is open, catching stale cleanup that empties the new form.
 The existing browser diagnostic/failure-state tests cover bounded retained
 attachments; the renderer load probe adds only timing metadata.
 
+`session-fixtures.ts` is an opt-in closed-profile clone experiment, currently
+used by drive-scoped dashboard and table/view specs with
+`ATOMIC_E2E_CLONE_SESSION=1`. Every test gets
+separate browser files, device ID and project drive; each worker reuses its seed
+agent. Cold identity/storage/account tests keep the fresh fixture. Full-suite
+acceptance with this setup remains pending. Playwright 1.63 uses a documented,
+version-specific Chromium preload compatibility flag; browser cross-world
+service-worker isolation is outside this validation (see the E2E README).
+
 `template.spec.ts` exercises each actual generated Next/Svelte site independently,
 using the fresh drive from `before()` instead of provisioning a second drive.
 Both can run in parallel. All timing/coverage claims require actual suite runs:
@@ -834,3 +843,13 @@ blob garbage collection, or encrypted Vault attachment recovery.
 one physical object shared by two owners counts once in each drive, repeated
 references within one drive do not inflate usage, and report ordering,
 co-location and removal of another owner's references do not change attribution.
+
+The durable snapshot worker regression (`client-db-durable-put.test.ts`) checks
+that JSON and Loro writes finish before the flush acknowledgement, flush errors
+reject, failed flushes retry, and successful writes avoid a redundant flush.
+`store.test.ts` holds that acknowledgement pending to verify an online save
+cannot resolve early and needs no second RPC during identity handoff.
+
+`useAvailableHeight.test.ts` checks that observer-driven grid sizing defers and
+coalesces DOM writes outside ResizeObserver delivery, and cancels pending work
+on unmount. Table filtering E2E retains strict browser diagnostics.

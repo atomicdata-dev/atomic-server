@@ -641,10 +641,10 @@ export class ClientDbWorker {
   }
 
   /**
-   * Atomic put: JSON-AD index entry + optional Loro snapshot in one
-   * worker postMessage. Either both forms land or neither does —
-   * the previous shape (separate `putResource` + `putLoroSnapshot`
-   * calls) was the source of OPFS half-states under load.
+   * Write the JSON-AD index entry and optional Loro snapshot in one worker
+   * message, then flush before acknowledging. Rejects if durability fails;
+   * callers must not follow this with a separate flush RPC, which could race
+   * an identity handoff closing the worker.
    */
   async putResourceWithSnapshot(
     subject: string,

@@ -79,6 +79,40 @@ ability to request 8 or 12 workers as evidence those settings are reliable.
 The active experiments and caching decisions live in
 [`planning/e2e-concurrency.md`](../../planning/e2e-concurrency.md).
 
+### Cloned-session experiment
+
+`ATOMIC_E2E_CLONE_SESSION=1 PLAYWRIGHT_WORKERS=4 pnpm test-e2e:local dashboard.spec.ts`
+compares the dashboard specs using a closed browser profile as a seed.
+Without the environment flag they retain the normal fresh-agent setup.
+Only specs importing `tests/session-fixtures.ts` opt into this experiment:
+dashboards, table tools/filtering/refresh/templates, row actions, aggregates,
+derived columns, calendar, kanban, timer and quick-add.
+
+Each worker initializes its own agent once and closes Chromium. Each test gets
+an independent copy of that immutable profile, including its encrypted OPFS
+database and IndexedDB signing keys, a distinct device ID, and a fresh project
+drive. Copy-on-write is requested where the filesystem supports it; hard links
+are never used. Profiles are removed during teardown and live under the run's
+output directory so interrupted runs do not scatter state into global temp paths.
+Seed timings are retained separately from per-test restore/drive setup timings.
+Do not use this fixture for account settings, personal-drive lists, authorization,
+backup/discovery identity, or cold-start/storage tests: those contracts need a
+fresh identity or fresh disk. Global account searches can also see prior drives.
+
+Playwright and the CI image are pinned to 1.63.0. Its OPFS JSON snapshot option
+works, but its IndexedDB serialization does not restore non-extractable
+`CryptoKey` objects, so a JSON snapshot alone cannot restore this signed-in app.
+The closed profile preserves those keys without changing application security.
+
+The version-specific `playwright-core` patch adds a temporary Chromium launch
+flag for `PreventCrossWorldServiceWorkerResourceReuse`, preserving Playwright's
+other default flags. Chromium 153's preload check confuses null and MainWorld()
+and produces warnings even in fresh-session reload tests. Remove the patch when
+the bundled browser includes [Chromium's fix](https://github.com/chromium/chromium/commit/4df9ee2790a40a55a6ac0a08e4ded457d1460723).
+Service workers and strict diagnostic assertions remain active. These runs do
+not validate that browser's cross-world service-worker resource isolation check.
+Browser installation uses `--no-remove` to preserve other jobs' browser versions.
+
 ### Deployment fixtures
 
 Import `standaloneTest as test` or `managedTest as test` from

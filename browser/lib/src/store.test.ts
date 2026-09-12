@@ -433,9 +433,9 @@ describe('Store', () => {
     expect(persisted.get(core.properties.name)).toBe('After');
   });
 
-  it.each(['snapshot', 'flush'])(
-    'an acknowledged edit waits for local %s before save resolves',
-    async stage => {
+  it(
+    'an acknowledged edit waits for its durable snapshot before save resolves',
+    async () => {
       const { expect } = await import('vitest');
       const { store } = await testStore();
       const drive = await store.createDrive('Home');
@@ -450,12 +450,8 @@ describe('Store', () => {
       const pendingWrite = new Promise<void>(resolve => {
         release = resolve;
       });
-      const putResourceWithSnapshot = vi.fn(() =>
-        stage === 'snapshot' ? pendingWrite : Promise.resolve(),
-      );
-      const flush = vi.fn(() =>
-        stage === 'flush' ? pendingWrite : Promise.resolve(),
-      );
+      const putResourceWithSnapshot = vi.fn(() => pendingWrite);
+      const flush = vi.fn(() => Promise.reject(new Error('worker destroyed')));
       store.setClientDb({
         isReady: true,
         flush,
@@ -469,9 +465,7 @@ describe('Store', () => {
 
       try {
         await vi.waitFor(() =>
-          expect(
-            stage === 'snapshot' ? putResourceWithSnapshot : flush,
-          ).toHaveBeenCalled(),
+          expect(putResourceWithSnapshot).toHaveBeenCalled(),
         );
         // The server is already mocked as acknowledged; only the local write
         // remains blocked. Leaving now must not expose the pre-edit cache.
@@ -483,6 +477,7 @@ describe('Store', () => {
       }
 
       expect(finished).toBe(true);
+      expect(flush).not.toHaveBeenCalled();
     },
   );
 

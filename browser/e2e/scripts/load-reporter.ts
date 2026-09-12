@@ -148,8 +148,17 @@ export default class LoadReporter implements Reporter {
       this.templateSteps.set(test.id, steps);
     }
 
-    if (step.title === 'Initialize fresh agent and drive')
-      this.setupMs.set(test.id, step.duration);
+    if (
+      [
+        'Initialize fresh agent and drive',
+        'Restore isolated browser profile',
+        'Initialize fresh drive from cloned session',
+      ].includes(step.title)
+    )
+      this.setupMs.set(
+        test.id,
+        (this.setupMs.get(test.id) ?? 0) + step.duration,
+      );
   }
 
   onTestEnd(test: TestCase, result: TestResult) {

@@ -16,8 +16,8 @@
     "format": "oxfmt -c ../.oxfmtrc.json --ignore-path ../.gitignore .",
     "lint": "oxlint -c ../.oxlintrc.json . && pnpm format-check",
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
-    "playwright-install": "playwright install chromium",
-    "playwright-install-webkit": "playwright install webkit",
+    "playwright-install": "playwright install chromium --no-remove",
+    "playwright-install-webkit": "playwright install webkit --no-remove",
     "upload-report": "netlify deploy --dir playwright-report --prod --site atomic-tests",
     "test-server": "./scripts/e2e-server.sh",
     "test-server-fresh": "./scripts/e2e-server.sh --fresh",
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@tomic/lib": "workspace:*",
     "@axe-core/playwright": "^4.11.3",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.63.0",
     "@types/kill-port": "^2.0.3",
     "kill-port": "^2.0.1"
   }

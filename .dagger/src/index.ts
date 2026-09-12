@@ -49,7 +49,7 @@ const RUST_IMAGE = 'rust:bookworm';
 // test-only commits stay cached). A cache volume cannot rescue it either: the
 // image sets `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`, so the download lands
 // there rather than in `~/.cache`.
-const PLAYWRIGHT_PACKAGE_VERSION = '1.60.0';
+const PLAYWRIGHT_PACKAGE_VERSION = '1.63.0';
 const PLAYWRIGHT_VERSION = `v${PLAYWRIGHT_PACKAGE_VERSION}-noble`;
 // Keep in sync with `flutter/.mise.toml` (`[tools].flutter`).
 const FLUTTER_IMAGE = 'ghcr.io/cirruslabs/flutter:3.44.0';
