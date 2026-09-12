@@ -696,6 +696,15 @@ the **chunk, not its contents**: individual entries may still be skipped
 (tombstoned locally, unreadable, a failed Loro import). A sender that needs
 proof re-probes.
 
+The Rust drive-replication client counts all chunk acknowledgements before
+re-probing. On a WebSocket peer advertising `keepalive`, it then sends a
+`KEEPALIVE` and reads through the echo to drain blob requests queued after
+those acknowledgements. If no blob was requested, it can re-probe immediately
+instead of waiting for 30 seconds of silence. The echo does not acknowledge
+asynchronous blob storage: transfers with blob requests, and peers without
+`keepalive`, retain the idle wait. Only the independent matching-hash response
+sets the replication result's `in_sync` flag.
+
 A push refused **as a whole** is answered with `ERROR`, `request_id = 0`,
 code `SYNC_REJECTED (6)`, message
 `SYNC_PUSH rejected for drive <drive>: <reason>`, and **no `SYNC_OK`**.

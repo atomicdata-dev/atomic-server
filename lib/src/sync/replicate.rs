@@ -149,8 +149,8 @@ pub async fn replicate_drive_to_remote(
     Ok(outcome)
 }
 
-/// Read frames until the remote goes quiet, answering as we go. Returns how
-/// many resources we pushed in this round.
+/// Read replies until the acknowledged resource-only exchange is drained, or
+/// the remote goes quiet. Returns how many resources we pushed in this round.
 async fn drive_exchange(
     client: &WsClient,
     rx: &mut Receiver<WsMessage>,
@@ -161,6 +161,13 @@ async fn drive_exchange(
     started: std::time::Instant,
 ) -> AtomicResult<usize> {
     let mut sent_this_round = 0;
+    let mut pending_chunks = 0;
+    let mut draining = false;
+    let mut requested_blob = false;
+    let echoes_keepalive = client
+        .server_capabilities()
+        .iter()
+        .any(|c| c == "keepalive");
 
     loop {
         if started.elapsed() > TOTAL_TIMEOUT {
@@ -176,14 +183,32 @@ async fn drive_exchange(
         };
 
         match msg {
-            // A SYNC_OK arriving before we pushed anything means our hashes
-            // already match. One arriving *after* is just a per-chunk ack —
-            // it says the chunk was admitted, not that every subject in it
-            // was kept — so those fall through and we keep listening.
-            WsMessage::SyncOk { drive: d } if d == drive && sent_this_round == 0 => {
-                outcome.in_sync = true;
-
-                break;
+            WsMessage::SyncOk { drive: d } if d == drive => {
+                if sent_this_round == 0 {
+                    outcome.in_sync = true;
+                    break;
+                }
+                // Each accepted chunk has its own ack. None proves matching
+                // state: only the separate SYNC probe may set in_sync.
+                if pending_chunks > 0 {
+                    pending_chunks -= 1;
+                    if pending_chunks == 0 && echoes_keepalive {
+                        // The server queues blob requests AFTER the chunk ack.
+                        // Its WS keepalive echo drains those trailing frames;
+                        // it is not a barrier for asynchronous blob writes.
+                        client.send_keepalive().await?;
+                        draining = true;
+                    }
+                }
+            }
+            WsMessage::Keepalive if draining => {
+                draining = false;
+                if !requested_blob {
+                    break;
+                }
+                // Blob writes have no completion ack. Preserve the existing
+                // idle grace period (also used for older peers without the
+                // keepalive capability) rather than racing their storage.
             }
             WsMessage::SyncDiff { drive: d, pull, .. } if d == drive => {
                 if pull.is_empty() {
@@ -210,7 +235,9 @@ async fn drive_exchange(
                     .map(|(s, b)| (s.as_str(), b.as_slice()))
                     .collect();
 
-                for chunk in protocol::encode_sync_push_chunks(drive, &refs) {
+                let chunks = protocol::encode_sync_push_chunks(drive, &refs);
+                pending_chunks += chunks.len();
+                for chunk in chunks {
                     client.send_binary(chunk).await?;
                 }
 
@@ -219,6 +246,7 @@ async fn drive_exchange(
                 tracing::info!("[replicate] pushed {} resources of {drive}", entries.len());
             }
             WsMessage::BlobRequest { hash } => {
+                requested_blob = true;
                 // The remote imported a resource referencing a blob it lacks.
                 // Blobs are only ever served on request — it will not accept an
                 // unsolicited one.
@@ -283,4 +311,222 @@ async fn build_sync_frame(store: &Db, drive: &str) -> Vec<u8> {
     }
 
     protocol::encode_sync(drive, &drive_hash, &peers, &resources)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
+
+    type Peer = WebSocketStream<TcpStream>;
+
+    async fn receive(peer: &mut Peer, tag: u8) -> Vec<u8> {
+        let frame = peer.next().await.unwrap().unwrap().into_data().to_vec();
+        assert_eq!(frame.first(), Some(&tag), "unexpected frame: {frame:?}");
+        frame
+    }
+
+    async fn send(peer: &mut Peer, frame: Vec<u8>) {
+        peer.send(Message::Binary(frame.into())).await.unwrap();
+    }
+
+    async fn source() -> (Db, String) {
+        let db = Db::init_memory(Some("https://localhost".into()))
+            .await
+            .unwrap();
+        let (_, drive) = db.setup("Replication test").await.unwrap();
+        (db, drive)
+    }
+
+    async fn accept_peer(listener: TcpListener, caps: &[&str]) -> Peer {
+        let mut peer = accept_async(listener.accept().await.unwrap().0)
+            .await
+            .unwrap();
+        // This scripted peer tests exchange ordering, not AUTH verification.
+        receive(&mut peer, protocol::tag::HELLO).await;
+        receive(&mut peer, protocol::tag::AUTH).await;
+        send(&mut peer, protocol::encode_auth_ok_with_caps(caps)).await;
+        receive(&mut peer, protocol::tag::SYNC).await;
+        peer
+    }
+
+    fn request(drive: &str, count: usize) -> Vec<u8> {
+        protocol::encode_sync_diff(
+            drive,
+            &vec![drive.to_owned(); count],
+            &[],
+            &[],
+            &Default::default(),
+            &Default::default(),
+        )
+    }
+
+    async fn with_peer<F, Fut>(
+        caps: &'static [&'static str],
+        script: F,
+    ) -> AtomicResult<ReplicateOutcome>
+    where
+        F: FnOnce(Peer, String) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = ()> + Send,
+    {
+        let (db, drive) = source().await;
+        db.put_blob(blake3::hash(b"attachment").as_bytes(), b"attachment")
+            .await
+            .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}/ws", listener.local_addr().unwrap());
+        let remote_drive = drive.clone();
+        let peer = tokio::spawn(async move {
+            let peer = accept_peer(listener, caps).await;
+            script(peer, remote_drive).await;
+        });
+        let outcome = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            replicate_drive_to_remote(
+                &db,
+                &drive,
+                &url,
+                &ForAgent::Sudo,
+                ReplicateAuth::PreSigned(vec![protocol::tag::AUTH]),
+            ),
+        )
+        .await
+        .expect("replication waited for the 30-second idle timeout");
+        peer.await.unwrap();
+        outcome
+    }
+
+    async fn drain(peer: &mut Peer) {
+        receive(peer, protocol::tag::KEEPALIVE).await;
+        send(peer, protocol::encode_keepalive()).await;
+    }
+
+    async fn assert_waiting(peer: &mut Peer) {
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(150), peer.next())
+                .await
+                .is_err(),
+            "client advanced before the exchange was complete"
+        );
+    }
+
+    #[tokio::test]
+    async fn acknowledged_push_is_verified_without_waiting_for_idle() {
+        let outcome = with_peer(&["keepalive"], |mut peer, drive| async move {
+            send(&mut peer, request(&drive, 1)).await;
+            receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            drain(&mut peer).await;
+            receive(&mut peer, protocol::tag::SYNC).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+        })
+        .await
+        .unwrap();
+        assert_eq!(outcome.pushed, 1);
+        assert!(outcome.in_sync);
+    }
+
+    #[tokio::test]
+    async fn waits_for_every_chunk_ack_and_ignores_other_drives() {
+        let outcome = with_peer(&["keepalive"], |mut peer, drive| async move {
+            // Repeating one readable snapshot exercises the real chunk encoder
+            // without creating 101 unrelated resources in the test fixture.
+            send(
+                &mut peer,
+                request(&drive, protocol::SYNC_PUSH_MAX_ENTRIES + 1),
+            )
+            .await;
+            let first = receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            assert!(!protocol::decode_sync_push(&first[1..]).unwrap().last);
+            let last = receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            assert!(protocol::decode_sync_push(&last[1..]).unwrap().last);
+            send(&mut peer, protocol::encode_sync_ok("did:ad:another-drive")).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            assert_waiting(&mut peer).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            drain(&mut peer).await;
+            receive(&mut peer, protocol::tag::SYNC).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+        })
+        .await
+        .unwrap();
+        assert_eq!(outcome.pushed, protocol::SYNC_PUSH_MAX_ENTRIES + 1);
+        assert!(outcome.in_sync);
+    }
+
+    #[tokio::test]
+    async fn chunk_ack_does_not_prove_the_final_hash_matches() {
+        let outcome = with_peer(&["keepalive"], |mut peer, drive| async move {
+            send(&mut peer, request(&drive, 1)).await;
+            receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            drain(&mut peer).await;
+            receive(&mut peer, protocol::tag::SYNC).await;
+            // The remote still differs, even though it acknowledged the push.
+            send(
+                &mut peer,
+                protocol::encode_sync_diff(
+                    &drive,
+                    &[],
+                    std::slice::from_ref(&drive),
+                    &[],
+                    &Default::default(),
+                    &Default::default(),
+                ),
+            )
+            .await;
+        })
+        .await
+        .unwrap();
+        assert_eq!(outcome.pushed, 1);
+        assert!(!outcome.in_sync);
+    }
+
+    #[tokio::test]
+    async fn trailing_blob_request_keeps_the_storage_grace_period() {
+        let error = with_peer(&["keepalive"], |mut peer, drive| async move {
+            send(&mut peer, request(&drive, 1)).await;
+            receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            receive(&mut peer, protocol::tag::KEEPALIVE).await;
+            let hash = *blake3::hash(b"attachment").as_bytes();
+            // The engine sends blob requests after the corresponding ack.
+            send(&mut peer, protocol::encode_blob_request(&hash)).await;
+            send(&mut peer, protocol::encode_keepalive()).await;
+            let frame = receive(&mut peer, protocol::tag::BLOB_RESPONSE).await;
+            let response = protocol::decode_blob_response(&frame[1..]).unwrap();
+            assert_eq!(response.hash, hash);
+            assert_eq!(response.bytes, b"attachment");
+            assert_waiting(&mut peer).await;
+            // Asynchronous remote storage failure must still reach the caller.
+            send(
+                &mut peer,
+                protocol::encode_error(0, protocol::error_code::UNKNOWN, "Blob storage failed"),
+            )
+            .await;
+        })
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains("Blob storage failed"));
+    }
+
+    #[tokio::test]
+    async fn older_peer_without_keepalive_keeps_the_idle_fallback() {
+        let error = with_peer(&[], |mut peer, drive| async move {
+            send(&mut peer, request(&drive, 1)).await;
+            receive(&mut peer, protocol::tag::SYNC_PUSH).await;
+            send(&mut peer, protocol::encode_sync_ok(&drive)).await;
+            assert_waiting(&mut peer).await;
+            send(
+                &mut peer,
+                protocol::encode_error(0, protocol::error_code::SYNC_REJECTED, "Import refused"),
+            )
+            .await;
+        })
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains("Import refused"));
+    }
 }
