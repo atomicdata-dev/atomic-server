@@ -315,7 +315,7 @@ ran all seven dashboard tests with two workers and zero retries in 1.3 minutes,
 using the existing optimized binary through explicit --skip-build. This validates
 launcher/reporting/teardown, not a rebuilt full-suite acceptance result.
 Artifacts: Mancave .e2e-runs/2026-09-12T08-40-34.904Z-VO9ZNy.
-The new cold-build and separate-origin preview paths have not been rerun.
+Both rebuilt launcher paths were subsequently validated as recorded below.
 
 
 Merge validation: both rebuilt launcher paths pass their dashboard smoke case:
@@ -334,3 +334,19 @@ unit reproducer fails before bundling i18n.json and passes after (3/3 tests);
 app typecheck passes. Discussion alone passed five times (39.4s, two workers),
 then was updated to the existing reloadReconnected helper so the badge's unchanged
 15-second assertion starts after reconnect. Full Dagger rerun is required.
+
+
+The ec38a1d37 full Dagger run (four isolated servers, two workers each, cloned
+sessions enabled, zero retries) completed with 212 passed, six failed and eight
+skipped. Failures: canvas and deep-link total test timeouts, a saved-drive reload
+leader-election warning, server-only initial SUB/SYNC refusals, and both template
+sync waits. The canvas and deep-link specs redundantly created another agent and
+drive after their shared before hook; those extra calls are removed. Failure
+snapshots now include scheduled saves as well as dirty/in-flight resources.
+
+A rebuilt native run at two workers passed all 20 selected canvas, deep-link,
+saved-drive, server-only, website and table-template tests in 3.6m, zero retries.
+Canvas also passed eight focused repetitions before this run. The other failures
+did not reproduce at this load; they are not claimed fixed. Artifacts: Mancave
+.e2e-runs/2026-09-12T09-44-09.837Z-PqfUko. Eight Node harness checks and E2E
+typecheck pass. Another complete Dagger run remains necessary before merge.
