@@ -135,6 +135,6 @@ export function removeCachedSearchResults(store: Store) {
   );
 
   for (const resource of searchResources) {
-    store.removeResource(resource.subject, false);
+    store.evictResource(resource.subject, false);
   }
 }

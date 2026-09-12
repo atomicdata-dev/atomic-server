@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import {
   before,
-  devDrive,
+  getDevDriveSecret,
   getCurrentSubject,
   makeDrivePublic,
   newResource,
@@ -73,7 +73,7 @@ test.describe('canvas live update', () => {
     browser,
   }) => {
     // Session A: dev drive + a canvas, signed in.
-    const secret = await devDrive(page);
+    const secret = await getDevDriveSecret(page);
     await newResource(CANVAS_CLASS, page);
     const canvasSubject = await getCurrentSubject(page);
 
@@ -126,7 +126,6 @@ test.describe('canvas live update', () => {
     browser,
   }) => {
     // Owner: dev drive made public, plus a canvas.
-    await devDrive(page);
     await makeDrivePublic(page);
     await newResource(CANVAS_CLASS, page);
     const canvasSubject = await getCurrentSubject(page);

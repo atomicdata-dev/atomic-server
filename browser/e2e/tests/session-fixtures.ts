@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { test as base, expect, installEmptyDiscoveryRoom } from './fixtures';
@@ -44,7 +44,6 @@ export const test = base.extend<{}, { sessionSeed: Seed | undefined }>({
           'Cloned session experiment currently requires Chromium',
         );
 
-      const started = Date.now();
       const seeds = join(workerInfo.project.outputDir, 'session-seeds');
       await mkdir(seeds, { recursive: true });
       const directory = await mkdtemp(join(seeds, 'worker-'));
@@ -83,20 +82,6 @@ export const test = base.extend<{}, { sessionSeed: Seed | undefined }>({
         // OPFS/redb file can produce a torn image even after an explicit flush.
         await context.close();
         expect(diagnostics, 'Seed initialization diagnostics').toEqual([]);
-
-        if (process.env.ATOMIC_E2E_METRICS_DIR) {
-          await mkdir(process.env.ATOMIC_E2E_METRICS_DIR, { recursive: true });
-          await writeFile(
-            join(
-              process.env.ATOMIC_E2E_METRICS_DIR,
-              `session-seed-${workerInfo.workerIndex}.json`,
-            ),
-            JSON.stringify({
-              worker: workerInfo.workerIndex,
-              durationMs: Date.now() - started,
-            }),
-          );
-        }
 
         await use({ directory, url });
       } finally {

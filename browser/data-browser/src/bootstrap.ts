@@ -8,6 +8,7 @@ import ontologiesDefaults from '@repo-lib-defaults/ontologies.json';
 import aiDefaults from '@repo-lib-defaults/ai.json';
 import meetingDefaults from '@repo-lib-defaults/meeting.json';
 import forksDefaults from '@repo-lib-defaults/forks.json';
+import i18nDefaults from '@repo-lib-defaults/i18n.json';
 
 /**
  * A bundled entry that holds no content of its own — no class, and no
@@ -79,6 +80,7 @@ export function bootstrap(store: Store): void {
     addBootstrapped(aiDefaults);
     addBootstrapped(meetingDefaults);
     addBootstrapped(forksDefaults);
+    addBootstrapped(i18nDefaults);
   } catch (e) {
     console.error('Failed to bootstrap store:', e);
   }
