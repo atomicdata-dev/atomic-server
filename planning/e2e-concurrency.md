@@ -372,3 +372,19 @@ previously relied on the optimistic sidebar title. It now waits for synced setup
 before disconnecting. Six focused repetitions pass in 46.2s, two workers, zero
 retries, using the existing native binary (test-only validation). Artifacts:
 .e2e-runs/2026-09-12T10-30-56.686Z-0uaEUs. E2E typecheck passes.
+
+GitHub CI passed on 645e8ec31. Full Dagger on 5b648d48e still failed at eight
+workers: cloned sessions had 216 passed, two failed, eight skipped; fresh
+sessions had 211 passed, seven failed, eight skipped. Neither establishes a
+reliable eight-worker budget. Keep cloning opt-in and the concurrency acceptance
+open. The fresh run's slowest shard took 19.4m; busy eight-worker samples used
+about 20 logical CPUs and 15 GiB RAM. These are samples, not causal attribution.
+
+The full hosted-budget comparison (two shards, one worker each, fresh sessions,
+zero retries) exposed a table selection race on 5b648d48e. Trace snapshots show
+rowA at aria-rowindex 3 while aria-busy=true, then at index 2 after loading.
+The test clicked before the collection finished sorting, leaving focus on rowB
+at the selected position. Use the existing waitForGridMounted after reload before
+selecting the row. Keyboard assertions and timeouts are unchanged. E2E typecheck
+passes; focused browser validation and the complete comparison remain pending.
+Trace: Mancave /tmp/e2e-1465-shift-enter-trace.zip.
