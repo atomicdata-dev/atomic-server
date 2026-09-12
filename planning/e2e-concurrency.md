@@ -316,3 +316,12 @@ using the existing optimized binary through explicit --skip-build. This validate
 launcher/reporting/teardown, not a rebuilt full-suite acceptance result.
 Artifacts: Mancave .e2e-runs/2026-09-12T08-40-34.904Z-VO9ZNy.
 The new cold-build and separate-origin preview paths have not been rerun.
+
+
+Merge validation: both rebuilt launcher paths pass their dashboard smoke case:
+preview 6.4s (.e2e-runs/2026-09-12T08-47-06.245Z-Vq0M0u), embedded 8.6s
+(.e2e-runs/2026-09-12T08-54-28.885Z-VDTlpU). Builds ran without --skip-build;
+dependency/compiler caches were retained. The full Dagger run exposed a startup
+failure: custom nonce hostnames plus Dagger DNS suffix exceeded the runtime's
+hostname limit. Shards now use Dagger-generated names and retain the stable
+consumer alias. Runtime identity still prevents service deduplication.

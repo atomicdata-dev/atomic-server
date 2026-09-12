@@ -1602,9 +1602,10 @@ export class AtomicServer {
     if (instance)
       runtime = runtime.withEnvVariable('E2E_SERVICE_INSTANCE', instance);
 
-    return runtime
-      .asService()
-      .withHostname(instance ? `${ATOMIC_DOMAIN}-${instance}` : ATOMIC_DOMAIN);
+    const service = runtime.asService();
+    // Dagger appends its own DNS suffix. Let it generate short unique names
+    // for shards; their consumers still bind the stable `atomic` alias.
+    return instance ? service : service.withHostname(ATOMIC_DOMAIN);
   }
 
   /**
