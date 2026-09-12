@@ -7,6 +7,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Allow authenticated, admitted drives to bootstrap through hash-first sync on an empty destination, retaining signed import and existing-drive read checks.
+
 ## [v0.41.0-beta.7] - 2026-09-12
 
 - Store hosted files in S3 without silently falling back to node-local storage.

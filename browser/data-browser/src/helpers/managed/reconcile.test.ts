@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   evaluateServerReconciliation,
+  evaluateIdentityReconciliation,
   connectHostedDrive,
   localAgentIsDisposable,
 } from './reconcile';
@@ -349,4 +350,31 @@ describe('localAgentIsDisposable', () => {
 
     expect(await localAgentIsDisposable(store, 'did:ad:agent:a')).toBe(true);
   });
+});
+
+it('shares the account check within one identity reconciliation', async () => {
+  vi.stubEnv('VITE_MANAGED_API_BASE', 'https://portal.example/api');
+  const fetcher = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/me'))
+        return Response.json({ email: 'one@example.com' });
+      if (url.endsWith('/recovery-secret'))
+        return new Response(null, { status: 204 });
+      if (url.endsWith('/sync-enrollments')) return Response.json([]);
+      throw new Error(`Unexpected request ${url}`);
+    });
+
+  try {
+    await expect(
+      evaluateIdentityReconciliation(undefined),
+    ).resolves.toMatchObject({ ok: true });
+    expect(
+      fetcher.mock.calls.filter(([url]) => String(url).endsWith('/me')),
+    ).toHaveLength(1);
+  } finally {
+    fetcher.mockRestore();
+    vi.unstubAllEnvs();
+  }
 });

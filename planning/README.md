@@ -17,6 +17,10 @@ Protocol reference lives in the public docs:
 discuss how that protocol is used internally, but should not duplicate the
 wire reference.
 
+## Staging investigations
+
+- [Idle request amplification and first Cloud Server upload](staging-request-audit.md): reproduced on staging; fixes and regression coverage prepared, deployment verification pending.
+
 ## Decisions
 
 Decision documents: one question each, written as an RFC with a recommendation.

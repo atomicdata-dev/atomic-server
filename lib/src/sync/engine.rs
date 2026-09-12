@@ -972,10 +972,23 @@ pub async fn drive_items_for(
     agent: &crate::agents::ForAgent,
 ) -> Result<Vec<crate::sync::rbsr::Item>, String> {
     let drive_subject = crate::Subject::from_raw(drive, store.get_base_domain().as_deref());
-    let drive_resource = store
-        .get_resource(&drive_subject)
-        .await
-        .map_err(|_| "not readable".to_string())?;
+    let drive_resource = match store.get_resource(&drive_subject).await {
+        Ok(resource) => resource,
+        Err(error) => {
+            // A first upload has no remote root to authorize a read against.
+            // Expose only an empty destination to authenticated writers whose
+            // drive is admitted (or may be enrolled). Do not enroll on a read:
+            // SYNC_PUSH still verifies admission, genesis and signed snapshots.
+            let policy = store.sync_policy();
+            if error.error_type == crate::errors::AtomicErrorType::NotFoundError
+                && !matches!(agent, crate::agents::ForAgent::Public)
+                && (policy.admit_drive_write(drive) || policy.may_enroll_drive(drive, agent))
+            {
+                return Ok(Vec::new());
+            }
+            return Err("not readable".to_string());
+        }
+    };
     crate::hierarchy::check_read(store, &drive_resource, agent)
         .await
         .map_err(|e| e.to_string())?;

@@ -1,5 +1,5 @@
 import { accountPasskey } from './accountPasskey';
-import { getManagedAccount } from './session';
+import { getManagedAccount, type ManagedAccount } from './session';
 import { isRunningInTauri } from '../tauri';
 import { wasmBinaryUrl, wasmJsUrl } from '../wasmUrls';
 import { PRODUCT_NAME } from './product';
@@ -1386,8 +1386,13 @@ export async function saveRecoverySecret(input: RecoverySecretInput) {
   return saved;
 }
 
-export async function getRecoverySecret(): Promise<RecoverySecret | null> {
-  if (!(await getManagedAccount())) return null;
+export async function getRecoverySecret(
+  // A caller performing a compound read may reuse its freshly checked account.
+  // The endpoint still authenticates this request; no settled session is cached.
+  account?: ManagedAccount | null,
+): Promise<RecoverySecret | null> {
+  if (!(account === undefined ? await getManagedAccount() : account))
+    return null;
   // [RECOVERY-RECONSTRUCTED] body — only this function's signature survived in
   // the transcripts. Reconstructed as the GET counterpart of saveRecoverySecret
   // (PUT) above; 204/401/404 all mean "no recovery secret stored".

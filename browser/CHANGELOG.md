@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Reduce redundant Cloud Server account/enrollment requests and pause status/catalog polling in hidden tabs.
+
 ## [v0.41.0-beta.7] - 2026-09-12
 
 - Add template onboarding with editable previews and consistent mobile UI.

@@ -1,3 +1,4 @@
+import { startVisiblePolling } from '../helpers/visiblePolling';
 import { useEffect, useState } from 'react';
 import { core, server, useStore } from '@tomic/react';
 import { driveDisplayMetadata } from '../helpers/managed/driveDisplayMetadata';
@@ -108,10 +109,7 @@ export function useAccountDriveCatalog(local: string[]) {
       }
     };
 
-    void refresh();
-    const interval = window.setInterval(refresh, 30000);
-    window.addEventListener('focus', refresh);
-    window.addEventListener('online', refresh);
+    const stopPolling = startVisiblePolling(refresh, 30000);
     const logout = onManagedLogout(() => {
       if (sync.snapshot) {
         try {
@@ -128,9 +126,7 @@ export function useAccountDriveCatalog(local: string[]) {
       stopped = true;
       sync.reset();
       logout();
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('online', refresh);
+      stopPolling();
     };
   }, [store, agent, key]);
   const current = snapshot?.agent === agent ? snapshot : null;
