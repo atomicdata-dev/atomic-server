@@ -2,7 +2,9 @@ import {
   type Agent,
   type Resource,
   isNotAvailableLocally,
+  LOCAL_ONLY_NOT_FOUND_MESSAGE,
   isUnauthorized,
+  isNotFound,
 } from '@tomic/react';
 import { isRootWelcomeResourceError } from './isRootWelcomeResourceError';
 
@@ -22,7 +24,8 @@ import { isRootWelcomeResourceError } from './isRootWelcomeResourceError';
  * available locally" instead. For a signed-out visitor that is the same
  * situation — the data can only arrive through a sign-in (a vault restore, or
  * a connected device) — so it gets the same guard. A drive opened from the
- * portal on a fresh phone is exactly this.
+ * portal on a fresh phone is exactly this. Local-only drives require the
+ * same unlock even on an origin with a node: that node does not hold them.
  */
 export function isDriveSignInError(
   resource: Resource,
@@ -36,6 +39,11 @@ export function isDriveSignInError(
 
   return (
     isUnauthorized(resource.error) ||
-    (!!options.originWithoutNode && isNotAvailableLocally(resource.error))
+    // A DID is not tied to this node. A missing copy may live in the
+    // account vault or on another device and still require an unlock.
+    (resource.subject.startsWith('did:ad:') && isNotFound(resource.error)) ||
+    (isNotAvailableLocally(resource.error) &&
+      (options.originWithoutNode === true ||
+        resource.error?.message === LOCAL_ONLY_NOT_FOUND_MESSAGE))
   );
 }

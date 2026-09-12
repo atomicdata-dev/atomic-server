@@ -305,6 +305,20 @@ that turned out to be already done, or blocked by a finding, say so inline.
 
 ## Outbox modernization
 
+### Full-suite lifecycle regressions (September 12)
+
+- [x] Reproduce cold-fetch cancellation returning an undefined resource and
+  sign-out worker teardown being reported as a storage failure; preserve
+  rejecting save semantics while treating cancellation distinctly.
+- [x] Reproduce text reordering from delayed Loro-ProseMirror cursor restoration
+  (`a|d`, remote metadata, then typing `b` and `c` becoming `acdb`). Patch 0.4.3 to
+  restore selection synchronously; remove the package patch when an upstream
+  release passes `loroSelection.test.ts` without it.
+- [x] Give generated-site tests independent ports and clean up their owned
+  process groups, including descendants after the shell exits. A real-process
+  regression verifies that cleanup releases the listening port.
+- [ ] Verify the document, sign-out and generated-site browser cases in full CI.
+
 The dirty-bit sign-at-drain core is the right design — keep it. What needs work is the
 plumbing around it, which still carries HTTP-era shapes:
 
@@ -486,3 +500,15 @@ Findings referenced by number (F1–F12) are written up in
    the constrained append-only inbox in
    [`authorization-sync.md`](./authorization-sync.md)). Decide what ceremony grants
    known-peer status before rebuilding the accept path around it.
+
+### September 12 paired SaaS recovery validation
+
+- [x] Reproduce a second browser opening a vault-only DID as a node 404 instead of an unlock screen. Add a failing helper regression and route signed-out DID not-found errors to unlock; preserve HTTP 404 and signed-in error handling.
+- [x] Reproduce restored vault-only drives repeatedly subscribing to a node that returned NotFound. Preserve local-only routing after a successful nonempty restore when node absence is known; transport errors and failed restores do not change routing. All 878 frontend unit tests pass.
+- [x] Verify the paired SaaS vault-only second-browser journey: original profile and vault-only canary restored with strict diagnostics (1.7 minutes).
+- [ ] Pass full CI on the updated combined commit. The prior run on a9baad3ea was cancelled because this additional fix changes the head.
+
+### Follow-up from paired CI on fa5865ad7
+
+- [x] Reproduce dev-drive creation being redirected by account reconciliation before the temporary identity has a workspace. Skip reconciliation during the dev-drive setup route; resume on exit. Paired SaaS regression passes locally without enrollment (1.1 minutes); TypeScript and focused lint/format pass.
+- [ ] Include this follow-up in the next validated combined head after current CI finishes collecting failures.

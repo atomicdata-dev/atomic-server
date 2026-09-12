@@ -202,14 +202,29 @@ const HOST_PROFILES: Record<HostProfile, HostKnobs> = {
     nextestBuildJobs: '4',
     cargoBuildJobs: '8',
   },
+  // Sized for GitHub's standard hosted runner. The widths below said 2 for
+  // every knob, which matched the 2-vCPU runner this profile was written
+  // against; public repositories have had 4 vCPU / 16GB since 2024, so half
+  // the box sat idle through every compile.
+  //
+  // Only the *build* widths move. Rust compilation is the dominant cost here
+  // and scales cleanly with cores. The test widths stay where they are on
+  // purpose: `ci()` runs endToEnd concurrently with clippy, nextest, flutter
+  // and vitest, so raising those would stack more browsers and more test
+  // threads onto the same four cores — the starvation the mancave notes
+  // above describe. Build jobs mostly occupy phases the tests are not in.
+  //
+  // This profile is not the fallback it reads as: `CI_RUNNER` has been set to
+  // `["ubuntu-latest"]` since 2026-09-08, and `pick` treats that as an
+  // explicit escape hatch, so *every* run currently lands here.
   hosted: {
     e2eShardCount: 2,
     e2ePlaywrightWorkers: '1',
     e2ePlaywrightRetries: '2',
     nextestTestThreads: '2',
     nextestRetries: '2',
-    nextestBuildJobs: '2',
-    cargoBuildJobs: '2',
+    nextestBuildJobs: '4',
+    cargoBuildJobs: '4',
   },
 };
 

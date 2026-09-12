@@ -52,6 +52,12 @@ describe('isDriveSignInError', () => {
     );
   });
 
+  it('a signed-out DID absent from this node can be unlocked from a vault', () => {
+    const drive = res('did:ad:private-drive', notFound);
+    expect(isDriveSignInError(drive, undefined, BASE)).toBe(true);
+    expect(isDriveSignInError(drive, someAgent, BASE)).toBe(false);
+  });
+
   it('no error at all → no guard', () => {
     expect(isDriveSignInError(res(DRIVE), undefined, BASE)).toBe(false);
   });
@@ -74,6 +80,19 @@ describe('isDriveSignInError', () => {
         originWithoutNode: true,
       }),
     ).toBe(true);
+  });
+
+  it('a signed-out local-only drive requires unlock even when the app has a node', () => {
+    expect(
+      isDriveSignInError(res(DRIVE, localOnlyGone), undefined, BASE, {
+        originWithoutNode: false,
+      }),
+    ).toBe(true);
+    expect(
+      isDriveSignInError(res(DRIVE, localOnlyGone), someAgent, BASE, {
+        originWithoutNode: false,
+      }),
+    ).toBe(false);
   });
 
   it('not held locally, but a node exists → just offline, no guard', () => {

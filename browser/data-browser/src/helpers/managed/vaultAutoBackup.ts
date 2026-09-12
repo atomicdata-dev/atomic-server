@@ -1,5 +1,5 @@
 import { driveDisplayMetadata } from './driveDisplayMetadata';
-import { StoreEvents, type Store } from '@tomic/lib';
+import { StoreEvents, isNotFound, type Store } from '@tomic/lib';
 import {
   VaultSessionEndedError,
   agentVaultProof,
@@ -441,6 +441,8 @@ export async function restoreFromVault(
 
   if (!agent?.subject) return { status: 'no-backup', reason: 'not signed in' };
 
+  const absentFromNode = isNotFound(store.resources.get(driveSubject)?.error);
+
   try {
     // Session first: one quick request, against a database wait of up to
     // `CLIENT_DB_WAIT_MS`. Sign-in calls this on every device that holds no
@@ -493,6 +495,13 @@ export async function restoreFromVault(
       devicePubkey: lane,
       driveKey,
     });
+
+    // Restoring a vault copy does not upload it to the node. Preserve a
+    // confirmed node absence so saves and subscriptions stay on this device.
+    // A transport failure alone says nothing about where the drive is hosted.
+    if (absentFromNode && outcome.resourcesRestored > 0) {
+      store.registerLocalOnlyDrive(driveSubject);
+    }
 
     // The device now holds the drive and the key; later edits here should go
     // back up without a second enrollment round trip.

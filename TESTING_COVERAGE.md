@@ -454,6 +454,14 @@ vector (`personal_drive_cross_lang_vector`) pins the nonce, signature, and DID.
 | Parent action stays available on a non-drive stub and fetches parent at run | glue | `browser/data-browser/src/actions/resourceActions.parent.test.ts` |
 
 Not covered: derived AI tools invoked through a real model; MCP protocol projection (no Atomic MCP server yet); collapsing specialized `destroy()` call sites (table rows, views, tags) onto the resource delete action.
+## View transitions
+
+| Flow | Layer | Where |
+|---|---|---|
+| Hashed `view-transition-name` plus `view-transition-class` per tag | glue | `browser/data-browser/src/helpers/viewTransition.test.ts` |
+| `startViewTransition` throw / hung `finished` / rejected `ready` still navigates and skips the overlay | glue | `browser/data-browser/src/helpers/viewTransition.test.ts` |
+
+Not covered: visual morph of a grid card into the resource page in Firefox (needs a headed Firefox run; Playwright's firefox project is locks-only and automation bypasses view transitions unless `forceViewTransitions` is set).
 
 ## Documents
 
@@ -568,6 +576,17 @@ aliases. The editor Link lifecycle test preserves telephone links across multipl
 mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
+
+- `scripts/owned-process.node.mjs` exercises the template runner process lifecycle,
+  including independent ephemeral ports and descendant cleanup. The superseded
+  template-process helper and its standalone Playwright regression were removed.
+- `cancelled-lifecycle.test.ts` covers cold-fetch cancellation, optional tree
+  preload cancellation, pending worker destruction, and persistence rejection
+  without misreporting cancellation as a storage fault. Real storage failures
+  still reject and log errors.
+- `loroSelection.test.ts` drives real ProseMirror transactions and Loro imports
+  to verify that resource metadata arriving between keystrokes cannot reorder
+  text. It guards the synchronous-selection patch to `loro-prosemirror` 0.4.3.
 
 - `collection-page-assemble.test.ts` holds a local query in flight while a
   member is deleted, then releases the stale result. It checks membership,
@@ -904,6 +923,26 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `e2e.spec.ts` verify Continue remains clickable while feedback is offered.
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
+
+## Signed-out local drive opened from the portal
+
+`browser/data-browser/src/helpers/isDriveSignInError.test.ts` covers a local-only missing-resource error with no app agent, including origins with a configured node. It also covers signed-out DID resources absent from the current node: their copy may be in the account vault, so they offer unlock. Signed-in users, ordinary HTTP 404s, and unrelated transport failures retain their error handling.
+
+Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creation, passkey enrollment, recovery-code acknowledgement, completed app sign-out, portal passkey sign-in, and the Open link reaching the app unlock screen. It then unlocks and verifies the original drive title. Chromium virtual PRF state is tied to the original CDP target, so the unlock portion runs there after verifying the real popup handoff. Unlocking within the popup itself remains a physical-browser acceptance check.
+## Ontology codegen (`@tomic/cli`) and DID fetch
+
+| Flow | Where |
+|---|---|
+| HTTP path `https://host/did:ad:…` and `/did?subject=` extract the same DID | `browser/lib/src/subject.test.ts` |
+| JSON-AD parse accepts `@id: did:ad:…` when the request used the HTTP path alias | `browser/lib/src/parse.test.ts` |
+| `Client.fetchResourceHTTP` resolves DIDs via `/did?subject=` and does not touch `window` in Node | `browser/lib/src/client.fetch.test.ts` |
+| Store fetch by HTTP path alias returns the resource stored under the DID | `browser/lib/src/store.test.ts` |
+
+Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI test runner).
+
+`helpers/managed/vaultAutoBackup.test.ts` verifies successful vault restoration preserves known node absence as local-only routing, while transport failures and failed restores do not disable node sync. Paired SaaS second-browser coverage verifies the original profile and vault-only canary after restore, with bounded pre-restore refusal diagnostics.
+
+Paired SaaS `portal/e2e/identity-reconcile.spec.ts` exercises dev-drive creation while a managed account is active: reconciliation waits until the temporary identity has a drive, and creation must not enroll it in the account.
 
 Session restore routing: `helpers/managed/reconcile.test.ts` covers connecting the
 exact hosted drive before availability checks, clearing local-only routing,

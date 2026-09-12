@@ -14,7 +14,12 @@ import './reset.css';
 import { useContext, type JSX } from 'react';
 import { SettingsContext } from './helpers/AppSettings';
 import { CurrentBackgroundColor } from './globalCssVars';
-import { BREADCRUMB_BAR_TRANSITION_TAG } from './helpers/transitionName';
+import {
+  BREADCRUMB_BAR_TRANSITION_TAG,
+  MEETING_PANEL_TITLE_TRANSITION_TAG,
+  PAGE_TITLE_TRANSITION_TAG,
+  RESOURCE_PAGE_TRANSITION_TAG,
+} from './helpers/transitionName';
 
 interface ThemeWrapperProps {
   children: React.ReactNode;
@@ -340,6 +345,13 @@ export const GlobalStyle = createGlobalStyle`
     --view-transition-duration: 150ms;
   }
 
+  /* Firefox 144 sizes the root view-transition snapshot from :root's
+     used height. Without an explicit height the snapshot stretches
+     (https://bugzilla.mozilla.org/show_bug.cgi?id=1962617). */
+  html {
+    height: 100%;
+  }
+
   * {
     box-sizing: border-box;
     scrollbar-color: ${p => p.theme.colors.bg2} transparent;
@@ -441,13 +453,29 @@ export const GlobalStyle = createGlobalStyle`
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation-duration: var(--view-transition-duration);
-    /* Scale snapshots by height, preserving aspect ratio. The UA default
-       (inline-size: 100%, block-size: auto) smears text horizontally when a
-       narrow snapshot morphs into a wide group (grid title → page H1) —
-       most visible in Firefox, which doesn't interpolate changing aspect
-       ratios as smoothly as Chromium. */
+  }
+
+  /* Title morphs: scale by height so a narrow grid label does not smear
+     horizontally into the page H1. Firefox does not interpolate changing
+     aspect ratios as smoothly as Chromium — scoped to titles via
+     view-transition-class so it does not apply to card→page morphs. */
+  ::view-transition-old(.${PAGE_TITLE_TRANSITION_TAG}),
+  ::view-transition-new(.${PAGE_TITLE_TRANSITION_TAG}),
+  ::view-transition-old(.${MEETING_PANEL_TITLE_TRANSITION_TAG}),
+  ::view-transition-new(.${MEETING_PANEL_TITLE_TRANSITION_TAG}) {
     block-size: 100%;
     inline-size: auto;
+  }
+
+  /* Card / main morphs: fill the animating group on both axes. Scaling by
+     height alone made a square card snapshot as wide as the page is tall —
+     a giant overlay, worst on Firefox. */
+  ::view-transition-old(.${RESOURCE_PAGE_TRANSITION_TAG}),
+  ::view-transition-new(.${RESOURCE_PAGE_TRANSITION_TAG}) {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+    overflow: clip;
   }
 
   /* Keep geometry (group) animations on the same clock as the fades. The UA

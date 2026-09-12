@@ -6,6 +6,7 @@ import * as path from 'path';
 const TEMPLATE_CONFIG_FILE = {
   outputFolder: './src/ontologies',
   moduleAlias: '@tomic/lib',
+  serverUrl: 'http://localhost:9883',
   ontologies: [],
 };
 
@@ -32,7 +33,7 @@ export const initCommand = async (args: string[]) => {
   console.log(chalk.green('Done!'));
   console.log(
     chalk.cyan(
-      'Next add your ontologies to your atomic.config.json file. You can find more info on how to do this here: https://docs.atomicdata.dev/js-cli',
+      'Set "serverUrl" to your Atomic Server origin, then add ontology subjects (did:ad:… identifiers, not the https://host/did:ad:… address-bar URL). More info: https://docs.atomicdata.dev/js-cli',
     ),
   );
 };

@@ -703,6 +703,35 @@ describe('Store', () => {
     expect(gotByAlias).toBe(gotByDID);
   });
 
+  it('returns a DID resource fetched by its HTTP path alias', async ({
+    expect,
+  }) => {
+    const did = 'did:ad:ontology123';
+    const httpAlias = `https://example.com/${did}`;
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setServerConnected(true);
+    store.injectFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '@id': did,
+            [core.properties.name]: 'My ontology',
+          }),
+          { status: 200 },
+        ),
+    );
+
+    const resource = await store.fetchResourceFromServer(httpAlias, {
+      noWebSocket: true,
+    });
+
+    expect(resource).toBeDefined();
+    expect(resource.error).toBeUndefined();
+    expect(resource.subject).toBe(did);
+    expect(resource.get(core.properties.name)).toBe('My ontology');
+    expect(store.getResourceLoading(httpAlias).subject).toBe(did);
+  });
+
   it('normalizes relative subjects to full URLs', async ({ expect }) => {
     const store = new Store({ serverUrl: 'https://myserver.dev' });
 

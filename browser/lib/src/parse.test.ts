@@ -219,4 +219,41 @@ describe('parse.ts', () => {
     ]);
     expect(commit.get(core.properties.description)).toBeUndefined();
   });
+
+  /**
+   * Regression: `@tomic/cli` users copy `https://host/did:ad:…` from the
+   * address bar. The server returns `@id: did:ad:…` (the resource's
+   * identity). Treating that as a mismatch made `ad-generate ontologies`
+   * fail after a successful fetch.
+   */
+  it('accepts a DID @id when the requested subject is the HTTP path alias', ({
+    expect,
+  }) => {
+    const did = 'did:ad:ontology123';
+    const httpAlias = `https://myserver.example/${did}`;
+    const jsonObject = {
+      '@id': did,
+      [STRING_PROPERTY]: 'My ontology',
+    };
+
+    const parser = new JSONADParser();
+    const [resource] = parser.parse(jsonObject, httpAlias);
+
+    expect(resource.error).toBeUndefined();
+    expect(resource.subject).toBe(did);
+    expect(resource.get(STRING_PROPERTY)).toBe('My ontology');
+  });
+
+  it('still rejects a genuine @id mismatch', ({ expect }) => {
+    const jsonObject = {
+      '@id': 'https://example.com/other',
+      [STRING_PROPERTY]: 'Hoi',
+    };
+
+    const parser = new JSONADParser();
+
+    expect(() => parser.parse(jsonObject, EXAMPLE_SUBJECT)).toThrow(
+      /wrong subject in @id/,
+    );
+  });
 });

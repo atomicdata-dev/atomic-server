@@ -25,6 +25,7 @@
  * ```
  */
 
+import { RequestCancelledError } from './error.js';
 import { versionVectorRecords } from './version-vector-records.js';
 import {
   parseHistoryAttribution,
@@ -1024,7 +1025,7 @@ export class ClientDbWorker {
     this.seedPromise = null;
 
     for (const [, pending] of this.pending) {
-      pending.reject(new Error('ClientDb worker destroyed'));
+      pending.reject(new RequestCancelledError('ClientDb worker destroyed'));
     }
 
     this.pending.clear();
@@ -1040,6 +1041,10 @@ export class ClientDbWorker {
     // need to let it finish.
     if (this.role === 'initializing' && this.initPromise) {
       await this.initPromise;
+    }
+
+    if (this.destroyed) {
+      throw new RequestCancelledError('ClientDb worker destroyed');
     }
 
     if (this.role === 'leader') {

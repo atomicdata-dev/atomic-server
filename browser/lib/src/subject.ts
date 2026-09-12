@@ -75,6 +75,81 @@ export function isHttpSubject(subject: Subject): boolean {
   return HTTP_RE.test(subject);
 }
 
+/**
+ * If `raw` is a `did:ad:` subject, return it with query/fragment stripped.
+ * If it is an HTTP(S) URL that *names* a DID resource — the path form
+ * `https://host/did:ad:…` (an address-bar / copy-paste URL) or the
+ * `/did` endpoint `https://host/did?subject=did:ad:…` — return that DID.
+ * Otherwise `undefined`.
+ *
+ * The server always serialises a DID resource's `@id` as the DID itself,
+ * even when the resource was fetched through one of these HTTP aliases.
+ * Callers comparing a requested subject against `@id` should use
+ * {@link subjectsReferToSameResource} rather than string equality.
+ */
+export function extractDidSubject(raw: string): string | undefined {
+  if (raw.startsWith(DID_PREFIX)) {
+    return raw.split(/[?#]/)[0];
+  }
+
+  if (!HTTP_RE.test(raw)) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(raw);
+    const path = url.pathname.replace(/\/$/, '') || '/';
+
+    // Path form: https://host/did:ad:…
+    if (path.startsWith(`/${DID_PREFIX}`) && !path.slice(1).includes('/')) {
+      return path.slice(1);
+    }
+
+    // Endpoint form: https://host/did?subject=did:ad:…
+    if (path === '/did') {
+      const subject = url.searchParams.get('subject');
+
+      if (subject?.startsWith(DID_PREFIX)) {
+        return subject.split(/[?#]/)[0];
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+/**
+ * True when `requested` and `received` name the same resource: exact
+ * match, same URL ignoring query params, or one is an HTTP alias of
+ * the other's DID (`https://host/did:ad:x` vs `did:ad:x`).
+ */
+export function subjectsReferToSameResource(
+  requested: string,
+  received: string,
+): boolean {
+  if (requested === received) {
+    return true;
+  }
+
+  const requestedNoParams = requested.split('?')[0];
+  const receivedNoParams = received.split('?')[0];
+
+  if (requestedNoParams === receivedNoParams) {
+    return true;
+  }
+
+  const requestedDid = extractDidSubject(requested);
+  const receivedDid = extractDidSubject(received);
+
+  return (
+    requestedDid !== undefined &&
+    receivedDid !== undefined &&
+    requestedDid === receivedDid
+  );
+}
+
 export class InvalidSubjectError extends Error {
   constructor(public readonly raw: string) {
     super(`Invalid subject: ${JSON.stringify(raw)}`);

@@ -50,7 +50,10 @@ export function transitionName(tag: string, subject: string | undefined) {
     return 'view-transition-name: none';
   }
 
-  return `view-transition-name: ${name}`;
+  // Class lets us target a *kind* of snapshot (title vs page) without
+  // enumerating hashed names. Firefox needs different sizing rules per
+  // kind — a global `block-size: 100%` on `*` inflates card→page morphs.
+  return `view-transition-name: ${name}; view-transition-class: ${tag}`;
 }
 
 export function getTransitionStyle(tag: string, subject: string | undefined) {
@@ -64,5 +67,6 @@ export function getTransitionStyle(tag: string, subject: string | undefined) {
 
   return {
     viewTransitionName: name,
+    viewTransitionClass: tag,
   };
 }
