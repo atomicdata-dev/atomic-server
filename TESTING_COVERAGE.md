@@ -513,6 +513,12 @@ mounts without resetting or re-registering the global parser.
 
 ### Save durability and identity lifecycle regressions
 
+- `save-acknowledgement.test.ts` exercises `Resource.save()` through the real
+  outbox with a stubbed commit transport: server refusals (including terminal
+  drops), backoff, blocked entries and cancellation cannot report persistence.
+  It also covers offline transport failures, successful retries, unrelated
+  subjects and edits arriving during an acknowledged save (#1388).
+
 - `client-db.worker.test.ts` requires vault cursor commits to flush before the
   worker acknowledges backup completion, and propagates flush failures. The
   SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.

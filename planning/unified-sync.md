@@ -305,6 +305,22 @@ that turned out to be already done, or blocked by a finding, say so inline.
 
 ## Outbox modernization
 
+### Explicit save acknowledgement (#1388)
+
+- [x] Reproduce false `persisted` results through the public `Resource.save()` API.
+- [x] Preserve per-entry failure causes across terminal removal and propagate
+  them to explicit saves; background drains retain their retry policy.
+- [x] Check queued saves against the captured Loro version so an acknowledged
+  save can finish while newer edits remain queued. Preserve offline and
+  local-only durability semantics.
+- [x] Cover refusals, retries, cancellation and concurrent edits in library tests.
+- [ ] Merge after PR validation.
+
+An attempted drain is not an acknowledgement. Callers must handle rejected
+saves and distinguish `offline` from `persisted` before starting server work
+that depends on the resource. `persisted` also denotes local database durability
+for local-only resources, which have no server acknowledgement.
+
 The dirty-bit sign-at-drain core is the right design — keep it. What needs work is the
 plumbing around it, which still carries HTTP-era shapes:
 
