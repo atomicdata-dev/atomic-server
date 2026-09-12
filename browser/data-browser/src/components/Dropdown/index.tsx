@@ -229,7 +229,18 @@ export function DropdownMenu({
       // transition must start AFTER it becomes visible — one frame later —
       // or it plays unseen and the menu appears to pop in.
       const reveal = () => {
-        dropdownRef.current!.style.visibility = 'visible';
+        const menu = dropdownRef.current!;
+        menu.style.visibility = 'visible';
+
+        // Focus only after this exact menu has been revealed. A separate
+        // effect's RAF can run before the positioning RAF under React's
+        // scheduling, and browsers refuse focus on visibility:hidden inputs.
+        if (searchable) {
+          searchInputRef.current?.focus();
+        } else if (!menu.contains(document.activeElement)) {
+          menu.focus();
+        }
+
         requestAnimationFrame(() => {
           dropdownRef.current?.setAttribute('data-positioned', 'true');
         });
@@ -308,7 +319,7 @@ export function DropdownMenu({
 
       reveal();
     });
-  }, [isActive, setIsActive, anchorPoint]);
+  }, [isActive, setIsActive, anchorPoint, searchable]);
 
   const handleMouseOverMenu = useCallback(() => {
     setUseKeys(false);
@@ -382,35 +393,6 @@ export function DropdownMenu({
       handleClose();
     }
   };
-
-  // Focus the menu on open so keyboard navigation works even when it opened at
-  // the cursor with no highlighted item (context menus). Only when focus isn't
-  // already inside it — a normal dropdown highlights + focuses its first item.
-  // Deferred to the frame AFTER the positioning RAF made the menu visible —
-  // focusing a visibility:hidden element is refused (which is also why the
-  // search input can't use the autoFocus attribute).
-  useEffect(() => {
-    if (!isActive) {
-      return;
-    }
-
-    const raf = requestAnimationFrame(() => {
-      if (searchable) {
-        searchInputRef.current?.focus();
-
-        return;
-      }
-
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(document.activeElement)
-      ) {
-        dropdownRef.current.focus();
-      }
-    });
-
-    return () => cancelAnimationFrame(raf);
-  }, [isActive, searchable]);
 
   // A pointerdown on the trigger while the menu is open must NOT close the
   // menu via the blur handler below — the same click's toggle would then

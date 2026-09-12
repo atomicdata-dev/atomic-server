@@ -3538,9 +3538,8 @@ export class Resource<C extends OptionalClass = any> {
         JSON.stringify(obj),
         snapshot,
       );
-      // Worker writes are batched without fsync; put completion alone is not
-      // the durability barrier promised by save().
-      await clientDb.flush();
+      // This RPC includes the durable flush. A second RPC could race the
+      // identity handoff closing this worker after the write has completed.
       closePersist();
     } catch (e) {
       closePersist({ err: e instanceof Error ? e.message : String(e) });

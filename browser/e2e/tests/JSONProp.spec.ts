@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './fixtures';
-import { before, FRONTEND_URL, newDrive, signIn } from './test-utils';
+import { before, FRONTEND_URL } from './test-utils';
 
 const props = {
   name: 'https://atomicdata.dev/properties/name',
@@ -61,9 +61,6 @@ test.describe('JSON prop', () => {
   test.beforeEach(before);
 
   test('create JSON prop', async ({ page }) => {
-    await signIn(page);
-    await newDrive(page);
-
     const classSubject = await createClassWithJsonProp(page);
     // Straight to the form for that class. `newResource` cannot be used here:
     // it treats anything not starting with `https://` as a shortname, and a

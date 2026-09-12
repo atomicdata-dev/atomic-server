@@ -1,7 +1,5 @@
 import { test, expect, Locator } from './fixtures';
 import {
-  signIn,
-  newDrive,
   newResource,
   before,
   inDialog,
@@ -11,16 +9,12 @@ import {
   waitForClassInstanceSearchable,
   waitForOntologyClass,
   smoke,
+  getCurrentSubject,
 } from './test-utils';
 
 test.describe('Ontology', async () => {
   test.beforeEach(before);
 
-  // FLAKY (remote CI, observed once): one of the dropdown picks fails
-  // to register — `pickOption` helper has a 100 ms wait that's
-  // probably too short under contention. Investigate: replace the
-  // `waitForTimeout(100)` in `pickOption` with an explicit visibility
-  // wait on the dropdown's option list.
   test('Create and edit ontology', smoke, async ({ page }) => {
     test.slow();
 
@@ -53,8 +47,6 @@ test.describe('Ontology', async () => {
       page.getByTestId(`class-card-write-${name}`);
 
     // --- Test Start ---
-    await signIn(page);
-    await newDrive(page);
 
     // Create new Table
     await newResource('ontology', page);
@@ -231,6 +223,32 @@ test.describe('Ontology', async () => {
     // search) can see `arrow-kind` rather than sleeping for the index flush.
     await waitForOntologyClass(page, 'arrow-kind');
 
+    // Hold the first save's completion after persistence. Its card can render
+    // and the next form can open while the old onSuccess callback is pending.
+    await page.evaluate(
+      async subject => {
+        const ontology = await window.store.getResource(subject!);
+        const save = ontology.save.bind(ontology);
+        const state = window as unknown as {
+          finishPreviousInstanceSave: () => void;
+          previousInstanceSaveHeld: boolean;
+        };
+        const gate = new Promise<void>(resolve => {
+          state.finishPreviousInstanceSave = resolve;
+        });
+
+        ontology.save = async (...args) => {
+          const result = await save(...args);
+          ontology.save = save;
+          state.previousInstanceSaveHeld = true;
+          await gate;
+
+          return result;
+        };
+      },
+      await getCurrentSubject(page),
+    );
+
     const createInstance = async (name: string) => {
       await page.getByRole('button', { name: 'New Instance' }).click();
       await inDialog(page, async (dialog, closeDialogWith) => {
@@ -246,9 +264,26 @@ test.describe('Ontology', async () => {
 
         await expect(dialog.getByLabel('name')).toBeVisible();
         await dialog.getByLabel('name').fill(name);
+
+        if (name === 'Green arrow with black border') {
+          await page.evaluate(async () => {
+            (
+              window as unknown as { finishPreviousInstanceSave: () => void }
+            ).finishPreviousInstanceSave();
+            // Allow the older save's scroll callback and React update to run.
+            await new Promise<void>(resolve =>
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve()),
+              ),
+            );
+          });
+          await expect(dialog.getByLabel('name')).toHaveValue(name);
+        }
+
         await closeDialogWith('Save');
       });
 
+      if (name === 'Red arrow with circle') return;
       await expect(page.getByText('Resource loading...')).not.toBeVisible();
       await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible({
         timeout: 20000,
@@ -256,7 +291,15 @@ test.describe('Ontology', async () => {
     };
 
     await createInstance('Red arrow with circle');
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { previousInstanceSaveHeld: boolean })
+          .previousInstanceSaveHeld,
+    );
     await createInstance('Green arrow with black border');
+    await expect(
+      page.getByRole('heading', { name: 'Red arrow with circle', level: 2 }),
+    ).toBeVisible();
 
     // The picker offers what the SERVER search returns, so wait for the exact
     // instance it is about to be asked for. A fixed sleep guesses at Tantivy's

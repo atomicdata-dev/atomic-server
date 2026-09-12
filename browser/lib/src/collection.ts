@@ -264,6 +264,9 @@ export class Collection {
    * that says "0 members" silently wipes the optimistic add and the
    * UI loses the just-created resource until the next reload. */
   private _optimisticAdds = new Set<string>();
+  /** Removals survive stale queries until a matching resource event admits
+   * the subject again. */
+  private _removedSubjects = new Set<string>();
   private server: string;
   private params: CollectionParams;
 
@@ -439,6 +442,24 @@ export class Collection {
     pageIdx: number,
     resource: Resource<Collections.Collection>,
   ): void {
+    const incomingMembers = resource.getSubjects(
+      collections.properties.members,
+    );
+    const retained = incomingMembers.filter(s => !this._removedSubjects.has(s));
+
+    if (retained.length !== incomingMembers.length) {
+      const total = resource.get(collections.properties.totalMembers);
+      this.writePageMembers(
+        resource,
+        retained,
+        Math.max(
+          0,
+          (typeof total === 'number' ? total : incomingMembers.length) -
+            (incomingMembers.length - retained.length),
+        ),
+      );
+    }
+
     // Drop the old page's members from the index first, then re-add the
     // new page's. Members can move between pages on `refresh`, so we
     // can't just additively merge.
@@ -577,6 +598,15 @@ export class Collection {
           constraintMatches(resource, f.property, f.value, f.operator ?? 'eq'),
       );
 
+    if (!resource) {
+      // refresh clears the index before awaiting its query. Remember deletion
+      // even when the subject is temporarily absent from that index.
+      this._removedSubjects.add(subject);
+      this._optimisticAdds.delete(subject);
+    } else if (matches && !resource.new && !this._assemblingPage) {
+      this._removedSubjects.delete(subject);
+    }
+
     // O(1) lookup via the maintained subject→page index instead of
     // scanning every loaded page on every incoming event. The within-
     // page `indexOf` for the remove path stays — that's the array
@@ -711,6 +741,7 @@ export class Collection {
     // Share the index too — both clones look at the same `pages` Map,
     // so they should observe the same membership.
     collection._memberIndex = this._memberIndex;
+    collection._removedSubjects = this._removedSubjects;
 
     return collection;
   }
@@ -1014,6 +1045,7 @@ export class Collection {
       result.resources.length === result.subjects.length
     ) {
       for (let i = 0; i < result.subjects.length; i++) {
+        if (this._removedSubjects.has(result.subjects[i]!)) continue;
         this.store.hydrateResourceFromJsonAd(
           result.subjects[i]!,
           result.resources[i]!,
@@ -1027,7 +1059,9 @@ export class Collection {
     // `TableResource` and react-window render an empty `TableRow` slot
     // for the missing index that gets stuck on a loading shimmer. Stripping
     // here keeps the count and the addressable members consistent.
-    result.subjects = filterIndexLeakage(result.subjects);
+    result.subjects = filterIndexLeakage(result.subjects).filter(
+      subject => !this._removedSubjects.has(subject),
+    );
     result.count = result.subjects.length;
 
     if (result.subjects.length === 0) {

@@ -18,7 +18,12 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
 
   const [dialogProps, show, close] = useDialog({
     onSuccess: async () => {
-      ontology.push(core.properties.instances, [createdInstanceSubject], true);
+      const savedSubject = createdInstanceSubject;
+      if (!savedSubject) return;
+      // Clear this save's state before yielding. Its completion may arrive
+      // after the user has already opened another instance form.
+      setCreatedInstanceSubject(undefined);
+      ontology.push(core.properties.instances, [savedSubject], true);
       await ontology.save();
 
       // Wait for the new instance card to render, then scroll it into view.
@@ -27,14 +32,10 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
       let attempts = 0;
 
       const tryScroll = () => {
-        const el = document.querySelector(
-          `[about="${createdInstanceSubject}"]`,
-        );
+        const el = document.querySelector(`[about="${savedSubject}"]`);
 
         if (el) {
           el.scrollIntoView({ behavior: 'instant', block: 'center' });
-          setCreatedInstanceSubject(undefined);
-          setClassSubject(undefined);
 
           return;
         }

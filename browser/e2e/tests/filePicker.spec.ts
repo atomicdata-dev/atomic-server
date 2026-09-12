@@ -7,10 +7,8 @@ import {
   before,
   fillSearchBox,
   inDialog,
-  newDrive,
   newResource,
   openNewResourcePage,
-  signIn,
   testFilePath,
   waitForOntologyClass,
   smoke,
@@ -99,9 +97,6 @@ test.describe('File Picker', () => {
     smoke,
     async ({ page }) => {
       const SEARCH_BAR_PLACEHOLDER = 'Search or enter a URL...';
-
-      await signIn(page);
-      await newDrive(page);
 
       await uploadFile(page, 'testFile1.txt');
       await uploadFile(page, 'testFile2.md');

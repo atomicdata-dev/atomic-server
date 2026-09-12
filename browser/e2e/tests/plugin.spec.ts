@@ -5,11 +5,9 @@ import {
   currentDriveTitle,
   fillSearchBox,
   inDialog,
-  newDrive,
   newResource,
   setTitle,
   sidebarDriveButtonId,
-  signIn,
   testFilePath,
   waitForSynced,
 } from './test-utils';
@@ -26,8 +24,6 @@ test.describe('Plugins', () => {
     // routinely needs 40-50s on a dev machine even when nothing is wrong.
     // test.slow() triples the default 60s budget.
     test.slow();
-    await signIn(page);
-    await newDrive(page);
 
     // Plugin must be installed BEFORE the folder is created. The plugin uses
     // `after_commit` + `host.commit` to set the canonical folder name, so it

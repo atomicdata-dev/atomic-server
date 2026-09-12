@@ -1,0 +1,80 @@
+--- a/src/sync-plugin.ts
++++ b/src/sync-plugin.ts
+@@ -1,6 +1,6 @@
+ import type { Cursor, LoroEventBatch, LoroMap } from "loro-crdt";
+ import { Fragment, Slice } from "prosemirror-model";
+-import { type EditorState, Plugin, type StateField } from "prosemirror-state";
++import { type EditorState, Plugin, type StateField, TextSelection } from "prosemirror-state";
+ import type { EditorView } from "prosemirror-view";
+ 
+ import {
+@@ -209,14 +209,16 @@
+   tr.setMeta(loroSyncPluginKey, {
+     type: "non-local-updates",
+   });
++  // Restore selection atomically: a later timer can overwrite a newer key's cursor.
++  if (anchor != null) {
++    const anchorPos = cursorToAbsolutePosition(anchor, state.doc, mapping)[0];
++    const focusPos = focus ? cursorToAbsolutePosition(focus, state.doc, mapping)[0] : anchorPos;
++    const size = tr.doc.content.size;
++    if (anchorPos != null && focusPos != null && anchorPos >= 0 && focusPos >= 0 && anchorPos <= size && focusPos <= size) {
++      tr.setSelection(TextSelection.between(tr.doc.resolve(anchorPos), tr.doc.resolve(focusPos)));
++    }
++  }
+   view.dispatch(tr);
+-
+-  if (anchor == null) {
+-    return;
+-  }
+-  setTimeout(() => {
+-    syncCursorsToPmSelection(view, anchor, focus);
+-  });
+ }
+ 
+ /**
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -652,11 +652,16 @@
+ 	const { anchor, focus } = convertPmSelectionToCursors(view.state.doc, view.state.selection, state);
+ 	let tr = view.state.tr.replace(0, view.state.doc.content.size, new Slice(Fragment.from(node), 0, 0));
+ 	tr.setMeta(loroSyncPluginKey, { type: "non-local-updates" });
++	// Restore selection atomically: a later timer can overwrite a newer key's cursor.
++	if (anchor != null) {
++	  const anchorPos = cursorToAbsolutePosition(anchor, state.doc, mapping)[0];
++	  const focusPos = focus ? cursorToAbsolutePosition(focus, state.doc, mapping)[0] : anchorPos;
++	  const size = tr.doc.content.size;
++	  if (anchorPos != null && focusPos != null && anchorPos >= 0 && focusPos >= 0 && anchorPos <= size && focusPos <= size) {
++	    tr.setSelection(TextSelection.between(tr.doc.resolve(anchorPos), tr.doc.resolve(focusPos)));
++	  }
++	}
+ 	view.dispatch(tr);
+-	if (anchor == null) return;
+-	setTimeout(() => {
+-		syncCursorsToPmSelection(view, anchor, focus);
+-	});
+ }
+ /**
+ * Update ProseMirror selection based on the given Loro cursors.
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -653,11 +653,16 @@
+ 	const { anchor, focus } = convertPmSelectionToCursors(view.state.doc, view.state.selection, state);
+ 	let tr = view.state.tr.replace(0, view.state.doc.content.size, new prosemirror_model.Slice(prosemirror_model.Fragment.from(node), 0, 0));
+ 	tr.setMeta(loroSyncPluginKey, { type: "non-local-updates" });
++	// Restore selection atomically: a later timer can overwrite a newer key's cursor.
++	if (anchor != null) {
++	  const anchorPos = cursorToAbsolutePosition(anchor, state.doc, mapping)[0];
++	  const focusPos = focus ? cursorToAbsolutePosition(focus, state.doc, mapping)[0] : anchorPos;
++	  const size = tr.doc.content.size;
++	  if (anchorPos != null && focusPos != null && anchorPos >= 0 && focusPos >= 0 && anchorPos <= size && focusPos <= size) {
++	    tr.setSelection(prosemirror_state.TextSelection.between(tr.doc.resolve(anchorPos), tr.doc.resolve(focusPos)));
++	  }
++	}
+ 	view.dispatch(tr);
+-	if (anchor == null) return;
+-	setTimeout(() => {
+-		syncCursorsToPmSelection(view, anchor, focus);
+-	});
+ }
+ /**
+ * Update ProseMirror selection based on the given Loro cursors.

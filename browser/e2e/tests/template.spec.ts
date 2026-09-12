@@ -1,24 +1,45 @@
-import { expect, test, type Page } from './fixtures';
-import { exec } from 'child_process';
+import { expect, test as baseTest, type Page } from './fixtures';
 import {
   before,
   makeDrivePublic,
-  newDrive,
   nodeReachableServerUrl,
-  signIn,
   openNewResourcePage,
+  waitForSynced,
 } from './test-utils';
 import fs from 'node:fs';
-import type { ChildProcess } from 'node:child_process';
 import path from 'node:path';
-import {
-  freeTemplatePort,
-  startTemplateProcess,
-  stopTemplateProcess,
-} from './template-process';
 import os from 'node:os';
 
-const EXEC_DIR = path.join(os.tmpdir(), 'atomic-data-template-tests');
+import { OwnedProcess } from '../scripts/owned-process.mjs';
+import { positiveInteger } from '../scripts/concurrency.mjs';
+
+const test = baseTest.extend<{
+  site: { directory: string; processes: OwnedProcess[] };
+}>({
+  // Playwright requires destructuring even for a fixture with no dependencies.
+  // eslint-disable-next-line no-empty-pattern
+  site: async ({}, use, testInfo) => {
+    const directory = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'atomic-template-'),
+    );
+    const processes: OwnedProcess[] = [];
+
+    try {
+      await use({ directory, processes });
+    } finally {
+      await Promise.all(processes.map(process => process.stop()));
+
+      for (const [index, process] of processes.entries()) {
+        await testInfo.attach(`template-process-${index}`, {
+          body: process.output,
+          contentType: 'text/plain',
+        });
+      }
+
+      await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+  },
+});
 const TEMPLATE_IMPORT_TIMEOUT = 60_000;
 
 /**
@@ -82,28 +103,42 @@ const CREATE_TEMPLATE_BIN = path.join(
   'index.js',
 );
 
-const execAsync = async (command: Parameters<typeof exec>[0], cwd?: string) => {
-  return new Promise((resolve, reject) => {
-    const options = {
-      cwd: cwd ? path.join(EXEC_DIR, cwd) : EXEC_DIR,
-    };
-
-    exec(command, options, (err, stdout, stderr) => {
-      // eslint-disable-next-line no-console
-      console.log(stdout, stderr);
-
-      if (err) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `Encountered error while excecuting ${command} in ${options.cwd}`,
-        );
-        reject(new Error(err.message));
-      }
-
-      resolve(stdout.toString());
+async function runCommand(
+  site: { directory: string; processes: OwnedProcess[] },
+  command: string,
+  args: string[],
+  subdirectory = '',
+) {
+  await test.step(`Template ${command === process.execPath ? 'scaffold' : args[0]}`, async () => {
+    const buildWorkers = process.env.ATOMIC_TEMPLATE_BUILD_WORKERS
+      ? positiveInteger(
+          process.env.ATOMIC_TEMPLATE_BUILD_WORKERS,
+          'ATOMIC_TEMPLATE_BUILD_WORKERS',
+        )
+      : Math.max(1, Math.min(2, Math.floor(os.availableParallelism() / 2)));
+    const child = new OwnedProcess(command, args, {
+      cwd: path.join(site.directory, subdirectory),
+      env: {
+        ...process.env,
+        // Next 16.2's default cpus is CIRCLE_NODE_TOTAL - 1. Budget its
+        // build without changing the generated project's config.
+        // https://github.com/vercel/next.js/blob/v16.2.6/packages/next/src/server/config-shared.ts
+        ...(args[0] === 'build'
+          ? {
+              CIRCLE_NODE_TOTAL: String(buildWorkers + 1),
+              RAYON_NUM_THREADS: String(buildWorkers),
+            }
+          : {}),
+      },
     });
+    site.processes.push(child);
+    const code = await child.done;
+    if (code !== 0)
+      throw new Error(
+        `${command} ${args.join(' ')} exited ${code}:\n${child.output}`,
+      );
   });
-};
+}
 
 /** The `@tomic/*` packages a generated site depends on, and where they live here. */
 const WORKSPACE_PACKAGES = {
@@ -126,8 +161,8 @@ const WORKSPACE_PACKAGES = {
  * these, and the site is built against the code on this branch — which is the
  * point of the test, not an incidental convenience.
  */
-async function useWorkspacePackages(siteType: string) {
-  const manifestPath = path.join(EXEC_DIR, siteType, 'package.json');
+async function useWorkspacePackages(directory: string, siteType: string) {
+  const manifestPath = path.join(directory, siteType, 'package.json');
   const manifest = JSON.parse(
     await fs.promises.readFile(manifestPath, 'utf-8'),
   ) as Record<string, Record<string, string> | undefined>;
@@ -153,76 +188,60 @@ async function useWorkspacePackages(siteType: string) {
 }
 
 async function setupTemplateSite(
+  site: { directory: string; processes: OwnedProcess[] },
   serverUrl: string,
   drive: string,
   siteType: string,
 ) {
-  fs.mkdirSync(EXEC_DIR, { recursive: true });
-
-  // `serverUrl` comes from the browser store (`atomic.localhost` in dagger).
-  // create-template runs in Node and needs the service-binding hostname.
   const reachable = nodeReachableServerUrl(serverUrl);
-
-  await execAsync(
-    `node ${CREATE_TEMPLATE_BIN} ${siteType} --template ${siteType} --server-url ${reachable} --drive ${drive}`,
-  );
-
-  await useWorkspacePackages(siteType);
-
-  // No frozen lockfile because it would cause issues in the ci. No dependency
-  // build scripts either: none of them matter to what this test asserts, and
-  // pnpm 11 turns an unapproved one (`sharp`, via next) into a hard
-  // ERR_PNPM_IGNORED_BUILDS failure rather than a warning.
-  await execAsync(
-    'pnpm install --no-frozen-lockfile --ignore-scripts',
+  await runCommand(site, process.execPath, [
+    CREATE_TEMPLATE_BIN,
+    siteType,
+    '--template',
+    siteType,
+    '--server-url',
+    reachable,
+    '--drive',
+    drive,
+  ]);
+  await useWorkspacePackages(site.directory, siteType);
+  await runCommand(
+    site,
+    'pnpm',
+    ['install', '--prefer-offline', '--no-frozen-lockfile', '--ignore-scripts'],
     siteType,
   );
-
-  await execAsync('pnpm update-ontologies', siteType);
+  await runCommand(site, 'pnpm', ['update-ontologies'], siteType);
+  await runCommand(site, 'pnpm', ['build'], siteType);
 }
 
-async function startServer(siteType: string) {
-  const port = await freeTemplatePort();
-  // Adjust runtime commands per template
-  const command =
+function startServer(
+  site: { directory: string; processes: OwnedProcess[] },
+  siteType: string,
+) {
+  // Both CLIs pass port 0 to listen(): the OS allocates the actual port while
+  // binding, avoiding a reserve/close/rebind race with another test or run.
+  const args =
     siteType === 'nextjs-site'
-      ? `pnpm build && pnpm start --port ${port}`
-      : `pnpm run build && NO_COLOR=1 pnpm preview --port ${port} --strictPort`;
-
-  return startTemplateProcess(command, path.join(EXEC_DIR, siteType));
-}
-
-const waitForServer = (
-  childProcess: ChildProcess,
-  timeout = 120000,
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('Server took too long to start.'));
-    }, timeout);
-
-    childProcess.stdout?.on('data', data => {
-      const message = data.toString();
-
-      const match = message.match(/http:\/\/localhost:\d+/);
-
-      if (match) {
-        clearTimeout(timeoutId); // Clear the timeout when resolved
-        resolve(match[0]); // Resolve with the URL
-      }
-    });
-
-    childProcess.stderr?.on('data', data => console.error(data.toString()));
-
-    childProcess.on('exit', code => {
-      clearTimeout(timeoutId); // Clear the timeout when the process exits
-
-      if (code !== 0) {
-        reject(new Error(`Server process exited with code ${code}`));
-      }
-    });
+      ? ['exec', 'next', 'start', '--hostname', '127.0.0.1', '--port', '0']
+      : [
+          'exec',
+          'vite',
+          'preview',
+          '--host',
+          '127.0.0.1',
+          '--port',
+          '0',
+          '--strictPort',
+        ];
+  const child = new OwnedProcess('pnpm', args, {
+    cwd: path.join(site.directory, siteType),
+    env: { ...process.env, NO_COLOR: '1' },
   });
-};
+  site.processes.push(child);
+
+  return child;
+}
 
 /**
  * The seeded site is a two-locale site (en default, nl declared): the balloon
@@ -269,22 +288,12 @@ async function assertTwoLocaleSite(
 }
 
 test.describe('Test create-template package', () => {
-  test.describe.configure({ mode: 'serial' });
   test.beforeEach(before);
 
-  // A run that is killed (or that fails before `afterAll`) leaves EXEC_DIR
-  // behind, and `create-template` then *prompts* "Folder already exists …
-  // Continue? (y/n)" on stdin — which `exec` never answers, so the next run
-  // hangs until the test times out. Start from a clean slate instead of
-  // trusting the previous run's cleanup.
-  test.beforeAll(async () => {
-    await fs.promises.rm(EXEC_DIR, { recursive: true, force: true });
-  });
-
-  test('apply next-js template', async ({ page }) => {
+  test('apply next-js template', async ({ page, site }) => {
     test.slow();
-    await signIn(page);
-    const drive = await newDrive(page);
+    // before() already created a unique identity and drive for this test.
+    const drive = await page.evaluate(() => window.store.getDrive()!);
     await makeDrivePublic(page);
 
     // Apply the template in data browser
@@ -294,16 +303,17 @@ test.describe('Test create-template package', () => {
 
     await applyWebsiteTemplate(page);
 
-    await setupTemplateSite(
-      await appServerUrl(page),
-      drive.driveURL,
-      'nextjs-site',
-    );
+    await waitForSynced(page);
+    const serverUrl = await appServerUrl(page);
+    // Release the editor's sockets and rendering while compiling the site.
+    await page.goto('about:blank');
+    await setupTemplateSite(site, serverUrl, drive, 'nextjs-site');
 
-    const child = await startServer('nextjs-site');
-
-    try {
-      const url = await waitForServer(child);
+    {
+      //start server
+      const child = startServer(site, 'nextjs-site');
+      const url = await test.step('Template HTTP readiness', () =>
+        child.readyURL());
 
       // check if the server is running
       const response = await page.goto(url);
@@ -323,15 +333,13 @@ test.describe('Test create-template package', () => {
       await expect(page.locator('body')).not.toContainText('coffee');
 
       await assertTwoLocaleSite(page, url, false);
-    } finally {
-      await stopTemplateProcess(child);
     }
   });
 
-  test('apply sveltekit template', async ({ page }) => {
+  test('apply sveltekit template', async ({ page, site }) => {
     test.slow();
-    await signIn(page);
-    const drive = await newDrive(page);
+    // before() already created a unique identity and drive for this test.
+    const drive = await page.evaluate(() => window.store.getDrive()!);
     await makeDrivePublic(page);
 
     // Apply the template in data browser
@@ -342,16 +350,16 @@ test.describe('Test create-template package', () => {
 
     await applyWebsiteTemplate(page);
 
-    await setupTemplateSite(
-      await appServerUrl(page),
-      drive.driveURL,
-      'sveltekit-site',
-    );
+    await waitForSynced(page);
+    const serverUrl = await appServerUrl(page);
+    await page.goto('about:blank');
+    await setupTemplateSite(site, serverUrl, drive, 'sveltekit-site');
 
-    const child = await startServer('sveltekit-site');
-
-    try {
-      const url = await waitForServer(child);
+    {
+      const child = startServer(site, 'sveltekit-site');
+      //start server
+      const url = await test.step('Template HTTP readiness', () =>
+        child.readyURL());
 
       // check if the server is running
       const response = await page.goto(url);
@@ -370,25 +378,6 @@ test.describe('Test create-template package', () => {
       await expect(page.locator('body')).not.toContainText('coffee');
 
       await assertTwoLocaleSite(page, url, true);
-    } finally {
-      await stopTemplateProcess(child);
-    }
-  });
-
-  test.afterAll(async () => {
-    if (!fs.existsSync(EXEC_DIR)) {
-      // eslint-disable-next-line no-console
-      console.log('No EXEC_DIR to delete, skipping...');
-
-      return;
-    }
-
-    try {
-      await fs.promises.rm(EXEC_DIR, { recursive: true, force: true });
-      // eslint-disable-next-line no-console
-      console.log('Cleared EXEC_DIR');
-    } catch (error) {
-      console.error(`Failed to delete ${EXEC_DIR}:`, error);
     }
   });
 });

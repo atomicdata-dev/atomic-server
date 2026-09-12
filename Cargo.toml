@@ -28,7 +28,7 @@ debug = "line-tables-only"
 # Full `--release` was tried and reverted for costing 15-30 minutes of cold
 # compile before Playwright could start. Nearly all of that is LTO and the
 # single codegen unit, which buy runtime performance a test server does not
-# need. This keeps the parts that matter (optimisation, no debug assertions)
+# need. This keeps the parts that matter (optimisation)
 # and drops the parts that only cost compile time.
 [profile.e2e]
 inherits = "release"

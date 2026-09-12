@@ -68,7 +68,11 @@ test.describe('documents', async () => {
     await editor.fill('/heading');
     await expect(page.getByText('Heading 1')).toBeVisible();
     await page.keyboard.press('Enter');
-    await page.keyboard.type(teststring);
+    // The command changes the document structure asynchronously. Type only
+    // once its heading exists, rather than racing that selection transition.
+    const heading = editor.locator('h1');
+    await expect(heading).toBeVisible();
+    await heading.fill(teststring);
 
     await expect(page.getByRole('heading', { name: teststring })).toBeVisible();
 

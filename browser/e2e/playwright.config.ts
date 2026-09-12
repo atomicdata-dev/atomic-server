@@ -1,5 +1,6 @@
 import type { PlaywrightTestConfig } from '@playwright/test';
 import { devices } from '@playwright/test';
+import { workerBudget } from './scripts/concurrency.mjs';
 
 const config: PlaywrightTestConfig = {
   // Default `expect` timeout. Playwright's built-in is 5s; bump to 10s
@@ -56,6 +57,7 @@ const config: PlaywrightTestConfig = {
     },
   },
   reporter: [
+    ['./scripts/load-reporter.ts'],
     [
       'html',
       {
@@ -151,24 +153,9 @@ const config: PlaywrightTestConfig = {
   // Light vs full: tag `@smoke` (see `smoke` in tests/test-utils.ts).
   // `pnpm test-e2e:light` / CI feature branches pass `--grep @smoke`.
   // `pnpm test-e2e` and develop/tag CI run the unfiltered suite.
-  // Worker count:
-  // - local (no CI): 2
-  // - CI without override: 1 (safe on the smallest hosted runner)
-  // - dagger Main on Mancave (24 cores / 31GB WSL): PLAYWRIGHT_WORKERS=2 per
-  //   shard, 4 shards in `.dagger/src/index.ts` (≈8 browsers total)
-  //
-  // The figures above were stale in both directions: the box reports 24 cores
-  // and 31GB (not 12c/64GB), and the per-shard width was walked back from 3
-  // to 2 after 12 browsers starved the host. `.dagger/src/index.ts` is the
-  // source of truth for both — see HOST_PROFILES there.
-  //
-  // Per-shard limit is contention on that shard's atomic-server. Raise
-  // via the env var rather than changing the hosted-runner default.
-  workers: process.env.PLAYWRIGHT_WORKERS
-    ? Number(process.env.PLAYWRIGHT_WORKERS)
-    : process.env.CI
-      ? 1
-      : 2,
+  // The local runner and direct Playwright share one conservative budget.
+  // Dagger sets a per-shard override; aggregate concurrency includes all shards.
+  workers: workerBudget().workers,
 };
 
 export default config;

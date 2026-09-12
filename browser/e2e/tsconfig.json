@@ -9,5 +9,11 @@
     "outDir": "./dist",
     "strictNullChecks": true
   },
-  "include": ["./tests", "playwright.config.ts", "./global.d.ts"]
+  "include": [
+    "./tests",
+    "playwright.config.ts",
+    "./global.d.ts",
+    "./scripts/load-reporter.ts",
+    "./scripts/owned-process.d.mts"
+  ]
 }

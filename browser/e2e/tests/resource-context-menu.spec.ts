@@ -1,5 +1,10 @@
 import { test, expect, type Locator, type Page } from './fixtures';
-import { before, focusCell, newResource } from './test-utils';
+import {
+  before,
+  focusCell,
+  newResource,
+  waitForTableBuild,
+} from './test-utils';
 
 /**
  * Right-clicks `target` until its context menu is open AND shows `items`.
@@ -67,6 +72,7 @@ test.describe('resource context menu', () => {
       .locator('dialog[open]')
       .getByRole('button', { name: 'Create', exact: true })
       .click();
+    await waitForTableBuild(page);
 
     // --- Sidebar link (AtomicLink seam) ---
     const sidebarLink = page
@@ -104,13 +110,8 @@ test.describe('resource context menu', () => {
     // Type into the first cell, then Enter to advance off the row so it
     // materializes into a real (persisted) resource, and reload so it renders
     // as a collection member with a real subject.
-    // Drive the cell the way `tables.spec` does for a blank table's virtual
-    // row — a forced click, then Enter to open the editor. The cell element
-    // itself never takes focus here, so no focus assertion is possible; what
-    // makes this honest is checking the row exists before going on. The CI
-    // snapshot for this failure showed both gridcells empty and a row count of
-    // 0: the keystrokes went nowhere, and no amount of waiting for saves
-    // afterwards can recover a row that was never created.
+    // Focus the virtual row's cell before Enter opens its editor, then prove
+    // that the typed row exists before waiting for persistence.
     // Focus must be IN the grid before typing: after a table is created it is
     // on the title input, and keystrokes follow focus.
     await focusCell(page, page.getByRole('gridcell').first());

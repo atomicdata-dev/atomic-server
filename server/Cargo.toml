@@ -27,6 +27,7 @@ path = "src/bin.rs"
 test = false
 
 [build-dependencies]
+blake3 = "1.8.5"
 brotli = "8"
 dircpy = "0.3.20"
 static-files = "0.3.1"
@@ -201,6 +202,8 @@ features = ["env-filter"]
 version = "0.3.23"
 
 [dev-dependencies]
+brotli = "8"
+tempfile = "3.27"
 actix-rt = "2.11.0"
 assert_cmd = "2.2.2"
 mainline = "6.2.0"

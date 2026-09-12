@@ -237,14 +237,11 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
       // back on. Without an immediate flush here, a reload landing before
       // the next tick reads the pre-edit (or entirely absent) state and
       // silently drops the offline edit.
-      try {
-        db!.flush();
-      } catch (e) {
-        console.error(
-          '[ClientDb] OPFS flush failed after putResourceWithSnapshot:',
-          e,
-        );
-      }
+      // Leave a periodic retry armed on failure, and reject the RPC so a
+      // caller never mistakes an in-memory write for a durable snapshot.
+      dirty = true;
+      db!.flush();
+      dirty = false;
 
       return;
     }
@@ -548,7 +545,6 @@ let workQueue: Promise<void> = Promise.resolve();
 const WRITE_OPS: ReadonlySet<WorkerRequest['type']> = new Set([
   'putResource',
   'putResources',
-  'putResourceWithSnapshot',
   'applyCommit',
   'removeResource',
   'putBlob',

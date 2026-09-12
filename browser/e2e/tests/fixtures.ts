@@ -22,25 +22,39 @@ export const test = base.extend<{
         watched.add(context);
         diagnostics.start(context);
         transport.start(context);
+        await context.addInitScript(() => {
+          const load = {
+            longTasks: [] as Array<{ start: number; duration: number }>,
+            maxTimerLagMs: 0,
+          };
+          window.__e2eLoad = load;
+
+          if (PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+            new PerformanceObserver(list => {
+              for (const entry of list.getEntries())
+                load.longTasks.push({
+                  start: entry.startTime,
+                  duration: entry.duration,
+                });
+              load.longTasks = load.longTasks.slice(-100);
+            }).observe({ entryTypes: ['longtask'] });
+          }
+
+          let previous = performance.now();
+          setInterval(() => {
+            const now = performance.now();
+            load.maxTimerLagMs = Math.max(
+              load.maxTimerLagMs,
+              now - previous - 1000,
+            );
+            previous = now;
+          }, 1000);
+        });
 
         // General UI tests use an empty discovery room, independent of public
         // service availability. verify-peer-mesh.mjs separately exercises real
         // signaling, authenticated WebRTC, persistence and reconciliation.
-        await context.routeWebSocket(
-          /^wss:\/\/(?:staging\.)?atomicserver\.eu\/webrtc-signal$/,
-          socket => {
-            socket.onMessage(message => {
-              if (
-                typeof message === 'string' &&
-                JSON.parse(message).type === 'join'
-              ) {
-                socket.send(
-                  JSON.stringify({ type: 'joined', peers: [], iceServers: [] }),
-                );
-              }
-            });
-          },
-        );
+        await installEmptyDiscoveryRoom(context);
       };
 
       // Depend on context so assertions run BEFORE Playwright closes it. The
@@ -157,3 +171,22 @@ export const test = base.extend<{
 });
 
 export default test;
+
+/** Isolated UI fixtures do not depend on the public discovery service. */
+export async function installEmptyDiscoveryRoom(context: BrowserContext) {
+  await context.routeWebSocket(
+    /^wss:\/\/(?:staging\.)?atomicserver\.eu\/webrtc-signal$/,
+    socket => {
+      socket.onMessage(message => {
+        if (
+          typeof message === 'string' &&
+          JSON.parse(message).type === 'join'
+        ) {
+          socket.send(
+            JSON.stringify({ type: 'joined', peers: [], iceServers: [] }),
+          );
+        }
+      });
+    },
+  );
+}

@@ -51,7 +51,10 @@ export function ApplyTemplateDialog({
 
     if (!rootLocalId) return undefined;
 
+    // Template imports happen on the server. Its result is authoritative while
+    // the local worker may still be indexing the imported resources.
     const [subject] = await store.search('', {
+      serverOnly: true,
       parents: destination,
       filters: {
         [core.properties.localId]: rootLocalId,

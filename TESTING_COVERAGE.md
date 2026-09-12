@@ -13,6 +13,52 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## E2E isolation and performance harness (#1461)
+
+`loro-selection.test.ts` checks cursor preservation across a remote metadata
+update followed by keystrokes before and after queued timers. The scoped
+loro-prosemirror 0.4.3 patch restores document and selection atomically.
+`store-search-server.test.ts` checks that authoritative server lookups after
+imports do not wait on local indexing or WebSocket readiness.
+
+`cargo test -p atomic-server --test build_assets` exercises content/settings
+cache separation, corrupted Brotli recovery and concurrent atomic publication.
+The context-menu E2E flow catches title blur stealing focus from the menu;
+Enter retains its explicit handoff into page content.
+
+`node --experimental-strip-types --test browser/e2e/scripts/*.node.mjs`
+checks process-group ownership with concurrent real HTTP servers, ephemeral
+ports, unrelated-service preservation, startup failure and worker disconnect
+cleanup. It also checks hardware budget validation, build-cache invalidation
+(product/untracked inputs, environment and artifact changes), and rejects
+acceptance summaries with missing executions, failures, retries or dirty sources.
+`browser/e2e` typecheck includes the process fixture and load reporter.
+The harness tests also run through the e2e package's `test` script in the normal
+recursive JS test job; they need Node and Git, not Rust or a browser install.
+`node --experimental-strip-types --test scripts/e2e-budget.test.mjs` validates
+CI overrides without mutating the profile or its coverage selection.
+`initClientDb.handoff.test.ts` checks that dev-drive can defer anonymous startup
+while still attaching the fresh identity, alongside the identity-handoff guard.
+The ontology E2E test gates an earlier instance save's completion while the next
+form is open, catching stale cleanup that empties the new form.
+The existing browser diagnostic/failure-state tests cover bounded retained
+attachments; the renderer load probe adds only timing metadata.
+
+`session-fixtures.ts` is an opt-in closed-profile clone experiment, currently
+used by drive-scoped dashboard and table/view specs with
+`ATOMIC_E2E_CLONE_SESSION=1`. Every test gets
+separate browser files, device ID and project drive; each worker reuses its seed
+agent. Cold identity/storage/account tests keep the fresh fixture. Full-suite
+acceptance with this setup remains pending. Playwright 1.63 uses a documented,
+version-specific Chromium preload compatibility flag; browser cross-world
+service-worker isolation is outside this validation (see the E2E README).
+
+`template.spec.ts` exercises each actual generated Next/Svelte site independently,
+using the fresh drive from `before()` instead of provisioning a second drive.
+Both can run in parallel. All timing/coverage claims require actual suite runs:
+five unfiltered Chromium passes per high-worker setting, skips reviewed, are
+still pending. See `planning/e2e-concurrency.md` for live measurement status.
+
 ## New-resource catalog
 
 `creationCatalog.test.ts` covers catalog completeness, multiword search and the
@@ -532,6 +578,15 @@ mounts without resetting or re-registering the global parser.
   to verify that resource metadata arriving between keystrokes cannot reorder
   text. It guards the synchronous-selection patch to `loro-prosemirror` 0.4.3.
 
+- `collection-page-assemble.test.ts` holds a local query in flight while a
+  member is deleted, then releases the stale result. It checks membership,
+  counts, skipped hydration, optimistic additions, and subsequent readmission.
+- The `delete resource` smoke E2E requires a known sidebar link to disappear
+  before reload; a success toast no longer substitutes for this assertion.
+  Local Chromium verification passed using the existing Rust/WASM builds.
+  One run timed out at the separate child-cascade store-removal barrier;
+  a subsequent run passed, so cascade timing remains an intermittent gap.
+
 - `client-db.worker.test.ts` requires vault cursor commits to flush before the
   worker acknowledges backup completion, and propagates flush failures. The
   SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.
@@ -828,6 +883,16 @@ one physical object shared by two owners counts once in each drive, repeated
 references within one drive do not inflate usage, and report ordering,
 co-location and removal of another owner's references do not change attribution.
 
+The durable snapshot worker regression (`client-db-durable-put.test.ts`) checks
+that JSON and Loro writes finish before the flush acknowledgement, flush errors
+reject, failed flushes retry, and successful writes avoid a redundant flush.
+`store.test.ts` holds that acknowledgement pending to verify an online save
+cannot resolve early and needs no second RPC during identity handoff.
+
+`useAvailableHeight.test.ts` checks that observer-driven grid sizing defers and
+coalesces DOM writes outside ResizeObserver delivery, and cancels pending work
+on unmount. Table filtering E2E retains strict browser diagnostics.
+
 ## Unified templates and create-drive setup
 
 `chunks/Templates/model.test.ts` tests version-pinned composition, duplicate keys,
@@ -868,3 +933,8 @@ Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI t
 `helpers/managed/vaultAutoBackup.test.ts` verifies successful vault restoration preserves known node absence as local-only routing, while transport failures and failed restores do not disable node sync. Paired SaaS second-browser coverage verifies the original profile and vault-only canary after restore, with bounded pre-restore refusal diagnostics.
 
 Paired SaaS `portal/e2e/identity-reconcile.spec.ts` exercises dev-drive creation while a managed account is active: reconciliation waits until the temporary identity has a drive, and creation must not enroll it in the account.
+
+Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
+responses open to verify concurrent downloads are bounded at four and that
+reverse completion preserves listing order at import. Existing progress and
+failure checks also pass. Actual staging phone restore latency remains unmeasured.

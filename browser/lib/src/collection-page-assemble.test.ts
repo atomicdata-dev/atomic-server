@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, it, vi, expect as assert } from 'vitest';
 import { Collection } from './collection.js';
 import type { ClientDbQueryResult, ClientDbWorker } from './client-db.js';
 import { commits, core, dataBrowser, collections } from './index.js';
@@ -233,6 +233,67 @@ describe('collection page assemble does not flash unsorted members', () => {
     expect(members.slice(0, 2)).toEqual([ALICE, BOB]);
     expect(members).toContain(created);
   });
+
+  it.each([false, true])(
+    'does not restore a deleted member from an in-flight query (optimistic=%s)',
+    async optimistic => {
+      const store = new Store({ serverUrl: 'https://example.com' });
+      store.setDrive(DRIVE);
+      store.finishDriveSync(DRIVE, 2, Date.now());
+      const stale = {
+        subjects: [ALICE, BOB],
+        resources: [jsonAd(ALICE, 1000), jsonAd(BOB, 2000)],
+        count: 2,
+      };
+      let release!: (result: ClientDbQueryResult) => void;
+      let delayed = false;
+      store.setClientDb(
+        mockClientDb(async () =>
+          delayed
+            ? new Promise(resolve => {
+                release = resolve;
+              })
+            : stale,
+        ),
+      );
+      const collection = new Collection(
+        store,
+        'https://example.com',
+        {
+          page_size: '30',
+          include_nested: false,
+          property: core.properties.parent,
+          value: TABLE,
+          drive: DRIVE,
+        },
+        true,
+      );
+      await collection.refresh();
+
+      if (optimistic) {
+        collection.applyResourceChange(ALICE, undefined);
+        collection.applyResourceChange(ALICE, store.resources.get(ALICE));
+      }
+
+      delayed = true;
+      const refreshing = collection.refresh();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      collection.applyResourceChange(ALICE, undefined);
+      const hydrate = vi.spyOn(store, 'hydrateResourceFromJsonAd');
+      release(stale);
+      await refreshing;
+      assert(await collection.getMembersOnPage(0)).toEqual([BOB]);
+      assert(collection.totalMembers).toBe(1);
+      assert(hydrate.mock.calls.map(([subject]) => subject)).toEqual([BOB]);
+      hydrate.mockRestore();
+      // A real resource update can admit a subsequently restored member.
+      assert(
+        collection.applyResourceChange(ALICE, store.resources.get(ALICE)),
+      ).toBe('member-added');
+      assert(await collection.getMembersOnPage(0)).toEqual([BOB, ALICE]);
+      assert(collection.totalMembers).toBe(2);
+    },
+  );
 
   it('treats a missing sort key as missing, not the string "undefined"', async ({
     expect,
