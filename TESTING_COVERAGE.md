@@ -13,6 +13,52 @@ caught it, and if the answer is "none", that is the row to add.
 
 ---
 
+## E2E isolation and performance harness (#1461)
+
+`loro-selection.test.ts` checks cursor preservation across a remote metadata
+update followed by keystrokes before and after queued timers. The scoped
+loro-prosemirror 0.4.3 patch restores document and selection atomically.
+`store-search-server.test.ts` checks that authoritative server lookups after
+imports do not wait on local indexing or WebSocket readiness.
+
+`cargo test -p atomic-server --test build_assets` exercises content/settings
+cache separation, corrupted Brotli recovery and concurrent atomic publication.
+The context-menu E2E flow catches title blur stealing focus from the menu;
+Enter retains its explicit handoff into page content.
+
+`node --experimental-strip-types --test browser/e2e/scripts/*.node.mjs`
+checks process-group ownership with concurrent real HTTP servers, ephemeral
+ports, unrelated-service preservation, startup failure and worker disconnect
+cleanup. It also checks hardware budget validation, build-cache invalidation
+(product/untracked inputs, environment and artifact changes), and rejects
+acceptance summaries with missing executions, failures, retries or dirty sources.
+`browser/e2e` typecheck includes the process fixture and load reporter.
+The harness tests also run through the e2e package's `test` script in the normal
+recursive JS test job; they need Node and Git, not Rust or a browser install.
+`node --experimental-strip-types --test scripts/e2e-budget.test.mjs` validates
+CI overrides without mutating the profile or its coverage selection.
+`initClientDb.handoff.test.ts` checks that dev-drive can defer anonymous startup
+while still attaching the fresh identity, alongside the identity-handoff guard.
+The ontology E2E test gates an earlier instance save's completion while the next
+form is open, catching stale cleanup that empties the new form.
+The existing browser diagnostic/failure-state tests cover bounded retained
+attachments; the renderer load probe adds only timing metadata.
+
+`session-fixtures.ts` is an opt-in closed-profile clone experiment, currently
+used by drive-scoped dashboard and table/view specs with
+`ATOMIC_E2E_CLONE_SESSION=1`. Every test gets
+separate browser files, device ID and project drive; each worker reuses its seed
+agent. Cold identity/storage/account tests keep the fresh fixture. Full-suite
+acceptance with this setup remains pending. Playwright 1.63 uses a documented,
+version-specific Chromium preload compatibility flag; browser cross-world
+service-worker isolation is outside this validation (see the E2E README).
+
+`template.spec.ts` exercises each actual generated Next/Svelte site independently,
+using the fresh drive from `before()` instead of provisioning a second drive.
+Both can run in parallel. All timing/coverage claims require actual suite runs:
+five unfiltered Chromium passes per high-worker setting, skips reviewed, are
+still pending. See `planning/e2e-concurrency.md` for live measurement status.
+
 ## New-resource catalog
 
 `creationCatalog.test.ts` covers catalog completeness, multiword search and the
@@ -808,6 +854,16 @@ blob garbage collection, or encrypted Vault attachment recovery.
 one physical object shared by two owners counts once in each drive, repeated
 references within one drive do not inflate usage, and report ordering,
 co-location and removal of another owner's references do not change attribution.
+
+The durable snapshot worker regression (`client-db-durable-put.test.ts`) checks
+that JSON and Loro writes finish before the flush acknowledgement, flush errors
+reject, failed flushes retry, and successful writes avoid a redundant flush.
+`store.test.ts` holds that acknowledgement pending to verify an online save
+cannot resolve early and needs no second RPC during identity handoff.
+
+`useAvailableHeight.test.ts` checks that observer-driven grid sizing defers and
+coalesces DOM writes outside ResizeObserver delivery, and cancels pending work
+on unmount. Table filtering E2E retains strict browser diagnostics.
 
 ## Unified templates and create-drive setup
 

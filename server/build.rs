@@ -1,6 +1,7 @@
+mod build_assets;
+
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     time::{Duration, Instant, SystemTime},
 };
@@ -118,13 +119,12 @@ fn main() -> std::io::Result<()> {
     // runtime `middleware::Compress` only uses brotli at its default
     // quality (~3), which leaves significant size on the table for big
     // assets (the 5.6 MB Loro WASM is the bulk of the cost). Files are
-    // re-used across builds — `precompress_assets` skips when the `.br`
-    // sibling is newer than the source.
+    // reused across builds from a content-validated cache in OUT_DIR, even
+    // when replacing assets_tmp after a frontend rebuild.
     //
     // This is a *production-serving* optimization and is pure overhead for
-    // local iteration (q11 over the wasm alone is ~100s, and the
-    // `rm -rf assets_tmp` above invalidates the `.br` cache on every real
-    // build). So only run it for release builds; debug `cargo run` — the dev
+    // local iteration (a cold q11 pass over the wasm alone is ~100s).
+    // So only run it for release builds; debug `cargo run` — the dev
     // iteration loop — skips it and lets the runtime middleware compress on
     // the fly. Override with `ATOMICSERVER_PRECOMPRESS=true` if you need to
     // test the precompressed path in debug.
@@ -376,17 +376,27 @@ fn precompress_assets(root: &Path) -> std::io::Result<()> {
         return Ok(());
     }
 
-    // Pass 2 (parallel): each file is independent, so brotli q11 runs on all
-    // cores at once. Wall-clock collapses to the slowest single file (the
+    // Pass 2 (parallel): each file is independent, so brotli q11 runs within
+    // Cargo's parallel job budget. Wall-clock collapses to the slowest single file (the
     // 5.6 MB wasm) instead of the serial sum over every asset. Per-file errors
     // are non-fatal — a file that fails to compress is simply served raw.
     let next = AtomicUsize::new(0);
     let compressed = AtomicUsize::new(0);
+    let cache_hits = AtomicUsize::new(0);
+    let cache = PathBuf::from(std::env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"))
+        .join("brotli-cache");
     let total_in = AtomicU64::new(0);
     let total_out = AtomicU64::new(0);
     let threads = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
+        .min(
+            std::env::var("NUM_JOBS")
+                .ok()
+                .and_then(|n| n.parse::<usize>().ok())
+                .unwrap_or(4)
+                .max(1),
+        )
         .min(jobs.len());
 
     std::thread::scope(|s| {
@@ -397,12 +407,12 @@ fn precompress_assets(root: &Path) -> std::io::Result<()> {
                     break;
                 };
                 let Ok(data) = fs::read(src) else { continue };
-                let mut out: Vec<u8> = Vec::with_capacity(data.len() / 3);
-                {
-                    let mut w = brotli::CompressorWriter::new(&mut out, 4096, QUALITY, WINDOW);
-                    if w.write_all(&data).is_err() || w.flush().is_err() {
-                        continue;
-                    }
+                let Ok((out, hit)) = build_assets::compress_cached(&data, &cache, QUALITY, WINDOW)
+                else {
+                    continue;
+                };
+                if hit {
+                    cache_hits.fetch_add(1, Ordering::Relaxed);
                 }
                 // Only emit if compression actually paid off — for tiny files
                 // brotli sometimes inflates.
@@ -421,8 +431,9 @@ fn precompress_assets(root: &Path) -> std::io::Result<()> {
         let total_out = total_out.into_inner();
         let saved = total_in.saturating_sub(total_out);
         p!(
-            "Pre-compressed {} files: {} KB → {} KB (saved {} KB, {:.1}% ratio)",
+            "Pre-compressed {} files ({} verified cache hits): {} KB → {} KB (saved {} KB, {:.1}% ratio)",
             compressed,
+            cache_hits.into_inner(),
             total_in / 1024,
             total_out / 1024,
             saved / 1024,

@@ -36,7 +36,7 @@ test('creation catalog searches templates and creates a selected table inside a 
     page.getByRole('button', { name: 'Use Website template', exact: true }),
   ).toBeVisible();
   await page.screenshot({
-    path: '/tmp/atomic-new-resource-desktop.png',
+    path: test.info().outputPath('new-resource-desktop.png'),
     fullPage: true,
     animations: 'disabled',
   });
@@ -87,7 +87,7 @@ test('creation prompt opens the assistant and keeps the request while setting up
   });
   await prompt.fill('A project tracker for our volunteers');
   await page.screenshot({
-    path: '/tmp/atomic-new-resource-mobile.png',
+    path: test.info().outputPath('new-resource-mobile.png'),
     fullPage: true,
     animations: 'disabled',
   });

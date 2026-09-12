@@ -589,7 +589,9 @@ test.describe('data-browser', async () => {
     await expect(editableTitle(page)).toHaveRole('textbox');
   });
 
-  test('user drives page', async ({ page, browser }) => {
+  test('user drives page creates and switches saved drives', async ({
+    page,
+  }) => {
     const initialDriveSubject = await getCurrentSubject(page);
     const initialDriveTitle = await currentDriveTitle(page).textContent();
 
@@ -616,7 +618,14 @@ test.describe('data-browser', async () => {
       .fill(initialDriveSubject);
     await page.locator('[data-test="drive-url-save"]').click();
     await expect(currentDriveTitle(page)).toHaveText(initialDriveTitle ?? '');
+  });
 
+  test('visiting a public drive adds it to Recently visited', async ({
+    page,
+    browser,
+  }) => {
+    // This is independent of creating/switching our own drives above. Keeping
+    // both journeys in one case spent the timeout on two identity bootstraps.
     // Opening a drive that is neither personal nor saved lands it in
     // Recently visited, which makes the section appear.
     const otherContext = await browser.newContext();

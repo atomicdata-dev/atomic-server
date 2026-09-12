@@ -1,5 +1,6 @@
-import { test, expect, type Page } from './fixtures';
-import { before, editableTitle, FRONTEND_URL } from './test-utils';
+import { before } from './session-fixtures';
+import { test, expect, type Page } from './session-fixtures';
+import { editableTitle, FRONTEND_URL } from './test-utils';
 
 /**
  * UI e2e for the table view's filtering + Views feature: the different filter
