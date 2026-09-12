@@ -15,8 +15,8 @@ establish supported concurrency.
 Initial audit: before() creates fresh agents/drives, normal browser contexts have
 separate storage, and the common fixture closes extra contexts. Template tests
 instead share /tmp/atomic-data-template-tests and kill owners of fixed ports.
-The local runner builds once per invocation but forces one worker. CI already
-isolates one server per shard; its aggregate browser budget is eight on Mancave.
+The local runner builds once per invocation but forces one worker. CI intends one server per shard; its aggregate browser budget is eight on Mancave.
+The follow-up Dagger probe below found that identical definitions were deduplicated.
 
 Measurement host: Mancave WSL2 reports 24 logical CPUs and 31 GiB RAM (not the
 64 GiB described by older comments). The Mac has about 20 GiB used swap and
@@ -267,3 +267,28 @@ The cursor regression passes on Linux with Node WASM, and app typecheck passes.
 User asked for maximum parallel throughput on Mancave: prioritize full runs at
 12, 16 and 24 workers, then compare eight, while retaining failures alongside
 timings. No fastest reliable setting has been established yet.
+
+
+## Follow-up after merging #1463
+
+- [x] Merge the first improvements into develop (#1463, 3ac7aefe5).
+- [x] Correct the library test formatting that stopped merged CI (#1464).
+  Actual library, data-browser and E2E package format-check commands all pass.
+- [x] Reproduce Dagger service deduplication with live containers on Mancave.
+- [x] Give each shard a distinct runtime graph and hostname while sharing the
+  binary build; expose cloned profiles through an explicit Dagger CLI argument.
+- [ ] Validate the changed Dagger path with the actual E2E suite.
+- [ ] Complete the maximum-worker matrix and repeated acceptance above.
+
+The live Dagger probe bound the same service definition twice and a third with
+an instance environment variable. The first two endpoints returned the same
+process-start UUID; the third returned a different UUID. This confirms the old
+shard setup shared writable server state. The fix varies the runtime only, using
+the existing run nonce plus shard index. Browser-facing service aliases remain
+`atomic`. Evidence: Mancave /tmp/e2e-1461-service-proof.log.
+
+`ci` and `end-to-end` now expose `--playwright-clone-sessions`; schema/help loading
+passes. The default stays false until full-suite acceptance. Worker and retry
+defaults also stay unchanged. Mancave's runner service is active. The earlier
+12-worker run was interrupted for the requested merge before completing and is
+not a valid performance result. No maximum reliable worker count is established.
