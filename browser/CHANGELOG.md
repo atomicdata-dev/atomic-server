@@ -4,6 +4,14 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+## [v0.41.0-beta.7] - 2026-09-12
+
+- Add template onboarding with editable previews and consistent mobile UI.
+- Prevent Cloud Vault growth on refresh and download vault objects concurrently.
+- Connect the selected hosted drive before falling back to vault restore during sign-in.
+- Preserve editor selection during remote updates and improve focus, table selection and save-state feedback.
+- Fix deleted sidebar items returning from stale queries.
+
 - Add peer rooms for up to eight simultaneous browsers on the Sync page with WebRTC collaboration, OPFS reconciliation and attachment sync without a Cloud subscription. Discovery defaults to shared Atomic SaaS signaling, independent of the drive’s data node. Export `BrowserPeerSync`, `WebRtcPeer` and `WebRtcTransport` from `@tomic/lib` ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
 - Portal Open links select their workspace; ordinary resource links keep the current drive.
 - Sync distinguishes remote node data from Cloud Server enrollment, explains drive-specific plans, and refreshes account/recovery status after portal sign-in.

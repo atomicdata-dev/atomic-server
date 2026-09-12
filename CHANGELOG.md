@@ -7,6 +7,13 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+## [v0.41.0-beta.7] - 2026-09-12
+
+- Store hosted files in S3 without silently falling back to node-local storage.
+- Fix stale collection queries bringing deleted sidebar resources back.
+- Improve browser database durability and resource save-state handling.
+- Isolate E2E shard state and simplify local test tooling; full develop CI passes on the release base.
+
 - Add drive-scoped authenticated browser peer sessions; subscription-independent signaling and optional temporary TURN credentials are provided by Atomic SaaS ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
 
 ## [v0.41.0-beta.6] - 2026-09-09
