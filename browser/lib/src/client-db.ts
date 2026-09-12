@@ -41,6 +41,7 @@ import type {
   ClientDbInitTimings,
 } from './client-db.worker.js';
 import { perfMark, perfSpan } from './perf-trace.js';
+import { randomUUID } from './random-uuid.js';
 
 /**
  * Duplicated from `client-db-open.ts` on purpose — do NOT import it here.
@@ -213,9 +214,10 @@ export class ClientDbWorker {
   private worker: Worker | null = null;
   private bc: BroadcastChannel | null = null;
   private role: Role = 'initializing';
-  private tabId = (crypto as Crypto & { randomUUID?: () => string }).randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
+  // Was an inline guard falling back to `Math.random()` — same secure-context
+  // problem, but a fallback that is neither a UUID nor cryptographically
+  // random. Tab ids collide across tabs opened in the same millisecond.
+  private tabId = randomUUID();
   private nextId = 1;
   private pending = new Map<string, PendingRequest>();
   private workerUrl: string;

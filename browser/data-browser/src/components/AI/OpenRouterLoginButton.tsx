@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { randomUUID } from '@tomic/lib';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { ButtonLink } from '../ButtonLink';
 import { paths } from '../../routes/paths';
-import { randomString } from '../../helpers/randomString';
 
 const TEXT = 'Login with OpenRouter';
 const AUTH_ENDPOINT = 'https://openrouter.ai/auth';
@@ -39,7 +39,7 @@ export const OpenRouterLoginButton = () => {
   const [challenge, setChallenge] = useState<string | null>(null);
 
   useEffect(() => {
-    const verifier = crypto.randomUUID ? crypto.randomUUID() : randomString(32);
+    const verifier = randomUUID();
     const generatedChallenge = createSHA256CodeChallenge(verifier);
     setChallenge(generatedChallenge);
     // Stored in localStorage (not sessionStorage) so the verifier survives the

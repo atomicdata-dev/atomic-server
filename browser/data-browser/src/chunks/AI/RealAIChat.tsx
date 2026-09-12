@@ -11,7 +11,7 @@ import { IconButton } from '@components/IconButton/IconButton';
 import { Button } from '@components/Button';
 import { FaXmark, FaPaperclip, FaFile } from 'react-icons/fa6';
 import { ChatMessagesContainer } from '@components/ChatMessagesContainer';
-import { useStore, type Resource } from '@tomic/react';
+import { useStore, type Resource, randomUUID } from '@tomic/react';
 import { AIProvider } from '@components/AI/aiContstants';
 import {
   AIAgent,
@@ -471,13 +471,13 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
       if (mention.type === 'atomic-resource') {
         return {
           type: mention.type,
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           subject: mention.id,
         } as AIAtomicResourceMessageContext;
       } else if (mention.type === 'mcp-resource') {
         return {
           type: mention.type,
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           uri: mention.id,
           name: mention.label,
           serverId: mention.serverId,
@@ -485,7 +485,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
       } else if (mention.type === 'skill') {
         return {
           type: 'skill',
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           name: mention.label,
         } as AISkillMessageContext;
       }

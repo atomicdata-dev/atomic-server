@@ -7,6 +7,7 @@ import {
   server,
   type JSONObject,
   dataBrowser,
+  randomUUID,
 } from '@tomic/react';
 import {
   getToolName,
@@ -511,7 +512,7 @@ const toSourceUrlPart = (
   resource: Resource<Ai.SourceUrlPart>,
 ): SourceUrlUIPart => ({
   type: 'source-url',
-  sourceId: crypto.randomUUID(), // Do we need real IDs?
+  sourceId: randomUUID(), // Do we need real IDs?
   url: resource.props.url,
   title: resource.props.name,
 });

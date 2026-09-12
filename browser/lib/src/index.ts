@@ -51,6 +51,7 @@ export * from './genesis.js';
 export * from './commit.js';
 export * from './error.js';
 export * from './withDeadline.js';
+export * from './random-uuid.js';
 export * from './datatypes.js';
 export * from './safeHref.js';
 export { EventManager } from './EventManager.js';

@@ -1,4 +1,4 @@
-import { parseCanvasStrokes, type CanvasStroke } from '@tomic/lib';
+import { parseCanvasStrokes, type CanvasStroke, randomUUID } from '@tomic/lib';
 import type { JSONValue } from '@tomic/lib';
 
 /**
@@ -164,7 +164,7 @@ export function archiveBranch(
 
   const next = [
     ...branches,
-    { id: crypto.randomUUID(), strokes: cloneStrokes(strokes) },
+    { id: randomUUID(), strokes: cloneStrokes(strokes) },
   ];
 
   return next.slice(-BRANCH_LIMIT);

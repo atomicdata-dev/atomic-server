@@ -1,5 +1,6 @@
 import type { EphemeralStore } from 'loro-crdt';
 import { LoroLoader } from './loro-loader.js';
+import { randomUUID } from './random-uuid.js';
 import type { Store } from './store.js';
 
 /** What a session announces about itself on a drive's presence channel. */
@@ -79,7 +80,10 @@ export class DrivePresenceManager {
     private store: Store,
     private drive: string,
   ) {
-    this.sessionId = crypto.randomUUID();
+    // Not `crypto.randomUUID`: that is secure-context-only, and this
+    // constructor runs on every drive load, so over plain HTTP on a LAN it
+    // threw before first paint and the app rendered its error screen instead.
+    this.sessionId = randomUUID();
   }
 
   /**

@@ -14,6 +14,7 @@
 // Canonical design: planning/device-pairing.md (§ SaaS-assisted pairing).
 
 import { managedFetch } from './api';
+import { randomUUID } from '@tomic/lib';
 import { getManagedAccount } from './session';
 import { getLocalServerOrigin, isRunningInTauri } from '../tauri';
 import { pairAndSync } from '../pairing';
@@ -49,7 +50,7 @@ export function getOrCreateDeviceId(): string | null {
 
     if (existing) return existing;
 
-    const fresh = crypto.randomUUID();
+    const fresh = randomUUID();
     localStorage.setItem(DEVICE_ID_KEY, fresh);
 
     return fresh;

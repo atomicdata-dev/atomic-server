@@ -1,5 +1,6 @@
 // @wc-ignore-file
 import { tool } from 'ai';
+import { randomUUID } from '@tomic/lib';
 import { z } from 'zod';
 import { setLocalStorageValue, useLocalStorage } from '@hooks/useLocalStorage';
 
@@ -124,7 +125,7 @@ function isBundledSkillName(normalizedName: string): boolean {
 }
 
 function generateUserSkillId(): string {
-  return `user-skill.${crypto.randomUUID()}`;
+  return `user-skill.${randomUUID()}`;
 }
 
 function persistUserSkills(skills: AgentSkill[]): void {

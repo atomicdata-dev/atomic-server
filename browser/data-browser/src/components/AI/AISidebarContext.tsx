@@ -1,4 +1,5 @@
 import React, { useCallback, useContext, useState, createContext } from 'react';
+import { randomUUID } from '@tomic/lib';
 
 import type { AIMessageContext } from '../../chunks/AI/types';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
@@ -89,6 +90,6 @@ export function newContextItem<T extends AIMessageContext>(
 ): T {
   return {
     ...item,
-    id: crypto.randomUUID() as string,
+    id: randomUUID() as string,
   } as T;
 }

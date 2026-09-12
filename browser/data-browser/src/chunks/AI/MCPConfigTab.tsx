@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { randomUUID } from '@tomic/lib';
 import { createPortal } from 'react-dom';
 import { styled } from 'styled-components';
 import { Row, Column } from '@components/Row';
@@ -13,7 +14,7 @@ import { useAISettings } from '@components/AI/AISettingsContext';
 import type { MCPServer } from './types';
 import { getDefaultMCPServer } from './defaultMCPServers';
 
-const generateId = () => crypto.randomUUID();
+const generateId = () => randomUUID();
 
 const defaultNewServer: MCPServer = {
   id: '',
