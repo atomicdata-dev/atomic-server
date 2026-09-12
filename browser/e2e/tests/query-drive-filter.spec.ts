@@ -3,6 +3,7 @@ import {
   before,
   editableTitle,
   waitForClientDbFlush,
+  waitForClientDbReady,
   waitForDriveSettled,
   waitForSynced,
 } from './test-utils';
@@ -152,6 +153,10 @@ test.describe('query GETs after refresh', () => {
     // Wait for steady state: WS connected, ClientDb ready, and the
     // OPFS bootstrap-fingerprint check has completed (logged as
     // "skipping seed" when the fingerprint matches).
+    // This test requires OPFS. The general settled helper also supports
+    // apps without ClientDb, so it can succeed before an expected worker
+    // has attached. Require the actual worker before measuring local reads.
+    await waitForClientDbReady(page);
     await waitForDriveSettled(page);
 
     // Drop frames from the bootstrap window. `Collection.fetchPage` falls

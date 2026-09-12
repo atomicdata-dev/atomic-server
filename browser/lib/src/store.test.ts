@@ -5,6 +5,35 @@ import { bootstrapCoreVocab } from './test-vocab.js';
 import { testStore } from './test-store.js';
 
 describe('Store', () => {
+  it('does not start a second fetch when applying a received snapshot', async ({
+    expect,
+  }) => {
+    await enableLoro();
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setServerConnected(true);
+    const source = new Resource('https://example.com/query?property=parent');
+    await source.set(
+      core.properties.isA,
+      ['https://atomicdata.dev/classes/Folder'],
+      false,
+    );
+    await source.set(core.properties.name, 'Received snapshot', false);
+    const fetch = vi
+      .spyOn(store, 'fetchResourceFromServer')
+      .mockResolvedValue(source as never);
+    store.applyIncoming({
+      subject: source.subject,
+      loroBytes: source.getLoroDoc()!.export({ mode: 'snapshot' }),
+      source: 'http-fetch',
+      replaceLoroDocsFromRemote: true,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      store.getResourceLoading(source.subject).get(core.properties.name),
+    ).toBe('Received snapshot');
+  });
+
   it('tracks immutable save status across cancellation and offline queueing', async ({
     expect,
   }) => {

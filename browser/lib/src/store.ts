@@ -388,12 +388,12 @@ export interface IncomingChange {
 const supportsWebSockets = () => typeof WebSocket !== 'undefined';
 
 /**
- * How long a fetch that is about to fail a resource will wait for the app's
- * local database to attach. It is a boot-time event — `initClientDb` derives a
+ * How long resource fallback and collection reads wait for the app's
+ * expected local database to attach. It is a boot-time event — `initClientDb` derives a
  * database name and unwraps a key first — so it either happens within seconds
- * of the page loading or not at all. Only ever waited on paths that would
- * otherwise fail the resource permanently, and only when a database was
- * actually announced (see `Store.expectClientDb`).
+ * of the page loading or not at all. Waiting avoids premature resource
+ * failures and redundant server queries, and happens only when a database
+ * was actually announced (see `Store.expectClientDb`).
  */
 const CLIENT_DB_ATTACH_GRACE = 5000;
 
@@ -748,7 +748,9 @@ export class Store {
    * database right after sign-in (a vault restore, a first backup) would
    * otherwise read `getClientDb()` as "this app has no database".
    */
-  public waitForClientDb(timeoutMs: number): Promise<boolean> {
+  public waitForClientDb(
+    timeoutMs: number = CLIENT_DB_ATTACH_GRACE,
+  ): Promise<boolean> {
     if (this.clientDb) return Promise.resolve(true);
     if (!this.clientDbExpected) return Promise.resolve(false);
 
@@ -1966,8 +1968,16 @@ export class Store {
       return 'deduped';
     }
 
+    // Receiving state must not initiate another read of that same state.
+    // getResourceLoading starts an OPFS/server lookup whose delayed fallback
+    // can refetch a snapshot we have already applied. Only pending offline
+    // edits need that local hydration to merge their durable copy back in.
     const resource =
-      existing ?? this.getResourceLoading(subject, { newResource: false });
+      existing ??
+      (this.outbox.hasPending(subject)
+        ? this.getResourceLoading(subject, { newResource: false })
+        : new Resource(subject));
+    resource.setStore(this);
     // A GET response carrying the SNAPSHOT flag is authoritative full state
     // (`replaceLoroDocsFromRemote`). REPLACE rather than merge it — merging a
     // full snapshot into a doc the client already seeded with partial state (a
@@ -2029,8 +2039,8 @@ export class Store {
       // commit, and claiming it would make the echo-dedup at the top of this
       // method drop the very fetch being issued to repair the gap.
       resource.loading = !this.hasRenderableContent(resource);
-      this.recoverFromIncompleteImport(subject, change.source);
       this.addResource(resource, { skipCommitCompare: true });
+      this.recoverFromIncompleteImport(subject, change.source);
 
       return 'invalid';
     }
