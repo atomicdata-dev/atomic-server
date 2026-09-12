@@ -363,3 +363,12 @@ The search/store selection passes 35/35. Full Dagger validation remains pending.
 Next caching improvement: jsBuild mounts all browser sources before its build,
 so E2E-only edits also invalidate the frontend build and embedded server link.
 Separate test inputs from build inputs after the current merge validation.
+
+
+Full Dagger on 645e8ec31 confirmed both generated sites pass after cache eviction:
+217 passed, one failed, eight skipped. The remaining offline-sync diagnostic came
+from disconnecting while the online setup commit was still pending; the test
+previously relied on the optimistic sidebar title. It now waits for synced setup
+before disconnecting. Six focused repetitions pass in 46.2s, two workers, zero
+retries, using the existing native binary (test-only validation). Artifacts:
+.e2e-runs/2026-09-12T10-30-56.686Z-0uaEUs. E2E typecheck passes.
