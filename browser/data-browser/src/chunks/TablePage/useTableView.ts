@@ -234,9 +234,8 @@ export function useTableView(
   const [storedKind] = useString(view, dataBrowser.properties.viewKind);
   const [viewGroupBy] = useString(view, dataBrowser.properties.viewGroupBy);
   const [viewEndProp] = useString(view, dataBrowser.properties.viewEndProp);
-  // Deliberately NOT `useBoolean`: it treats an unset value as `false` AND
-  // writes that back, which would silently flip this toggle off (its default is
-  // on) the first time any timer view rendered.
+  // Preserve absence here: unlike useBoolean's false fallback, an unset
+  // timer-exclusive value means on.
   const [storedTimerExclusive] = useValue(
     view,
     dataBrowser.properties.viewTimerExclusive,

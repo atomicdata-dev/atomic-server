@@ -74,6 +74,11 @@ describe('safePortalUrl', () => {
     expect(safePortalUrl('http://127.0.0.1:49237/')).toBe(
       'http://127.0.0.1:49237',
     );
+    expect(safePortalUrl('http://atomic.localhost:9883/')).toBe(
+      'http://atomic.localhost:9883',
+    );
+    expect(safePortalUrl('http://evil-localhost')).toBeUndefined();
+    expect(safePortalUrl('http://atomic.localhost.example')).toBeUndefined();
     expect(safePortalUrl('http://portal.example')).toBeUndefined();
     expect(safePortalUrl('http://localhost.example')).toBeUndefined();
   });

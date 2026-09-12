@@ -40,7 +40,7 @@ const trimTrailingSlashes = (url: string): string => url.replace(/\/+$/, '');
  * or undefined when it is not one.
  *
  * Only absolute `https:` URLs qualify, plus `http:` on `localhost` /
- * `127.0.0.1` for development. The value usually comes from a remote node's
+ * `127.0.0.1` / `*.localhost` for development. The value usually comes from a remote node's
  * `GET /server`, which is exactly the party that must not be able to point
  * "Sign in" at a phishing page or a `javascript:` URL. Trailing slashes are
  * trimmed so `${url}/api` composes cleanly.
@@ -66,7 +66,9 @@ export function safePortalUrl(
   if (parsed.username || parsed.password) return undefined;
 
   const isLocalhost =
-    parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname.endsWith('.localhost');
 
   if (
     parsed.protocol === 'https:' ||

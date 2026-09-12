@@ -497,19 +497,13 @@ export function useNumber(
   return [valToNumber(value), set];
 }
 
-/** Returns false if there is no value for this propertyURL. See {@link useValue} */
+/** Reads an absent Boolean as false without writing a default. See {@link useValue} */
 export function useBoolean(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
 ): [boolean, SetValue<boolean>] {
   const [value, set] = useValue(resource, propertyURL, opts);
-
-  useEffect(() => {
-    if (value === undefined) {
-      set(false);
-    }
-  }, [value, set]);
 
   if (value === undefined) {
     return [false, set];

@@ -7,11 +7,16 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = resolvePath(dirname(fileURLToPath(import.meta.url)), '../../..');
-const playwrightArgs = process.argv.slice(2).filter(arg => arg !== '--');
+const sameOrigin = !process.argv.includes('--preview');
+const playwrightArgs = process.argv
+  .slice(2)
+  .filter(
+    arg => arg !== '--' && arg !== '--same-origin' && arg !== '--preview',
+  );
 
 if (playwrightArgs.includes('--help')) {
   console.info(
-    'Build and run isolated production Chromium E2E: pnpm test-e2e:local [Playwright arguments]\nRequires Cargo, cargo-run-bin/wasm-pack and the wasm32-unknown-unknown target.\nReports, build logs and fresh data are saved under .e2e-runs/. No existing services are stopped.',
+    'Build and run isolated embedded-server Chromium E2E: pnpm test-e2e:local [Playwright arguments]\nUse --preview for separate-origin Vite preview. Default matches CI at atomic.localhost.\nRequires Cargo, cargo-run-bin/wasm-pack and the wasm32-unknown-unknown target.\nReports, build logs and fresh data are saved under .e2e-runs/. No existing services are stopped.',
   );
   process.exit(0);
 }
@@ -131,11 +136,14 @@ try {
   const serverPort = await freePort();
   let frontendPort = await freePort();
   while (frontendPort === serverPort) frontendPort = await freePort();
-  const serverURL = `http://localhost:${serverPort}`;
-  const frontendURL = `http://127.0.0.1:${frontendPort}`;
+  const serverURL = `http://${sameOrigin ? 'atomic.localhost' : 'localhost'}:${serverPort}`;
+  const frontendURL = sameOrigin
+    ? serverURL
+    : `http://127.0.0.1:${frontendPort}`;
   const env = {
     ...process.env,
     SERVER_URL: serverURL,
+    ATOMIC_SERVICE_URL: `http://127.0.0.1:${serverPort}`,
     FRONTEND_URL: frontendURL,
     VITE_ATOMIC_SERVER_URL: serverURL,
     VITE_E2E: 'true',
@@ -148,7 +156,7 @@ try {
     ATOMIC_CONFIG_DIR: join(output, 'config'),
     ATOMIC_CACHE_DIR: join(output, 'cache'),
     ATOMIC_PORT: String(serverPort),
-    ATOMIC_DOMAIN: 'localhost',
+    ATOMIC_DOMAIN: sameOrigin ? 'atomic.localhost' : 'localhost',
     ATOMIC_INITIALIZE: 'true',
     ATOMICSERVER_SKIP_JS_BUILD: 'true',
   };
@@ -180,25 +188,29 @@ try {
     root,
     env,
   );
-  await healthy(serverURL, server);
-  const preview = start(
-    'pnpm',
-    [
-      'exec',
-      'vite',
+  await healthy(`http://127.0.0.1:${serverPort}`, server);
+
+  if (!sameOrigin) {
+    const preview = start(
+      'pnpm',
+      [
+        'exec',
+        'vite',
+        'preview',
+        '--host',
+        '127.0.0.1',
+        '--port',
+        String(frontendPort),
+        '--strictPort',
+      ],
       'preview',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(frontendPort),
-      '--strictPort',
-    ],
-    'preview',
-    join(browser, 'data-browser'),
-    env,
-  );
-  await healthy(frontendURL, preview);
-  await healthy(`${frontendURL}/server`, preview);
+      join(browser, 'data-browser'),
+      env,
+    );
+    await healthy(frontendURL, preview);
+    await healthy(`${frontendURL}/server`, preview);
+  }
+
   writeFileSync(
     join(output, 'environment.json'),
     JSON.stringify(
@@ -206,6 +218,8 @@ try {
         serverURL,
         frontendURL,
         vaultPortal: env.ATOMIC_VAULT_PORTAL_URL || null,
+        deployment: sameOrigin ? 'embedded' : 'preview',
+        cpuThrottle: env.ATOMIC_TEST_CPU_THROTTLE ?? null,
         retries: 0,
       },
       null,

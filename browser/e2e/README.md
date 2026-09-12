@@ -2,8 +2,9 @@
 
 From `browser/`, run `pnpm test-e2e:local`. It installs locked dependencies,
 builds every JS package and WASM, then builds the native server from this
-checkout. It starts a fresh database and production preview on matching free
-ports, checks both the frontend and its backend proxy, and runs Chromium with
+checkout. It serves the embedded production app and API from the same
+`atomic.localhost` origin on a free port, matching CI, with a fresh database.
+Use `--preview` to exercise the separate-origin Vite preview instead. It runs Chromium with
 one worker and zero retries. It stops only its own process groups. Build logs,
 test data, failure traces and the HTML report remain in the git-ignored `.e2e-runs/` directory.
 
