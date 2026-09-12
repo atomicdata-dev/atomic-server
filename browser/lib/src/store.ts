@@ -9,14 +9,6 @@ import {
 } from './ws-v2.js';
 import { serializeDeterministically as serializePeerCommit } from './commit.js';
 import { taskSchema } from './task-schema.js';
-import { verifyLocalDriveCopy } from './local-drive-copy.js';
-import {
-  encodeCommit as encodePeerCommit,
-  encodeEphemeral as encodePeerEphemeral,
-  decodeEphemeral as decodePeerEphemeral,
-  EphemeralKind as PeerEphemeralKind,
-} from './ws-v2.js';
-import { serializeDeterministically as serializePeerCommit } from './commit.js';
 import {
   mergeHistoryAttributions,
   parseHistoryAttribution,

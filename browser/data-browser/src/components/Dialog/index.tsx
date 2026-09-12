@@ -1,6 +1,12 @@
-import { FeedbackMenuItem } from '../SideBar/FeedbackMenuItem';
 import { useRootWelcomeLayout } from '../../context/RootWelcomeLayoutContext';
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaXmark } from 'react-icons/fa6';
@@ -20,6 +26,12 @@ import { useDialogGlobalContext } from './DialogGlobalContextProvider';
 import { DIALOG_CONTENT_CONTAINER } from '../../helpers/containers';
 import { CurrentBackgroundColor } from '../../globalCssVars';
 import { timeoutEffect } from '@helpers/timeoutEffect';
+
+const FeedbackMenuItem = lazy(() =>
+  import('../SideBar/FeedbackMenuItem').then(module => ({
+    default: module.FeedbackMenuItem,
+  })),
+);
 
 export interface InternalDialogProps {
   show: boolean;
@@ -238,7 +250,9 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             {children}
             {show && rootWelcomeChromeHidden && !hideOnboardingFeedback && (
               <DialogFeedback>
-                <FeedbackMenuItem floating />
+                <Suspense fallback={null}>
+                  <FeedbackMenuItem floating />
+                </Suspense>
               </DialogFeedback>
             )}
           </DropdownContainer>

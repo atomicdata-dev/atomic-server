@@ -474,3 +474,38 @@ open the form with validated non-secret arguments. Credentials remain host-owned
 The existing installer is behind an explicitly trusted adapter, not exposed as
 arbitrary frontend JS execution. This does not complete the setup/action lifecycle
 migration. Remaining work and verification are in [app-setup.md](app-setup.md).
+
+## Rebase validation — 2026-09-12
+
+- [x] Rebased feat/plugin-model onto develop `881007997` in its own worktree.
+- [x] Reconciled duplicate exports/imports, iframe renderer names and the lazy
+  feedback import; retained upstream authenticated iframe asset loading.
+- [x] Fresh frontend, WASM (wasm-pack 0.15.0) and Rust server builds passed.
+- [x] Library: 746 tests; focused app UI: 45 tests; discovery regression: 1 test;
+  frontend TypeScript check passed.
+- [x] Ran Chromium `apps.spec.ts app-setup.spec.ts plugins.spec.ts plugin.spec.ts`
+  with the isolated embedded-server runner: 17 passed, 8 failed, 1 skipped.
+  This is focused app coverage, not the full repository suite or live-provider certification.
+- [x] Fixed browser worker packaging (`?worker`, including shared imports) for
+  manual runs, manifest inspection and MT940 validation; restored the obsolete
+  English publication label. The missing-target browser test now reaches the
+  intended validation error rather than failing to load the sandbox.
+- [x] Updated tab navigation, exact Close selection, connection labels and
+  Notion OAuth test origins. Evidence checks accept an explicitly uncertified
+  bundle; partial Notion setup clears the token and refuses a blind retry.
+- [x] Preserved sync, automation sample approval, trigger permissions and reload
+  checks using a resource/API automation fixture. New automation chat handoff
+  remains covered separately; model-generated automation creation is still a gap.
+- [x] Targeted reruns pass, including the scheduled sync after browser closure.
+  Runner/sandbox unit tests: 35 passed; discovery regression: 1 passed; frontend
+  TypeScript check passed. Final combined app E2E: **25 passed, 1 skipped**,
+  zero retries. The skipped Pets case requires a separately configured mock proxy.
+  Report: `.e2e-runs/plugin-fails-final/report/index.html`.
+
+Local artifacts: `.e2e-runs/2026-09-12T04-01-45.010Z/` (report, traces,
+screenshots and server log). The full suite was not run.
+
+- [ ] Commit the Rust post-rebase repair after resolving the pre-commit gate: browser
+  lint passed, but workspace Clippy failed (including cargo-bin format-in-format-args
+  and atomic_lib test lints), and the temporary snapshot server asset build failed.
+  The repair commit was blocked; no hook bypass was used.

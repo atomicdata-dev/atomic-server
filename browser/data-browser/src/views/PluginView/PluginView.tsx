@@ -126,9 +126,6 @@ const PluginViewSession: React.FC<PluginViewProps> = ({ plugin }) => {
     };
   }, [pluginUrl, hasCss, store, frameRef]);
 
-  return () => window.removeEventListener('message', onMessage);
-  }, [stylesheet, frameRef]);
-
   return (
     <>
       {loadError && <ErrorBlock error={loadError} />}

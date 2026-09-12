@@ -1,3 +1,18 @@
+App runner production regression (2026-09-12): `plugins.spec.ts` exercises
+manual preview/apply, missing-target refusal, manifest credential discovery,
+publishing, and integration sync against the embedded production frontend.
+The runner must use Vite's worker bundling: copying only its entry with `?url`
+left shared library imports missing in production. MT940 validation uses the
+same bundled worker. The publish-button assertion also catches an obsolete
+English catalog entry rendering an empty label.
+
+The integration case seeds an automation draft through the public resource API,
+then tests editing, sample review/apply, execution permissions and persistence.
+It does not claim assistant-generated automation creation coverage; the separate
+GitHub case verifies the current New automation chat handoff. Notion fixtures
+use the configured test origin and assert native required-field validation,
+UUID refusal, token clearing and duplicate-prevention after partial setup failure.
+
 Save acknowledgement: `browser/lib/src/save-acknowledgement.test.ts` reproduces
 an online genesis POST failure reported as persisted. It verifies pending/backoff
 saves return offline and a later acknowledged retry preserves the subject.

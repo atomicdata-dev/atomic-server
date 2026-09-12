@@ -11050,8 +11050,9 @@ msgstr "Unknown setup error"
 #~ "panel. An app with no rows yet still needs to render its heading and a "
 #~ "way to add the first one. Fix it with update_app."
 
-#~ msgid "Publish to integration store"
-#~ msgstr "Publish to integration store"
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Publish to integration store"
+msgstr "Publish to integration store"
 
 #~ msgid "Integration store"
 #~ msgstr "Integration store"

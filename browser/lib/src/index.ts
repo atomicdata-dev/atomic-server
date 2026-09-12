@@ -274,16 +274,6 @@ export {
 
 export * from './calendar-recurrence.js';
 
-export { WebRtcPeer } from './webrtc-peer.js';
-export { WebRtcTransport } from './webrtc-transport.js';
-
-export {
-  BrowserPeerSync,
-  randomPeerToken,
-  type BrowserPeerOptions,
-} from './browser-peer-sync.js';
-
-export { decodeBrowserInvite } from './browser-peer-invite.js';
 export {
   parseSetupDeclaration,
   validateSetupArguments,

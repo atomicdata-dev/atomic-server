@@ -22,7 +22,9 @@ import {
   useStore,
   type Store,
 } from '@tomic/react';
-import pluginWorkerUrl from '@tomic/lib/plugin-run.worker.js?url';
+// Bundle the worker and its shared @tomic/lib chunks. A ?url import copies
+// only the entry file, leaving its relative imports missing in production.
+import PluginWorker from '@tomic/lib/plugin-run.worker.js?worker';
 import { useEffect, useState } from 'react';
 import { signRequest } from '@tomic/react';
 
@@ -331,8 +333,7 @@ export function usePluginManifest(source: string | undefined): PluginManifest {
     let cancelled = false;
 
     void describePlugin(source, {
-      createWorker: () =>
-        new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+      createWorker: () => new PluginWorker() as never,
       timeoutMs: 5000,
     }).then(found => {
       if (!cancelled) setManifest(found);
@@ -373,8 +374,7 @@ export async function prepareRun(
   // browser: the sandbox has no I/O, and a secret the page could read would not
   // be a secret. Placement follows from that rather than being configured.
   const declaration = await describePlugin(source, {
-    createWorker: () =>
-      new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+    createWorker: () => new PluginWorker() as never,
   });
   const serverPlaced = target
     ? (declaration.operations?.length ?? 0) > 0 ||
@@ -395,8 +395,7 @@ export async function prepareRun(
         source,
         { trigger, schemas },
         {
-          createWorker: () =>
-            new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+          createWorker: () => new PluginWorker() as never,
         },
       );
 

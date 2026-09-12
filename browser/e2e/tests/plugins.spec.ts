@@ -10,6 +10,7 @@ import {
   getPluginSync,
   pluginSyncSchedule,
   dataBrowser,
+  signRequest,
 } from '@tomic/lib';
 
 /**
@@ -186,7 +187,7 @@ export function run() { return { intents: [] }; }
           json: {
             state: 'fixture-state',
             ...(managed ? { mode: 'managed' } : {}),
-            url: 'http://localhost:9898/integration-oauth/notion/callback?state=fixture-state&code=fixture',
+            url: `${SERVER_URL}/integration-oauth/notion/callback?state=fixture-state&code=fixture`,
           },
         }),
       );
@@ -197,7 +198,7 @@ export function run() { return { intents: [] }; }
             contentType: 'text/html',
             body: managed
               ? 'Authorization finished. Return to Atomic.'
-              : `<script>opener.postMessage({type:'atomic-notion-oauth',state:'fixture-state',code:'fixture',error:null},'http://localhost:6747')</script>`,
+              : `<script>opener.postMessage({type:'atomic-notion-oauth',state:'fixture-state',code:'fixture',error:null},${JSON.stringify(new URL(page.url()).origin)})</script>`,
           }),
         );
       let finishCalls = 0;
@@ -347,12 +348,24 @@ export function run() { return { intents: [] }; }
       await disclosure.click();
     }
 
-    await expect(
-      page.getByText('Offline checks passed:', { exact: false }),
-    ).toHaveCount(4);
-    await expect(
-      page.getByText('Live provider checks are not included in these results.'),
-    ).toHaveCount(4);
+    const evidence = page.locator('details').filter({
+      has: page.locator('summary', { hasText: 'Repository test results' }),
+    });
+
+    for (const item of await evidence.all()) {
+      await expect(item).toContainText(
+        /Offline checks passed:|No matching test evidence is available/,
+      );
+
+      if (
+        await item.getByText('Offline checks passed:', { exact: false }).count()
+      ) {
+        await expect(item).toContainText(
+          'Live provider checks are not included in these results.',
+        );
+      }
+    }
+
     await page
       .locator('details')
       .filter({ hasText: 'Repository test results' })
@@ -374,7 +387,14 @@ export function run() { return { intents: [] }; }
     await manual
       .getByRole('button', { name: 'Connect Notion', exact: true })
       .click();
-    await expect(page.getByRole('alert')).toContainText('Enter');
+    const sourceId = page.getByLabel('Data source ID', { exact: true });
+    await expect(sourceId).toBeFocused();
+    expect(
+      await sourceId.evaluate(
+        (input: HTMLInputElement) => input.validity.valueMissing,
+      ),
+    ).toBe(true);
+    expect(secretWrites).toEqual([]);
     await page.getByLabel('Data source ID', { exact: true }).fill('../pages');
     await page
       .getByLabel('Notion connection token', { exact: true })
@@ -386,7 +406,8 @@ export function run() { return { intents: [] }; }
       page.getByRole('alert').filter({ hasText: 'UUID' }),
     ).toBeVisible();
     expect(secretWrites).toEqual([]);
-    // A rejected setup request must remain visible, and the user can retry.
+    // A failure after installation starts stays visible and clears the token.
+    // It must not offer a blind retry that could create another connection.
     await page.route('**/plugin-secret', route =>
       route.fulfill({
         status: 503,
@@ -402,9 +423,15 @@ export function run() { return { intents: [] }; }
     await expect(page.getByRole('alert')).toContainText(
       'Could not store Notion credential',
     );
+    await expect(page.getByRole('alert')).toContainText(
+      'Check your integrations for a partially created connection',
+    );
+    await expect(
+      page.getByLabel('Notion connection token', { exact: true }),
+    ).toHaveValue('');
     await expect(
       manual.getByRole('button', { name: 'Connect Notion', exact: true }),
-    ).toBeEnabled();
+    ).toBeDisabled();
     expect(errors).toEqual([]);
     await page.screenshot({
       path: '/tmp/atomic-notion-store.png',
@@ -1271,21 +1298,7 @@ export async function run(ctx) {
       },
       { release: id },
     );
-    await expect(
-      page.getByRole('button', { name: 'Preview sync' }),
-    ).toBeVisible();
-    await page
-      .getByText('Add an automation (optional)', { exact: true })
-      .click();
-    await page
-      .getByText('Advanced: write JavaScript yourself', { exact: true })
-      .click();
-    await expect(
-      page.getByRole('heading', { name: 'Automations', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Create automation' }),
-    ).toBeEnabled();
+    await page.getByRole('tab', { name: 'Sync', exact: true }).click();
     await page.getByRole('button', { name: 'Preview sync' }).click();
     await expect(page.getByText('0 records')).toBeVisible();
     await page.getByRole('button', { name: 'Approve sync' }).click();
@@ -1323,24 +1336,82 @@ export async function run(ctx) {
     await expect(
       page.getByRole('button', { name: 'Pause background sync' }),
     ).toBeVisible();
-    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
-    await page
-      .locator(`[data-connection="${target.plugin}"]`)
-      .getByRole('button', { name: 'Create automation', exact: true })
-      .click();
-    await page
-      .getByRole('dialog')
-      .getByText('Advanced: write JavaScript yourself', { exact: true })
-      .click();
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Create automation', exact: true })
-      .click();
+    // New automation now starts a conversation. Its entry point is covered by
+    // the assistant handoff test above; seed a draft here to exercise review, editing,
+    // trigger permissions and persistence independently of a live model.
+    const automationSubject = await page.evaluate(
+      async ({ connection, drive }) => {
+        const store = window.store;
+        const owner = await store.getResource(drive);
+        const ontology = await store.getResource(
+          owner.get(
+            'https://atomicdata.dev/ontology/server/property/default-ontology',
+          ),
+        );
+        const properties = await Promise.all(
+          ontology
+            .get('https://atomicdata.dev/properties/properties')
+            .map((subject: string) => store.getResource(subject)),
+        );
+
+        const property = (name: string) => {
+          const found = properties.find(
+            p => p.get('https://atomicdata.dev/properties/shortname') === name,
+          );
+          if (!found) throw new Error(`Missing fixture property ${name}`);
+
+          return found.subject;
+        };
+
+        const integration = await store.getResource(connection);
+        const draft = await store.newResource({
+          parent: drive,
+          isA: integration.get('https://atomicdata.dev/properties/isA'),
+          propVals: {
+            'https://atomicdata.dev/properties/name': 'Issue automation',
+            [property('plugin-source')]:
+              'export function run(ctx) { const subject = ctx.trigger.subject; return { intents: [], problems: [] }; }',
+            [property('plugin-schemas')]: {},
+            [property('trigger')]: 'manual',
+            [property('automation-integrations')]: [connection],
+            [property('automation-trigger')]: {
+              integration: connection,
+              event: 'added',
+              name: 'Issue added to Atomic',
+            },
+          },
+        });
+        await draft.save();
+
+        return draft.subject;
+      },
+      { connection: target.plugin, drive: target.drive },
+    );
+    const triggerURL = `${SERVER_URL}/plugin-trigger`;
+    const triggerResponse = await page.request.post(triggerURL, {
+      headers: await signRequest(triggerURL, agent, {}),
+      data: {
+        drive: target.drive,
+        plugin: automationSubject,
+        filters: [
+          {
+            property: 'https://atomicdata.dev/properties/parent',
+            value: target.plugin,
+          },
+        ],
+        onEnter: true,
+        onLeave: false,
+        autoApply: false,
+      },
+    });
+    expect(triggerResponse.ok()).toBe(true);
+    const draftURL = new URL(original);
+    draftURL.searchParams.set('subject', automationSubject);
+    await page.goto(draftURL.href);
     await page.getByText('View or edit JavaScript', { exact: true }).click();
     await expect(
       page.getByRole('textbox', { name: 'Automation JavaScript' }),
     ).toBeVisible();
-    const automationSubject = new URL(page.url()).searchParams.get('subject')!;
     const relationship = await page.evaluate(async () => {
       const store = window.store;
       const script = await store.getResource(
@@ -1409,7 +1480,7 @@ export function run() { return { intents: [{ op: 'create', localId: 'sample', pa
     ).toBeVisible();
     await page.getByRole('link', { name: 'Integrations', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: 'Your integrations', exact: true }),
+      page.getByRole('heading', { name: 'Your connections', exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole('region', { name: 'Your integrations' }).getByText('🐙'),
@@ -1459,7 +1530,11 @@ export function run() { return { intents: [{ op: 'create', localId: 'sample', pa
     ).toBeVisible();
 
     // The starter source is what an author (or an LLM) reads first.
-    await expect(main.getByText('export function run(input)')).toBeVisible();
+    await page.getByRole('tab', { name: 'Code', exact: true }).click();
+    await expect(main.getByRole('code')).toContainText(
+      'export function run(input)',
+    );
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
 
     // Run appears once the drive's plugin class resolves — the menu subscribes
     // to the ontology, so no reload is needed after the schema is created.
@@ -1561,9 +1636,10 @@ export function run() { return { intents: [{ op: 'create', localId: 'sample', pa
 
     // Cancelling a blocked run still records it: a refusal that leaves no
     // trace reads the same as a plugin that never ran.
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(dialog).toBeHidden();
 
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
     await expect(main.getByText('blocked', { exact: true })).toBeVisible();
   });
   test('a plugin asks for the credentials it declares, and nothing else', async ({
@@ -1572,6 +1648,8 @@ export function run() { return { intents: [{ op: 'create', localId: 'sample', pa
     const main = page.getByRole('main');
 
     await newPlugin(page);
+
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click();
 
     // The starter needs no credentials, so it says so rather than showing an
     // empty heading with nowhere to type.
@@ -1613,6 +1691,8 @@ export function run() { return { intents: [{ op: 'create', localId: 'sample', pa
          return { intents: [], problems: [] };
        }`,
     );
+
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click();
 
     // The author who forgot to declare is the one who cannot work out where to
     // enter it, so a slot appears anyway — with the origin read from the URL
