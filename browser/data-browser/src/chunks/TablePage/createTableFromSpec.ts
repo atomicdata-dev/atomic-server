@@ -1,4 +1,9 @@
 import {
+  ensureSchema,
+  resumableInstallation,
+  type SchemaSpec,
+} from '@tomic/lib';
+import {
   Client,
   Datatype,
   JSONValue,
@@ -45,6 +50,10 @@ export type TableColumnType =
   | 'select';
 
 export interface TableColumnSpec {
+  /** Resolve a property from the template schema, reusing it within this drive. */
+  schemaProperty?: string;
+  /** Reuse an existing property without modifying its definition. */
+  propertySubject?: string;
   name: string;
   type: TableColumnType;
   /** For `select` columns: the tag options, e.g. ['Todo', 'Doing', 'Done']. */
@@ -190,6 +199,7 @@ export interface TableFilterSpec {
 }
 
 export interface TableSpec {
+  schema?: SchemaSpec;
   name: string;
   /** What a single row is called ("Issue", "Employee"); names the row class.
    *  Falls back to "Row". */
@@ -277,6 +287,55 @@ export async function createColumnOnClass(
    */
   deferAttach = false,
 ): Promise<{ subject: string; tags?: Record<string, string> }> {
+  if (column.propertySubject) {
+    const property = await store.getResource(column.propertySubject);
+    const expected =
+      column.type === 'select'
+        ? Datatype.RESOURCEARRAY
+        : DATATYPE_BY_TYPE[column.type];
+
+    if (
+      !property.hasClasses(core.classes.property) ||
+      property.get(core.properties.datatype) !== expected
+    ) {
+      throw new Error(
+        `Shared property ${column.name} has an incompatible datatype`,
+      );
+    }
+
+    const tags: Record<string, string> = {};
+
+    if (column.type === 'select') {
+      if (!property.hasClasses(dataBrowser.classes.selectProperty))
+        throw new Error(
+          `Shared property ${column.name} is not a select property`,
+        );
+      const options = property.get(core.properties.allowsOnly) as
+        | string[]
+        | undefined;
+
+      for (const subject of options ?? []) {
+        const tag = await store.getResource(subject);
+        tags[String(tag.get(core.properties.name))] = subject;
+      }
+
+      for (const option of column.options ?? []) {
+        if (!tags[option])
+          throw new Error(
+            `Shared property ${column.name} has no option ${option}`,
+          );
+      }
+    }
+
+    if (!deferAttach)
+      await attachPropertiesToClass(store, tableClass, [property.subject]);
+
+    return {
+      subject: property.subject,
+      ...(column.type === 'select' ? { tags } : {}),
+    };
+  }
+
   if (column.type === 'select') {
     return createSelectPropertyOnClass(store, tableClass, {
       name: column.name,
@@ -745,8 +804,17 @@ export async function buildTableFromSpec(
     parent: string;
     driveSubject: string;
     addToOntology: (resource: Resource) => Promise<void>;
+    /** Stable app-owned setup key. Repeating the same spec resumes its resources. */
+    installationKey?: string;
   },
 ): Promise<BuildTableResult> {
+  if (opts.installationKey)
+    store = await resumableInstallation(
+      store,
+      opts.driveSubject,
+      opts.installationKey,
+      spec,
+    );
   const closeBuild = perfSpan('table.build', { name: spec.name });
 
   const closeParent = perfSpan('table.resolveOntologyParent');
@@ -762,6 +830,9 @@ export async function buildTableFromSpec(
   await opts.addToOntology(rowClass);
   closeClass();
 
+  const reusable = spec.schema
+    ? await ensureSchema(store, opts.driveSubject, spec.schema)
+    : undefined;
   const columns: Record<string, string> = {};
   const tags: Record<string, Record<string, string>> = {};
 
@@ -772,7 +843,17 @@ export async function buildTableFromSpec(
     // `true`: hold off registering each column on the ontology and the row
     // class — those are the same two resources for every column, so one
     // attach at the end costs two commits instead of two per column.
-    const created = await createColumnOnClass(store, rowClass, column, true);
+    const propertySubject = column.schemaProperty
+      ? reusable?.properties[column.schemaProperty]
+      : column.propertySubject;
+    if (column.schemaProperty && !propertySubject)
+      throw new Error(`Unknown schema property ${column.schemaProperty}`);
+    const created = await createColumnOnClass(
+      store,
+      rowClass,
+      { ...column, propertySubject },
+      true,
+    );
     closeColumn();
     columns[column.name] = created.subject;
     columnSubjects.push(created.subject);

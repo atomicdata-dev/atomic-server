@@ -1,0 +1,111 @@
+[
+  {
+    "name": "public read",
+    "manifest": {
+      "schemaVersion": 1,
+      "operations": [
+        {
+          "id": "list",
+          "method": "GET",
+          "url": "https://api.test/items",
+          "effect": "read"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "name": "post query",
+    "manifest": {
+      "schemaVersion": 1,
+      "operations": [
+        {
+          "id": "query",
+          "method": "POST",
+          "url": "https://api.test/query",
+          "effect": "read"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "name": "unknown version",
+    "manifest": {
+      "schemaVersion": 2
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown permission",
+    "manifest": {
+      "schemaVersion": 1,
+      "sudo": true
+    },
+    "valid": false
+  },
+  {
+    "name": "bad secret origin",
+    "manifest": {
+      "schemaVersion": 1,
+      "secrets": [
+        {
+          "name": "a",
+          "origin": "https://a.test/path"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "name": "duplicate operation",
+    "manifest": {
+      "schemaVersion": 1,
+      "operations": [
+        {
+          "id": "a",
+          "method": "GET",
+          "url": "https://a.test",
+          "effect": "read"
+        },
+        {
+          "id": "a",
+          "method": "GET",
+          "url": "https://a.test",
+          "effect": "read"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown effect",
+    "manifest": {
+      "schemaVersion": 1,
+      "operations": [
+        {
+          "id": "a",
+          "method": "GET",
+          "url": "https://a.test",
+          "effect": "maybe"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "name": "credentials URL",
+    "manifest": {
+      "schemaVersion": 1,
+      "operations": [
+        {
+          "id": "a",
+          "method": "GET",
+          "url": "https://secret@a.test",
+          "effect": "read"
+        }
+      ]
+    },
+    "valid": false
+  }
+]

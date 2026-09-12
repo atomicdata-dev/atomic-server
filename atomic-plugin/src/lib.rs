@@ -9,7 +9,8 @@ pub use bindings::*;
 // Types re-exports
 pub use bindings::atomic::class_extender::host;
 pub use bindings::atomic::class_extender::types::{
-    CommitContext, GetContext, ResourceJson, ResourceResponse,
+    CommitContext, GetContext, HttpHeader, HttpRequest, HttpResponse, ResourceJson,
+    ResourceResponse,
 };
 
 pub use bindings::Guest;
@@ -245,6 +246,39 @@ pub fn commit(commit: &CommitBuilder) -> Result<(), String> {
     let commit_str =
         serde_json::to_string(commit).map_err(|e| format!("Failed to serialize commit: {}", e))?;
     host::commit(&commit_str).map_err(|e| format!("Failed to commit: {}", e))
+}
+
+/// Makes an HTTP request through the host.
+///
+/// A plugin has no sockets of its own; this is the only way out, and the host
+/// decides whether it opens. The manifest must declare the origin, and the URL
+/// must resolve to somewhere on the public internet.
+///
+/// # Credentials
+///
+/// Put `secret:<name>` in a **header value** and the host substitutes the
+/// secret before sending. The plugin never sees it — printing the header shows
+/// `secret:notion`, not the token.
+///
+/// ```no_run
+/// # use atomic_plugin::{fetch, HttpHeader, HttpRequest};
+/// let response = fetch(HttpRequest {
+///     method: "GET".to_string(),
+///     url: "https://api.notion.com/v1/users/me".to_string(),
+///     headers: vec![HttpHeader {
+///         name: "Authorization".to_string(),
+///         value: "Bearer secret:notion".to_string(),
+///     }],
+///     body: None,
+/// })?;
+/// # Ok::<(), String>(())
+/// ```
+///
+/// A handle in the URL or the body is an error, not a substitution: a
+/// credential in a URL is written to access logs as a matter of course.
+/// Redirects are not followed, so a 3xx comes back for the plugin to handle.
+pub fn fetch(request: HttpRequest) -> Result<HttpResponse, String> {
+    host::fetch(&request)
 }
 
 impl TryFrom<ResourceJson> for Resource {

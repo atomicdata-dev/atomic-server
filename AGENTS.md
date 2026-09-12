@@ -24,6 +24,38 @@ introduce a `main` branch, treat `master` as production, or add a job that
 fast-forwards `main` when a tag is pushed — the tag is the release. Hotfixes
 branch from the tag and merge back to `develop`. See `CONTRIBUTING.md`.
 
+**Stop the vite dev server before any git operation that rewrites files** — a
+rebase, a branch switch, a `git checkout -- .`. See below for why.
+
+## Translation catalogs (`src/locales/*.po`)
+
+Wuchale extracts these from source *as vite serves it*, so the dev server is a
+second writer on tracked files. Four ways that has cost real time:
+
+- **During a rebase.** The extractor rewrote the `.po` files between steps, so
+  git reported "You must edit all merge conflicts" while `git diff` showed
+  nothing unmerged. Stop vite first.
+- **Two writers.** Two dev servers, or a dev server plus a build, race on the
+  same catalogs and corrupt them. Symptom: `[i18n-404:NNN]` where a label
+  should be. One vite at a time — a worktree has its own catalogs, so one per
+  worktree is fine.
+- **Catalogs that are not the extractor's fixed point.** If what is committed
+  differs from what extraction produces, every dev-server start rewrites them,
+  vite sees a file change, and the page reloads. That is not cosmetic: a reload
+  abandons in-flight work, and this silently cancelled a destroy mid-test. If
+  `git status` shows `.po` churn on a clean checkout, settle them and commit.
+- **`pnpm clean-translations` is not the same writer.** It extracts from test
+  files too, which the vite plugin does not, so its output is a *different*
+  fixed point. Settling by running the app is what matches the dev server.
+
+Strings a model reads — tool descriptions, prompts, instructions — must be
+`@wc-ignore`d. A translated tool name is not a tool name. See
+`browser/data-browser/CLAUDE.md` for the ignore syntax.
+
+After touching anything that renders text, read the `.po` diff by hand: a
+guarded element can silently drop sibling strings, and entries re-key when an
+icon moves into a message.
+
 ## Quick Dev Setup
 
 Use the Charlotte MCP server and navigate to `http://localhost:6747/app/dev-drive` to instantly create a fresh agent.
@@ -266,20 +298,25 @@ The startup update script only runs `pnpm install` (in `browser/`). Everything b
 already handled in the VM snapshot; these notes capture the non-obvious gotchas for
 building/running the stack again after pulling changes.
 
-### Run the server on port 9885 (not the default 9883)
+### Run the server on the port the frontend is pointed at
 
-The frontend's `browser/data-browser/.env.development` and the Vite proxy both point at
-`http://localhost:9885`, but `atomic-server` defaults to `9883`. For a standalone dev
-setup the two MUST be aligned, so start the server on 9885:
+`browser/data-browser/vite.config.ts` defaults `VITE_ATOMIC_SERVER_URL` and points the
+Vite proxy at the same value, so the app and the proxy always agree with each other. The
+server has to be started on that port too, which is 9883 by default:
 
 ```
-/workspace/target/debug/atomic-server --port 9885            # subsequent runs
-/workspace/target/debug/atomic-server --port 9885 --initialize   # first run / to reset the /setup invite
+/workspace/target/debug/atomic-server --port 9883            # subsequent runs
+/workspace/target/debug/atomic-server --port 9883 --initialize   # first run / to reset the /setup invite
 ```
 
-If they disagree, the app silently repoints drives to a server that isn't listening and
-auth/drive resolution fails. Then open `http://localhost:6747/app/dev-drive` for a clean
-authenticated agent + drive.
+If the three disagree, the app silently repoints drives to a server that isn't listening
+and auth/drive resolution fails. Then open `http://localhost:6747/app/dev-drive` for a
+clean authenticated agent + drive.
+
+A wrapper that runs its own node overrides the app's port by exporting
+`VITE_ATOMIC_SERVER_URL` (vite prefers a `VITE_`-prefixed process variable over the env
+files), and starts its node there instead. Check what the dev server printed before
+assuming 9883.
 
 ### pnpm scripts need bash (`build:wasm` breaks under dash)
 

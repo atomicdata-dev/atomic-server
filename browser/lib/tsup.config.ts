@@ -13,6 +13,10 @@ export default defineConfig(options => ({
     // hand-written `public/wasm/client-db-worker.js` that drifted out of
     // sync with the TS source whenever message types changed.
     'client-db.worker': 'src/client-db.worker.ts',
+    // The DedicatedWorker that executes a plugin's `run` export. Same
+    // reasoning as above: its own entry so hosts can point a `new Worker(...)`
+    // at it without hand-maintaining a parallel copy.
+    'plugin-run.worker': 'src/plugin-run.worker.ts',
     'ontologies/core': 'src/ontologies/core.ts',
     'ontologies/server': 'src/ontologies/server.ts',
     'ontologies/dataBrowser': 'src/ontologies/dataBrowser.ts',
@@ -25,6 +29,9 @@ export default defineConfig(options => ({
   format: ['esm', 'cjs'],
   target: 'es2023',
   external: ['loro-crdt'],
+  // rrule advertises an ESM entry to bundlers but only exposes CommonJS to
+  // Node. Bundle it so the published ESM build also works in the MCP CLI.
+  noExternal: ['rrule'],
   // We need to generate the type definition files ourselves because the build in rollup dts plugin does not work with the way we use module augmentation.
   // Tsup will switch to microsoft-api-extractor in the future but they don't even support rolling up module augments at all. https://github.com/microsoft/rushstack/issues/1709
   onSuccess: async () => {

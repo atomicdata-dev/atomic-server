@@ -2,6 +2,7 @@
   "devDependencies": {
     "@stylistic/eslint-plugin": "^4.4.1",
     "@types/node": "^25.9.1",
+    "esbuild": ">=0.28.1 <0.29.0",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "netlify-cli": "26.0.2",
@@ -35,7 +36,8 @@
     "typedoc": "typedoc --options ./typedoc.json",
     "typedoc-publish": "pnpm run typedoc && if [ -z \"$NETLIFY_AUTH_TOKEN\" ]; then echo 'NETLIFY_AUTH_TOKEN not set — skipping deploy (typedoc built only)'; exit 0; fi && netlify link --id a628f703-2dc1-4305-93d2-4ddc16c13f75 --auth $NETLIFY_AUTH_TOKEN && netlify deploy --dir data-browser/publish/docs/ ${NETLIFY_PROD:+--prod} --auth $NETLIFY_AUTH_TOKEN",
     "typecheck": "pnpm run -r --parallel typecheck",
-    "test-e2e:local": "node e2e/scripts/local-e2e.mjs"
+    "test-e2e:local": "node e2e/scripts/local-e2e.mjs",
+    "certify:integrations": "node ../integrations/tooling/certify.mjs"
   },
   "workspaces": {
     "packages": [

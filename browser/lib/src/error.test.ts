@@ -1,40 +1,41 @@
-import { describe, it } from 'vitest';
-import { AtomicError, ErrorType } from './error.js';
+import { describe, expect, it } from 'vitest';
+import { errorMessageFromResponse } from './error.js';
+import { core } from './ontologies/core.js';
 
-describe('AtomicError code (F5: planning/unified-sync.md)', () => {
-  it('takes an explicit code over anything parsed from the message (WS path)', ({
-    expect,
-  }) => {
-    const err = new AtomicError('No write right', ErrorType.Server, 3);
-    expect(err.code).toBe(3);
-    expect(err.message).toBe('No write right');
-  });
-
-  it('extracts errorCode from a JSON-AD error body (HTTP path)', ({
-    expect,
-  }) => {
+describe('errorMessageFromResponse', () => {
+  it('pulls the description out of a JSON-AD error', () => {
+    // The real shape: a sentence, buried under a class list and a Loro update.
     const body = JSON.stringify({
-      'https://atomicdata.dev/properties/description': 'No write right',
-      'https://atomicdata.dev/properties/errorCode': 3,
+      [core.properties.description]:
+        '`awfawf` is not a URL: relative URL without a base',
+      'https://atomicdata.dev/properties/errorCode': 0,
+      'https://atomicdata.dev/properties/isA': [
+        'https://atomicdata.dev/classes/Error',
+      ],
+      'https://atomicdata.dev/properties/loroUpdate': 'bG9ybwAAAA…',
     });
-    const err = new AtomicError(body, ErrorType.Server);
-    expect(err.code).toBe(3);
-    expect(err.message).toBe('No write right');
+
+    expect(errorMessageFromResponse(body, 500)).toBe(
+      '`awfawf` is not a URL: relative URL without a base',
+    );
   });
 
-  it('leaves code undefined when the body has none (older server)', ({
-    expect,
-  }) => {
-    const body = JSON.stringify({
-      'https://atomicdata.dev/properties/description': 'Something broke',
-    });
-    const err = new AtomicError(body, ErrorType.Server);
-    expect(err.code).toBeUndefined();
+  it('falls back to a short body that is not one of ours', () => {
+    expect(errorMessageFromResponse('Bad Request', 400)).toBe('Bad Request');
   });
 
-  it('leaves code undefined for a plain non-JSON message', ({ expect }) => {
-    const err = new AtomicError('plain text error', ErrorType.Server);
-    expect(err.code).toBeUndefined();
-    expect(err.message).toBe('plain text error');
+  it('does not paste a whole error page into a toast', () => {
+    const html = `<html>${'x'.repeat(400)}</html>`;
+
+    expect(errorMessageFromResponse(html, 502)).toBe('Request failed (502)');
+  });
+
+  it('says something when the body says nothing', () => {
+    expect(errorMessageFromResponse('', 500)).toBe('Request failed (500)');
+    expect(errorMessageFromResponse('   ', 500)).toBe('Request failed (500)');
+  });
+
+  it('ignores a JSON body with no description', () => {
+    expect(errorMessageFromResponse('{"a":1}', 418)).toBe('{"a":1}');
   });
 });

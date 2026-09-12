@@ -1,0 +1,25 @@
+{
+  "name": "changing a resource that is not there blocks the plan",
+  "schema": {
+    "https://atomicdata.dev/properties/name": {
+      "datatype": "https://atomicdata.dev/datatypes/string",
+      "shortname": "name"
+    }
+  },
+  "resources": {},
+  "verdict": {
+    "intents": [
+      {
+        "op": "set",
+        "subject": "https://x/ghost",
+        "set": { "https://atomicdata.dev/properties/name": "x" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": true,
+    "problems": ["does not exist"],
+    "changes": [{ "op": "set", "subject": "https://x/ghost", "properties": [] }]
+  }
+}

@@ -288,6 +288,7 @@ const DEFAULT_FILES: &[(&str, &str)] = &[
     ),
     ("ai.json", include_str!("../defaults/ai.json")),
     ("plugins.json", include_str!("../defaults/plugins.json")),
+    ("tasks.json", include_str!("../defaults/tasks.json")),
     ("forks.json", include_str!("../defaults/forks.json")),
     ("i18n.json", include_str!("../defaults/i18n.json")),
 ];

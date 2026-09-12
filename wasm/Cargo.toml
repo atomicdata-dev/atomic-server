@@ -42,6 +42,10 @@ serde-wasm-bindgen = "0.6"
 js-sys = "0.3"
 console_error_panic_hook = "0.1"
 
+syncables = { path = "../integrations/localthought/syncables" }
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 

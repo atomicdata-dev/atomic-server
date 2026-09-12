@@ -1,15 +1,42 @@
 {
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
+    "rootDir": "../..",
     "typeRoots": ["../node_modules/@types"],
     "types": ["node"],
     "composite": false,
     // Resolve workspace packages from source so the IDE does not depend on
     // dist/*.d.ts while tsup watch rebuilds @tomic/lib and @tomic/react.
-    "rootDir": "..",
+
     "paths": {
       "@tomic/react": ["../react/src/index.ts"],
       "@tomic/lib": ["../lib/src/index.ts"],
+      "@localthought/atomic-integrations": [
+        "./node_modules/devonian/platform-lenses/atomic-integrations/index.ts"
+      ],
+      "@localthought/atomic-integrations/*": [
+        "./node_modules/devonian/platform-lenses/atomic-integrations/*"
+      ],
+      "@integration-host/import-records": ["../lib/src/import-records.ts"],
+      "@integration-host/plugin-connection": [
+        "../lib/src/plugin-connection.ts"
+      ],
+      "@integration-host/plugin-reconcile": [
+        "../lib/src/plugin-reconcile.ts"
+      ],
+      "@integration-host/navigation": ["./src/helpers/navigation.tsx"],
+      "@integration-host/runScript": [
+        "./src/chunks/PluginRuns/runScript.ts"
+      ],
+      "@integration-host/RunPluginDialog": [
+        "./src/chunks/PluginRuns/RunPluginDialog.tsx"
+      ],
+      "@integration-host/table/createTableFromSpec": [
+        "./src/chunks/TablePage/createTableFromSpec.ts"
+      ],
+      "@integration-host/table/tableTemplates": [
+        "./src/chunks/TablePage/tableTemplates.ts"
+      ],
       "@components/*": ["./src/components/*"],
       "@views/*": ["./src/views/*"],
       "@hooks/*": ["./src/hooks/*"],

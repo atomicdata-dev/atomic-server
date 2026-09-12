@@ -45,3 +45,5 @@ scratchpad
 .pnpm-store/
 **/zed backup settings.json
 node_modules/
+# Generated integration certification evidence
+/artifacts/integration-certification/

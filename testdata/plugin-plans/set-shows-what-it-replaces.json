@@ -1,0 +1,39 @@
+{
+  "name": "a set carries the value it replaces, so a preview is a diff",
+  "schema": {
+    "https://atomicdata.dev/properties/name": {
+      "datatype": "https://atomicdata.dev/datatypes/string",
+      "shortname": "name"
+    }
+  },
+  "resources": {
+    "https://x/a": { "https://atomicdata.dev/properties/name": "Before" }
+  },
+  "verdict": {
+    "intents": [
+      {
+        "op": "set",
+        "subject": "https://x/a",
+        "set": { "https://atomicdata.dev/properties/name": "After" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": false,
+    "problems": [],
+    "changes": [
+      {
+        "op": "set",
+        "subject": "https://x/a",
+        "properties": [
+          {
+            "property": "https://atomicdata.dev/properties/name",
+            "from": "Before",
+            "to": "After"
+          }
+        ]
+      }
+    ]
+  }
+}

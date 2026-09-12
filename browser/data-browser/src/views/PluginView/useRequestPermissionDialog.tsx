@@ -16,7 +16,8 @@ export type RequestPermissionFn = (subject: string) => Promise<boolean>;
 export function useRequestPermissionDialog(
   plugin: string,
   type: 'read' | 'write',
-): [RequestPermissionFn, React.ReactNode] {
+  installation: string,
+): [RequestPermissionFn, React.ReactNode, (subject: string) => boolean] {
   const [show, setShow] = useState(false);
   const [requestedSubject, setRequestedSubject] = useState<string | undefined>(
     undefined,
@@ -25,7 +26,7 @@ export function useRequestPermissionDialog(
   const [allowAll, setAllowAll] = useState(false);
 
   const { grants: permissions, setGrants: setPermissions } =
-    useStoredPluginGrants(plugin, type);
+    useStoredPluginGrants(installation, type);
 
   // Keep a ref to permissions to access the latest value in the queue processing logic
   const permissionsRef = useRef(permissions);
@@ -37,6 +38,15 @@ export function useRequestPermissionDialog(
     [],
   );
   const resolverRef = useRef<((value: boolean) => void) | undefined>(undefined);
+
+  useEffect(
+    () => () => {
+      resolverRef.current?.(false);
+      resolverRef.current = undefined;
+      for (const request of queueRef.current.splice(0)) request.resolve(false);
+    },
+    [],
+  );
 
   const processQueue = () => {
     if (resolverRef.current) {
@@ -134,7 +144,13 @@ export function useRequestPermissionDialog(
     />
   );
 
-  return [requestPermission, dialog];
+  return [
+    requestPermission,
+    dialog,
+    subject =>
+      permissionsRef.current.allowAll ||
+      permissionsRef.current.allowed.includes(subject),
+  ];
 }
 
 interface ScopeGrantResult {

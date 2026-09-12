@@ -1,0 +1,12 @@
+{
+  "extends": "../../browser/tsconfig.build.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "typeRoots": ["../../browser/node_modules/@types"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["parser.ts", "plugin.ts"]
+}

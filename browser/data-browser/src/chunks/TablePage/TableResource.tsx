@@ -13,6 +13,8 @@ import {
 } from '@tomic/react';
 import type { CellIndex } from '@chunks/TableEditor';
 import toast from 'react-hot-toast';
+import { styled } from 'styled-components';
+import { AppFrame } from '@chunks/AppPage/AppFrame';
 import { computeSortOrder, readSortKey } from '@helpers/fractionalSortOrder';
 import { useHandleClearCells } from '@chunks/TablePage/helpers/useHandleClearCells';
 import { useHandleColumnResize } from '@chunks/TablePage/helpers/useHandleColumnResize';
@@ -137,6 +139,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     ready,
     invalidateCollection,
     viewKind,
+    appView,
     viewGroupBy,
     setViewGroupBy,
     viewEndProp,
@@ -1090,6 +1093,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
       <TablePresenceContext value={presenceValue}>
         {!embedded && (
           <TableViewTabs
+            rowClass={tableClass.subject}
             views={views}
             activeView={activeView}
             setActiveView={setActiveView}
@@ -1133,7 +1137,18 @@ export const TableResource: React.FC<TableResourceProps> = ({
             onRowCreated={notifyEntryCreated}
           />
         )}
-        {viewKind === 'kanban' ? (
+        {appView !== undefined ? (
+          // An app rendering this table's rows. It sits beside the Table tab
+          // rather than in place of it: adding a way to look at rows never
+          // takes one away, and the table is always one tab over.
+          <AppViewWrapper>
+            <AppFrame
+              app={appView}
+              drive={store.getDrive()!}
+              table={resource.subject}
+            />
+          </AppViewWrapper>
+        ) : viewKind === 'kanban' ? (
           <KanbanView
             tableSubject={resource.subject}
             tableClass={tableClass}
@@ -1184,7 +1199,6 @@ export const TableResource: React.FC<TableResourceProps> = ({
               // load shift the row's index, not its key (`itemKey` offsets by
               // `memberCount`), so nothing remounts.
               itemCount={memberCount + newRowSubjects.length}
-              busy={!ready}
               itemKey={itemKey}
               columnToKey={columnToKey}
               labelledBy={titleId}
@@ -1229,3 +1243,16 @@ export const TableResource: React.FC<TableResourceProps> = ({
     </TablePageContext>
   );
 };
+
+/**
+ * Sizes the app tab the same way the Kanban and Calendar tabs size themselves:
+ * fill the space under the title and view tabs, capped so the page chrome
+ * stays reachable. An iframe cannot report how tall its document is, so the
+ * box has to be decided out here.
+ */
+const AppViewWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: min(80vh, calc(100dvh - 13rem));
+  min-height: 18rem;
+`;

@@ -1,5 +1,7 @@
+import { AppVerifierProvider } from '@chunks/AppPage/AppVerifierContext';
 import { DemoActionsBar, readDemoDrive } from './DemoExitButton';
 import { readTemplateDemo } from '../chunks/Templates/demoSession';
+import { AppSetupProvider } from './AppSetup/AppSetupProvider';
 import * as React from 'react';
 import { type JSX, useMemo } from 'react';
 import { styled } from 'styled-components';
@@ -87,40 +89,44 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
   return (
     <RightPanelProvider>
       <AISidebarContextProvider>
-        {/* The single app-wide resource context menu (right-click). Mounted here
-         * so its actions have the AI-sidebar, dialog, and router contexts. */}
-        <ResourceContextMenuHost />
-        {/* Toasts new meeting messages when the meeting panel isn't open. */}
-        {!hideGlobalChrome && <MeetingMessageToaster />}
-        {previewBar && (
-          <PreviewHeader>
-            <DemoActionsBar />
-          </PreviewHeader>
-        )}
-        {!hideGlobalChrome && (
-          <TopBar
-            previewHeight={previewHeight}
-            subject={contextualSubject}
-            top={navbarTop}
-          />
-        )}
-        <SideBarWrapper
-          previewHeight={previewHeight}
-          top={navbarTop}
-          fullViewportContent={hideGlobalChrome}
-        >
-          {!hideGlobalChrome && <SideBar />}
-          <Content>{children}</Content>
-          {!hideGlobalChrome && (
-            <HideInPrint>
-              <CommentsPanelMemo />
-              <FollowSessionPanelMemo />
-              <AISidebarMemo />
-            </HideInPrint>
-          )}
-        </SideBarWrapper>
-        {hideGlobalChrome && <OnboardingFeedback />}
-        <OverlayContainer />
+        <AppVerifierProvider>
+          <AppSetupProvider>
+            {/* The single app-wide resource context menu (right-click). Mounted here
+             * so its actions have the AI-sidebar, dialog, and router contexts. */}
+            <ResourceContextMenuHost />
+            {/* Toasts new meeting messages when the meeting panel isn't open. */}
+            {!hideGlobalChrome && <MeetingMessageToaster />}
+            {previewBar && (
+              <PreviewHeader>
+                <DemoActionsBar />
+              </PreviewHeader>
+            )}
+            {!hideGlobalChrome && (
+              <TopBar
+                previewHeight={previewHeight}
+                subject={contextualSubject}
+                top={navbarTop}
+              />
+            )}
+            <SideBarWrapper
+              previewHeight={previewHeight}
+              top={navbarTop}
+              fullViewportContent={hideGlobalChrome}
+            >
+              {!hideGlobalChrome && <SideBar />}
+              <Content>{children}</Content>
+              {!hideGlobalChrome && (
+                <HideInPrint>
+                  <CommentsPanelMemo />
+                  <FollowSessionPanelMemo />
+                  <AISidebarMemo />
+                </HideInPrint>
+              )}
+            </SideBarWrapper>
+            {hideGlobalChrome && <OnboardingFeedback />}
+            <OverlayContainer />
+          </AppSetupProvider>
+        </AppVerifierProvider>
       </AISidebarContextProvider>
     </RightPanelProvider>
   );

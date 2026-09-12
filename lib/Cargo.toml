@@ -79,7 +79,9 @@ lazy_static = "1"
 ntest = "0.9.5"
 tracing-chrome = "0.7.2"
 tracing-subscriber = { version = "0.3.23", features = ["registry"] }
-tokio = { version = "1.52.3", features = ["rt", "macros"] }
+# Native durability tests and benchmarks construct Runtime::new() directly.
+# Keep the multithread runtime test-only so normal/WASM builds stay unchanged.
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 
 [dependencies.opentelemetry]
 optional = true

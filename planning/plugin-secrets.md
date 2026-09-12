@@ -1,0 +1,265 @@
+# Plugin Secrets and Host-Side Fetch
+
+## Status
+
+Built (2026-08-21); encrypted at rest (2026-08-22). Proposed 2026-08-20;
+every step below shipped and was proved end to end — a plugin fetched an echo
+endpoint and the response showed the substituted credential, which the plugin
+itself never saw. The gating dependency for
+[`plugins.md`](./plugins.md) A3, and named there and in
+[`importers.md`](./importers.md) as designed nowhere.
+
+## At rest
+
+Stored secrets are wrapped with a **node key**, kept beside `config.toml` at
+mode 0600 and never inside the database it protects. The format is the
+envelope already built for vault secrets
+([`encrypted-vault-format.md`](./encrypted-vault-format.md)) with one wrapper
+kind added, rather than a second scheme.
+
+**What this protects, and what it cannot.** Every way a store leaves a machine
+intact — a stolen disk, a backup, a copied file, a support bundle — now leaves
+with ciphertext. It does not protect against a compromised running server, and
+no arrangement can while unattended runs exist: a plugin importing at 3am has
+nobody to ask for a passkey, so the process must be able to open what it
+opens.
+
+`config.toml` itself holds this server's agent secret and was created
+world-readable by every version before this one. It is narrowed on every boot,
+so an existing installation is fixed by upgrading rather than by someone
+reading a release note.
+
+**The wrapper set follows the trigger, and is not a setting.** A secret used
+only when someone presses Run could be wrapped to their credential, leaving
+the server unable to read it at all. A secret a schedule or a query trigger
+spends cannot be — that is the trade, not a gap to engineer around. So arming
+a schedule or trigger refuses when a plugin holds a secret this node cannot
+open alone, at the moment of arming, where a person is present to read why.
+The user-wrapped half is not built; the refusal is, so it cannot be
+retrofitted after the first silent overnight failure. Not started.
+
+## Why
+
+Four things on the roadmap are waiting on this and nothing else:
+
+- the HTTP action a plugin needs to reach anything outside the drive;
+- email, which should be an HTTP call to a provider rather than an SMTP
+  client in atomic-server;
+- token-based importers — Notion's API sends no CORS headers, so the browser
+  cannot fetch it at all;
+- every scheduled connector in
+  [`personal-information-suite.md`](./personal-information-suite.md).
+
+All four need the same two things: somewhere to keep a credential that is not
+the resource graph, and a way to spend it without the plugin ever seeing it.
+
+## What Exists Today
+
+Three findings from the current WASM plugin runtime, all load-bearing for this
+design:
+
+**Secrets already live outside the graph.** `PluginMeta`
+(`lib/src/db/plugin_meta.rs`) stores a plugin's `agent_secret` in its own redb
+table keyed by `(drive, namespace, name)` — not as a resource. It is therefore
+never committed, never synced, never indexed. That is the right shape and this
+design extends it rather than inventing a second one.
+
+**Network access is all or nothing.** `PermissionType::Network` maps to
+`builder.inherit_network()` in `server/src/plugins/wasm.rs`. A plugin that
+declares it gets the host's entire network: loopback, the private ranges, and
+any cloud instance-metadata endpoint the host can reach. There is no origin
+allowlist, and `plugins.md`'s manifest already assumes `network.origins`.
+
+**`get_resource` is a second egress.** For a subject outside the server's own
+URL the host calls `db.fetch_resource`, gated on the same binary Network
+permission. Any allowlist that only covers a new `http-request` import would
+leave this path open.
+
+## The Threat
+
+Not "the plugin author is hostile" — the interesting case is duller and more
+likely. A plugin is written by an LLM, from a prompt, over data the user did
+not audit. It will contain mistakes, and its input may contain text an attacker
+chose. The properties worth buying:
+
+- A credential cannot end up in a commit, a sync frame, a search index, a log
+  line, or an LLM's context, because it is never in any of them.
+- A plugin cannot read a credential it is allowed to *use*, so a mistake that
+  serializes its own config cannot leak one.
+- A plugin cannot reach the host's internal network, whatever URL it computes.
+- A user can see which origins a plugin may reach before approving it, and can
+  revoke that later.
+
+## Design
+
+### Secrets are host state, not resources
+
+```text
+PluginSecret          keyed by (drive, plugin subject, name)
+  value               plaintext, at rest under the same protection as agent_secret
+  origins             origins this secret may be sent to
+  createdAt, lastUsedAt
+```
+
+Stored in a redb table beside `PluginMeta`. **No endpoint returns a value** —
+not to the browser, not to the plugin, not to an admin UI. Writes are
+create-or-replace; reads are for the host at invoke time only. Deleting the
+plugin deletes its secrets.
+
+`lastUsedAt` exists so a user can answer "is this still in use" before
+revoking, which is the question that otherwise keeps dead credentials alive.
+
+### A plugin gets a handle, never a value
+
+The guest sees `secret:<name>` and can pass it where a credential goes:
+
+```ts
+const res = await ctx.http({
+  url: 'https://api.notion.com/v1/databases/…',
+  headers: { Authorization: 'Bearer secret:notion' },
+});
+```
+
+The host substitutes at the boundary. A plugin that logs its config, returns it
+in a verdict, or embeds it in an intent leaks the string `secret:notion`.
+
+Substitution happens **only** in header values and only for a secret whose
+`origins` include the request's origin. A handle in a URL, a body, or a query
+parameter is not substituted — it is an error naming the handle, because a
+credential in a URL ends up in logs and referrers by design, and silently
+sending it there would be the worst kind of helpful.
+
+### One egress, with guards
+
+Every outbound request — the new `http-request` import *and* the existing
+`get_resource` fetch for foreign subjects — goes through one function:
+
+1. **Origin allowlist.** The manifest's `network.origins`, approved at install
+   and shown in the install dialog. No wildcard hosts; `*.example.com` is
+   spelled out or not allowed.
+2. **Resolve, then check.** DNS-resolve the host and reject loopback,
+   link-local, private, unique-local, and unspecified addresses. Checking the
+   hostname is not enough: a name that resolves to `169.254.169.254` is the
+   whole attack.
+3. **Re-check after every redirect**, against both the allowlist and the
+   address rules. Cap the chain; drop credential headers on a cross-origin
+   redirect.
+4. **Cap** response size, total time, and concurrent requests per plugin.
+5. **Redact.** Log the handle name, never the substituted value. Errors
+   returned to the plugin carry status and origin, not response bodies from
+   another origin's error page.
+
+This replaces `inherit_network()`. A plugin never gets ambient sockets, so
+there is no second path to guard.
+
+### Placement follows the secret
+
+A browser cannot hold a secret the plugin's own page cannot read, and cannot
+reach a no-CORS API. So:
+
+> **A run that needs a secret, or an origin the browser cannot reach, is
+> placed server-side.**
+
+This is a rule, not an option, and it is derived from the manifest exactly like
+the other placement rules in [`plugins.md`](./plugins.md). It also means A3 is
+only fully useful once A4 (the job queue and server-side placement) exists —
+but the storage, the allowlist, and the egress guards are worth having first,
+because the existing WASM runtime needs them today.
+
+### Setting a secret
+
+A drive authority pastes a value into a dialog listing the origins it will be
+sent to. The value goes straight to a write-only endpoint. It is never put in a
+resource, so it never enters the outbox, and the LLM assistant has no tool that
+can read or set one — a plugin that "needs" a credential in its source is an
+authoring mistake, and the assistant should say so rather than route around it.
+
+## What This Changes
+
+- `lib/src/db/plugin_meta.rs` — a `PluginSecret` record and table beside
+  `PluginMeta`.
+- `lib/src/db/plugin_meta.rs` — `PluginManifest.permissions` gains structured
+  `network.origins`; `PermissionType::Network` is removed rather than kept as
+  a synonym for "everything", so no existing manifest silently keeps ambient
+  access.
+- `server/src/plugins/wasm.rs` — drop `inherit_network()`; add the guarded
+  egress; route `get_resource`'s foreign-subject branch through it.
+- A write-only secrets endpoint plus the install-dialog origin list.
+- The `run` contract gains `ctx.http`, host-side only, absent in the browser
+  placement so a plugin that calls it there fails at authoring time with the
+  message the sandbox already gives for `fetch`.
+
+## Rollout
+
+1. **Egress guard + origin allowlist. Done.** `inherit_network()` is gone; both
+   ways out — the guest's sockets and the host's fetch of a foreign subject —
+   check the *resolved* address, because a hostname resolving to
+   169.254.169.254 is the whole attack.
+2. **Secret storage + write-only endpoint + UI. Done.** Secrets live in their
+   own tree beside `PluginMeta`. No accessor returns a value: `use_plugin_secret`
+   hands it to a closure and never out of one, and `PluginSecretInfo` has no
+   field to put one in.
+3. **`fetch` with handle substitution. Done.** Header values only; a handle in a
+   URL or body is refused, and one that does not resolve fails the request
+   rather than sending it bare.
+4. **Prove the path. Done.** Ran through the UI end to end.
+
+A Notion importer is deliberately *not* a step here. It is the acceptance
+criterion for the platform — a user asks, and the assistant builds one — and
+the assistant is the thing being tested. An importer hand-written by us would
+prove the opposite of what it looks like it proves.
+
+## What changed while building
+
+**Origins come from the plugin's declaration, not from its secrets.** The
+design left this open and the first implementation inferred a plugin's
+reachable origins from whichever secrets existed — which made "can reach" follow
+from "has a credential for", backwards, and left a public API needing no auth
+unreachable. A plugin now declares `{ name, origin }` in its source (see
+[`plugins.md`](./plugins.md)), and the allowlist comes from that.
+
+**The UI is driven by the declaration.** One labelled field per declared secret,
+so nobody retypes a name that has to match the source. A plugin that spends an
+undeclared handle still gets a slot, with the origin read from the URLs its
+source requests — asking only when several origins appear or the URLs are built
+at run time.
+
+**Three bugs the guards' unit tests could not catch**, all found by a real
+request: the signature was verified against the plugin subject while the client
+signs the URL, so every authenticated request failed; plugins were evaluated as
+scripts, so `export function run` — the shape every plugin including the starter
+is written in — was a syntax error server-side; and an absent `error` field
+arrives as `null`, so every *successful* run was reported as a failure.
+
+## Decisions
+
+- Secrets are host state keyed by `(drive, plugin, name)`, never resources.
+  They cannot be synced or committed because there is nothing to sync.
+- Plugins receive handles. No endpoint returns a value, to anyone.
+- Substitution is header-only, origin-scoped. A handle anywhere else is an
+  error, not a best-effort substitution.
+- One egress function for every outbound request, including the existing
+  foreign-subject fetch.
+- Allowlists are exact origins, checked after DNS resolution and again after
+  every redirect.
+- `PermissionType::Network` is removed, not aliased. Ambient network access
+  stops being expressible.
+- A run needing a secret is placed server-side. Not configurable.
+
+## Open Questions
+
+- Encryption at rest: `agent_secret` is stored plaintext today and plugin
+  secrets inherit that. A deliberate deferral, not an oversight — the key
+  hierarchy in [`encryption.md`](./encryption.md) is where it belongs.
+- **Answered: scope is per plugin.** Revoking one is then obviously about one
+  plugin. The cost is pasting the same token into two importers, which is the
+  cheaper mistake.
+- **Answered: `lastUsedAt` is a timestamp and a count.** "Used 0 times in 90
+  days" is what makes revoking easy; a date alone leaves you guessing.
+- Rate limiting is per plugin. Per origin as well, so one plugin cannot get a
+  drive's token throttled by a provider?
+- Redirects are refused rather than followed. Following one needs the allowlist
+  and address rules re-checked and credential headers dropped across origins —
+  worth doing once something legitimate needs it.
+- Invalid input answers 500: the server has no bad-request error type, and
+  everything that is not auth or not-found maps to a server error.

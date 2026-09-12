@@ -51,6 +51,10 @@ export interface ActionContext {
   openEmojiPicker?: () => void;
   /** Opens the pick-or-upload dialog for this resource's cover image. */
   openCoverPicker?: () => void;
+  /** Runs a plugin and shows what it proposes before anything is written. */
+  openPluginRun?: () => void;
+  /** The drive's plugin class, once resolved. Absent while looking up. */
+  pluginClass?: string;
   onAfterDelete?: () => void;
   /** App-level: lock or unlock the sidebar. */
   toggleSidebar?: () => void;

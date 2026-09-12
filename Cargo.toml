@@ -9,9 +9,12 @@ members = [
   "plugin-examples/random-folder-extender",
   "plugin-examples/test-plugin",
   "atomic-plugin",
+  # Built for wasm32-wasip2, not the host triple. Kept in the workspace so it
+  # shares the lockfile; the server loads the artifact rather than linking it.
+  "plugin-runtime",
   "tools/cargo-bin",
 ]
-exclude = ["flutter/rust"]
+exclude = ["flutter/rust", "integrations/localthought/syncables"]
 
 # Debuginfo dominates target/ size: with ~1460 deps (tauri, actix, iroh) the
 # default `debug = true` produces a multi-GB tree per build flavor, and this

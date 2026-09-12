@@ -614,7 +614,27 @@ impl PluginHostState {
         //     .inherit_stdin()
 
         if PluginManifest::option_has_permission(manifest.as_ref(), PermissionType::Network) {
-            builder.inherit_network();
+            // Not `inherit_network()`, which is `socket_addr_check(|_, _| true)`
+            // and hands the plugin loopback, the private ranges and any cloud
+            // metadata endpoint the host can reach. The check runs on the
+            // resolved address, which is the only place it can work — a
+            // hostname resolving to 169.254.169.254 is the whole attack.
+            builder.socket_addr_check(|addr, _use| {
+                Box::pin(async move {
+                    match crate::plugins::egress::refuse_address(addr.ip()) {
+                        None => true,
+                        Some(refusal) => {
+                            tracing::warn!(
+                                address = %addr,
+                                ?refusal,
+                                "plugin refused an address outside the public internet",
+                            );
+
+                            false
+                        }
+                    }
+                })
+            });
         }
 
         if let Some(owned_folder_path) = owned_folder_path {
@@ -706,6 +726,132 @@ impl WasiHttpView for PluginHostState {
 }
 
 impl bindings::atomic::class_extender::host::Host for PluginHostState {
+    /// The only way out of a plugin.
+    ///
+    /// Four things have to hold before a byte leaves: the manifest declared
+    /// this origin, the URL resolves to somewhere on the public internet, no
+    /// secret handle appears anywhere it would be logged, and every handle in a
+    /// header resolves to a secret this plugin owns and scoped to this origin.
+    async fn fetch(
+        &mut self,
+        request: bindings::atomic::class_extender::types::HttpRequest,
+    ) -> Result<bindings::atomic::class_extender::types::HttpResponse, String> {
+        use crate::plugins::egress;
+
+        let Some(plugin_subject) = self.plugin_subject.clone() else {
+            return Err("this plugin has no subject, so it has no secrets".to_string());
+        };
+
+        if let Some(refusal) =
+            egress::refuse_misplaced_handles(&request.url, request.body.as_deref())
+        {
+            return Err(refusal);
+        }
+
+        let url = url::Url::parse(&request.url).map_err(|e| format!("not a URL: {e}"))?;
+        let origin = egress::origin_of(&url)?;
+
+        if !self
+            .manifest
+            .as_ref()
+            .is_some_and(|m| m.allows_origin(&origin))
+        {
+            return Err(format!(
+                "this plugin does not declare {origin} in its manifest, so it cannot reach it",
+            ));
+        }
+
+        if let Some(refusal) = egress::refuse_url(&request.url).await {
+            tracing::warn!(url = %request.url, %refusal, "plugin fetch refused");
+
+            return Err(format!("cannot reach {origin}: {refusal}"));
+        }
+
+        let drive = self.db.get_active_drive();
+        let db = self.db.clone();
+        let now = atomic_lib::utils::now();
+
+        let headers = egress::substitute_headers(
+            request
+                .headers
+                .into_iter()
+                .map(|h| (h.name, h.value))
+                .collect(),
+            |name| {
+                let key = atomic_lib::db::plugin_secret::PluginSecretKey::new(
+                    drive.as_deref().unwrap_or_default(),
+                    &plugin_subject,
+                    name,
+                );
+
+                db.use_plugin_secret(&key, &origin, now, |value| value.to_string())
+                    .ok()
+                    .flatten()
+            },
+        )?;
+
+        let method = reqwest::Method::from_bytes(request.method.as_bytes())
+            .map_err(|e| format!("not an HTTP method: {e}"))?;
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(
+                crate::plugins::egress::FETCH_TIMEOUT_SECS,
+            ))
+            // Every redirect would need re-checking against the allowlist and
+            // the address rules, and credential headers would have to be
+            // dropped crossing origins. Refusing to follow them is the honest
+            // version until that exists: the plugin sees the 3xx and can decide.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| format!("could not build an HTTP client: {e}"))?;
+
+        let mut outgoing = client.request(method, url);
+
+        for (name, value) in headers {
+            outgoing = outgoing.header(name, value);
+        }
+
+        if let Some(body) = request.body {
+            outgoing = outgoing.body(body);
+        }
+
+        let response = outgoing
+            .send()
+            .await
+            .map_err(|e| format!("request to {origin} failed: {e}"))?;
+
+        let status = response.status().as_u16();
+        let response_headers = response
+            .headers()
+            .iter()
+            .map(
+                |(name, value)| bindings::atomic::class_extender::types::HttpHeader {
+                    name: name.to_string(),
+                    value: value.to_str().unwrap_or_default().to_string(),
+                },
+            )
+            .collect();
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| format!("could not read the response from {origin}: {e}"))?;
+
+        if bytes.len() > crate::plugins::egress::FETCH_MAX_RESPONSE_BYTES {
+            return Err(format!(
+                "{origin} returned {} bytes, over the limit of {}",
+                bytes.len(),
+                crate::plugins::egress::FETCH_MAX_RESPONSE_BYTES,
+            ));
+        }
+
+        Ok(bindings::atomic::class_extender::types::HttpResponse {
+            status,
+            headers: response_headers,
+            body: String::from_utf8_lossy(&bytes).into_owned(),
+        })
+    }
+
     async fn get_resource(
         &mut self,
         subject: String,
@@ -724,6 +870,14 @@ impl bindings::atomic::class_extender::host::Host for PluginHostState {
                 PermissionType::Network,
             ) {
                 return Err("Plugin does not have network access".to_string());
+            }
+
+            // The host fetches this one, so the guest's socket check never sees
+            // it. Same rules, applied here.
+            if let Some(refusal) = crate::plugins::egress::refuse_url(&subject).await {
+                tracing::warn!(%subject, %refusal, "plugin refused a foreign subject fetch");
+
+                return Err(format!("cannot fetch {subject}: {refusal}"));
             }
 
             let resource = self

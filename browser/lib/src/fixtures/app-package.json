@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "id": "https://packages.example.org/hello/releases/1.json",
+  "name": "Hello app",
+  "description": "A standalone package fixture with no build-time provider imports.",
+  "emoji": "👋",
+  "release": {
+    "source": "throw new Error('Package import must not execute source');\nexport const literal = 'local:keep-me';\nexport const manifest = { schemaVersion: 1, secrets: [] };\nexport function run() { return { intents: [], problems: [] }; }",
+    "manifest": { "schemaVersion": 1, "secrets": [] },
+    "runtime": "atomic-js/1",
+    "schemas": { "item": "https://atomicdata.dev/classes/Resource" }
+  },
+  "setup": {
+    "title": "Set up Hello",
+    "description": "Name your workspace.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "local:keep-this-literal-too",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

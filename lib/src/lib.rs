@@ -87,6 +87,7 @@ pub mod expression;
 pub mod genesis;
 pub mod hierarchy;
 pub mod history;
+pub mod import_identity;
 #[doc(hidden)]
 pub mod loro;
 pub mod mapping;

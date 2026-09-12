@@ -12,7 +12,7 @@ import {
 import { Column } from '../Row';
 import { useCallback, useEffect, useState } from 'react';
 import Markdown from '../datatypes/Markdown';
-import { core, useStore } from '@tomic/react';
+import { useStore } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { InlineErrMessage } from '../forms/InputStyles';
 import { useSettings } from '../../helpers/AppSettings';
@@ -51,21 +51,12 @@ export function ApplyTemplateDialog({
 
     if (!rootLocalId) return undefined;
 
-    // Template imports happen on the server. Its result is authoritative while
-    // the local worker may still be indexing the imported resources.
-    const [subject] = await store.search('', {
-      serverOnly: true,
-      parents: destination,
-      filters: {
-        [core.properties.localId]: rootLocalId,
-        [core.properties.parent]: destination,
-      },
-      include: true,
-      limit: 1,
-    });
+    // Resolve against the server while imported resources are still indexing
+    // locally, and honor any recorded resolution of duplicate local IDs.
+    const resource = await store.findByLocalId(drive, destination, rootLocalId);
 
-    return subject;
-  }, [destination, store, template]);
+    return resource?.subject;
+  }, [drive, destination, store, template]);
 
   const alreadyApplied = existingRootSubject !== undefined;
 
@@ -99,7 +90,11 @@ export function ApplyTemplateDialog({
     if (open) {
       show();
       setExistingRootSubject(undefined);
-      void findRootSubject().then(setExistingRootSubject);
+      setError(undefined);
+      setApplying(false);
+      void findRootSubject()
+        .then(setExistingRootSubject)
+        .catch(e => setError(String(e)));
     }
   }, [findRootSubject, open, show]);
 

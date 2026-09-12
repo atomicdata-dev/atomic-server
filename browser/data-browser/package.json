@@ -62,6 +62,7 @@
     "clsx": "^2.1.1",
     "codemirror-json-schema": "^0.8.1",
     "diff": "^8.0.4",
+    "devonian": "github:localthought/devonian#fb415ef194f30cacb92b885e73c88b788dbcdde1",
     "downshift": "^9.3.3",
     "emoji-mart": "^5.6.0",
     "fast-json-patch": "^3.1.1",
@@ -146,8 +147,8 @@
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
     "preview": "vite preview",
     "start": "vite",
-    "test": "vitest run",
-    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run --exclude scripts/integration-mcp.test.mjs && node --test scripts/integration-mcp.test.mjs",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
     "clean-translations": "pnpm exec wuchale --clean"
   }
 }

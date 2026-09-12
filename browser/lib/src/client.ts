@@ -293,6 +293,17 @@ export class Client {
         try {
           const json = JSON.parse(body);
 
+          // /path represents the fetched resource under its request URL.
+          // Restore the requested identity only for that exact proxy alias.
+          if (
+            from !== undefined &&
+            json &&
+            !Array.isArray(json) &&
+            json['@id'] === url
+          ) {
+            json['@id'] = subject;
+          }
+
           if (opts.noNested) {
             resource = json;
           } else {

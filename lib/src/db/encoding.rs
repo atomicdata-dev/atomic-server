@@ -132,6 +132,152 @@ impl crate::db::plugin_meta::PluginMeta {
     }
 }
 
+impl crate::db::plugin_secret::PluginSecret {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginSecret: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::plugin_secret::PluginSecret> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| format!("Failed to decode PluginSecret: {}", e).into())
+    }
+}
+
+impl crate::db::plugin_schedule::PluginSchedule {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginSchedule: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::plugin_schedule::PluginSchedule> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| format!("Failed to decode PluginSchedule: {}", e).into())
+    }
+}
+
+impl crate::db::plugin_schedule::PluginScheduleKey {
+    /// `drive \0 plugin`, so the scheduler can scan every schedule in order.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::with_capacity(self.drive.len() + self.plugin.len() + 1);
+        buf.extend_from_slice(self.drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(self.plugin.as_bytes());
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<Self> {
+        let mut parts = bytes.splitn(2, |b| *b == 0);
+        let drive = parts.next().ok_or("Malformed plugin schedule key")?;
+        let plugin = parts.next().ok_or("Malformed plugin schedule key")?;
+
+        Ok(Self {
+            drive: String::from_utf8_lossy(drive).into_owned(),
+            plugin: String::from_utf8_lossy(plugin).into_owned(),
+        })
+    }
+}
+
+impl crate::db::app_agent::AppAgent {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode AppAgent: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::app_agent::AppAgent> {
+        rmp_serde::from_slice(bytes).map_err(|e| format!("Failed to decode AppAgent: {}", e).into())
+    }
+}
+
+impl crate::db::app_agent::AppAgentKey {
+    /// `drive \0 app`, matching the other per-plugin keys.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::with_capacity(self.drive.len() + self.app.len() + 1);
+        buf.extend_from_slice(self.drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(self.app.as_bytes());
+        Ok(buf)
+    }
+}
+
+impl crate::db::plugin_trigger::PluginTrigger {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginTrigger: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::plugin_trigger::PluginTrigger> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| format!("Failed to decode PluginTrigger: {}", e).into())
+    }
+}
+
+impl crate::db::plugin_trigger::PluginTriggerKey {
+    /// `drive \0 plugin`, matching the schedule key beside it.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::with_capacity(self.drive.len() + self.plugin.len() + 1);
+        buf.extend_from_slice(self.drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(self.plugin.as_bytes());
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<Self> {
+        let mut parts = bytes.splitn(2, |b| *b == 0);
+        let drive = parts.next().ok_or("Malformed plugin trigger key")?;
+        let plugin = parts.next().ok_or("Malformed plugin trigger key")?;
+
+        Ok(Self {
+            drive: String::from_utf8_lossy(drive).into_owned(),
+            plugin: String::from_utf8_lossy(plugin).into_owned(),
+        })
+    }
+}
+
+impl crate::db::plugin_secret::PluginSecretKey {
+    /// `drive \0 plugin \0 name`.
+    ///
+    /// Not msgpack, unlike the value beside it: listing a plugin's secrets is a
+    /// prefix scan, and a msgpack struct is an array whose length is in the
+    /// first byte — so a two-field prefix is not a prefix of a three-field key.
+    /// Subjects cannot contain a NUL and names are validated not to, so the
+    /// separator is unambiguous.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Self::plugin_prefix(&self.drive, &self.plugin);
+        buf.extend_from_slice(self.name.as_bytes());
+        Ok(buf)
+    }
+
+    /// Every secret of one plugin shares this prefix.
+    pub fn plugin_prefix(drive: &str, plugin: &str) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(drive.len() + plugin.len() + 2);
+        buf.extend_from_slice(drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(plugin.as_bytes());
+        buf.push(0);
+        buf
+    }
+
+    /// The secret's name, read back out of a key produced by `encode`.
+    pub fn name_from_key(key: &[u8]) -> AtomicResult<String> {
+        let name = key
+            .split(|b| *b == 0)
+            .nth(2)
+            .ok_or("Malformed plugin secret key")?;
+
+        String::from_utf8(name.to_vec())
+            .map_err(|e| format!("Plugin secret name is not UTF-8: {}", e).into())
+    }
+}
+
 impl crate::db::plugin_meta::PluginMetaKey {
     pub fn encode(&self) -> AtomicResult<Vec<u8>> {
         let mut buf = Vec::new();

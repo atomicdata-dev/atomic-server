@@ -33,23 +33,75 @@ Contrary to Endpoints, these can be any type of Class.
 They are used for performing custom queries, or calculating dynamic attributes.
 */
 
+#[cfg(feature = "wasm-plugins")]
+pub mod actions;
+#[cfg(feature = "wasm-plugins")]
+pub mod apply;
 pub mod bind_drive;
 pub mod bookmark;
 pub mod chatroom;
+#[cfg(feature = "wasm-plugins")]
+pub mod connection_state;
 pub mod did;
+pub mod egress;
 pub mod export;
+#[cfg(feature = "wasm-plugins")]
+pub mod external;
 pub mod files;
 pub mod importer;
+#[cfg(feature = "wasm-plugins")]
+pub mod installation;
 pub mod invite;
+#[cfg(feature = "wasm-plugins")]
+pub mod journal;
+#[cfg(feature = "wasm-plugins")]
+pub mod js_runtime;
+pub mod manifest;
 pub mod path;
+#[cfg(feature = "wasm-plugins")]
+pub mod plan;
 pub mod plugin;
 pub mod prunetests;
 pub mod query;
+#[cfg(feature = "wasm-plugins")]
+pub mod release_binding;
 pub mod replicate;
+#[cfg(feature = "wasm-plugins")]
+pub mod run_log;
+#[cfg(feature = "wasm-plugins")]
+pub mod scheduler;
 pub mod search;
 pub mod server_info;
+#[cfg(feature = "wasm-plugins")]
+pub mod store_host;
+#[cfg(all(test, feature = "wasm-plugins"))]
+pub mod test_fixture;
+#[cfg(feature = "wasm-plugins")]
+pub mod triggers;
 #[cfg(feature = "vector-search")]
 pub mod vector_search;
 pub mod versioning;
+pub mod view_token;
 #[cfg(feature = "wasm-plugins")]
 pub mod wasm;
+
+#[cfg(feature = "wasm-plugins")]
+pub mod sync_session;
+#[cfg(all(test, feature = "wasm-plugins"))]
+mod sync_session_tests;
+
+#[cfg(feature = "wasm-plugins")]
+pub mod sync_worker;
+
+#[cfg(all(test, feature = "wasm-plugins"))]
+mod notion_sync_tests;
+
+#[cfg(test)]
+mod clockify_tests;
+
+#[cfg(test)]
+#[path = "mt940_tests.rs"]
+mod bank_statement_tests;
+
+#[cfg(test)]
+mod pets_tests;

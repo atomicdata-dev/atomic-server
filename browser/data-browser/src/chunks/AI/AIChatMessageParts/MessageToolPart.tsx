@@ -1,3 +1,4 @@
+import { IntegrationActionReview } from './IntegrationActionReview';
 import { getToolName, type DynamicToolUIPart, type ToolUIPart } from 'ai';
 import { styled } from 'styled-components';
 import {
@@ -40,6 +41,33 @@ export const MessageToolPart: React.FC<ToolMessageProps> = ({ part }) => {
         </PartSummary>
       </Shimmer>
     );
+  }
+
+  if (
+    part.state === 'output-available' &&
+    toolName === TOOL_NAMES.CALL_INTEGRATION_ACTION
+  ) {
+    const output = part.output as {
+      status?: string;
+      drive?: string;
+      integration?: string;
+      proposal?: { id?: string };
+    } | null;
+
+    if (
+      output?.status === 'needs_review' &&
+      typeof output.drive === 'string' &&
+      typeof output.integration === 'string' &&
+      typeof output.proposal?.id === 'string'
+    ) {
+      return (
+        <IntegrationActionReview
+          drive={output.drive}
+          plugin={output.integration}
+          id={output.proposal.id}
+        />
+      );
+    }
   }
 
   if (part.state === 'output-available') {

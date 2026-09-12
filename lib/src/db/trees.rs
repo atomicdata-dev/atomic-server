@@ -18,6 +18,10 @@ pub enum Tree {
     ValPropSub,
     /// Stores metadata about installed plugins.
     PluginMeta,
+    PluginSecret,
+    PluginSchedule,
+    PluginTrigger,
+    AppAgent,
     /// Maps Drive Hints (short IDs) to full Drive DIDs.
     DriveMapping,
     /// Maps DID pure IDs to their best known routing hint (e.g. drive DID).
@@ -59,6 +63,10 @@ const QUERY_MEMBERS: &str = "members_index_v6";
 const PROPVALSUB: &str = "prop_val_sub_index";
 const QUERIES_WATCHED: &str = "watched_queries_v5";
 const PLUGIN_META: &str = "plugin_meta";
+const PLUGIN_SECRET: &str = "plugin_secret";
+const PLUGIN_SCHEDULE: &str = "plugin_schedule";
+const PLUGIN_TRIGGER: &str = "plugin_trigger";
+const APP_AGENT: &str = "app_agent";
 const DRIVE_MAPPING: &str = "drive_mapping";
 const DID_MAPPING: &str = "did_mapping";
 const LORO_SNAPSHOTS: &str = "loro_snapshots";
@@ -78,6 +86,10 @@ impl std::fmt::Display for Tree {
             Tree::ValPropSub => f.write_str(VALPROPSUB),
             Tree::QueryMembers => f.write_str(QUERY_MEMBERS),
             Tree::PluginMeta => f.write_str(PLUGIN_META),
+            Tree::PluginSecret => f.write_str(PLUGIN_SECRET),
+            Tree::PluginSchedule => f.write_str(PLUGIN_SCHEDULE),
+            Tree::PluginTrigger => f.write_str(PLUGIN_TRIGGER),
+            Tree::AppAgent => f.write_str(APP_AGENT),
             Tree::DriveMapping => f.write_str(DRIVE_MAPPING),
             Tree::DidMapping => f.write_str(DID_MAPPING),
             Tree::LoroSnapshots => f.write_str(LORO_SNAPSHOTS),
@@ -101,6 +113,10 @@ impl AsRef<[u8]> for Tree {
             Tree::ValPropSub => VALPROPSUB.as_bytes(),
             Tree::QueryMembers => QUERY_MEMBERS.as_bytes(),
             Tree::PluginMeta => PLUGIN_META.as_bytes(),
+            Tree::PluginSecret => PLUGIN_SECRET.as_bytes(),
+            Tree::PluginSchedule => PLUGIN_SCHEDULE.as_bytes(),
+            Tree::PluginTrigger => PLUGIN_TRIGGER.as_bytes(),
+            Tree::AppAgent => APP_AGENT.as_bytes(),
             Tree::DriveMapping => DRIVE_MAPPING.as_bytes(),
             Tree::DidMapping => DID_MAPPING.as_bytes(),
             Tree::LoroSnapshots => LORO_SNAPSHOTS.as_bytes(),

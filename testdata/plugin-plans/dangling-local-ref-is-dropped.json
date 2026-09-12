@@ -1,0 +1,27 @@
+{
+  "name": "a link to something no create defines drops the intent",
+  "schema": {
+    "https://x/employer": {
+      "datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "shortname": "employer"
+    }
+  },
+  "resources": {
+    "https://x/a": {}
+  },
+  "verdict": {
+    "intents": [
+      {
+        "op": "set",
+        "subject": "https://x/a",
+        "set": { "https://x/employer": "local:missing" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": true,
+    "problems": ["local:missing"],
+    "changes": []
+  }
+}

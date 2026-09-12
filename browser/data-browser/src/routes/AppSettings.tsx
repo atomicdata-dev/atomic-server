@@ -12,6 +12,7 @@ import { Main } from '../components/Main';
 import { Panel, usePanelList } from '../components/SideBar/usePanelList';
 import { pathNames } from './paths';
 import { appRoute } from './RootRoutes';
+import { IntegrationSettings } from '@components/Settings/IntegrationSettings';
 import AISettings from '@components/AI/AISettings';
 import { VirtualDriveSettings } from '@components/Settings/VirtualDriveSettings';
 import { isVirtualDriveAvailable } from '../helpers/virtualDrive';
@@ -214,6 +215,7 @@ const AppSettings: React.FunctionComponent = () => {
               </SettingsSection>
             )}
             <AISettings />
+            <IntegrationSettings />
           </SettingsGroup>
         </SettingsSearchProvider>
       </ContainerNarrow>

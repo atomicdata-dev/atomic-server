@@ -174,3 +174,32 @@ export class AtomicError extends Error {
 export class RequestCancelledError extends Error {
   override name = 'RequestCancelledError';
 }
+
+/**
+ * The readable part of a failed HTTP response from an Atomic server.
+ *
+ * The server answers errors with a JSON-AD Error resource, which carries a
+ * plain description alongside a Loro update and a class list. Showing the whole
+ * body in a toast buries one sentence under a kilobyte of base64 — so this
+ * returns the description, and falls back to the raw text only when the body is
+ * not one of ours.
+ */
+export function errorMessageFromResponse(body: string, status: number): string {
+  try {
+    const parsed = JSON.parse(body);
+    const description = parsed?.[core.properties.description];
+
+    if (typeof description === 'string' && description.length > 0) {
+      return description;
+    }
+  } catch {
+    // Not JSON: fall through to the body itself.
+  }
+
+  const trimmed = body.trim();
+
+  if (trimmed.length === 0) return `Request failed (${status})`;
+
+  // A stray HTML error page is no more useful than the status alone.
+  return trimmed.length > 300 ? `Request failed (${status})` : trimmed;
+}

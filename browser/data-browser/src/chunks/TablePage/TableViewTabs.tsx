@@ -14,6 +14,7 @@ import {
   FaPencil,
   FaPlus,
   FaTableColumns,
+  FaWindowMaximize,
   FaTrash,
 } from 'react-icons/fa6';
 import { DIVIDER, DropdownMenu, DropdownItem } from '@components/Dropdown';
@@ -24,7 +25,13 @@ import {
   ConfirmationDialogTheme,
 } from '@components/ConfirmationDialog';
 import { InputStyled } from '@components/forms/InputStyles';
+import { useStore } from '@tomic/react';
 import { TablePageContext } from './tablePageContext';
+import {
+  appsForClass,
+  useDriveApps,
+  type DriveApp,
+} from '@chunks/AppPage/useDriveApps';
 import type { DerivedColumnSpec } from './derivedColumns';
 import { derivedFilterKey, filterKey } from './tableFiltering';
 import { usePropertyTitles } from './helpers/usePropertyTitles';
@@ -39,11 +46,13 @@ import { QuickAddDialog } from './QuickAddDialog';
 import type { QuickAddSpec } from './quickAdd';
 
 interface TableViewTabsProps {
+  /** The class of this table's rows, which decides what apps can show it. */
+  rowClass: string;
   views: string[];
   activeView: string | undefined;
   setActiveView: (subject: string) => void;
-  createView: (kind?: ViewKind) => void;
-  setViewKind: (subject: string, kind: ViewKind) => void;
+  createView: (kind?: ViewKind | string, label?: string) => void;
+  setViewKind: (subject: string, kind: ViewKind | string) => void;
   duplicateView: (subject: string) => void;
   deleteView: (subject: string) => void;
   viewName: string;
@@ -75,6 +84,7 @@ interface TableViewTabsProps {
  * tab is renamed inline by double-clicking it.
  */
 export function TableViewTabs({
+  rowClass,
   views,
   activeView,
   setActiveView,
@@ -97,6 +107,7 @@ export function TableViewTabs({
 }: TableViewTabsProps): JSX.Element {
   // A table with no saved views yet still shows one implicit "Default View" tab.
   const tabs = views.length > 0 ? views : [undefined];
+  const apps = appsForClass(useDriveApps(useStore().getDrive()), rowClass);
 
   return (
     <Bar>
@@ -111,6 +122,7 @@ export function TableViewTabs({
             onSelect={() => subject && setActiveView(subject)}
             onRename={renameView}
             setViewKind={setViewKind}
+            apps={apps}
             duplicateView={duplicateView}
             deleteView={deleteView}
             classProperties={allColumns}
@@ -118,7 +130,7 @@ export function TableViewTabs({
             setQuickAdd={setQuickAdd}
           />
         ))}
-        {canWrite && <AddViewMenu createView={createView} />}
+        {canWrite && <AddViewMenu createView={createView} apps={apps} />}
       </Tabs>
       <Actions>
         <FilterMenu columns={columns} derivedColumns={derivedColumns} />
@@ -141,12 +153,14 @@ const AddViewTrigger = buildDefaultTrigger(<FaPlus />, 'Add view');
 /** The `+` tab: a dropdown to add a new view of a chosen kind (Table/Kanban). */
 function AddViewMenu({
   createView,
+  apps,
 }: {
-  createView: (kind?: ViewKind) => void;
+  createView: (kind?: ViewKind | string, label?: string) => void;
+  apps: DriveApp[];
 }): JSX.Element {
   const items = useMemo(
-    (): DropdownItem[] =>
-      VIEW_KINDS.map(kind => {
+    (): DropdownItem[] => [
+      ...VIEW_KINDS.map(kind => {
         const Icon = VIEW_KIND_ICONS[kind];
 
         return {
@@ -156,7 +170,16 @@ function AddViewMenu({
           onClick: () => createView(kind),
         };
       }),
-    [createView],
+      // An app is another kind of view, added the same way. It arrives as a
+      // new tab: the table's own views stay exactly as they were.
+      ...apps.map(app => ({
+        id: app.subject,
+        label: app.name,
+        icon: <FaWindowMaximize />,
+        onClick: () => createView(app.subject, app.name),
+      })),
+    ],
+    [createView, apps],
   );
 
   return <DropdownMenu Trigger={AddViewTrigger} items={items} />;
@@ -230,6 +253,7 @@ function ViewTab({
   onSelect,
   onRename,
   setViewKind,
+  apps,
   duplicateView,
   deleteView,
   classProperties,
@@ -242,7 +266,9 @@ function ViewTab({
   canWrite: boolean;
   onSelect: () => void;
   onRename: (name: string) => void;
-  setViewKind: (subject: string, kind: ViewKind) => void;
+  setViewKind: (subject: string, kind: ViewKind | string) => void;
+  /** Resolved once by the tab bar rather than once per tab. */
+  apps: DriveApp[];
   duplicateView: (subject: string) => void;
   deleteView: (subject: string) => void;
   classProperties: Property[];
@@ -328,6 +354,15 @@ function ViewTab({
           label: VIEW_KIND_LABELS[kind],
           icon: kind === currentKind ? <FaCheck /> : undefined,
           onClick: () => setViewKind(subject, kind),
+        })),
+        // An app is another way of looking at these rows, chosen the same way
+        // as a built-in kind. It is set on this view only — the table's own
+        // Table tab is untouched, and no app becomes the default.
+        ...apps.map(app => ({
+          id: `kind-${app.subject}`,
+          label: app.name,
+          icon: app.subject === storedKind ? <FaCheck /> : undefined,
+          onClick: () => setViewKind(subject, app.subject),
         })),
       ]
     : [];
