@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   Agent,
+  AtomicError,
+  ErrorType,
   JSCryptoProvider,
   Store,
   Resource,
@@ -405,6 +407,23 @@ describe('restoreFromVault', () => {
     );
   });
 
+  it.each([ErrorType.NotFound, ErrorType.Transport])(
+    'only a confirmed node absence makes a restored drive local (%s)',
+    async errorType => {
+      const store = await signedInStore();
+      const resource = new Resource(DRIVE);
+      resource.error = new AtomicError('missing', errorType);
+      store.resources.set(DRIVE, resource);
+      const deps = fakeDeps();
+
+      await restoreFromVault(store, DRIVE, deps);
+
+      expect(store.isLocalOnlyDrive(DRIVE)).toBe(
+        errorType === ErrorType.NotFound,
+      );
+    },
+  );
+
   /** The device now holds the key: later edits back up without re-enrolling. */
   it('remembers the key so the next backup skips enrollment', async () => {
     const store = await signedInStore();
@@ -461,6 +480,9 @@ describe('restoreFromVault', () => {
 
   it('reports a failed download instead of throwing', async () => {
     const store = await signedInStore();
+    const resource = new Resource(DRIVE);
+    resource.error = new AtomicError('missing', ErrorType.NotFound);
+    store.resources.set(DRIVE, resource);
     const deps = fakeDeps({
       restoreDrive: vi.fn(async () => {
         throw new Error('403');
@@ -468,6 +490,7 @@ describe('restoreFromVault', () => {
     });
 
     expect((await restoreFromVault(store, DRIVE, deps)).status).toBe('failed');
+    expect(store.isLocalOnlyDrive(DRIVE)).toBe(false);
   });
 });
 

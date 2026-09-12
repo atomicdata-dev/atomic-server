@@ -4,6 +4,7 @@ import {
   isNotAvailableLocally,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
   isUnauthorized,
+  isNotFound,
 } from '@tomic/react';
 import { isRootWelcomeResourceError } from './isRootWelcomeResourceError';
 
@@ -38,6 +39,9 @@ export function isDriveSignInError(
 
   return (
     isUnauthorized(resource.error) ||
+    // A DID is not tied to this node. A missing copy may live in the
+    // account vault or on another device and still require an unlock.
+    (resource.subject.startsWith('did:ad:') && isNotFound(resource.error)) ||
     (isNotAvailableLocally(resource.error) &&
       (options.originWithoutNode === true ||
         resource.error?.message === LOCAL_ONLY_NOT_FOUND_MESSAGE))

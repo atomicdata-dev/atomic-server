@@ -500,3 +500,10 @@ Findings referenced by number (F1–F12) are written up in
    the constrained append-only inbox in
    [`authorization-sync.md`](./authorization-sync.md)). Decide what ceremony grants
    known-peer status before rebuilding the accept path around it.
+
+### September 12 paired SaaS recovery validation
+
+- [x] Reproduce a second browser opening a vault-only DID as a node 404 instead of an unlock screen. Add a failing helper regression and route signed-out DID not-found errors to unlock; preserve HTTP 404 and signed-in error handling.
+- [x] Reproduce restored vault-only drives repeatedly subscribing to a node that returned NotFound. Preserve local-only routing after a successful nonempty restore when node absence is known; transport errors and failed restores do not change routing. All 878 frontend unit tests pass.
+- [x] Verify the paired SaaS vault-only second-browser journey: original profile and vault-only canary restored with strict diagnostics (1.7 minutes).
+- [ ] Pass full CI on the updated combined commit. The prior run on a9baad3ea was cancelled because this additional fix changes the head.

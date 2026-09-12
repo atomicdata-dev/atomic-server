@@ -851,7 +851,7 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 
 ## Signed-out local drive opened from the portal
 
-`browser/data-browser/src/helpers/isDriveSignInError.test.ts` covers a local-only missing-resource error with no app agent, including origins with a configured node. Signed-in users and unrelated transport failures retain their error handling.
+`browser/data-browser/src/helpers/isDriveSignInError.test.ts` covers a local-only missing-resource error with no app agent, including origins with a configured node. It also covers signed-out DID resources absent from the current node: their copy may be in the account vault, so they offer unlock. Signed-in users, ordinary HTTP 404s, and unrelated transport failures retain their error handling.
 
 Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creation, passkey enrollment, recovery-code acknowledgement, completed app sign-out, portal passkey sign-in, and the Open link reaching the app unlock screen. It then unlocks and verifies the original drive title. Chromium virtual PRF state is tied to the original CDP target, so the unlock portion runs there after verifying the real popup handoff. Unlocking within the popup itself remains a physical-browser acceptance check.
 ## Ontology codegen (`@tomic/cli`) and DID fetch
@@ -864,3 +864,5 @@ Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creat
 | Store fetch by HTTP path alias returns the resource stored under the DID | `browser/lib/src/store.test.ts` |
 
 Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI test runner).
+
+`helpers/managed/vaultAutoBackup.test.ts` verifies successful vault restoration preserves known node absence as local-only routing, while transport failures and failed restores do not disable node sync. Paired SaaS second-browser coverage verifies the original profile and vault-only canary after restore, with bounded pre-restore refusal diagnostics.

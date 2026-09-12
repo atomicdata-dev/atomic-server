@@ -52,6 +52,12 @@ describe('isDriveSignInError', () => {
     );
   });
 
+  it('a signed-out DID absent from this node can be unlocked from a vault', () => {
+    const drive = res('did:ad:private-drive', notFound);
+    expect(isDriveSignInError(drive, undefined, BASE)).toBe(true);
+    expect(isDriveSignInError(drive, someAgent, BASE)).toBe(false);
+  });
+
   it('no error at all → no guard', () => {
     expect(isDriveSignInError(res(DRIVE), undefined, BASE)).toBe(false);
   });
