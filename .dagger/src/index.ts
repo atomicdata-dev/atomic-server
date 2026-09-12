@@ -995,15 +995,6 @@ export class AtomicServer {
     // Keep the workspace manifest for installation, but don't let a spec edit
     // invalidate the frontend build (and the server embedding its assets).
     // Test consumers mount the complete E2E directory separately.
-    const sources = buildOnly
-      ? browser.withoutDirectory('e2e').withDirectory(
-          'e2e',
-          dag.directory().withFile(
-            'package.json',
-            browser.file('e2e/package.json'),
-          ),
-        )
-      : browser;
     // Create a container with PNPM installed
     const pnpmContainer = dag
       .container()
@@ -1052,7 +1043,14 @@ export class AtomicServer {
     // from data-browser/src to filesystem /lib if /app is only browser — do not mount there
     // (it overwrites OS /lib). Mount alongside browser and resolve via alias in vite.config.
     const sourceContainer = workspaceContainer
-      .withDirectory('/app', sources)
+      .withDirectory(
+        '/app',
+        // Normalize metadata too: excluded spec edits otherwise missed the
+        // frontend exec cache in the Mancave spec-only mutation probe.
+        buildOnly
+          ? browser.filter({ exclude: ['e2e'] }).withTimestamps(0)
+          : browser,
+      )
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
       // data-browser imports the repo-root logo from `../../../../logo.svg`
       // and `../../../../../logo.svg`. Browser mount sits at /app, so those

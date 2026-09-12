@@ -417,10 +417,22 @@ Eight-worker reliability and the full acceptance matrix remain open in #1461.
 - [x] Start an isolated branch from merged develop and preserve final validation.
 - [x] Extract step timings from retained native Playwright reports: 186 fresh
   setups accumulated 1040.9s. Nested step totals overlap and must not be summed.
-- [ ] Measure two shards x two workers with cloned sessions, zero retries.
-  Four workers may avoid eight-worker CPU contention while retaining seed reuse;
-  this is a hypothesis until the complete suite passes within 15 minutes.
-- [ ] Verify E2E-only changes reuse the frontend/embedded-server build. Keep the
+- [x] Measure two shards x two workers with cloned sessions, zero retries.
+  First complete run on f9162c3a0: 218 passed, eight existing skips, no retries;
+  shards took 12.1m and 12.9m. Dagger exited zero. Build time is separate.
+  Reports: Mancave `.e2e-runs/four-cloned-1/{2473,2475}/`.
+  This is one successful run, not repeatability acceptance.
+- [x] Verify E2E-only changes reuse the frontend/embedded-server build. Keep the
   E2E workspace manifest in build inputs, but mount specs only in test consumers.
   Reuse the E2E frontend build for both server assets and test workspace packages.
 - [ ] Repeat any successful candidate before changing CI defaults.
+
+The first cache probe disproved the initial directory-removal approach: a
+comment-only spec edit rebuilt the frontend and embedded server. Testing a
+copy-time exclusion instead; keep this failed probe in the evidence.
+
+Filtering the browser snapshot and normalizing timestamps passes the spec-only
+mutation probe: frontend and Rust build execs are cached, and the embedded
+server digest stays `b988095c5ae7e117ce3b5369372b3fbe925c36e78fdbd67be3ec3fed132e60ad`.
+Logs: Mancave `/tmp/e2e-cache-final-{baseline,probe}.log`. Temporary spec edits
+were restored. The manifest remains an installation input; lint uses full sources.
