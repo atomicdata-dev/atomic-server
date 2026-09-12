@@ -173,10 +173,10 @@ async fn do_install_plugin(
     };
 
     let bytes = if let Some(internal_id) = internal_id_str {
-        // Files are stored content-addressed in `Tree::Blobs` (the kv store),
+        // Files are stored content-addressed in the configured blob backend,
         // keyed by the blake3 hash hex digest. The legacy `uploads_dir/<id>`
         // filesystem path was retired with the content-addressed migration —
-        // see server/src/handlers/upload.rs which inserts into `Tree::Blobs`.
+        // see server/src/handlers/upload.rs which writes to that backend.
         let hash_bytes = match hex::decode(&internal_id) {
             Ok(b) if b.len() == 32 => b,
             _ => {
@@ -198,21 +198,18 @@ async fn do_install_plugin(
             }
         };
 
-        match store
-            .kv
-            .get(atomic_lib::db::trees::Tree::Blobs, &hash_bytes)
-        {
+        match store.get_blob(&hash_bytes).await {
             Ok(Some(bytes)) => {
-                info!("Reading plugin from kv blob store ({} bytes)", bytes.len());
+                info!("Reading plugin from blob backend ({} bytes)", bytes.len());
                 bytes
             }
             Ok(None) => {
                 error!(
-                    "Plugin file {} blob not found in kv store for hash {}",
+                    "Plugin file {} blob not found in blob backend for hash {}",
                     plugin_file_subject, internal_id
                 );
                 return Err(AtomicError::from(format!(
-                    "Plugin file blob not found in kv store: {}",
+                    "Plugin file blob not found in blob backend: {}",
                     internal_id
                 )));
             }

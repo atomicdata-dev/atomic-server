@@ -81,3 +81,31 @@ A consequence of content-addressed storage is that an attacker who already knows
 - [Discussion on specification](https://github.com/ontola/atomic-data-docs/issues/57)
 - [Discussion on Rust server implementation](https://github.com/atomicdata-dev/atomic-server/issues/72)
 - [Discussion on Typescript client implementation](https://github.com/atomicdata-dev/atomic-data-browser/issues/121)
+
+## Server file storage
+
+By default, file bytes are stored in the local database. Operators can select
+S3-compatible storage with `ATOMIC_BLOB_BACKEND=s3`, `ATOMIC_S3_BUCKET`,
+`ATOMIC_S3_REGION`, and optionally `ATOMIC_S3_ENDPOINT`. Set the paired
+`ATOMIC_S3_ACCESS_KEY_ID` / `ATOMIC_S3_SECRET_ACCESS_KEY` credentials, or use
+instance credentials. `ATOMIC_S3_PREFIX` defaults to `blobs`;
+`ATOMIC_S3_PATH_STYLE=true` selects path-style addressing for services such as
+MinIO. HTTPS is required unless `ATOMIC_S3_ALLOW_HTTP=true` is explicitly set
+for local testing.
+
+Uploads, downloads, peer sync and image renditions all use the selected
+backend. In S3 mode there is no local file cache or fallback: an unavailable
+object store causes an error. The server checks read/write access before
+serving traffic, then migrates existing database blobs one at a time, verifying
+each remote copy before removing its local row. Database pages become reusable
+but the database file may not shrink. Keep the bucket and prefix stable across
+node replacements, and use an S3-capable binary for rollback after migration.
+
+This is primary storage for hosted files. It does not provide client-encrypted
+Vault backups, and the server still buffers file contents in memory while
+proxying requests.
+
+Drive usage counts each referenced blob once within that drive. When two drives
+reference identical content, each drive counts its full size toward its quota,
+while the shared S3 namespace stores one object. Account/drive usage totals
+therefore describe logical usage, not the physical size of the bucket.

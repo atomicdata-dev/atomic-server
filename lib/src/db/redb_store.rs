@@ -397,6 +397,20 @@ impl KvStore for RedbStore {
         }
     }
 
+    fn first_entry(&self, tree: Tree) -> AtomicResult<Option<KvPair>> {
+        let tx = self
+            .db
+            .begin_read()
+            .map_err(|e| format!("redb read tx: {e}"))?;
+        let table = tx
+            .open_table(table_def(tree))
+            .map_err(|e| format!("redb open table: {e}"))?;
+        let first = table
+            .first()
+            .map_err(|e| format!("redb first entry: {e}"))?;
+        Ok(first.map(|(key, value)| (key.value().to_vec(), value.value().to_vec())))
+    }
+
     fn iter_tree(&self, tree: Tree) -> KvIter {
         let tx = match self.db.begin_read() {
             Ok(tx) => tx,

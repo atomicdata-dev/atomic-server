@@ -98,9 +98,7 @@ pub async fn put_blob(
         });
     }
 
-    store
-        .kv
-        .insert(atomic_lib::db::trees::Tree::Blobs, &hash_bytes, &body)?;
+    store.put_blob(&hash_bytes, &body).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }

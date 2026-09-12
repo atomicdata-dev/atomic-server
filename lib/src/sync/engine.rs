@@ -407,7 +407,7 @@ pub async fn handle_frame_full(
 
         protocol::tag::BLOB_REQUEST => {
             if let Some(hash) = protocol::decode_blob_request(payload) {
-                match store.kv.get(Tree::Blobs, &hash) {
+                match store.get_blob(&hash).await {
                     Ok(Some(bytes)) => vec![protocol::encode_blob_response(&hash, &bytes)],
                     _ => vec![protocol::encode_error(
                         0,
@@ -446,8 +446,17 @@ pub async fn handle_frame_full(
                         vec![]
                     }
                     Some(drive) if store.sync_policy().admit_drive_write(&drive) => {
-                        let _ = store.kv.insert(Tree::Blobs, &resp.hash, &resp.bytes);
-                        vec![]
+                        match store.put_blob(&resp.hash, &resp.bytes).await {
+                            Ok(()) => vec![],
+                            Err(error) => {
+                                tracing::warn!("BLOB_RESPONSE: storage failed: {error}");
+                                vec![protocol::encode_error(
+                                    0,
+                                    protocol::error_code::UNKNOWN,
+                                    "Blob storage failed",
+                                )]
+                            }
+                        }
                     }
                     Some(drive) => {
                         tracing::warn!(
@@ -1173,7 +1182,7 @@ pub async fn handle_sync_vv_filtered(
                         if hash_bytes.len() == 32 {
                             let mut hash = [0u8; 32];
                             hash.copy_from_slice(&hash_bytes);
-                            if !store.kv.contains_key(Tree::Blobs, &hash).unwrap_or(false) {
+                            if !store.has_blob(&hash).await.unwrap_or(false) {
                                 // If we don't have the blob, add to pull so the server requests it
                                 if !pull.contains(subject) {
                                     pull.push(subject.clone());
@@ -1613,7 +1622,7 @@ pub async fn import_sync_push(
                     if hash_bytes.len() == 32 {
                         let mut hash = [0u8; 32];
                         hash.copy_from_slice(&hash_bytes);
-                        if !store.kv.contains_key(Tree::Blobs, &hash).unwrap_or(false) {
+                        if !store.has_blob(&hash).await.unwrap_or(false) {
                             // Record which (already-admitted, see the top of
                             // this fn) drive this hash belongs to so the
                             // BLOB_RESPONSE handler can gate the write

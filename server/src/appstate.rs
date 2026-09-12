@@ -60,6 +60,8 @@ impl AppState {
         )
         .await?;
 
+        crate::blob_storage::configure(&mut store).await?;
+
         // Drop the persisted watched-query registry on startup. Every
         // entry was registered by a now-dead WS connection; live
         // subscribers re-register on reconnect. Without this, e2e

@@ -39,6 +39,12 @@ pub trait KvStore: Send + Sync {
     /// Iterate over all entries in a tree, ordered by key.
     fn iter_tree(&self, tree: Tree) -> KvIter;
 
+    /// Read one entry without materializing the whole tree. Used when moving
+    /// large blob tables out of local storage before transports start.
+    fn first_entry(&self, tree: Tree) -> AtomicResult<Option<KvPair>> {
+        self.iter_tree(tree).next().transpose()
+    }
+
     /// Remove all entries from a specific tree.
     fn clear_tree(&self, tree: Tree) -> AtomicResult<()>;
 
