@@ -15,6 +15,11 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## E2E isolation and performance harness (#1461)
 
+A live Dagger service probe confirmed identical definitions share a process,
+while a per-instance runtime environment variable starts a distinct process.
+Shards now vary runtime identity while sharing binary builds. This probe does
+not establish full Dagger E2E acceptance or a supported worker count.
+
 `loro-selection.test.ts` checks cursor preservation across a remote metadata
 update followed by keystrokes before and after queued timers. The scoped
 loro-prosemirror 0.4.3 patch restores document and selection atomically.

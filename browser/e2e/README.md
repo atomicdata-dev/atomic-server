@@ -71,7 +71,8 @@ another run uses them; use separate worktrees for concurrent local runs.
 High-worker defaults remain **unvalidated** pending issue #1461's repeated matrix.
 CI keeps its explicit aggregate budget: Mancave full uses 4 shards × 2 workers,
 hosted uses 2 × 1; other build/unit jobs run concurrently. Dagger `ci` and `end-to-end` accept
-`--playwright-workers`, `--playwright-shards` and `--playwright-retries` for
+`--playwright-workers`, `--playwright-shards`, `--playwright-retries` and
+`--playwright-clone-sessions` for
 controlled experiments; 0 workers/shards retain the profile and -1 retries
 retains its retry policy. Use `--playwright-retries=0` for acceptance and include
 all simultaneous build/unit jobs when interpreting the printed aggregate budget. Do not interpret the
@@ -85,6 +86,12 @@ costs more than a debug build; subsequent runs reuse verified artifacts.
 `ATOMIC_E2E_CARGO_PROFILE=dev` explicitly selects the slower debug server for
 iteration, and `release` selects the production profile. Profile changes
 invalidate the native build cache without invalidating the WASM cache.
+
+Each Dagger shard has a unique runtime identity and hostname so Dagger cannot
+deduplicate its writable server state with another shard. The server binary
+build remains shared. Profile cloning defaults to false; opt in explicitly for
+comparisons. Repository runner overrides can still force hosted execution even
+when Mancave is online; check the Pick runner job before interpreting CI timings.
 
 ### Cloned-session experiment
 
