@@ -15,6 +15,9 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## E2E isolation and performance harness (#1461)
 
+`search.test.ts` verifies search-cache invalidation only evicts memory entries,
+without deleting persisted resources or adding pending database writes.
+
 `bootstrap.test.ts` verifies website language properties are ready from bundled
 definitions without fetching atomicdata.dev. The discussion badge test uses the
 shared reconnecting reload helper before asserting device-local unseen state.

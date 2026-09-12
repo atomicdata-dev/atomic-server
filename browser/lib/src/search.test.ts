@@ -1,5 +1,11 @@
-import { describe, it } from 'vitest';
-import { buildSearchSubject, SearchOpts } from './search.js';
+import { describe, it, vi } from 'vitest';
+import {
+  buildSearchSubject,
+  removeCachedSearchResults,
+  SearchOpts,
+} from './search.js';
+import { Store } from './store.js';
+import { Resource } from './resource.js';
 
 describe('search.ts', () => {
   it('Builds a good search URL', ({ expect }) => {
@@ -30,4 +36,22 @@ describe('search.ts', () => {
       'filters=https%3A%2F%2Fatomicdata.dev%2Fproperties%2FisA%3A%22https%3A%2F%2Fatomicdata.dev%2Fclasses%2FFile%22',
     );
   });
+});
+
+it('invalidating search projections does not delete persisted resources or leave sync pending', ({
+  expect,
+}) => {
+  const store = new Store({ serverUrl: 'https://example.com' });
+  const subject = buildSearchSubject(store.getServerUrl(), 'website');
+  store.addResource(new Resource(subject));
+  const removeResource = vi.fn(() => new Promise<void>(() => {}));
+  store.setClientDb({ removeResource } as unknown as Parameters<
+    Store['setClientDb']
+  >[0]);
+
+  removeCachedSearchResults(store);
+
+  expect(store.resources.has(subject)).toBe(false);
+  expect(removeResource).not.toHaveBeenCalled();
+  expect(store.getSyncStatus().pendingDirtyCount).toBe(0);
 });

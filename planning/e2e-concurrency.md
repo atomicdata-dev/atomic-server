@@ -350,3 +350,16 @@ Canvas also passed eight focused repetitions before this run. The other failures
 did not reproduce at this load; they are not claimed fixed. Artifacts: Mancave
 .e2e-runs/2026-09-12T09-44-09.837Z-PqfUko. Eight Node harness checks and E2E
 typecheck pass. Another complete Dagger run remains necessary before merge.
+
+
+Full Dagger on 2a9e9d369 completed with 216 passed, two failed and eight skipped.
+Only Next/Svelte template sync waits failed; all other prior failures passed.
+Expanded snapshots showed no scheduled or saving resources, despite two pending
+writes: search-cache invalidation used the persistent deletion path. A unit
+regression fails on that unwanted database call. Search invalidation now uses
+explicit memory eviction; real deletion retains its ClientDb tombstone path.
+The search/store selection passes 35/35. Full Dagger validation remains pending.
+
+Next caching improvement: jsBuild mounts all browser sources before its build,
+so E2E-only edits also invalidate the frontend build and embedded server link.
+Separate test inputs from build inputs after the current merge validation.
