@@ -76,6 +76,19 @@ describe('isDriveSignInError', () => {
     ).toBe(true);
   });
 
+  it('a signed-out local-only drive requires unlock even when the app has a node', () => {
+    expect(
+      isDriveSignInError(res(DRIVE, localOnlyGone), undefined, BASE, {
+        originWithoutNode: false,
+      }),
+    ).toBe(true);
+    expect(
+      isDriveSignInError(res(DRIVE, localOnlyGone), someAgent, BASE, {
+        originWithoutNode: false,
+      }),
+    ).toBe(false);
+  });
+
   it('not held locally, but a node exists → just offline, no guard', () => {
     expect(isDriveSignInError(res(DRIVE, notLocal), undefined, BASE)).toBe(
       false,
