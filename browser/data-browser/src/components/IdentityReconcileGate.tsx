@@ -75,9 +75,12 @@ export function IdentityReconcileGate({
   // re-checks resolve in the background without disturbing the mounted UI.
   const hasCheckedOnceRef = useRef(false);
 
-  // The welcome/recover flow does its own convergence; don't double-handle it.
+  // Identity setup owns its transition. Reconciling a half-created dev agent
+  // can classify it as disposable and redirect before its drive is saved.
   const skip =
-    pathname === paths.welcome || pathname.startsWith(`${paths.welcome}/`);
+    pathname === paths.devDrive ||
+    pathname === paths.welcome ||
+    pathname.startsWith(`${paths.welcome}/`);
 
   const converge = useCallback(async () => {
     if (skip) {

@@ -866,3 +866,5 @@ Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creat
 Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI test runner).
 
 `helpers/managed/vaultAutoBackup.test.ts` verifies successful vault restoration preserves known node absence as local-only routing, while transport failures and failed restores do not disable node sync. Paired SaaS second-browser coverage verifies the original profile and vault-only canary after restore, with bounded pre-restore refusal diagnostics.
+
+Paired SaaS `portal/e2e/identity-reconcile.spec.ts` exercises dev-drive creation while a managed account is active: reconciliation waits until the temporary identity has a drive, and creation must not enroll it in the account.

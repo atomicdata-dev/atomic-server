@@ -507,3 +507,8 @@ Findings referenced by number (F1–F12) are written up in
 - [x] Reproduce restored vault-only drives repeatedly subscribing to a node that returned NotFound. Preserve local-only routing after a successful nonempty restore when node absence is known; transport errors and failed restores do not change routing. All 878 frontend unit tests pass.
 - [x] Verify the paired SaaS vault-only second-browser journey: original profile and vault-only canary restored with strict diagnostics (1.7 minutes).
 - [ ] Pass full CI on the updated combined commit. The prior run on a9baad3ea was cancelled because this additional fix changes the head.
+
+### Follow-up from paired CI on fa5865ad7
+
+- [x] Reproduce dev-drive creation being redirected by account reconciliation before the temporary identity has a workspace. Skip reconciliation during the dev-drive setup route; resume on exit. Paired SaaS regression passes locally without enrollment (1.1 minutes); TypeScript and focused lint/format pass.
+- [ ] Include this follow-up in the next validated combined head after current CI finishes collecting failures.
