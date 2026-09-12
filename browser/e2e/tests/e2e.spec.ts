@@ -52,9 +52,17 @@ test.describe('data-browser', async () => {
     await expect(currentDriveTitle(page)).toBeVisible();
   });
 
-  test('switch Server URL', async ({ page }) => {
-    await changeDrive('https://atomicdata.dev', page);
-    await expect(currentDriveTitle(page)).toContainText('atomicdata.dev');
+  test('switch drives by URL', async ({ page }) => {
+    const initialDrive = await getCurrentSubject(page);
+    const initialTitle = await currentDriveTitle(page).textContent();
+    const other = await newDrive(page);
+
+    // Exercise the real Open-by-URL flow without relying on a public site's
+    // deployment, node discovery endpoint, or availability.
+    await changeDrive(initialDrive, page);
+    await expect(currentDriveTitle(page)).toHaveText(initialTitle ?? '');
+    await changeDrive(other.driveURL, page);
+    await expect(currentDriveTitle(page)).toHaveText(other.driveTitle);
   });
 
   test(
