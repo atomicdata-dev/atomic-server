@@ -72,7 +72,7 @@ function TagSelectPopoverWrapper({ resource }: { resource: Resource }) {
   const store = useStore();
   const [driveSubject, setDriveSubject] = useState<string>();
   const drive = useResource(driveSubject);
-  const [driveTags, setDriveTags] = useArray(
+  const [driveTags, , pushDriveTags] = useArray(
     drive,
     dataBrowser.properties.tagList,
     { commit: true },
@@ -87,7 +87,9 @@ function TagSelectPopoverWrapper({ resource }: { resource: Resource }) {
   }, [resource, store]);
 
   const handleNewTag = (newTag: string) => {
-    setDriveTags([...driveTags, newTag]);
+    // Tag creation finishes asynchronously; append to the live resource
+    // instead of replacing it with the array captured by an older render.
+    pushDriveTags([newTag]);
   };
 
   if (driveSubject === undefined || resource.loading) {

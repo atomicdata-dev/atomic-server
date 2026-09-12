@@ -83,6 +83,18 @@ test.describe('resource context menu', () => {
     await filter.fill('histo');
     await expect(page.getByTestId('menu-item-history')).toBeVisible();
     await expect(page.getByTestId('menu-item-edit')).toHaveCount(0);
+    // Reproduce a late creation notification after the user has already
+    // chosen to type in the menu. Automatic title editing must not steal it.
+    await page.evaluate(async () => {
+      const subject = document
+        .querySelector('main[about]')
+        ?.getAttribute('about');
+      if (!subject) throw new Error('Table subject missing');
+      await window.store.notifyResourceManuallyCreated(
+        await window.store.getResource(subject),
+      );
+    });
+    await expect(filter).toBeFocused();
     await filter.fill('');
     // Close it.
     await page.keyboard.press('Escape');

@@ -128,6 +128,20 @@ export function EditableTitle({
       return;
     }
 
+    // A creation notification can arrive after the user has opened an
+    // overlay. Automatic title editing must not steal its keyboard focus.
+    // Explicit title clicks still focus the editor normally.
+    if (
+      caretRef.current === 'all' &&
+      document.activeElement?.closest(
+        '[role="menu"], [role="dialog"], dialog[open]',
+      )
+    ) {
+      setIsEditing(false);
+
+      return;
+    }
+
     el.focus();
 
     const caret = caretRef.current;

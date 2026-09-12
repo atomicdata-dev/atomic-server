@@ -188,7 +188,14 @@ export async function searchAndOpen(
   // window. Retry the click (re-resolving the locator each attempt) until it
   // lands on a stable node, rather than racing a single re-render.
   await expect(async () => {
-    await result.click({ timeout: 2000 });
+    // A click can close the overlay before Playwright finishes its action.
+    // On a retry, that closed overlay is success, not a missing result to
+    // click again. Otherwise the helper times out after successful navigation.
+    if (await searchInput(page).isVisible()) {
+      await result.click({ timeout: 2000 });
+    }
+
+    await expect(searchInput(page)).toBeHidden();
   }).toPass({ timeout: 15000 });
 }
 

@@ -754,6 +754,21 @@ check; real refresh/query timing remains a browser acceptance check.
 - `e2e.spec.ts` opens two real local drives by URL; switching does not depend
   on public `atomicdata.dev` hosting or its `/server` discovery endpoint.
 
+- `collection-attach.test.ts` delays database attachment after a collection starts:
+  an expected worker must get the query before the server fallback. Apps without
+  an expected local database retain the immediate server path.
+- `resource-context-menu.spec.ts` delivers a late resource-creation notification
+  while typing in a menu. Automatic title editing must preserve overlay focus;
+  the folder-creation E2E continues to verify normal title autofocus.
+
+- `store.test.ts` verifies that applying a received Loro snapshot does not start
+  another fetch of that subject. Pending offline edits retain their hydration path.
+- The tag-search E2E creates two tags sequentially and verifies both drive-list
+  entries and search filters. Tag callbacks append to the live resource, so a
+  delayed callback cannot replace the list with an older render's array.
+- `searchAndOpen` treats overlay closure as click completion when retrying a
+  detached result row, avoiding false failures after successful navigation.
+
 ## CI quality and failure evidence
 
 - `failure-state.spec.ts` checks bounded failure metadata and omission of resource
