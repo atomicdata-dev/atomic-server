@@ -1,3 +1,4 @@
+import { startVisiblePolling } from '../helpers/visiblePolling';
 import {
   ServiceGroup,
   ServiceSection,
@@ -839,16 +840,14 @@ function SyncPage() {
         if (!cancelled) setManagedInfo(info);
       });
 
-    void poll();
-
     // Re-poll so a device connecting or dropping shows up without a reload —
     // `peer/live` is a moment-to-moment fact, not a one-time read. Version and
     // node id don't change, so this is cheap and idempotent.
-    const timer = setInterval(poll, 5000);
+    const stopPolling = startVisiblePolling(poll, 5000);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stopPolling();
     };
   }, [status.serverUrl]);
 
@@ -967,13 +966,17 @@ function SyncPage() {
       .catch(() => {});
   }, []);
 
+  // Node liveness changes every poll; hosting belongs to the provider/account,
+  // not to the identity of a freshly parsed node metadata object.
+  const cloudPortal = getManagedPortalUrl(managedInfo);
+
   // Does the active drive already have a Cloud Server enrollment? Drives the
   // Cloud Server CTA below. Skips entirely when no control plane is
   // reachable (pure self-hosted), so the CTA never shows there.
   useEffect(() => {
     const drive = status.drive;
 
-    if (!drive || !isCloudSyncAvailable(managedInfo)) {
+    if (!drive || !cloudPortal) {
       setCloudEnrollment(null);
 
       return;
@@ -992,7 +995,7 @@ function SyncPage() {
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, managedInfo, managedAccount]);
+  }, [status.drive, status.serverUrl, cloudPortal, managedAccount]);
 
   useEffect(() => {
     const refresh = () => setStatus(store.getSyncStatus());

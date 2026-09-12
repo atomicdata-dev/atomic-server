@@ -59,8 +59,10 @@ export async function evaluateIdentityReconciliation(
   }
 
   const [recovery, enrollments] = await Promise.all([
-    getRecoverySecret().catch(() => null),
-    getManagedEnrollments().catch(() => [] as ManagedEnrollmentSummary[]),
+    getRecoverySecret(managedAccount).catch(() => null),
+    getManagedEnrollments(false, managedAccount).catch(
+      () => [] as ManagedEnrollmentSummary[],
+    ),
   ]);
 
   const binding = readManagedAccountBinding();
@@ -166,7 +168,7 @@ async function resolveHostedDriveOrigin(
     return undefined;
   }
 
-  const enrollments = await getManagedEnrollments().catch(
+  const enrollments = await getManagedEnrollments(false, managedAccount).catch(
     () => [] as ManagedEnrollmentSummary[],
   );
 

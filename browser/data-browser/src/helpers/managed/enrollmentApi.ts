@@ -7,7 +7,7 @@
 // against the control-plane `GET /api/sync-enrollments` route.
 
 import { managedFetch } from './api';
-import { getManagedAccount } from './session';
+import { getManagedAccount, type ManagedAccount } from './session';
 
 export type ManagedEnrollmentStatus = 'Active' | 'Disabled' | string;
 
@@ -34,8 +34,9 @@ export type ManagedEnrollmentSummary = {
  */
 export async function getManagedEnrollments(
   strict = false,
+  account?: ManagedAccount | null,
 ): Promise<ManagedEnrollmentSummary[]> {
-  if (!(await getManagedAccount())) {
+  if (!(account === undefined ? await getManagedAccount() : account)) {
     if (strict) throw new Error('Sign in to check Cloud Server hosting.');
 
     return [];

@@ -4,7 +4,13 @@
 // route. Mirrors the captured `getManagedUser()` in helpers/managedUsage.ts.
 
 import { PRODUCT_NAME } from './product';
-import { hasManagedApi, managedFetch, setManagedDeviceToken } from './api';
+import {
+  getManagedApiBase,
+  getManagedDeviceToken,
+  hasManagedApi,
+  managedFetch,
+  setManagedDeviceToken,
+} from './api';
 
 export type ManagedAccount = {
   email: string;
@@ -18,23 +24,42 @@ let pendingLogouts = 0;
  * The signed-in Managed Sync account (cookie session against the control plane),
  * or null when not signed in. 204/401 both mean "no session".
  */
+let pendingRead:
+  | { key: string; promise: Promise<ManagedAccount | null> }
+  | undefined;
+const readKey = () =>
+  JSON.stringify([
+    sessionGeneration,
+    getManagedApiBase(),
+    getManagedDeviceToken(),
+  ]);
+
 export async function getManagedAccount(): Promise<ManagedAccount | null> {
   if (pendingLogouts > 0 || !hasManagedApi()) return null;
-  const generation = sessionGeneration;
-  const response = await managedFetch(`/me`, {});
-  if (generation !== sessionGeneration) return null;
+  const key = readKey();
+  if (pendingRead?.key === key) return pendingRead.promise;
 
-  if (response.status === 204 || response.status === 401) {
-    return null;
+  const read = async () => {
+    const response = await managedFetch('/me', {});
+    if (key !== readKey()) return null;
+    if (response.status === 204 || response.status === 401) return null;
+    if (!response.ok)
+      throw new Error(`Could not check ${PRODUCT_NAME} session.`);
+    const account = (await response.json()) as ManagedAccount;
+
+    return key === readKey() ? account : null;
+  };
+
+  const request = { key, promise: read() };
+  pendingRead = request;
+
+  try {
+    return await request.promise;
+  } finally {
+    // Share only in-flight reads. A later check must see account switches,
+    // and completion of an old credential's request must not clear a new one.
+    if (pendingRead === request) pendingRead = undefined;
   }
-
-  if (!response.ok) {
-    throw new Error(`Could not check ${PRODUCT_NAME} session.`);
-  }
-
-  const account = (await response.json()) as ManagedAccount;
-
-  return generation === sessionGeneration ? account : null;
 }
 
 const logoutListeners = new Set<() => void>();

@@ -2109,6 +2109,124 @@ mod peer_sync_tests {
         assert!(err.message.contains("SYNC refused"), "{}", err.message);
     }
 
+    #[tokio::test]
+    async fn sync_probe_bootstraps_admitted_missing_drive_without_exposing_private_data() {
+        use crate::sync::engine::{drive_items_for, handle_frame};
+        use crate::sync::policy::SyncPolicy;
+        use crate::sync::protocol::{encode_sync_probe, tag};
+        struct Admission {
+            allowed: String,
+        }
+        impl SyncPolicy for Admission {
+            fn drive_is_allowed(&self, drive: &str) -> bool {
+                drive == self.allowed
+            }
+            fn drive_within_quota(&self, _: &str) -> bool {
+                true
+            }
+            fn may_enroll_drive(&self, _: &str, _: &ForAgent) -> bool {
+                false
+            }
+        }
+        let source = Db::init_temp("probe_source").await.unwrap();
+        let (alice, drive) = source.setup("Alice").await.unwrap();
+        let destination = Db::init_temp("probe_destination").await.unwrap();
+        destination.set_sync_policy(std::sync::Arc::new(Admission {
+            allowed: drive.clone(),
+        }));
+        let mut owner = ForAgent::AgentSubject(alice.subject.clone());
+        let reply = handle_frame(
+            &encode_sync_probe(&drive, "nonempty"),
+            &destination,
+            &mut owner,
+        )
+        .await;
+        assert_eq!(
+            reply[0][0],
+            tag::SYNC_RESEND,
+            "a newly admitted drive must reach bootstrap"
+        );
+        assert!(
+            drive_items_for(&destination, &drive, &owner)
+                .await
+                .unwrap()
+                .is_empty(),
+            "RBSR must also see the empty destination"
+        );
+        assert!(
+            drive_items_for(&destination, &drive, &ForAgent::Public)
+                .await
+                .is_err(),
+            "anonymous callers cannot probe even an admitted missing drive"
+        );
+        // The normal signed import path remains authoritative after the empty
+        // fingerprint. Verify real content reaches the previously empty node.
+        let document = source
+            .create_resource(
+                "https://atomicdata.dev/classes/Document",
+                &drive,
+                "First upload",
+                None,
+            )
+            .await
+            .unwrap();
+        let frames = crate::sync::engine::handle_sync_vv(
+            &drive,
+            "",
+            &[],
+            &std::collections::HashMap::new(),
+            &source,
+            &owner,
+        )
+        .await;
+        let mut imported = 0;
+        for frame in frames {
+            if frame[0] == tag::SYNC_PUSH {
+                let push = crate::sync::protocol::decode_sync_push(&frame[1..]).unwrap();
+                imported +=
+                    crate::sync::engine::import_sync_push(&push, &destination, &owner, false)
+                        .await
+                        .unwrap()
+                        .0;
+            }
+        }
+        assert!(imported >= 2);
+        let saved = destination
+            .get_resource(&document.as_str().into())
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.get(crate::urls::NAME).unwrap().to_string(),
+            "First upload"
+        );
+        let mut public = ForAgent::Public;
+        assert_eq!(
+            handle_frame(
+                &encode_sync_probe(&drive, "nonempty"),
+                &destination,
+                &mut public
+            )
+            .await[0][0],
+            tag::ERROR
+        );
+        let (_, other_drive) = source.setup("Other").await.unwrap();
+        assert_eq!(
+            handle_frame(
+                &encode_sync_probe(&other_drive, "nonempty"),
+                &destination,
+                &mut owner
+            )
+            .await[0][0],
+            tag::ERROR
+        );
+        assert!(
+            drive_items_for(&source, &other_drive, &owner)
+                .await
+                .is_err(),
+            "an existing private drive must stay unreadable even on an open node"
+        );
+    }
+
     /// The hash-first probe answers "in sync" purely from `drive_sync_hash`.
     /// For that to ever say yes, the standalone hash MUST equal the hash
     /// `handle_sync_vv` compares against — and it MUST change when the drive's

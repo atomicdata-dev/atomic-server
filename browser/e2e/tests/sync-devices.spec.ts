@@ -89,6 +89,59 @@ test.describe('sync page devices', () => {
     await expect(page.getByTestId('link-provider-panel')).not.toBeVisible();
   });
 
+  test('idle node polls do not recheck account hosting', async ({ page }) => {
+    let nodeReads = 0;
+    let enrollmentReads = 0;
+    await page.route('**/server', async route => {
+      const response = await route.fetch({
+        url: nodeReachableServerUrl(route.request().url()),
+      });
+      nodeReads++;
+      await route.fulfill({
+        json: {
+          ...(await response.json()),
+          'https://atomicdata.dev/properties/server/managed': true,
+          'https://atomicdata.dev/properties/server/portalUrl':
+            'http://localhost:49237',
+        },
+      });
+    });
+    await page.route('**/api/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/sync-enrollments') enrollmentReads++;
+
+      return route.fulfill({
+        json:
+          path === '/api/me'
+            ? { email: 'polling-test@example.com' }
+            : path === '/api/drives/catalog'
+              ? { drives: [], removed: [] }
+              : [],
+      });
+    });
+    await gotoSync(page);
+    await expect(
+      page.getByTestId('cloud-server-row').getByRole('button', {
+        name: 'Set up Cloud Server',
+        exact: true,
+      }),
+    ).toBeVisible();
+    // Let the initial account/enrollment effects finish, then observe two real
+    // liveness polls, shorter than the independent 30-second catalog interval.
+    await page.waitForTimeout(300);
+    const baseline = { nodeReads, enrollmentReads };
+    await expect
+      .poll(() => nodeReads, { timeout: 14000 })
+      .toBeGreaterThanOrEqual(baseline.nodeReads + 2);
+    await page.waitForTimeout(300);
+    expect(enrollmentReads).toBe(baseline.enrollmentReads);
+    // Returning from portal sign-in must still refresh even for the same email.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect
+      .poll(() => enrollmentReads)
+      .toBeGreaterThan(baseline.enrollmentReads);
+  });
+
   test('the pairing code on screen is a routable envelope', async ({
     page,
   }) => {
