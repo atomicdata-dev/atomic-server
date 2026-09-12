@@ -104,3 +104,5 @@ These components help with rendering resources in different contexts.
 - `src/globalCssVars.ts` - Typed CSS variable helpers used by layout and global surfaces.
 
 - `src/components/TeamProfileStep.tsx` — shared collaboration profile review for senders and invitees. Saves full name and optional cropped avatar to the existing Atomic agent before continuing; requires no SaaS account.
+
+- `src/components/OnboardingFeedback.tsx` - Shared bottom-right subtle feedback control; the onboarding Shell reserves bottom space for it.

@@ -514,6 +514,8 @@ function ColumnsMenu({
 }
 
 const Bar = styled.div`
+  min-width: 0;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -522,12 +524,21 @@ const Bar = styled.div`
 `;
 
 const Tabs = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  > * {
+    flex-shrink: 0;
+  }
   display: flex;
   align-items: center;
   gap: 0.25rem;
 `;
 
 const Actions = styled.div`
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.25rem;

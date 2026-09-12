@@ -94,9 +94,12 @@ interface AsyncAIChatInputProps {
   /** A one-time handoff draft; later typing and clearing remain user-owned. */
   prefill?: string;
   hasFiles: boolean;
+  autoFocus?: boolean;
   disabled?: boolean;
   disableSubmit?: boolean;
   large?: boolean;
+  /** Keep text until the caller confirms a successful response. */
+  clearOnSubmit?: boolean;
   onMentionUpdate: (mentions: MentionItem[]) => void;
   onChange: (markdown: string) => void;
   onSubmit: () => void;
@@ -114,9 +117,11 @@ const AsyncAIChatInput: React.FC<
 > = ({
   children,
   hasFiles,
+  autoFocus = true,
   disabled = false,
   disableSubmit = false,
   large = false,
+  clearOnSubmit = true,
   onMentionUpdate,
   onChange,
   onSubmit,
@@ -135,6 +140,8 @@ const AsyncAIChatInput: React.FC<
   const prefilled = useRef<string | undefined>(undefined);
   const markdownRef = useRef(markdown);
   const onSubmitRef = useRef(onSubmit);
+  const clearOnSubmitRef = useRef(clearOnSubmit);
+  clearOnSubmitRef.current = clearOnSubmit;
   const onCompactRef = useRef(onCompact);
   const disableSubmitRef = useRef(disableSubmit);
   const onEditModelRef = useRef(onEditModel);
@@ -172,8 +179,11 @@ const AsyncAIChatInput: React.FC<
 
                 // The content has to be read from a ref because this callback is not updated often leading to stale content.
                 onSubmitRef.current();
-                setMarkdown('');
-                this.editor.commands.clearContent();
+
+                if (clearOnSubmitRef.current) {
+                  setMarkdown('');
+                  this.editor.commands.clearContent();
+                }
 
                 return true;
               },
@@ -239,7 +249,7 @@ const AsyncAIChatInput: React.FC<
           }),
         ),
       ],
-      autofocus: true,
+      autofocus: autoFocus,
       content: markdownRef.current,
       contentType: 'markdown',
       editable: !disabled,
@@ -316,8 +326,11 @@ const AsyncAIChatInput: React.FC<
             }
             onClick={() => {
               onSubmit();
-              setMarkdown('');
-              editor?.commands.clearContent();
+
+              if (clearOnSubmit) {
+                setMarkdown('');
+                editor?.commands.clearContent();
+              }
             }}
             title='Send'
             variant={IconButtonVariant.Fill}

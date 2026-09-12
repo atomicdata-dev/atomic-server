@@ -808,3 +808,24 @@ blob garbage collection, or encrypted Vault attachment recovery.
 one physical object shared by two owners counts once in each drive, repeated
 references within one drive do not inflate usage, and report ordering,
 co-location and removal of another owner's references do not change attribution.
+
+## Unified templates and create-drive setup
+
+`chunks/Templates/model.test.ts` tests version-pinned composition, duplicate keys,
+missing dependencies and dependency cycles. `aiProposal.test.ts` tests catalog-only
+AI references, size limits and removal of undeclared authority/executable fields.
+`drive-template-onboarding.spec.ts` exercises a mobile local-only preview, edits it,
+then adopts a fresh workspace without the demo edit or sample rows; it also checks
+blank creation and that the mobile feedback footer cannot cover its action.
+Existing `table-templates.spec.ts` exercises the same table adapter.
+Not covered: a live AI provider, durable interrupted-install resume, portable graph
+import/export, shared schema IDs, initial identity signup, physical mobile browsers.
+
+- Demo speaker attribution: `browser/data-browser/src/chunks/Demo/messageSpeaker.test.ts` covers local persona display and rejection outside the demo, without overriding verified creator metadata.
+
+Template adoption: `keepTemplateDemo.test.ts` covers retaining graph identity, saved-drive registration, failed-save retry preservation, and expired-preview rejection. `drive-template-onboarding.spec.ts` covers the keep-edits and fresh-template UI choices.
+
+Onboarding dialog feedback: the authorization/invite and chatroom cases in
+`e2e.spec.ts` verify Continue remains clickable while feedback is offered.
+`onboarding-storage.spec.ts` checks feedback availability;
+`drive-template-onboarding.spec.ts` checks mobile creation and dismissal.

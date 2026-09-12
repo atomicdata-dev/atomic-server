@@ -10,11 +10,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./background.css": "./src/background.css"
   },
   "files": [
     "dist",
-    "src/styles.css"
+    "src/styles.css",
+    "src/background.css"
   ],
   "scripts": {
     "build": "tsc",
