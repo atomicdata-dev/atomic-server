@@ -27,6 +27,7 @@ it.each([false, true])(
     vi.stubGlobal('self', worker);
     await import('./client-db.worker.js');
     let id = 0;
+
     async function send(message: object) {
       const requestId = ++id;
       const response = new Promise<Record<string, unknown>>(resolve => {
@@ -35,8 +36,10 @@ it.each([false, true])(
         });
       });
       worker.onmessage({ data: { ...message, id: requestId } });
+
       return response;
     }
+
     await send({
       type: 'init',
       wasmUrl: 'data:text/javascript,export default async function() {}',
