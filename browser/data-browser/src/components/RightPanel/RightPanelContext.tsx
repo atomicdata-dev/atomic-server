@@ -5,9 +5,14 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
 
-export type RightPanelId = 'ai' | 'comments' | 'followSession';
+import {
+  emptyPanelState,
+  updatePanelState,
+  type RightPanelId,
+} from './panelState';
+
+export type { RightPanelId } from './panelState';
 
 /**
  * Manages which panel occupies the right side of the screen. Panels are
@@ -32,29 +37,29 @@ const RightPanelContext = createContext<{
 
 export const useRightPanel = () => useContext(RightPanelContext);
 
-export const RightPanelProvider: React.FC<React.PropsWithChildren> = ({
-  children,
-}) => {
-  const [activePanel, setActivePanel] = useLocalStorage<RightPanelId | null>(
-    'atomic.rightPanel.active',
-    null,
-  );
-  const [selectedMeeting, setSelectedMeeting] = useState<string>();
+export const RightPanelProvider: React.FC<
+  React.PropsWithChildren<{ scope: string }>
+> = ({ children, scope }) => {
+  // Open panels are transient context, not a browser preference. Persisting only
+  // the panel ID resurrected empty meeting drawers after a new session.
+  const [state, setState] = useState(() => emptyPanelState(scope));
+  const current = state.scope === scope ? state : emptyPanelState(scope);
+  if (state.scope !== scope) setState(current);
+  const { activePanel, selectedMeeting } = current;
+
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem('atomic.rightPanel.active');
+    } catch {
+      // Panel state also works when browser storage is unavailable.
+    }
+  }, []);
 
   const setPanelOpen = useCallback(
     (panel: RightPanelId, action: React.SetStateAction<boolean>) => {
-      setActivePanel(prev => {
-        const isOpen = prev === panel;
-        const open = typeof action === 'function' ? action(isOpen) : action;
-
-        if (open) {
-          return panel;
-        }
-
-        return isOpen ? null : prev;
-      });
+      setState(previous => updatePanelState(previous, scope, panel, action));
     },
-    [setActivePanel],
+    [scope],
   );
 
   const togglePanel = useCallback(
@@ -64,17 +69,18 @@ export const RightPanelProvider: React.FC<React.PropsWithChildren> = ({
 
   const openMeetingPanel = useCallback(
     (subject: string) => {
-      setSelectedMeeting(subject);
-      setPanelOpen('followSession', true);
+      setState(previous =>
+        previous.scope === scope
+          ? {
+              scope,
+              activePanel: 'followSession',
+              selectedMeeting: subject,
+            }
+          : previous,
+      );
     },
-    [setPanelOpen],
+    [scope],
   );
-
-  useEffect(() => {
-    if (activePanel !== 'followSession') {
-      setSelectedMeeting(undefined);
-    }
-  }, [activePanel]);
 
   return (
     <RightPanelContext.Provider

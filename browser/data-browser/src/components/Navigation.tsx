@@ -85,7 +85,9 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
   );
 
   return (
-    <RightPanelProvider>
+    <RightPanelProvider
+      scope={JSON.stringify([agent?.subject, drive, hideGlobalChrome])}
+    >
       <AISidebarContextProvider>
         {/* The single app-wide resource context menu (right-click). Mounted here
          * so its actions have the AI-sidebar, dialog, and router contexts. */}

@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Stop restoring stale right-side panels across sessions, accounts and drives; close meeting/comments panels when their target disappears.
+
 ## [v0.41.0-beta.7] - 2026-09-12
 
 - Add template onboarding with editable previews and consistent mobile UI.
