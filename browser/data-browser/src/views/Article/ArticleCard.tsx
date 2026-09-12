@@ -25,9 +25,9 @@ export function ArticleCard({ resource }: CardViewProps): JSX.Element {
 
   return (
     <div>
-      <AtomicLink subject={resource.subject}>
+      <TitleLink subject={resource.subject}>
         <Title subject={resource.subject}>{resource.title}</Title>
-      </AtomicLink>
+      </TitleLink>
       <p>
         {truncated}
         {truncationMark}
@@ -35,6 +35,12 @@ export function ArticleCard({ resource }: CardViewProps): JSX.Element {
     </div>
   );
 }
+
+const TitleLink = styled(AtomicLink)`
+  /* Firefox IB-split workaround: see ResourceCardTitle. */
+  display: inline-block;
+  max-width: 100%;
+`;
 
 const Title = styled.h2<ViewTransitionProps>`
   white-space: nowrap;
