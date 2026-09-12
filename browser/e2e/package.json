@@ -29,7 +29,8 @@
     "test-query": "DELETE_PREVIOUS_TEST_DRIVES=false playwright test -g",
     "test-query-debug": "PWDEBUG=1 playwright test --project=chromium -g",
     "test-ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test --test-timeout=15000 scripts/*.node.mjs"
   },
   "devDependencies": {
     "@tomic/lib": "workspace:*",

@@ -5,6 +5,7 @@ import {
   inDialog,
   reloadGrid,
   waitForGridMounted,
+  waitForSynced,
 } from './test-utils';
 
 /**
@@ -120,20 +121,24 @@ test.describe('quick add', () => {
     // Commits travel over the websocket while connected, so delaying the HTTP
     // /commit route holds nothing — an earlier version of this test did that
     // and passed against the bug it was written for.
-    let holdCommits = true;
-    // Scoped to the server's own socket (`/ws`, see `websockets.ts`) rather
-    // than every socket the page opens.
+    let holdCommits = false;
+    const pendingCommits: Array<() => void> = [];
     await page.routeWebSocket('**/ws', ws => {
       const server = ws.connectToServer();
-      ws.onMessage(async message => {
-        if (holdCommits) {
-          await new Promise(resolve => setTimeout(resolve, 2500));
+      ws.onMessage(message => {
+        // Hold COMMIT frames, while allowing authentication and reads through.
+        if (holdCommits && typeof message !== 'string' && message[0] === 0x13) {
+          pendingCommits.push(() => server.send(message));
+        } else {
+          server.send(message);
         }
-
-        server.send(message);
       });
       server.onMessage(message => ws.send(message));
     });
+    // Routing only affects new sockets. Reconnect before arming the gate.
+    await reloadGrid(page);
+    await waitForSynced(page);
+    holdCommits = true;
 
     const input = page.getByTestId('quick-add-input');
 
@@ -143,6 +148,7 @@ test.describe('quick add', () => {
     // No wait for Milk's row: the point is to type while its save is in
     // flight. The field clearing is the signal that the create was accepted.
     await expect(input).toHaveValue('');
+    await expect.poll(() => pendingCommits.length).toBeGreaterThan(0);
 
     await input.fill('Bread');
     await input.press('Enter');
@@ -151,6 +157,7 @@ test.describe('quick add', () => {
     await expect(input).toHaveValue('');
 
     holdCommits = false;
+    for (const send of pendingCommits.splice(0)) send();
 
     await expect(row(page, 'Milk')).toBeVisible({ timeout: 20_000 });
     await expect(row(page, 'Bread')).toBeVisible({ timeout: 20_000 });

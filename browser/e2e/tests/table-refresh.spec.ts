@@ -20,12 +20,7 @@ import {
  * phantom row accumulates.
  */
 test.describe('table refresh', () => {
-  // 8-reload tests are I/O-heavy enough that running them concurrently with
-  // other suites overloads the single shared atomic-server (drive-creation
-  // races, search-index lag, etc.). Serializing this file's tests against
-  // itself keeps that load predictable; the rest of the suite still runs
-  // in parallel via the global `fullyParallel`.
-  test.describe.configure({ mode: 'serial' });
+  // Each test owns its browser storage and fresh agent/drive.
   test.beforeEach(before);
 
   test('reloading a table does not add empty rows', async ({ page }) => {
@@ -51,24 +46,6 @@ test.describe('table refresh', () => {
     // Reload many times and assert the count doesn't grow beyond baseline.
     for (let i = 0; i < 10; i++) {
       await page.reload({ waitUntil: 'domcontentloaded' });
-
-      // Suite-wide load can flake the server's WS GET (it returns
-      // intermittently as "Resource not found" or times out). Click Retry
-      // up to 3× to recover before bailing — the regression we're testing
-      // is monotonic ROW GROWTH, not transient fetch failures.
-      for (let retry = 0; retry < 3; retry++) {
-        const titleVisible = await editableTitle(page)
-          .isVisible({ timeout: 30000 })
-          .catch(() => false);
-        if (titleVisible) break;
-        const retryBtn = page.getByRole('button', { name: 'Retry' });
-
-        if (await retryBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-          await retryBtn.click();
-        } else {
-          break;
-        }
-      }
 
       await expect(editableTitle(page)).toBeVisible({ timeout: 30000 });
       // The regression is monotonic ROW GROWTH; under-render mid-mount is a
@@ -130,34 +107,6 @@ test.describe('table refresh', () => {
 
     for (let i = 0; i < 8; i++) {
       await page.reload({ waitUntil: 'domcontentloaded' });
-
-      // Same recovery as the empty-reload test: suite-wide load can flake
-      // the WS GET into ErrorPage / "Still loading…". The regression is
-      // row growth, not a missing title on a stalled fetch.
-      for (let retry = 0; retry < 3; retry++) {
-        const titleVisible = await editableTitle(page)
-          .isVisible({ timeout: 30000 })
-          .catch(() => false);
-        if (titleVisible) break;
-        const retryBtn = page.getByRole('button', { name: 'Retry' });
-
-        if (await retryBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-          await retryBtn.click();
-          continue;
-        }
-
-        const stillLoading = await page
-          .getByRole('heading', { name: /Still loading/i })
-          .isVisible({ timeout: 500 })
-          .catch(() => false);
-
-        if (stillLoading) {
-          await page.reload({ waitUntil: 'domcontentloaded' });
-          continue;
-        }
-
-        break;
-      }
 
       await expect(editableTitle(page)).toBeVisible({ timeout: 30000 });
 
@@ -290,38 +239,6 @@ test.describe('table refresh', () => {
     // latency flakes without strengthening the assertion.
     for (let i = 0; i < 1; i++) {
       await page.reload({ waitUntil: 'domcontentloaded' });
-
-      // Under suite-wide load the WS GET (5s lib-side timeout) sometimes
-      // races and the page lands either on the ErrorPage (Retry button) or
-      // on the ResourcePage "Still loading…" fallback (no button, but a
-      // simple reload kicks the resource fetch again). Try both recovery
-      // paths up to a few times before bailing. Dagger CI's container is
-      // slower than a dev laptop: 3 attempts × 25s = 75s budget for this
-      // loop, leaving headroom under the 180s `test.slow()` per-test cap.
-      for (let retry = 0; retry < 3; retry++) {
-        const titleVisible = await editableTitle(page)
-          .isVisible({ timeout: 25000 })
-          .catch(() => false);
-        if (titleVisible) break;
-        const retryBtn = page.getByRole('button', { name: 'Retry' });
-
-        if (await retryBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-          await retryBtn.click();
-          continue;
-        }
-
-        const stillLoading = await page
-          .getByRole('heading', { name: /Still loading/i })
-          .isVisible({ timeout: 500 })
-          .catch(() => false);
-
-        if (stillLoading) {
-          await page.reload({ waitUntil: 'domcontentloaded' });
-          continue;
-        }
-
-        break;
-      }
 
       await expect(editableTitle(page)).toBeVisible({ timeout: 25000 });
       await expect(rows).toHaveCount(initialCount, { timeout: 15000 });

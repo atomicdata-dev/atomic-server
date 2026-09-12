@@ -4,7 +4,12 @@ import type { Page } from '@playwright/test';
 export async function collectFailureState(page: Page): Promise<unknown> {
   return page.evaluate(() => {
     const store = window.store;
-    if (!store) return { url: location.href, store: 'unavailable' };
+    if (!store)
+      return {
+        url: location.href,
+        store: 'unavailable',
+        load: window.__e2eLoad,
+      };
     const subject = new URL(location.href).searchParams.get('subject');
     const resources = Array.from(store.resources.values());
     const relevant = resources.filter(
@@ -18,6 +23,29 @@ export async function collectFailureState(page: Page): Promise<unknown> {
 
     return {
       url: location.href,
+      load: window.__e2eLoad,
+      perfRollup: (
+        window as unknown as {
+          __atomicPerf?: {
+            snapshot: () => {
+              rollup: Array<{
+                name: string;
+                count: number;
+                totalMs: number;
+                maxMs: number;
+              }>;
+            };
+          };
+        }
+      ).__atomicPerf
+        ?.snapshot()
+        .rollup.slice(0, 30)
+        .map(({ name, count, totalMs, maxMs }) => ({
+          name,
+          count,
+          totalMs,
+          maxMs,
+        })),
       sync: store.getSyncStatus(),
       resourceCount: resources.length,
       resources: relevant.slice(0, 50).map(r => ({

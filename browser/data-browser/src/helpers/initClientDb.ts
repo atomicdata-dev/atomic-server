@@ -36,7 +36,10 @@ const ANON_DB_NAME = 'atomic_data.anon.redb';
  * sessions use a shared plaintext database. On agent change the worker is
  * torn down and restarted against the new identity's database.
  */
-export function initClientDb(store: Store): void {
+export function initClientDb(
+  store: Store,
+  options: { deferAnonymous?: boolean } = {},
+): void {
   // NOT `SharedWorker`: the implementation moved to a dedicated Worker long
   // ago, and Android WebView (the Tauri mobile app) has no SharedWorker — a
   // stale SharedWorker guard silently disabled the entire local database
@@ -52,7 +55,19 @@ export function initClientDb(store: Store): void {
   // this to wait out the attach instead — see Store.expectClientDb.
   store.expectClientDb();
 
-  scheduleStart(store, store.getAgent()?.subject);
+  // Routes that immediately provision an identity do not need to open and
+  // seed an anonymous database only to flush and destroy it moments later.
+  const initialAgent = store.getAgent()?.subject;
+
+  if (!options.deferAnonymous || initialAgent) {
+    scheduleStart(store, initialAgent);
+  } else if (currentIdentity === null) {
+    // Preserve the identity boundary even without opening its worker. The
+    // new agent must use WASM's bundled defaults, not a copy of the signed-out
+    // Store. Treating it as a first page start also writes a transient seed
+    // fingerprint, forcing unnecessary full reseeding on the next reload.
+    currentIdentity = undefined;
+  }
 
   unsubscribeAgentListener?.();
   unsubscribeAgentListener = store.on(StoreEvents.AgentChanged, agent => {

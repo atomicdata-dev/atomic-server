@@ -11,6 +11,7 @@ import {
   Service,
   CacheSharingMode,
 } from '@dagger.io/dagger';
+import { overrideE2eBudget } from './e2e-budget';
 
 /**
  * Bumps the mtime of every mounted workspace source before cargo runs.
@@ -250,6 +251,8 @@ export class AtomicServer {
         '**/.swc',
         '**/.netlify',
         // e2e
+        '**/.e2e-runs',
+        '**/.e2e-store',
         '**/test-results',
         '**/template-tests',
         '**/playwright-report',
@@ -407,7 +410,9 @@ export class AtomicServer {
      */
     @argument() publishDocs = false,
     /**
-     * `mancave` = hot parallelism for the 12c/64GB self-hosted runner.
+     * `mancave` = explicit aggregate budget for the self-hosted runner.
+     * Measure the WSL allocation, not installed RAM (24 logical CPUs / 31 GiB
+     * observed on 2026-09-12); see planning/e2e-concurrency.md.
      * `hosted` (default) = conservative knobs for ubuntu-latest fallback.
      * Passed from `.github/workflows/main.yml` per job.
      */
@@ -422,9 +427,21 @@ export class AtomicServer {
      * then cannot find the argument.
      */
     @argument() playwrightMode: string = 'full',
+    /** Per-shard worker override; 0 keeps the host profile. */
+    @argument() playwrightWorkers: number = 0,
+    /** Number of isolated servers; 0 keeps the host profile. */
+    @argument() playwrightShards: number = 0,
+    /** -1 keeps the host profile; 0 exposes failures without retrying. */
+    @argument() playwrightRetries: number = -1,
   ): Promise<string> {
     this.hostProfile = resolveHostProfile(hostProfile);
     this.hostKnobs = HOST_PROFILES[this.hostProfile];
+    overrideE2eBudget(
+      e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode)),
+      playwrightWorkers,
+      playwrightShards,
+      playwrightRetries,
+    );
 
     // Fail fast on cheap static checks. A store.ts oxfmt miss used to burn
     // ~20+ minutes of rust/e2e compile before jsLint surfaced it.
@@ -436,7 +453,13 @@ export class AtomicServer {
     await Promise.all([
       this.docsPublish(netlifyAuthToken, publishDocs),
       this.typedocPublish(netlifyAuthToken, publishDocs),
-      this.endToEnd(netlifyAuthToken, playwrightMode),
+      this.endToEnd(
+        netlifyAuthToken,
+        playwrightMode,
+        playwrightWorkers,
+        playwrightShards,
+        playwrightRetries,
+      ),
       this.jsTest(),
       this.jsTestIntegration(),
       this.flutterTest(),
@@ -1710,12 +1733,26 @@ export class AtomicServer {
      * guess the git ref. See `ci()` for why this is not named `e2eMode`.
      */
     @argument() playwrightMode: string = 'full',
+    /** Per-shard worker override; 0 keeps the host profile. */
+    @argument() playwrightWorkers: number = 0,
+    /** Number of isolated servers; 0 keeps the host profile. */
+    @argument() playwrightShards: number = 0,
+    /** -1 keeps the host profile; 0 exposes failures without retrying. */
+    @argument() playwrightRetries: number = -1,
   ): Promise<string> {
     // Shards × own atomic-server. Count comes from `--host-profile`
     // (Mancave hot / hosted conservative) plus `--playwright-mode` (light uses
     // fewer shards). Dagger dedupes the shared debug `rustBuild(e2e)` /
     // base-container graph.
-    this.e2eRun = e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode));
+    this.e2eRun = overrideE2eBudget(
+      e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode)),
+      playwrightWorkers,
+      playwrightShards,
+      playwrightRetries,
+    );
+    console.info(
+      `E2E budget: ${this.e2eRun.shardCount} shards x ${this.e2eRun.workers} workers = ${this.e2eRun.shardCount * Number(this.e2eRun.workers)} browser workers; retries=${this.e2eRun.retries}; concurrent CI cargo jobs=${this.hostKnobs.cargoBuildJobs}, nextest threads=${this.hostKnobs.nextestTestThreads}. JS/Flutter jobs also share this host.`,
+    );
     const shardCount = this.e2eRun.shardCount;
     const base = this.e2eBaseContainer();
     const shardIndexes = Array.from({ length: shardCount }, (_, i) => i + 1);

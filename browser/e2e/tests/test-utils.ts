@@ -1,4 +1,11 @@
-import { Page, expect, Browser, Locator, TestInfo } from '@playwright/test';
+import {
+  Page,
+  expect,
+  Browser,
+  Locator,
+  TestInfo,
+  test,
+} from '@playwright/test';
 import {
   applyCpuThrottle,
   envCpuThrottle,
@@ -15,9 +22,6 @@ export const PROPERTIES = {
   push: 'https://atomicdata.dev/properties/push',
   loroUpdate: 'https://atomicdata.dev/properties/loroUpdate',
 } as const;
-
-export const SECRET =
-  'eyJwcml2YXRlS2V5IjoiVUZDV2xoMGM0b05XVm4ySnNXbndWRVp0VXVEZXBpQmRQelFRMWVVcjdLbz0iLCJzdWJqZWN0IjoiZGlkOmFkOmFnZW50OmdKUlpWVEdQbmdhRzNtU1BBL2U2TEVld0tpeFlwWnR1VVlRaE5nK3Q3WTQ9IiwiaW5pdGlhbERyaXZlIjoiZGlkOmFkOmJiWlRJd2hBbFdhQjl0enpuUVpVSlB0QlhldGhvSFcxYmpMc3VhMXQ5RUtYU3ZNU0k3TWdaKzg0bzJsRGZKR0lhbk8zai8zb2xYNTNwam9GWGVwT0RnPT0ifQ==';
 
 export const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9883';
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:6747';
@@ -252,7 +256,7 @@ export const before = async (
   if (testInfo) registerPerfPage(testInfo, page);
 
   await installCommitWatcher(page);
-  await devDrive(page);
+  await test.step('Initialize fresh agent and drive', () => devDrive(page));
 };
 
 /**
@@ -466,7 +470,7 @@ function waitForCommitForSubject(page: Page, subject: string, since: number) {
 }
 
 /**
- * Signs in with the shared test secret if not already signed in.
+ * Signs in with the explicit or current test agent secret if not already signed in.
  *
  * Handles three entry states:
  *   1. Already signed in (e.g. post-`before()`/`devDrive()`): no-op.
@@ -499,7 +503,7 @@ async function enterSecret(page: Page, secret: string) {
   await page.getByLabel('Agent secret').fill(secret);
 }
 
-export async function signIn(page: Page, secret: string = SECRET) {
+export async function signIn(page: Page, secret?: string) {
   const input = page.getByLabel('Agent secret');
   const signInButton = page.getByRole('button', {
     name: 'Sign in',
@@ -522,7 +526,7 @@ export async function signIn(page: Page, secret: string = SECRET) {
     await signInButton.click();
   }
 
-  await enterSecret(page, secret);
+  await enterSecret(page, secret ?? (await getDevDriveSecret(page)));
   await expect(settings).toBeVisible({ timeout: 20000 });
 }
 
@@ -1977,37 +1981,11 @@ export async function inDialog(
         ? currentDialog(page).getByRole('button', { name: 'Close' })
         : currentDialog(page).locator('footer button', { hasText: buttonText });
 
-    // The dialog footer re-renders while an async commit settles — the
-    // Save/Create button is detached and replaced under Playwright's
-    // click ("element is not stable" / "element was detached from the
-    // DOM"). A single click then races that churn and times out.
-    //
-    // Retry the click while the dialog is still open: every
-    // `closeDialogWith` call is meant to dismiss the dialog, so a click
-    // that took effect closes it (and further clicks hit nothing), while
-    // a click that lost the detach race leaves it open for another try.
-    // Bounded, so a genuinely stuck dialog still fails loudly.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (await currentDialog(page).isHidden()) {
-        return;
-      }
-
-      await expect(button).toBeEnabled();
-      await button.click({ timeout: 10000 }).catch(() => undefined);
-
-      const closed = await currentDialog(page)
-        .waitFor({ state: 'hidden', timeout: 4000 })
-        .then(() => true)
-        .catch(() => false);
-
-      if (closed) {
-        return;
-      }
-    }
-
-    // Final attempt — no catch, so a still-stuck dialog surfaces the error.
-    await expect(button).toBeEnabled();
+    // Locator.click already waits for actionability and resolves replacement
+    // nodes before dispatch. Submit once, then observe the dialog closing;
+    // replaying a save after a short timeout can create duplicate mutations.
     await button.click();
+    await expect(currentDialog(page)).toBeHidden({ timeout: timeoutMs });
   };
 
   await fn(currentDialog(page), closeDialogWith);

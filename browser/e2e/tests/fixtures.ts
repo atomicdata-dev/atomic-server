@@ -22,6 +22,34 @@ export const test = base.extend<{
         watched.add(context);
         diagnostics.start(context);
         transport.start(context);
+        await context.addInitScript(() => {
+          const load = {
+            longTasks: [] as Array<{ start: number; duration: number }>,
+            maxTimerLagMs: 0,
+          };
+          window.__e2eLoad = load;
+
+          if (PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+            new PerformanceObserver(list => {
+              for (const entry of list.getEntries())
+                load.longTasks.push({
+                  start: entry.startTime,
+                  duration: entry.duration,
+                });
+              load.longTasks = load.longTasks.slice(-100);
+            }).observe({ entryTypes: ['longtask'] });
+          }
+
+          let previous = performance.now();
+          setInterval(() => {
+            const now = performance.now();
+            load.maxTimerLagMs = Math.max(
+              load.maxTimerLagMs,
+              now - previous - 1000,
+            );
+            previous = now;
+          }, 1000);
+        });
 
         // General UI tests use an empty discovery room, independent of public
         // service availability. verify-peer-mesh.mjs separately exercises real

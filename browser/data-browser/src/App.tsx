@@ -207,7 +207,9 @@ import { initClientDb } from './helpers/initClientDb';
 import { isClientDbEnabled } from './helpers/clientDbMode';
 
 if (isClientDbEnabled()) {
-  initClientDb(store);
+  initClientDb(store, {
+    deferAnonymous: window.location.pathname === '/app/dev-drive',
+  });
 }
 
 store.parseMetaTags();
