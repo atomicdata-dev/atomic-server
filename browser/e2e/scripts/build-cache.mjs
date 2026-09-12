@@ -85,9 +85,11 @@ export function buildKey(root, env, toolVersions, scope = 'all') {
   const buildEnv = Object.fromEntries(
     Object.entries(env)
       .filter(([key]) =>
-        /^(VITE_|CARGO_|RUST|BINARYEN_|NODE_|TAURI$|SOURCEMAP$|ATOMICSERVER_|CC$|CXX$|CFLAGS$|CXXFLAGS$|LDFLAGS$)/.test(
-          key,
-        ),
+        key === 'ATOMIC_E2E_CARGO_PROFILE'
+          ? scope !== 'wasm'
+          : /^(VITE_|CARGO_|RUST|BINARYEN_|NODE_|TAURI$|SOURCEMAP$|ATOMICSERVER_|CC$|CXX$|CFLAGS$|CXXFLAGS$|LDFLAGS$)/.test(
+              key,
+            ),
       )
       .sort(([a], [b]) => a.localeCompare(b)),
   );

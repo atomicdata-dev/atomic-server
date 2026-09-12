@@ -27,6 +27,7 @@ export interface PopoverProps {
   noLock?: boolean;
   modal?: boolean;
   side?: 'top' | 'bottom' | 'left' | 'right';
+  updatePositionStrategy?: 'optimized' | 'always';
 }
 
 export function Popover({
@@ -40,6 +41,7 @@ export function Popover({
   onOpenChange,
   Trigger,
   side = 'bottom',
+  updatePositionStrategy = 'optimized',
 }: PropsWithChildren<PopoverProps>): JSX.Element {
   const { setHasOpenInnerPopup } = useDialogTreeInfo();
   const containerRef = useContext(PopoverContainerContext);
@@ -74,6 +76,7 @@ export function Popover({
           sticky='always'
           className={className}
           side={side}
+          updatePositionStrategy={updatePositionStrategy}
         >
           {children}
           {!noArrow && <Arrow />}

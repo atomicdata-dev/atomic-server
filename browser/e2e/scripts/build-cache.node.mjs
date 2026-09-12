@@ -34,6 +34,17 @@ test('cache invalidates product changes and corrupted outputs but permits spec-o
     const versions = ['node-test', 'pnpm-test', 'rustc-test', 'cargo-test'];
     const before = buildKey(root, process.env, versions);
     const wasmBefore = buildKey(root, process.env, versions, 'wasm');
+    const optimizedEnv = { ...process.env, ATOMIC_E2E_CARGO_PROFILE: 'e2e' };
+    const debugEnv = { ...process.env, ATOMIC_E2E_CARGO_PROFILE: 'dev' };
+    assert.notEqual(
+      buildKey(root, optimizedEnv, versions),
+      buildKey(root, debugEnv, versions),
+    );
+    assert.equal(
+      buildKey(root, optimizedEnv, versions, 'wasm'),
+      buildKey(root, debugEnv, versions, 'wasm'),
+    );
+
     writeFileSync(join(root, 'browser/e2e/spec.ts'), '// another test');
     assert.equal(buildKey(root, process.env, versions), before);
     git(['add', '.']);

@@ -82,7 +82,7 @@ if (matrixArg && playwrightArgs.length && !playwrightArgs.includes('--help')) {
 
 if (playwrightArgs.includes('--help')) {
   console.info(
-    'Build and run isolated embedded-server Chromium E2E: pnpm test-e2e:local [Playwright arguments]\nUse --preview for separate-origin Vite preview. Default matches CI at atomic.localhost.\nRequires Cargo, cargo-run-bin/wasm-pack and the wasm32-unknown-unknown target.\nUse --matrix=1,2,4,8,12,2x4 --repeat=5 to compare workers and isolated shards on one build.\nReports, build logs and fresh data are saved under .e2e-runs/. No existing services are stopped.',
+    'Build and run isolated embedded-server Chromium E2E: pnpm test-e2e:local [Playwright arguments]\nUse --preview for separate-origin Vite preview. Default matches CI at atomic.localhost.\nUses the optimized e2e Cargo profile, matching CI; ATOMIC_E2E_CARGO_PROFILE=dev opts into debug.\nRequires Cargo, cargo-run-bin/wasm-pack and the wasm32-unknown-unknown target.\nUse --matrix=1,2,4,8,12,2x4 --repeat=5 to compare workers and isolated shards on one build.\nReports, build logs and fresh data are saved under .e2e-runs/. No existing services are stopped.',
   );
   process.exit(0);
 }
@@ -233,6 +233,7 @@ try {
     PLAYWRIGHT_WORKERS: String(budget.workers),
     PLAYWRIGHT_RETRIES: '0',
     ATOMICSERVER_SKIP_JS_BUILD: 'true',
+    ATOMIC_E2E_CARGO_PROFILE: process.env.ATOMIC_E2E_CARGO_PROFILE ?? 'e2e',
   };
   // Never inherit a stale-artifact opt-out from the invoking shell.
   delete env.SKIP_WASM_BUILD;
@@ -244,7 +245,17 @@ try {
   const browser = join(root, 'browser');
   await run('pnpm', ['install', '--frozen-lockfile'], 'install', browser, env);
   const target = resolvePath(root, env.CARGO_TARGET_DIR ?? 'target');
-  const binary = join(target, 'debug/atomic-server');
+  const profile = env.ATOMIC_E2E_CARGO_PROFILE;
+  if (!['dev', 'e2e', 'release'].includes(profile))
+    throw new Error('ATOMIC_E2E_CARGO_PROFILE must be dev, e2e or release');
+  const binary = join(
+    target,
+    profile === 'dev' ? 'debug' : profile,
+    'atomic-server',
+  );
+  console.log(
+    `Native server profile: ${profile}; immutable build cache is profile-specific`,
+  );
   const cacheCheckStarted = Date.now();
   const key = buildKey(root, env);
   const manifestPath = join(root, '.e2e-runs', 'build-cache.json');
@@ -317,7 +328,7 @@ try {
     });
     await run(
       'cargo',
-      ['build', '--locked', '-p', 'atomic-server'],
+      ['build', '--locked', '--profile', profile, '-p', 'atomic-server'],
       'build-server',
       root,
       env,
@@ -439,6 +450,7 @@ try {
                 deployment: sameOrigin ? 'embedded' : 'preview',
                 cpuThrottle: env.ATOMIC_TEST_CPU_THROTTLE ?? null,
                 clonedSessions: env.ATOMIC_E2E_CLONE_SESSION === '1',
+                cargoProfile: profile,
                 browserPlatformOverride:
                   env.PLAYWRIGHT_HOST_PLATFORM_OVERRIDE ?? null,
                 workers,

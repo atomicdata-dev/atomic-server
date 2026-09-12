@@ -181,3 +181,58 @@ along with offline persistence, second-device load, sign-out/sign-in, documents
 and context menus. Artifacts: .e2e-runs/2026-09-12T05-52-24.721Z-qruJy6.
 The matching Playwright 1.63 noble CI image manifest is available for amd64
 and arm64. Freeze this source for the next complete matrix.
+
+Frozen 815bae28d DEBUG-server eight-worker run: 206 passed, six unexpected
+failures, eight existing skips, zero retries, 12.7m. The four-worker entry was
+interrupted after discovering a major local/CI mismatch: local-e2e still built
+target/debug, while CI atomicService already uses the optimized e2e profile.
+Do not treat these debug-server timings as CI concurrency evidence. Retained
+artifacts: .e2e-runs/2026-09-12T05-55-45.108Z-v7F7OE.
+
+Local default now matches Cargo profile e2e; dev/release remain explicit
+ATOMIC_E2E_CARGO_PROFILE overrides. Cache regression failed before profile-aware
+keys and passes afterwards, preserving WASM reuse across native profiles.
+Profile e2e retains debug assertions and overflow checks. Optimized browser
+validation is pending; the first profile build is a separate one-time cost.
+
+Menu focus now follows visibility in the same reveal callback, but this alone
+did not fix the failure. A focus-call trace reproduced it in all eight parallel
+copies: focusing the menu blurs EditableTitle, whose onCommit callback then
+focuses the first table cell synchronously. Blur now saves without invoking the
+Enter-only focus handoff. Validate the same eight-copy reproduction again. The user
+drives case completed all assertions but used its 60s budget before teardown;
+its own-drive and public-drive journeys now run as independent tests. Date
+filtering still produced a ResizeObserver diagnostic under eight workers; trace
+places it while the open popover anchor text changes, so inspect Radix/Floating
+UI observation next. The website import took 25.142s before root lookup/render.
+Offline-table and late second-user bootstrap failures included transport-level
+408s. Re-evaluate those costs on the optimized server before tuning timeouts.
+
+Optimized e2e-profile focused run: 28 passed, one context-menu focus failure,
+one existing Linux shortcut skip, zero retries, 1.8m. Artifacts:
+.e2e-runs/2026-09-12T06-14-08.241Z-8bEPim. Both split drive journeys and the
+previously failing website/offline-table/second-device selections passed.
+Playwright 1.63 officially supports Ubuntu 26.04; subsequent probes remove the
+old Ubuntu 24 override inherited from the earlier Playwright version.
+
+The first optimized native build took 8m21s, including 89.437s precompression.
+A content-addressed Brotli cache in OUT_DIR now survives replacement of staged
+frontend assets; each hit is decompressed and compared before reuse. Cache
+publication is atomic, and compression honors Cargo NUM_JOBS. Corruption and
+concurrent publication tests passed (2/2) under the optimized e2e profile.
+The initial cache population compressed 67 files in 84.050s with zero hits;
+warm-build timing remains pending.
+
+Observer instrumentation reproduced the remaining date-filter warning in 1/8
+runs and captured Floating UI anchor-size updates during operator changes.
+The filter popover now requests frame-based position tracking; repeated browser
+validation is pending. This is a hypothesis until that reproduction passes.
+
+Post-fix validation: both targeted cases passed (11.6s). The exact menu probe
+changed from 8/8 failures to 8/8 passes at eight workers (26.4s), proving the
+blur focus handoff fix. Filter probe passed 8/8 at two workers (43.6s), including
+strict diagnostics; full eight-worker suite remains the next check.
+Artifacts: .e2e-runs/2026-09-12T06-42-59.446Z-2VqUuC,
+/tmp/e2e-1461-focus-run-wLS7c7 and /tmp/e2e-1461-observer-run-cAKRsg.
+App typecheck, focused lint (existing warnings, zero errors), formatting and
+E2E typecheck passed. Freeze before complete optimized matrix.

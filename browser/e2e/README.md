@@ -79,6 +79,13 @@ ability to request 8 or 12 workers as evidence those settings are reliable.
 The active experiments and caching decisions live in
 [`planning/e2e-concurrency.md`](../../planning/e2e-concurrency.md).
 
+The isolated local runner builds with Cargo's optimized `e2e` profile, matching
+CI while preserving debug assertions and overflow checks. Its first native build
+costs more than a debug build; subsequent runs reuse verified artifacts.
+`ATOMIC_E2E_CARGO_PROFILE=dev` explicitly selects the slower debug server for
+iteration, and `release` selects the production profile. Profile changes
+invalidate the native build cache without invalidating the WASM cache.
+
 ### Cloned-session experiment
 
 `ATOMIC_E2E_CLONE_SESSION=1 PLAYWRIGHT_WORKERS=4 pnpm test-e2e:local dashboard.spec.ts`
