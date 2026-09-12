@@ -3,7 +3,6 @@ import {
   useResource,
   useResourceSnapshot,
   useString,
-  useBoolean,
   useStore,
   Resource,
   urls,
@@ -13,8 +12,9 @@ import {
   dataBrowser,
 } from '@tomic/react';
 import { generateInviteToken } from '@tomic/lib';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Dialog } from './Dialog';
+import { prepareDriveSharing } from '../helpers/managed/prepareDriveSharing';
 import { managedFetch } from '../helpers/managed/api';
 import {
   automaticPeerRoom,
@@ -75,7 +75,6 @@ function InviteFormContent({
   const invite = useResource(subject, {
     newResource: true,
   });
-  const [allowEdits] = useBoolean(invite, server.properties.write);
   const isSaas = !!getManagedPortalUrl();
   const [err, setErr] = useState<Error | undefined>(undefined);
   const [agent] = useCurrentAgent();
@@ -83,8 +82,54 @@ function InviteFormContent({
   const [saved, setSaved] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | undefined>(undefined);
 
+  const [creating, setCreating] = useState(false);
+  const [seats, setSeats] = useState<{
+    drive: string;
+    used?: number;
+    included?: number;
+  }>();
+
+  useEffect(() => {
+    setSeats(undefined);
+    if (!isSaas) return;
+    const controller = new AbortController();
+    const drive = target.hasClasses(server.classes.drive)
+      ? target.subject
+      : store.getDrive();
+    if (!drive) return;
+    void managedFetch(
+      `/billing/subscription?${new URLSearchParams({ drive })}`,
+      {
+        signal: controller.signal,
+      },
+    )
+      .then(async response => {
+        if (!response.ok || response.status === 204) return;
+        const subscription = await response.json();
+        if (
+          controller.signal.aborted ||
+          subscription.plan !== 'server' ||
+          subscription.status === 'canceled'
+        )
+          return;
+        setSeats({
+          drive,
+          used: subscription.editors_used,
+          included: subscription.editors_included,
+        });
+      })
+      .catch(() => {
+        /* Do not imply hosting when billing is unavailable. */
+      });
+
+    return () => controller.abort();
+  }, [isSaas, target, store]);
+
   /** Generates the signed token and constructs the invite URL */
   const createInvite = useCallback(async () => {
+    setCreating(true);
+    setErr(undefined);
+
     try {
       if (!agent) {
         throw new Error('No agent found');
@@ -108,14 +153,10 @@ function InviteFormContent({
         const enrollments = Array.isArray(body) ? body : body.enrollments;
         if (!Array.isArray(enrollments))
           throw new Error('Could not check Cloud Server status. Try again.');
-        browserPeer = !enrollments.some(
-          e => e.drive_subject === target.subject && e.status !== 'Disabled',
-        );
-      }
-
-      if (browserPeer && !store.isLocalOnlyDrive(target.subject)) {
-        throw new Error(
-          'This drive still uses a data server. A complete local copy must be verified before switching it to browser-only sharing. Its existing server connection has been kept.',
+        browserPeer = await prepareDriveSharing(
+          store,
+          target.subject,
+          enrollments,
         );
       }
 
@@ -158,6 +199,8 @@ function InviteFormContent({
       toast.success('Copied to clipboard');
     } catch (e) {
       setErr(e);
+    } finally {
+      setCreating(false);
     }
   }, [invite, agent, target, store, isSaas]);
 
@@ -176,7 +219,11 @@ function InviteFormContent({
     return (
       <InviteFormLayout
         inDialog={inDialog}
-        actions={<Button onClick={createInvite}>Create</Button>}
+        actions={
+          <Button disabled={creating} onClick={createInvite}>
+            {creating ? 'Preparing invite…' : 'Create'}
+          </Button>
+        }
       >
         <Column gap='1rem'>
           <ResourceField
@@ -184,13 +231,19 @@ function InviteFormContent({
             propertyURL={server.properties.write}
             resource={invite}
           />
-          {isSaas && (
-            <p>
-              {allowEdits
-                ? 'Cloud Server: each editor uses one seat on this drive. An existing editor on this drive counts once. Viewers are free.'
-                : 'Browser collaboration is free. Editor seats apply only when this drive uses Cloud Server.'}
-            </p>
-          )}
+          {seats &&
+            seats.drive ===
+              (target.hasClasses(server.classes.drive)
+                ? target.subject
+                : store.getDrive()) && (
+              <p>
+                {Number.isSafeInteger(seats.used) &&
+                Number.isSafeInteger(seats.included)
+                  ? `${Math.max(0, seats.included! - seats.used!)} of ${seats.included} editor seats available on this drive.`
+                  : 'Editor seat availability for this drive is unavailable.'}{' '}
+                Viewers are free.
+              </p>
+            )}
           <ResourceField
             label={'Invite text (optional)'}
             propertyURL={core.properties.description}

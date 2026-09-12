@@ -31,6 +31,8 @@ now live in [`completed/`](./completed/):
 
 ## Active
 
+- [Drive sharing and hosting state](drive-sharing-state.md) — verified transition for unenrolled drives; authoritative seat counts and staging acceptance remain.
+
 Remaining work, not "this file exists."
 
 Cross-repository account recovery: the canonical active plan is
