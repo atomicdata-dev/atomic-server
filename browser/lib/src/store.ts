@@ -4256,8 +4256,13 @@ export class Store {
         .then(() => this.finishScheduledSave());
     }
 
-    // The stored state is gone, so the next write for this subject must not be
-    // mistaken for a duplicate of it.
+    this.evictResource(subjectRaw, shouldNotify);
+  }
+
+  /** Forget an in-memory cache entry without deleting or tombstoning its data. */
+  public evictResource(subjectRaw: string, shouldNotify = true): void {
+    const resolved = this.resolveSubject(subjectRaw);
+    // A subsequently loaded resource must not inherit the old cache stamp.
     this.lastPersistedStamp.delete(resolved);
 
     if (this.resources.delete(resolved)) {

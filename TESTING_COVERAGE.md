@@ -15,6 +15,18 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## E2E isolation and performance harness (#1461)
 
+`search.test.ts` verifies search-cache invalidation only evicts memory entries,
+without deleting persisted resources or adding pending database writes.
+
+`bootstrap.test.ts` verifies website language properties are ready from bundled
+definitions without fetching atomicdata.dev. The discussion badge test uses the
+shared reconnecting reload helper before asserting device-local unseen state.
+
+A live Dagger service probe confirmed identical definitions share a process,
+while a per-instance runtime environment variable starts a distinct process.
+Shards now vary runtime identity while sharing binary builds. This probe does
+not establish full Dagger E2E acceptance or a supported worker count.
+
 `loro-selection.test.ts` checks cursor preservation across a remote metadata
 update followed by keystrokes before and after queued timers. The scoped
 loro-prosemirror 0.4.3 patch restores document and selection atomically.
@@ -29,16 +41,14 @@ Enter retains its explicit handoff into page content.
 `node --experimental-strip-types --test browser/e2e/scripts/*.node.mjs`
 checks process-group ownership with concurrent real HTTP servers, ephemeral
 ports, unrelated-service preservation, startup failure and worker disconnect
-cleanup. It also checks hardware budget validation, build-cache invalidation
-(product/untracked inputs, environment and artifact changes), and rejects
-acceptance summaries with missing executions, failures, retries or dirty sources.
-`browser/e2e` typecheck includes the process fixture and load reporter.
-The harness tests also run through the e2e package's `test` script in the normal
-recursive JS test job; they need Node and Git, not Rust or a browser install.
+cleanup. Additional Node checks cover hardware budgets and checkout locking.
+These run through the E2E package test script in recursive JS tests.
+Playwright provides accounting, reports and step timings. Custom build caches,
+host sampling and matrix-acceptance scripts were removed to simplify maintenance.
 `node --experimental-strip-types --test scripts/e2e-budget.test.mjs` validates
-CI overrides without mutating the profile or its coverage selection.
-`initClientDb.handoff.test.ts` checks that dev-drive can defer anonymous startup
-while still attaching the fresh identity, alongside the identity-handoff guard.
+CI overrides without mutating the profile or coverage selection.
+`initClientDb.handoff.test.ts` checks the deferred anonymous startup and identity
+handoff guard.
 The ontology E2E test gates an earlier instance save's completion while the next
 form is open, catching stale cleanup that empties the new form.
 The existing browser diagnostic/failure-state tests cover bounded retained
@@ -933,6 +943,12 @@ Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI t
 `helpers/managed/vaultAutoBackup.test.ts` verifies successful vault restoration preserves known node absence as local-only routing, while transport failures and failed restores do not disable node sync. Paired SaaS second-browser coverage verifies the original profile and vault-only canary after restore, with bounded pre-restore refusal diagnostics.
 
 Paired SaaS `portal/e2e/identity-reconcile.spec.ts` exercises dev-drive creation while a managed account is active: reconciliation waits until the temporary identity has a drive, and creation must not enroll it in the account.
+
+Session restore routing: `helpers/managed/reconcile.test.ts` covers connecting the
+exact hosted drive before availability checks, clearing local-only routing,
+skipping Pending/Disabled placements and other drives, and ignoring discovery
+that completes after its deadline. Staging phone restore latency and end-to-end
+WebSocket query delivery remain unverified.
 
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
 responses open to verify concurrent downloads are bounded at four and that

@@ -2,7 +2,6 @@ import { test, expect } from './fixtures';
 import {
   before,
   currentDriveTitle,
-  devDrive,
   getCurrentSubject,
   makeDrivePublic,
   newResource,
@@ -17,9 +16,8 @@ test.describe('drive deep link', () => {
     'opening a share link to a NON-DRIVE child resource adopts the PARENT drive as the session drive',
     smoke,
     async ({ page, browser }) => {
-      // Context 1: create a dev drive and make it publicly readable so an
-      // anonymous session can resolve it and its contents.
-      await devDrive(page);
+      // before() created this context's drive; make it publicly readable so
+      // an anonymous session can resolve it and its contents.
       const driveSubject = await getCurrentSubject(page);
       const driveTitle = await currentDriveTitle(page).textContent();
       expect(driveTitle).toBeTruthy();
@@ -78,9 +76,8 @@ test.describe('drive deep link', () => {
     page,
     browser,
   }) => {
-    // Context 1: create a dev drive and make it publicly readable so an
-    // anonymous session can resolve it.
-    await devDrive(page);
+    // before() created this context's drive; make it publicly readable so
+    // an anonymous session can resolve it.
     const driveSubject = await getCurrentSubject(page);
     const driveTitle = await currentDriveTitle(page).textContent();
     expect(driveTitle).toBeTruthy();

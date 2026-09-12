@@ -20,6 +20,7 @@ import {
   FRONTEND_URL,
   getCurrentSubject,
   newResource,
+  reloadReconnected,
 } from './test-utils';
 
 const COMMENTS = ['First comment!', 'Second comment!'] as const;
@@ -92,7 +93,7 @@ test.describe('discussion comments', () => {
     await page.evaluate(() =>
       window.localStorage.removeItem('atomic.comments.lastSeen'),
     );
-    await page.reload();
+    await reloadReconnected(page);
     const badgeAfterReload = page.getByTestId('comment-count-badge');
     await expect(badgeAfterReload).toBeVisible({ timeout: 15000 });
     await expect(badgeAfterReload).toHaveAttribute('data-unseen', '');

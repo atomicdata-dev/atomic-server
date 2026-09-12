@@ -15,8 +15,8 @@ establish supported concurrency.
 Initial audit: before() creates fresh agents/drives, normal browser contexts have
 separate storage, and the common fixture closes extra contexts. Template tests
 instead share /tmp/atomic-data-template-tests and kill owners of fixed ports.
-The local runner builds once per invocation but forces one worker. CI already
-isolates one server per shard; its aggregate browser budget is eight on Mancave.
+The local runner builds once per invocation but forces one worker. CI intends one server per shard; its aggregate browser budget is eight on Mancave.
+The follow-up Dagger probe below found that identical definitions were deduplicated.
 
 Measurement host: Mancave WSL2 reports 24 logical CPUs and 31 GiB RAM (not the
 64 GiB described by older comments). The Mac has about 20 GiB used swap and
@@ -267,3 +267,124 @@ The cursor regression passes on Linux with Node WASM, and app typecheck passes.
 User asked for maximum parallel throughput on Mancave: prioritize full runs at
 12, 16 and 24 workers, then compare eight, while retaining failures alongside
 timings. No fastest reliable setting has been established yet.
+
+
+## Follow-up after merging #1463
+
+- [x] Merge the first improvements into develop (#1463, 3ac7aefe5).
+- [x] Correct the library test formatting that stopped merged CI (#1464).
+  Actual library, data-browser and E2E package format-check commands all pass.
+- [x] Reproduce Dagger service deduplication with live containers on Mancave.
+- [x] Give each shard a distinct runtime graph and hostname while sharing the
+  binary build; expose cloned profiles through an explicit Dagger CLI argument.
+- [ ] Validate the changed Dagger path with the actual E2E suite.
+- [ ] Complete the maximum-worker matrix and repeated acceptance above.
+
+The live Dagger probe bound the same service definition twice and a third with
+an instance environment variable. The first two endpoints returned the same
+process-start UUID; the third returned a different UUID. This confirms the old
+shard setup shared writable server state. The fix varies the runtime only, using
+the existing run nonce plus shard index. Browser-facing service aliases remain
+`atomic`. Evidence: Mancave /tmp/e2e-1461-service-proof.log.
+
+`ci` and `end-to-end` now expose `--playwright-clone-sessions`; schema/help loading
+passes. The default stays false until full-suite acceptance. Worker and retry
+defaults also stay unchanged. Mancave's runner service is active. The earlier
+12-worker run was interrupted for the requested merge before completing and is
+not a valid performance result. No maximum reliable worker count is established.
+
+
+## Harness simplification
+
+User requested less permanent harness complexity. Earlier measurements remain
+historical evidence; retained artifacts are not deleted.
+
+- [x] Replace local matrix scheduling with one stack and Playwright arguments.
+- [x] Remove custom build hashes, host reporter and acceptance summarizer.
+- [x] Keep process ownership, checkout locking, fresh data and private binaries.
+- [x] Document explicit --skip-build and native reports/shell-loop comparisons.
+- [x] Verify the simplified launcher with a real server/browser and Node checks.
+
+Local builds use normal Cargo/pnpm behavior. --skip-build explicitly reuses
+artifacts without claiming freshness. Dagger owns container caching and isolated
+server shards. Deleted benchmark helpers remain available in Git history.
+
+Refactor validation: all eight remaining Node harness checks pass; E2E typecheck,
+lint and formatting pass (existing lint warnings remain). The simplified launcher
+ran all seven dashboard tests with two workers and zero retries in 1.3 minutes,
+using the existing optimized binary through explicit --skip-build. This validates
+launcher/reporting/teardown, not a rebuilt full-suite acceptance result.
+Artifacts: Mancave .e2e-runs/2026-09-12T08-40-34.904Z-VO9ZNy.
+Both rebuilt launcher paths were subsequently validated as recorded below.
+
+
+Merge validation: both rebuilt launcher paths pass their dashboard smoke case:
+preview 6.4s (.e2e-runs/2026-09-12T08-47-06.245Z-Vq0M0u), embedded 8.6s
+(.e2e-runs/2026-09-12T08-54-28.885Z-VDTlpU). Builds ran without --skip-build;
+dependency/compiler caches were retained. The full Dagger run exposed a startup
+failure: custom nonce hostnames plus Dagger DNS suffix exceeded the runtime's
+hostname limit. Shards now use Dagger-generated names and retain the stable
+consumer alias. Runtime identity still prevents service deduplication.
+
+
+Full Dagger validation on adb66378b failed three tests: both generated templates
+blocked on the unbundled i18n language property, and the discussion test asserted
+its badge while the post-reload app was still on the startup splash. A bootstrap
+unit reproducer fails before bundling i18n.json and passes after (3/3 tests);
+app typecheck passes. Discussion alone passed five times (39.4s, two workers),
+then was updated to the existing reloadReconnected helper so the badge's unchanged
+15-second assertion starts after reconnect. Full Dagger rerun is required.
+
+
+The ec38a1d37 full Dagger run (four isolated servers, two workers each, cloned
+sessions enabled, zero retries) completed with 212 passed, six failed and eight
+skipped. Failures: canvas and deep-link total test timeouts, a saved-drive reload
+leader-election warning, server-only initial SUB/SYNC refusals, and both template
+sync waits. The canvas and deep-link specs redundantly created another agent and
+drive after their shared before hook; those extra calls are removed. Failure
+snapshots now include scheduled saves as well as dirty/in-flight resources.
+
+A rebuilt native run at two workers passed all 20 selected canvas, deep-link,
+saved-drive, server-only, website and table-template tests in 3.6m, zero retries.
+Canvas also passed eight focused repetitions before this run. The other failures
+did not reproduce at this load; they are not claimed fixed. Artifacts: Mancave
+.e2e-runs/2026-09-12T09-44-09.837Z-PqfUko. Eight Node harness checks and E2E
+typecheck pass. Another complete Dagger run remains necessary before merge.
+
+
+Full Dagger on 2a9e9d369 completed with 216 passed, two failed and eight skipped.
+Only Next/Svelte template sync waits failed; all other prior failures passed.
+Expanded snapshots showed no scheduled or saving resources, despite two pending
+writes: search-cache invalidation used the persistent deletion path. A unit
+regression fails on that unwanted database call. Search invalidation now uses
+explicit memory eviction; real deletion retains its ClientDb tombstone path.
+The search/store selection passes 35/35. Full Dagger validation remains pending.
+
+Next caching improvement: jsBuild mounts all browser sources before its build,
+so E2E-only edits also invalidate the frontend build and embedded server link.
+Separate test inputs from build inputs after the current merge validation.
+
+
+Full Dagger on 645e8ec31 confirmed both generated sites pass after cache eviction:
+217 passed, one failed, eight skipped. The remaining offline-sync diagnostic came
+from disconnecting while the online setup commit was still pending; the test
+previously relied on the optimistic sidebar title. It now waits for synced setup
+before disconnecting. Six focused repetitions pass in 46.2s, two workers, zero
+retries, using the existing native binary (test-only validation). Artifacts:
+.e2e-runs/2026-09-12T10-30-56.686Z-0uaEUs. E2E typecheck passes.
+
+GitHub CI passed on 645e8ec31. Full Dagger on 5b648d48e still failed at eight
+workers: cloned sessions had 216 passed, two failed, eight skipped; fresh
+sessions had 211 passed, seven failed, eight skipped. Neither establishes a
+reliable eight-worker budget. Keep cloning opt-in and the concurrency acceptance
+open. The fresh run's slowest shard took 19.4m; busy eight-worker samples used
+about 20 logical CPUs and 15 GiB RAM. These are samples, not causal attribution.
+
+The full hosted-budget comparison (two shards, one worker each, fresh sessions,
+zero retries) exposed a table selection race on 5b648d48e. Trace snapshots show
+rowA at aria-rowindex 3 while aria-busy=true, then at index 2 after loading.
+The test clicked before the collection finished sorting, leaving focus on rowB
+at the selected position. Use the existing waitForGridMounted after reload before
+selecting the row. Keyboard assertions and timeouts are unchanged. E2E typecheck
+passes; focused browser validation and the complete comparison remain pending.
+Trace: Mancave /tmp/e2e-1465-shift-enter-trace.zip.

@@ -180,8 +180,8 @@ function condenseErrorContext(body: string): string {
 const HOST_PROFILES: Record<HostProfile, HostKnobs> = {
   // 4 shards × 2 workers ≈ 8 browsers. `ci()` runs endToEnd concurrently with
   // clippy/nextest/flutter/vitest, so the box carries those browsers AND their
-  // four debug atomic-servers AND cargoBuildJobs=8 AND a 6-wide nextest at the
-  // same time. At 3 workers that was 12 browsers on 12 cores and the suite
+  // four optimized atomic-servers AND cargoBuildJobs=8 AND a 6-wide nextest at the
+  // same time. Earlier 3-worker runs produced 12 browsers and the suite
   // failed accordingly — including a chromium killed outright ("Target page,
   // context or browser has been closed"), which is starvation, not a race.
   // Raise this only alongside the cargo/nextest widths it shares the host with.
@@ -249,6 +249,7 @@ export class AtomicServer {
   /** Playwright-only knobs for the in-flight `endToEnd` run. Isolated from
    *  `hostKnobs` so a light E2E job cannot change nextest width mid-`ci()`. */
   private e2eRun: E2eRunKnobs = e2eRunKnobs('hosted', 'full');
+  private e2eCloneSessions = false;
 
   constructor(
     @argument({
@@ -448,6 +449,8 @@ export class AtomicServer {
     @argument() playwrightShards: number = 0,
     /** -1 keeps the host profile; 0 exposes failures without retrying. */
     @argument() playwrightRetries: number = -1,
+    /** Reuse closed worker profiles for eligible drive-scoped specs. */
+    @argument() playwrightCloneSessions: boolean = false,
   ): Promise<string> {
     this.hostProfile = resolveHostProfile(hostProfile);
     this.hostKnobs = HOST_PROFILES[this.hostProfile];
@@ -474,6 +477,7 @@ export class AtomicServer {
         playwrightWorkers,
         playwrightShards,
         playwrightRetries,
+        playwrightCloneSessions,
       ),
       this.jsTest(),
       this.jsTestIntegration(),
@@ -1575,7 +1579,16 @@ export class AtomicServer {
 
   @func()
   /** Returns a Service running atomic-server for use in tests */
-  atomicService(@argument() e2e: boolean = false): Service {
+  atomicService(
+    @argument() e2e: boolean = false,
+    /** Distinct service state for an E2E shard; empty keeps the default service. */
+    @argument() instance: string = '',
+  ): Service {
+    if (instance && !/^[a-z0-9-]{1,48}$/.test(instance)) {
+      throw new Error(
+        'Service instance must use 1-48 lowercase letters, digits or hyphens',
+      );
+    }
     // E2E builds with the `e2e` cargo profile (workspace Cargo.toml): a debug
     // server costs ~7x per commit round-trip, and four of them run alongside
     // eight browsers, so the slowness lands as timing failures. Full
@@ -1588,23 +1601,26 @@ export class AtomicServer {
       e2e,
     ).file('/atomic-server-binary');
 
-    return (
-      dag
-        .container()
-        .from('alpine:latest')
-        .withFile('/atomic-server-bin', atomicServerBinary, {
-          permissions: 0o755,
-        })
-        .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
-        // First-run flag — sets up the bootstrap agent + public drive +
-        // /app/dev-drive endpoint that the e2e tests' `beforeEach` relies on.
-        // Without this, every test's `before()` hook times out fetching it.
-        .withEnvVariable('ATOMIC_INITIALIZE', 'true')
-        .withExposedPort(9883)
-        .withEntrypoint(['/atomic-server-bin'])
-        .asService()
-        .withHostname(ATOMIC_DOMAIN)
-    );
+    let runtime = dag
+      .container()
+      .from('alpine:latest')
+      .withFile('/atomic-server-bin', atomicServerBinary, {
+        permissions: 0o755,
+      })
+      .withEnvVariable('ATOMIC_DOMAIN', ATOMIC_DOMAIN)
+      .withEnvVariable('ATOMIC_INITIALIZE', 'true')
+      .withExposedPort(9883)
+      .withEntrypoint(['/atomic-server-bin']);
+
+    // Dagger deduplicates identical services, including their writable state.
+    // Vary only the runtime graph: every shard still shares the binary build.
+    if (instance)
+      runtime = runtime.withEnvVariable('E2E_SERVICE_INSTANCE', instance);
+
+    const service = runtime.asService();
+    // Dagger appends its own DNS suffix. Let it generate short unique names
+    // for shards; their consumers still bind the stable `atomic` alias.
+    return instance ? service : service.withHostname(ATOMIC_DOMAIN);
   }
 
   /**
@@ -1642,6 +1658,10 @@ export class AtomicServer {
     // `pnpm install` — see git history for ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
     return playwrightContainer
       .withEnvVariable('CI', 'true')
+      .withEnvVariable(
+        'ATOMIC_E2E_CLONE_SESSION',
+        this.e2eCloneSessions ? '1' : '0',
+      )
       // Playwright-run knobs — see `e2eRunKnobs` / `--playwright-mode`. Isolated
       // from `hostKnobs` so a light suite does not change nextest width.
       .withEnvVariable(
@@ -1717,7 +1737,10 @@ export class AtomicServer {
     const shardCount = this.e2eRun.shardCount;
 
     return base
-      .withServiceBinding('atomic', this.atomicService(true))
+      .withServiceBinding(
+        'atomic',
+        this.atomicService(true, `${this.e2eRunNonce}-${shardIndex}`),
+      )
       .withExec([
         'sh',
         '-c',
@@ -1754,10 +1777,13 @@ export class AtomicServer {
     @argument() playwrightShards: number = 0,
     /** -1 keeps the host profile; 0 exposes failures without retrying. */
     @argument() playwrightRetries: number = -1,
+    /** Reuse closed worker profiles for eligible drive-scoped specs. */
+    @argument() playwrightCloneSessions: boolean = false,
   ): Promise<string> {
+    this.e2eCloneSessions = playwrightCloneSessions;
     // Shards × own atomic-server. Count comes from `--host-profile`
     // (Mancave hot / hosted conservative) plus `--playwright-mode` (light uses
-    // fewer shards). Dagger dedupes the shared debug `rustBuild(e2e)` /
+    // fewer shards). Dagger dedupes the shared optimized `rustBuild(e2e)` /
     // base-container graph.
     this.e2eRun = overrideE2eBudget(
       e2eRunKnobs(this.hostProfile, resolveE2eMode(playwrightMode)),
@@ -1766,7 +1792,7 @@ export class AtomicServer {
       playwrightRetries,
     );
     console.info(
-      `E2E budget: ${this.e2eRun.shardCount} shards x ${this.e2eRun.workers} workers = ${this.e2eRun.shardCount * Number(this.e2eRun.workers)} browser workers; retries=${this.e2eRun.retries}; concurrent CI cargo jobs=${this.hostKnobs.cargoBuildJobs}, nextest threads=${this.hostKnobs.nextestTestThreads}. JS/Flutter jobs also share this host.`,
+      `E2E budget: ${this.e2eRun.shardCount} shards x ${this.e2eRun.workers} workers = ${this.e2eRun.shardCount * Number(this.e2eRun.workers)} browser workers; retries=${this.e2eRun.retries}; cloned profiles=${this.e2eCloneSessions}; concurrent CI cargo jobs=${this.hostKnobs.cargoBuildJobs}, nextest threads=${this.hostKnobs.nextestTestThreads}. JS/Flutter jobs also share this host.`,
     );
     const shardCount = this.e2eRun.shardCount;
     const base = this.e2eBaseContainer();

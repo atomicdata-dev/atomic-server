@@ -494,7 +494,9 @@ test.describe('tables', async () => {
     // Reload so the rows are collection members (positional insert targets
     // persisted rows; this-session virtual rows always append at the bottom).
     await page.reload();
-    await expect(page.getByTestId('editable-title').first()).toBeVisible();
+    // Cached rows can be visible in a different order while the collection
+    // reloads. Wait for aria-busy to clear before selecting a row position.
+    await waitForGridMounted(page);
     await expect(page.getByText('rowA', { exact: true })).toBeVisible({
       timeout: 15000,
     });

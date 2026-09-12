@@ -252,6 +252,10 @@ test.describe('sync', () => {
       timeout: 15000,
     });
 
+    // The sidebar updates optimistically; finish the online setup's saves
+    // before disconnecting so this test isolates edits made while offline.
+    await waitForSynced(page);
+
     // 2. Go offline using Playwright's network control + close the WS
     // directly. `setOffline(true)` blocks new connections but doesn't tear
     // down the open one, so the store's `serverConnected` flag won't flip

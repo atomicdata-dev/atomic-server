@@ -57,7 +57,6 @@ const config: PlaywrightTestConfig = {
     },
   },
   reporter: [
-    ['./scripts/load-reporter.ts'],
     [
       'html',
       {

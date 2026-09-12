@@ -17,6 +17,7 @@ export async function collectFailureState(page: Page): Promise<unknown> {
         r.subject === subject ||
         r.hasUnsavedChanges() ||
         r.isSaving ||
+        store.getSaveState(r).scheduledCount > 0 ||
         r.error ||
         r.commitError,
     );
