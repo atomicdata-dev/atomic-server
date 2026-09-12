@@ -824,3 +824,8 @@ import/export, shared schema IDs, initial identity signup, physical mobile brows
 - Demo speaker attribution: `browser/data-browser/src/chunks/Demo/messageSpeaker.test.ts` covers local persona display and rejection outside the demo, without overriding verified creator metadata.
 
 Template adoption: `keepTemplateDemo.test.ts` covers retaining graph identity, saved-drive registration, failed-save retry preservation, and expired-preview rejection. `drive-template-onboarding.spec.ts` covers the keep-edits and fresh-template UI choices.
+
+Onboarding dialog feedback: the authorization/invite and chatroom cases in
+`e2e.spec.ts` verify Continue remains clickable while feedback is offered.
+`onboarding-storage.spec.ts` checks feedback availability;
+`drive-template-onboarding.spec.ts` checks mobile creation and dismissal.

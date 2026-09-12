@@ -1,4 +1,4 @@
-import { OnboardingFeedback } from '../OnboardingFeedback';
+import { FeedbackMenuItem } from '../SideBar/FeedbackMenuItem';
 import { useRootWelcomeLayout } from '../../context/RootWelcomeLayoutContext';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -237,7 +237,9 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             )}
             {children}
             {show && rootWelcomeChromeHidden && !hideOnboardingFeedback && (
-              <OnboardingFeedback />
+              <DialogFeedback>
+                <FeedbackMenuItem floating />
+              </DialogFeedback>
             )}
           </DropdownContainer>
         </PopoverContainer>
@@ -274,6 +276,13 @@ export const DialogActions: DialogSlotComponent = ({ children, ...props }) => (
 Dialog.Title = DialogTitle;
 Dialog.Content = DialogContent;
 Dialog.Actions = DialogActions;
+
+// Keep feedback in layout: transformed dialogs establish a containing block
+// for fixed descendants, which otherwise overlap the primary footer action.
+const DialogFeedback = styled.div`
+  grid-column: 1 / -1;
+  justify-self: end;
+`;
 
 const CloseButtonSlot = styled(Slot)`
   align-self: center;
