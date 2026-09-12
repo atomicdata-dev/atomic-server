@@ -36,6 +36,12 @@ const TOUCH_WORKSPACE_SOURCES = [
 const NODE_IMAGE = 'node:22';
 const RUST_IMAGE = 'rust:bookworm';
 
+// Pin the tools and their published dependency locks. Unlocked linkcheck
+// installation picked up jiff 0.2.36, whose packaged doc includes are broken.
+const INSTALL_DOCS_TOOLS =
+  'cargo install mdbook --version 0.5.4 --locked --quiet && ' +
+  'cargo install mdbook-linkcheck --version 0.7.7 --locked --quiet';
+
 // Must match `@playwright/test` in `browser/e2e/package.json`.
 //
 // The image bakes in the browser builds its own Playwright wants, and each
@@ -350,7 +356,8 @@ export class AtomicServer {
           'echo "=== mdbook install ===" && ' +
             'if [ -x /opt/cargo-bin/bin/mdbook ] && [ -x /opt/cargo-bin/bin/mdbook-linkcheck ]; then echo "cache_hit=1"; fi && ' +
             'START=$(date +%s) && ' +
-            'cargo install mdbook mdbook-linkcheck --quiet && ' +
+            INSTALL_DOCS_TOOLS +
+            ' && ' +
             'END=$(date +%s) && ' +
             'echo "elapsed_s=$((END-START))" && ' +
             'mdbook --version && mdbook-linkcheck --version',
@@ -965,7 +972,7 @@ export class AtomicServer {
         .withExec([
           'sh',
           '-c',
-          'cargo install mdbook mdbook-linkcheck --quiet && mdbook build',
+          INSTALL_DOCS_TOOLS + ' && mdbook build',
         ])
         .directory('/docs/build')
     );
