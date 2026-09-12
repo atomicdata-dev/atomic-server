@@ -601,23 +601,15 @@ export class AtomicServer {
         dag.container().from(RUST_IMAGE),
         CARGO_HOME_BOOKWORM,
       )
-        // Cache `cargo install`-built binaries (wasm-pack here). Without
-        // this, each CI run recompiled wasm-pack from source (~2 min).
-        // Routed through `CARGO_INSTALL_ROOT` to a non-default path so
-        // the cache mount can't hide the rust image's preinstalled
-        // \`cargo\`/\`rustc\` at \`/usr/local/cargo/bin\`. Adding the
-        // install root's \`bin\` to \`PATH\` makes \`wasm-pack\` resolvable.
-        // \`cargo install\` no-ops when the latest version is already
-        // present.
-        .withMountedCache('/opt/cargo-bin', dag.cacheVolume('cargo-bin'), {
-          // Shared so wasm-pack and mdbook installs can proceed in parallel.
-          sharing: CacheSharingMode.Shared,
-        })
-        .withEnvVariable('CARGO_INSTALL_ROOT', '/opt/cargo-bin')
-        .withEnvVariable(
-          'PATH',
-          '/opt/cargo-bin/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+        // Use the pinned upstream executable instead of compiling wasm-pack
+        // on every cold runner. Install before source inputs so Rust edits
+        // cannot invalidate this layer; no mutable volume hides the binary.
+        .withFile(
+          '/tmp/install-wasm-pack.sh',
+          this.source.file('.dagger/scripts/install-wasm-pack.sh'),
         )
+        .withExec(['sh', '/tmp/install-wasm-pack.sh'])
+        .withoutFile('/tmp/install-wasm-pack.sh')
         .withFile('/code/Cargo.toml', this.source.file('Cargo.toml'))
         .withFile('/code/Cargo.lock', this.source.file('Cargo.lock'))
         // wasm-pack runs `cargo metadata` which validates every workspace
@@ -637,29 +629,17 @@ export class AtomicServer {
           this.source.directory('atomic-plugin'),
         )
         .withDirectory('/code/tools', this.source.directory('tools'))
-        .withMountedCache('/code/target', dag.cacheVolume('rust-wasm-target-v3'))
+        .withMountedCache(
+          '/code/target',
+          dag.cacheVolume('rust-wasm-target-v3'),
+        )
         .withExec(TOUCH_WORKSPACE_SOURCES)
         .withWorkdir('/code/wasm')
-        // Install + build in a single exec so the install is part of the
-        // build step's own cache key. Splitting them lets dagger cache the
-        // `cargo install` step as "already ran" while the mounted
-        // `cargo-bin` cache volume can be cleared by the engine (e.g. after
-        // a restart with `Locked` sharing), leaving wasm-pack missing from
-        // PATH on replay ("executable file not found in $PATH"). Bundling
-        // makes any cache hit imply the binary is present too; `cargo
-        // install` no-ops when the binary is current.
-        //
-        // `CARGO_ENCODED_RUSTFLAGS` is exported INLINE so it only applies
-        // to the wasm-pack build. Setting it at container scope leaks into
-        // `cargo install wasm-pack` (which compiles wasm-pack for the host
-        // triple, not wasm32) and trips getrandom's
-        //   "wasm_js backend can be enabled only for OS-less WASM targets!"
-        // compile_error. The `\x1f` is the encoded-rustflags arg separator.
+        // The encoded-rustflags separator applies only to the WASM build.
         .withExec([
           'sh',
           '-c',
-          'cargo install wasm-pack --quiet && ' +
-            'CARGO_ENCODED_RUSTFLAGS=\'--cfg\x1fgetrandom_backend="wasm_js"\' ' +
+          'CARGO_ENCODED_RUSTFLAGS=\'--cfg\x1fgetrandom_backend="wasm_js"\' ' +
             'wasm-pack build --target web --out-dir pkg',
         ])
         .directory('/code/wasm/pkg')
