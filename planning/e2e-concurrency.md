@@ -388,3 +388,71 @@ at the selected position. Use the existing waitForGridMounted after reload befor
 selecting the row. Keyboard assertions and timeouts are unchanged. E2E typecheck
 passes; focused browser validation and the complete comparison remain pending.
 Trace: Mancave /tmp/e2e-1465-shift-enter-trace.zip.
+
+## Refactor merged: final validation
+
+PR #1465 merged into develop as a608c3308 on 2026-09-12. Final PR head
+e4b8b2570 passed GitHub CI run 34691447496. The complete rebuilt Chromium suite
+on Mancave passed 218 tests with eight existing skips and zero retries, using
+two isolated shards with one worker each and fresh sessions. Both shard exit
+codes were zero; durations were 27.9m and 21.9m, excluding the rebuild.
+Reports and exit codes: Mancave .e2e-runs/dagger-e4b8b2570-hosted/.
+The local wrapper's optional upload failed because the invocation supplied a
+placeholder report token instead of an empty token; test results are separate.
+Future local Dagger runs should supply an empty report token when not uploading.
+
+The corrected positional-insertion spec passed six focused repetitions in
+41.9s with two workers and zero retries, reusing the existing native binary.
+A temporary merge with develop ff545134d passed 109 targeted bootstrap, vault,
+reconciliation, search, store and collection tests. Its tree matches the actual
+merge commit; the full E2E run above tested the PR head. The temporary checkout
+was removed after validation.
+
+Remaining work: separate E2E sources from Dagger build inputs, profile repeated
+ClientDb persistence/initialization, and establish repeatable worker budgets.
+Eight-worker reliability and the full acceptance matrix remain open in #1461.
+
+## Performance follow-up: codex/e2e-performance-1461
+
+- [x] Start an isolated branch from merged develop and preserve final validation.
+- [x] Extract step timings from retained native Playwright reports: 186 fresh
+  setups accumulated 1040.9s. Nested step totals overlap and must not be summed.
+- [x] Measure two shards x two workers with cloned sessions, zero retries.
+  First complete run on f9162c3a0: 218 passed, eight existing skips, no retries;
+  shards took 12.1m and 12.9m. Dagger exited zero. Build time is separate.
+  Reports: Mancave `.e2e-runs/four-cloned-1/{2473,2475}/`.
+  This is one successful run, not repeatability acceptance.
+- [x] Verify E2E-only changes reuse the frontend/embedded-server build. Keep the
+  E2E workspace manifest in build inputs, but mount specs only in test consumers.
+  Reuse the E2E frontend build for both server assets and test workspace packages.
+- [x] Repeat the candidate before considering CI defaults. The repeat failed;
+  defaults remain unchanged and concurrency acceptance remains open.
+
+The first cache probe disproved the initial directory-removal approach: a
+comment-only spec edit rebuilt the frontend and embedded server. Testing a
+copy-time exclusion instead; keep this failed probe in the evidence.
+
+Filtering the browser snapshot and normalizing timestamps passes the spec-only
+mutation probe: frontend and Rust build execs are cached, and the embedded
+server digest stays `b988095c5ae7e117ce3b5369372b3fbe925c36e78fdbd67be3ec3fed132e60ad`.
+Logs: Mancave `/tmp/e2e-cache-final-{baseline,probe}.log`. Temporary spec edits
+were restored. The manifest remains an installation input; lint uses full sources.
+
+Final implementation 6c64e0ec1, repeat with the same four-worker configuration:
+217 passed, one failed, eight existing skips, zero retries. Shards: 12.0m and
+12.9m; complete warm-cache Dagger invocation: 828 seconds (13m48s). Exit codes
+0 and 1. Reports: Mancave `.e2e-runs/four-cloned-2/{3199,3201}/`.
+The pairing-dialog browser/device gate test opened Sync in browser mode, then
+stayed on the splash screen after injecting the simulated Tauri environment and
+reloading. Its unchanged 10-second heading assertion failed. Root cause is not
+established; do not dismiss it as contention or increase the timeout. Trace:
+`.e2e-runs/four-cloned-2/e2e-performance-pairing-trace.zip` on Mancave.
+
+The first successful run and failed repeat establish promising speed, not a
+supported four-worker default. Keep #1461 open. Next work: reproduce the pairing
+reload stall, then complete the fixed-commit reliability matrix under recorded
+host load. Fresh initialization remains a large cost: the first run's clone
+shard had 56 cloned setups (median 3.716s) and 36 fresh setups (median 7.16s),
+while the other shard had 94 fresh setups totaling 636.8s. These are different
+test populations, not a controlled causal comparison. Keep authentication,
+account, personal-drive and cold-storage contracts on fresh contexts.

@@ -990,8 +990,11 @@ export class AtomicServer {
   }
 
   /** Installed workspace sources; deliberately has no build or WASM dependency. */
-  private jsSource(): Container {
+  private jsSource(buildOnly: boolean = false): Container {
     const browser = this.source.directory('browser');
+    // Keep the workspace manifest for installation, but don't let a spec edit
+    // invalidate the frontend build (and the server embedding its assets).
+    // Test consumers mount the complete E2E directory separately.
     // Create a container with PNPM installed
     const pnpmContainer = dag
       .container()
@@ -1040,7 +1043,14 @@ export class AtomicServer {
     // from data-browser/src to filesystem /lib if /app is only browser — do not mount there
     // (it overwrites OS /lib). Mount alongside browser and resolve via alias in vite.config.
     const sourceContainer = workspaceContainer
-      .withDirectory('/app', browser)
+      .withDirectory(
+        '/app',
+        // Normalize metadata too: excluded spec edits otherwise missed the
+        // frontend exec cache in the Mancave spec-only mutation probe.
+        buildOnly
+          ? browser.filter({ exclude: ['e2e'] }).withTimestamps(0)
+          : browser,
+      )
       .withDirectory('/app/lib-defaults', this.source.directory('lib/defaults'))
       // data-browser imports the repo-root logo from `../../../../logo.svg`
       // and `../../../../../logo.svg`. Browser mount sits at /app, so those
@@ -1070,7 +1080,7 @@ export class AtomicServer {
   @func()
   private jsBuild(e2e: boolean = false): Container {
     // Only builds depend on WASM. Static lint must not wait for Rust compilation.
-    let buildContainer = this.jsSource()
+    let buildContainer = this.jsSource(true)
       .withDirectory('/app/data-browser/public/wasm', this.wasmBuild())
       .withEnvVariable('SKIP_WASM_BUILD', '1');
 
@@ -1616,7 +1626,7 @@ export class AtomicServer {
   private e2eBaseContainer(): Container {
     // Workspace deps only — SPA assets come from `atomicService(true)` →
     // `rustBuild(..., e2e=true)` → `jsBuild(true)`.
-    const browserContainer = this.jsBuild();
+    const browserContainer = this.jsBuild(true);
 
     // Reuses the npm-global volume so `netlify-cli` isn't re-downloaded when
     // docs deploy already warmed it.
