@@ -83,7 +83,7 @@ function isRunning(phase: Phase): boolean {
 
 /**
  * Owns the one dialog that every pairing entry point drives — the in-app
- * scanner, the paste field, and a tapped `atomic://pair` deep link.
+ * scanner, the paste field, and a tapped `atomic:pair` deep link.
  *
  * Pairing is a short linear flow with a couple of waits in it, so it reads as
  * steps rather than as a status line plus a toast that lands after the user has

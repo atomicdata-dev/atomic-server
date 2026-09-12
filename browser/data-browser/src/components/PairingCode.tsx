@@ -12,7 +12,7 @@ interface PairingCodeProps {
 }
 
 /**
- * An `atomic://pair` code for `nodeDid`, as a QR and as copyable text, for
+ * An `atomic:pair` code for `nodeDid`, as a QR and as copyable text, for
  * another device to scan or paste.
  *
  * The node is whichever one another device should reach to sync: this device

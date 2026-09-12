@@ -46,7 +46,7 @@ fn android_device_name() -> Option<String> {
     .filter(|name| !name.is_empty())
 }
 
-/// Deep links (`atomic://pair?p=…`, see `planning/device-pairing.md`) are
+/// Deep links (`atomic:pair?…`, see `planning/device-pairing.md`) are
 /// forwarded to the webview as `atomic-deep-link` DOM events; the frontend
 /// captures them from module scope (`helpers/deepLinkQueue.ts`). A link can
 /// arrive before the page has loaded — the cold start from the system camera
@@ -63,7 +63,7 @@ struct PairLinks {
 fn queue_pair_links(state: &PairLinks, urls: impl IntoIterator<Item = String>) {
   let mut pending = state.pending.lock().unwrap();
   for url in urls {
-    if url.starts_with("atomic://") && !pending.contains(&url) {
+    if url.starts_with("atomic:") && !pending.contains(&url) {
       println!("[pairing] queued deep link");
       pending.push(url);
     }

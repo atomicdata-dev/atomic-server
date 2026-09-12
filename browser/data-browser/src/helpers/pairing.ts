@@ -3,7 +3,7 @@
 // the deep-link handler, the Sync page's dialog, and the post-sign-in
 // "connect a device" screen.
 //
-// Recording a peer grants it nothing. `atomic://pair` codes are routing only:
+// Recording a peer grants it nothing. `atomic:pair` codes are routing only:
 // the dialed node still has to prove it holds the same agent key over AUTH
 // before a single resource crosses. See planning/device-pairing.md.
 

@@ -94,16 +94,16 @@ inputs with different contracts:
 | Screen | Accepts | Placeholder |
 | --- | --- | --- |
 | Sync page (`SyncRoute.tsx:1582`) | a **server address** | `localhost:9883 or your-server.example` |
-| Getting-started `ConnectDeviceStep` | an **`atomic://pair` code** or bare node DID | — |
+| Getting-started `ConnectDeviceStep` | an **`atomic:pair` code** or bare node DID | — |
 
 Typing `atomic.ontola.io` — the obvious thing, and valid one screen over —
-fails with *"Not a pairing code: expected an atomic://pair link."* Observed
+fails with *"Not a pairing code: expected an atomic:pair link."* Observed
 twice on the current build, by someone who knew exactly what they were doing.
 
 Two contributing details:
 
 - **The error names one of two accepted formats.** `decodePairingEnvelope`
-  (`browser/lib/src/pairing.ts:175`) takes an `atomic://pair?…` URI **or** a
+  (`browser/lib/src/pairing.ts:175`) takes an `atomic:pair?…` URI **or** a
   bare `did:ad:node:…`; the message (`pairing.ts:185`) mentions only the
   first. Someone holding a node DID — which the Sync page shows with a copy
   button — is told it is invalid.

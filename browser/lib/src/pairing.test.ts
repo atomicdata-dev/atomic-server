@@ -91,7 +91,7 @@ describe('pairing envelope', () => {
 
   // A pairing code is routing only. A code carrying an identity must be
   // refused outright, not parsed-and-ignored: any app or web page can fire an
-  // `atomic://` link, and a device that adopted the sender's agent would sync
+  // `atomic:` link, and a device that adopted the sender's agent would sync
   // everything its owner then wrote to the sender's node.
   it('refuses a code that tries to hand over an account', () => {
     expect(
@@ -182,5 +182,15 @@ describe('pairing envelope', () => {
     expect(() =>
       encodePairingEnvelope({ ...namedDrives, node: 'did:ad:node:short' }),
     ).toThrow(PairingEnvelopeError);
+  });
+});
+
+describe('the older double-slash form', () => {
+  it('is still decoded, so codes minted before the change keep working', () => {
+    const modern = encodePairingEnvelope(allDrives);
+    const legacy = modern.replace('atomic:pair?', 'atomic://pair?');
+
+    expect(modern.startsWith('atomic:pair?')).toBe(true);
+    expect(decodePairingEnvelope(legacy)).toEqual(decodePairingEnvelope(modern));
   });
 });

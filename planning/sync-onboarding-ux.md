@@ -46,7 +46,7 @@ The same concept has been called a server, a sync hub, a connection and a node
 | workspace | drive, store | "drive" is our schema's word, not a person's |
 | your devices | peers, nodes | a node is an implementation detail |
 | device; *always-on device*, or its address (`atomicserver.eu`) | server, hub, sync hub, node | a server is a device that never sleeps — three words for one thing taught three mental models |
-| pairing code | envelope, node DID, `atomic://pair` URI | it is a code you scan |
+| pairing code | envelope, node DID, `atomic:pair` URI | it is a code you scan |
 | sync | replicate, reconcile, promote | one verb, whatever the transport |
 
 Rules of thumb:

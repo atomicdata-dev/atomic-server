@@ -1,5 +1,5 @@
 /**
- * Device-pairing envelope: the payload behind the `atomic://pair` QR code /
+ * Device-pairing envelope: the payload behind the `atomic:pair` QR code /
  * deep link (see `planning/device-pairing.md`).
  *
  * **A pairing code is routing only.** It says where to reach a node and which
@@ -10,11 +10,12 @@
  *
  * Wire form is a plain, readable URI:
  *
- *     atomic://pair?v=1&node=did:ad:node:<64 hex>&drives=*
+ *     atomic:pair?v=1&node=did:ad:node:<64 hex>&drives=*
  *
- * `atomic://` is the transport and `did:ad:node:` is the identity — they nest
+ * `atomic:` is the transport and `did:ad:node:` is the identity — they nest
  * rather than compete, so a node is written the same way here as everywhere
- * else. The scheme has to be one the app registers, because a QR scanned by
+ * else. No `//`: there is no authority part, and Atomic's other identifiers
+ * (`did:ad:…`) have none either. The scheme has to be one the app registers, because a QR scanned by
  * the system camera must launch it; `did:` can't serve that role (iOS
  * registers bare schemes, so claiming `did` would claim `did:key` and
  * `did:web` too). And a bare DID has nowhere to carry `drives` — the field
@@ -41,7 +42,14 @@ export type PairingEnvelope = {
   drives: '*' | string[];
 };
 
-export const PAIRING_URI_PREFIX = 'atomic://pair?';
+export const PAIRING_URI_PREFIX = 'atomic:pair?';
+
+/**
+ * The form codes were minted in before the double slash was dropped. Still
+ * accepted on decode, never produced: a QR printed last month must keep
+ * working.
+ */
+const LEGACY_PAIRING_URI_PREFIX = 'atomic://pair?';
 
 const NODE_DID_PREFIX = 'did:ad:node:';
 
@@ -142,7 +150,7 @@ function encodeValue(value: string): string {
   return encodeURIComponent(value).replace(/%3A/gi, ':').replace(/%2A/gi, '*');
 }
 
-/** Serialize an envelope into its `atomic://pair?…` QR / deep-link form. */
+/** Serialize an envelope into its `atomic:pair?…` QR / deep-link form. */
 export function encodePairingEnvelope(envelope: PairingEnvelope): string {
   // Round-trip through the validator so we can never mint a QR this module
   // would refuse to scan.
@@ -167,7 +175,7 @@ export function encodePairingEnvelope(envelope: PairingEnvelope): string {
 
 /**
  * Parse and strictly validate a scanned/pasted pairing code. Accepts the full
- * `atomic://pair?…` URI, or a bare `did:ad:node:…` (routing-only, all drives)
+ * `atomic:pair?…` URI (or the older `atomic://pair?…`), or a bare `did:ad:node:…` (routing-only, all drives)
  * for someone who copied just the node identity. Throws
  * {@link PairingEnvelopeError} — check `code === 'unsupported-version'` to
  * show an "update the app" message instead of a generic scan error.
@@ -179,14 +187,20 @@ export function decodePairingEnvelope(input: string): PairingEnvelope {
     return assertValid({ v: 1, node: trimmed, drives: '*' });
   }
 
-  if (!trimmed.startsWith(PAIRING_URI_PREFIX)) {
+  const prefix = trimmed.startsWith(PAIRING_URI_PREFIX)
+    ? PAIRING_URI_PREFIX
+    : trimmed.startsWith(LEGACY_PAIRING_URI_PREFIX)
+      ? LEGACY_PAIRING_URI_PREFIX
+      : undefined;
+
+  if (prefix === undefined) {
     throw new PairingEnvelopeError(
       'malformed',
-      'Not a pairing code: expected an atomic://pair link.',
+      'Not a pairing code: expected an atomic:pair link.',
     );
   }
 
-  const params = new URLSearchParams(trimmed.slice(PAIRING_URI_PREFIX.length));
+  const params = new URLSearchParams(trimmed.slice(prefix.length));
 
   const version = params.get('v');
 
@@ -206,7 +220,7 @@ export function decodePairingEnvelope(input: string): PairingEnvelope {
   // A pairing code never carries an identity (see the type doc). Refuse the
   // whole code rather than ignoring the field: a device that silently accepted
   // an attacker's secret would sync everything the user then wrote to the
-  // attacker's node, and `atomic://` links can be fired by any app or web page
+  // attacker's node, and `atomic:` links can be fired by any app or web page
   // — not only by the camera.
   if (params.has('secret')) {
     throw new PairingEnvelopeError(

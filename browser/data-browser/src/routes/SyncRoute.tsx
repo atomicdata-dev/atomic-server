@@ -1337,7 +1337,7 @@ function SyncPage() {
   async function syncWithPeer(input: string) {
     if (!input || !status.drive) return;
 
-    // A pasted atomic://pair link is routing sugar for the same thing: pull
+    // A pasted atomic:pair link is routing sugar for the same thing: pull
     // the node identity out of the envelope.
     let nodeDid = input;
 

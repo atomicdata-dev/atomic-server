@@ -43,7 +43,7 @@ export const rootRoute = createRootRoute({
         <IdentityReconcileGate>
           <Outlet />
         </IdentityReconcileGate>
-        {/* Consumes scanned/tapped atomic://pair deep links (QR pairing). */}
+        {/* Consumes scanned/tapped atomic:pair deep links (QR pairing). */}
         <PairingLinkHandler />
         {/* Keeps the device-lock heartbeat alive and enforces idle policies
             while the app is open (no-op unless a policy is set). */}

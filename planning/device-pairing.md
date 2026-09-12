@@ -93,7 +93,7 @@ for v1 (option A below). Two things killed it:
   (`helpers/agentStorage.ts`), specifically so no plaintext copy sits beside
   it. Nothing can mint an `onboard` code. Option A is not merely unwise, it is
   unimplementable as written.
-- **The consuming half was an open door.** `atomic://` is a registered scheme,
+- **The consuming half was an open door.** `atomic:` is a registered scheme,
   so *any* app or web page on the device can fire that deep link — not only the
   camera. A handler that imported an identity from a link would let a poster or
   a phishing page silently sign a fresh install in as an attacker, after which
@@ -125,13 +125,13 @@ Deep-link URI so the system camera opens the app directly
 (`tauri-plugin-deep-link`; intent filter in `desktop/gen/android`):
 
 ```
-atomic://pair?v=1
+atomic:pair?v=1
              &node=did:ad:node:…            # issuing node
              &url=http://192.168.0.153:9883 # optional LAN/WS fast path
              &drives=*                      # or repeated: &drives=<subject>&drives=…
 ```
 
-`atomic://` is the transport, `did:ad:node:` is the identity; they nest rather
+`atomic:` is the transport, `did:ad:node:` is the identity; they nest rather
 than compete, so a node is written the same way here as everywhere else in the
 system. Two constraints forced the wrapper, and both are worth recording:
 
@@ -261,7 +261,7 @@ Guardrails:
   Replace with "open Settings → Devices to pair a device". This ships with
   P0 below regardless of everything else.
 - A pairing code carries no identity, and one that claims to is refused. This
-  is what lets the deep-link handler act without a prompt: `atomic://` links can
+  is what lets the deep-link handler act without a prompt: `atomic:` links can
   be fired by any app or web page, so a link must never be able to sign a device
   in as someone else. Removed 2026-07-10 along with the `onboard` kind.
 - Scanning a malicious `pair` QR dials an attacker node that then fails
@@ -304,11 +304,11 @@ for it.
       `getAgentSecretFromIDB()`, which `6cdab0e3` deleted along with the
       plaintext key record. The Sync page now shows the routing-only `pair`
       QR + code outright (no dialog, no reveal, nothing to blur), and also
-      accepts a pasted `atomic://pair` link or a bare `did:ad:node:…`.
-- [x] Phone: `atomic://` deep link — **verified on-device 2026-07-09**
+      accepts a pasted `atomic:pair` link or a bare `did:ad:node:…`.
+- [x] Phone: `atomic:` deep link — **verified on-device 2026-07-09**
       (Xiaomi Pad): a cold-start `pair` VIEW intent lands as a persisted
       `KnownPeer` carrying the Mac's node DID. **No in-app scanner needed
-      for v1**: the QR encodes the `atomic://` URI, so the system camera
+      for v1**: the QR encodes the `atomic:` URI, so the system camera
       IS the scanner — the in-app scan path (OQ1) is only for devices
       whose camera app won't open custom schemes.
       Two hard-won Android findings:
@@ -330,7 +330,7 @@ for it.
       verified live in the web app by dispatching the DOM events.
       **Revised 2026-07-10:** the identity-importing half (`Agent.fromSecret`
       → `setAgent` → `saveAgentToIDB`) and its "Switch account?" dialog were
-      removed. Any app or web page can fire an `atomic://` link, so a link
+      removed. Any app or web page can fire an `atomic:` link, so a link
       must never be able to sign this device in as someone else; the decoder
       now refuses a code carrying `secret=`. What remains grants nothing, so
       it needs no prompt.

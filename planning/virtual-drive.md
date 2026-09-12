@@ -51,7 +51,7 @@ Done:
   `drives`), *not* every Drive (Sudo) — a synced node holds thousands the user
   can't open.
 - Non-file/non-folder resources surface as read-only macOS `.inetloc` link
-  files that open in Atomic desktop via an `atomic://open?subject=…` deep link.
+  files that open in Atomic desktop via an `atomic:open?subject=…` deep link.
 - Listing performance: shallow (propvals-only) reads, a dir cache, and
   cache-backed `lookup`/`getattr` — a cold root listing of 2578 drives went
   from ~762 s to ~0.01 s.
