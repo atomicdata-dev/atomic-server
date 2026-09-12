@@ -915,3 +915,21 @@ Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
 responses open to verify concurrent downloads are bounded at four and that
 reverse completion preserves listing order at import. Existing progress and
 failure checks also pass. Actual staging phone restore latency remains unmeasured.
+
+## Replication completion and CI tool installation
+
+`lib/src/sync/replicate.rs` has five scripted WebSocket peer tests covering
+resource-only completion without the idle timeout, acknowledgement of every
+chunk, unrelated-drive acknowledgements, an independently mismatching hash,
+trailing blob requests and asynchronous storage errors, and the fallback for
+peers without keepalive support. They exercise the real Rust WebSocket client
+and snapshot/chunk encoding with an isolated in-memory source; the peer scripts
+simulate replies and do not validate authentication or remote import policy.
+The real-server `server/tests/it/replicate.rs` tests retain destination-data,
+repeat-push, boot-reconcile and export-authorization assertions.
+
+The pinned wasm-pack installer was executed in Dagger's `rust:bookworm` image
+on Linux x86_64, including a cached install followed by changed downstream
+source input and execution of the retained binary. Its aarch64 archive digest
+is pinned to the upstream release; native aarch64 execution is not covered by
+that check. Full CI wall-time savings require a completed hosted run.
