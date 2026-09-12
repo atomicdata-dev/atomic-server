@@ -32,6 +32,9 @@ patchedDependencies:
   '@reactflow/core':
     hash: 935d9637d2c27d9e60fa127023cedd926c1aa26549a352ac28662c5f5f9bca8e
     path: patches/@reactflow__core.patch
+  loro-prosemirror@0.4.3:
+    hash: 7db99e4dd1232d548e82e63e5ae603df844ab4e5830ab68f85cdfab16fa8192c
+    path: patches/loro-prosemirror@0.4.3.patch
   playwright-core@1.63.0:
     hash: 51ccaaf15d34f7f1a82e936ef746184b5ff972a17b05ddff80d43daf6d89d86b
     path: patches/playwright-core@1.63.0.patch
@@ -431,7 +434,7 @@ importers:
         version: 17.0.5
       loro-prosemirror:
         specifier: ^0.4.3
-        version: 0.4.3(loro-crdt@1.12.1)
+        version: 0.4.3(patch_hash=7db99e4dd1232d548e82e63e5ae603df844ab4e5830ab68f85cdfab16fa8192c)(loro-crdt@1.12.1)
       oxc-transform-react:
         specifier: 0.145.0
         version: 0.145.0
@@ -16999,7 +17002,7 @@ snapshots:
 
   loro-crdt@1.12.1: {}
 
-  loro-prosemirror@0.4.3(loro-crdt@1.12.1):
+  loro-prosemirror@0.4.3(patch_hash=7db99e4dd1232d548e82e63e5ae603df844ab4e5830ab68f85cdfab16fa8192c)(loro-crdt@1.12.1):
     dependencies:
       lib0: 0.2.117
       loro-crdt: 1.12.1

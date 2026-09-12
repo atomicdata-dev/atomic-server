@@ -236,3 +236,34 @@ Artifacts: .e2e-runs/2026-09-12T06-42-59.446Z-2VqUuC,
 /tmp/e2e-1461-focus-run-wLS7c7 and /tmp/e2e-1461-observer-run-cAKRsg.
 App typecheck, focused lint (existing warnings, zero errors), formatting and
 E2E typecheck passed. Freeze before complete optimized matrix.
+
+Complete optimized 16ef6e015 eight-worker run: 211 passed, two failures,
+eight existing skips, zero retries, 11.6m. Remaining failures were fork body
+text (characters reordered) and website import completion. Other matrix entries
+were stopped after the full eight-worker result to address these first.
+Artifacts: .e2e-runs/2026-09-12T06-52-46.554Z-5b8bcN.
+
+A DOM-free Loro/ProseMirror regression reproduces remote metadata moving the
+selection from 3 to 5 before its deferred cursor timer fires. A narrow 0.4.3
+patch restores selection in the same transaction, passing the regression.
+The app's test resolver aliases Loro to web WASM, so this DOM-free test explicitly
+mocks that import to Node WASM; app typecheck validation is being repeated.
+
+Website timing probe: import HTTP completed in 1.5-1.8s, then local index search
+consumed 22.0-22.6s before the server lookup. Store.search now has an explicit
+serverOnly option for authoritative HTTP results after server-side writes;
+template completion uses it. Its regression fails on the old local-index wait
+and passes now, along with all 459 library tests. General/offline search remains
+unchanged. Probe: /tmp/e2e-1461-import-run-YiKKkR (4/4 passed in 34.9s,
+showing the delay rather than an absolute failure at this load).
+
+Warm compression after these UI fixes: 40 verified hits among 67 assets,
+15.321s versus 84.050s cold. WASM build was independently reused.
+
+The fork/import/document selection passed 9/9 at eight workers in 33.9s,
+zero retries, with both fixes. Artifacts:
+.e2e-runs/2026-09-12T07-09-38.725Z-1MNyif.
+The cursor regression passes on Linux with Node WASM, and app typecheck passes.
+User asked for maximum parallel throughput on Mancave: prioritize full runs at
+12, 16 and 24 workers, then compare eight, while retaining failures alongside
+timings. No fastest reliable setting has been established yet.

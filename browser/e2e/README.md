@@ -224,3 +224,11 @@ pnpm test-new
 # deploy report to netlify
 netlify deploy --dir playwright-report --prod --site atomic-tests
 ```
+
+### Editor binding compatibility
+
+The scoped `loro-prosemirror@0.4.3` patch restores the selection in the same
+transaction as an imported document update. The upstream deferred cursor timer
+can run after a subsequent keystroke and reorder typed text. Its regression is
+`data-browser/src/chunks/RTE/loro-selection.test.ts`; remove the patch when the
+upstream binding includes an equivalent atomic selection fix.

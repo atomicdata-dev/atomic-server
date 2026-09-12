@@ -2695,7 +2695,9 @@ export class Store {
     // description, Loro body, 1-edit prefix fuzzy, PropValSub filters).
     const clientDb = this.clientDb;
     const kvResults =
-      clientDb?.isReady && typeof clientDb.search === 'function'
+      !opts.serverOnly &&
+      clientDb?.isReady &&
+      typeof clientDb.search === 'function'
         ? await clientDb.search(query, {
             limit: opts.limit ?? 30,
             parents: parentScope,
@@ -2709,7 +2711,7 @@ export class Store {
 
     // Offline: hosted `/search` is unreachable. Return whatever the local
     // index has (empty if ClientDb is down).
-    if (!this._serverConnected) {
+    if (!this._serverConnected && !opts.serverOnly) {
       searchDebug('[search] OFFLINE kv →', kvResults.length, kvResults);
 
       return kvResults;

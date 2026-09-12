@@ -48,3 +48,4 @@ overrides:
 patchedDependencies:
   '@reactflow/core': patches/@reactflow__core.patch
   playwright-core@1.63.0: patches/playwright-core@1.63.0.patch
+  loro-prosemirror@0.4.3: patches/loro-prosemirror@0.4.3.patch

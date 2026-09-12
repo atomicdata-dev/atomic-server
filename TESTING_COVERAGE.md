@@ -15,6 +15,12 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## E2E isolation and performance harness (#1461)
 
+`loro-selection.test.ts` checks cursor preservation across a remote metadata
+update followed by keystrokes before and after queued timers. The scoped
+loro-prosemirror 0.4.3 patch restores document and selection atomically.
+`store-search-server.test.ts` checks that authoritative server lookups after
+imports do not wait on local indexing or WebSocket readiness.
+
 `cargo test -p atomic-server --test build_assets` exercises content/settings
 cache separation, corrupted Brotli recovery and concurrent atomic publication.
 The context-menu E2E flow catches title blur stealing focus from the menu;
