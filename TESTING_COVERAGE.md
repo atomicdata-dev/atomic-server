@@ -885,3 +885,8 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `e2e.spec.ts` verify Continue remains clickable while feedback is offered.
 `onboarding-storage.spec.ts` checks feedback availability;
 `drive-template-onboarding.spec.ts` checks mobile creation and dismissal.
+
+Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
+responses open to verify concurrent downloads are bounded at four and that
+reverse completion preserves listing order at import. Existing progress and
+failure checks also pass. Actual staging phone restore latency remains unmeasured.
