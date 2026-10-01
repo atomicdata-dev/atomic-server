@@ -16,8 +16,9 @@
 //! installation's private keys is [`super::route_keys`]'s. Nothing here logs.
 //!
 //! Algorithms: `rsa-sha256` / `rsa-v1_5-sha256`, `rsa-pss-sha512` (verify
-//! only) and `ed25519`. `hs2019` picks by key type. ECDSA and HMAC are
-//! refused.
+//! only), `ed25519` and `ecdsa-p256-sha256` (verify only; the JWK `ES256`
+//! Nextcloud 35 signs OCM requests with). `hs2019` picks by key type. Other
+//! ECDSA curves and HMAC are refused.
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rsa::{
@@ -50,6 +51,9 @@ const ED25519_SPKI_PREFIX: [u8; 12] = [
 pub enum PublicKey {
     Rsa(RsaPublicKey),
     Ed25519(ed25519_dalek::VerifyingKey),
+    /// ECDSA on P-256, only ever from a JWK (OCM's `ES256`). Verified, never
+    /// produced.
+    EcdsaP256(p256::ecdsa::VerifyingKey),
 }
 
 fn pem_body(pem: &str) -> Result<(String, Vec<u8>), String> {
@@ -131,14 +135,18 @@ impl PublicKey {
                     B64.encode(der)
                 )
             }
+            PublicKey::EcdsaP256(key) => p256::PublicKey::from(key)
+                .to_public_key_pem(LineEnding::LF)
+                .expect("a P-256 public key encodes"),
         }
     }
 
     /// A public JWK (RFC 7517) with its `alg`, the way Open Cloud Mesh
     /// publishes signing keys: `OKP`/`Ed25519` (`alg` `Ed25519` or `EdDSA`),
-    /// or `RSA` (`alg` `RS256` or `PS512`). Other key types and algorithms,
-    /// and JWKs without an `alg`, are refused: the algorithm comes from the
-    /// key, never from the message.
+    /// `EC`/`P-256` (`alg` `ES256`, what Nextcloud 35 publishes), or `RSA`
+    /// (`alg` `RS256` or `PS512`). Other key types and algorithms, and JWKs
+    /// without an `alg`, are refused: the algorithm comes from the key,
+    /// never from the message.
     pub fn from_jwk(jwk: &serde_json::Value) -> Result<(Self, Algorithm), String> {
         use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64URL;
         let field = |name: &str| {
@@ -168,6 +176,28 @@ impl PublicKey {
                     Algorithm::Ed25519,
                 )
             }
+            ("EC", "ES256") => {
+                if field("crv")? != "P-256" {
+                    return Err("only the P-256 curve is accepted for ES256 keys".into());
+                }
+                let coordinate = |name: &str| -> Result<[u8; 32], String> {
+                    bytes(name)?
+                        .try_into()
+                        .map_err(|_| format!("a P-256 `{name}` is 32 bytes"))
+                };
+                let point = p256::EncodedPoint::from_affine_coordinates(
+                    &coordinate("x")?.into(),
+                    &coordinate("y")?.into(),
+                    false,
+                );
+                (
+                    PublicKey::EcdsaP256(
+                        p256::ecdsa::VerifyingKey::from_encoded_point(&point)
+                            .map_err(|_| "not a P-256 public key".to_string())?,
+                    ),
+                    Algorithm::EcdsaP256Sha256,
+                )
+            }
             ("RSA", "RS256" | "PS512") => {
                 let n = rsa::BigUint::from_bytes_be(&bytes("n")?);
                 let e = rsa::BigUint::from_bytes_be(&bytes("e")?);
@@ -183,8 +213,8 @@ impl PublicKey {
             }
             (kty, alg) => {
                 return Err(format!(
-                    "a `{kty}` JWK with `alg` `{alg}` is not accepted (Ed25519, RS256 or PS512)"
-                ))
+                "a `{kty}` JWK with `alg` `{alg}` is not accepted (Ed25519, ES256, RS256 or PS512)"
+            ))
             }
         };
         key.0.check_strength()?;
@@ -210,6 +240,17 @@ impl PublicKey {
                 "n": B64URL.encode(key.n().to_bytes_be()),
                 "e": B64URL.encode(key.e().to_bytes_be()),
             }),
+            PublicKey::EcdsaP256(key) => {
+                let point = key.to_encoded_point(false);
+                serde_json::json!({
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "use": "sig",
+                    "x": B64URL.encode(point.x().expect("an uncompressed point has x")),
+                    "y": B64URL.encode(point.y().expect("an uncompressed point has y")),
+                })
+            }
         }
     }
 
@@ -219,10 +260,11 @@ impl PublicKey {
         match self {
             PublicKey::Rsa(_) => &[Algorithm::RsaV15Sha256, Algorithm::RsaPssSha512],
             PublicKey::Ed25519(_) => &[Algorithm::Ed25519],
+            PublicKey::EcdsaP256(_) => &[Algorithm::EcdsaP256Sha256],
         }
     }
 
-    fn verify_with(&self, algorithm: Algorithm, base: &[u8], signature: &[u8]) -> bool {
+    pub(crate) fn verify_with(&self, algorithm: Algorithm, base: &[u8], signature: &[u8]) -> bool {
         match (self, algorithm) {
             (PublicKey::Rsa(key), Algorithm::RsaV15Sha256) => {
                 rsa::pkcs1v15::Signature::try_from(signature).is_ok_and(|s| {
@@ -242,6 +284,12 @@ impl PublicKey {
                 ed25519_dalek::Signature::from_slice(signature)
                     .is_ok_and(|s| key.verify_strict(base, &s).is_ok())
             }
+            // RFC 9421 3.3.4: the signature is `r || s`, 32 bytes each; the
+            // base is hashed with SHA-256.
+            (PublicKey::EcdsaP256(key), Algorithm::EcdsaP256Sha256) => {
+                p256::ecdsa::Signature::from_slice(signature)
+                    .is_ok_and(|s| key.verify(base, &s).is_ok())
+            }
             _ => false,
         }
     }
@@ -257,6 +305,9 @@ pub enum Algorithm {
     /// produced.
     RsaPssSha512,
     Ed25519,
+    /// ECDSA on P-256 with SHA-256 (RFC 9421 `ecdsa-p256-sha256`, JWK
+    /// `ES256`). Verified, never produced.
+    EcdsaP256Sha256,
 }
 
 impl Algorithm {
@@ -265,6 +316,7 @@ impl Algorithm {
             Algorithm::RsaV15Sha256 => "rsa-v1_5-sha256",
             Algorithm::RsaPssSha512 => "rsa-pss-sha512",
             Algorithm::Ed25519 => "ed25519",
+            Algorithm::EcdsaP256Sha256 => "ecdsa-p256-sha256",
         }
     }
 }
@@ -866,6 +918,7 @@ fn parse_rfc9421(message: &Message, input: &str, signature: &str) -> Result<Vec<
                 "rsa-v1_5-sha256" => Algorithm::RsaV15Sha256,
                 "rsa-pss-sha512" => Algorithm::RsaPssSha512,
                 "ed25519" => Algorithm::Ed25519,
+                "ecdsa-p256-sha256" => Algorithm::EcdsaP256Sha256,
                 other => return refused(format!("the algorithm `{other}` is not accepted")),
             }),
             Some(_) => return refused("`alg` is not a string"),

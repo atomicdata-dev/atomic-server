@@ -111,6 +111,9 @@ rand = "0.8.6"
 rsa = { version = "0.9", optional = true, features = ["sha2"] }
 ed25519-dalek = { version = "2", optional = true, features = ["rand_core"] }
 sha2 = { version = "0.10", optional = true }
+# ES256 (ECDSA P-256) verification for OCM signatures: Nextcloud 35 signs
+# with it. Verify only. Only with the `plugin-routes` feature.
+p256 = { version = "0.13", optional = true, features = ["ecdsa", "pem"] }
 httpdate = { version = "1", optional = true }
 fastembed = { version = "5", optional = true, default-features = false, features = [
   "ort-download-binaries-rustls-tls",
@@ -283,6 +286,7 @@ plugin-routes = [
   "wasm-plugins",
   "dep:rsa",
   "dep:ed25519-dalek",
+  "dep:p256",
   "dep:sha2",
   "dep:httpdate",
 ]

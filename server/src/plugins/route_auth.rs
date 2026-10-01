@@ -564,8 +564,14 @@ impl RequestParts {
 
 /// The domain an OCM request names as its signer: `senderDomain`, or the
 /// part after the last `@` of `sender` (an OCM address). When both are
-/// given they must agree. Lowercased; a host with an optional port.
-pub fn ocm_signer_domain(body: &[u8]) -> Result<String, Refused> {
+/// given they must agree. When the body names neither (Nextcloud 35's
+/// notifications carry no `senderDomain`, though OCM 1.5 requires it), the
+/// domain of the signature's `keyid`: an `http(s)` URL's host and port
+/// (Nextcloud's `https://host/ocm#ecdsa-p256-sha256-1`), or the part before
+/// `#` (`sender.example.org#key1`). That is no weaker: the key is still
+/// looked up in that domain's own discovery and JWK Set. Lowercased; a host
+/// with an optional port.
+pub fn ocm_signer_domain(body: &[u8], key_id: &str) -> Result<String, Refused> {
     let doc: Json = serde_json::from_slice(body).map_err(|_| {
         Refused("an OCM-signed request needs a JSON body that names its sender".into())
     })?;
@@ -574,6 +580,7 @@ pub fn ocm_signer_domain(body: &[u8]) -> Result<String, Refused> {
         .as_str()
         .and_then(|s| s.rsplit_once('@'))
         .map(|(_, d)| d);
+    let from_key: String;
     let raw = match (from_domain, from_sender) {
         (Some(a), Some(b)) if !a.eq_ignore_ascii_case(b) => {
             return Err(Refused(
@@ -582,9 +589,20 @@ pub fn ocm_signer_domain(body: &[u8]) -> Result<String, Refused> {
         }
         (Some(d), _) | (None, Some(d)) => d,
         (None, None) => {
-            return Err(Refused(
-                "an OCM-signed request must name `senderDomain` or a `sender` address".into(),
-            ))
+            from_key = match url::Url::parse(key_id) {
+                Ok(u) if matches!(u.scheme(), "http" | "https") => match (u.host_str(), u.port()) {
+                    (Some(h), Some(p)) => format!("{h}:{p}"),
+                    (Some(h), None) => h.to_string(),
+                    _ => String::new(),
+                },
+                _ => key_id.split('#').next().unwrap_or_default().to_string(),
+            };
+            if from_key.is_empty() {
+                return Err(Refused(
+                    "an OCM-signed request must name `senderDomain` or a `sender` address".into(),
+                ));
+            }
+            &from_key
         }
     };
     let domain = raw.to_ascii_lowercase();
@@ -618,7 +636,7 @@ pub async fn verify_ocm_signature(
     let parsed = http_signatures::tagged(signatures, http_signatures::OCM_TAG)?;
     http_signatures::check_policy(parsed, message, body, now_ms.div_euclid(1000))?;
     http_signatures::check_ocm_policy(parsed, body)?;
-    let domain = ocm_signer_domain(body)?;
+    let domain = ocm_signer_domain(body, &parsed.key_id)?;
     let check = |resolved: &Resolved| {
         let mut pinned = parsed.clone();
         if let Some(alg) = resolved.alg {
@@ -1599,15 +1617,11 @@ mod tests {
             .unwrap_err();
         assert!(err.0.contains("more than one"), "{err}");
 
-        // `senderDomain` and `sender` must agree; one of them must be there.
+        // `senderDomain` and `sender` must agree.
         for (bad, why) in [
             (
                 json!({"senderDomain": "other.example", "sender": "a@sender.example"}),
                 "differ",
-            ),
-            (
-                json!({"notificationType": "SHARE_UNSHARED"}),
-                "senderDomain",
             ),
             (
                 json!({"senderDomain": "sender.example/path"}),
@@ -1631,14 +1645,77 @@ mod tests {
             .unwrap_err();
             assert!(err.0.contains(why), "{bad}: {err}");
         }
+        // Neither in the body (Nextcloud 35's notifications): the keyid's
+        // domain, whose own discovery and JWK Set must still have the key.
+        let bytes = json!({"notificationType": "SHARE_UNSHARED"})
+            .to_string()
+            .into_bytes();
+        let caller = verify_signature(
+            &resolver,
+            &db,
+            "did:ad:i",
+            &ocm_share(&key, "sender.example#key1", &bytes, at),
+            &bytes,
+            now_ms(at),
+        )
+        .await
+        .unwrap();
+        assert_eq!(caller["domain"], "sender.example");
         assert_eq!(
-            ocm_signer_domain(br#"{"senderDomain":"Sender.Example:8443"}"#).unwrap(),
+            ocm_signer_domain(br#"{"senderDomain":"Sender.Example:8443"}"#, "k").unwrap(),
             "sender.example:8443"
         );
         assert_eq!(
-            ocm_signer_domain(br#"{"sender":"a@b@sender.example"}"#).unwrap(),
+            ocm_signer_domain(br#"{"sender":"a@b@sender.example"}"#, "k").unwrap(),
             "sender.example"
         );
+        assert_eq!(
+            ocm_signer_domain(b"{}", "https://Cloud.Example:8443/ocm#ecdsa-p256-sha256-1").unwrap(),
+            "cloud.example:8443"
+        );
+        assert_eq!(
+            ocm_signer_domain(b"{}", "sender.example#key1").unwrap(),
+            "sender.example"
+        );
+        // The body still wins over the keyid.
+        assert_eq!(
+            ocm_signer_domain(br#"{"senderDomain":"a.example"}"#, "b.example#k").unwrap(),
+            "a.example"
+        );
+        for bad in ["#key1", "", "user@sender.example#k", "sender.example/x#k"] {
+            assert!(ocm_signer_domain(b"{}", bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn es256_jwks_from_nextcloud_verify_ecdsa_p256_signatures() {
+        use p256::ecdsa::{signature::Signer, Signature, SigningKey};
+        // An invented, fixed P-256 key (the scalar is just 0x01..0x20).
+        let signing = SigningKey::from_slice(&(1..=32).collect::<Vec<u8>>()).unwrap();
+        let public = PublicKey::EcdsaP256(*signing.verifying_key());
+        let mut jwk = public.to_jwk();
+        assert_eq!(jwk["kty"], "EC");
+        assert_eq!(jwk["alg"], "ES256");
+        // The shape Nextcloud 35.0.1 publishes at its jwksUri.
+        jwk["kid"] = json!("https://cloud.example/ocm#ecdsa-p256-sha256-1");
+        let (key, alg) = PublicKey::from_jwk(&jwk).unwrap();
+        assert_eq!(alg, Algorithm::EcdsaP256Sha256);
+        assert_eq!(alg.rfc9421_name(), "ecdsa-p256-sha256");
+        assert_eq!(key, public);
+        assert!(key.to_pem().starts_with("-----BEGIN PUBLIC KEY-----"));
+        let base = b"\"@method\": POST";
+        let signature: Signature = signing.sign(base);
+        assert!(key.verify_with(alg, base, &signature.to_bytes()));
+        assert!(!key.verify_with(alg, b"other", &signature.to_bytes()));
+        assert!(!key.verify_with(Algorithm::Ed25519, base, &signature.to_bytes()));
+        for bad in [
+            json!({"kty": "EC", "alg": "ES256", "crv": "P-384", "x": jwk["x"], "y": jwk["y"]}),
+            json!({"kty": "EC", "alg": "ES384", "crv": "P-256", "x": jwk["x"], "y": jwk["y"]}),
+            json!({"kty": "EC", "alg": "ES256", "crv": "P-256", "x": jwk["x"], "y": jwk["x"]}),
+            json!({"kty": "EC", "alg": "ES256", "crv": "P-256", "x": "AAAA", "y": jwk["y"]}),
+        ] {
+            assert!(PublicKey::from_jwk(&bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
