@@ -17,16 +17,24 @@ import {
   FaGear,
   FaInfo,
   FaPlug,
+  FaTrash,
   FaUser,
 } from 'react-icons/fa6';
 import { LuChevronsUpDown } from 'react-icons/lu';
 import {
   core,
+  dataBrowser,
   unknownSubject,
+  useCanWrite,
   useCurrentAgent,
   useResource,
+  useStore,
   useString,
 } from '@tomic/react';
+import { toast } from 'react-hot-toast';
+import { useSettings } from '../../helpers/AppSettings';
+import { constructOpenURL } from '../../helpers/navigation';
+import { getOrCreateTrashFolder } from '../../helpers/standardLocations';
 import { paths } from '../../routes/paths';
 import { shortcuts } from '../../actions/shortcuts';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -104,6 +112,14 @@ function AccountMenuRow({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const feedback = useFeedbackDialog({ triggerRef });
   const [install, showInstallButton] = useInstallPrompt();
+  const store = useStore();
+  const { drive } = useSettings();
+  const driveResource = useResource(drive);
+  const [trashFolder] = useString(
+    driveResource,
+    dataBrowser.properties.trashFolder,
+  );
+  const agentCanWrite = useCanWrite(driveResource);
 
   // "Give feedback" in the More menu opens this menu's feedback dialog.
   // Error pages and dialogs have their own FeedbackButton and don't listen.
@@ -117,6 +133,22 @@ function AccountMenuRow({
   const goTo = (path: string) => () => {
     navigate(path);
     onItemClick();
+  };
+
+  // The Trash folder is created on first use. Until then the item is offered
+  // to agents that can write the drive, and opening it creates the folder.
+  // Read-only agents only see it once a Trash folder exists.
+  const showTrash = !!trashFolder || agentCanWrite;
+
+  const goToTrash = async () => {
+    try {
+      const trash = trashFolder ?? (await getOrCreateTrashFolder(store, drive));
+
+      navigate(constructOpenURL(trash));
+      onItemClick();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not open Trash');
+    }
   };
 
   const unreadLabel =
@@ -181,6 +213,17 @@ function AccountMenuRow({
       helper: getSyncLabel(syncStatus),
       onClick: goToSync,
     },
+    ...(showTrash
+      ? [
+          {
+            id: 'trash',
+            label: 'Trash',
+            icon: <FaTrash />,
+            helper: 'Items you deleted from this drive',
+            onClick: goToTrash,
+          },
+        ]
+      : []),
     {
       id: 'feedback',
       label: 'Feedback',
