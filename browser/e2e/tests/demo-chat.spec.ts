@@ -67,8 +67,45 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
         .filter({ hasText: 'Welcome to the team' }),
     ).toBeVisible({ timeout: 5000 });
   } catch (e) {
+    // What the chat and the outbox hold when the message or the answer is
+    // missing: whether the Hi was written at all, and whether saves are stuck.
+    const state = await page
+      .evaluate(() => {
+        const entries = Array.from(
+          document.querySelectorAll('[data-entry-key]'),
+        ).map(
+          el =>
+            `${el.getAttribute('data-entry-key')}: ${(el.textContent ?? '').slice(0, 80)}`,
+        );
+        const store = window.store;
+        const outbox = store?.outbox;
+
+        return JSON.stringify(
+          {
+            entries,
+            input: document.querySelector('textarea')?.value,
+            serverConnected: store?.serverConnected,
+            outbox: outbox && {
+              size: outbox.size,
+              blocked: outbox.blockedCount,
+              draining: outbox.isDraining,
+              pending: outbox.pending().map(entry => {
+                try {
+                  return JSON.stringify(entry).slice(0, 300);
+                } catch {
+                  return String(entry);
+                }
+              }),
+            },
+          },
+          undefined,
+          2,
+        );
+      })
+      .catch(err => `could not read the page state: ${err}`);
     console.log(
-      `demo-chat: browser console up to the failure:\n${consoleLines.slice(-80).join('\n')}`,
+      `demo-chat: page state at the failure:\n${state}\n` +
+        `demo-chat: browser console up to the failure:\n${consoleLines.slice(-80).join('\n')}`,
     );
     throw e;
   }
