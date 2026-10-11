@@ -859,6 +859,7 @@ msgstr "Invalid Resource"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Untitled Chat"
 
@@ -8269,6 +8270,7 @@ msgid "This is taking longer than it should. The person who invited you needs to
 msgstr "This is taking longer than it should. The person who invited you needs to have this drive open in their browser. Try again, or ask them for a new invitation."
 
 #: src/chunks/AI/AISidebar.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "AI chat"
 msgstr "AI chat"
 
@@ -8861,6 +8863,7 @@ msgstr "Invite sent to {0} people"
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Message"
 msgstr "Message"
 
@@ -11558,7 +11561,7 @@ msgstr "{0} conflict{1}"
 msgid "Merging keeps the fork's version."
 msgstr "Merging keeps the fork's version."
 
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
+#. 0: total; 1: total !== 1 ? 's' \\: ''
 #. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
 #: src/routes/Search/SearchOverlay.tsx
@@ -12930,3 +12933,7 @@ msgstr "Search by name"
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
 msgstr "No matches"
+
+#: src/components/OverlayContainer.tsx
+msgid "Chats"
+msgstr "Chats"

@@ -859,6 +859,7 @@ msgstr "Ressource invalide"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Discussion sans titre"
 
@@ -8263,6 +8264,7 @@ msgid "This is taking longer than it should. The person who invited you needs to
 msgstr ""
 
 #: src/chunks/AI/AISidebar.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "AI chat"
 msgstr ""
 
@@ -8855,6 +8857,7 @@ msgstr ""
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Message"
 msgstr ""
 
@@ -11545,7 +11548,7 @@ msgstr ""
 msgid "Merging keeps the fork's version."
 msgstr ""
 
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
+#. 0: total; 1: total !== 1 ? 's' \\: ''
 #. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
 #: src/routes/Search/SearchOverlay.tsx
@@ -12916,4 +12919,8 @@ msgstr ""
 
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
+msgstr ""
+
+#: src/components/OverlayContainer.tsx
+msgid "Chats"
 msgstr ""
