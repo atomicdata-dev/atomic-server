@@ -37,7 +37,13 @@ async function indexDrive(store: Store): Promise<string | undefined> {
   const drive = await store.newResource({
     isA: server.classes.drive,
     noParent: true,
-    propVals: { [core.properties.name]: 'Message search' },
+    // Rights for this agent only: without them the copies cannot be removed
+    // again (`forgetConversation`), since destroy checks write on the parents.
+    propVals: {
+      [core.properties.name]: 'Message search',
+      [core.properties.write]: [agent],
+      [core.properties.read]: [agent],
+    },
   });
 
   // Before the first save: registration is what keeps it out of the outbox.
