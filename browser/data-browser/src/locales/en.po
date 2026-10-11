@@ -2142,8 +2142,6 @@ msgid "Add tag"
 msgstr "Add tag"
 
 #. 0: label
-#. 0: getTitle(resource)
-#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr "Switch to {0}"
@@ -3268,6 +3266,7 @@ msgstr "Search"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -4038,10 +4037,6 @@ msgstr "<0/> and{0} <1/> are typing"
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
 msgstr "Private drive"
-
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
-msgstr "Manage drives"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View and organize all your drives."
@@ -12902,3 +12897,7 @@ msgstr "Could not reach that address."
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
 msgstr "That address answers, but it is not an AtomicServer."
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "View all drives"
+msgstr "View all drives"

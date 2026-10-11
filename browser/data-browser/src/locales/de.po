@@ -2142,8 +2142,6 @@ msgid "Add tag"
 msgstr ""
 
 #. 0: label
-#. 0: getTitle(resource)
-#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr ""
@@ -3268,6 +3266,7 @@ msgstr ""
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr ""
 
@@ -4031,10 +4030,6 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
-msgstr ""
-
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
 msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -12880,6 +12875,7 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older backup copies are removed, and so is the edit history of the backup: it keeps only the current state of every item. Restoring from it brings back your workspace as it is now, without its version history. Items you deleted recently can no longer be recovered from the backup. Your devices keep their own edit history and your workspace is not changed."
+msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "Could not reach that address."
@@ -12887,4 +12883,8 @@ msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
+msgstr ""
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "View all drives"
 msgstr ""
