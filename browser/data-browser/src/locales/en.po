@@ -3268,6 +3268,7 @@ msgstr "Search"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -6014,6 +6015,7 @@ msgstr "No signed envelope covers this change on this node"
 msgid "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
 msgstr "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
 
+#: src/components/Cloud/HostOnPortalOffer.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sign-in wasn’t completed — hosting setup was cancelled."
 msgstr "Sign-in wasn’t completed — hosting setup was cancelled."
@@ -10505,6 +10507,7 @@ msgstr "You missed a message while you were away"
 msgid "You missed {0} messages while you were away"
 msgstr "You missed {0} messages while you were away"
 
+#: src/components/Cloud/HostOnPortalOffer.tsx
 #: src/components/Notifications/MessageNotifier.tsx
 msgid "Not now"
 msgstr "Not now"
@@ -11490,7 +11493,7 @@ msgstr "{0} added Cloud Server to this workspace. It waits for your consent."
 msgid "This workspace’s plan includes Cloud Server. It waits for your consent."
 msgstr "This workspace’s plan includes Cloud Server. It waits for your consent."
 
-#: src/routes/SyncRoute.tsx
+#: src/components/Cloud/HostingConsentNotice.tsx
 msgid "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this workspace on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
 msgstr "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this workspace on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
 
@@ -12902,3 +12905,32 @@ msgstr "Could not reach that address."
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
 msgstr "That address answers, but it is not an AtomicServer."
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Your workspace is now hosted on atomic.place."
+msgstr "Your workspace is now hosted on atomic.place."
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "No atomic.place portal is configured for this server."
+msgstr "No atomic.place portal is configured for this server."
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Hosting…"
+msgstr "Hosting…"
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Host on atomic.place"
+msgstr "Host on atomic.place"
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "You will be asked for your email to sign in to atomic.place first."
+msgstr "You will be asked for your email to sign in to atomic.place first."
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Agree and host"
+msgstr "Agree and host"
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "This workspace is only on this device and your server. Host it on atomic.place and signing in with your secret finds it anywhere."
+msgstr "This workspace is only on this device and your server. Host it on atomic.place and signing in with your secret finds it anywhere."

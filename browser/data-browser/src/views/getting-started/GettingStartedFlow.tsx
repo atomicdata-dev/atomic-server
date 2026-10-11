@@ -27,6 +27,7 @@ import { deviceHasDriveData } from '../../helpers/driveData';
 import { discoverHomeServerForApp } from '../../helpers/discoverHomeServer';
 import { openPrivateHome } from '../../helpers/openPrivateHome';
 import { privateHomeNudge } from '../../helpers/privateHomeNudge';
+import { hostOnPortalNudge } from '../../helpers/hostOnPortalNudge';
 import { withDeadline } from '../../helpers/withDeadline';
 import { constructOpenURL } from '../../helpers/navigation';
 import { paths } from '../../routes/paths';
@@ -763,6 +764,10 @@ export function GettingStartedFlow({
         // a device that holds its data. Not awaited — the first pass seals
         // the whole drive, and sign-in should not wait on an upload.
         void ensureVaultBackup(store, target!);
+
+        // Found nowhere but here: offer to host it, so a sign-in on any other
+        // instance finds it. The offer re-checks and hides itself.
+        if (!hosted && !returnToAgent) hostOnPortalNudge(target!);
 
         navigate(
           returnToAgent ? paths.agentSettings : constructOpenURL(target!),

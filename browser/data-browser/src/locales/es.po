@@ -3268,6 +3268,7 @@ msgstr "Buscar"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr ""
 
@@ -6008,6 +6009,7 @@ msgstr ""
 msgid "This drive uses a legacy server address. Cloud Server requires a portable DID drive."
 msgstr ""
 
+#: src/components/Cloud/HostOnPortalOffer.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sign-in wasn’t completed — hosting setup was cancelled."
 msgstr ""
@@ -10492,6 +10494,7 @@ msgstr ""
 msgid "You missed {0} messages while you were away"
 msgstr ""
 
+#: src/components/Cloud/HostOnPortalOffer.tsx
 #: src/components/Notifications/MessageNotifier.tsx
 msgid "Not now"
 msgstr ""
@@ -11477,7 +11480,7 @@ msgstr ""
 msgid "This workspace’s plan includes Cloud Server. It waits for your consent."
 msgstr ""
 
-#: src/routes/SyncRoute.tsx
+#: src/components/Cloud/HostingConsentNotice.tsx
 msgid "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this workspace on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
 msgstr ""
 
@@ -12880,6 +12883,7 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older backup copies are removed, and so is the edit history of the backup: it keeps only the current state of every item. Restoring from it brings back your workspace as it is now, without its version history. Items you deleted recently can no longer be recovered from the backup. Your devices keep their own edit history and your workspace is not changed."
+msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "Could not reach that address."
@@ -12887,4 +12891,33 @@ msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Your workspace is now hosted on atomic.place."
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "No atomic.place portal is configured for this server."
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Hosting…"
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Host on atomic.place"
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "You will be asked for your email to sign in to atomic.place first."
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "Agree and host"
+msgstr ""
+
+#: src/components/Cloud/HostOnPortalOffer.tsx
+msgid "This workspace is only on this device and your server. Host it on atomic.place and signing in with your secret finds it anywhere."
 msgstr ""

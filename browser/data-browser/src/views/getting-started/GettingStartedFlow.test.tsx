@@ -23,6 +23,8 @@ const state = vi.hoisted(() => ({
   recovery: vi.fn(),
   account: null as { email: string } | null,
   hasData: true,
+  connected: true,
+  nudge: vi.fn(),
   agent: { subject: 'did:ad:agent:test' },
   agentName: 'Robin' as string | undefined,
   store: {
@@ -108,11 +110,14 @@ vi.mock('../../helpers/managed/vaultAutoBackup', () => ({
   restoreFromVault: state.restoreVault,
 }));
 vi.mock('../../helpers/managed/reconcile', () => ({
-  connectHostedDrive: async () => true,
+  connectHostedDrive: async () => state.connected,
   shortDid: (subject: string) => subject,
 }));
 vi.mock('../../helpers/discoverHomeServer', () => ({
   discoverHomeServerForApp: async () => false,
+}));
+vi.mock('../../helpers/hostOnPortalNudge', () => ({
+  hostOnPortalNudge: (drive: string) => state.nudge(drive),
 }));
 vi.mock('../../helpers/agentStorage', () => ({ saveAgentToIDB: vi.fn() }));
 vi.mock('../../helpers/deviceLock', () => ({ beat: vi.fn() }));
@@ -189,6 +194,7 @@ beforeEach(() => {
   state.recovery.mockResolvedValue(null);
   state.account = null;
   state.hasData = true;
+  state.connected = true;
   state.restoreVault.mockResolvedValue({
     status: 'no-backup',
     reason: 'no backup',
@@ -417,4 +423,33 @@ it('signs in without asking when the secret is the account agent', async () => {
   });
   expect(logoutManagedSession).not.toHaveBeenCalled();
   expect(state.navigate).toHaveBeenCalledWith('/app/agent');
+});
+
+const signInWithSecret = async () => {
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+};
+
+it('offers hosting after sign-in when the drive is hosted nowhere', async () => {
+  state.connected = false;
+  await show('?step=signin');
+  await signInWithSecret();
+  expect(state.nudge).toHaveBeenCalledWith('did:ad:home');
+});
+
+it('does not offer hosting for a drive that is already hosted', async () => {
+  await show('?step=signin');
+  await signInWithSecret();
+  expect(state.navigate).toHaveBeenCalled();
+  expect(state.nudge).not.toHaveBeenCalled();
+});
+
+it('does not offer hosting when sign-in only returns to settings', async () => {
+  state.connected = false;
+  await show('?return_to=agent');
+  await signInWithSecret();
+  expect(state.nudge).not.toHaveBeenCalled();
 });

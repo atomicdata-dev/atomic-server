@@ -49,6 +49,7 @@ import {
   CARD_TITLE_FONT,
 } from '../components/cardSurface';
 import { openExternal } from '../helpers/openExternal';
+import { HostingConsentNotice } from '../components/Cloud/HostingConsentNotice';
 import { formatBytes } from '../helpers/formatBytes';
 import { AICreditsService } from '../components/Vault/AICreditsService';
 import {
@@ -2111,14 +2112,7 @@ function SyncPage() {
                 details={serverRow.details}
                 notice={
                   serverRow.state === 'offered' ? (
-                    <>
-                      <strong>Before you turn it on:</strong> unlike Cloud
-                      Vault, Cloud Server stores a readable, unencrypted copy of
-                      this workspace on our servers, so we can run search,
-                      shareable links and the API for it. Your sharing
-                      permissions still control who else sees it, and you can
-                      turn it off at any time.
-                    </>
+                    <HostingConsentNotice />
                   ) : undefined
                 }
                 actions={serverRow.actions}
