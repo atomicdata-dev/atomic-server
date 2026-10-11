@@ -1,5 +1,9 @@
 import { Datatype } from './datatypes.js';
-import { parseConstraint, parseConstraints } from './class-constraints.js';
+import {
+  MAX_DEPTH,
+  parseConstraint,
+  parseConstraints,
+} from './class-constraints.js';
 import { core } from './ontologies/core.js';
 import { canonicalizeScheme } from './subject.js';
 import {
@@ -96,10 +100,50 @@ const PROPERTY_KEYS = new Set([
   'description',
   'x-atomic-datatype',
   'x-atomic-class',
+  'properties',
+  'required',
+  'additionalProperties',
+  'anyOf',
   ...CONSTRAINT_PASSTHROUGH,
   ...ANNOTATIONS,
   ...INFORMATIONAL,
 ]);
+
+/** Keywords of a schema nested inside a json value (below a property). */
+const NESTED_SCHEMA_KEYS = new Set([
+  'type',
+  'title',
+  'description',
+  'enum',
+  'const',
+  'properties',
+  'required',
+  'additionalProperties',
+  'items',
+  'anyOf',
+  ...CONSTRAINT_PASSTHROUGH,
+  ...ANNOTATIONS,
+  ...INFORMATIONAL,
+]);
+
+/** Keywords that make a schema a nested one, stored whole in the class constraints. */
+const NESTED_KEYWORDS = [
+  'properties',
+  'required',
+  'additionalProperties',
+  'items',
+  'anyOf',
+];
+
+const SCHEMA_TYPES = [
+  'string',
+  'number',
+  'integer',
+  'boolean',
+  'null',
+  'object',
+  'array',
+];
 
 const REF_KEYS = new Set([
   '$ref',
@@ -236,6 +280,161 @@ function enumOf(schema: Obj, pointer: string): unknown[] | undefined {
   return undefined;
 }
 
+/**
+ * Reads the nested keywords of `node` into `out`: `properties`, `required`,
+ * `additionalProperties`, `items` and `anyOf`, each validated by pointer.
+ * `depth` is the nesting level of `node` itself.
+ */
+function readNestedKeywords(
+  node: Obj,
+  pointer: string,
+  depth: number,
+  withItems: boolean,
+  out: Record<string, JSONValue>,
+): void {
+  if (node.properties !== undefined) {
+    const at = child(pointer, 'properties');
+
+    if (!isPlainObject(node.properties)) {
+      fail(at, 'expected an object of schemas');
+    }
+
+    const read: Record<string, JSONValue> = {};
+
+    for (const [key, value] of Object.entries(node.properties)) {
+      read[key] = readNested(value, child(at, key), depth + 1);
+    }
+
+    out.properties = read;
+  }
+
+  if (node.required !== undefined) {
+    const at = child(pointer, 'required');
+
+    if (!Array.isArray(node.required)) {
+      fail(at, 'expected an array of property names');
+    }
+
+    node.required.forEach((name, index) => {
+      if (typeof name !== 'string') {
+        fail(child(at, index), 'expected a property name');
+      }
+    });
+
+    out.required = node.required as JSONValue;
+  }
+
+  if (node.additionalProperties !== undefined) {
+    out.additionalProperties =
+      typeof node.additionalProperties === 'boolean'
+        ? node.additionalProperties
+        : readNested(
+            node.additionalProperties,
+            child(pointer, 'additionalProperties'),
+            depth + 1,
+          );
+  }
+
+  if (withItems && node.items !== undefined) {
+    out.items = readNested(node.items, child(pointer, 'items'), depth + 1);
+  }
+
+  if (node.anyOf !== undefined) {
+    const at = child(pointer, 'anyOf');
+
+    if (!Array.isArray(node.anyOf)) fail(at, 'expected an array of schemas');
+
+    if (node.anyOf.length === 0) fail(at, 'anyOf needs at least one schema');
+
+    out.anyOf = node.anyOf.map((branch, index) =>
+      readNested(branch, child(at, index), depth + 1),
+    );
+  }
+}
+
+const isPlainObject = (v: unknown): v is Obj =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Reads a schema nested inside a json value into the constraint vocabulary of
+ * `class-constraints`. Annotations are dropped; everything Atomic cannot check
+ * (`$ref`, `oneOf`, `format`, ...) is refused by JSON pointer.
+ */
+function readNested(
+  schema: unknown,
+  pointer: string,
+  depth: number,
+): Record<string, JSONValue> {
+  if (depth > MAX_DEPTH) {
+    fail(pointer, `schemas nest deeper than ${MAX_DEPTH} levels`);
+  }
+
+  const s = asObject(schema, pointer);
+
+  checkKeys(s, pointer, NESTED_SCHEMA_KEYS);
+
+  const out: Record<string, JSONValue> = {};
+
+  if (s.type !== undefined) {
+    const names = Array.isArray(s.type) ? s.type : [s.type];
+
+    if (names.length === 0) {
+      fail(
+        child(pointer, 'type'),
+        'expected a type name or a non-empty array of them',
+      );
+    }
+
+    for (const name of names) {
+      if (typeof name !== 'string' || !SCHEMA_TYPES.includes(name)) {
+        fail(
+          child(pointer, 'type'),
+          `unsupported type ${JSON.stringify(name)}. Supported: ${SCHEMA_TYPES.join(', ')}`,
+        );
+      }
+    }
+
+    out.type = s.type as JSONValue;
+  }
+
+  if (s.enum !== undefined && s.const !== undefined) {
+    fail(pointer, "'enum' and 'const' cannot be combined");
+  }
+
+  if (s.enum !== undefined) {
+    if (!Array.isArray(s.enum))
+      fail(child(pointer, 'enum'), 'expected an array');
+
+    out.enum = s.enum as JSONValue;
+  }
+
+  if (s.const !== undefined) out.const = s.const as JSONValue;
+
+  for (const key of CONSTRAINT_PASSTHROUGH) {
+    if (s[key] !== undefined) out[key] = s[key] as JSONValue;
+  }
+
+  readNestedKeywords(s, pointer, depth, true, out);
+
+  // The children were checked on their own, so an error is about this node.
+  try {
+    parseConstraint(out);
+  } catch (e) {
+    fail(pointer, (e as Error).message);
+  }
+
+  return out;
+}
+
+/** Whether the `items` schema of an array needs the nested reader. */
+function itemsAreNested(items: Obj): boolean {
+  return (
+    Object.keys(items).some(
+      k => NESTED_KEYWORDS.includes(k) || CONSTRAINT_PASSTHROUGH.includes(k),
+    ) || Array.isArray(items.type)
+  );
+}
+
 function readProperty(
   schema: unknown,
   pointer: string,
@@ -249,24 +448,54 @@ function readProperty(
   const name = optionalString(s, 'title', pointer);
   const description = optionalString(s, 'description', pointer);
   const constraint: Record<string, JSONValue> = {};
-  const type = s.type;
+  // `type` is a name, or an array of names where "null" makes the value
+  // nullable and several other names make it a union.
+  const typeList: string[] = [];
+  const typeIsArray = Array.isArray(s.type);
 
-  if (Array.isArray(type)) {
-    fail(
-      child(pointer, 'type'),
-      'type arrays (such as nullable types) are not supported. Atomic has no null: leave the property out of the value instead',
-    );
+  if (Array.isArray(s.type)) {
+    for (const typeName of s.type) {
+      if (typeof typeName !== 'string' || !SCHEMA_TYPES.includes(typeName)) {
+        fail(
+          child(pointer, 'type'),
+          `unsupported type ${JSON.stringify(typeName)}. Supported: ${SCHEMA_TYPES.join(', ')}`,
+        );
+      }
+
+      if (!typeList.includes(typeName)) typeList.push(typeName);
+    }
+
+    if (typeList.length === 0) {
+      fail(child(pointer, 'type'), 'expected at least one type');
+    }
+  } else if (s.type !== undefined) {
+    if (typeof s.type !== 'string') {
+      fail(child(pointer, 'type'), 'expected a string');
+    }
+
+    typeList.push(s.type);
   }
 
-  if (type !== undefined && typeof type !== 'string') {
-    fail(child(pointer, 'type'), 'expected a string');
+  const nonNull = typeList.filter(t => t !== 'null');
+  const union = nonNull.length > 1;
+  const nullable = typeList.length > nonNull.length && nonNull.length > 0;
+  const type: string | undefined = union
+    ? undefined
+    : (nonNull[0] ?? typeList[0]);
+
+  for (const key of ['properties', 'required', 'additionalProperties']) {
+    if (key in s && type !== undefined && type !== 'object') {
+      fail(child(pointer, key), `'${key}' only applies to objects`);
+    }
   }
 
   let inferred: string | undefined;
   let values: unknown[] | undefined;
   let linkClass: unknown;
 
-  const isArray = type === 'array' || (type === undefined && 'items' in s);
+  const isArray =
+    !union && (type === 'array' || (type === undefined && 'items' in s));
+  const nested: Record<string, JSONValue> = {};
 
   if (hasRef) {
     inferred = Datatype.ATOMIC_URL;
@@ -303,9 +532,15 @@ function readProperty(
       const itemsPointer = child(pointer, 'items');
       const items = asObject(s.items, itemsPointer);
 
-      checkKeys(items, itemsPointer, ITEM_KEYS);
+      if (itemsAreNested(items)) {
+        nested.items = readNested(items, itemsPointer, 1);
+      } else {
+        checkKeys(items, itemsPointer, ITEM_KEYS);
+      }
 
-      if ('$ref' in items) {
+      if (nested.items !== undefined) {
+        // Checked by the nested reader; nothing maps to a link here.
+      } else if ('$ref' in items) {
         for (const key of Object.keys(items)) {
           if (!['$ref', 'enum', 'const'].includes(key)) {
             fail(child(itemsPointer, key), `not supported next to '$ref'`);
@@ -319,7 +554,7 @@ function readProperty(
         linkClass = items['x-atomic-class'];
       }
 
-      values = enumOf(items, itemsPointer);
+      if (nested.items === undefined) values = enumOf(items, itemsPointer);
     }
   } else {
     linkClass = s['x-atomic-class'];
@@ -356,7 +591,8 @@ function readProperty(
         inferred = Datatype.JSON;
         break;
       case undefined:
-        if (values) inferred = datatypeOfValues(values, pointer);
+        if (union || 'anyOf' in s) inferred = Datatype.JSON;
+        else if (values) inferred = datatypeOfValues(values, pointer);
 
         break;
       default:
@@ -373,6 +609,17 @@ function readProperty(
 
   for (const key of CONSTRAINT_PASSTHROUGH) {
     if (s[key] !== undefined) constraint[key] = s[key] as JSONValue;
+  }
+
+  if (!hasRef) {
+    readNestedKeywords(s, pointer, 0, false, nested);
+  }
+
+  if (Object.keys(nested).length > 0 || (typeIsArray && (union || nullable))) {
+    // The nested schema checks the type too, so keep it next to it.
+    if (s.type !== undefined) constraint.type = s.type as JSONValue;
+
+    Object.assign(constraint, nested);
   }
 
   if (values) constraint.enum = values as JSONValue[];

@@ -7,6 +7,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Class constraints: a property's entry in `constraints` can describe nested JSON values with `type` (including `["string", "null"]`), `const`, `properties`, `required`, `additionalProperties`, `items` and `anyOf`, up to 16 levels deep. Every keyword works at every level and errors name the failing value by JSON pointer (`... breaks maximum on class patch at /pad/tune: ...`). JSON Schema import keeps nested schemas, nullable types and `anyOf` below a property as `json` plus constraints instead of refusing them, and export writes them back (`docs/src/schema/classes.md`, `json-schema.md`).
 - Loro documents: strings that start with `[`, `{`, `atomic:`, `did:ad:` or `http(s)://` are tagged as `string` in the `datatypes` map so they are no longer read back as nested resources or URLs, and JSON `null` is kept inside nested maps and lists.
 
 ## [v0.41.0-beta.8] - 2026-10-10

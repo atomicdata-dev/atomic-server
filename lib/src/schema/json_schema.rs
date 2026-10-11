@@ -24,7 +24,7 @@ use serde_json::{Map, Number, Value as Json};
 
 use crate::{
     agents::Agent,
-    class_constraints::{parse_constraint, parse_constraints},
+    class_constraints::{parse_constraint, parse_constraints, MAX_DEPTH},
     commit::{Commit, CommitBuilder, CommitOpts},
     datatype::{match_datatype, DataType},
     errors::AtomicResult,
@@ -316,9 +316,209 @@ fn property_keys() -> Vec<&'static str> {
         "description",
         "x-atomic-datatype",
         "x-atomic-class",
+        "properties",
+        "required",
+        "additionalProperties",
+        "anyOf",
     ]);
     keys.extend(CONSTRAINT_PASSTHROUGH);
     keys
+}
+
+/// Keywords of a schema nested inside a json value (below a property).
+fn nested_keys() -> Vec<&'static str> {
+    let mut keys = allowed(&[
+        "type",
+        "title",
+        "description",
+        "enum",
+        "const",
+        "properties",
+        "required",
+        "additionalProperties",
+        "items",
+        "anyOf",
+    ]);
+    keys.extend(CONSTRAINT_PASSTHROUGH);
+    keys
+}
+
+/// Keywords that make a schema a nested one, stored whole in the class
+/// constraints instead of being mapped to a datatype.
+const NESTED_KEYWORDS: [&str; 5] = [
+    "properties",
+    "required",
+    "additionalProperties",
+    "items",
+    "anyOf",
+];
+
+const SCHEMA_TYPES: [&str; 7] = [
+    "string", "number", "integer", "boolean", "null", "object", "array",
+];
+
+/// Reads the nested keywords of `node` into `out`: `properties`, `required`,
+/// `additionalProperties`, `items` and `anyOf`, each validated by pointer.
+/// `depth` is the nesting level of `node` itself.
+fn read_nested_keywords(
+    node: &Node,
+    pointer: &str,
+    depth: usize,
+    with_items: bool,
+    out: &mut Map<String, Json>,
+) -> AtomicResult<()> {
+    if let Some(properties) = node.get("properties") {
+        let at = child(pointer, "properties");
+        let Node::Object(entries) = properties else {
+            return fail(&at, "expected an object of schemas");
+        };
+        let mut read = Map::new();
+        for (key, value) in entries {
+            read.insert(
+                key.clone(),
+                read_nested(value, &child(&at, key), depth + 1)?,
+            );
+        }
+        out.insert("properties".into(), Json::Object(read));
+    }
+    if let Some(required) = node.get("required") {
+        let at = child(pointer, "required");
+        let Node::Array(names) = required else {
+            return fail(&at, "expected an array of property names");
+        };
+        for (index, name) in names.iter().enumerate() {
+            if !matches!(name, Node::String(_)) {
+                return fail(&child(&at, &index.to_string()), "expected a property name");
+            }
+        }
+        out.insert("required".into(), required.to_json());
+    }
+    if let Some(additional) = node.get("additionalProperties") {
+        let at = child(pointer, "additionalProperties");
+        out.insert(
+            "additionalProperties".into(),
+            match additional {
+                Node::Bool(b) => Json::Bool(*b),
+                other => read_nested(other, &at, depth + 1)?,
+            },
+        );
+    }
+    if let Some(items) = node.get("items").filter(|_| with_items) {
+        out.insert(
+            "items".into(),
+            read_nested(items, &child(pointer, "items"), depth + 1)?,
+        );
+    }
+    if let Some(any_of) = node.get("anyOf") {
+        let at = child(pointer, "anyOf");
+        let Node::Array(branches) = any_of else {
+            return fail(&at, "expected an array of schemas");
+        };
+        if branches.is_empty() {
+            return fail(&at, "anyOf needs at least one schema");
+        }
+        let mut read = Vec::new();
+        for (index, branch) in branches.iter().enumerate() {
+            read.push(read_nested(
+                branch,
+                &child(&at, &index.to_string()),
+                depth + 1,
+            )?);
+        }
+        out.insert("anyOf".into(), Json::Array(read));
+    }
+    Ok(())
+}
+
+/// Reads a schema nested inside a json value into the constraint vocabulary of
+/// `class_constraints`. Annotations are dropped; everything Atomic cannot check
+/// (`$ref`, `oneOf`, `format`, ...) is refused by JSON pointer.
+fn read_nested(schema: &Node, pointer: &str, depth: usize) -> AtomicResult<Json> {
+    if depth > MAX_DEPTH {
+        return fail(
+            pointer,
+            format!("schemas nest deeper than {MAX_DEPTH} levels"),
+        );
+    }
+    let s = as_object(schema, pointer)?;
+    check_keys(s, pointer, &nested_keys())?;
+    let mut out = Map::new();
+
+    match s.get("type") {
+        None => {}
+        Some(Node::String(_)) => {}
+        Some(Node::Array(names)) if !names.is_empty() => {}
+        Some(_) => {
+            return fail(
+                &child(pointer, "type"),
+                "expected a type name or a non-empty array of them",
+            )
+        }
+    }
+    if let Some(ty) = s.get("type") {
+        let names: Vec<&Node> = match ty {
+            Node::Array(names) => names.iter().collect(),
+            single => vec![single],
+        };
+        for name in names {
+            if !name.as_str().is_some_and(|n| SCHEMA_TYPES.contains(&n)) {
+                return fail(
+                    &child(pointer, "type"),
+                    format!(
+                        "unsupported type {}. Supported: {}",
+                        name.to_json(),
+                        SCHEMA_TYPES.join(", ")
+                    ),
+                );
+            }
+        }
+        out.insert("type".into(), ty.to_json());
+    }
+    if s.has("enum") && s.has("const") {
+        return fail(pointer, "'enum' and 'const' cannot be combined");
+    }
+    match s.get("enum") {
+        Some(values @ Node::Array(_)) => {
+            out.insert("enum".into(), values.to_json());
+        }
+        Some(_) => return fail(&child(pointer, "enum"), "expected an array"),
+        None => {}
+    }
+    if let Some(value) = s.get("const") {
+        out.insert("const".into(), value.to_json());
+    }
+    for key in CONSTRAINT_PASSTHROUGH {
+        if let Some(value) = s.get(key) {
+            out.insert(key.to_string(), value.to_json());
+        }
+    }
+    read_nested_keywords(s, pointer, depth, true, &mut out)?;
+
+    // The children were checked on their own, so an error is about this node.
+    if let Err(e) = parse_constraint(&Json::Object(out.clone())) {
+        return fail(pointer, e.to_string());
+    }
+    Ok(Json::Object(out))
+}
+
+/// The nested keywords of a property schema other than `items`, which the
+/// array branch reads itself.
+fn read_nested_keywords_except_items(
+    node: &Node,
+    pointer: &str,
+    out: &mut Map<String, Json>,
+) -> AtomicResult<()> {
+    read_nested_keywords(node, pointer, 0, false, out)
+}
+
+/// Whether the `items` schema of an array needs the nested reader instead of
+/// the one-level mapping to a link or an option list.
+fn items_are_nested(items: &Node) -> bool {
+    items
+        .keys()
+        .iter()
+        .any(|k| NESTED_KEYWORDS.contains(k) || CONSTRAINT_PASSTHROUGH.contains(k))
+        || matches!(items.get("type"), Some(Node::Array(_)))
 }
 
 fn ref_keys() -> Vec<&'static str> {
@@ -504,23 +704,69 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
     let description = optional_string(s, "description", pointer)?;
     let mut constraint = Map::new();
 
-    let type_name = match s.get("type") {
-        None => None,
-        Some(Node::String(t)) => Some(t.as_str()),
-        Some(Node::Array(_)) => {
-            return fail(
-                &child(pointer, "type"),
-                "type arrays (such as nullable types) are not supported. Atomic has no null: leave the property out of the value instead",
-            )
+    // `type` is a name, or an array of names where "null" makes the value
+    // nullable and several other names make it a union.
+    let mut type_list: Vec<String> = Vec::new();
+    let mut type_is_array = false;
+    match s.get("type") {
+        None => {}
+        Some(Node::String(t)) => type_list.push(t.clone()),
+        Some(Node::Array(names)) => {
+            type_is_array = true;
+            for name in names {
+                match name {
+                    Node::String(t) if SCHEMA_TYPES.contains(&t.as_str()) => {
+                        if !type_list.contains(t) {
+                            type_list.push(t.clone());
+                        }
+                    }
+                    other => {
+                        return fail(
+                            &child(pointer, "type"),
+                            format!(
+                                "unsupported type {}. Supported: {}",
+                                other.to_json(),
+                                SCHEMA_TYPES.join(", ")
+                            ),
+                        )
+                    }
+                }
+            }
+            if type_list.is_empty() {
+                return fail(&child(pointer, "type"), "expected at least one type");
+            }
         }
         Some(_) => return fail(&child(pointer, "type"), "expected a string"),
+    }
+    let non_null: Vec<&String> = type_list.iter().filter(|t| *t != "null").collect();
+    let union = non_null.len() > 1;
+    let nullable = type_list.len() > non_null.len() && !non_null.is_empty();
+    let type_name: Option<&str> = if union {
+        None
+    } else {
+        non_null
+            .first()
+            .copied()
+            .or(type_list.first())
+            .map(|t| t.as_str())
     };
+
+    for key in ["properties", "required", "additionalProperties"] {
+        if s.has(key) && type_name.is_some_and(|t| t != "object") {
+            return fail(
+                &child(pointer, key),
+                format!("'{key}' only applies to objects"),
+            );
+        }
+    }
 
     let mut inferred: Option<String> = None;
     let mut values: Option<Vec<Json>> = None;
     let mut link_class: Option<Json> = None;
 
-    let is_array = type_name == Some("array") || (type_name.is_none() && s.has("items"));
+    let is_array =
+        !union && (type_name == Some("array") || (type_name.is_none() && s.has("items")));
+    let mut nested = Map::new();
 
     if has_ref {
         inferred = Some(urls::ATOMIC_URL.into());
@@ -557,9 +803,16 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
         if let Some(items) = s.get("items") {
             let items_pointer = child(pointer, "items");
             let items = as_object(items, &items_pointer)?;
-            check_keys(items, &items_pointer, &ITEM_KEYS)?;
 
-            if items.has("$ref") {
+            if items_are_nested(items) {
+                nested.insert("items".into(), read_nested(items, &items_pointer, 1)?);
+            } else {
+                check_keys(items, &items_pointer, &ITEM_KEYS)?;
+            }
+
+            if nested.contains_key("items") {
+                // Checked by the nested reader; nothing maps to a link here.
+            } else if items.has("$ref") {
                 for key in items.keys() {
                     if !["$ref", "enum", "const"].contains(&key) {
                         return fail(&child(&items_pointer, key), "not supported next to '$ref'");
@@ -578,7 +831,9 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
                 inferred = Some(urls::RESOURCE_ARRAY.into());
                 link_class = items.get("x-atomic-class").map(Node::to_json);
             }
-            values = enum_of(items, &items_pointer)?;
+            if !nested.contains_key("items") {
+                values = enum_of(items, &items_pointer)?;
+            }
         }
     } else {
         link_class = s.get("x-atomic-class").map(Node::to_json);
@@ -610,7 +865,9 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
             Some("boolean") => inferred = Some(urls::BOOLEAN.into()),
             Some("object") => inferred = Some(urls::JSON.into()),
             None => {
-                if let Some(values) = &values {
+                if union || s.has("anyOf") {
+                    inferred = Some(urls::JSON.into());
+                } else if let Some(values) = &values {
                     inferred = Some(datatype_of_values(values, pointer)?);
                 }
             }
@@ -631,6 +888,16 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
         if let Some(value) = s.get(key) {
             constraint.insert(key.to_string(), value.to_json());
         }
+    }
+    if !has_ref {
+        read_nested_keywords_except_items(s, pointer, &mut nested)?;
+    }
+    if !nested.is_empty() || (type_is_array && (union || nullable)) {
+        // The nested schema checks the type too, so keep it next to it.
+        if let Some(ty) = s.get("type") {
+            constraint.insert("type".into(), ty.to_json());
+        }
+        constraint.extend(nested);
     }
     if let Some(values) = values {
         constraint.insert("enum".into(), Json::Array(values));
