@@ -135,7 +135,12 @@ const editNextRow: KeyboardHandler = {
   cursorMode: new Set([CursorMode.Edit]),
   disabledInReadOnly: true,
   preventDefault: true,
-  handler: ({ translateCursor }) => {
+  handler: ({ tableContext, translateCursor }) => {
+    // Enter commits and lands on the next row in selection mode, as in Excel
+    // and Sheets. Staying in Edit mode opened the next row's editor, and when
+    // that row had no editor to mount (virtualized, still loading) nothing
+    // owned the keyboard.
+    tableContext.setCursorMode(CursorMode.Visual);
     translateCursor(1, 0);
   },
 };

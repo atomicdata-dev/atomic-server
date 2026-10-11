@@ -338,6 +338,8 @@ test.describe('tables', async () => {
     for (const value of values) {
       await enterGridEdit(page);
       await typeInActiveGridCell(page, value);
+      // Enter commits and selects the next row; the next pass opens it.
+      await page.keyboard.press('Enter');
     }
 
     // Every Enter must have created a row. This is the regression guard for
@@ -467,6 +469,8 @@ test.describe('tables', async () => {
       for (const name of ['gamma', 'alpha', 'beta']) {
         await enterGridEdit(page);
         await typeInActiveGridCell(page, name);
+        // Enter commits and selects the next row; the next pass opens it.
+        await page.keyboard.press('Enter');
       }
 
       await page.keyboard.press('Escape');
@@ -507,6 +511,8 @@ test.describe('tables', async () => {
     for (const value of ['rowA', 'rowB']) {
       await enterGridEdit(page);
       await typeInActiveGridCell(page, value);
+      // Enter commits and selects the next row; the next pass opens it.
+      await page.keyboard.press('Enter');
     }
 
     await page.keyboard.press('Escape');
@@ -610,6 +616,8 @@ test.describe('tables', async () => {
     for (const value of ['rowA', 'rowB']) {
       await enterGridEdit(page);
       await typeInActiveGridCell(page, value);
+      // Enter commits and selects the next row; the next pass opens it.
+      await page.keyboard.press('Enter');
     }
 
     await page.keyboard.press('Escape');
@@ -819,5 +827,59 @@ test.describe('tables', async () => {
     await waitForSynced(page);
     await page.reload();
     await expect.poll(tabNames).toEqual(['Calendar', 'Kanban']);
+  });
+
+  test('Escape from a cell editor returns to cell selection', async ({
+    page,
+  }) => {
+    test.slow();
+    await createBlankTable(page, 'Escape Test');
+
+    const activeCell = page.locator('[role="gridcell"][tabindex="0"]');
+    const focusInGrid = () =>
+      page.evaluate(
+        () =>
+          !!document
+            .querySelector('[role="grid"]')
+            ?.contains(document.activeElement),
+      );
+    const position = () =>
+      activeCell.evaluate(el => [
+        el.getAttribute('aria-colindex'),
+        el.closest('[aria-rowindex]')?.getAttribute('aria-rowindex'),
+      ]);
+
+    await focusCell(page, page.getByRole('gridcell').first());
+    const [startCol, startRow] = await position();
+
+    // Enter opens the editor, Escape must drop back to selection mode with
+    // the grid still holding the keyboard.
+    await enterGridEdit(page);
+    await page.keyboard.type('hello');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="grid"] input')).toHaveCount(0);
+    expect(await focusInGrid()).toBe(true);
+
+    // Arrows move the selection.
+    // (A blank table has one column, so move vertically.)
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(async () => Number((await position())[1]))
+      .toBe(Number(startRow) + 1);
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(position).toEqual([startCol, startRow]);
+    expect(await focusInGrid()).toBe(true);
+
+    // Enter commits and lands on the next row in selection mode.
+    await enterGridEdit(page);
+    await page.keyboard.type('x');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('[role="grid"] input')).toHaveCount(0);
+    await expect
+      .poll(async () => Number((await position())[1]))
+      .toBe(Number(startRow) + 1);
+    expect(await focusInGrid()).toBe(true);
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(position).toEqual([startCol, startRow]);
   });
 });

@@ -324,22 +324,22 @@ function FancyTableInner<T>({
 
   // Safety net for the same class of bug on the focus side: an editor surface
   // that unmounts can drop focus on `<body>` (a dialog restoring focus to a
-  // button that no longer exists, for instance), and keystrokes then reach
-  // nothing. While the grid still owns a selected cell, take the arrow keys —
-  // only when focus is genuinely nowhere, never from another focused widget —
-  // and hand focus back to the grid so the next key arrives normally. Only
-  // navigation: a stray character should not start an edit from off-grid.
+  // button that no longer exists, a virtualized row scrolling out from under
+  // its editor), and keystrokes then reach nothing. While the grid still owns
+  // a selected cell, take the arrow keys (and Escape in Edit mode, where no
+  // editor is left to receive it) — only when focus is genuinely nowhere,
+  // never from another focused widget — and hand focus back to the grid so
+  // the next key arrives normally. Only navigation: a stray character should
+  // not start an edit from off-grid.
   useEffect(() => {
-    if (cursorMode === CursorMode.Edit) {
-      return;
-    }
-
     if (selectedRow === undefined || selectedColumn === undefined) {
       return;
     }
 
     const handleOrphanedKey = (e: KeyboardEvent) => {
-      if (!NAVIGATION_KEYS.has(e.key)) {
+      const editing = cursorMode === CursorMode.Edit;
+
+      if (!NAVIGATION_KEYS.has(e.key) && !(editing && e.key === 'Escape')) {
         return;
       }
 
@@ -353,6 +353,26 @@ function FancyTableInner<T>({
         return;
       }
 
+      // An editor that owns its own surface handles its keys itself.
+      if (
+        editing &&
+        disabledKeyboardInteractions.has(KeyboardInteraction.ExitEditMode)
+      ) {
+        return;
+      }
+
+      if (editing) {
+        // No editor holds the focus, so there is nothing left to edit. Leave
+        // Edit mode (the layout effect above focuses the grid) and let the
+        // next key navigate.
+        e.preventDefault();
+        emitInteractionsFired([KeyboardInteraction.ExitEditMode]);
+        exitEditMode();
+        tableRef.current?.focus({ preventScroll: true });
+
+        return;
+      }
+
       tableRef.current?.focus({ preventScroll: true });
       handleKeyDown(e);
     };
@@ -362,7 +382,16 @@ function FancyTableInner<T>({
     return () => {
       document.removeEventListener('keydown', handleOrphanedKey);
     };
-  }, [cursorMode, selectedRow, selectedColumn, tableRef, handleKeyDown]);
+  }, [
+    cursorMode,
+    selectedRow,
+    selectedColumn,
+    tableRef,
+    handleKeyDown,
+    disabledKeyboardInteractions,
+    emitInteractionsFired,
+    exitEditMode,
+  ]);
 
   useClearCommands(columns, onClearRow, onClearCells);
 

@@ -242,6 +242,69 @@ describe('keyboard navigation after leaving edit mode', () => {
     );
   });
 
+  it('keeps the grid in control after Escape: focus inside it, arrows move', () => {
+    const { onSelectedCellChange } = renderGrid();
+
+    fireEvent.mouseDown(getCell(1));
+    fireEvent.click(getCell(1));
+    fireEvent.keyDown(getCell(1), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByLabelText('edit row 1'), { key: 'Escape' });
+
+    const grid = screen.getByRole('grid');
+    expect(grid.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
+    expect(selectedCell(onSelectedCellChange)).toEqual([0, 1]);
+    expect(grid.contains(document.activeElement)).toBe(true);
+  });
+
+  it('leaves Edit mode on Enter, selecting the next row', () => {
+    const { onSelectedCellChange } = renderGrid();
+
+    fireEvent.mouseDown(getCell(0));
+    fireEvent.click(getCell(0));
+    fireEvent.keyDown(getCell(0), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByLabelText('edit row 0'), { key: 'Enter' });
+
+    // Selection mode on the next row: no editor opened there.
+    expect(selectedCell(onSelectedCellChange)).toEqual([1, 1]);
+    expect(screen.queryByLabelText('edit row 1')).toBeNull();
+    expect(screen.queryByLabelText('edit row 0')).toBeNull();
+    expect(screen.getByRole('grid').contains(document.activeElement)).toBe(
+      true,
+    );
+
+    // Arrows navigate right away, and Enter opens the editor again.
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(selectedCell(onSelectedCellChange)).toEqual([2, 1]);
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+    expect(screen.getByLabelText('edit row 2')).toBeTruthy();
+  });
+
+  it('takes Escape back when an editor lost focus entirely', () => {
+    const { onSelectedCellChange } = renderGrid();
+
+    fireEvent.mouseDown(getCell(0));
+    fireEvent.click(getCell(0));
+    fireEvent.keyDown(getCell(0), { key: 'Enter' });
+
+    // The editor is still mounted but nothing holds focus (a virtualized row
+    // remounting under it, say), so the Escape never reaches the grid.
+    (screen.getByLabelText('edit row 0') as HTMLElement).blur();
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.queryByLabelText('edit row 0')).toBeNull();
+    expect(screen.getByRole('grid').contains(document.activeElement)).toBe(
+      true,
+    );
+
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(selectedCell(onSelectedCellChange)).toEqual([1, 1]);
+  });
+
   it('keeps its rows mounted while the cursor moves', () => {
     renderGrid();
 
