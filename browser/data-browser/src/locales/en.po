@@ -689,11 +689,11 @@ msgstr "Add an OpenRouter API key in settings"
 msgid "{0} /M output tokens"
 msgstr "{0} /M output tokens"
 
-#: src/components/SideBar/AIPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "AI Chats"
 msgstr "AI Chats"
 
-#: src/components/SideBar/index.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Ontologies"
 msgstr "Ontologies"
 
@@ -829,12 +829,12 @@ msgstr "Unauthorized"
 msgid "This drive is private, sign in to view it"
 msgstr "This drive is private, sign in to view it"
 
-#: src/components/SideBar/SideBarHomePanels.tsx
 #: src/components/SideBar/SidebarDropZones.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Favorites"
 msgstr "Favorites"
 
-#: src/components/SideBar/SideBarHomePanels.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Shared with me"
 msgstr "Shared with me"
 
@@ -3268,6 +3268,7 @@ msgstr "Search"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -3960,6 +3961,7 @@ msgstr "Chat and the log of resources visited during the meeting."
 msgid "End"
 msgstr "End"
 
+#: src/actions/resourceActions.tsx
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave"
 msgstr "Leave"
@@ -11117,7 +11119,7 @@ msgstr "Discard upload"
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 
-#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Messages"
 msgstr "Messages"
 
@@ -12611,11 +12613,6 @@ msgstr "{0} Viewers are free."
 msgid "Signed in"
 msgstr "Signed in"
 
-#. 0: title
-#: src/components/SideBar/SideBarPanel.tsx
-msgid "Hide {0}"
-msgstr "Hide {0}"
-
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This device's storage isn't responding. Close other atomic.place windows or tabs, then try again."
 msgstr "This device's storage isn't responding. Close other atomic.place windows or tabs, then try again."
@@ -12902,3 +12899,34 @@ msgstr "Could not reach that address."
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
 msgstr "That address answers, but it is not an AtomicServer."
+
+#: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
+msgid "Leave conversation"
+msgstr "Leave conversation"
+
+#: src/actions/resourceActions.tsx
+msgid "Remove this conversation from your list."
+msgstr "Remove this conversation from your list."
+
+#: src/actions/resourceActions.tsx
+msgid "Confirm Leave"
+msgstr "Confirm Leave"
+
+#. 0: who
+#: src/actions/resourceActions.tsx
+msgid "Leave {0}? This only removes it from your list. The other members keep the conversation."
+msgstr "Leave {0}? This only removes it from your list. The other members keep the conversation."
+
+#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search messages"
+msgstr "Search messages"
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search by name"
+msgstr "Search by name"
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "No matches"
+msgstr "No matches"

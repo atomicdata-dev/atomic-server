@@ -5,6 +5,11 @@ import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../navigation';
 import { fetchPrivateDriveSubject } from '../privateDrive';
+import {
+  unhideConversation,
+  useHiddenConversations,
+  withoutHidden,
+} from './hiddenConversations';
 import { hasMembers, startConversation } from './conversations';
 import { hasConversationsEndpoint } from './conversationsEndpoint';
 
@@ -24,6 +29,7 @@ export function useConversations(): string[] {
   const { agent } = useSettings();
   const [listed] = usePrivateDriveList(conversations.properties.conversations);
   const [fromServer, setFromServer] = useState<string[]>([]);
+  const hidden = useHiddenConversations(agent?.subject);
 
   useEffect(() => {
     if (!agent?.subject) return;
@@ -45,7 +51,10 @@ export function useConversations(): string[] {
     };
   }, [store, agent]);
 
-  return agent?.subject ? [...new Set([...listed, ...fromServer])] : listed;
+  return withoutHidden(
+    agent?.subject ? [...new Set([...listed, ...fromServer])] : listed,
+    hidden,
+  );
 }
 
 /** The conversations on this server the signed-in agent is a member of.
@@ -117,6 +126,9 @@ export async function findOrStartConversation(
     candidate => !candidate.error && hasMembers(candidate, members),
   );
   const conversation = existing ?? (await startConversation(store, others));
+
+  // Opening it again brings back a conversation that was left.
+  unhideConversation(agent.subject, conversation.subject);
 
   if (privateDrive && !listed.includes(conversation.subject)) {
     privateDrive.push(

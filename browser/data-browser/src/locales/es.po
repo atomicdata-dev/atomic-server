@@ -689,11 +689,11 @@ msgstr "Añade una clave API de OpenRouter en la configuración"
 msgid "{0} /M output tokens"
 msgstr "{0} /M tokens de salida"
 
-#: src/components/SideBar/AIPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "AI Chats"
 msgstr "Chats de IA"
 
-#: src/components/SideBar/index.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Ontologies"
 msgstr "Ontologías"
 
@@ -829,12 +829,12 @@ msgstr "No autorizado"
 msgid "This drive is private, sign in to view it"
 msgstr "Esta unidad es privada, inicia sesión para verla"
 
-#: src/components/SideBar/SideBarHomePanels.tsx
 #: src/components/SideBar/SidebarDropZones.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Favorites"
 msgstr ""
 
-#: src/components/SideBar/SideBarHomePanels.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Shared with me"
 msgstr "Compartido conmigo"
 
@@ -3268,6 +3268,7 @@ msgstr "Buscar"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr ""
 
@@ -3954,6 +3955,7 @@ msgstr ""
 msgid "End"
 msgstr ""
 
+#: src/actions/resourceActions.tsx
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave"
 msgstr ""
@@ -11104,7 +11106,7 @@ msgstr ""
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr ""
 
-#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Messages"
 msgstr ""
 
@@ -12598,11 +12600,6 @@ msgstr ""
 msgid "Signed in"
 msgstr ""
 
-#. 0: title
-#: src/components/SideBar/SideBarPanel.tsx
-msgid "Hide {0}"
-msgstr ""
-
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This device's storage isn't responding. Close other atomic.place windows or tabs, then try again."
 msgstr ""
@@ -12880,6 +12877,7 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older backup copies are removed, and so is the edit history of the backup: it keeps only the current state of every item. Restoring from it brings back your workspace as it is now, without its version history. Items you deleted recently can no longer be recovered from the backup. Your devices keep their own edit history and your workspace is not changed."
+msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "Could not reach that address."
@@ -12887,4 +12885,35 @@ msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
+msgid "Leave conversation"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Remove this conversation from your list."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Confirm Leave"
+msgstr ""
+
+#. 0: who
+#: src/actions/resourceActions.tsx
+msgid "Leave {0}? This only removes it from your list. The other members keep the conversation."
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search messages"
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search by name"
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "No matches"
 msgstr ""

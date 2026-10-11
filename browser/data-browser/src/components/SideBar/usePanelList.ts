@@ -64,3 +64,19 @@ export const usePanelList = (): {
 
   return { enabledPanels, enablePanel, disablePanel };
 };
+
+/** The name each panel shows in its header and in the panel menu. */
+export const panelTitle = (panel: Panel): string => {
+  switch (panel) {
+    case Panel.Ontologies:
+      return 'Ontologies';
+    case Panel.AIChats:
+      return 'AI Chats';
+    case Panel.Messages:
+      return 'Messages';
+    case Panel.Favorites:
+      return 'Favorites';
+    case Panel.SharedWithMe:
+      return 'Shared with me';
+  }
+};
