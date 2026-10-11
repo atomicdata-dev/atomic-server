@@ -25,6 +25,13 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
   page,
 }) => {
   test.setTimeout(180000);
+  // This test fails in CI only, so keep the page's console to print when it
+  // does: what the app logged around the visitor's message is the evidence.
+  const consoleLines: string[] = [];
+  page.on('console', msg =>
+    consoleLines.push(`[${msg.type()}] ${msg.text().slice(0, 500)}`),
+  );
+  page.on('pageerror', err => consoleLines.push(`[pageerror] ${err.message}`));
   await page.goto(`${FRONTEND_URL}/app/demo`);
 
   // The first resource is the meeting, with its chat open beside it.
@@ -42,12 +49,29 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
   const meetingUrl = page.url();
 
   await message.fill('Hi');
+  await expect(message).toHaveValue('Hi');
   await message.press('Enter');
 
-  // Mara answers them directly, and promptly.
-  await expect(
-    page.locator('[data-entry-key]').filter({ hasText: 'Welcome to the team' }),
-  ).toBeVisible({ timeout: 5000 });
+  try {
+    // Their own message lands first: without it there is nothing to answer.
+    await expect(
+      page
+        .locator('[data-entry-key]')
+        .filter({ has: page.getByText('Hi', { exact: true }) }),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Mara answers them directly, and promptly.
+    await expect(
+      page
+        .locator('[data-entry-key]')
+        .filter({ hasText: 'Welcome to the team' }),
+    ).toBeVisible({ timeout: 5000 });
+  } catch (e) {
+    console.log(
+      `demo-chat: browser console up to the failure:\n${consoleLines.slice(-80).join('\n')}`,
+    );
+    throw e;
+  }
 
   // Then they follow her to the board, where the card has been ticked.
   await expect(page).not.toHaveURL(meetingUrl, { timeout: 60000 });
