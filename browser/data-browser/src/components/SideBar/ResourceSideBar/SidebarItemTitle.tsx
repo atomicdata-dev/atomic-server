@@ -35,6 +35,10 @@ interface SidebarItemTitleProps {
 const NavResourceLink = styled(StyledLink)`
   display: flex;
   align-self: stretch;
+  /* A held touch is ours (menu or drag): no native callout or selection. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 `;
 
 export const SidebarItemTitle = memo(
