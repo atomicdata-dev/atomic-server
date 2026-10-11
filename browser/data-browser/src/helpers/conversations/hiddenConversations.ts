@@ -1,6 +1,7 @@
 import { conversations, type Store } from '@tomic/react';
 import { useSyncExternalStore } from 'react';
 import { fetchPrivateDriveSubject } from '../privateDrive';
+import { forgetConversation } from './messageIndex';
 
 const STORAGE_KEY = 'atomic.hidden-conversations';
 const EMPTY: string[] = [];
@@ -117,6 +118,7 @@ export async function leaveConversation(
   if (!agent?.subject) return;
 
   hideConversation(agent.subject, subject);
+  void forgetConversation(store, subject);
 
   const privateDriveSubject = await fetchPrivateDriveSubject(store, agent);
 

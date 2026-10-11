@@ -49,10 +49,27 @@ export function ChatMatchRow({
           title || 'Untitled Chat'
         )}
       </Name>
+      {match.snippet && <Snippet>{snippetOf(match.snippet)}</Snippet>}
       <Kind>{isDm ? 'Message' : 'AI chat'}</Kind>
     </Row>
   );
 }
+
+/** One line of the message, for a row that was found by its text. */
+function snippetOf(text: string): string {
+  const line = text.replace(/\s+/g, ' ').trim();
+
+  return line.length > 60 ? `${line.slice(0, 60)}...` : line;
+}
+
+const Snippet = styled.span`
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: ${p => p.theme.colors.textLight};
+  font-size: 0.8rem;
+`;
 
 const Row = styled.button<{ $selected: boolean }>`
   display: flex;

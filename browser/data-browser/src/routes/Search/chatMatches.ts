@@ -15,6 +15,8 @@ export interface ChatMatch {
   kind: ChatMatchKind;
   /** What matched: a name or title, or the text of a message. */
   via: 'name' | 'message';
+  /** The text of a matching message, when `via` is `message`. */
+  snippet?: string;
 }
 
 /** Case-insensitive substring match; an empty query matches nothing. */
@@ -54,6 +56,8 @@ export function entryText(entry: { t?: unknown; parts?: unknown }): string {
 export function findChatMatches(
   query: string,
   candidates: ChatCandidate[],
+  /** DM text found by the local index, by conversation. */
+  found: Map<string, string> = new Map(),
 ): ChatMatch[] {
   if (query.trim() === '') return [];
 
@@ -63,6 +67,13 @@ export function findChatMatches(
   for (const { subject, kind, names, texts = [] } of candidates) {
     if (names.some(name => includesQuery(name, query))) {
       byName.push({ subject, kind, via: 'name' });
+    } else if (found.has(subject)) {
+      byMessage.push({
+        subject,
+        kind,
+        via: 'message',
+        snippet: found.get(subject),
+      });
     } else if (texts.some(text => includesQuery(text, query))) {
       byMessage.push({ subject, kind, via: 'message' });
     }
