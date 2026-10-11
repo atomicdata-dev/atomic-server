@@ -1,25 +1,37 @@
 // @wc-ignore-file
-import { core, server, Datatype, type Store } from '@tomic/react';
+import {
+  core,
+  server,
+  Datatype,
+  type Resource,
+  type Store,
+} from '@tomic/react';
 
 /**
  * Local search over DM text. Messages are sealed on the server, so the only
  * place their words can be searched is this device, after it has decrypted
- * them. Each decrypted message is copied into one small resource in a hidden
- * local-only drive: the local full-text index treats it like any resource, and
+ * them. Decrypted messages are copied, as lines of text, into chunks of up to
+ * `CHUNK_SIZE` messages (one resource per chunk, like a ChatLog page) in a
+ * hidden local-only drive: the local full-text index treats a chunk like any
+ * resource, and
  * `registerLocalOnlyDrive` keeps it out of the outbox, sync and the server.
  * The drive is in no drive list, so no switcher, sidebar or backup lists it.
  */
 
 /** Not in any ontology: these resources never leave the device. */
-const SOURCE = 'https://atomicdata.dev/properties/localSourceMessage';
 const CONVERSATION = 'https://atomicdata.dev/properties/localConversation';
+/** The message subjects of a chunk, in line order: line i is message i. */
+const SOURCES = 'https://atomicdata.dev/properties/localSourceMessages';
+const CHUNK = 'https://atomicdata.dev/properties/localChunk';
 const DATATYPES = {
-  [SOURCE]: Datatype.ATOMIC_URL,
+  [SOURCES]: Datatype.RESOURCEARRAY,
   [CONVERSATION]: Datatype.ATOMIC_URL,
+  [CHUNK]: Datatype.INTEGER,
 };
-const DRIVE_KEY = 'atomic.messageSearchDrive.';
 
-const requested = new Set<string>();
+/** The same size as a ChatLog page (planning/chat-log.md). */
+export const CHUNK_SIZE = 256;
+const DRIVE_KEY = 'atomic.messageSearchDrive.';
 
 async function indexDrive(store: Store): Promise<string | undefined> {
   const agent = store.getAgent()?.subject;
@@ -59,6 +71,139 @@ async function indexDrive(store: Store): Promise<string | undefined> {
   return drive.subject;
 }
 
+interface Chunk {
+  resource: Resource;
+  sources: string[];
+  lines: string[];
+}
+
+interface ConversationState {
+  chunks: Chunk[];
+  known: Set<string>;
+}
+
+/** Per conversation, what this session knows of its chunks. */
+const states = new Map<string, Promise<ConversationState>>();
+/** Per conversation, the end of the writes queued so far. */
+const queues = new Map<string, Promise<void>>();
+
+/**
+ * The subject of chunk `index` of `conversation`: an `atomic:` identifier like
+ * any other (64 bytes, base64url), taken from a hash so the same chunk always
+ * gets the same name. A DID may not carry a path, so it cannot be built from
+ * the drive's subject.
+ */
+async function chunkSubject(
+  conversation: string,
+  index: number,
+): Promise<string> {
+  const data = new TextEncoder().encode(`chunk\n${conversation}\n${index}`);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-512', data));
+  const base64 = btoa(String.fromCharCode(...hash));
+
+  return `atomic:${base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+
+/** One line per message: a newline would shift every line after it. */
+const toLine = (text: string) => text.replace(/\s*\n\s*/g, ' ').trim();
+
+async function loadState(
+  store: Store,
+  drive: string,
+  conversation: string,
+): Promise<ConversationState> {
+  // One local lookup per conversation and session. After that the chunks are
+  // addressed by subject, so a new message is a single update.
+  const found = await store.search('', {
+    parents: drive,
+    filters: { [CONVERSATION]: conversation },
+    limit: 10_000,
+  });
+  const chunks: Chunk[] = [];
+
+  for (const subject of found) {
+    const resource = await store.getResource(subject);
+    const sources = (resource.get(SOURCES) as string[] | undefined) ?? [];
+    const text = (resource.get(core.properties.name) as string) ?? '';
+
+    chunks[Number(resource.get(CHUNK) ?? chunks.length)] = {
+      resource,
+      sources,
+      lines: text.split('\n'),
+    };
+  }
+
+  const dense = chunks.filter(Boolean);
+
+  return { chunks: dense, known: new Set(dense.flatMap(c => c.sources)) };
+}
+
+const stateOf = (store: Store, drive: string, conversation: string) => {
+  let state = states.get(conversation);
+
+  if (!state) {
+    state = loadState(store, drive, conversation);
+    states.set(conversation, state);
+    state.catch(() => states.delete(conversation));
+  }
+
+  return state;
+};
+
+async function write(
+  store: Store,
+  conversation: string,
+  message: string,
+  line: string,
+): Promise<void> {
+  const drive = await indexDrive(store);
+
+  if (!drive) return;
+
+  const state = await stateOf(store, drive, conversation);
+
+  if (state.known.has(message)) return;
+
+  const open = state.chunks.at(-1);
+
+  if (open && open.sources.length < CHUNK_SIZE) {
+    open.sources.push(message);
+    open.lines.push(line);
+    await open.resource.set(
+      SOURCES,
+      open.sources,
+      false,
+      Datatype.RESOURCEARRAY,
+    );
+    await open.resource.set(
+      core.properties.name,
+      open.lines.join('\n'),
+      false,
+      Datatype.STRING,
+    );
+    await open.resource.save();
+  } else {
+    const index = state.chunks.length;
+    const resource = await store.newResource({
+      // Deterministic: the chunk of a conversation has one name.
+      subject: await chunkSubject(conversation, index),
+      parent: drive,
+      propVals: {
+        [core.properties.name]: line,
+        [SOURCES]: [message],
+        [CONVERSATION]: conversation,
+        [CHUNK]: index,
+      },
+      propDatatypes: DATATYPES,
+    });
+
+    await resource.save();
+    state.chunks.push({ resource, sources: [message], lines: [line] });
+  }
+
+  state.known.add(message);
+}
+
 /** Remember the decrypted `text` of `message`, once. */
 export async function indexMessage(
   store: Store,
@@ -66,44 +211,45 @@ export async function indexMessage(
   conversation: string,
   text: string,
 ): Promise<void> {
-  if (!text.trim() || requested.has(message)) return;
+  const line = toLine(text);
 
-  requested.add(message);
+  if (!line) return;
 
-  try {
-    const drive = await indexDrive(store);
+  // Writes of one conversation take turns: they all update the open chunk.
+  const previous = queues.get(conversation) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    try {
+      await write(store, conversation, message, line);
+    } catch (error) {
+      // Start from what is on disk the next time.
+      states.delete(conversation);
+      store.notifyError(error);
+    }
+  });
 
-    if (!drive) return;
-
-    const [existing] = await store.search('', {
-      parents: drive,
-      filters: { [SOURCE]: message },
-      limit: 1,
-    });
-
-    if (existing) return;
-
-    const copy = await store.newResource({
-      parent: drive,
-      propVals: {
-        [core.properties.name]: text,
-        [SOURCE]: message,
-        [CONVERSATION]: conversation,
-      },
-      propDatatypes: DATATYPES,
-    });
-
-    await copy.save();
-  } catch (error) {
-    requested.delete(message);
-    store.notifyError(error);
-  }
+  queues.set(conversation, next);
+  await next;
 }
 
 export interface MessageMatch {
   conversation: string;
-  /** The text of a message that matched. */
+  /** The message whose line matched. */
+  message: string;
+  /** The text of that message. */
   text: string;
+}
+
+/** The line of `lines` that best fits `query`: all words, else any word. */
+function bestLine(lines: string[], query: string): number {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const lower = lines.map(l => l.toLowerCase());
+  const all = lower.findIndex(l => words.every(w => l.includes(w)));
+
+  if (all !== -1) return all;
+
+  const any = lower.findIndex(l => words.some(w => l.includes(w)));
+
+  return any === -1 ? 0 : any;
 }
 
 /** The conversations with a decrypted message matching `query`, best first. */
@@ -119,13 +265,21 @@ export async function searchMessages(
   const found = new Map<string, MessageMatch>();
 
   for (const hit of hits) {
-    const copy = await store.getResource(hit);
-    const conversation = copy.get(CONVERSATION) as string | undefined;
-    const text = copy.get(core.properties.name) as string | undefined;
+    const chunk = await store.getResource(hit);
+    const conversation = chunk.get(CONVERSATION) as string | undefined;
+    const text = chunk.get(core.properties.name) as string | undefined;
+    const sources = (chunk.get(SOURCES) as string[] | undefined) ?? [];
 
-    if (conversation && text && !found.has(conversation)) {
-      found.set(conversation, { conversation, text });
-    }
+    if (!conversation || !text || found.has(conversation)) continue;
+
+    const lines = text.split('\n');
+    const i = bestLine(lines, query);
+
+    found.set(conversation, {
+      conversation,
+      message: sources[i] ?? '',
+      text: lines[i],
+    });
   }
 
   return [...found.values()];
@@ -140,17 +294,17 @@ export async function forgetConversation(
 
   if (!drive) return;
 
-  const copies = await store.search('', {
+  // After any write still queued, so none recreates a chunk.
+  await queues.get(conversation);
+  states.delete(conversation);
+
+  const chunks = await store.search('', {
     parents: drive,
     filters: { [CONVERSATION]: conversation },
     limit: 10_000,
   });
 
   await Promise.all(
-    copies.map(async copy => {
-      const resource = await store.getResource(copy);
-      requested.delete(resource.get(SOURCE) as string);
-      await resource.destroy();
-    }),
+    chunks.map(async chunk => (await store.getResource(chunk)).destroy()),
   );
 }
