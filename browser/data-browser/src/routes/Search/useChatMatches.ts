@@ -1,6 +1,7 @@
 // @wc-ignore-file
 import { core, useResources, useStore } from '@tomic/react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { searchMessages } from '../../helpers/conversations/messageIndex';
 import { useConversations } from '../../helpers/conversations/useConversations';
 import { knownPages, scopeKey } from '../../helpers/chatLog';
 import { usePrivateDrive } from '../../hooks/usePrivateDrive';
@@ -24,9 +25,9 @@ function useStableList(subjects: string[]): string[] {
  * search cannot find: DMs are end-to-end encrypted in drives of their own and
  * AI chats live in the private drive.
  *
- * DMs match on member names only. Their messages are sealed, and decrypting
- * every message of every conversation for a search is not worth it. AI chats
- * also match on messages, but only pages this session already loaded.
+ * DMs match on member names and on messages this device has decrypted before
+ * (see `messageIndex`). AI chats match on messages too, but only pages this
+ * session already loaded.
  */
 export function useChatMatches(query: string, enabled: boolean): ChatMatch[] {
   const store = useStore();
@@ -49,6 +50,7 @@ export function useChatMatches(query: string, enabled: boolean): ChatMatch[] {
     ...new Set(dms.flatMap(subject => membersOf(subject))),
   ]);
   const memberResources = useResources(memberList);
+  const found = useDmTextMatches(query, enabled);
 
   if (!enabled || query.trim() === '') return [];
 
@@ -72,7 +74,7 @@ export function useChatMatches(query: string, enabled: boolean): ChatMatch[] {
     ),
   ];
 
-  return findChatMatches(query, candidates);
+  return findChatMatches(query, candidates, found);
 }
 
 /** Text of the pages of an AI chat this client already knows and has in
@@ -88,4 +90,37 @@ function loadedMessageTexts(
         .listChatLogEntries()
         .map(({ entry }) => entryText(entry)),
   );
+}
+
+const NO_TEXT_MATCHES = new Map<string, string>();
+
+/** Conversations with a decrypted message matching `query`, with that text. */
+export function useDmTextMatches(
+  query: string,
+  enabled: boolean,
+): Map<string, string> {
+  const store = useStore();
+  const [found, setFound] = useState(new Map<string, string>());
+
+  useEffect(() => {
+    if (!enabled || query.trim() === '') return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchMessages(store, query)
+        .then(matches => {
+          if (!cancelled) {
+            setFound(new Map(matches.map(m => [m.conversation, m.text])));
+          }
+        })
+        .catch(() => undefined);
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [store, query, enabled]);
+
+  return enabled && query.trim() !== '' ? found : NO_TEXT_MATCHES;
 }

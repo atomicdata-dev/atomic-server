@@ -18,6 +18,7 @@ import {
 import { sendSealedMessage } from '../../helpers/conversations/conversations';
 import { ChatView, useChatMessages } from '../ChatRoom/ChatRoomView';
 import type { ResourcePageProps } from '../ResourcePage';
+import { indexMessage } from '../../helpers/conversations/messageIndex';
 import { ConversationIcon } from './ConversationIcon';
 import { ConversationTitle } from './ConversationTitle';
 import { SealedMessagesContext } from './sealedMessages';
@@ -134,6 +135,17 @@ function useOpenedMessages(
         conversation,
         sealed.map(message => message.value),
       );
+
+      payloads.forEach((payload, i) => {
+        if (payload?.text) {
+          void indexMessage(
+            store,
+            sealed[i].subject,
+            conversation,
+            payload.text,
+          );
+        }
+      });
 
       if (cancelled) return;
 

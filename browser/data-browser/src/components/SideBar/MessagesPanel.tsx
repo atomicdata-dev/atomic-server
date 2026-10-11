@@ -2,6 +2,7 @@ import { useResource } from '@tomic/react';
 import { useEffect, useState, type JSX } from 'react';
 import { FaMagnifyingGlass, FaPlus } from 'react-icons/fa6';
 import { styled } from 'styled-components';
+import { useDmTextMatches } from '../../routes/Search/useChatMatches';
 import { useConversations } from '../../helpers/conversations/useConversations';
 import { ConversationIcon } from '../../views/Conversation/ConversationIcon';
 import {
@@ -34,6 +35,7 @@ export function MessagesPanel({
   const [query, setQuery] = useState('');
   // Which conversations match the query, reported by their links.
   const [matches, setMatches] = useState<Record<string, boolean>>({});
+  const foundByText = useDmTextMatches(query, searching);
   const filtering = searching && query.trim() !== '';
   const noMatches =
     filtering && conversations.every(subject => matches[subject] === false);
@@ -100,6 +102,7 @@ export function MessagesPanel({
                 key={subject}
                 subject={subject}
                 query={searching ? query : ''}
+                textMatch={foundByText.has(subject)}
                 onMatch={match =>
                   setMatches(prev =>
                     prev[subject] === match
@@ -123,12 +126,15 @@ export function MessagesPanel({
 function ConversationLink({
   subject,
   query,
+  textMatch,
   onMatch,
   onClick,
 }: {
   subject: string;
   /** Only conversations with a member whose name contains this show. */
   query: string;
+  /** The local index found the query in a message of this conversation. */
+  textMatch: boolean;
   onMatch: (match: boolean) => void;
   onClick: () => void;
 }): JSX.Element | null {
@@ -136,7 +142,9 @@ function ConversationLink({
   const names = useMemberNames(resource);
   const needle = query.trim().toLowerCase();
   const match =
-    needle === '' || names.some(name => name.toLowerCase().includes(needle));
+    needle === '' ||
+    textMatch ||
+    names.some(name => name.toLowerCase().includes(needle));
 
   useEffect(() => onMatch(match), [match, onMatch]);
 

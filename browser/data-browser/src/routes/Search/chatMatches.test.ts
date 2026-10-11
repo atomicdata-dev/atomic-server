@@ -38,6 +38,18 @@ describe('findChatMatches', () => {
     });
   });
 
+  it('matches a DM by text the local index found, with the text', () => {
+    const found = new Map([['dm1', 'meet at the hangar']]);
+    expect(findChatMatches('hangar', candidates, found)).toEqual([
+      {
+        subject: 'dm1',
+        kind: 'dm',
+        via: 'message',
+        snippet: 'meet at the hangar',
+      },
+    ]);
+  });
+
   it('lists name matches before message matches', () => {
     const [first] = findChatMatches('alice', candidates);
     expect(first.via).toBe('name');

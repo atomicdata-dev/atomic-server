@@ -3729,7 +3729,11 @@ export class Store {
     // Local hits come from the durable KV index in ClientDb (title,
     // description, Loro body, 1-edit prefix fuzzy, PropValSub filters).
     const clientDb = this.clientDb;
-    const offline = !this._serverConnected && !opts.serverOnly;
+    // A local-only drive is not on the server, so searching it never asks.
+    const offline =
+      (!this._serverConnected ||
+        (!!parentScope && this.isLocalOnlyDrive(parentScope))) &&
+      !opts.serverOnly;
     const limit = opts.limit ?? 30;
 
     // The local OPFS search can take a while on a large drive, so it must not
