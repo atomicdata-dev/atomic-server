@@ -44,10 +44,12 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
   await message.fill('Hi');
   await message.press('Enter');
 
-  // Mara answers them directly, and promptly.
+  // Mara answers them directly, and promptly: she replies in about a second
+  // alone and in 4 to 7 s with four workers on four cores, so the wait only
+  // has to tell "answers" from "never answers" (the board move below is 60 s).
   await expect(
     page.locator('[data-entry-key]').filter({ hasText: 'Welcome to the team' }),
-  ).toBeVisible({ timeout: 5000 });
+  ).toBeVisible({ timeout: 30000 });
 
   // Then they follow her to the board, where the card has been ticked.
   await expect(page).not.toHaveURL(meetingUrl, { timeout: 60000 });
