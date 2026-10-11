@@ -3268,6 +3268,7 @@ msgstr ""
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr ""
 
@@ -12880,6 +12881,7 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older backup copies are removed, and so is the edit history of the backup: it keeps only the current state of every item. Restoring from it brings back your workspace as it is now, without its version history. Items you deleted recently can no longer be recovered from the backup. Your devices keep their own edit history and your workspace is not changed."
+msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "Could not reach that address."
@@ -12887,4 +12889,18 @@ msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
+msgstr ""
+
+#. 0: name
+#: src/helpers/syncProblem.ts
+msgid "This server does not have “{0}”"
+msgstr ""
+
+#: src/helpers/syncProblem.ts
+msgid "This server does not have another workspace on this device"
+msgstr ""
+
+#. 0: serverName
+#: src/helpers/syncProblem.ts
+msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr ""

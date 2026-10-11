@@ -34,6 +34,9 @@ import {
   type StoreSyncStatus,
   type CommitLogEntry,
   useStore,
+  useResource,
+  useString,
+  core,
   useProperty,
   truncateUrl,
   Datatype,
@@ -1873,13 +1876,28 @@ function SyncPage() {
 
   // Why this workspace is not syncing, if it is not. A local-only workspace is
   // not supposed to be, so it has nothing to explain.
+  const syncProblemInput = {
+    status,
+    refusedByServer: store.isDriveRefusedByServer(status.drive),
+    entries: store.outbox.pending(),
+    serverName: serverLabel(status.serverUrl ?? ''),
+    driveOf: (subject: string) => store.driveOfSubject(subject),
+  };
+  // A problem can be about another workspace than the one in view; name it by
+  // its title, which needs a first pass to know which one it is.
+  const problemDrive = localOnlyDrive
+    ? undefined
+    : describeSyncProblem(syncProblemInput)?.otherDrive;
+  const problemDriveResource = useResource(problemDrive);
+  const [problemDriveName] = useString(
+    problemDriveResource,
+    core.properties.name,
+  );
   const syncProblem = localOnlyDrive
     ? null
     : describeSyncProblem({
-        status,
-        refusedByServer: store.isDriveRefusedByServer(status.drive),
-        entries: store.outbox.pending(),
-        serverName: serverLabel(status.serverUrl ?? ''),
+        ...syncProblemInput,
+        driveTitle: () => (problemDrive ? problemDriveName : undefined),
       });
   const syncProblemKey = syncProblem?.key;
   const syncProblemOurs = syncProblem?.cause === 'ours';

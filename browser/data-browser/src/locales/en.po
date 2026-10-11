@@ -3268,6 +3268,7 @@ msgstr "Search"
 #: src/helpers/managed/cloudSync.ts
 #: src/helpers/managed/prepareDriveSharing.ts
 #: src/helpers/managed/reconcile.ts
+#: src/helpers/managed/refusedDrive.ts
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -12902,3 +12903,17 @@ msgstr "Could not reach that address."
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
 msgstr "That address answers, but it is not an AtomicServer."
+
+#. 0: name
+#: src/helpers/syncProblem.ts
+msgid "This server does not have “{0}”"
+msgstr "This server does not have “{0}”"
+
+#: src/helpers/syncProblem.ts
+msgid "This server does not have another workspace on this device"
+msgstr "This server does not have another workspace on this device"
+
+#. 0: serverName
+#: src/helpers/syncProblem.ts
+msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+msgstr "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
