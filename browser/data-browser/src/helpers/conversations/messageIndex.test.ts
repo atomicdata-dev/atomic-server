@@ -6,6 +6,8 @@ const load = () => import('./messageIndex');
 const SOURCES = 'https://atomicdata.dev/properties/localSourceMessages';
 const CONVERSATION = 'https://atomicdata.dev/properties/localConversation';
 
+let saves = 0;
+
 class FakeResource {
   destroyed = false;
 
@@ -22,7 +24,9 @@ class FakeResource {
     this.props[prop] = value;
   }
 
-  async save() {}
+  async save() {
+    saves++;
+  }
 
   async destroy() {
     this.destroyed = true;
@@ -84,6 +88,7 @@ const chunks = (resources: Map<string, FakeResource>) =>
 
 describe('messageIndex', () => {
   beforeEach(() => {
+    saves = 0;
     const data = new Map<string, string>();
 
     vi.stubGlobal('localStorage', {
@@ -186,6 +191,39 @@ describe('messageIndex', () => {
 
     expect(hit.message).toBe('atomic:m300');
     expect(hit.text).toBe('line 300');
+  });
+
+  it('writes messages queued together with one save per chunk', async () => {
+    const index = await load();
+    const { store, resources } = fakeStore();
+
+    await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        index.indexMessage(store, `atomic:m${i}`, 'atomic:c1', `line ${i}`),
+      ),
+    );
+
+    // The drive's own save, and one for all fifty messages.
+    expect(saves).toBe(2);
+    expect(chunks(resources)).toHaveLength(1);
+    expect(chunks(resources)[0].props[SOURCES]).toHaveLength(50);
+
+    // A later pass is one more save, of the same chunk.
+    saves = 0;
+    await Promise.all([
+      index.indexMessage(store, 'atomic:m50', 'atomic:c1', 'line 50'),
+      index.indexMessage(store, 'atomic:m51', 'atomic:c1', 'line 51'),
+    ]);
+    expect(saves).toBe(1);
+
+    // Crossing the chunk boundary: one save for the old chunk, one for the new.
+    saves = 0;
+    await Promise.all(
+      Array.from({ length: index.CHUNK_SIZE }, (_, i) =>
+        index.indexMessage(store, `atomic:n${i}`, 'atomic:c1', `more ${i}`),
+      ),
+    );
+    expect(saves).toBe(2);
   });
 
   it('reports one match per conversation and nothing for an empty query', async () => {

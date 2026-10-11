@@ -150,62 +150,90 @@ const stateOf = (store: Store, drive: string, conversation: string) => {
   return state;
 };
 
-async function write(
-  store: Store,
-  conversation: string,
-  message: string,
-  line: string,
-): Promise<void> {
-  const drive = await indexDrive(store);
+interface Pending {
+  message: string;
+  line: string;
+}
+
+/** Per conversation, messages waiting for the next flush. */
+const pending = new Map<string, Pending[]>();
+
+/**
+ * Append every pending line of `conversation`: one `set` and one `save` per
+ * chunk touched, whatever the number of messages.
+ */
+async function flush(store: Store, conversation: string): Promise<void> {
+  const items = pending.get(conversation) ?? [];
+
+  pending.delete(conversation);
+
+  const drive = items.length > 0 ? await indexDrive(store) : undefined;
 
   if (!drive) return;
 
   const state = await stateOf(store, drive, conversation);
+  const fresh: Pending[] = [];
 
-  if (state.known.has(message)) return;
-
-  const open = state.chunks.at(-1);
-
-  if (open && open.sources.length < CHUNK_SIZE) {
-    open.sources.push(message);
-    open.lines.push(line);
-    await open.resource.set(
-      SOURCES,
-      open.sources,
-      false,
-      Datatype.RESOURCEARRAY,
-    );
-    await open.resource.set(
-      core.properties.name,
-      open.lines.join('\n'),
-      false,
-      Datatype.STRING,
-    );
-    await open.resource.save();
-  } else {
-    const index = state.chunks.length;
-    const resource = await store.newResource({
-      // Deterministic: the chunk of a conversation has one name.
-      subject: await chunkSubject(conversation, index),
-      parent: drive,
-      propVals: {
-        [core.properties.name]: line,
-        [SOURCES]: [message],
-        [CONVERSATION]: conversation,
-        [CHUNK]: index,
-      },
-      propDatatypes: DATATYPES,
-    });
-
-    await resource.save();
-    state.chunks.push({ resource, sources: [message], lines: [line] });
+  for (const item of items) {
+    if (!state.known.has(item.message)) {
+      state.known.add(item.message);
+      fresh.push(item);
+    }
   }
 
-  state.known.add(message);
+  while (fresh.length > 0) {
+    const open = state.chunks.at(-1);
+
+    if (open && open.sources.length < CHUNK_SIZE) {
+      const taken = fresh.splice(0, CHUNK_SIZE - open.sources.length);
+
+      open.sources.push(...taken.map(t => t.message));
+      open.lines.push(...taken.map(t => t.line));
+      await open.resource.set(
+        SOURCES,
+        open.sources,
+        false,
+        Datatype.RESOURCEARRAY,
+      );
+      await open.resource.set(
+        core.properties.name,
+        open.lines.join('\n'),
+        false,
+        Datatype.STRING,
+      );
+      await open.resource.save();
+    } else {
+      const taken = fresh.splice(0, CHUNK_SIZE);
+      const index = state.chunks.length;
+      const resource = await store.newResource({
+        // Deterministic: the chunk of a conversation has one name.
+        subject: await chunkSubject(conversation, index),
+        parent: drive,
+        propVals: {
+          [core.properties.name]: taken.map(t => t.line).join('\n'),
+          [SOURCES]: taken.map(t => t.message),
+          [CONVERSATION]: conversation,
+          [CHUNK]: index,
+        },
+        propDatatypes: DATATYPES,
+      });
+
+      await resource.save();
+      state.chunks.push({
+        resource,
+        sources: taken.map(t => t.message),
+        lines: taken.map(t => t.line),
+      });
+    }
+  }
 }
 
-/** Remember the decrypted `text` of `message`, once. */
-export async function indexMessage(
+/**
+ * Remember the decrypted `text` of `message`, once. This only queues it: all
+ * messages queued in the same tick (a conversation opening) are written
+ * together, so opening 50 messages is one save. Resolves once they are saved.
+ */
+export function indexMessage(
   store: Store,
   message: string,
   conversation: string,
@@ -213,13 +241,22 @@ export async function indexMessage(
 ): Promise<void> {
   const line = toLine(text);
 
-  if (!line) return;
+  if (!line) return Promise.resolve();
+
+  const list = pending.get(conversation);
+
+  if (list) {
+    list.push({ message, line });
+  } else {
+    pending.set(conversation, [{ message, line }]);
+  }
 
   // Writes of one conversation take turns: they all update the open chunk.
+  // The first message of a tick schedules the flush; the rest ride along.
   const previous = queues.get(conversation) ?? Promise.resolve();
   const next = previous.then(async () => {
     try {
-      await write(store, conversation, message, line);
+      await flush(store, conversation);
     } catch (error) {
       // Start from what is on disk the next time.
       states.delete(conversation);
@@ -228,7 +265,8 @@ export async function indexMessage(
   });
 
   queues.set(conversation, next);
-  await next;
+
+  return next;
 }
 
 export interface MessageMatch {
