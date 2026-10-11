@@ -7,6 +7,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Loro documents: strings that start with `[`, `{`, `atomic:`, `did:ad:` or `http(s)://` are tagged as `string` in the `datatypes` map so they are no longer read back as nested resources or URLs, and JSON `null` is kept inside nested maps and lists.
+
 ## [v0.41.0-beta.8] - 2026-10-10
 
 - Discovery (#2198): a drive's pkarr record also lists the public https origins of the servers hosting it (`_atomic_http`), published at boot and every hour, so the app can find a drive's server from the secret alone. New anonymous `GET /genesis?subject=<did>` returns only a drive's genesis certificate, which the app verifies against the drive DID before connecting. Drives minted before genesis certificates existed answer 404 and are not found this way.
