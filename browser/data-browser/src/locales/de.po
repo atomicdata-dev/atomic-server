@@ -12919,5 +12919,5 @@ msgid "Agree and host"
 msgstr ""
 
 #: src/components/Cloud/HostOnPortalOffer.tsx
-msgid "This workspace is only on this device and your server. Host it on atomic.place and signing in with your secret finds it anywhere."
+msgid "Your workspace isn’t hosted anywhere yet. Host it on atomic.place and signing in with your secret finds it on any device."
 msgstr ""

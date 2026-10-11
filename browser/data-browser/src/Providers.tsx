@@ -82,12 +82,13 @@ export const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
                           <FormValidationContextProvider
                             onValidationChange={() => undefined}
                           >
-                            <Toaster />
                             <DatabaseUpgradeNotice />
                             <CustomViewProvider>
                               <MetaSetter />
                               <DropdownContainer>
                                 <DialogGlobalContextProvider>
+                                  {/* Inside the dialog provider: a toast that holds a dialog (the hosting offer) portals it into this provider's container. */}
+                                  <Toaster />
                                   <LazyAIChangesProvider>
                                     <PopoverContainer>
                                       <DropdownContainer>

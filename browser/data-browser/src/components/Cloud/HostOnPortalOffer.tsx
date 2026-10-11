@@ -126,8 +126,8 @@ export function HostOnPortalOffer({
   return (
     <Card data-testid='host-on-portal-offer'>
       <p>
-        This workspace is only on this device and your server. Host it on
-        atomic.place and signing in with your secret finds it anywhere.
+        Your workspace isn’t hosted anywhere yet. Host it on atomic.place and
+        signing in with your secret finds it on any device.
       </p>
       <Actions>
         <Button
