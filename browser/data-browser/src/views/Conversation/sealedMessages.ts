@@ -1,4 +1,6 @@
 import { createContext, useContext } from 'react';
+import { migratedKeyHash } from '@tomic/react';
+import { parseEntryId } from '../../helpers/chatLog';
 import type { SealedPayload } from '../../helpers/conversations/conversationCrypto';
 
 /**
@@ -25,4 +27,43 @@ export function useSealedMessage(subject: string): SealedState {
   }
 
   return { sealed: true, payload: opened.get(subject) };
+}
+
+/**
+ * A reply inside a payload names the message it answers by its id when it was
+ * sent. For a message that was moved into the log afterwards that is the old
+ * `SealedMessage` subject, which no longer exists; the entry it became has the
+ * same hash in its key (`migratedEntryKey`). Point such replies at the entry,
+ * when it is listed. The payload itself is encrypted and stays as it was.
+ */
+export function resolveReplies(
+  payloads: Map<string, SealedPayload | null>,
+  messages: string[],
+): Map<string, SealedPayload | null> {
+  const byHash = new Map<string, string>();
+
+  for (const id of messages) {
+    const key = parseEntryId(id)?.key;
+
+    if (key) byHash.set(key.slice(key.indexOf('-') + 1), id);
+  }
+
+  if (byHash.size === 0) return payloads;
+
+  const resolved = new Map<string, SealedPayload | null>();
+
+  for (const [id, payload] of payloads) {
+    const replyTo = payload?.replyTo;
+    const target =
+      replyTo && !parseEntryId(replyTo)
+        ? byHash.get(migratedKeyHash(replyTo))
+        : undefined;
+
+    resolved.set(
+      id,
+      payload && target ? { ...payload, replyTo: target } : payload,
+    );
+  }
+
+  return resolved;
 }

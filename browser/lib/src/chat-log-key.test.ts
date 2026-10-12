@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { migratedEntryKey } from './chat-log.js';
+import { migratedEntryKey, migratedKeyHash } from './chat-log.js';
 
 describe('migratedEntryKey', () => {
   // The same vectors are in `migrated_key_is_the_same_in_both_spellings...`
@@ -17,5 +17,11 @@ describe('migratedEntryKey', () => {
     }
 
     expect(migratedEntryKey(0x1a122ad6665, 'did:ad:abd')).not.toBe(want);
+  });
+
+  it('has a hash part that does not depend on the creation time', () => {
+    expect(migratedKeyHash('did:ad:abc')).toBe('ba7816bf');
+    expect(migratedKeyHash('atomic:abc?x=1')).toBe('ba7816bf');
+    expect(migratedEntryKey(7, 'did:ad:abc').endsWith('-ba7816bf')).toBe(true);
   });
 });

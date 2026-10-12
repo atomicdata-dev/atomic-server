@@ -84,6 +84,28 @@ test.describe('conversations', () => {
     await send(bob, reply);
     await expect(page.getByText(reply)).toBeVisible({ timeout: 30_000 });
 
+    // Both messages are entries of the conversation's chat log, not resources
+    // of their own, and the second author is Bob's.
+    await expect(page.locator('[data-entry-key]')).toHaveCount(2);
+    await expect(bob.locator('[data-entry-key]')).toHaveCount(2);
+
+    // Only the author gets the delete button: Bob's message has none for Alice.
+    const bobsLine = page
+      .locator('[data-entry-key]')
+      .filter({ hasText: reply });
+    await bobsLine.hover();
+    await expect(
+      bobsLine.getByRole('button', { name: 'Delete message' }),
+    ).toHaveCount(0);
+
+    // Bob removes his own and it disappears for Alice too.
+    bob.once('dialog', dialog => dialog.accept());
+    const ownLine = bob.locator('[data-entry-key]').filter({ hasText: reply });
+    await ownLine.hover();
+    await ownLine.getByRole('button', { name: 'Delete message' }).click();
+    await expect(page.getByText(reply)).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByText(hello)).toBeVisible();
+
     await bobContext.close();
   });
 });

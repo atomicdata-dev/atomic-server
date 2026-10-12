@@ -26,7 +26,7 @@ export function useChatLogPages(
   property: string,
   value: string,
   drive?: string,
-  /** Conversations hold sealed messages and no log. */
+  /** Set false to skip the query, for a chat that has no log. */
   enabled = true,
 ): {
   pages: string[];

@@ -6,7 +6,7 @@ import {
   type Agent,
   type Store,
 } from '@tomic/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FaLock } from 'react-icons/fa6';
 import { styled } from 'styled-components';
 import { Column } from '../../components/Row';
@@ -15,11 +15,12 @@ import {
   openPayloads,
   type SealedPayload,
 } from '../../helpers/conversations/conversationCrypto';
+import { parseEntryId } from '../../helpers/chatLog';
 import { sendSealedMessage } from '../../helpers/conversations/conversations';
 import { ChatView, useChatMessages } from '../ChatRoom/ChatRoomView';
 import type { ResourcePageProps } from '../ResourcePage';
 import { ConversationTitle } from './ConversationTitle';
-import { SealedMessagesContext } from './sealedMessages';
+import { resolveReplies, SealedMessagesContext } from './sealedMessages';
 
 /**
  * An end-to-end encrypted conversation: the chat, with each message opened
@@ -39,12 +40,16 @@ export function ConversationPage({ resource }: ResourcePageProps) {
     core.properties.parent,
     true,
   );
-  const opened = useOpenedMessages(
+  const payloads = useOpenedMessages(
     store,
     agent,
     keyring,
     resource.subject,
     messages,
+  );
+  const opened = useMemo(
+    () => resolveReplies(payloads, messages),
+    [payloads, messages],
   );
 
   // The conversation is a drive of its own, never the open one, so its new
@@ -114,16 +119,27 @@ function useOpenedMessages(
     let cancelled = false;
 
     const run = async () => {
-      const resources = await Promise.all(
-        pending.map(message => store.getResource(message)),
-      );
-      const sealed = resources.flatMap(message => {
-        const value = message.get(conversations.properties.sealed);
+      // An id is a log entry (`<page>#<key>`, what is written now) or a
+      // SealedMessage resource that was not moved into the log yet.
+      const sealed = (
+        await Promise.all(
+          pending.map(async id => {
+            const entryId = parseEntryId(id);
 
-        return typeof value === 'string'
-          ? [{ subject: message.subject, value }]
-          : [];
-      });
+            if (entryId) {
+              const page = await store.getResource(entryId.page);
+              const value = page.getChatLogEntry(entryId.key)?.s;
+
+              return typeof value === 'string' ? [{ subject: id, value }] : [];
+            }
+
+            const message = await store.getResource(id);
+            const value = message.get(conversations.properties.sealed);
+
+            return typeof value === 'string' ? [{ subject: id, value }] : [];
+          }),
+        )
+      ).flat();
       const payloads = await openPayloads(
         agent,
         keyring,

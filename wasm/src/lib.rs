@@ -779,6 +779,34 @@ impl ClientDb {
         serde_json::to_string(&step).map_err(to_js_err)
     }
 
+    /// Whether old `SealedMessage` resources may still have to be moved into
+    /// chat log pages (`Db::conversation_migration_pending`).
+    #[wasm_bindgen(js_name = "conversationMigrationPending")]
+    pub fn conversation_migration_pending(&self) -> Result<bool, JsError> {
+        self.db()
+            .conversation_migration_pending()
+            .map_err(to_js_err)
+    }
+
+    /// Like `migrateMessagesStep`, for the messages of conversations
+    /// (`Db::migrate_conversations_step`).
+    #[wasm_bindgen(js_name = "migrateConversationsStep")]
+    pub async fn migrate_conversations_step(
+        &self,
+        limit: u32,
+        local_only_drives_json: &str,
+    ) -> Result<String, JsError> {
+        let drives: Vec<String> =
+            serde_json::from_str(local_only_drives_json).map_err(to_js_err)?;
+        let create_in = atomic_lib::db::chat_migration_drive_set(drives);
+        let step = self
+            .db()
+            .migrate_conversations_step(limit as usize, Some(&create_in))
+            .await
+            .map_err(to_js_err)?;
+        serde_json::to_string(&step).map_err(to_js_err)
+    }
+
     /// The retained signed envelopes of each subject, as
     /// `{ "<subject>": ["<commit JSON-AD>", ...] }`, to ride along a
     /// `SYNC_PUSH` (`atomic_lib::envelopes::for_subjects`). `subjects_json`

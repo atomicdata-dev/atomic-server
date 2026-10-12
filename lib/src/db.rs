@@ -13,6 +13,9 @@ mod chat_migration_test;
 #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
 pub mod compaction;
 mod compressed_kv;
+mod conversation_migration;
+#[cfg(test)]
+mod conversation_migration_test;
 mod encoding;
 pub mod encrypted_backend;
 mod index_keys;
@@ -625,6 +628,8 @@ impl Db {
         self.migrate_messages().await?;
         #[cfg(not(target_arch = "wasm32"))]
         self.migrate_ai_chats().await?;
+        #[cfg(not(target_arch = "wasm32"))]
+        self.migrate_conversations().await?;
         crate::search::maybe_rebuild_search_index(&self)?;
         self.load_lenses().await;
         Ok(self)

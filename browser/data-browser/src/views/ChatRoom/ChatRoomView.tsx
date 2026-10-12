@@ -617,11 +617,20 @@ function LogMessage({
   const store = useStore();
   const [agent] = useCurrentAgent();
   const { entry, key } = useChatLogEntry(id);
+  const sealedState = useSealedMessage(id);
   const [editingText, setEditingText] = useState<string>();
 
   if (!entry || !key) {
     return <MessageComponent about={id} />;
   }
+
+  // A direct message: the entry holds the sealed payload (`s`), opened by the
+  // conversation page. There is no plain text to edit.
+  const isSealed = typeof entry.s === 'string';
+  const text =
+    isSealed && sealedState.sealed ? sealedText(sealedState) : entry.t;
+  const replyTo =
+    isSealed && sealedState.sealed ? sealedState.payload?.replyTo : entry.r;
 
   if (isFollowEntry(entry)) {
     return (
@@ -667,10 +676,10 @@ function LogMessage({
     <MessageView
       about={id}
       entryKey={key}
-      text={entry.t}
+      text={text}
       createdAt={new Date(entry.c)}
       createdBy={entry.a}
-      replyTo={entry.r}
+      replyTo={replyTo}
       edited={entry.e !== undefined}
       editing={
         editingText === undefined ? undefined : (
@@ -690,7 +699,7 @@ function LogMessage({
           />
         )
       }
-      onEdit={isMine ? () => setEditingText(entry.t) : undefined}
+      onEdit={isMine && !isSealed ? () => setEditingText(entry.t) : undefined}
       onDelete={isMine ? handleDelete : undefined}
       onReply={() => setReplyTo(id)}
       onCopyUrl={handleCopyUrl}
@@ -894,13 +903,18 @@ function ResourceMessageLine({ subject }: MessageLineProps) {
 
 function EntryMessageLine({ subject: id }: MessageLineProps) {
   const { entry } = useChatLogEntry(id);
+  const sealed = useSealedMessage(id);
+  const text =
+    typeof entry?.s === 'string' && sealed.sealed
+      ? sealedText(sealed)
+      : entry?.t;
 
   return (
     <MessageLineView
       subject={id}
       ready={!!entry}
       author={entry?.a}
-      text={entry?.t}
+      text={text}
     />
   );
 }
@@ -1238,7 +1252,7 @@ export function useChatMessages(
     },
     { pageSize: CHAT_PAGE_SIZE, preferServer: true },
   );
-  const logPages = useChatLogPages(property, subject, drive, !sealed);
+  const logPages = useChatLogPages(property, subject, drive);
   // Entries are not properties: an entry from another tab or agent, or one
   // added here, only shows up through this number changing.
   const revision = useChatLogRevision(view.loadedPages);

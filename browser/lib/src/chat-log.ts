@@ -54,12 +54,21 @@ export function newChatLogEntryKey(createdAt: number): string {
  * client) whose entry already exists.
  */
 export function migratedEntryKey(createdAt: number, subject: string): string {
+  return `${Math.max(0, Math.trunc(createdAt)).toString(16)}-${migratedKeyHash(subject)}`;
+}
+
+/**
+ * The part of a {@link migratedEntryKey} after the dash: the first 8 hex chars
+ * of the SHA-256 of the old subject's id. It does not depend on the creation
+ * time, so something that only holds the old subject (a reply inside an
+ * encrypted payload) can find the entry it became.
+ */
+export function migratedKeyHash(subject: string): string {
   const id = (
     /^(?:did:ad:|atomic:)(?!\/\/)(.*)$/.exec(subject)?.[1] ?? subject
   ).split(/[?#]/)[0];
-  const hash = bytesToHex(sha256(utf8ToBytes(id))).slice(0, 8);
 
-  return `${Math.max(0, Math.trunc(createdAt)).toString(16)}-${hash}`;
+  return bytesToHex(sha256(utf8ToBytes(id))).slice(0, 8);
 }
 
 function clean(entry: ChatLogEntry): ChatLogEntry {

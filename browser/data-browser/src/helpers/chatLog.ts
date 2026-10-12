@@ -8,6 +8,7 @@ import {
   commits,
   core,
   dataBrowser,
+  server,
   type Resource,
   type Store,
 } from '@tomic/react';
@@ -212,6 +213,11 @@ export interface SendLogMessage {
   kind?: string;
   /** Writes the entry as this author instead of the signed-in agent (the demo's personas). */
   author?: string;
+  /**
+   * A direct message: the sealed payload (`s`) in place of the text. The host
+   * stores it as it is and cannot read it; `text` stays empty.
+   */
+  sealed?: string;
   /** Pages of this chat the client already knows. */
   pages: string[];
   scope: string;
@@ -242,7 +248,17 @@ export function appendToChatLog(
 
 async function append(
   store: Store,
-  { parent, about, text, replyTo, kind, author, pages, scope }: SendLogMessage,
+  {
+    parent,
+    about,
+    text,
+    replyTo,
+    kind,
+    author,
+    sealed,
+    pages,
+    scope,
+  }: SendLogMessage,
 ): Promise<string> {
   const candidates = mergePages(store, scope, pages);
   const infos: PageInfo[] = [];
@@ -266,6 +282,7 @@ async function append(
     ...(replyTo && { r: replyTo }),
     ...(kind && { k: kind }),
     ...(author && { a: author }),
+    ...(sealed && { s: sealed }),
   };
 
   if (target) {
@@ -341,6 +358,8 @@ export interface SendEntryOptions {
   kind?: string;
   /** See {@link SendLogMessage.author}. */
   author?: string;
+  /** See {@link SendLogMessage.sealed}. */
+  sealed?: string;
 }
 
 /**
@@ -350,7 +369,7 @@ export interface SendEntryOptions {
  */
 export async function sendLogEntry(
   store: Store,
-  { parent, text, about, replyTo, kind, author }: SendEntryOptions,
+  { parent, text, about, replyTo, kind, author, sealed }: SendEntryOptions,
 ): Promise<string> {
   const property = about
     ? dataBrowser.properties.about
@@ -363,7 +382,10 @@ export async function sendLogEntry(
 
   if (pages.length === 0) {
     const chat = await store.getResource(parent);
-    const drive = chat.get(DRIVE_PROP);
+    // A Conversation is a drive itself, so it carries no stamp of its own.
+    const drive =
+      chat.get(DRIVE_PROP) ??
+      (chat.hasClasses(server.classes.drive) ? parent : undefined);
     pages = await queryPages(
       store,
       property,
@@ -379,6 +401,7 @@ export async function sendLogEntry(
     replyTo,
     kind,
     author,
+    sealed,
     pages,
     scope,
   });

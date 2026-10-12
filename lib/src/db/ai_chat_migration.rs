@@ -336,7 +336,7 @@ impl Db {
     }
 
     /// The pages a chat already has: entry key to (page subject, `c`).
-    async fn existing_ai_entries(
+    pub(super) async fn existing_ai_entries(
         &self,
         chat: &str,
     ) -> AtomicResult<HashMap<String, (String, i64)>> {

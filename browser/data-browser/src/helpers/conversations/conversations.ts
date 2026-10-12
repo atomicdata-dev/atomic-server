@@ -13,14 +13,15 @@ import {
   sealPayload,
   type ConversationMember,
 } from './conversationCrypto';
+import { sendLogEntry } from '../chatLog';
 
 /**
  * Starting, finding and posting in encrypted conversations (DMs and group
  * chats). A conversation is a drive of its own: its members can read it and
  * append to it, and nobody can change it, its creator included, because a
  * `write` on the drive would reach every message in it. Each message is
- * writable by its author only. Messages are SealedMessages, so its host
- * stores ciphertext. See
+ * writable by its author only. Messages are entries of the conversation's chat
+ * log (`s` holds the sealed payload), so its host stores ciphertext. See
  * `planning/encrypted-conversations.md`.
  */
 
@@ -165,7 +166,7 @@ export async function sendSealedMessage(
   replyTo?: string,
 ): Promise<void> {
   const agent = store.getAgent();
-  const me = requireSubject(agent);
+  requireSubject(agent);
   const keyring = conversation.get(conversations.properties.conversationKeys);
 
   if (typeof keyring !== 'string') {
@@ -177,16 +178,12 @@ export async function sendSealedMessage(
     replyTo,
   });
 
-  const message = await store.newResource({
+  // The message is an entry of the conversation's chat log (a page whose parent
+  // is the conversation). Members hold `append` only, and the server lets a
+  // member change just the entries that name them as author.
+  await sendLogEntry(store, {
     parent: conversation.subject,
-    isA: conversations.classes.sealedMessage,
-    propVals: {
-      [conversations.properties.sealed]: sealed,
-      // Members may only append; the message stays writable by its author.
-      [core.properties.write]: [me],
-    },
+    text: '',
+    sealed,
   });
-
-  await message.save();
-  store.notifyResourceManuallyCreated(message);
 }

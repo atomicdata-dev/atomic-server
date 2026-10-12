@@ -326,6 +326,9 @@ export function MessageNotifier(): null {
       const page = resource.stable;
 
       for (const { key, entry } of page.listChatLogEntries()) {
+        // A sealed entry (a direct message) has no text this app can read here.
+        if (typeof entry.s === 'string') continue;
+
         const facts = entryFacts(page.subject, factsOf(page), key, entry);
 
         if (handled.current.has(facts.subject)) continue;

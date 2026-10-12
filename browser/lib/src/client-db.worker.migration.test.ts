@@ -7,6 +7,8 @@ const db = vi.hoisted(() => ({
   migrateMessagesStep: vi.fn(),
   aiChatMigrationPending: vi.fn(),
   migrateAiChatsStep: vi.fn(),
+  conversationMigrationPending: vi.fn(),
+  migrateConversationsStep: vi.fn(),
 }));
 vi.mock('./client-db-open.js', () => ({
   openClientDb: async () => ({ db }),
@@ -198,5 +200,48 @@ it('moves the messages of AI chats after the group chats, with the same drives',
   ).toEqual([
     ['messages', 0, 0, false],
     ['messages', 40, 40, true],
+  ]);
+});
+
+it('moves the messages of conversations last, with the same drives', async () => {
+  db.indexMigrationPending.mockReturnValue(false);
+  db.messageMigrationPending.mockReturnValue(false);
+  db.aiChatMigrationPending.mockReturnValue(false);
+  db.conversationMigrationPending.mockReturnValue(true);
+  db.migrateConversationsStep.mockResolvedValue(
+    JSON.stringify({ done: 12, total: 12, finished: true }),
+  );
+
+  const posted: Array<Record<string, unknown>> = [];
+  const worker = {
+    onmessage: null as unknown as (event: unknown) => void,
+    postMessage: vi.fn((value: Record<string, unknown>) => posted.push(value)),
+  };
+  vi.stubGlobal('self', worker);
+  await import('./client-db.worker.js');
+
+  worker.onmessage({
+    data: {
+      id: 1,
+      type: 'init',
+      wasmUrl: 'data:text/javascript,export default async function() {}',
+      localOnlyDrives: ['did:ad:local'],
+    },
+  });
+  await vi.waitFor(() => expect(posted.some(m => m.id === 1)).toBe(true));
+
+  expect(db.migrateMessagesStep).not.toHaveBeenCalled();
+  expect(db.migrateAiChatsStep).not.toHaveBeenCalled();
+  expect(db.migrateConversationsStep).toHaveBeenCalledWith(
+    500,
+    JSON.stringify(['did:ad:local']),
+  );
+  expect(
+    posted
+      .filter(m => m.type === 'migration-progress')
+      .map(m => [m.phase, m.done, m.total, m.finished]),
+  ).toEqual([
+    ['messages', 0, 0, false],
+    ['messages', 12, 12, true],
   ]);
 });

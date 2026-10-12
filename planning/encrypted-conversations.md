@@ -21,6 +21,11 @@ write, because everything authorization needs stays readable.
 
 ## Model
 
+- Messages are entries of `ChatLog` pages under the Conversation, not
+  `SealedMessage` resources of their own (`planning/chat-log.md`, step 4). The
+  `SealedMessage` class stays for old data until every store has migrated.
+  Read "each message sets `write` to its author" below as: the server only
+  lets an entry's author change or remove it.
 - A **Conversation** is a drive of its own (`isA` `[Conversation, Drive]`),
   never inside someone's private drive or a team drive. Members get `read`
   and `append`, and nobody has `write`: a `write` on the drive would reach
@@ -49,7 +54,8 @@ write, because everything authorization needs stays readable.
   XChaCha20-Poly1305. The wrap is bound to the member and the epoch.
 - **Sealed message** = base64url(version | epoch (4 BE) | message id (16) |
   nonce (24) | ciphertext). The per-message key is derived from the epoch key
-  and the random message id (the DID subject is unknown before signing). The
+  and the random message id (the DID subject is unknown before signing; the id
+  is also independent of a chat log entry's key). The
   associated data is the header plus the conversation subject, so a message
   can't be replayed into another conversation.
 - The payload is JSON `{text, replyTo?}`: what a `Message` carries in the

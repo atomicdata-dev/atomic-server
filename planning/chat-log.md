@@ -5,7 +5,8 @@
 > Steps 1 (class, entries, server rule, tests) and 2 (group chat and comments)
 > are built, and so is the migration of existing messages and the follow events
 > (see "Existing messages"). Step 3, AI chat, is built with its migration (see
-> "Step 3: AI chat").
+> "Step 3: AI chat"), and so is step 4, direct messages (see "Step 4: direct
+> messages").
 
 ## Why
 
@@ -98,7 +99,7 @@ restamp it was 201 B.
 | Group chat | the `ChatRoom` | replaces `Message` with `parent` |
 | Comments | the drive's comments folder, page has `about` = the item | one log per commented item, found by `about` (one index row per page, not per comment) |
 | AI chat | the AI chat | single author; a message and its parts become one entry, the biggest win per message |
-| DMs | the `Conversation` | entries carry the sealed payload; members already have only `append` |
+| DMs | the `Conversation` | entries carry the sealed payload (`s`); members already have only `append` (step 4, built) |
 | Follow events, meeting toasts | the follow-sessions `ChatRoom` | they are `Message`s today, one per visited page |
 
 Notifications (`Notification` per message in the inbox) are the other
@@ -118,7 +119,8 @@ Old `Message` resources are moved into the log, and the old resources are then
 removed. Decisions (Joep, 2026-10-09):
 
 1. **Scope.** Every `Message` resource: group chat, comments, meeting chat and
-   FollowEvents. Not `SealedMessage` (DMs) and not AI chat yet.
+   FollowEvents. DMs (`SealedMessage`) and AI chat have their own migrations
+   (steps 3 and 4 below).
 2. **Grouping.** By `(parent, about)`. Inside a group the messages sort by
    `createdAt` and fill pages of 256, the same page shape the app writes
    (`ChatLog`, `parent`, `about` for comments, entries in `entries`). Entry `a`
@@ -293,6 +295,70 @@ Choices to revisit:
 - **Not changed.** The chat list (`AIPanel`, `findLatestAiChatAbout`) reads the
   AI chat resources, not messages. The summary role and
   `CompactSeparatorWidget` work on UI messages, so they are untouched.
+
+## Step 4: direct messages (as built)
+
+- **Shape.** The `Conversation` stays a drive with no `write`; its messages are
+  entries of `ChatLog` pages whose `parent` is the conversation (no `drive`
+  stamp of its own, so the pages are stamped with the conversation). An entry:
+  `a` the author, `c`, `t` empty, `s` the sealed payload, the `sealed` string
+  exactly as the sealing wrote it (base64url). No `r`: what a message replies
+  to is inside the encrypted payload, and the host must not learn the thread
+  structure. `sendSealedMessage` seals, then `sendLogEntry` (with `sealed`)
+  appends to the newest page with room or makes the next one. Nobody creates
+  `SealedMessage` resources any more.
+- **The sealed format and the entry key.** Checked: the "message id" in the
+  sealed header is 16 random bytes chosen by `seal_message`; it feeds the
+  per-message key and sits in the header the AEAD binds, and it is not the
+  resource subject (the subject was unknown before signing). The associated data
+  is the header plus the conversation's subject. Nothing names the resource or
+  the entry key, so a migrated message keeps its `sealed` string byte for byte,
+  opens and reveals as before, and `lib/src/conversation.rs` did not change.
+  The entry key is independent of the message id. (Unchanged property: the AEAD
+  does not bind the author, so a member could re-post someone else's ciphertext
+  under their own name, as they could with a `SealedMessage` before.)
+- **Rights.** Same server rule as the group chat; members hold `append` and the
+  creator's `write` is gone, so nobody has `write` on the pages and only the
+  author changes or removes an entry (server test
+  `members_post_entries_and_only_the_author_changes_them`: a member posts, the
+  other member, the conversation's creator and an outsider can neither replace,
+  forge, nor remove it, and an outsider cannot start a page).
+- **Reading.** `ConversationPage` opens each id of `useChatMessages(...,
+  sealed = true)`: an entry id reads `s` from the page, an unmigrated
+  `SealedMessage` its `sealed`. `useChatMessages` now merges pages for
+  conversations too: old resources whose deterministic key is in a page are
+  hidden. Live updates are the page commits arriving over the conversation's
+  `SUB`. Replies in payloads written before the move name the old subject;
+  `resolveReplies` points them at the entry with the same hash part in its key
+  (`migratedKeyHash`), when that entry is in the listed window (otherwise the
+  quote shows as "loading"). Sealed entries have no edit button (as before) and
+  are skipped by `MessageNotifier` (no readable text; DM notifications stay a
+  separate item).
+- **Migration** (`lib/src/db/conversation_migration.rs`). Same mechanism as the
+  AI chats: marker `conversation-log-migration-v1` and `-state` in
+  `Tree::PluginMeta`, whole conversations per slice with `done/total` in
+  messages, `Db::open` on native stores (after the AI chats), the browser
+  worker after the AI chats (same notice, same local-only versus hosted rule; a
+  conversation needs a server, so a browser cache only drops rows that have
+  their entry). Per conversation: oldest first, `a` = `createdBy`, `s` = the
+  stored `sealed` string, `e` when a later commit was retained, key
+  `migrated_entry_key(createdAt, old subject)`, pages of 256 written first,
+  then the old resources, genesis commit rows, envelopes and indexes removed.
+  The server never decrypts anything.
+- **Measured** (`migrating_a_conversation_shrinks_the_store`, 50 messages of
+  about 35 characters): 8604 B per message as `SealedMessage` resources, 855 B
+  after the move (1,505,771 B to 1,118,345 B on a 1,075,565 B baseline). What
+  remains is not the steady state: the migrated page keeps its signed genesis
+  envelope (~330 B per message, replaced by the next commit to that page), the
+  tombstones (~106 B per message) and the page snapshot (~190 B per message,
+  mostly the ciphertext). A message sent afterwards adds only its snapshot
+  delta.
+- **Possible saving, not taken.** Storing `s` as a Loro binary value instead of
+  base64url would save about a quarter of the sealed value (~35 B of ~190 B per
+  message), at the price of a second encoding to carry through the TS helpers,
+  the entry type and the migration (`sealed` strings would be decoded and
+  re-encoded). Deferred; the string keeps the payload identical to what the
+  resources held.
 
 ## Open questions
 

@@ -227,3 +227,206 @@ async fn members_post_and_outsiders_cannot() -> AtomicResult<()> {
 
     Ok(())
 }
+
+// --- Messages as chat log entries -------------------------------------------
+//
+// A message is an entry of a `ChatLog` page whose parent is the conversation
+// (`planning/chat-log.md`, step 4). Members hold `append` only, so the server
+// rule for such pages is what keeps one member's message theirs.
+
+use atomic_lib::{chat_log::Entry, commit::CommitBuilder, loro::AtomicLoroDoc, Commit, Subject};
+
+/// A sealed-looking entry by `author`.
+fn sealed_entry(author: &Agent, sealed: &str) -> Entry {
+    let mut entry = Entry::new(author.subject.to_string(), "", atomic_lib::utils::now());
+    entry.extra.insert("s".into(), sealed.into());
+    entry
+}
+
+/// Creates a page under `conversation` as `agent`, with `entries` in it.
+async fn create_page(
+    client: &Client,
+    agent: &Agent,
+    conversation: &str,
+    entries: &[(&str, Entry)],
+) -> AtomicResult<String> {
+    let doc = AtomicLoroDoc::new();
+    for (key, entry) in entries {
+        doc.put_entry(key, entry)?;
+    }
+    let is_a = Value::ResourceArray(vec![urls::CHAT_LOG.to_string().into()]);
+    let parent = Value::AtomicUrl(conversation.into());
+    doc.set_property(urls::IS_A, &is_a)?;
+    doc.set_property(urls::PARENT, &parent)?;
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(urls::PARENT.into(), parent);
+    builder.set_loro_update(doc.export_snapshot());
+    let commit = Commit::create_did(builder, agent, client.store()).await?;
+    let subject = commit.subject.to_string();
+    atomic_lib::client::post_commit(&commit, client.store()).await?;
+    Ok(subject)
+}
+
+/// Edits the page's entries as `agent` (fetching it through `reader`, which
+/// may be someone else) and sends the change as `client`.
+async fn edit_page(
+    client: &Client,
+    reader: &Client,
+    agent: &Agent,
+    page: &str,
+    change: impl FnOnce(&AtomicLoroDoc),
+) -> AtomicResult<()> {
+    let resource = reader.get_resource(page).await?;
+    let doc = resource.build_state_doc()?;
+    let vv = doc.oplog_vv();
+    change(&doc);
+    doc.commit();
+    let mut builder = CommitBuilder::new(Subject::from(page));
+    builder.set_loro_update(doc.export_updates_since(&vv));
+    let commit = builder.sign(agent, client.store(), &resource).await?;
+    atomic_lib::client::post_commit(&commit, client.store()).await
+}
+
+/// A member posts a sealed entry; the other member, the conversation's creator
+/// and an outsider cannot change, replace, forge or remove it. Its author can.
+#[tokio::test]
+async fn members_post_entries_and_only_the_author_changes_them() -> AtomicResult<()> {
+    let port = start_server("conversations_entries");
+    wait_for_server(port).await;
+    let server_url = format!("http://localhost:{}", port);
+
+    let alice_client = Client::new(&server_url).await?;
+    let bob_client = Client::new(&server_url).await?;
+    let dave_client = Client::new(&server_url).await?;
+    let carol_client = Client::new(&server_url).await?;
+    let alice = alice_client.new_agent("Alice").await?;
+    let bob = bob_client.new_agent("Bob").await?;
+    let dave = dave_client.new_agent("Dave").await?;
+    let carol = carol_client.new_agent("Carol").await?;
+
+    // Alice started a conversation with Bob and Dave. Nobody has `write`.
+    let mut keyring = Keyring::default();
+    keyring.add_epoch(&[member(&alice, 1), member(&bob, 2), member(&dave, 3)])?;
+    let dm = new_drive(
+        &alice_client,
+        &[urls::DRIVE, urls::CONVERSATION],
+        &[&alice, &bob, &dave],
+        Some(&keyring),
+    )
+    .await?;
+
+    // Bob posts: a member with `append` creates the page, with his entry in it.
+    let key = "19f0a1b2c3d-0000000a";
+    let page = create_page(
+        &bob_client,
+        &bob,
+        &dm,
+        &[(key, sealed_entry(&bob, "sealed-by-bob"))],
+    )
+    .await?;
+    let read_back = alice_client.get_resource(&page).await?;
+    let entries = read_back.build_state_doc()?.entries();
+    assert_eq!(
+        atomic_lib::chat_log::entry_author(&entries[key]),
+        Some(bob.subject.to_string().as_str())
+    );
+    assert!(
+        read_back.get(urls::WRITE).is_err(),
+        "the page gives its creator no `write`"
+    );
+
+    // The conversation's other member and its creator cannot alter or remove it.
+    for (who, who_client) in [(&dave, &dave_client), (&alice, &alice_client)] {
+        let name = who.subject.to_string();
+        assert!(
+            edit_page(who_client, who_client, who, &page, |d| {
+                d.put_entry(key, &sealed_entry(who, "mine now")).unwrap()
+            })
+            .await
+            .is_err(),
+            "{name} cannot replace Bob's entry"
+        );
+        assert!(
+            edit_page(who_client, who_client, who, &page, |d| {
+                d.put_entry(key, &sealed_entry(&bob, "forged")).unwrap()
+            })
+            .await
+            .is_err(),
+            "{name} cannot rewrite it under Bob's name"
+        );
+        assert!(
+            edit_page(who_client, who_client, who, &page, |d| {
+                d.remove_entry(key).unwrap()
+            })
+            .await
+            .is_err(),
+            "{name} cannot remove it"
+        );
+    }
+
+    // An outsider can neither read the page nor change it, and cannot start one.
+    assert!(carol_client.get_resource(&page).await.is_err());
+    assert!(
+        edit_page(&carol_client, &bob_client, &carol, &page, |d| {
+            d.put_entry(key, &sealed_entry(&carol, "intruder")).unwrap()
+        })
+        .await
+        .is_err(),
+        "Carol cannot change a message"
+    );
+    assert!(
+        create_page(
+            &carol_client,
+            &carol,
+            &dm,
+            &[("19f0a1b2c3e-0000000b", sealed_entry(&carol, "intruder"))],
+        )
+        .await
+        .is_err(),
+        "Carol cannot post in the conversation"
+    );
+
+    // Dave adds his own entry to Bob's page. He cannot sign one as Bob.
+    let dave_key = "19f0a1b2c3f-0000000c";
+    edit_page(&dave_client, &dave_client, &dave, &page, |d| {
+        d.put_entry(dave_key, &sealed_entry(&dave, "sealed-by-dave"))
+            .unwrap()
+    })
+    .await?;
+    assert!(edit_page(&dave_client, &dave_client, &dave, &page, |d| {
+        d.put_entry("19f0a1b2c40-0000000d", &sealed_entry(&bob, "fake bob"))
+            .unwrap()
+    })
+    .await
+    .is_err());
+
+    // Bob edits and removes his own.
+    edit_page(&bob_client, &bob_client, &bob, &page, |d| {
+        d.put_entry(key, &sealed_entry(&bob, "sealed-by-bob-again"))
+            .unwrap()
+    })
+    .await?;
+    let now = alice_client
+        .get_resource(&page)
+        .await?
+        .build_state_doc()?
+        .entries();
+    assert_eq!(now.len(), 2);
+    assert_eq!(
+        atomic_lib::chat_log::entry_author(&now[dave_key]),
+        Some(dave.subject.to_string().as_str())
+    );
+    edit_page(&bob_client, &bob_client, &bob, &page, |d| {
+        d.remove_entry(key).unwrap()
+    })
+    .await?;
+    let after = alice_client
+        .get_resource(&page)
+        .await?
+        .build_state_doc()?
+        .entries();
+    assert_eq!(after.len(), 1);
+    assert!(after.contains_key(dave_key));
+
+    Ok(())
+}
