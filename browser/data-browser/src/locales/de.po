@@ -8706,7 +8706,7 @@ msgstr ""
 msgid "Workspace sync off"
 msgstr ""
 
-#: src/chunks/RTE/FormattingToolbar.tsx
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Show formatting toolbar"
 msgstr ""
 
@@ -8728,10 +8728,6 @@ msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
 msgid "Mention a resource (@)"
-msgstr ""
-
-#: src/chunks/RTE/FormattingToolbar.tsx
-msgid "Hide toolbar (type / or @ instead)"
 msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
@@ -12911,4 +12907,8 @@ msgstr ""
 #. 0: serverName
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+msgstr ""
+
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
+msgid "Hide formatting toolbar"
 msgstr ""

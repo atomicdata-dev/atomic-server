@@ -2,6 +2,10 @@ import { EditableTitle } from '@components/EditableTitle';
 import { ResourceCoverImage } from '@components/ResourceDecorations';
 import { dataBrowser, useLoroDoc, useLoroReady, useStore } from '@tomic/react';
 import type { ResourcePageProps } from '@views/ResourcePage';
+import {
+  FormattingToolbarToggle,
+  TitleRow,
+} from '@chunks/RTE/useFormattingToolbarVisible';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
@@ -125,11 +129,14 @@ export const DocumentV2FullPage: React.FC<ResourcePageProps> = ({
     <FullPageWrapper>
       <ResourceCoverImage resource={resource} />
       <DocumentContainer>
-        <EditableTitle
-          resource={resource}
-          onCommit={focusEditor}
-          withDecorations
-        />
+        <TitleRow>
+          <EditableTitle
+            resource={resource}
+            onCommit={focusEditor}
+            withDecorations
+          />
+          <FormattingToolbarToggle />
+        </TitleRow>
 
         <Suspense fallback={<Spinner centered />}>
           <CollaborativeEditor
