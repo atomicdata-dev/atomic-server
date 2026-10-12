@@ -59,7 +59,7 @@ function setup() {
   const onSelect = vi.fn();
 
   render(
-    <ThemeProvider theme={buildTheme('light')}>
+    <ThemeProvider theme={buildTheme(false, '#1b50d8')}>
       <FeedbackDiagnostics onSelect={onSelect} disabled={false} />
     </ThemeProvider>,
   );
