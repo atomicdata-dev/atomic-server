@@ -97,3 +97,28 @@ it('accepts the message boundary and rejects oversized text before sending', asy
   await expect(submitFeedback('a'.repeat(4097), '')).rejects.toThrow('4096');
   expect(Sentry.sendFeedback).not.toHaveBeenCalled();
 });
+
+it('sends a 60k-character AI chat report, keeping the description and the latest turns', async () => {
+  vi.mocked(Sentry.isEnabled).mockReturnValue(true);
+  vi.mocked(Sentry.sendFeedback).mockClear();
+  vi.mocked(Sentry.sendFeedback).mockResolvedValue('receipt');
+  const transcript = `What went wrong:\nIt looped\n\n${'x'.repeat(60_000)}END`;
+
+  await expect(submitFeedback(transcript, '', 'ai-chat')).resolves.toBe(
+    'receipt',
+  );
+
+  const [feedback] = vi.mocked(Sentry.sendFeedback).mock.calls.at(-1)!;
+  expect(feedback.message.length).toBeLessThanOrEqual(60_000);
+  expect(feedback.message.startsWith('What went wrong:\nIt looped')).toBe(true);
+  expect(feedback.message.endsWith('END')).toBe(true);
+  expect(feedback.source).toBe('ai-chat');
+});
+
+it('sends an AI chat report under the cap unchanged', async () => {
+  vi.mocked(Sentry.isEnabled).mockReturnValue(true);
+  vi.mocked(Sentry.sendFeedback).mockResolvedValue('receipt');
+  await submitFeedback('y'.repeat(10_000), '', 'ai-chat');
+  const [feedback] = vi.mocked(Sentry.sendFeedback).mock.calls.at(-1)!;
+  expect(feedback.message).toBe('y'.repeat(10_000));
+});
