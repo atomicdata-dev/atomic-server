@@ -17,6 +17,7 @@ import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition
 import { constructOpenURL } from '../../helpers/navigation';
 import { parseEntryId } from '../../helpers/chatLog';
 import {
+  bubbleId,
   classifyMessage,
   entryFacts,
   isCandidate,
@@ -41,6 +42,12 @@ const TEXT_MAX = 140;
 
 /** Messages created before the app started are backlog, not news. */
 const APP_STARTED = Date.now();
+
+/**
+ * Entries announced (or ruled out) in this page load. Outside the component:
+ * a remount used to start from an empty set and announce every entry again.
+ */
+const handledEntries = new Set<string>();
 
 function factsOf(resource: Resource): MessageFacts {
   const stable = resource.stable;
@@ -106,7 +113,6 @@ export function MessageNotifier(): null {
   const { privateDrive } = usePrivateDrive();
   const [sharedWithMe] = usePrivateDriveList(core.properties.sharedWithMe);
 
-  const handled = useRef(new Set<string>());
   // Announced while away, with system notifications not decided yet.
   const missed = useRef(0);
   // Inbox writes still in flight, per target, so reading waits for them.
@@ -239,6 +245,7 @@ export function MessageNotifier(): null {
         ...ctx,
         classesOf: s =>
           related.get(s)?.get(core.properties.isA) as string[] | undefined,
+        isLocalOnly: s => store.isLocalOnlySubject(s),
         creatorOf: s => {
           const entry = parseEntryId(s);
 
@@ -301,7 +308,7 @@ export function MessageNotifier(): null {
               </ToastBody>
             </ToastCard>
           ),
-          { duration: 6000, id: subject },
+          { duration: 6000, id: bubbleId(n.target) },
         );
 
         return;
@@ -309,7 +316,12 @@ export function MessageNotifier(): null {
 
       if (shouldOfferOsNotifications()) missed.current += 1;
 
-      showOsNotification({ title, body, tag: subject, onClick: () => open(n) });
+      showOsNotification({
+        title,
+        body,
+        tag: bubbleId(n.target),
+        onClick: () => open(n),
+      });
     },
   );
 
@@ -325,15 +337,19 @@ export function MessageNotifier(): null {
     if (classes.includes(dataBrowser.classes.chatLog)) {
       const page = resource.stable;
 
+      // Nobody but you writes in a local-only drive, so whoever speaks there
+      // is the demo's script. Not news, and never the Inbox of a real account.
+      if (store.isLocalOnlySubject(page.subject)) return;
+
       for (const { key, entry } of page.listChatLogEntries()) {
         const facts = entryFacts(page.subject, factsOf(page), key, entry);
 
-        if (handled.current.has(facts.subject)) continue;
+        if (handledEntries.has(facts.subject)) continue;
 
         // Not decidable yet: the page's own metadata hasn't arrived.
         if (isCandidate(facts, ctx) === undefined) continue;
 
-        handled.current.add(facts.subject);
+        handledEntries.add(facts.subject);
 
         if (isCandidate(facts, ctx)) await announce(facts, entry.t);
       }
@@ -341,7 +357,7 @@ export function MessageNotifier(): null {
       return;
     }
 
-    if (handled.current.has(subject)) return;
+    if (handledEntries.has(subject)) return;
 
     const facts = factsOf(resource);
     const candidate = isCandidate(facts, ctx);
@@ -349,7 +365,7 @@ export function MessageNotifier(): null {
     // Not decidable yet: its genesis hasn't arrived. A later update will ask again.
     if (candidate === undefined) return;
 
-    handled.current.add(subject);
+    handledEntries.add(subject);
 
     if (!candidate) return;
 

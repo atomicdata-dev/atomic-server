@@ -55,6 +55,12 @@ export interface MessageContext {
   classesOf: (subject: string) => string[] | undefined;
   /** Creator of a resource, if it could be loaded. */
   creatorOf: (subject: string) => string | undefined;
+  /**
+   * Whether a subject lives in a local-only drive (the demo, a template
+   * preview). Nobody else can write there, so a message by someone else is
+   * scripted, never a teammate; it must not reach the Inbox of a real account.
+   */
+  isLocalOnly?: (subject: string) => boolean;
 }
 
 export interface MessageNotification {
@@ -99,6 +105,10 @@ export function classifyMessage(
 
   if (!target) return undefined;
 
+  if (ctx.isLocalOnly?.(target) || ctx.isLocalOnly?.(msg.subject)) {
+    return undefined;
+  }
+
   const base = {
     message: msg.subject,
     author,
@@ -124,3 +134,10 @@ export function classifyMessage(
 
   return undefined;
 }
+
+/**
+ * The id of the bubble that announces messages in `target`. One per place, so
+ * a burst of lines in the same chat is one bubble showing the latest, not a
+ * stack that covers the screen.
+ */
+export const bubbleId = (target: string): string => `message:${target}`;
