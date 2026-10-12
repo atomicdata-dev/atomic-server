@@ -86,6 +86,22 @@ describe('startConversation', () => {
       );
     });
 
+    it('treats the two spellings of an agent as one member', () => {
+      const conversation = {
+        get: () => ['did:ad:agent:abc', 'atomic:agent:def'],
+      };
+
+      expect(
+        hasMembers(conversation as never, [
+          'atomic:agent:abc',
+          'did:ad:agent:def',
+        ]),
+      ).toBe(true);
+      expect(hasMembers(conversation as never, ['atomic:agent:abc'])).toBe(
+        false,
+      );
+    });
+
     it('is browser-only before the first save, so no commit is queued', async () => {
       const { store, outbox, events, localOnly } = setup();
 
