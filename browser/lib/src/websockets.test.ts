@@ -1335,6 +1335,38 @@ describe('WSClient SYNC_DIFF and the outbox', () => {
     client.close();
   });
 
+  it('resends a push whose SYNC_OK never arrives, then fails explicitly', async () => {
+    const timeout = WSClient.syncAckTimeoutMs;
+    WSClient.syncAckTimeoutMs = 20;
+
+    try {
+      const { client, socket, store } = await connectedClient();
+      const resource = new Resource('atomic:silent');
+      resource.getLoroDoc()!.getMap('properties').set('name', 'keep me');
+      resource.getLoroDoc()!.commit();
+      store.resources.set(resource.subject, resource);
+      const finish = vi.spyOn(store, 'finishDriveSync');
+      const fail = vi.spyOn(store, 'failDriveSync');
+      socket.receive(
+        syncFrame(
+          Tag.SYNC_DIFF,
+          'did:ad:drive',
+          JSON.stringify({ pull: ['did:ad:silent'], push: [] }),
+        ),
+      );
+
+      // The server never answers: first send plus two bounded resends.
+      await vi.waitFor(() => assert(fail).toHaveBeenCalledTimes(1));
+      assert(framesWithTag(socket, Tag.SYNC_PUSH)).toHaveLength(3);
+      assert(fail.mock.calls[0][1]).toContain('did not acknowledge');
+      assert(finish).not.toHaveBeenCalled();
+      assert(store.resources.get(resource.subject)).toBe(resource);
+      client.close();
+    } finally {
+      WSClient.syncAckTimeoutMs = timeout;
+    }
+  });
+
   it('does not finish a bidirectional sync until the server acknowledges our push', async () => {
     const { client, socket, store } = await connectedClient();
     vi.spyOn(client, 'driveInventory').mockResolvedValue([

@@ -85,6 +85,8 @@ import { perfMark, perfSpan } from './perf-trace.js';
 /** How long a drive's sync probe waits so the screen's first reads are not
  *  queued behind the version-vector scan. */
 const SYNC_PROBE_DELAY_MS = 2000;
+/** How long a pushed chunk may wait for its `SYNC_OK` before it is resent. */
+const SYNC_ACK_TIMEOUT_MS = 30_000;
 /** A drive with this many resources (last time it was synced) has its first
  *  sync probe held back; see `runVVSync`. */
 const LARGE_DRIVE_ENTRIES = 500;
@@ -271,6 +273,8 @@ interface SyncTransfer {
     vv: Record<string, number>;
   }>;
   retries: number;
+  /** Fires when the outstanding `SYNC_OK`s do not arrive in time. */
+  ackTimer?: ReturnType<typeof setTimeout>;
   envelopes?: Record<string, string[]>;
   /** Pulled states handed to the database worker in bulk, still writing. */
   writes?: Promise<unknown>[];
@@ -283,6 +287,8 @@ interface SyncTransfer {
 export class WSClient {
   /** Tests set this to 0. */
   public static syncProbeDelayMs = SYNC_PROBE_DELAY_MS;
+  /** Tests shorten this. */
+  public static syncAckTimeoutMs = SYNC_ACK_TIMEOUT_MS;
 
   private ws: WebSocket;
   private store: Store;
@@ -1594,6 +1600,7 @@ export class WSClient {
 
           if (transfer) {
             transfer.pendingAcks = Math.max(0, transfer.pendingAcks - 1);
+            if (!transfer.pendingAcks) clearTimeout(transfer.ackTimer);
             await this.finishSyncTransfer(drive);
           } else if (this.activeSyncs.has(drive)) {
             // A matching hash (including after a reduced/full-vector
@@ -2552,10 +2559,8 @@ export class WSClient {
       try {
         transfer.envelopes = envelopes;
         const frames = this.encodeWireSyncPush(drive, entries, envelopes);
-        // Each chunk receives its own SYNC_OK. Register before sending.
-        transfer.pendingAcks = frames.length;
         transfer.count += entries.length;
-        for (const frame of frames) this.sendBinary(frame);
+        this.sendTransferFrames(drive, transfer, frames);
       } catch (e) {
         this.failSyncTransfer(drive, e);
 
@@ -2564,6 +2569,53 @@ export class WSClient {
     }
 
     await this.finishSyncTransfer(drive);
+  }
+
+  /** Each chunk receives its own SYNC_OK: register before sending, and do
+   *  not wait for one that never comes. A missing ack resends the push under
+   *  the same retry bound as a failed verification, then fails explicitly. */
+  private sendTransferFrames(
+    drive: string,
+    transfer: SyncTransfer,
+    frames: Uint8Array[],
+  ): void {
+    clearTimeout(transfer.ackTimer);
+    transfer.pendingAcks = frames.length;
+    transfer.ackTimer = setTimeout(
+      () => this.onSyncAckTimeout(drive, transfer),
+      WSClient.syncAckTimeoutMs,
+    );
+    for (const frame of frames) this.sendBinary(frame);
+  }
+
+  private onSyncAckTimeout(drive: string, transfer: SyncTransfer): void {
+    if (
+      this.syncTransfers.get(drive) !== transfer ||
+      transfer.failed ||
+      !transfer.pendingAcks
+    )
+      return;
+
+    if (transfer.retries >= 2 || this.readyState !== WebSocket.OPEN) {
+      this.failSyncTransfer(
+        drive,
+        `The server did not acknowledge ${transfer.pendingAcks} sync chunk(s) in time. Local data is retained. Reconnect to retry.`,
+      );
+
+      return;
+    }
+
+    transfer.retries++;
+
+    try {
+      this.sendTransferFrames(
+        drive,
+        transfer,
+        this.encodeWireSyncPush(drive, transfer.sent, transfer.envelopes),
+      );
+    } catch (e) {
+      this.failSyncTransfer(drive, e);
+    }
   }
 
   private async finishSyncTransfer(drive: string): Promise<void> {
@@ -2626,13 +2678,13 @@ export class WSClient {
           missing,
           transfer.envelopes,
         );
-        transfer.pendingAcks = frames.length;
-        for (const frame of frames) this.sendBinary(frame);
+        this.sendTransferFrames(drive, transfer, frames);
 
         return;
       }
     }
 
+    clearTimeout(transfer.ackTimer);
     this.syncTransfers.delete(drive);
     this.completeSyncDrive(drive, transfer.count);
   }
@@ -2656,6 +2708,7 @@ export class WSClient {
       retries: 0,
     };
     transfer.failed = true;
+    clearTimeout(transfer.ackTimer);
     this.activeSyncs.delete(drive);
     this.queuedSyncs.delete(drive);
     this.syncTransfers.set(drive, transfer);
