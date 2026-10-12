@@ -5941,6 +5941,7 @@ export class Store {
 
     if (drive) {
       this._syncedDrives.delete(drive);
+      this._syncedDrives.delete(canonicalizeScheme(drive));
     }
 
     this.emitSyncStatus();

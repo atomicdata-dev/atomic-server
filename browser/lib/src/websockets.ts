@@ -2659,8 +2659,10 @@ export class WSClient {
     this.activeSyncs.delete(drive);
     this.queuedSyncs.delete(drive);
     this.syncTransfers.set(drive, transfer);
+    // The store gets the subject as the server named it; it is also the
+    // form `_lastDriveSyncError` and the refused-drive heal match on.
     this.store.failDriveSync(
-      drive,
+      wireDrive,
       error instanceof Error ? error.message : String(error),
     );
   }
