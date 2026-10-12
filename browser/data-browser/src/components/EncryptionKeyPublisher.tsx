@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useStore } from '@tomic/react';
+import { RequestCancelledError, useStore } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
 import { ensureEncryptionKey } from '../helpers/conversations/conversations';
 
@@ -20,9 +20,13 @@ export function EncryptionKeyPublisher() {
     // Not on the boot path: the first screen needs the network more.
     const timer = setTimeout(() => {
       if (cancelled) return;
-      ensureEncryptionKey(store, agent).catch(error =>
-        console.warn('Could not publish the encryption key:', error),
-      );
+      ensureEncryptionKey(store, agent).catch(error => {
+        // A cancelled request means the page, agent or drive changed under
+        // us. The effect runs again for the new one; nothing failed.
+        if (error instanceof RequestCancelledError) return;
+
+        console.warn('Could not publish the encryption key:', error);
+      });
     }, 2000);
 
     return () => {

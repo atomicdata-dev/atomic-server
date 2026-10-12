@@ -3,6 +3,8 @@ import { LoroLoader } from './loro-loader.js';
 import { Store } from './store.js';
 import { attachTestDb } from './test-store.js';
 import { core } from './ontologies/core.js';
+import { Agent } from './agent.js';
+import { JSCryptoProvider } from './CryptoProvider.js';
 
 beforeAll(() => LoroLoader.initializeLoro());
 
@@ -161,3 +163,58 @@ it.each([false, true])(
     logged.mockRestore();
   },
 );
+
+it.each([
+  ['an equal agent with the same subject', true],
+  ['a different agent', false],
+])('a read in flight survives %s replacing the agent: %s', async (_, same) => {
+  const { store, records, subject, change } = fixture();
+  const keys = await Agent.generateKeyPair();
+  const agent = new Agent(
+    new JSCryptoProvider(keys.privateKey),
+    `did:ad:agent:${keys.publicKey}`,
+  );
+  store.setAgent(agent);
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const reading = new Promise<void>(resolve => {
+    entered = resolve;
+  });
+  vi.spyOn(store.getClientDb()!, 'getResourceWithSnapshot').mockImplementation(
+    async () => {
+      const result = {
+        jsonAd: records.get(subject)!.jsonAd,
+        snapshot: records.get(subject)!.snapshot!,
+      };
+      entered();
+      await gate;
+
+      return result;
+    },
+  );
+  const work = store.applyRemoteIncoming(change);
+  const outcome = same
+    ? expect(work).resolves.toBe('applied')
+    : expect(work).rejects.toThrow('database changed');
+  await reading;
+
+  if (same) {
+    store.setAgent(
+      new Agent(new JSCryptoProvider(keys.privateKey), agent.subject),
+    );
+  } else {
+    const other = await Agent.generateKeyPair();
+    store.setAgent(
+      new Agent(
+        new JSCryptoProvider(other.privateKey),
+        `did:ad:agent:${other.publicKey}`,
+      ),
+    );
+  }
+
+  release();
+  await outcome;
+});

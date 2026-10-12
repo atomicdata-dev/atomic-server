@@ -2733,11 +2733,14 @@ export class Store {
     const subject = this.normalizeSubject(
       change.resource?.subject ?? change.subject,
     );
-    const identity = this.agent;
+    // Identity is the agent's subject, not the object: sign-in flows replace
+    // the Agent instance with an equal one (e.g. `Agent.fromSecret` after the
+    // dev drive is made) and that must not cancel reads in flight.
+    const identity = this.agent?.subject;
     const previous = this.remoteIngress.get(subject);
     const queue = previous ?? { tail: Promise.resolve(), cancelled: false };
     const valid = () =>
-      current() && this.agent === identity && !queue.cancelled;
+      current() && this.agent?.subject === identity && !queue.cancelled;
 
     const apply = async () => {
       if (!valid()) throw new RequestCancelledError('Remote ingress cancelled');
