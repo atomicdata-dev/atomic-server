@@ -1169,6 +1169,11 @@ export class Store {
     this.localOnlyDrives.add(normalized);
   }
 
+  /** The drive a subject belongs to, for naming it to the person. */
+  public driveOfSubject(subject: string): string {
+    return this.driveOf(this.normalizeSubject(subject));
+  }
+
   /**
    * Whether the server in use refuses `drive` outright because it does not
    * host it: a managed node answering "not enrolled" to our pushes, seen

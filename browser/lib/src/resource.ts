@@ -197,6 +197,20 @@ export function normalizeLoroChangeTimestampMs(timestamp: number): number {
 }
 
 /**
+ * Thrown by an explicit save when the commit is only queued in the outbox
+ * (offline or retrying). The queued state is normal and visible through
+ * `Store.getSaveState`; callers that merely schedule saves can ignore it.
+ */
+export class SaveQueuedError extends Error {
+  constructor(
+    message = 'Save is still queued; the server has not acknowledged it.',
+  ) {
+    super(message);
+    this.name = 'SaveQueuedError';
+  }
+}
+
+/**
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
  * / Value combinations.
  *
@@ -3810,9 +3824,7 @@ export class Resource<C extends OptionalClass = any> {
           );
 
         if (!acknowledged) {
-          throw new Error(
-            'Save is still queued; the server has not acknowledged it.',
-          );
+          throw new SaveQueuedError();
         }
       }
 
