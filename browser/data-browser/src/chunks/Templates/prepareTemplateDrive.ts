@@ -1,3 +1,4 @@
+import { dbgEnrollCall } from '../../helpers/managed/api';
 import type { Store } from '@tomic/react';
 import { fetchManagedInfo } from '../../helpers/managedServer';
 import { getManagedEnrollments } from '../../helpers/managed/enrollmentApi';
@@ -34,6 +35,7 @@ export async function prepareTemplateDrive(store: Store): Promise<void> {
     return;
   }
 
+  dbgEnrollCall('prepareTemplateDrive');
   const enrollments = await getManagedEnrollments(true);
   const enrolledHereOrUnknown = enrollments.some(
     enrollment =>

@@ -2,6 +2,39 @@ import { ManagedReadCache } from './readCache';
 
 const metadataReads = new ManagedReadCache();
 
+export const dbgEnrollCall = (label: string) => {
+  console.error(`ENROLLCALL t=${Math.round(performance.now())} ${label}`);
+};
+
+// TEMPORARY DEBUG (enrollment read budget): name who makes each control-plane read.
+if (typeof window !== 'undefined') {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+
+    if (
+      /\/api\/sync-enrollments$/.test(url) &&
+      (init?.method ?? 'GET') === 'GET'
+    ) {
+      const frames = (new Error().stack ?? '')
+        .split('\n')
+        .slice(2, 9)
+        .map(f => f.trim().replace(/https?:\/\/[^/]+\/assets\//, ''))
+        .join(' < ');
+      console.error(
+        `ENROLLREAD t=${Math.round(performance.now())} cache=${String(init?.cache)} ${frames}`,
+      );
+    }
+
+    return realFetch(input, init);
+  }) as typeof window.fetch;
+}
+
 // A portal sign-in in another tab can replace the cookie session. Never
 // carry cached identity metadata across a return to this app.
 const resetMetadataReads = () => metadataReads.invalidate();

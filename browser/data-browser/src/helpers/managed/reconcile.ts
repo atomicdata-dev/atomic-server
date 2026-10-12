@@ -1,3 +1,4 @@
+import { dbgEnrollCall } from './api';
 import { core } from '@tomic/react';
 import { withDeadline } from '../withDeadline';
 import { PRODUCT_NAME } from './product';
@@ -60,6 +61,7 @@ export async function evaluateIdentityReconciliation(
     return { ok: true, managedAccount: null };
   }
 
+  dbgEnrollCall('reconcile.evaluate');
   const [recovery, enrollments] = await Promise.all([
     getRecoverySecret().catch(() => null),
     getManagedEnrollments().catch(() => [] as ManagedEnrollmentSummary[]),
@@ -168,6 +170,7 @@ async function resolveHostedDriveOrigin(
     return undefined;
   }
 
+  dbgEnrollCall('reconcile.second');
   const enrollments = await getManagedEnrollments().catch(
     () => [] as ManagedEnrollmentSummary[],
   );

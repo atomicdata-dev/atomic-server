@@ -1,3 +1,4 @@
+import { dbgEnrollCall } from './api';
 import { getRuntimeManagedPortalUrl } from './api';
 // Turning on hosted sync for a local or server-hosted drive —
 // the Cloud Server action on the /sync page. This is the bridge between
@@ -64,6 +65,7 @@ export function isCloudSyncAvailable(info?: ManagedInfo | null): boolean {
  * keep that state unknown; it is not evidence that hosting is disabled.
  */
 export async function driveHasCloudEnrollment(drive: string): Promise<boolean> {
+  dbgEnrollCall('cloudSync.driveHasCloudEnrollment');
   const enrollments = await getManagedEnrollments(true);
 
   return enrollments.some(

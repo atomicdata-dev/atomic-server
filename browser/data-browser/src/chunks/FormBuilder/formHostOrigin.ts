@@ -1,3 +1,4 @@
+import { dbgEnrollCall } from '@helpers/managed/api';
 import { useStore } from '@tomic/react';
 import { useEffect, useState } from 'react';
 import { getManagedEnrollments } from '@helpers/managed/enrollmentApi';
@@ -72,7 +73,7 @@ export function useFormHostOrigin(): {
 
     let cancelled = false;
 
-    getManagedEnrollments()
+    (dbgEnrollCall('formHostOrigin'), getManagedEnrollments())
       .catch(() => [] as ManagedEnrollmentSummary[])
       .then(list => {
         if (!cancelled) setEnrollments(list);

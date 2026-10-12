@@ -1,3 +1,4 @@
+import { dbgEnrollCall } from './api';
 import { conversations, type Store } from '@tomic/react';
 import { hasMembers } from '../conversations/conversations';
 import {
@@ -65,7 +66,7 @@ export async function healRefusedDrive(
   drive: string,
   lookup: () => Promise<
     Pick<ManagedEnrollmentSummary, 'drive_subject' | 'status'>[]
-  > = () => getManagedEnrollments(true),
+  > = () => (dbgEnrollCall('refusedDrive'), getManagedEnrollments(true)),
 ): Promise<boolean> {
   if (store.isLocalOnlyDrive(drive)) return true;
   if (!(await mayMoveToBrowser(store, drive))) return false;
