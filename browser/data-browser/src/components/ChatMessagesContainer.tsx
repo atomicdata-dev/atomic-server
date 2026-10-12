@@ -7,17 +7,17 @@ import { Column } from '@components/Row';
 const BOTTOM_THRESHOLD_PX = 48;
 
 /**
- * How long (ms) after the list appears it is still settling: its messages load
- * and animate in while the panel slides open. In that time the view jumps to
- * the newest message instead of gliding, and a scroll is the page laying out,
- * not the reader. A smooth glide started in the middle of that could be
- * knocked back to the top and read as the reader scrolling up, leaving a
- * freshly opened chat showing its oldest messages.
+ * Input that means the reader is scrolling by hand. Until one of these, every
+ * scroll is the list laying out (messages loading and animating in while the
+ * panel slides open), never the reader. Judging that by a clock either pulled
+ * back a reader who scrolled up early, or missed content that landed late.
  */
-const SETTLE_MS = 800;
-
-const isSettling = (mountedAt: number) =>
-  performance.now() - mountedAt < SETTLE_MS;
+const READER_SCROLL_EVENTS = [
+  'wheel',
+  'touchstart',
+  'pointerdown',
+  'keydown',
+] as const;
 
 interface ChatMessagesContainerProps {
   enableAutoScroll?: boolean;
@@ -38,7 +38,8 @@ export const ChatMessagesContainer: React.FC<
   fullView,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mountedAtRef = useRef(0);
+  // Whether the reader has touched the list yet (see READER_SCROLL_EVENTS).
+  const readerScrolledRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Whether the view is "stuck" to the bottom. The user detaches by scrolling
   // up while a message streams in, and re-attaches by scrolling back down.
@@ -76,7 +77,7 @@ export const ChatMessagesContainer: React.FC<
     ).matches;
     scroller.scrollTo({
       top: scroller.scrollHeight,
-      behavior: reduced || isSettling(mountedAtRef.current) ? 'auto' : 'smooth',
+      behavior: reduced ? 'auto' : 'smooth',
     });
   };
 
@@ -127,7 +128,6 @@ export const ChatMessagesContainer: React.FC<
 
   useEffect(() => {
     // Initial scroll to bottom when component mounts.
-    mountedAtRef.current = performance.now();
     scrollToBottom();
 
     const scroller = scrollRef.current;
@@ -163,8 +163,9 @@ export const ChatMessagesContainer: React.FC<
         el.clientHeight > viewportHeightRef.current ||
         (atBottom && performance.now() - resizedAtRef.current < 150);
 
-      if (isSettling(mountedAtRef.current)) {
-        // Still laying out: stay attached and keep to the newest message.
+      if (!readerScrolledRef.current) {
+        // Still laying out, or a glide knocked back: the reader has not
+        // scrolled, so stay attached and keep to the newest message.
         if (stuckToBottomRef.current && !isNearBottom()) scrollToBottom();
       } else if (top < lastScrollTopRef.current - 1 && !clamped) {
         stuckToBottomRef.current = false;
@@ -180,6 +181,18 @@ export const ChatMessagesContainer: React.FC<
     };
 
     scroller?.addEventListener('scroll', handleScroll, { passive: true });
+
+    const markReaderScrolled = () => {
+      readerScrolledRef.current = true;
+    };
+
+    // The scroll area's root holds the viewport and its scrollbars, so a drag
+    // on the scrollbar counts too.
+    const scrollArea = scroller?.parentElement;
+
+    for (const type of READER_SCROLL_EVENTS) {
+      scrollArea?.addEventListener(type, markReaderScrolled, { passive: true });
+    }
 
     // Opening the keyboard shrinks the message viewport without adding any
     // messages. Keep the last line visible when already following the bottom;
@@ -229,6 +242,11 @@ export const ChatMessagesContainer: React.FC<
 
     return () => {
       scroller?.removeEventListener('scroll', handleScroll);
+
+      for (const type of READER_SCROLL_EVENTS) {
+        scrollArea?.removeEventListener(type, markReaderScrolled);
+      }
+
       observer?.disconnect();
       resizeObserver.disconnect();
     };
