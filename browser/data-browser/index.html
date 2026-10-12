@@ -159,11 +159,11 @@
         position: fixed;
         inset: 0;
         z-index: 2147483000;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1.75rem;
+        /* The mark alone is centred, so it sits where the app's own loaders
+           do: the caption hangs below it instead of pushing it up. */
+        display: grid;
+        place-items: center;
+        --boot-mark-size: min(11rem, 36vw);
         background-color: var(--background-color);
         color: var(--text-splash);
         transition:
@@ -180,17 +180,13 @@
           visibility 0s linear 420ms;
       }
 
+      /* No scale or slide on the way in or out: the mark stays put from the
+         first paint until the splash has faded away. */
       .boot-mark {
         position: relative;
-        width: min(11rem, 36vw);
+        width: var(--boot-mark-size);
         aspect-ratio: 1;
         --orbit-period: 2.4s;
-        animation: boot-mark-in 500ms ease-out both;
-      }
-
-      #boot-splash.boot-splash-leaving .boot-mark {
-        transform: scale(1.12);
-        transition: transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
       }
 
       .boot-mark-system,
@@ -218,6 +214,12 @@
 
       /* Said only when it takes a while, so a quick start is just the mark. */
       .boot-caption {
+        position: absolute;
+        top: calc(50% + var(--boot-mark-size) / 2 + 1.75rem);
+        left: 0;
+        right: 0;
+        padding: 0 1rem;
+        text-align: center;
         margin: 0;
         font:
           400 0.95rem/1.4 'Open Sans',
@@ -226,13 +228,6 @@
         opacity: 0;
         color: var(--text-splash);
         animation: boot-caption-in 600ms ease 1.6s forwards;
-      }
-
-      @keyframes boot-mark-in {
-        from {
-          opacity: 0;
-          transform: scale(0.92);
-        }
       }
 
       @keyframes boot-caption-in {
@@ -272,9 +267,7 @@
           --orbit-period: 6s;
         }
 
-        #root.boot-revealing,
-        .boot-mark,
-        #boot-splash.boot-splash-leaving .boot-mark {
+        #root.boot-revealing {
           animation: none;
           transform: none;
         }
@@ -305,7 +298,16 @@
     <div id="boot-splash" role="status" aria-live="polite">
       <span class="boot-mark" aria-hidden="true">
         <span class="boot-mark-system">
-          <svg class="boot-mark-sweep" viewBox="0 0 100 100" fill="none"><path d="M74 50 A 24 24 0 1 1 50 26" stroke="currentColor" stroke-width="14" stroke-linecap="round"/></svg>
+          <!-- The logo's sweep (brand/src/place-mark.svg): an outlined ring,
+               a 24-wide outer stroke with a 14-wide one cut out of it. The
+               mask keeps the inside see-through on any background. -->
+          <svg class="boot-mark-sweep" viewBox="0 0 100 100" fill="none">
+            <mask id="boot-sweep-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+              <path d="M74 50 A 24 24 0 1 1 50 26" stroke="white" stroke-width="24" stroke-linecap="round"/>
+              <path d="M74 50 A 24 24 0 1 1 50 26" stroke="black" stroke-width="14" stroke-linecap="round"/>
+            </mask>
+            <rect width="100" height="100" fill="currentColor" mask="url(#boot-sweep-mask)"/>
+          </svg>
           <svg class="boot-mark-orb" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="12" fill="url(#boot-orb)" />
             <defs>

@@ -1,4 +1,6 @@
+import { useEffect, useId } from 'react';
 import { styled } from 'styled-components';
+import { holdBootSplash } from '../helpers/bootSplash';
 
 interface SpinnerProps {
   size?: string;
@@ -18,6 +20,11 @@ export const Spinner = ({
   inheritColor = false,
   centered = false,
 }: SpinnerProps) => {
+  // A pane-level spinner that takes over from the boot splash would be a
+  // second loader at another size and position; the splash waits for it.
+  useEffect(() => (centered ? holdBootSplash() : undefined), [centered]);
+
+  const maskId = `spinner-sweep-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const mark = (
     <Mark
       $size={size ?? (centered ? '4rem' : undefined)}
@@ -27,12 +34,35 @@ export const Spinner = ({
       <System>
         <Sweep viewBox='0 0 100 100' fill='none'>
           {/* The logo's sweep (brand/src/place-mark.svg): 270 degrees,
-              centred on the orb. */}
-          <path
-            d='M74 50 A 24 24 0 1 1 50 26'
-            stroke='currentColor'
-            strokeWidth='14'
-            strokeLinecap='round'
+              centred on the orb, and outlined like the logo: a 24-wide
+              stroke with a 14-wide one cut out of it, so the inside stays
+              see-through on any background. */}
+          <mask
+            id={maskId}
+            maskUnits='userSpaceOnUse'
+            x='0'
+            y='0'
+            width='100'
+            height='100'
+          >
+            <path
+              d='M74 50 A 24 24 0 1 1 50 26'
+              stroke='white'
+              strokeWidth='24'
+              strokeLinecap='round'
+            />
+            <path
+              d='M74 50 A 24 24 0 1 1 50 26'
+              stroke='black'
+              strokeWidth='14'
+              strokeLinecap='round'
+            />
+          </mask>
+          <rect
+            width='100'
+            height='100'
+            fill='currentColor'
+            mask={`url(#${maskId})`}
           />
         </Sweep>
       </System>
