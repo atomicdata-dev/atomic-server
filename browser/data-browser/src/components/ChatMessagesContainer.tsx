@@ -6,6 +6,19 @@ import { Column } from '@components/Row';
 /** How close to the bottom (px) still counts as "stuck to the bottom". */
 const BOTTOM_THRESHOLD_PX = 48;
 
+/**
+ * How long (ms) after the list appears it is still settling: its messages load
+ * and animate in while the panel slides open. In that time the view jumps to
+ * the newest message instead of gliding, and a scroll is the page laying out,
+ * not the reader. A smooth glide started in the middle of that could be
+ * knocked back to the top and read as the reader scrolling up, leaving a
+ * freshly opened chat showing its oldest messages.
+ */
+const SETTLE_MS = 800;
+
+const isSettling = (mountedAt: number) =>
+  performance.now() - mountedAt < SETTLE_MS;
+
 interface ChatMessagesContainerProps {
   enableAutoScroll?: boolean;
   /** When this value changes, scroll the compact separator (or bottom) into view. */
@@ -25,6 +38,7 @@ export const ChatMessagesContainer: React.FC<
   fullView,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mountedAtRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Whether the view is "stuck" to the bottom. The user detaches by scrolling
   // up while a message streams in, and re-attaches by scrolling back down.
@@ -62,7 +76,7 @@ export const ChatMessagesContainer: React.FC<
     ).matches;
     scroller.scrollTo({
       top: scroller.scrollHeight,
-      behavior: reduced ? 'auto' : 'smooth',
+      behavior: reduced || isSettling(mountedAtRef.current) ? 'auto' : 'smooth',
     });
   };
 
@@ -113,6 +127,7 @@ export const ChatMessagesContainer: React.FC<
 
   useEffect(() => {
     // Initial scroll to bottom when component mounts.
+    mountedAtRef.current = performance.now();
     scrollToBottom();
 
     const scroller = scrollRef.current;
@@ -148,7 +163,10 @@ export const ChatMessagesContainer: React.FC<
         el.clientHeight > viewportHeightRef.current ||
         (atBottom && performance.now() - resizedAtRef.current < 150);
 
-      if (top < lastScrollTopRef.current - 1 && !clamped) {
+      if (isSettling(mountedAtRef.current)) {
+        // Still laying out: stay attached and keep to the newest message.
+        if (stuckToBottomRef.current && !isNearBottom()) scrollToBottom();
+      } else if (top < lastScrollTopRef.current - 1 && !clamped) {
         stuckToBottomRef.current = false;
         // Stop a glide still on its way down, or it carries on past the
         // reader and lands them back at the bottom.

@@ -12,6 +12,7 @@ import {
 } from '@tomic/react';
 import { AgentAvatar } from '../Presence/AgentAvatar';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
+import { useFollow } from '../Presence/FollowContext';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -101,12 +102,28 @@ export function MessageNotifier(): null {
   const store = useStore();
   const [agent] = useCurrentAgent();
   const [currentSubject] = useCurrentSubject();
-  const { activePanel, setPanelOpen } = useRightPanel();
+  const { activePanel, selectedMeeting, setPanelOpen } = useRightPanel();
+  const { followedSession, activeMeeting } = useFollow();
+  // The meeting chat in the right panel, when it is open (as the panel picks it).
+  const panelChat =
+    activePanel === 'followSession'
+      ? (selectedMeeting ?? followedSession ?? activeMeeting)
+      : undefined;
   const navigate = useNavigateWithTransition();
   const { privateDrive } = usePrivateDrive();
   const [sharedWithMe] = usePrivateDriveList(core.properties.sharedWithMe);
 
   const handled = useRef(new Set<string>());
+  // Toasts on screen, so opening the meeting panel can take them away.
+  const shown = useRef(new Set<string>());
+  const meetingPanelOpen = activePanel === 'followSession';
+
+  useEffect(() => {
+    if (!meetingPanelOpen) return;
+
+    shown.current.forEach(id => toast.dismiss(id));
+    shown.current.clear();
+  }, [meetingPanelOpen]);
   // Announced while away, with system notifications not decided yet.
   const missed = useRef(0);
   // Inbox writes still in flight, per target, so reading waits for them.
@@ -210,6 +227,16 @@ export function MessageNotifier(): null {
 
   const isLookingAt = useEffectEvent((n: MessageNotification) => {
     if (document.hidden || !document.hasFocus()) return false;
+
+    // The meeting chat is open beside the page: its messages are on screen
+    // whatever the page is.
+    if (
+      panelChat &&
+      store.normalizeSubject(panelChat) === store.normalizeSubject(n.target)
+    ) {
+      return true;
+    }
+
     if (!currentSubject) return false;
 
     if (
@@ -285,6 +312,11 @@ export function MessageNotifier(): null {
       }
 
       if (!document.hidden && document.hasFocus()) {
+        // The meeting panel covers or crowds the page and has its own chat
+        // open; a bubble over its message box is noise. Still in the Inbox.
+        if (meetingPanelOpen) return;
+
+        shown.current.add(subject);
         toast.custom(
           t => (
             <ToastCard
