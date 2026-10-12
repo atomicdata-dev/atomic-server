@@ -89,14 +89,22 @@ function otherDriveOf(
 ): string | undefined {
   const viewed = input.status.drive && canonicalizeScheme(input.status.drive);
   const named = driveInMessage(message);
-  const drive =
-    named ?? (entry ? input.driveOf?.(entry.subject) : undefined) ?? undefined;
+  const drive = named ?? (entry ? input.driveOf?.(entry.subject) : undefined);
 
   if (!drive || !viewed) return undefined;
 
   const canonical = canonicalizeScheme(drive);
 
   return canonical === viewed ? undefined : canonical;
+}
+
+/** Title for a refusal about another workspace, named when its title is known. */
+export function notHostedTitle(name?: string | null): string {
+  const trimmed = name?.trim();
+
+  return trimmed
+    ? `This server does not have “${trimmed}”`
+    : 'This server does not have another workspace on this device';
 }
 
 /** Name the remedy for an error message that retrying cannot fix, or null. */
@@ -110,32 +118,28 @@ function fromMessage(
 
   if (NOT_ENROLLED.test(message) || MISSING_PARENT.test(message)) {
     const other = otherDriveOf(input, message, entry);
+    const shared = {
+      key: 'not-hosted',
+      cause: 'you',
+      detail: message,
+      reported,
+    } as const;
 
     if (other) {
-      const name = input.driveTitle?.(other)?.trim();
-
       return {
-        key: 'not-hosted',
-        cause: 'you',
-        title: name
-          ? `This server does not have “${name}”`
-          : 'This server does not have another workspace on this device',
+        ...shared,
+        title: notHostedTitle(input.driveTitle?.(other)),
         body: `That is not the workspace you are viewing. ${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there.`,
         actions: ['connect-device'],
-        detail: message,
         otherDrive: other,
-        reported,
       };
     }
 
     return {
-      key: 'not-hosted',
-      cause: 'you',
+      ...shared,
       title: 'This server does not have this workspace',
       body: `${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has this workspace, or turn off server sync for it to keep working here.`,
       actions: ['connect-device', 'review-sync'],
-      detail: message,
-      reported,
     };
   }
 
