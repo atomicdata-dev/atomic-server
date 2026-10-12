@@ -68,6 +68,9 @@ Both implementations run the cases in `lib/tests/fixtures/json-schema-interop.js
 | `type: array` of `$ref` | `resourceArray` plus a `class` constraint |
 | `type: array` of `{ type: string, format: uri }` | `resourceArray` |
 | Other `type: array`, `type: object` | `json` |
+| `type: ["string", "null"]` (one type plus `"null"`) | the datatype of that type, plus a `type` constraint that keeps the `null` |
+| `type: ["string", "integer"]`, or `anyOf` without a `type` | `json`, plus the `type` or `anyOf` constraint |
+| `properties`, `required`, `additionalProperties`, `items`, `anyOf` below a property | `json`, plus the same keywords as a [nested constraint](classes.md#nested-values) |
 | `enum`, `const` | `enum` constraint. Without a `type` the datatype follows the values. On an array, put it on `items` |
 | `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` | the same constraint keyword |
 | `minLength`, `maxLength`, `pattern` | the same constraint keyword |
@@ -78,22 +81,44 @@ That also means two classes that both declare `name` as a string share one Prope
 
 `$comment`, `examples`, `default`, `deprecated`, `readOnly`, `writeOnly` and a root `$id` are annotations.
 They are read and dropped.
-`additionalProperties` may be a boolean and is dropped: Atomic classes are open.
+On a class, `additionalProperties` may be a boolean and is dropped: Atomic classes are open. Inside a property it is kept (see [Nested schemas](#nested-schemas)).
 
 ## What does not map
 
 Each of these is an error on import, naming the keyword's JSON pointer, for example `/$defs/Invoice/properties/status/oneOf`.
 
-- `oneOf`, `anyOf`, `allOf`, `not`, `if`/`then`/`else`, `dependentSchemas`, `patternProperties`, `propertyNames`, `unevaluated*`, `prefixItems` and the other keywords that Atomic has no equivalent for.
-- Nullable types (`type: ["string", "null"]`). Atomic has no null: leave the property out of the value instead.
+- `oneOf`, `allOf`, `not`, `if`/`then`/`else`, `dependentSchemas`, `patternProperties`, `propertyNames`, `unevaluated*`, `prefixItems` and the other keywords that Atomic has no equivalent for.
+- `anyOf` on a class (it is only read below a property), and a `type` of just `null`.
 - A `$ref` that is not a local `#/$defs/Name` to an object schema, a `$defs` entry that is not an object schema, and any keyword next to `$ref` other than `title`, `description` and `enum`.
-- Object schemas nested inside a property (`properties` below a property). Move them to `$defs` and `$ref` them.
+- A `$ref` (or `oneOf`, `format`, ...) inside a nested schema, and tuple-form `items`. Nested schemas are self-contained.
+- Nesting deeper than 16 levels.
 - `enum` or `const` on an array. It constrains the whole array in JSON Schema, but a class constraint applies to every item. Put it on `items`.
 - A `format` other than `date-time`, `date` and `uri`, and any `type` other than `string`, `integer`, `number`, `boolean`, `array` and `object`.
 - Boolean schemas, a `$schema` other than draft 2020-12, unknown `x-` keywords, and any other keyword.
 - A property name that cannot become a [slug](datatypes.md#slug), two names that become the same shortname, and a shortname used with two datatypes in one Ontology (a Property is identified by shortname and datatype, and an Ontology cannot hold two with one shortname).
 
-Items of a `json` array are not described: `{ type: array, items: { type: string } }` imports as plain `json`.
+`{ type: array, items: { type: string } }` (items that are plain, with no `minLength` and the like) still imports as plain `json`.
+
+## Nested schemas
+
+A property whose schema has `properties`, `required`, `additionalProperties` or `anyOf`, whose `items` have keywords beyond a type or a link, or whose `type` is an array, keeps that schema.
+The datatype is `json` (or the type's own datatype for a nullable `string`, `integer`, ...), and the schema is stored whole in the Class's constraint for the property, in the same vocabulary: `type`, `enum`, `const`, the numeric, string and array limits, `properties`, `required`, `additionalProperties`, `items` and `anyOf`.
+See [nested values](classes.md#nested-values) for what is checked and when.
+
+```json
+"pad": {
+  "type": "object",
+  "required": ["tune"],
+  "additionalProperties": false,
+  "properties": {
+    "tune": { "type": "number", "minimum": -24, "maximum": 24 },
+    "label": { "type": ["string", "null"], "maxLength": 8 }
+  }
+}
+```
+
+Inside a nested schema `title`, `description` and the annotations are read and dropped; `format` and `$ref` are errors.
+Export writes the schema back next to `x-atomic-datatype: json`, so import, `ensureOntology` and export give the same nested schema again.
 
 ## `x-atomic-*` keywords
 

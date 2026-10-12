@@ -16,8 +16,15 @@ use crate::{
 };
 
 /// Every keyword a constraint may use. Anything else is rejected on write.
-pub const KEYWORDS: [&str; 11] = [
+pub const KEYWORDS: [&str; 18] = [
     "enum",
+    "const",
+    "type",
+    "properties",
+    "required",
+    "additionalProperties",
+    "items",
+    "anyOf",
     "minimum",
     "maximum",
     "exclusiveMinimum",
@@ -30,10 +37,36 @@ pub const KEYWORDS: [&str; 11] = [
     "class",
 ];
 
-/// The constraints on one property of one class.
+/// How deep schemas may nest (`properties`, `items`, `anyOf`, ...). A
+/// constraint nested deeper is rejected when it is parsed.
+pub const MAX_DEPTH: usize = 16;
+
+/// The JSON Schema `type` names a constraint accepts.
+pub const TYPES: [&str; 7] = [
+    "string", "number", "integer", "boolean", "null", "object", "array",
+];
+
+/// `additionalProperties`: `false` forbids unlisted keys, a schema checks them.
+/// `true` is the default and changes nothing.
+#[derive(Clone, Debug)]
+pub enum AdditionalProperties {
+    Allowed(bool),
+    Schema(Box<Constraint>),
+}
+
+/// The constraints on one property of one class. Below the top level the same
+/// struct describes a nested JSON Schema (`properties`, `items`, `anyOf`).
 #[derive(Clone, Debug, Default)]
 pub struct Constraint {
     pub enum_values: Option<Vec<Json>>,
+    pub const_value: Option<Json>,
+    /// Allowed JSON types, any of them. `"null"` makes a value nullable.
+    pub types: Option<Vec<String>>,
+    pub properties: Option<BTreeMap<String, Constraint>>,
+    pub required: Option<Vec<String>>,
+    pub additional_properties: Option<AdditionalProperties>,
+    pub items: Option<Box<Constraint>>,
+    pub any_of: Option<Vec<Constraint>>,
     pub minimum: Option<f64>,
     pub maximum: Option<f64>,
     pub exclusive_minimum: Option<f64>,
@@ -57,11 +90,18 @@ pub struct ConstraintError {
     /// The JSON Schema keyword that failed.
     pub keyword: &'static str,
     pub detail: String,
+    /// JSON pointer to the failing value inside the property's value. Empty
+    /// for the value itself, `/pad/tune` for a nested one.
+    pub path: String,
 }
 
 impl std::fmt::Display for ConstraintError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.keyword, self.detail)
+        if self.path.is_empty() {
+            write!(f, "{}: {}", self.keyword, self.detail)
+        } else {
+            write!(f, "{} at {}: {}", self.keyword, self.path, self.detail)
+        }
     }
 }
 
@@ -80,6 +120,17 @@ fn count(keyword: &str, v: &Json) -> AtomicResult<u64> {
 
 /// Parses one constraint object, rejecting unknown keywords and wrong types.
 pub fn parse_constraint(json: &Json) -> AtomicResult<Constraint> {
+    parse_at(json, 0)
+}
+
+fn nested(keyword: &str, key: &str, v: &Json, depth: usize) -> AtomicResult<Constraint> {
+    parse_at(v, depth + 1).map_err(|e| format!("in `{keyword}`{key}: {e}").into())
+}
+
+fn parse_at(json: &Json, depth: usize) -> AtomicResult<Constraint> {
+    if depth > MAX_DEPTH {
+        return Err(format!("Constraints nest deeper than {MAX_DEPTH} levels").into());
+    }
     let obj = json
         .as_object()
         .ok_or_else(|| format!("A constraint must be a JSON object, got {json}"))?;
@@ -111,10 +162,96 @@ pub fn parse_constraint(json: &Json) -> AtomicResult<Constraint> {
                 );
             }
             "class" => {
+                if depth > 0 {
+                    return Err(
+                        "Constraint `class` only applies to a property, not inside a nested schema"
+                            .into(),
+                    );
+                }
                 let s = v
                     .as_str()
                     .ok_or_else(|| format!("Constraint `class` must be a string, got {v}"))?;
                 c.class = Some(canonicalize_scheme(s));
+            }
+            "const" => c.const_value = Some(v.clone()),
+            "type" => {
+                let names: Vec<&Json> = match v {
+                    Json::Array(a) => a.iter().collect(),
+                    single => vec![single],
+                };
+                let mut types = Vec::new();
+                for name in names {
+                    match name.as_str().filter(|n| TYPES.contains(n)) {
+                        Some(n) => {
+                            if !types.iter().any(|t| t == n) {
+                                types.push(n.to_string());
+                            }
+                        }
+                        None => {
+                            return Err(format!(
+                                "Constraint `type` must be one of {} or an array of them, got {v}",
+                                TYPES.join(", ")
+                            )
+                            .into())
+                        }
+                    }
+                }
+                if types.is_empty() {
+                    return Err("Constraint `type` cannot be an empty array".into());
+                }
+                c.types = Some(types);
+            }
+            "properties" => {
+                let map = v
+                    .as_object()
+                    .ok_or_else(|| format!("Constraint `properties` must be an object, got {v}"))?;
+                let mut out = BTreeMap::new();
+                for (name, schema) in map {
+                    out.insert(
+                        name.clone(),
+                        nested("properties", &format!(" for \"{name}\""), schema, depth)?,
+                    );
+                }
+                c.properties = Some(out);
+            }
+            "required" => {
+                let arr = v
+                    .as_array()
+                    .ok_or_else(|| format!("Constraint `required` must be an array, got {v}"))?;
+                c.required = Some(
+                    arr.iter()
+                        .map(|n| {
+                            n.as_str().map(str::to_string).ok_or_else(|| {
+                                format!("Constraint `required` must hold strings, got {n}")
+                            })
+                        })
+                        .collect::<Result<_, _>>()?,
+                );
+            }
+            "additionalProperties" => {
+                c.additional_properties = Some(match v {
+                    Json::Bool(b) => AdditionalProperties::Allowed(*b),
+                    Json::Object(_) => {
+                        AdditionalProperties::Schema(Box::new(nested("additionalProperties", "", v, depth)?))
+                    }
+                    other => {
+                        return Err(format!(
+                            "Constraint `additionalProperties` must be a boolean or a schema, got {other}"
+                        )
+                        .into())
+                    }
+                });
+            }
+            "items" => c.items = Some(Box::new(nested("items", "", v, depth)?)),
+            "anyOf" => {
+                let arr = v.as_array().filter(|a| !a.is_empty()).ok_or_else(|| {
+                    format!("Constraint `anyOf` must be a non-empty array, got {v}")
+                })?;
+                c.any_of = Some(
+                    arr.iter()
+                        .map(|b| nested("anyOf", "", b, depth))
+                        .collect::<AtomicResult<_>>()?,
+                );
             }
             other => {
                 return Err(format!(
@@ -207,6 +344,20 @@ impl Constraint {
             max_items: upper(self.max_items, other.max_items),
             pattern: self.pattern.clone().or_else(|| other.pattern.clone()),
             class: self.class.clone().or_else(|| other.class.clone()),
+            // Nested schemas cannot be combined either: `self` wins.
+            const_value: self
+                .const_value
+                .clone()
+                .or_else(|| other.const_value.clone()),
+            types: self.types.clone().or_else(|| other.types.clone()),
+            properties: self.properties.clone().or_else(|| other.properties.clone()),
+            required: self.required.clone().or_else(|| other.required.clone()),
+            additional_properties: self
+                .additional_properties
+                .clone()
+                .or_else(|| other.additional_properties.clone()),
+            items: self.items.clone().or_else(|| other.items.clone()),
+            any_of: self.any_of.clone().or_else(|| other.any_of.clone()),
         }
     }
 
@@ -224,6 +375,16 @@ impl Constraint {
             max_items: top.max_items.or(self.max_items),
             pattern: top.pattern.clone().or_else(|| self.pattern.clone()),
             class: top.class.clone().or_else(|| self.class.clone()),
+            const_value: top.const_value.clone().or_else(|| self.const_value.clone()),
+            types: top.types.clone().or_else(|| self.types.clone()),
+            properties: top.properties.clone().or_else(|| self.properties.clone()),
+            required: top.required.clone().or_else(|| self.required.clone()),
+            additional_properties: top
+                .additional_properties
+                .clone()
+                .or_else(|| self.additional_properties.clone()),
+            items: top.items.clone().or_else(|| self.items.clone()),
+            any_of: top.any_of.clone().or_else(|| self.any_of.clone()),
         }
     }
 
@@ -266,6 +427,53 @@ impl Constraint {
         }
         if let Some(c) = &self.class {
             o.insert("class".into(), Json::String(c.clone()));
+        }
+        if let Some(v) = &self.const_value {
+            o.insert("const".into(), v.clone());
+        }
+        if let Some(types) = &self.types {
+            o.insert(
+                "type".into(),
+                match types.as_slice() {
+                    [one] => Json::String(one.clone()),
+                    many => Json::Array(many.iter().cloned().map(Json::String).collect()),
+                },
+            );
+        }
+        if let Some(props) = &self.properties {
+            o.insert(
+                "properties".into(),
+                Json::Object(
+                    props
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.to_json()))
+                        .collect(),
+                ),
+            );
+        }
+        if let Some(required) = &self.required {
+            o.insert(
+                "required".into(),
+                Json::Array(required.iter().cloned().map(Json::String).collect()),
+            );
+        }
+        match &self.additional_properties {
+            Some(AdditionalProperties::Allowed(b)) => {
+                o.insert("additionalProperties".into(), Json::Bool(*b));
+            }
+            Some(AdditionalProperties::Schema(c)) => {
+                o.insert("additionalProperties".into(), c.to_json());
+            }
+            None => {}
+        }
+        if let Some(items) = &self.items {
+            o.insert("items".into(), items.to_json());
+        }
+        if let Some(branches) = &self.any_of {
+            o.insert(
+                "anyOf".into(),
+                Json::Array(branches.iter().map(Constraint::to_json).collect()),
+            );
         }
         Json::Object(o)
     }
@@ -380,27 +588,117 @@ fn canonical_json(v: &Json) -> Json {
 fn json_eq(a: &Json, b: &Json) -> bool {
     match (a, b) {
         (Json::Number(x), Json::Number(y)) => x.as_f64() == y.as_f64(),
+        (Json::Array(x), Json::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(a, b)| json_eq(a, b))
+        }
+        (Json::Object(x), Json::Object(y)) => {
+            x.len() == y.len()
+                && x.iter()
+                    .all(|(k, a)| y.get(k).is_some_and(|b| json_eq(a, b)))
+        }
         _ => canonical_json(a) == canonical_json(b),
     }
 }
 
+fn pointer_of(path: &[String]) -> String {
+    path.iter()
+        .map(|s| format!("/{}", s.replace('~', "~0").replace('/', "~1")))
+        .collect()
+}
+
+fn type_matches(name: &str, value: &Json) -> bool {
+    match (name, value) {
+        ("string", Json::String(_))
+        | ("boolean", Json::Bool(_))
+        | ("null", Json::Null)
+        | ("object", Json::Object(_))
+        | ("array", Json::Array(_))
+        | ("number", Json::Number(_)) => true,
+        ("integer", Json::Number(n)) => {
+            n.is_i64()
+                || n.is_u64()
+                || n.as_f64()
+                    .is_some_and(|f| f.is_finite() && f.fract() == 0.0)
+        }
+        _ => false,
+    }
+}
+
+fn type_name_of(value: &Json) -> &'static str {
+    match value {
+        Json::Null => "null",
+        Json::Bool(_) => "boolean",
+        Json::Number(_) => "number",
+        Json::String(_) => "string",
+        Json::Array(_) => "array",
+        Json::Object(_) => "object",
+    }
+}
+
 /// Checks a JSON value. A keyword that does not apply to the value's type is
-/// ignored, as in JSON Schema. For an array, `enum` applies to every item.
+/// ignored, as in JSON Schema. For a top-level array, `enum` applies to every
+/// item; below the top level it applies to the value as a whole, as in JSON
+/// Schema. Nested schemas (`properties`, `items`, `anyOf`) are checked
+/// recursively and an error carries the JSON pointer of the failing value.
 pub fn check_json(c: &Constraint, value: &Json) -> Result<(), ConstraintError> {
-    let fail = |keyword: &'static str, detail: String| Err(ConstraintError { keyword, detail });
+    check_at(c, value, &mut Vec::new(), 0)
+}
+
+fn check_at(
+    c: &Constraint,
+    value: &Json,
+    path: &mut Vec<String>,
+    depth: usize,
+) -> Result<(), ConstraintError> {
+    let fail = |path: &[String], keyword: &'static str, detail: String| {
+        Err(ConstraintError {
+            keyword,
+            detail,
+            path: pointer_of(path),
+        })
+    };
+
+    if depth > MAX_DEPTH {
+        return fail(
+            path,
+            "depth",
+            format!("constraints nest deeper than {MAX_DEPTH} levels"),
+        );
+    }
 
     if let Some(allowed) = &c.enum_values {
         let items: Vec<&Json> = match value {
-            Json::Array(a) => a.iter().collect(),
+            Json::Array(a) if depth == 0 => a.iter().collect(),
             single => vec![single],
         };
         for item in items {
             if !allowed.iter().any(|a| json_eq(a, item)) {
                 return fail(
+                    path,
                     "enum",
                     format!("{item} is not one of {}", Json::Array(allowed.clone())),
                 );
             }
+        }
+    }
+
+    if let Some(expected) = &c.const_value {
+        if !json_eq(expected, value) {
+            return fail(path, "const", format!("{value} is not {expected}"));
+        }
+    }
+
+    if let Some(types) = &c.types {
+        if !types.iter().any(|t| type_matches(t, value)) {
+            return fail(
+                path,
+                "type",
+                format!(
+                    "{} is not of type {}",
+                    type_name_of(value),
+                    types.join(" or ")
+                ),
+            );
         }
     }
 
@@ -409,22 +707,22 @@ pub fn check_json(c: &Constraint, value: &Json) -> Result<(), ConstraintError> {
             let Some(n) = n.as_f64() else { return Ok(()) };
             if let Some(m) = c.minimum {
                 if n < m {
-                    return fail("minimum", format!("{n} is below {m}"));
+                    return fail(path, "minimum", format!("{n} is below {m}"));
                 }
             }
             if let Some(m) = c.maximum {
                 if n > m {
-                    return fail("maximum", format!("{n} is above {m}"));
+                    return fail(path, "maximum", format!("{n} is above {m}"));
                 }
             }
             if let Some(m) = c.exclusive_minimum {
                 if n <= m {
-                    return fail("exclusiveMinimum", format!("{n} is not above {m}"));
+                    return fail(path, "exclusiveMinimum", format!("{n} is not above {m}"));
                 }
             }
             if let Some(m) = c.exclusive_maximum {
                 if n >= m {
-                    return fail("exclusiveMaximum", format!("{n} is not below {m}"));
+                    return fail(path, "exclusiveMaximum", format!("{n} is not below {m}"));
                 }
             }
         }
@@ -432,17 +730,21 @@ pub fn check_json(c: &Constraint, value: &Json) -> Result<(), ConstraintError> {
             let len = s.chars().count() as u64;
             if let Some(m) = c.min_length {
                 if len < m {
-                    return fail("minLength", format!("length {len} is below {m}"));
+                    return fail(path, "minLength", format!("length {len} is below {m}"));
                 }
             }
             if let Some(m) = c.max_length {
                 if len > m {
-                    return fail("maxLength", format!("length {len} is above {m}"));
+                    return fail(path, "maxLength", format!("length {len} is above {m}"));
                 }
             }
             if let Some(re) = &c.pattern {
                 if !re.is_match(s) {
-                    return fail("pattern", format!("{s:?} does not match {}", re.as_str()));
+                    return fail(
+                        path,
+                        "pattern",
+                        format!("{s:?} does not match {}", re.as_str()),
+                    );
                 }
             }
         }
@@ -450,16 +752,79 @@ pub fn check_json(c: &Constraint, value: &Json) -> Result<(), ConstraintError> {
             let len = a.len() as u64;
             if let Some(m) = c.min_items {
                 if len < m {
-                    return fail("minItems", format!("{len} items is below {m}"));
+                    return fail(path, "minItems", format!("{len} items is below {m}"));
                 }
             }
             if let Some(m) = c.max_items {
                 if len > m {
-                    return fail("maxItems", format!("{len} items is above {m}"));
+                    return fail(path, "maxItems", format!("{len} items is above {m}"));
+                }
+            }
+            if let Some(items) = &c.items {
+                for (i, item) in a.iter().enumerate() {
+                    path.push(i.to_string());
+                    check_at(items, item, path, depth + 1)?;
+                    path.pop();
+                }
+            }
+        }
+        Json::Object(o) => {
+            for name in c.required.iter().flatten() {
+                if !o.contains_key(name) {
+                    return fail(path, "required", format!("missing property {name:?}"));
+                }
+            }
+            let mut keys: Vec<&String> = o.keys().collect();
+            keys.sort();
+            for key in keys {
+                let listed = c.properties.as_ref().and_then(|p| p.get(key));
+                let schema = match (listed, &c.additional_properties) {
+                    (Some(schema), _) => Some(schema),
+                    (None, Some(AdditionalProperties::Allowed(false))) => {
+                        path.push(key.clone());
+                        let err = fail(
+                            path,
+                            "additionalProperties",
+                            "property is not allowed".into(),
+                        );
+                        path.pop();
+                        return err;
+                    }
+                    (None, Some(AdditionalProperties::Schema(schema))) => Some(schema.as_ref()),
+                    (None, _) => None,
+                };
+                if let Some(schema) = schema {
+                    path.push(key.clone());
+                    check_at(schema, &o[key], path, depth + 1)?;
+                    path.pop();
                 }
             }
         }
         _ => {}
+    }
+
+    if let Some(branches) = &c.any_of {
+        let mut reasons = Vec::new();
+        for branch in branches {
+            match check_at(branch, value, &mut path.clone(), depth + 1) {
+                Ok(()) => {
+                    reasons.clear();
+                    break;
+                }
+                Err(e) => reasons.push(e.to_string()),
+            }
+        }
+        if !reasons.is_empty() {
+            return fail(
+                path,
+                "anyOf",
+                format!(
+                    "matches none of {} alternatives ({})",
+                    branches.len(),
+                    reasons.join("; ")
+                ),
+            );
+        }
     }
 
     Ok(())
@@ -538,8 +903,13 @@ pub async fn check_resource(store: &impl Storelike, resource: &Resource) -> Atom
                     .get(urls::SHORTNAME)
                     .map(|v| v.to_string())
                     .unwrap_or(class_subject.clone());
+                let at = if e.path.is_empty() {
+                    String::new()
+                } else {
+                    format!(" at {}", e.path)
+                };
                 return Err(format!(
-                    "Value for {shortname} breaks {} on class {class_name}: {}",
+                    "Value for {shortname} breaks {} on class {class_name}{at}: {}",
                     e.keyword, e.detail
                 )
                 .into());
@@ -593,6 +963,10 @@ mod test {
         assert!(cases.len() > 50);
 
         for case in &cases {
+            if case.get("rejected").and_then(Json::as_bool) == Some(true) {
+                parse_constraint(&case["constraint"]).unwrap_err();
+                continue;
+            }
             let constraint = parse_constraint(&case["constraint"]).unwrap();
             let valid = case["valid"].as_bool().unwrap();
             let rule = case.get("rule").and_then(Json::as_str);
@@ -606,7 +980,12 @@ mod test {
             ] {
                 match (&result, valid) {
                     (Ok(()), true) => {}
-                    (Err(e), false) => assert_eq!(Some(e.keyword), rule, "case {case}"),
+                    (Err(e), false) => {
+                        assert_eq!(Some(e.keyword), rule, "case {case}");
+                        if let Some(path) = case.get("path").and_then(Json::as_str) {
+                            assert_eq!(e.path, path, "case {case}");
+                        }
+                    }
                     _ => panic!("case {case} gave {result:?}"),
                 }
             }
@@ -679,6 +1058,48 @@ mod test {
             "{err}"
         );
     }
+
+    #[tokio::test]
+    async fn check_resource_names_the_nested_path() {
+        let store = crate::Db::init_temp("class_constraints_nested")
+            .await
+            .unwrap();
+        store.populate().await.unwrap();
+        class_with(
+            &store,
+            "https://example.com/Patch",
+            json!({ urls::NAME: { "type": "object", "properties": {
+                "tune": { "type": "number", "minimum": -24, "maximum": 24 } } } }),
+        )
+        .await;
+
+        let mut patch = Resource::new("https://example.com/patch1".into());
+        patch
+            .set_unsafe(
+                urls::IS_A.into(),
+                Value::ResourceArray(vec![SubResource::Subject(
+                    "https://example.com/Patch".into(),
+                )]),
+            )
+            .unwrap();
+        patch
+            .set_unsafe(urls::NAME.into(), Value::Json(json!({ "tune": 24 })))
+            .unwrap();
+        check_resource(&store, &patch).await.unwrap();
+
+        patch
+            .set_unsafe(urls::NAME.into(), Value::Json(json!({ "tune": 25 })))
+            .unwrap();
+        let err = check_resource(&store, &patch)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.starts_with("Value for name breaks maximum on class thing at /tune:"),
+            "{err}"
+        );
+    }
+
     async fn class_with(store: &crate::Db, subject: &str, constraints: Json) {
         let mut class = Resource::new_instance(urls::CLASS, store).await.unwrap();
         class.set_subject(subject.into());

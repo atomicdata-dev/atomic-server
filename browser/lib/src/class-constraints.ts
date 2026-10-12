@@ -11,6 +11,13 @@ import type { JSONObject, JSONValue } from './value.js';
 /** Every keyword a constraint may use. Anything else is rejected. */
 export const CONSTRAINT_KEYWORDS = [
   'enum',
+  'const',
+  'type',
+  'properties',
+  'required',
+  'additionalProperties',
+  'items',
+  'anyOf',
   'minimum',
   'maximum',
   'exclusiveMinimum',
@@ -25,8 +32,39 @@ export const CONSTRAINT_KEYWORDS = [
 
 export type ConstraintKeyword = (typeof CONSTRAINT_KEYWORDS)[number];
 
+/** How deep schemas may nest. A constraint nested deeper is rejected. */
+export const MAX_DEPTH = 16;
+
+/** The JSON Schema `type` names a constraint accepts. */
+export const CONSTRAINT_TYPES = [
+  'string',
+  'number',
+  'integer',
+  'boolean',
+  'null',
+  'object',
+  'array',
+] as const;
+
+export type ConstraintType = (typeof CONSTRAINT_TYPES)[number];
+
+const TYPES: readonly string[] = CONSTRAINT_TYPES;
+
+/**
+ * A constraint. Below the top level the same shape describes a nested JSON
+ * Schema (`properties`, `items`, `anyOf`).
+ */
 export interface Constraint {
   enum?: JSONValue[];
+  const?: JSONValue;
+  /** Allowed JSON types, any of them. `null` makes a value nullable. */
+  type?: ConstraintType[];
+  properties?: Record<string, Constraint>;
+  required?: string[];
+  /** `false` forbids unlisted keys, a schema checks them, `true` changes nothing. */
+  additionalProperties?: boolean | Constraint;
+  items?: Constraint;
+  anyOf?: Constraint[];
   minimum?: number;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -46,10 +84,12 @@ export type Constraints = Map<string, Constraint>;
 /** A value broke a constraint. */
 export class ConstraintError extends Error {
   public constructor(
-    public readonly keyword: ConstraintKeyword,
+    public readonly keyword: ConstraintKeyword | 'depth',
     public readonly detail: string,
+    /** JSON pointer to the failing value: empty for the value itself, `/pad/tune` for a nested one. */
+    public readonly path: string = '',
   ) {
-    super(`${keyword}: ${detail}`);
+    super(path ? `${keyword} at ${path}: ${detail}` : `${keyword}: ${detail}`);
     this.name = 'ConstraintError';
   }
 }
@@ -78,6 +118,27 @@ const COUNT_KEYWORDS = [
 
 /** Parses one constraint object, throwing on unknown keywords and wrong types. */
 export function parseConstraint(json: unknown): Constraint {
+  return parseAt(json, 0);
+}
+
+function parseNested(
+  keyword: string,
+  key: string,
+  v: unknown,
+  depth: number,
+): Constraint {
+  try {
+    return parseAt(v, depth + 1);
+  } catch (e) {
+    throw new Error(`in \`${keyword}\`${key}: ${(e as Error).message}`);
+  }
+}
+
+function parseAt(json: unknown, depth: number): Constraint {
+  if (depth > MAX_DEPTH) {
+    throw new Error(`Constraints nest deeper than ${MAX_DEPTH} levels`);
+  }
+
   if (!isObject(json)) {
     throw new Error(
       `A constraint must be a JSON object, got ${JSON.stringify(json)}`,
@@ -125,7 +186,88 @@ export function parseConstraint(json: unknown): Constraint {
           `Constraint \`pattern\` is not a valid regex: ${(e as Error).message}`,
         );
       }
+    } else if (keyword === 'const') {
+      out.const = v;
+    } else if (keyword === 'type') {
+      const names = Array.isArray(v) ? v : [v];
+      const types: ConstraintType[] = [];
+
+      for (const name of names) {
+        if (!(TYPES as readonly unknown[]).includes(name)) {
+          throw new Error(
+            `Constraint \`type\` must be one of ${TYPES.join(', ')} or an array of them, got ${JSON.stringify(v)}`,
+          );
+        }
+
+        if (!types.includes(name as ConstraintType)) {
+          types.push(name as ConstraintType);
+        }
+      }
+
+      if (types.length === 0) {
+        throw new Error('Constraint `type` cannot be an empty array');
+      }
+
+      out.type = types;
+    } else if (keyword === 'properties') {
+      if (!isObject(v)) {
+        throw new Error(
+          `Constraint \`properties\` must be an object, got ${JSON.stringify(v)}`,
+        );
+      }
+
+      const props: Record<string, Constraint> = {};
+
+      for (const [name, schema] of Object.entries(v)) {
+        props[name] = parseNested(
+          'properties',
+          ` for "${name}"`,
+          schema,
+          depth,
+        );
+      }
+
+      out.properties = props;
+    } else if (keyword === 'required') {
+      if (!Array.isArray(v) || !v.every(n => typeof n === 'string')) {
+        throw new Error(
+          `Constraint \`required\` must be an array of strings, got ${JSON.stringify(v)}`,
+        );
+      }
+
+      out.required = v as string[];
+    } else if (keyword === 'additionalProperties') {
+      if (typeof v === 'boolean') {
+        out.additionalProperties = v;
+      } else if (isObject(v)) {
+        out.additionalProperties = parseNested(
+          'additionalProperties',
+          '',
+          v,
+          depth,
+        );
+      } else {
+        throw new Error(
+          `Constraint \`additionalProperties\` must be a boolean or a schema, got ${JSON.stringify(v)}`,
+        );
+      }
+    } else if (keyword === 'items') {
+      out.items = parseNested('items', '', v, depth);
+    } else if (keyword === 'anyOf') {
+      if (!Array.isArray(v) || v.length === 0) {
+        throw new Error(
+          `Constraint \`anyOf\` must be a non-empty array, got ${JSON.stringify(v)}`,
+        );
+      }
+
+      out.anyOf = v.map(branch => parseNested('anyOf', '', branch, depth));
     } else if (keyword === 'class') {
+      if (depth > 0) {
+        throw new Error(
+          'Constraint `class` only applies to a property, not inside a nested schema',
+        );
+      }
+
       if (typeof v !== 'string') {
         throw new Error(
           `Constraint \`class\` must be a string, got ${JSON.stringify(v)}`,
@@ -175,28 +317,98 @@ export function parseConstraints(json: unknown): Constraints {
 const canonical = (v: unknown): unknown =>
   typeof v === 'string' ? canonicalizeScheme(v) : v;
 
-const jsonEq = (a: unknown, b: unknown): boolean =>
-  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+const jsonEq = (a: unknown, b: unknown): boolean => {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((x, i) => jsonEq(x, b[i]));
+  }
 
-/** Unwraps `{ '@id': subject }` list items so arrays of links compare as subjects. */
+  if (isObject(a) && isObject(b)) {
+    const keys = Object.keys(a);
+
+    return (
+      keys.length === Object.keys(b).length &&
+      keys.every(k => k in b && jsonEq(a[k], b[k]))
+    );
+  }
+
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+};
+
+const pointerOf = (path: string[]): string =>
+  path.map(s => `/${s.replaceAll('~', '~0').replaceAll('/', '~1')}`).join('');
+
+const typeMatches = (name: ConstraintType, v: unknown): boolean => {
+  switch (name) {
+    case 'string':
+      return typeof v === 'string';
+    case 'boolean':
+      return typeof v === 'boolean';
+    case 'null':
+      return v === null;
+    case 'object':
+      return isObject(v);
+    case 'array':
+      return Array.isArray(v);
+    case 'number':
+      return isNumber(v);
+    case 'integer':
+      return isNumber(v) && Number.isInteger(v);
+  }
+};
+
+const typeNameOf = (v: unknown): string =>
+  v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
+
+/**
+ * Unwraps `{ '@id': subject }` list items so arrays of links compare as
+ * subjects. Only a bare link is unwrapped: an object with more keys is data (a
+ * nested resource, or JSON that happens to have an `@id` key) and is checked as
+ * an object, as `atomic_lib` does.
+ */
 const plain = (v: unknown): unknown =>
-  isObject(v) && typeof v['@id'] === 'string' ? v['@id'] : v;
+  isObject(v) && typeof v['@id'] === 'string' && Object.keys(v).length === 1
+    ? v['@id']
+    : v;
 
 /**
  * Checks a value, throwing a {@link ConstraintError}. A keyword that does not
- * apply to the value's type is ignored, as in JSON Schema. For an array,
- * `enum` applies to every item.
+ * apply to the value's type is ignored, as in JSON Schema. For a top-level
+ * array, `enum` applies to every item; below the top level it applies to the
+ * value as a whole, as in JSON Schema. Nested schemas (`properties`, `items`,
+ * `anyOf`) are checked recursively and the error carries the JSON pointer of
+ * the failing value.
  */
 export function checkValue(c: Constraint, rawValue: unknown): void {
   const value = Array.isArray(rawValue) ? rawValue.map(plain) : plain(rawValue);
 
+  checkAt(c, value, [], 0);
+}
+
+function checkAt(
+  c: Constraint,
+  value: unknown,
+  path: string[],
+  depth: number,
+): void {
+  const fail = (
+    keyword: ConstraintError['keyword'],
+    detail: string,
+    at: string[] = path,
+  ): never => {
+    throw new ConstraintError(keyword, detail, pointerOf(at));
+  };
+
+  if (depth > MAX_DEPTH) {
+    fail('depth', `constraints nest deeper than ${MAX_DEPTH} levels`);
+  }
+
   if (c.enum) {
     const allowed = c.enum;
-    const items = Array.isArray(value) ? value : [value];
+    const items = Array.isArray(value) && depth === 0 ? value : [value];
 
     for (const item of items) {
       if (!allowed.some(a => jsonEq(a, item))) {
-        throw new ConstraintError(
+        fail(
           'enum',
           `${JSON.stringify(item)} is not one of ${JSON.stringify(allowed)}`,
         );
@@ -204,66 +416,105 @@ export function checkValue(c: Constraint, rawValue: unknown): void {
     }
   }
 
+  if (c.const !== undefined && !jsonEq(c.const, value)) {
+    fail('const', `${JSON.stringify(value)} is not ${JSON.stringify(c.const)}`);
+  }
+
+  if (c.type && !c.type.some(t => typeMatches(t, value))) {
+    fail('type', `${typeNameOf(value)} is not of type ${c.type.join(' or ')}`);
+  }
+
   if (isNumber(value)) {
     if (c.minimum !== undefined && value < c.minimum) {
-      throw new ConstraintError('minimum', `${value} is below ${c.minimum}`);
+      fail('minimum', `${value} is below ${c.minimum}`);
     }
 
     if (c.maximum !== undefined && value > c.maximum) {
-      throw new ConstraintError('maximum', `${value} is above ${c.maximum}`);
+      fail('maximum', `${value} is above ${c.maximum}`);
     }
 
     if (c.exclusiveMinimum !== undefined && value <= c.exclusiveMinimum) {
-      throw new ConstraintError(
-        'exclusiveMinimum',
-        `${value} is not above ${c.exclusiveMinimum}`,
-      );
+      fail('exclusiveMinimum', `${value} is not above ${c.exclusiveMinimum}`);
     }
 
     if (c.exclusiveMaximum !== undefined && value >= c.exclusiveMaximum) {
-      throw new ConstraintError(
-        'exclusiveMaximum',
-        `${value} is not below ${c.exclusiveMaximum}`,
-      );
+      fail('exclusiveMaximum', `${value} is not below ${c.exclusiveMaximum}`);
     }
   } else if (typeof value === 'string') {
     // Length in Unicode code points, like Rust's `chars().count()`.
     const length = [...value].length;
 
     if (c.minLength !== undefined && length < c.minLength) {
-      throw new ConstraintError(
-        'minLength',
-        `length ${length} is below ${c.minLength}`,
-      );
+      fail('minLength', `length ${length} is below ${c.minLength}`);
     }
 
     if (c.maxLength !== undefined && length > c.maxLength) {
-      throw new ConstraintError(
-        'maxLength',
-        `length ${length} is above ${c.maxLength}`,
-      );
+      fail('maxLength', `length ${length} is above ${c.maxLength}`);
     }
 
     if (c.pattern && !c.pattern.test(value)) {
-      throw new ConstraintError(
+      fail(
         'pattern',
         `${JSON.stringify(value)} does not match ${c.pattern.source}`,
       );
     }
   } else if (Array.isArray(value)) {
     if (c.minItems !== undefined && value.length < c.minItems) {
-      throw new ConstraintError(
-        'minItems',
-        `${value.length} items is below ${c.minItems}`,
-      );
+      fail('minItems', `${value.length} items is below ${c.minItems}`);
     }
 
     if (c.maxItems !== undefined && value.length > c.maxItems) {
-      throw new ConstraintError(
-        'maxItems',
-        `${value.length} items is above ${c.maxItems}`,
+      fail('maxItems', `${value.length} items is above ${c.maxItems}`);
+    }
+
+    if (c.items) {
+      value.forEach((item, i) =>
+        checkAt(c.items!, item, [...path, String(i)], depth + 1),
       );
     }
+  } else if (isObject(value)) {
+    for (const name of c.required ?? []) {
+      if (!Object.hasOwn(value, name))
+        fail('required', `missing property ${JSON.stringify(name)}`);
+    }
+
+    for (const key of Object.keys(value).sort()) {
+      const listed =
+        c.properties && Object.hasOwn(c.properties, key)
+          ? c.properties[key]
+          : undefined;
+      const extra = c.additionalProperties;
+      let schema: Constraint | undefined = listed;
+
+      if (!listed && extra === false) {
+        fail('additionalProperties', 'property is not allowed', [...path, key]);
+      } else if (!listed && isObject(extra)) {
+        schema = extra as Constraint;
+      }
+
+      if (schema) checkAt(schema, value[key], [...path, key], depth + 1);
+    }
+  }
+
+  if (c.anyOf) {
+    const reasons: string[] = [];
+
+    for (const branch of c.anyOf) {
+      try {
+        checkAt(branch, value, path, depth + 1);
+
+        return;
+      } catch (e) {
+        if (!(e instanceof ConstraintError)) throw e;
+
+        reasons.push(e.message);
+      }
+    }
+
+    fail(
+      'anyOf',
+      `matches none of ${c.anyOf.length} alternatives (${reasons.join('; ')})`,
+    );
   }
 }
 
@@ -316,8 +567,10 @@ export function checkResourceConstraints(
             classSubject,
         );
 
+        const at = e.path ? ` at ${e.path}` : '';
+
         throw new Error(
-          `Value for ${shortname} breaks ${e.keyword} on class ${className}: ${e.detail}`,
+          `Value for ${shortname} breaks ${e.keyword} on class ${className}${at}: ${e.detail}`,
         );
       }
     }
