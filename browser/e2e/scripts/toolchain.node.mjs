@@ -10,11 +10,16 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, delimiter } from 'node:path';
-import { pinnedEnvironment, verifyPlaywright } from './toolchain.mjs';
+import {
+  pinnedEnvironment,
+  pnpmPinVersion,
+  verifyPlaywright,
+} from './toolchain.mjs';
 
 const pin = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url)),
 ).packageManager;
+const pinVersion = pnpmPinVersion(pin);
 
 function hasCorepack() {
   try {
@@ -36,11 +41,9 @@ test('a pinned pnpm on PATH is used without Corepack', () => {
     );
     const bin = join(root, 'bin');
     mkdirSync(bin);
-    writeFileSync(
-      join(bin, 'pnpm'),
-      `#!/bin/sh\nprintf "${pin.slice('pnpm@'.length)}\\n"\n`,
-      { mode: 0o755 },
-    );
+    writeFileSync(join(bin, 'pnpm'), `#!/bin/sh\nprintf "${pinVersion}\\n"\n`, {
+      mode: 0o755,
+    });
     // Only the fake pnpm and the shell are reachable: no Corepack.
     const env = pinnedEnvironment(root, root, { ...process.env, PATH: bin });
     assert.equal(env.CI, 'true');
@@ -78,7 +81,8 @@ test(
         env,
         encoding: 'utf8',
       }).trim();
-      assert.equal(`pnpm@${actual}`, pin);
+      // pnpm 11 may print install progress before the command output.
+      assert.equal(actual.split('\n').pop(), pinVersion);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -104,4 +108,19 @@ test('an installed Playwright version different from the manifest fails closed',
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('a Corepack pin with a hash suffix is accepted and ranges are rejected', () => {
+  assert.equal(pnpmPinVersion('pnpm@11.10.0'), '11.10.0');
+  assert.equal(pnpmPinVersion('pnpm@11.10.0+sha512.0b7f8b98ab12'), '11.10.0');
+  for (const bad of [
+    'pnpm@^11.10.0',
+    'pnpm@11',
+    'pnpm@11.10.0+sha512.',
+    'pnpm@11.10.0+sha512.XYZ',
+    'pnpm@11.10.0+md5.abcd',
+    'npm@11.10.0',
+    undefined,
+  ])
+    assert.throws(() => pnpmPinVersion(bad), /exact pnpm pin/);
 });

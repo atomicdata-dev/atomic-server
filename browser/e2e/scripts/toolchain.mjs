@@ -9,13 +9,11 @@ export function pinnedEnvironment(browser, output, inherited = process.env) {
     readFileSync(join(browser, 'package.json'), 'utf8'),
   );
 
-  if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager)) {
-    throw new Error(`Expected an exact pnpm pin, got ${packageManager}`);
-  }
+  const wanted = pnpmPinVersion(packageManager);
 
   // The pnpm already on PATH is fine when it is the pinned one. Node 25
   // stopped bundling Corepack, so only reach for it on a mismatch.
-  if (pnpmVersion(browser, inherited) === packageManager.slice('pnpm@'.length))
+  if (pnpmVersion(browser, inherited) === wanted)
     return { ...inherited, CI: 'true' };
 
   const bin = join(output, 'toolchain-bin');
@@ -41,13 +39,30 @@ export function pinnedEnvironment(browser, output, inherited = process.env) {
   };
   const actual = pnpmVersion(browser, env);
 
-  if (`pnpm@${actual}` !== packageManager) {
+  if (actual !== wanted) {
     throw new Error(
       `Package manager mismatch: expected ${packageManager}, got pnpm@${actual}`,
     );
   }
 
   return env;
+}
+
+/**
+ * The version of an exact pnpm pin. Corepack writes `pnpm@X.Y.Z` and, once it
+ * has verified the download, `pnpm@X.Y.Z+sha512.<hex>`. Ranges are rejected.
+ */
+export function pnpmPinVersion(packageManager) {
+  const match =
+    /^pnpm@(\d+\.\d+\.\d+)(?:\+sha(?:224|256|384|512)\.[0-9a-f]+)?$/.exec(
+      String(packageManager),
+    );
+
+  if (!match) {
+    throw new Error(`Expected an exact pnpm pin, got ${packageManager}`);
+  }
+
+  return match[1];
 }
 
 function pnpmVersion(cwd, env) {
