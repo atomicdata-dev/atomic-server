@@ -1,6 +1,7 @@
 import { fetchManagedInfo } from '../helpers/managedServer';
 import { inviteSignupUrl } from '../helpers/inviteSignup';
 import { TeamProfileStep } from '../components/TeamProfileStep';
+import { SecretStep } from '../components/NewIdentitySection';
 import {
   useBoolean,
   useNumber,
@@ -21,7 +22,6 @@ import {
   agentSubject as mintAgentSubject,
 } from '@tomic/react';
 
-import { Button } from '../components/Button';
 import { constructOpenURL } from '../helpers/navigation';
 import { useSettings } from '../helpers/AppSettings';
 import { ResourcePageProps } from './ResourcePage';
@@ -36,9 +36,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { fetchPrivateDriveSubject } from '@helpers/privateDrive';
 import { saveAgentToIDB } from '@helpers/agentStorage';
 import { Dialog, useDialog } from '@components/Dialog';
-import { CodeBlock } from '@components/CodeBlock';
 import { styled } from 'styled-components';
-import Field from '@components/forms/Field';
 
 /** A View that opens an invite */
 function InvitePage({ resource }: ResourcePageProps): JSX.Element {
@@ -523,36 +521,20 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
       </Shell>
       <Dialog {...dialogProps} disableLightDismiss>
         <Dialog.Title>
-          <h1>Agent created!</h1>
+          <h1>Account created</h1>
         </Dialog.Title>
         <Dialog.Content>
           {isNewAgent && agentSecret && (
-            <Field label='Agent Secret'>
-              <p>
-                IMPORTANT! Below is your agent secret, you use this to login.
-                Save it somewhere safe, the secret will not be show again and if
-                you lose it you will not be able to access this user again.
-              </p>
-              <StyledCodeBlock
-                wordWrap
-                content={agentSecret}
-                onCopy={() => setHasCopiedSecret(true)}
-              />
-            </Field>
+            <SecretStep
+              secret={agentSecret}
+              secretBackedUp={hasCopiedSecret}
+              onCopy={() => setHasCopiedSecret(true)}
+              onDownloadBackup={() => setHasCopiedSecret(true)}
+              onConfirm={() => hide(true)}
+              verifySecret={false}
+            />
           )}
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button
-            onClick={() => hide(true)}
-            disabled={isNewAgent && !hasCopiedSecret}
-          >
-            {isNewAgent
-              ? hasCopiedSecret
-                ? 'Continue'
-                : 'Copy secret to continue'
-              : 'Continue'}
-          </Button>
-        </Dialog.Actions>
       </Dialog>
     </>
   );
@@ -569,13 +551,4 @@ const DescriptionWrap = styled.div`
   color: ${p => p.theme.colors.textLight};
   text-align: center;
   margin-bottom: ${p => p.theme.size(5)};
-`;
-
-const StyledCodeBlock = styled(CodeBlock)`
-  word-break: break-word;
-
-  & button {
-    top: ${p => p.theme.size(1)};
-    right: ${p => p.theme.size(1)};
-  }
 `;

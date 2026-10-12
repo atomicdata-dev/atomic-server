@@ -2,6 +2,7 @@ import { styled } from 'styled-components';
 import { FaCaretDown } from 'react-icons/fa6';
 
 import type { JSX } from 'react';
+import { SegmentedControl } from './SegmentedControl';
 
 export type ShareRole = 'write' | 'read';
 
@@ -42,6 +43,37 @@ export function RoleSelect({
       </Select>
       <FaCaretDown aria-hidden />
     </Wrapper>
+  );
+}
+
+const ROLE_OPTIONS: { value: ShareRole; label: string }[] = [
+  { value: 'read', label: 'Read' },
+  { value: 'write', label: 'Write' },
+];
+
+/**
+ * Read / Write as a single-click switch, styled like the Public switch. For
+ * choosing what an invite grants, where there is no "off" and no "remove".
+ */
+export function RoleSwitch({
+  value,
+  onChange,
+  disabled,
+  'aria-label': ariaLabel,
+}: {
+  value: ShareRole;
+  onChange: (role: ShareRole) => void;
+  disabled?: boolean;
+  'aria-label': string;
+}): JSX.Element {
+  return (
+    <SegmentedControl
+      options={ROLE_OPTIONS}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    />
   );
 }
 

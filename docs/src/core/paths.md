@@ -110,4 +110,4 @@ This means that we still have a unique, globally resolvable identifier - yay!
 
 ## Try for yourself
 
-Install the [`atomic-cli`](https://github.com/atomicdata-dev/atomic-server/blob/master/cli/README.md) software and run `atomic-cli get https://atomicdata.dev/classes/Class description`.
+Install the [`atomic-cli`](https://github.com/ontola/atomic-server/blob/master/cli/README.md) software and run `atomic-cli get https://atomicdata.dev/classes/Class description`.

@@ -17,7 +17,8 @@ export interface AtomicConfig {
   useNamespaces?: boolean;
   /**
    * [OPTIONAL] The secret of the agent that is used to access your atomic data server. This can also be provided as a command line argument if you don't want to store it in the config file.
-   * If left empty the public agent is used.
+   * If left empty, a key from `ad-generate connect` is used, or else the public agent.
+   * Prefer `ad-generate connect`: this file often ends up in a repository.
    */
   agentSecret?: string;
   /** HTTP(S) origin used to fetch `atomic:` / `did:ad:` ontology subjects via `/resource?subject=`. */

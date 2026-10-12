@@ -1,5 +1,6 @@
 import { readTemplateDemo } from '../chunks/Templates/demoSession';
 import { isLoopbackHost } from './runtimeSetting';
+import { fetchManagedInfo } from './managedServer';
 import {
   BrowserPeerSync,
   randomPeerToken,
@@ -235,6 +236,31 @@ export async function automaticPeerRoom(drive: string): Promise<string> {
 }
 
 const discovering = new WeakSet<Store>();
+const managedByOrigin = new Map<string, Promise<boolean>>();
+
+/**
+ * Does this drive sync through a Cloud Server? Such a drive reaches every member
+ * through the node, so peers add nothing and only spend the shared budget of
+ * peer sessions: a member with many drives hit "Too many peer sessions" while
+ * their data was already on the server. Answered per server, once.
+ */
+export async function driveUsesCloudServer(
+  store: Store,
+  drive: string,
+): Promise<boolean> {
+  const serverUrl = store.getServerUrl();
+
+  if (!serverUrl || !store.isLiveSyncedDrive(drive)) return false;
+
+  let managed = managedByOrigin.get(serverUrl);
+
+  if (!managed) {
+    managed = fetchManagedInfo(serverUrl).then(info => info.managed);
+    managedByOrigin.set(serverUrl, managed);
+  }
+
+  return managed;
+}
 
 export async function discoverPeerDrives(store: Store): Promise<void> {
   const agent = store.getAgent();
@@ -260,6 +286,19 @@ export async function discoverPeerDrives(store: Store): Promise<void> {
     for (const resource of store.resources.values()) {
       const drive = resource.subject;
       const id = `automatic:${drive}`;
+
+      if (
+        resource.isReady() &&
+        resource.hasClasses(server.classes.drive) &&
+        (await driveUsesCloudServer(store, drive))
+      ) {
+        links.get(id)?.close();
+        links.delete(id);
+        continue;
+      }
+
+      if (!current()) return;
+
       if (
         readTemplateDemo()?.drive === drive ||
         !isAtomicIdentifier(drive) ||

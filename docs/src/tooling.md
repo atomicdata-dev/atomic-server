@@ -15,7 +15,7 @@ Libraries and clients (all MIT licenced) that work great with [atomic-server](at
 ## Want to add to this list? Some ideas for tooling
 
 This document contains a set of ideas that would help achieve that success.
-Open a PR and [edit this file](https://github.com/atomicdata-dev/atomic-server/edit/develop/docs/src/tooling.md) to add your project!
+Open a PR and [edit this file](https://github.com/ontola/atomic-server/edit/develop/docs/src/tooling.md) to add your project!
 
 ### Atomic Companion
 

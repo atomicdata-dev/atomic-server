@@ -113,7 +113,7 @@ The Subject field is a URL that points to the Resource.
 The creator of the Subject MUST make sure that it resolves.
 In other words: following / downloading the Subject link will provide you with all the Atoms about the Subject (see [Querying Atomic Data](querying.md).
 For an `https://` Subject this means hosting the data at that URL, or using some service that hosts it.
-For a `did:ad:` Subject it means at least one device that holds the Resource is reachable, directly or through an always-on replica; the identifier itself does not depend on any host.
+For a `atomic:` Subject it means at least one device that holds the Resource is reachable, directly or through an always-on replica; the identifier itself does not depend on any host.
 See [URLs and identifiers](../urls.md) for the different Subject shapes and how each resolves.
 In JSON-AD, the Subject is denoted by `@id`.
 

@@ -38,7 +38,9 @@ export * from './ontologies/ai.js';
 export * from './ontologies/canvas.js';
 export * from './ontologies/forks.js';
 export * from './ontologies/notifications.js';
+export * from './ontologies/conversations.js';
 export * from './ontologies/i18n.js';
+export * from './ontologies/forms.js';
 export * from './canvas-strokes.js';
 export * from './agent.js';
 // Needed outside this package by the Cloud Vault client, which must convert an
@@ -52,14 +54,47 @@ export * from './genesis.js';
 export * from './commit.js';
 export * from './error.js';
 export * from './withDeadline.js';
+export * from './pkarr.js';
 export * from './datatypes.js';
+export * from './class-constraints.js';
+export * from './effective-constraint.js';
+export {
+  planOntology,
+  slugify,
+  type ConstraintInput,
+  type OntologyClassInput,
+  type OntologyInput,
+  type OntologyPlan,
+  type OntologyPropertyInput,
+} from './ontology-input.js';
+export {
+  JSON_SCHEMA_DIALECT,
+  ontologyFromJsonSchema,
+  ontologyToJsonSchema,
+  propertyJsonSchema,
+  type JsonSchemaImportOptions,
+} from './schema-json-schema.js';
+export { isJsonSchema, ontologyFromSchemaFile } from './schema-file.js';
+export {
+  assertLockfileMatches,
+  checkLockfile,
+  lockfileFromEnsured,
+  lockfileFromInput,
+  parseLockfile,
+  serializeLockfile,
+  type Lockfile,
+} from './schema-lockfile.js';
 export * from './safeHref.js';
 export { EventManager } from './EventManager.js';
 export * from './parse.js';
 export * from './search.js';
 export * from './resource.js';
+export * from './chat-log.js';
 export * from './forks.js';
 export * from './store.js';
+export * from './property-identity.js';
+export * from './lens.js';
+export * from './lens-ensure.js';
 export * from './subject.js';
 export * from './value.js';
 export * from './urls.js';
@@ -72,8 +107,18 @@ export * from './pairing.js';
 export * from './loro-loader.js';
 export * from './page-request-signal.js';
 export * from './presence.js';
+export * from './json-ad-compact.js';
+export * from './subject-refs.js';
+export * from './standard-class-alias.js';
+export * from './class-schema.js';
+export * from './assistant-tools.js';
 export * from './CryptoProvider.js';
 export { ClientDbWorker, STORAGE_BLOCKED_ERROR_NAME } from './client-db.js';
+export {
+  getIndexMigration,
+  subscribeIndexMigration,
+  type IndexMigrationProgress,
+} from './client-db-migration.js';
 export {
   attributionForVersion,
   mergeHistoryAttributions,
@@ -92,6 +137,7 @@ export {
   isTerminalCommitError,
   isUnrecoverableCommitError,
   isBenignTerminalCommitError,
+  isNotEnrolledMessage,
   type OutboxEntry,
   type OutboxDrainContext,
 } from './local-outbox.js';
@@ -173,9 +219,12 @@ export {
   type CreateRequest,
 } from './plugin-apply.js';
 export {
+  ensureOntology,
   ensureSchema,
   findSchema,
   type ClassSpec,
+  type EnsureOntologyOptions,
+  type EnsuredOntology,
   type EnsuredSchema,
   type PropertySpec,
   type SchemaSpec,
@@ -188,6 +237,7 @@ export {
   type RecordRunOptions,
   type RunStatus,
 } from './plugin-log.js';
+export * from './agent-grants.js';
 export * from './issue-access-agent.js';
 export {
   createApp,
@@ -228,6 +278,7 @@ export {
   type DeclaredConfigField,
   type DeclaredAccept,
   type DeclaredDestination,
+  type DeclaredDestinationTable,
   DEFAULT_ACCEPT_MAX_BYTES,
   ACCEPT_MAX_BYTES_CEILING,
   type ManifestRuntime,
@@ -319,6 +370,12 @@ export * from './import-resolution.js';
 
 export * from './import-reference-review.js';
 
+export {
+  destinationTablesFor,
+  provisionDestination,
+  type DestinationConfig,
+  type DestinationTable,
+} from './plugin-destination.js';
 export { pluginWorkspace, workspaceConnections } from './plugin-workspace.js';
 export type { WorkspaceConnection } from './plugin-workspace.js';
 

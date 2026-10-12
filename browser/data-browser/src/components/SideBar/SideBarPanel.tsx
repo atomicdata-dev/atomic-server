@@ -4,6 +4,12 @@ import { Collapse } from '../Collapse';
 import { useRef, useState, type JSX } from 'react';
 import { useResizable } from '@hooks/useResizable';
 import { useLocalStorage } from '@hooks/useLocalStorage';
+import { useLongPress } from '@hooks/useLongPress';
+import { FaEyeSlash } from 'react-icons/fa6';
+import { DropdownMenu } from '../Dropdown';
+import { AutoOpenTrigger } from '../Dropdown/AutoOpenTrigger';
+import { Panel, usePanelList } from './usePanelList';
+import { SIDEBAR_BAR_HEIGHT, SIDEBAR_BAR_HEIGHT_TOUCH } from './SidebarCSSVars';
 
 /** Height of one row in a sidebar section; anything shorter shows nothing. */
 const ROW_HEIGHT = 32;
@@ -19,6 +25,8 @@ export interface SideBarPanelProps {
   actions?: React.ReactNode;
   /** When false, section starts collapsed */
   defaultOpen?: boolean;
+  /** When set, a context menu on the header offers to hide this panel. */
+  panel?: Panel;
   /** Tighter padding when nested inside the drive tree (e.g. Shared with me) */
   embedded?: boolean;
   'data-testid'?: string;
@@ -32,6 +40,7 @@ export function SideBarPanel({
   actions,
   defaultOpen = true,
   embedded = false,
+  panel,
   'data-testid': dataTestId,
 }: React.PropsWithChildren<SideBarPanelProps>): JSX.Element {
   const [open, setOpen] = useLocalStorage(
@@ -117,6 +126,10 @@ export function SideBarPanel({
     window.addEventListener('pointercancel', end);
   };
 
+  const { disablePanel } = usePanelList();
+  const [menuPoint, setMenuPoint] = useState<{ x: number; y: number }>();
+  const longPress = useLongPress(setMenuPoint);
+
   const toggle = () => {
     if (suppressToggle.current) {
       suppressToggle.current = false;
@@ -138,13 +151,36 @@ export function SideBarPanel({
           aria-label={`${open ? 'Collapse' : 'Expand'} ${title}`}
           title={open ? 'Drag to resize' : 'Click or drag to open'}
           $dragging={isDragging || openingDrag}
-          onPointerDown={
-            open ? dragAreaListeners.onPointerDown : startOpeningDrag
+          onPointerDown={e => {
+            if (panel) longPress.handlers.onPointerDown(e);
+            (open ? dragAreaListeners.onPointerDown : startOpeningDrag)?.(e);
+          }}
+          onPointerMove={panel ? longPress.handlers.onPointerMove : undefined}
+          onPointerUp={panel ? longPress.handlers.onPointerUp : undefined}
+          onPointerCancel={
+            panel ? longPress.handlers.onPointerCancel : undefined
+          }
+          onContextMenu={
+            panel
+              ? e => {
+                  e.preventDefault();
+                  setMenuPoint({ x: e.clientX, y: e.clientY });
+                }
+              : undefined
           }
           // Always attached: a drag that closes the section re-renders it
           // closed before the click that ends the drag arrives, and that
           // click must not open it straight back up.
-          onClickCapture={dragAreaListeners.onClickCapture}
+          onClickCapture={e => {
+            if (panel && longPress.consumeClick()) {
+              e.preventDefault();
+              e.stopPropagation();
+
+              return;
+            }
+
+            dragAreaListeners.onClickCapture?.(e);
+          }}
         >
           <PanelTitle>{title}</PanelTitle>
           <Caret
@@ -155,6 +191,22 @@ export function SideBarPanel({
         </HeaderButton>
         {actions}
       </HeaderRow>
+      {panel && menuPoint && (
+        <DropdownMenu
+          Trigger={AutoOpenTrigger}
+          searchable={false}
+          anchorPoint={menuPoint}
+          bindActive={active => !active && setMenuPoint(undefined)}
+          items={[
+            {
+              id: 'hide-panel',
+              label: `Hide ${title}`,
+              icon: <FaEyeSlash />,
+              onClick: () => disablePanel(panel),
+            },
+          ]}
+        />
+      )}
       <StyledCollapse open={open} $embedded={embedded} $instant={openingDrag}>
         <PanelContent ref={contentRef} style={{ maxHeight: size }}>
           {children}
@@ -168,6 +220,11 @@ const HeaderRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  min-height: ${SIDEBAR_BAR_HEIGHT};
+
+  @media (pointer: coarse) {
+    min-height: ${SIDEBAR_BAR_HEIGHT_TOUCH};
+  }
 `;
 
 const PanelTitle = styled.span`
@@ -218,9 +275,12 @@ const HeaderButton = styled.button<{ $dragging: boolean }>`
     opacity: 1;
   }
 
-  @media (pointer: coarse) {
-    min-height: 44px;
+  /* Callout and text selection would fight the long-press menu. */
+  -webkit-touch-callout: none;
+  user-select: none;
+  align-self: stretch;
 
+  @media (pointer: coarse) {
     ${Caret} {
       opacity: 0.5;
     }

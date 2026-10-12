@@ -11,6 +11,15 @@ import { transition } from '../helpers/transition';
 export const NAV_BUTTON_HEIGHT = '1.75rem';
 export const NAV_BUTTON_RADIUS = '6px';
 
+/** Touch screens get 40px targets; labels are dropped there (see below). */
+export const TOUCH_TARGET = '2.5rem';
+
+/**
+ * Viewport-based (not container-based) "compact" test, so it is true from the
+ * very first paint, before the nav's container has been measured.
+ */
+export const COMPACT_MEDIA = '(max-width: 600px), (pointer: coarse)';
+
 export const LabelButton = styled.button<{ $active?: boolean }>`
   display: inline-flex;
   align-items: center;
@@ -42,6 +51,22 @@ export const LabelButton = styled.button<{ $active?: boolean }>`
     }
   }
 
+  @media ${COMPACT_MEDIA} {
+    > span {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    min-width: ${TOUCH_TARGET};
+    height: ${TOUCH_TARGET};
+    justify-content: center;
+
+    svg {
+      font-size: 1.25rem;
+    }
+  }
+
   &[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
@@ -70,6 +95,10 @@ export const ButtonArea = styled.div<{ $iconOnly: boolean }>`
   overflow: hidden;
 
   @container breadcrumb-bar (max-width: 600px) {
+    gap: 0;
+  }
+
+  @media ${COMPACT_MEDIA} {
     gap: 0;
   }
 

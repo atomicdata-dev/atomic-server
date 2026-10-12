@@ -118,6 +118,8 @@ export interface UseTableViewResult {
   ) => void;
   /** Copy a view (its config) into a new "<name> copy" view and switch to it. */
   duplicateView: (subject: string) => void;
+  /** Put the table's views in a new order (the tab order). */
+  reorderViews: (views: string[]) => void;
   /** Remove a view from the table and destroy its resource. */
   deleteView: (subject: string) => void;
   /** Which renderer the active view uses ('table' until a View exists). */
@@ -1128,6 +1130,16 @@ export function useTableView(
     [views, table, defaultViewSubject, activeView, store, readViewTypes],
   );
 
+  const reorderViews = useCallback(
+    (next: string[]) => {
+      void (async () => {
+        await table.set(dataBrowser.properties.tableViews, next, false);
+        await table.save();
+      })().catch(() => undefined);
+    },
+    [table],
+  );
+
   return {
     filters,
     addFilter,
@@ -1150,6 +1162,7 @@ export function useTableView(
     createView,
     setViewKind,
     duplicateView,
+    reorderViews,
     deleteView,
     viewKind: normalizeViewKind(storedKind),
     appView: appViewOf(storedKind),

@@ -1,18 +1,25 @@
 import {
   Core,
   Datatype,
+  JSONValue,
   Resource,
-  Store,
   core,
   dataBrowser,
   server,
-  useArray,
   useStore,
 } from '@tomic/react';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import { stringToSlug } from '@helpers/stringToSlug';
 import { PropertyFormCategory } from './categories';
-import { sortSubjectList } from '@views/OntologyPage/sortSubjectList';
+import {
+  copyablePropertyFields,
+  createPropertyDraft,
+} from '@helpers/propertyIdentity';
+import {
+  createPropertyOnClass,
+  createSelectPropertyOnClass,
+  type TagSeed,
+} from '../Kanban/createSelectProperty';
 import {
   Dialog,
   DialogActions,
@@ -23,6 +30,10 @@ import {
 import { Button } from '@components/Button';
 import { FormValidationContextProvider } from '@components/forms/formValidation/FormValidationContextProvider';
 import { PropertyForm } from './PropertyForm';
+import {
+  CONSTRAINT_FIELDS,
+  constraintPatchFromDraft,
+} from './columnConstraints';
 
 interface NewPropertyDialogProps {
   showDialog: boolean;
@@ -33,7 +44,7 @@ interface NewPropertyDialogProps {
   onCreated?: (subject: string) => void;
 }
 
-/** Returns the isA classes and propVals for a given category, for inclusion in the genesis commit. */
+/** Returns the isA classes and propVals a draft of the given category starts with. */
 const getCategoryGenesisPropVals = (
   category: PropertyFormCategory | undefined,
 ): { isA: string | string[]; propVals: Record<string, unknown> } => {
@@ -94,14 +105,43 @@ const getCategoryGenesisPropVals = (
   }
 };
 
-const getChildren = (store: Store, resource: Resource) =>
-  store.clientSideQuery(
-    res => res.get(core.properties.parent) === resource?.subject,
-  );
+// Fields the dialog passes on separately. The constraint fields (options,
+// linked class, limits) go to the table class's `constraints` map, not to the
+// immutable Property.
+const FORM_HANDLED_KEYS = [
+  core.properties.name,
+  core.properties.shortname,
+  core.properties.description,
+  core.properties.datatype,
+  ...CONSTRAINT_FIELDS,
+];
 
-const saveChildren = async (store: Store, resource: Resource) => {
-  const children = getChildren(store, resource);
-  await Promise.all(children.map(child => child.save()));
+/** The tags the user added to a select draft, as seeds for the real property. */
+const tagSeedsFromDraft = async (
+  store: ReturnType<typeof useStore>,
+  draft: Resource,
+): Promise<TagSeed[]> => {
+  const subjects = draft.getSubjects(core.properties.allowsOnly);
+  const seeds: TagSeed[] = [];
+
+  for (const subject of subjects) {
+    const tag = await store.getResource(subject);
+    const text =
+      (tag.get(core.properties.name) as string | undefined) ??
+      (tag.get(core.properties.shortname) as string | undefined);
+
+    if (!text) {
+      continue;
+    }
+
+    seeds.push({
+      name: text,
+      color: tag.get(dataBrowser.properties.color) as string | undefined,
+      emoji: tag.get(dataBrowser.properties.emoji) as string | undefined,
+    });
+  }
+
+  return seeds;
 };
 
 export function NewPropertyDialog({
@@ -112,48 +152,63 @@ export function NewPropertyDialog({
   onCreated,
 }: NewPropertyDialogProps): JSX.Element {
   const store = useStore();
+  // Form state only. The draft is never saved: the content-addressed property
+  // is created on confirm, once its shortname and datatype are final.
   const [propertyResource, setPropertyResource] = useState<Resource | null>(
     null,
   );
   const [valid, setValid] = useState(true);
 
-  const [_properties, _setProperties, pushProp] = useArray(
-    tableClassResource,
-    core.properties.recommends,
-    { commit: true },
-  );
+  const createProperty = useCallback(
+    async (draft: Resource) => {
+      const name = (draft.get(core.properties.name) as string) ?? '';
+      const shortname = stringToSlug(name.trim()) || 'column';
+      const datatype = draft.get(core.properties.datatype) as Datatype;
+      // A new column is always a new property: never reuse another column's.
+      const naming = { name, shortname, reuse: false };
 
-  const savePropertyToTable = useCallback(
-    async (prop: Resource) => {
-      const tableClassParent = await store.getResource(
-        tableClassResource.props.parent,
-      );
-
-      if (tableClassParent.hasClasses(core.classes.ontology)) {
-        const ontologyProps =
-          tableClassParent.get(core.properties.properties) ?? [];
-
-        await tableClassParent.set(
-          core.properties.properties,
-          await sortSubjectList(store, [...ontologyProps, prop.subject]),
+      if (selectedCategory === 'select') {
+        const max = draft.get(dataBrowser.properties.max) as number | undefined;
+        const { subject } = await createSelectPropertyOnClass(
+          store,
+          tableClassResource,
+          { ...naming, tags: await tagSeedsFromDraft(store, draft), max },
         );
 
-        await tableClassParent.save();
+        return subject;
       }
 
-      await prop.save();
-      await saveChildren(store, prop);
-      pushProp([prop.subject]);
-      onCreated?.(prop.subject);
+      const { isA, propVals } = copyablePropertyFields(draft);
+
+      for (const key of FORM_HANDLED_KEYS) {
+        delete propVals[key];
+      }
+
+      return createPropertyOnClass(store, tableClassResource, {
+        ...naming,
+        datatype,
+        constraint: constraintPatchFromDraft(draft),
+        description: (draft.get(core.properties.description) as string) ?? '',
+        // The range class only marked properties that carried `min` / `max`.
+        classes: isA.filter(
+          c =>
+            c !== core.classes.property &&
+            c !== dataBrowser.classes.rangeProperty,
+        ),
+        propVals,
+      });
     },
-    [store, tableClassResource, pushProp, onCreated],
+    [store, tableClassResource, selectedCategory],
   );
 
   const onSuccess = useCallback(async () => {
-    if (propertyResource) {
-      await savePropertyToTable(propertyResource);
+    if (!propertyResource) {
+      return;
     }
-  }, [propertyResource, savePropertyToTable]);
+
+    const subject = await createProperty(propertyResource);
+    onCreated?.(subject);
+  }, [propertyResource, createProperty, onCreated]);
 
   const [dialogProps, show, hide] = useDialog({ bindShow, onSuccess });
 
@@ -165,8 +220,7 @@ export function NewPropertyDialog({
     }
 
     const init = async () => {
-      // Determine the correct parent before signing the genesis commit, since
-      // the parent is baked into the commit and controls authorization.
+      // The draft sits under the same parent the property will get.
       const tableClassParent = await store.getResource(
         tableClassResource.props.parent,
       );
@@ -179,18 +233,16 @@ export function NewPropertyDialog({
         selectedCategory as PropertyFormCategory,
       );
 
-      const resource = await store.newResource({
-        parent: parentSubject,
+      const draft = await createPropertyDraft(store, parentSubject, {
         isA,
         propVals: {
-          [core.properties.shortname]: stringToSlug(name),
           [core.properties.name]: name,
           [core.properties.description]: '',
-          ...propVals,
+          ...(propVals as Record<string, JSONValue>),
         },
       });
 
-      setPropertyResource(resource);
+      setPropertyResource(draft);
       // show() is called in a separate effect after propertyResource is set,
       // so the Dialog is already in the DOM when show() runs.
     };

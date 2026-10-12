@@ -1,9 +1,10 @@
-import { useId, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
 import { useResource, useTitle } from '@tomic/react';
 import { FaCheck, FaRegCircle } from 'react-icons/fa6';
 import type { ShareRole } from './RoleSelect';
+import { SegmentedControl } from './SegmentedControl';
 
 type PublicLevel = 'off' | ShareRole;
 
@@ -29,7 +30,6 @@ export function PublicAccess({
   classLabel,
   onChange,
 }: PublicAccessProps): JSX.Element {
-  const name = useId();
   const [busy, setBusy] = useState(false);
   const isPublic = level !== 'off' || !!inherited;
 
@@ -59,21 +59,13 @@ export function PublicAccess({
           classLabel={classLabel}
         />
       </Text>
-      <Segmented role='radiogroup' aria-label='Public access'>
-        {OPTIONS.map(option => (
-          <SegmentLabel key={option.value}>
-            <input
-              type='radio'
-              name={name}
-              value={option.value}
-              checked={level === option.value}
-              disabled={!onChange || busy}
-              onChange={() => handleChange(option.value)}
-            />
-            <span>{option.label}</span>
-          </SegmentLabel>
-        ))}
-      </Segmented>
+      <SegmentedControl
+        options={OPTIONS}
+        value={level}
+        onChange={handleChange}
+        disabled={!onChange || busy}
+        aria-label='Public access'
+      />
     </Card>
   );
 }
@@ -149,58 +141,4 @@ const Text = styled.div`
 const Muted = styled.span`
   color: ${p => p.theme.colors.textLight};
   font-size: 0.95rem;
-`;
-
-const Segmented = styled.div`
-  display: inline-flex;
-  flex-shrink: 0;
-  padding: 0.2rem;
-  border-radius: ${p => p.theme.radius};
-  background-color: ${p => p.theme.colors.bg2};
-  background-color: color-mix(
-    in srgb,
-    ${p => p.theme.colors.bg2} 45%,
-    ${p => p.theme.colors.bg1}
-  );
-`;
-
-const SegmentLabel = styled.label`
-  position: relative;
-
-  input {
-    position: absolute;
-    opacity: 0;
-    inset: 0;
-    margin: 0;
-    cursor: pointer;
-  }
-
-  input:disabled {
-    cursor: default;
-  }
-
-  span {
-    display: block;
-    padding: 0.35rem 0.8rem;
-    border-radius: calc(${p => p.theme.radius} - 2px);
-    color: ${p => p.theme.colors.textLight};
-    font-size: 0.95rem;
-    transition:
-      background-color 100ms ease-in-out,
-      color 100ms ease-in-out;
-  }
-
-  input:checked + span {
-    background-color: ${p => p.theme.colors.bg};
-    color: ${p => p.theme.colors.text};
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
-  }
-
-  input:focus-visible + span {
-    outline: 2px solid ${p => p.theme.colors.main};
-  }
-
-  input:not(:checked):not(:disabled):hover + span {
-    color: ${p => p.theme.colors.text};
-  }
 `;

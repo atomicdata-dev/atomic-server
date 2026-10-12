@@ -3,7 +3,6 @@ import {
   newResource,
   before,
   inDialog,
-  DIALOG_CLOSE_BUTTON,
   SEARCHBOX_PROPERTY_PLACEHOLDER,
   waitForSearchIndex,
   waitForClassInstanceSearchable,
@@ -45,6 +44,30 @@ test.describe('Ontology', async () => {
 
     const classCard = (name: string) =>
       page.getByTestId(`class-card-write-${name}`);
+
+    // A property line inside a class card.
+    const propertyLine = (card: Locator, shortname: string) =>
+      card
+        .locator('li')
+        .filter({ has: page.locator(`input[value="${shortname}"]`) });
+
+    // Changing the datatype swaps in a new property (the datatype is part of
+    // its ID), which replaces the line. Wait for the replacement before using
+    // the line, or what was opened on the old one closes again.
+    const setDatatype = async (line: Locator, datatype: string) => {
+      await line.getByLabel('Property datatype').selectOption(datatype);
+      await expect(line.getByLabel('Property datatype')).toHaveValue(datatype);
+    };
+
+    // Sets the class a property links to, in the class's constraints.
+    const setLinkedClass = async (line: Locator, className: string) => {
+      await line.getByText('Constraints').click();
+      await expect(line.getByLabel('Linked class')).not.toBeDisabled();
+      await line.getByLabel('Linked class').click();
+      await page.getByPlaceholder('Search for a class').fill(className);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+    };
 
     // --- Test Start ---
 
@@ -93,30 +116,28 @@ test.describe('Ontology', async () => {
       .locator('input[value="a property"]')
       .fill('The arrows on a thumbnail');
 
-    // Arrows property
-    await page.getByRole('button', { name: 'Configure arrows' }).click();
-
-    await inDialog(page, async dialog => {
-      await dialog
-        .getByLabel('Datatype')
-        .selectOption('https://atomicdata.dev/datatypes/resourceArray');
-
-      await expect(dialog.getByLabel('Classtype')).not.toBeDisabled();
-      await dialog.getByLabel('Classtype').click();
-
-      await dialog.getByPlaceholder('Search for a class').fill('arrow');
-
-      await page.keyboard.press('ArrowDown');
-      await page.keyboard.press('Enter');
-    });
+    // Arrows property: a list of arrows. The datatype belongs to the
+    // property; the class it links to is a constraint of the thumbnail class.
+    const arrowsLine = propertyLine(classCard('thumbnail'), 'arrows');
+    await arrowsLine
+      .getByLabel('Property datatype')
+      .selectOption('https://atomicdata.dev/datatypes/resourceArray');
+    // The datatype is part of the property's ID: the line is replaced by one
+    // for the new property. Opening Constraints before that remounts it shut.
+    await expect(arrowsLine.getByLabel('Property datatype')).toHaveValue(
+      'https://atomicdata.dev/datatypes/resourceArray',
+    );
+    await setLinkedClass(arrowsLine, 'arrow');
 
     // Arrow class
 
     await expect(
       classCard('arrow').locator('input[value="arrow"]'),
     ).toBeVisible();
-    await expect(page.getByText('Change me')).toBeVisible();
-    await page.getByText('Change me').fill('An arrow in a thumbnail');
+    const arrowDescription = classCard('arrow').getByText('Change me');
+
+    await expect(arrowDescription).toBeVisible();
+    await arrowDescription.fill('An arrow in a thumbnail');
 
     await page
       .getByRole('button', { name: 'add recommended property' })
@@ -141,23 +162,12 @@ test.describe('Ontology', async () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
 
-    await page.getByTitle('Configure arrow-kind').click();
-
-    await inDialog(page, async dialog => {
-      await expect(dialog.locator('input[value="arrow-kind"]')).toBeVisible();
-
-      await dialog
-        .getByLabel('Datatype')
-        .selectOption('https://atomicdata.dev/datatypes/atomicURL');
-
-      await expect(dialog.getByLabel('Classtype')).not.toBeDisabled();
-      await dialog.getByLabel('Classtype').click();
-
-      await dialog.getByPlaceholder('Search for a class').fill('arrow-kind');
-
-      await page.keyboard.press('ArrowDown');
-      await page.keyboard.press('Enter');
-    });
+    const arrowKindLine = propertyLine(classCard('thumbnail'), 'arrow-kind');
+    await setDatatype(
+      arrowKindLine,
+      'https://atomicdata.dev/datatypes/atomicURL',
+    );
+    await setLinkedClass(arrowKindLine, 'arrow-kind');
 
     // arrow-kind class
 
@@ -185,38 +195,24 @@ test.describe('Ontology', async () => {
 
     await pickOption(page.getByText('Create line-type'));
 
-    await page.getByTitle('Configure line-type').click();
+    // The options of a property are a constraint of the class that uses it.
+    const lineTypeLine = propertyLine(arrowKindCard, 'line-type');
+    await setDatatype(
+      lineTypeLine,
+      'https://atomicdata.dev/datatypes/resourceArray',
+    );
+    await lineTypeLine.getByText('Constraints').click();
 
-    await inDialog(page, async (dialog, closeDialogWith) => {
-      await expect(dialog.locator('input[value="line-type"]')).toBeVisible();
+    // Create two tags: dashed and solid
+    await lineTypeLine.getByPlaceholder('New tag').fill('dashed');
+    await lineTypeLine.getByRole('button', { name: 'Add tag' }).click();
+    await expect(lineTypeLine.getByPlaceholder('New tag')).toHaveValue('');
+    await expect(lineTypeLine.getByText('dashed')).toBeVisible();
 
-      await expect(
-        dialog.getByRole('button', { name: 'Enum' }),
-      ).not.toBeVisible();
-
-      await dialog
-        .getByLabel('Datatype')
-        .selectOption('https://atomicdata.dev/datatypes/resourceArray');
-
-      await expect(dialog.getByRole('tab', { name: 'Enum' })).toBeVisible();
-
-      // Create two tags: dashed and solid
-      await dialog.getByPlaceholder('New tag').fill('dashed');
-      await dialog.getByRole('button', { name: 'Add tag' }).click();
-
-      await expect(dialog.getByPlaceholder('New tag')).toHaveValue('');
-
-      await expect(dialog.getByText('dashed')).toBeVisible();
-
-      await dialog.getByPlaceholder('New tag').fill('solid');
-      await dialog.getByRole('button', { name: 'Add tag' }).click();
-
-      await expect(dialog.getByPlaceholder('New tag')).toHaveValue('');
-
-      await expect(dialog.getByText('solid')).toBeVisible();
-
-      await closeDialogWith(DIALOG_CLOSE_BUTTON);
-    });
+    await lineTypeLine.getByPlaceholder('New tag').fill('solid');
+    await lineTypeLine.getByRole('button', { name: 'Add tag' }).click();
+    await expect(lineTypeLine.getByPlaceholder('New tag')).toHaveValue('');
+    await expect(lineTypeLine.getByText('solid')).toBeVisible();
 
     // Create arrow-kind instances. The New Instance dialog lists classes
     // from the drive's ontologies — wait until Tantivy (and that filtered
@@ -325,9 +321,8 @@ test.describe('Ontology', async () => {
       'Green arrow with black border',
     );
 
-    await page
+    await arrowKindLine
       .getByRole('button', { name: 'add an item to the allows-only list' })
-      .nth(0)
       .click();
     // Adding the row opens its search directly — no second click on the
     // trigger (which the open dropdown now covers anyway).
@@ -340,9 +335,8 @@ test.describe('Ontology', async () => {
         .getByText('Red arrow with circle', { exact: true }),
     );
 
-    await page
+    await arrowKindLine
       .getByRole('button', { name: 'add an item to the allows-only list' })
-      .nth(0)
       .click();
     await page
       .getByPlaceholder('Search for a arrow-kind ')

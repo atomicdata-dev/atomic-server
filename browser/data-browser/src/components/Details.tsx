@@ -68,12 +68,12 @@ export function Details(props: PropsWithChildren<DetailsProps>): JSX.Element {
   }, [initialState]);
 
   const toggleOpen = useCallback(() => {
-    setIsOpen(p => {
-      onStateToggle?.(!p);
-
-      return !p;
-    });
-  }, [onStateToggle]);
+    // Not inside the state updater: it must stay pure, and a parent's
+    // `setState` from there is a state update during render.
+    const next = !isOpen;
+    setIsOpen(next);
+    onStateToggle?.(next);
+  }, [isOpen, onStateToggle]);
 
   // titleButton renders its own <button>; wrapper onClick would double-toggle on click.
   const summaryRowClickToggle =

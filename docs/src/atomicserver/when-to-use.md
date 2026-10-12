@@ -7,7 +7,7 @@
 - You want **high performance**: AtomicServer is incredibly fast and can handle thousands of requests per second.
 - You want **standalone app**: no need for any external applications or dependencies (like a database / nginx).
 - You want **versioning** or **full-text search**.
-- You want to build a webapplication, and like working with using [React](https://github.com/atomicdata-dev/atomic-data-browser) or [Svelte](https://github.com/atomicdata-dev/atomic-svelte).
+- You want to build a webapplication, and like working with using [React](https://github.com/ontola/atomic-server/tree/develop/browser) or [Svelte](https://github.com/atomicdata-dev/atomic-svelte).
 - You want to make (high-value) **datasets as easily accessible as possible**
 - You want to specify and share a **common vocabulary** / ontology / schema for some specific domain or dataset. Example classes [here](https://atomicdata.dev/classes).
 - You want to use and **share linked data**, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.

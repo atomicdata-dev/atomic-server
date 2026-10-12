@@ -4,34 +4,43 @@ This skill provides a systematic procedure for building a formal Atomic Data Ont
 
 ## Workflow / Procedure
 
-1. **Check if a new ontology is needed**:
-   - See if there is an existing ontology on the drive that is a good fit for the new schema, use the `query` tool for this (`where: [{property: 'https://atomicdata.dev/properties/isA', value: 'https://atomicdata.dev/class/ontology'}]`)
-   - When querying, make sure to select the description property so you can read what each ontology is about.
-   - If there is no good fit, ask the user if they want a new ontology or use the drives default ontology (can be found on the drive resource).
+1. **Search first.** Call `find_schema` with a few words for the thing you need (e.g. `invoice customer`). It returns the matching classes of this drive, each with its ontology and its JSON Schema. If a class fits, reuse it: use its subject, do not make a copy. If it nearly fits, say so and ask the user before making a variant.
+2. **Write the new schema as JSON Schema** (draft 2020-12) and call `ensure_ontology` with it. Put every object schema in `$defs`; each becomes a class. Each entry of `properties` becomes a property, `required` the required properties, and `{"$ref": "#/$defs/Other"}` a link to another class (also to a class that `find_schema` showed you: use `x-atomic-class` with its subject).
+   ```json
+   {
+     "title": "Shop",
+     "$defs": {
+       "customer": {
+         "type": "object",
+         "properties": { "name": { "type": "string", "minLength": 1 } },
+         "required": ["name"]
+       },
+       "invoice": {
+         "type": "object",
+         "properties": {
+           "amount": { "type": "number", "minimum": 0 },
+           "status": { "enum": ["draft", "sent", "paid"] },
+           "customer": { "$ref": "#/$defs/customer" }
+         }
+       }
+     }
+   }
+   ```
+3. **Pass `shortname`** (lowercase slug) to name the ontology. Without it the schema's `title` is used, and without a title the drive's default ontology. Ask the user if a new ontology is warranted when a fitting one exists.
+4. **Read the result.** It maps the class and property shortnames to subjects. If it returns an `error`, it names a JSON pointer: fix that spot in your schema and call again. Unsupported: `oneOf`/`anyOf`/`allOf`, nullable types (`["string","null"]`), object schemas nested in a property (move them to `$defs`), unknown formats.
+5. **Suggest further improvements** to the user when you are done.
 
-   **When creating a new ontology:**
-   - Create a resource of class [Ontology](https://atomicdata.dev/class/ontology) first.
-   - This resource will serve as the `parent` for all subsequent Classes and Properties.
-   - Give it a fitting shortname and description.
+Rules to know:
 
-2. **Create Classes**:
-   - Define classes using the [Class](https://atomicdata.dev/classes/Class) class.
-   - Give the class a fitting shortname and description.
-   - Set the `parent` to the subject of the Ontology from step 1.
-   - Do not add the properties yet as you have not created these.
-3. **Create Properties**:
-   - Define all custom properties using the [Property](https://atomicdata.dev/classes/Property) class.
-   - Set the `parent` to the subject of the Ontology from step 1.
-   - Give the property a fitting shortname and description.
-   - Properties should have a fitting datatype, read the section about datatypes to see what datatypes are available.
-   - **Classtype Recommendation**: For `resourceArray` or `atomicURL` datatypes, set a `classtype` if the property is intended to point to a specific Class. Omit it only if the property needs to support multiple different resource types.
-4. **Update the classes**:
-   - Update the classes's `requires` and `recommends` arrays with the subjects of the Properties created in step 3 or any existing properties that the class should use.
-5. **Finalize the Ontology**:
-   - Update the Ontology resource's `classes` and `properties` arrays with the subjects created in steps 2 and 3.
-6. **Suggest further improvements**:
-   When you are done creating the schema, see if there are any improvements that can be made and suggest them to the user.
-   If you feel like the schema is missing important components, ask the user if they want you to add these.
+- Constraints (`enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `minItems`, `maxItems`) go in the JSON Schema, on the property. Do not create tag resources or edit `constraints` by hand for these. For an array, put `enum` on `items`.
+- It is idempotent: calling it again with the same schema changes nothing, so it is safe to retry.
+- A property is identified by its ontology, shortname and type. Renaming a shortname or changing a type makes a NEW property; the old one and the data stored with it stay. Do not rename to "fix" something, add the new property and tell the user.
+- Descriptions: give classes and properties a `description`; it is shown in the UI.
+- `type: string` with `format: date-time` is a timestamp, `format: date` a date, `format: uri` a link; `x-atomic-datatype` (`markdown`, `slug`, `json`) picks a specific datatype.
+
+## Manual route (only for changes `ensure_ontology` cannot express)
+
+Use `create_resource` with the [Ontology](https://atomicdata.dev/class/ontology), [Class](https://atomicdata.dev/classes/Class) and [Property](https://atomicdata.dev/classes/Property) classes: create the ontology first and make it the parent of the classes and properties, then set each class's `requires`/`recommends`, and finally the ontology's `classes` and `properties` arrays.
 
 ## Gotchas
 
@@ -40,7 +49,7 @@ This skill provides a systematic procedure for building a formal Atomic Data Ont
 - **Strictness vs. Flexibility**: Use `classtype` to improve the editing UX for specific relations, but leave it empty for generic "any resource" relations.
 - **Reuse Existing Properties**: Properties can be used by multiple classes. Do not create two properties for the same thing unless they mean something different. For example a `book` and `article` class can share the same `author` property but should probably not reuse it to refer to the director on a `movie` class.
 - **Prefer standard properties** There are some standard properties in atomic that are prefered over more specific custom properties. These are [name](https://atomicdata.dev/properties/name) (string), [shortname](https://atomicdata.dev/properties/shortname) (slug), [image](https://atomicdata.dev/ontology/data-browser/property/image) (atomicURL pointing to a file resource) and [description](https://atomicdata.dev/properties/description) (markdown). When these are used the UI will automatically use these properties as the resource's title, description etc.
-- **Search Before Create**: Never assume the drive is empty. Always search for existing Ontologies, Classes, and Properties that might match the user's needs before creating new ones.
+- **Search Before Create**: Never assume the drive is empty. Always call `find_schema` for existing Classes that might match the user's needs before creating new ones.
 - **Don't predict new subjects**: Resources created by the `create_resource` tool will be assigned a random subject, you can not predict this beforehand and should thus wait to use it until you've actually created the resource.
 
 ## Datatypes

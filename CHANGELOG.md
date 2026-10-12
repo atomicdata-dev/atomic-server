@@ -7,6 +7,67 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Loro documents: strings that start with `[`, `{`, `atomic:`, `did:ad:` or `http(s)://` are tagged as `string` in the `datatypes` map so they are no longer read back as nested resources or URLs, and JSON `null` is kept inside nested maps and lists.
+
+## [v0.41.0-beta.8] - 2026-10-10
+
+- Discovery (#2198): a drive's pkarr record also lists the public https origins of the servers hosting it (`_atomic_http`), published at boot and every hour, so the app can find a drive's server from the secret alone. New anonymous `GET /genesis?subject=<did>` returns only a drive's genesis certificate, which the app verifies against the drive DID before connecting. Drives minted before genesis certificates existed answer 404 and are not found this way.
+- Schemas (#2151): properties get content-addressed subjects, `atomic:prop:{blake3}` of their ontology, shortname and datatype (`docs/src/schema/property-identity.md`). The server verifies the hash on genesis, accepts the same property from two devices, and refuses changes to its `parent`, `shortname` or `datatype`. Existing properties keep their subjects and stay editable.
+- Class constraints (#2151): a Class's `constraints` map holds JSON Schema keywords per property (`enum`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `pattern`, `class`), enforced on commit; peer commits and sync skip it. An empty `allowsOnly` on a Property now restricts nothing.
+- Lenses (#2151): `atomic:lens:` resources map one property onto another (`rename`, `wrap`, `head`, `map`, `convert`); the derived values appear in reads and indexes without changing signed data (`docs/src/schema/lenses.md`).
+- `atomic-cli schema push | lock | check`: turn a JSON Schema or ontology file into an ontology and a lockfile that pins its property IDs (#2151). `atomic_lib::schema::json_schema` imports JSON Schema and `ensure_ontology` creates the result.
+- Forms: field options use JSON Schema keyword names (`minItems`, `maxItems`, `minimum`, `maximum`; the old names are still read) and may only tighten the column's class constraints; `describe_form` returns the form's JSON Schema (#2151).
+
+- `--served-domain-suffix` / `ATOMIC_SERVED_DOMAIN_SUFFIX` takes a comma-separated list (`atomicserver.eu,atomic.place`), so a node can answer under two domains while it moves from one to the other.
+
+- MCP endpoint: `POST /mcp` (Streamable HTTP) is the one implementation of the
+  MCP tools, for clients that cannot run a local process, such as claude.ai, and
+  for the local `@tomic/mcp`, which now only bridges to it. It is an OAuth 2.1
+  resource server (RFC 9728 metadata at `/.well-known/oauth-protected-resource`)
+  with the node as authorization server (`/oauth/register`, `/oauth/authorize`,
+  `/oauth/token`, PKCE S256, dynamic client registration, `resource` checked).
+  The person approves in the app (`/app/authorize-mcp`): which drives, and read
+  only or read and edit. Reading is as an issued agent under the normal rights
+  checks. If editing was allowed, `edit_resource`, `create_resource` (documents
+  take Markdown as `_documentText`) and `delete_resource` exist, and the node
+  signs those commits as that issued agent, never as the person. Revoking is
+  removing it under Connected apps. `list_drives`, `get_resource`, `search`,
+  `query`, `get_user_classes` and `get_schema` are the read tools.
+  `--app-url` / `ATOMIC_APP_URL` says where the approval page lives when the app
+  is not served by this node.
+- The approval page only works with a node the person is already using: a link
+  naming another server is refused, and the redirect back to the client must be
+  exactly the one registered, so a crafted link cannot grant access to someone
+  else's key or run script in the app.
+
+- `atomic-cli connect`: connect the CLI with a key made on this machine,
+  approved in the app (`/app/connect-agent`), instead of pasting your agent
+  secret. Without a config file, the CLI now points you to it rather than
+  asking for the secret.
+
+- Forms (beta): guests can fill in a form without an account, and each answer
+  becomes a row in a Table. New default ontology `forms`
+  (`lib/defaults/forms.json`: `Form`, `FormPage`, `FormField`, `FormHeading`,
+  `FormParagraph`, `FormInfoBox`, `FormCondition`, `FormInviteCode` and their
+  properties). New public endpoints: `GET /form/{id}` (the form page),
+  `GET /form/{id}/definition`, `GET /form/{id}/challenge` (a self-hosted
+  proof-of-work captcha, ALTCHA), `GET /form/{id}/image` and
+  `POST /form/{id}/submit`. `{id}` is a short publish slug or the form's
+  identifier. Only published forms inside their open/close window answer
+  (others get `410`); invite-only forms need a single-use code. Submissions
+  are validated against the form's questions and branching conditions
+  (answers to hidden questions are dropped), rate-limited per client address,
+  and written by the server's agent; a form can only write into, and show
+  visitors resources from, its own drive. A class extender adds
+  `form-submission-summary` to a Form for readers who may see it.
+  `server/build.rs` embeds the `browser/form-app` bundle.
+  [#875](https://github.com/ontola/atomic-server/issues/875)
+- Collection `/query`: the rights walk no longer full-decodes ancestors (memoize by subject + `get_resource_shallow`). Denied members still do not consume `page_size`, so a readable row after a private streak is returned.
+- Commits whose Loro update depends on ops the server does not have are now
+  refused ("parked as pending") instead of being accepted without effect; the
+  browser resends a self-contained update.
+- `/download/files/{hash}` and blob URLs serve the File's stored mimetype.
+
 - A plain `GET /ws` that is not a WebSocket upgrade (a crawler, a pasted URL) now answers 400 instead of 500, so it no longer shows up as an incident in error reporting.
 - A commit is also sent to WebSocket subscribers of the resource's parent. A
   resource shared out of a drive the recipient can't read (a chatroom) can only
@@ -15,6 +76,13 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
   recipient could hold. Read rights are checked per subscriber against the
   resource when it is sent, and a connection already reached through the
   resource or its drive doesn't get it twice.
+- End-to-end encrypted conversations. `atomic_lib::conversation` derives an
+  agent's X25519 `encryptionKey`, keeps a conversation's keys in a keyring
+  wrapped to each member, and seals and opens messages; the WASM build exports
+  it. New default ontology `conversations` (`lib/defaults/conversations.json`)
+  with the `Conversation` and `SealedMessage` classes. New endpoint
+  `/conversations` lists the conversations on the server the requesting agent
+  is a member of. See `planning/encrypted-conversations.md`.
 
 - New default ontology `notifications` (`lib/defaults/notifications.json`):
   the `Inbox` and `Notification` classes, and an `inbox` property the private

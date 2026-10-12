@@ -99,8 +99,12 @@ for (const localOnly of [true, false]) {
     await expect(
       page.getByRole('heading', { name: 'Sync', exact: true }),
     ).toBeVisible();
+    // Connect a device always renders; its "show this device" half is gated.
     await expect(
-      page.getByRole('heading', { name: 'Sync a device', exact: true }),
+      page.getByRole('heading', { name: 'Connect a device', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Show this device', { exact: true }),
     ).toHaveCount(0);
 
     if (localOnly) {

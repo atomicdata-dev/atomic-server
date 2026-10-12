@@ -1,0 +1,91 @@
+[
+  {
+    "@id": "https://atomicdata.dev/ontology/conversations",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/ontology",
+    "https://atomicdata.dev/properties/shortname": "conversations",
+    "https://atomicdata.dev/properties/description": "Direct messages and group chats, end-to-end encrypted. A Conversation is a drive its members share: they can read it and post in it, and each message stays writable by its author only. Messages are SealedMessages, so whoever hosts the drive stores ciphertext. The host still checks signatures and rights, which stay readable, and it can see who is in a conversation and when they post, but not what they say.\n\nEach member's agent publishes an `encryptionKey`. The Conversation holds a keyring: one key per epoch, sealed to each member's `encryptionKey`. A new epoch starts whenever the members change. See `planning/encrypted-conversations.md`.",
+    "https://atomicdata.dev/properties/classes": [
+      "https://atomicdata.dev/classes/Conversation",
+      "https://atomicdata.dev/classes/SealedMessage"
+    ],
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/properties/encryptionKey",
+      "https://atomicdata.dev/properties/conversationKeys",
+      "https://atomicdata.dev/properties/sealed",
+      "https://atomicdata.dev/properties/conversations"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Conversation",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/shortname": "conversation",
+    "https://atomicdata.dev/properties/description": "An end-to-end encrypted chat between two or more people: a drive of its own, never inside someone's private drive or a team drive. Its `read` and `append` list the members; its SealedMessages are its children. `conversationKeys` holds the keyring that lets members open them.",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/conversationKeys"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/read",
+      "https://atomicdata.dev/properties/append"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/SealedMessage",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/shortname": "sealed-message",
+    "https://atomicdata.dev/properties/description": "A message in a Conversation whose content is encrypted. `sealed` holds what a Message would carry in the clear (its text, and what it replies to) as ciphertext that only the Conversation's members can open.",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/parent",
+      "https://atomicdata.dev/properties/sealed"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/encryptionKey",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "encryption-key",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "An agent's public X25519 key, base64url, for encrypting things only that agent can open, such as a Conversation's keys. Derived from the agent's own key, so it is the same on every device. Set by the agent itself."
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/conversationKeys",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "conversation-keys",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A Conversation's keyring, as JSON: one key per epoch, each sealed to the `encryptionKey` of that epoch's members. Readable by the host, which learns only who holds a key."
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/sealed",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "sealed",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Encrypted content, base64url. Its header names the key epoch; the rest opens only with that epoch's Conversation key."
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/conversations",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "conversations",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Conversation",
+    "https://atomicdata.dev/properties/description": "On a private drive: the Conversations its owner is in, like `sharedWithMe` for chats. Kept separate from `drives` so conversations never show up as workspaces."
+  }
+]

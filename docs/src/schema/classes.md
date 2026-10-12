@@ -88,7 +88,8 @@ Example:
   ],
   "https://atomicdata.dev/properties/recommends": [
     "https://atomicdata.dev/properties/recommends",
-    "https://atomicdata.dev/properties/requires"
+    "https://atomicdata.dev/properties/requires",
+    "https://atomicdata.dev/properties/constraints"
   ],
   "https://atomicdata.dev/properties/requires": [
     "https://atomicdata.dev/properties/shortname",
@@ -99,3 +100,66 @@ Example:
 ```
 
 Check out a [list of example Classes](https://atomicdata.dev/classes/).
+
+## Constraints
+
+A Class can restrict the values its instances may hold with the [`constraints`](https://atomicdata.dev/properties/constraints) property (datatype `json`, recommended on Class).
+Properties are immutable, so everything beyond a Property's shortname and datatype lives here, the way JSON Schema keeps `enum` or `minimum` inside an object's `properties` instead of on a global field.
+
+The value is a JSON object keyed by property subject.
+Use the canonical `atomic:` form for Atomic identifiers (`did:ad:` is read as `atomic:`) and the URL as-is for HTTP subjects.
+Each value is an object of the keywords below.
+
+| Keyword | Value | Applies to | Breaks when |
+| --- | --- | --- | --- |
+| `enum` | array | any value; every item of an array | the value is not one of the listed values |
+| `minimum` | number | numbers | value `<` minimum |
+| `maximum` | number | numbers | value `>` maximum |
+| `exclusiveMinimum` | number | numbers | value `<=` the bound |
+| `exclusiveMaximum` | number | numbers | value `>=` the bound |
+| `minLength` | integer `>= 0` | strings | fewer Unicode code points than the bound |
+| `maxLength` | integer `>= 0` | strings | more Unicode code points than the bound |
+| `minItems` | integer `>= 0` | arrays | fewer items than the bound |
+| `maxItems` | integer `>= 0` | arrays | more items than the bound |
+| `pattern` | regex string | strings | the string has no match (unanchored, like JSON Schema) |
+| `class` | class subject | links | never checked, see below |
+
+These are JSON Schema keywords with the same meaning, except that `class` stands in for `$ref` and `enum` also accepts a list of subjects.
+A keyword that does not apply to the value's type is ignored, as in JSON Schema: `minimum` on a string does nothing.
+Numbers compare by value (`1` equals `1.0`), and subjects compare after `did:ad:` is read as `atomic:`.
+Unknown keywords are rejected when the Class is written, so a typo like `minimun` fails loudly.
+
+`pattern` uses the subset shared by Rust's `regex` crate and JavaScript without flags: literals, `.`, character classes, `^` and `$`, groups, `|`, and the quantifiers `* + ? {n,m}`.
+Avoid lookaround and backreferences (Rust rejects them) and write `[0-9]` instead of `\d`, since `\d`, `\w` and `\s` are Unicode-aware in Rust and ASCII-only in JavaScript.
+
+`class` names the class a link should point to.
+It is for pickers and forms, like `classtype` on a Property, and is **not** enforced when a value is written.
+
+### Enforcement
+
+- **Commit time.** The server checks every value of a resource against the constraints of each class in its `isA`, next to the check for `requires`, and rejects the commit with `Value for <shortname> breaks <keyword> on class <class shortname>: <detail>`.
+  A Class commit is rejected when its own `constraints` map has an unknown keyword or a wrong type.
+- **Never on sync.** Reconciling drives and importing peer data does not run these checks, and neither do commits received over a peer connection. A replica keeps what another node already accepted.
+- **Unloaded classes are skipped in the client.** Before signing, `@tomic/lib` runs the same checks for classes already in the local store and throws the same message. It never fetches a class for this, so the server stays the authority.
+- **Legacy.** A Property's own `allowsOnly` and `max` keep working as before and are still not enforced.
+
+Both implementations (`atomic_lib` and `@tomic/lib`) run the same cases from `lib/tests/fixtures/class-constraints.json`.
+
+### Example
+
+```json
+{
+  "@id": "https://example.com/classes/Invoice",
+  "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Class"],
+  "https://atomicdata.dev/properties/shortname": "invoice",
+  "https://atomicdata.dev/properties/description": "A bill.",
+  "https://atomicdata.dev/properties/constraints": {
+    "https://example.com/properties/status": { "enum": ["atomic:tag:draft", "atomic:tag:sent"], "maxItems": 1 },
+    "https://example.com/properties/amount": { "minimum": 0, "maximum": 10000 },
+    "https://example.com/properties/number": { "pattern": "^INV-[0-9]{4}$" },
+    "https://example.com/properties/customer": { "class": "https://example.com/classes/Customer" }
+  }
+}
+```
+
+An invoice with `amount` `-5` is rejected with `Value for amount breaks minimum on class invoice: -5 is below 0`.

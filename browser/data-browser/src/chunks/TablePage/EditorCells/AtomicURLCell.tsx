@@ -23,6 +23,7 @@ import { styled } from 'styled-components';
 import { FileDropzoneInput } from '@components/forms/FileDropzone/FileDropzoneInput';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles'; ////
 import { getIconForClass } from '@helpers/iconMap';
+import { asSubject } from '@helpers/formatPlainValue';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 import { useResourceSearch } from './useResourceSearch';
 import { IconButton } from '@components/IconButton/IconButton';
@@ -35,13 +36,16 @@ import {
   SearchResultWrapper,
 } from './CellComponents';
 import { FaXmark } from 'react-icons/fa6';
+import { useRowConstraint } from '../useColumnConstraint';
 import { usePopover } from '@components/CustomPopover';
 import { useTableEditorContext } from '@chunks/TableEditor/TableEditorContext';
 
-const useClassType = (subject: string) => {
-  const property = useResource<Core.Property>(subject);
+// The linked class comes from the row's class constraints, falling back to the
+// Property's legacy `classtype`.
+const useClassType = (subject: string, rowClasses: string[]) => {
+  const { class: linkedClass } = useRowConstraint(rowClasses, subject);
 
-  const classType = useResource<Core.Class>(property.props.classtype);
+  const classType = useResource<Core.Class>(linkedClass);
   const hasClassType = classType?.subject !== unknownSubject;
 
   return {
@@ -57,8 +61,8 @@ function AtomicURLCellEdit({
   resource: row,
 }: EditCellProps<JSONValue>): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
-  const cell = useResource(value as string);
-  const { classType, hasClassType } = useClassType(property);
+  const cell = useResource(asSubject(value));
+  const { classType, hasClassType } = useClassType(property, row.getClasses());
   const [title] = useTitle(cell);
   // `defaultOpen` only seeds the *initial* isOpen state — if this component
   // remounts (e.g. its row briefly re-resolving after this cell's own save,
@@ -215,6 +219,7 @@ function AtomicURLCellDisplay({
     return <></>;
   }
 
+  // A non-string value is shown as text by ResourceCell itself.
   return <ResourceCell subject={value as string} />;
 }
 

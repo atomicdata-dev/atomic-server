@@ -23,6 +23,12 @@ export interface AggregateTarget {
 }
 
 export interface TablePageContextType {
+  /** Rows ticked in the row header, by subject ("select mode" while non-empty). */
+  selectedRows: ReadonlySet<string>;
+  toggleRowSelected: (subject: string) => void;
+  clearRowSelection: () => void;
+  /** Deletes every ticked row, as one undo step. */
+  deleteSelectedRows: () => Promise<void>;
   tableSubject: string;
   tableClassSubject: string;
   sorting: TableSorting;
@@ -53,6 +59,8 @@ export interface TablePageContextType {
   aggregateOutcomes: AggregateOutcome[];
   /** Total rows the view matches — what the footer says on the left. */
   rowCount: number;
+  /** The rows have not arrived yet, so `rowCount` is not an answer. */
+  rowsLoading: boolean;
   /**
    * Sets (or clears, with `undefined`) the statistic shown under a column, in
    * the given totals row (the first one by default).
@@ -104,6 +112,8 @@ export interface TablePageContextType {
    * until it materializes.
    */
   rowSource: (index: number) => RowSource | undefined;
+  /** The kind of the active view ('table', 'calendar', …). */
+  viewKind?: string;
 }
 
 export type RowSource =
@@ -111,6 +121,10 @@ export type RowSource =
   | { kind: 'session'; key: string };
 
 export const TablePageContext = createContext<TablePageContextType>({
+  selectedRows: new Set(),
+  toggleRowSelected: () => undefined,
+  clearRowSelection: () => undefined,
+  deleteSelectedRows: async () => undefined,
   tableSubject: unknownSubject,
   tableClassSubject: unknownSubject,
   sorting: {
@@ -131,6 +145,7 @@ export const TablePageContext = createContext<TablePageContextType>({
   aggregates: [],
   aggregateOutcomes: [],
   rowCount: 0,
+  rowsLoading: false,
   setColumnAggregate: () => undefined,
   removeAggregateRow: () => undefined,
   canWriteTable: false,

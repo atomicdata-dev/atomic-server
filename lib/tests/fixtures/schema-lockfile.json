@@ -1,0 +1,58 @@
+{
+  "_comment": "Shared by lib/src/schema/lockfile.rs and browser/lib/src/schema-lockfile.test.ts. `lockfile` is the exact text both must write: sorted keys, 2-space indent, trailing newline.",
+  "cases": [
+    {
+      "name": "plan with a shared property and known class subjects",
+      "ontology": "did:ad:shopOntologyGenesis",
+      "classes": {
+        "customer": "did:ad:customerGenesis",
+        "invoice": "did:ad:invoiceGenesis"
+      },
+      "plan": {
+        "shortname": "shop",
+        "classes": [
+          {
+            "shortname": "customer",
+            "properties": [
+              { "shortname": "name", "datatype": "https://atomicdata.dev/datatypes/string" },
+              { "shortname": "email", "datatype": "https://atomicdata.dev/datatypes/string" }
+            ],
+            "requires": ["name"]
+          },
+          {
+            "shortname": "invoice",
+            "properties": [
+              { "shortname": "name", "datatype": "https://atomicdata.dev/datatypes/string" },
+              { "shortname": "total", "datatype": "https://atomicdata.dev/datatypes/float" },
+              { "shortname": "paid", "datatype": "https://atomicdata.dev/datatypes/boolean" }
+            ],
+            "requires": ["total"]
+          }
+        ]
+      },
+      "lockfile": "{\n  \"classes\": {\n    \"customer\": \"did:ad:customerGenesis\",\n    \"invoice\": \"did:ad:invoiceGenesis\"\n  },\n  \"ontology\": \"did:ad:shopOntologyGenesis\",\n  \"properties\": {\n    \"email\": \"atomic:prop:b4152651d32b39d8d89901323c9673775d2e43bb2ea452db01c8ad5d52432bc1\",\n    \"name\": \"atomic:prop:f04459be53adc3c4904126504db01a55e68a0932d3fd054fa8a5eb4b5bdd5d16\",\n    \"paid\": \"atomic:prop:c936055d9d82b752e65d0500f62f3318913a50c80f8db4002b6214a98f46a715\",\n    \"total\": \"atomic:prop:2d6898145b0e560b6d9cf4f71899d5b85cb2925700a9e339fe3aea8e98fb7539\"\n  }\n}\n"
+    },
+    {
+      "name": "JSON Schema, offline (no class subjects yet)",
+      "ontology": "did:ad:notesOntologyGenesis",
+      "classes": {},
+      "jsonSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Notes",
+        "x-atomic-ontology": "notes",
+        "$defs": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "pinned": { "type": "boolean" },
+              "created": { "type": "string", "format": "date-time" }
+            },
+            "required": ["title"]
+          }
+        }
+      },
+      "lockfile": "{\n  \"classes\": {},\n  \"ontology\": \"did:ad:notesOntologyGenesis\",\n  \"properties\": {\n    \"created\": \"atomic:prop:6de0c46d519d5bd92a2a67df62c5ed9aa33eef354d075efed6298838682208c4\",\n    \"pinned\": \"atomic:prop:d8f839a78c8dc003208dcc22b370e567051429bdb8c02fd48b2cc0c00d7f94c1\",\n    \"title\": \"atomic:prop:7daee85bf9d203e3315d321352da339f1890fdb91fc0ab199570eb6f15b8f280\"\n  }\n}\n"
+    }
+  ]
+}

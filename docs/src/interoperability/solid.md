@@ -19,7 +19,7 @@ But there are some important **differences**, too, which will be explained in mo
 - Atomic Data standardizes state changes (which also provides version control / history, audit trails)
 - Atomic Data is more easily serializable to other formats (like JSON)
 - Atomic Data has different models for authentication, authorization and hierarchies
-- Atomic Data identifies users and resources by `did:ad:` identifiers derived from keys and signatures, where Solid uses WebIDs (HTTP URLs) that depend on a host
+- Atomic Data identifies users and resources by `atomic:` identifiers derived from keys and signatures, where Solid uses WebIDs (HTTP URLs) that depend on a host
 - Atomic Data syncs signed CRDT updates between devices; Solid reads and writes documents on a server
 - Atomic Data does not depend on existing semantic web specifications
 - Atomic Data is a smaller and younger project, and as of now a one-man show
@@ -119,17 +119,17 @@ So, in a nutshell, I think this legacy makes Solid unnecessarily hard to use for
 Both Atomic Data and Solid are specifications that have different implementations.
 Some open source Solid implementations are the [Node Solid Server](https://github.com/solid/node-solid-server), the [Community Solid Server](https://github.com/solid/community-server) (also nodejs based) and the [DexPod](https://gitlab.com/ontola/dexpod) (Ruby on Rails based).
 
-[Atomic-Server](https://github.com/atomicdata-dev/atomic-server/) is a database + server written in the Rust programming language, that can be considered an alternative to Solid Pod implementations.
+[Atomic-Server](https://github.com/ontola/atomic-server/) is a database + server written in the Rust programming language, that can be considered an alternative to Solid Pod implementations.
 It was definitely built to be one, at least.
 It implements every part of the Atomic Data specification.
 I believe that as of today (february 2022), Atomic-Server has quite a few advantages over existing Solid implementations:
 
-<!-- List copied from https://github.com/atomicdata-dev/atomic-server/blob/master/README.md -->
+<!-- List copied from https://github.com/ontola/atomic-server/blob/master/README.md -->
 - **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html), combining the best of RDF, JSON and type safety.
 - **Fast** (1ms responses on my laptop)
 - **Lightweight** (8MB download, no runtime dependencies)
 - **HTTPS + HTTP2 support** with Built-in LetsEncrypt handshake.
-- **Browser GUI included** powered by [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more. Easy to use!
+- **Browser GUI included** powered by [atomic-data-browser](https://github.com/ontola/atomic-server/tree/develop/browser). Features dynamic forms, tables, authentication, theming and more. Easy to use!
 - **Versioning** / history from the Loro oplog, with writes authorized by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - **Full-text search** with fuzzy search and various operators, often <3ms responses.
@@ -144,5 +144,5 @@ Atomic Data is not even two years old, and although progress has been fast, it d
 Here's a list of things missing in Atomic Data, with links to their open issues and links to their existing Solid counterpart.
 
 - No inbox or [notifications](https://www.w3.org/TR/ldn/) yet ([issue](https://github.com/ontola/atomic-data/issues/28))
-- No OIDC support yet. ([issue](https://github.com/atomicdata-dev/atomic-server/issues/277))
+- No OIDC support yet. ([issue](https://github.com/ontola/atomic-server/issues/277))
 - No support from a big community, a well-funded business or the inventor of the world wide web.

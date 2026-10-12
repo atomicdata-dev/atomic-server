@@ -1,5 +1,6 @@
 import { Spinner } from '../../components/Spinner';
 import { resumeInviteUrl } from '../../helpers/inviteSignup';
+import { signInAccountWithAgent } from '../../helpers/managed/agentSession';
 import {
   pendingTemplateUrl,
   readPendingTemplate,
@@ -23,6 +24,7 @@ import { beat } from '../../helpers/deviceLock';
 import { fetchPrivateDriveSubject } from '../../helpers/privateDrive';
 import { connectHostedDrive, shortDid } from '../../helpers/managed/reconcile';
 import { deviceHasDriveData } from '../../helpers/driveData';
+import { discoverHomeServerForApp } from '../../helpers/discoverHomeServer';
 import { openPrivateHome } from '../../helpers/openPrivateHome';
 import { privateHomeNudge } from '../../helpers/privateHomeNudge';
 import { withDeadline } from '../../helpers/withDeadline';
@@ -60,6 +62,7 @@ import {
   saveRecoverySecret,
   getRecoverySecret,
   getUnlockableRecoverySecret,
+  forgetCachedRecoverySecret,
   readUnlockableCachedBackups,
   decryptRecoverySecret,
   decryptEnvelopeV2,
@@ -70,13 +73,14 @@ import {
   type RecoverySecret,
   type SecretAccountConflict,
 } from '../../helpers/managed/recovery';
+import { IconButton } from '../../components/IconButton/IconButton';
 import { CodeBlock } from '../../components/CodeBlock';
 import {
   AccountSignInPanel,
   AccountSignInViaBrowser,
 } from './AccountSignInPanel';
 import { InputStyled, InputWrapper } from '../../components/forms/InputStyles';
-import { FaArrowLeft, FaKey } from 'react-icons/fa6';
+import { FaArrowLeft, FaKey, FaXmark } from 'react-icons/fa6';
 import { Logo } from '../../components/Logo';
 import { ConnectDeviceStep } from './ConnectDeviceStep';
 import {
@@ -152,7 +156,7 @@ export function GettingStartedFlow({
   useWelcomeLayoutEffect();
   const store = useStore();
   const navigate = useNavigateWithTransition();
-  const { setAgent, setDrive, setServer, baseURL } = useSettings();
+  const { setAgent, setDrive, setServer, setBaseURL, baseURL } = useSettings();
   // When the connected node is "managed" (reports a dashboard/portal URL via
   // /node-info), account creation goes through the portal (email
   // verification). Self-hosted / FOSS nodes report nothing here, so we keep the
@@ -605,6 +609,11 @@ export function GettingStartedFlow({
         );
       }
 
+      // One sign-in: the identity just unlocked signs the account in too, so
+      // the portal is not left asking again. In the background; the app does
+      // not need the account session to open.
+      void signInAccountWithAgent(newAgent, { proven: true });
+
       if (inviteToken) {
         navigate(resumeInviteUrl(inviteToken));
 
@@ -635,9 +644,19 @@ export function GettingStartedFlow({
         ));
 
       // Resolve hosting before a failed read sends this device to Cloud Vault.
-      const hosted = target
+      const hostedByAccount = target
         ? await connectHostedDrive(store, target, setServer)
         : false;
+
+      // No account to ask (or it does not know this drive): the secret alone
+      // names the drive, and pkarr says which servers announced it. Only
+      // when the server in use does not already have it.
+      const hosted =
+        hostedByAccount ||
+        (!!target &&
+          (await discoverHomeServerForApp(store, target, setBaseURL, subject =>
+            deviceHasDriveData(store, subject),
+          )));
 
       // Check for existing data before creating anything, so a newly writable
       // home is never mistaken for successful recovery of previous content.
@@ -1001,7 +1020,7 @@ export function GettingStartedFlow({
     <Shell>
       {step === 'welcome' && !createTarget ? (
         <div role='status' aria-label='Loading account'>
-          <Spinner />
+          <Spinner size='4rem' />
         </div>
       ) : step === 'opening-workspace' ? (
         <Swap key='opening-workspace'>
@@ -1151,18 +1170,50 @@ export function GettingStartedFlow({
                     {error ? (
                       <CardError role='alert'>{error.message}</CardError>
                     ) : null}
-                    {knownAccounts.map(account => (
-                      <Button
-                        key={account.agent_subject}
-                        type='button'
-                        subtle
-                        disabled={loading}
-                        onClick={() => unlockWithPasskey(account)}
-                        data-test='account-choice'
-                      >
-                        {account.owner_address ?? account.owner_email}
-                      </Button>
-                    ))}
+                    {knownAccounts.map(account => {
+                      const address =
+                        account.owner_address ?? account.owner_email;
+                      // The same address twice is two identities of one
+                      // account, from before the newer backup replaced the
+                      // older. Say which is which, and let the stale one go.
+                      const repeated =
+                        knownAccounts.filter(
+                          other =>
+                            (other.owner_address ?? other.owner_email) ===
+                            address,
+                        ).length > 1;
+
+                      return (
+                        <AccountChoice key={account.agent_subject}>
+                          <Button
+                            type='button'
+                            subtle
+                            disabled={loading}
+                            onClick={() => unlockWithPasskey(account)}
+                            data-test='account-choice'
+                          >
+                            <AccountLabel>
+                              {address}
+                              {repeated && (
+                                <AccountDetail>
+                                  {`Saved ${new Date(account.updated_at || account.created_at).toLocaleDateString()}, identity …${account.agent_subject.slice(-6)}`}
+                                </AccountDetail>
+                              )}
+                            </AccountLabel>
+                          </Button>
+                          <IconButton
+                            title={`Forget ${address} on this device`}
+                            disabled={loading}
+                            onClick={() => {
+                              forgetCachedRecoverySecret(account.agent_subject);
+                              setKnownAccounts(readUnlockableCachedBackups());
+                            }}
+                          >
+                            <FaXmark />
+                          </IconButton>
+                        </AccountChoice>
+                      );
+                    })}
                     <OtherWaysLabel>or sign in another way</OtherWaysLabel>
                   </Column>
                 ) : null}
@@ -1807,6 +1858,30 @@ const AgentList = styled.dl`
     font-family: monospace;
     overflow-wrap: anywhere;
   }
+`;
+
+const AccountChoice = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  & > button:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+`;
+
+const AccountLabel = styled.span`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+`;
+
+const AccountDetail = styled.small`
+  display: block;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const OtherWaysLabel = styled.span`

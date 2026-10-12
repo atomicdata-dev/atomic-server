@@ -34,5 +34,5 @@ When a client generates a keypair, the public key immediately determines the Age
 See the [DID specification](did.md) for details on how agent DIDs work and are resolved.
 
 One way to start using your Agent is by accepting an [Invite](invitations.md) with your public key.
-The server will derive the `did:ad:agent:` identifier and grant the requested rights.
+The server will derive the `atomic:agent:` identifier and grant the requested rights.
 Alternatively, you can host an [Atomic Server](https://crates.io/crates/atomic-server) and use the `/setup` invite to configure the root Agent.

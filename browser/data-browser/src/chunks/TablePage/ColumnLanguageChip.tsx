@@ -102,7 +102,7 @@ const buildChipTrigger = (label: string): DropdownTriggerComponent => {
     </ChipButton>
   );
 
-  Comp.DisplayName = 'LanguageChipTrigger';
+  Comp.DisplayName = /* @wc-ignore */ 'LanguageChipTrigger';
 
   return Comp;
 };

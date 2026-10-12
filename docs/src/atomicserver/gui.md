@@ -20,7 +20,7 @@ At the start these will be:
 ## Creating an agent
 To create data in AtomicServer you'll need an agent.
 An agent is like a user account, it signs the changes (commits) you make to data so that others can verify that you made them.
-Agents are identified by a DID derived from their public key (`did:ad:{publicKey}`), so they can be used on any AtomicServer without needing to be registered first.
+Agents are identified by an identifier derived from their public key (`atomic:{publicKey}`), so they can be used on any AtomicServer without needing to be registered first.
 
 To get started, you can use the [demo invite](https://atomicdata.dev/invites/1) on atomicdata.dev, or the `/setup` invite on your own server.
 

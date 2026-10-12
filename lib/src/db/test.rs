@@ -379,6 +379,153 @@ async fn unauthorized_query_count_matches_subjects() {
     );
 }
 
+async fn genesis_child(store: &Db, parent: &Subject) -> Subject {
+    let mut res = Resource::new("did:ad:placeholder".into());
+    res.set(urls::PARENT.into(), Value::AtomicUrl(parent.clone()), store)
+        .await
+        .unwrap();
+    res.save_as_genesis(store)
+        .await
+        .unwrap()
+        .resource_new
+        .unwrap()
+        .get_subject()
+        .clone()
+}
+
+fn parent_query(parent: &Subject, limit: Option<usize>, for_agent: ForAgent) -> Query {
+    Query {
+        property: Some(urls::PARENT.into()),
+        value: Some(Value::AtomicUrl(parent.clone())),
+        filters: Vec::new(),
+        limit,
+        start_val: None,
+        end_val: None,
+        offset: 0,
+        sort_by: None,
+        sort_desc: false,
+        include_external: true,
+        include_nested: false,
+        for_agent,
+        drive: None,
+        aggregation: None,
+        expression_filters: Vec::new(),
+    }
+}
+
+/// Synthetic repro from `planning/slow-collection-queries.md`: drive → folder
+/// → form → many private children, queried `parent=form` as a non-authorized
+/// agent. Pins remaining cost to *call counts* (a fresh store's snapshots are
+/// too small to show wall-clock):
+///
+/// The rights walk must not full-decode ancestors (`get_resource` stays 0)
+/// and must not re-fetch a parent whose verdict is already cached. Each
+/// member is still shallow-fetched — a later readable sibling after a
+/// private streak must not be skipped.
+#[tokio::test]
+async fn unauthorized_collection_query_bounds_fetch_counts() {
+    let store = Db::init_temp("unauthorized_collection_query_bounds_fetch_counts")
+        .await
+        .unwrap();
+    crate::test_utils::setup_test_env(&store).await.unwrap();
+
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let folder = genesis_child(&store, &drive).await;
+    let form = genesis_child(&store, &folder).await;
+
+    const CHILDREN: usize = 100;
+    for _ in 0..CHILDREN {
+        genesis_child(&store, &form).await;
+    }
+
+    let sudo = store
+        .query(&parent_query(&form, Some(500), ForAgent::Sudo))
+        .await
+        .unwrap();
+    assert_eq!(
+        sudo.subjects.len(),
+        CHILDREN,
+        "sanity: the form has {CHILDREN} children visible to sudo"
+    );
+
+    store.reset_fetch_counters();
+
+    let denied = store
+        .query(&parent_query(&form, Some(1), urls::PUBLIC_AGENT.into()))
+        .await
+        .unwrap();
+    assert!(
+        denied.subjects.is_empty(),
+        "the public agent must not see private invite-code children"
+    );
+
+    let full_decodes = store.get_resource_call_count();
+    let shallow = store.get_resource_shallow_call_count();
+    assert_eq!(
+        full_decodes, 0,
+        "rights walk must not Loro-decode ancestors; get_resource was called {full_decodes} times"
+    );
+    assert!(
+        shallow >= CHILDREN,
+        "every member must still be shallow-fetched (a readable row after a private streak would otherwise be skipped); got {shallow}"
+    );
+    assert!(
+        shallow <= CHILDREN + 8,
+        "expected one shallow fetch per member plus a handful of ancestors, got {shallow} — \
+         the parent memo is not skipping refetches"
+    );
+}
+
+/// Denied members must not consume the page: a public child after a long
+/// private streak is still returned. Each member can carry its own grant,
+/// so a run of private siblings must not stop the scan.
+#[tokio::test]
+async fn unauthorized_query_skips_denials_to_fill_the_page() {
+    let store = Db::init_temp("unauthorized_query_skips_denials_to_fill_the_page")
+        .await
+        .unwrap();
+    crate::test_utils::setup_test_env(&store).await.unwrap();
+
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let form = genesis_child(&store, &drive).await;
+
+    for _ in 0..20 {
+        genesis_child(&store, &form).await;
+    }
+
+    let mut public_child = Resource::new("did:ad:placeholder".into());
+    public_child
+        .set(urls::PARENT.into(), Value::AtomicUrl(form.clone()), &store)
+        .await
+        .unwrap();
+    public_child
+        .set(
+            urls::READ.into(),
+            Value::ResourceArray(vec![urls::PUBLIC_AGENT.into()]),
+            &store,
+        )
+        .await
+        .unwrap();
+    let public_subject = public_child
+        .save_as_genesis(&store)
+        .await
+        .unwrap()
+        .resource_new
+        .unwrap()
+        .get_subject()
+        .clone();
+
+    let res = store
+        .query(&parent_query(&form, Some(1), urls::PUBLIC_AGENT.into()))
+        .await
+        .unwrap();
+    assert_eq!(
+        res.subjects,
+        vec![public_subject],
+        "a public child after many private siblings must still fill page_size=1"
+    );
+}
+
 #[tokio::test]
 async fn get_extended_resource_pagination() {
     let store = Db::init_temp("get_extended_resource_pagination")
@@ -436,7 +583,8 @@ async fn queries() {
     let store = &store_owned;
 
     let demo_val = Value::Slug("myval".to_string());
-    let demo_reference = Value::AtomicUrl(urls::PARAGRAPH.into());
+    // Nothing else in the seeded store points at it, so the count is exact.
+    let demo_reference = Value::AtomicUrl("https://example.com/queries-test-target".into());
 
     let count = 10;
     let limit = 5;
@@ -503,10 +651,16 @@ async fn queries() {
     );
     assert_eq!(limit, res.subjects.len(), "limit");
 
+    // The value index answers "what points at X". A plain value has no row in
+    // it, so without a property only a reference is found.
     q.property = None;
     q.value = Some(demo_val);
     let res = store.query(&q).await.unwrap();
-    assert_eq!(res.count, count, "literal value, no property filter");
+    assert_eq!(res.count, 0, "literal value, no property filter");
+
+    q.value = Some(demo_reference.clone());
+    let res = store.query(&q).await.unwrap();
+    assert_eq!(res.count, count, "reference value, no property filter");
 
     q.offset = 9;
     let res = store.query(&q).await.unwrap();
@@ -1565,6 +1719,7 @@ async fn did_loro_only_commit_sled() {
         validate_loro_causality: false,
         validate_rights: true,
         validate_schema: true,
+        validate_constraints: true,
         update_index: true,
         validate_for_agent: Some(agent.subject.to_string()),
         source_id: None,
@@ -1618,6 +1773,7 @@ async fn loro_non_property_container_survives_commit_roundtrip() {
         validate_loro_causality: true,
         validate_rights: true,
         validate_schema: true,
+        validate_constraints: true,
         update_index: true,
         validate_for_agent: Some(agent.subject.to_string()),
         source_id: None,
@@ -2119,6 +2275,7 @@ async fn a_cascade_deleted_child_names_its_drive() {
 
             let opts = crate::commit::CommitOpts {
                 validate_schema: true,
+                validate_constraints: true,
                 validate_signature: true,
                 validate_timestamp: false,
                 validate_rights: true,
@@ -2308,6 +2465,7 @@ async fn find_resource_scoped_to_its_drive() {
 
     let opts = crate::commit::CommitOpts {
         validate_schema: true,
+        validate_constraints: true,
         validate_signature: true,
         validate_timestamp: false,
         validate_rights: true,
@@ -3953,13 +4111,13 @@ async fn replica_row_keeps_unresolvable_props_from_snapshot() {
 
 /// A critical commit's `Tree::Resources` row is self-contained: its blob
 /// keeps the signed `loroUpdate` (a CRDT resource's blob drops it in favour
-/// of `Tree::LoroSnapshots`), and the row is findable by the resource it is
-/// about through the `subject` index. See `envelopes::tests::
+/// of `Tree::LoroSnapshots`). A creation's commit is not in the atom indexes;
+/// it is found by its id. See `envelopes::tests::
 /// stored_genesis_commit_keeps_its_signed_payload_after_a_later_edit` for
 /// why the payload cannot be borrowed from the envelope.
 #[tokio::test]
 #[timeout(120000)]
-async fn commit_resource_blob_keeps_loro_update_and_is_indexed_by_subject() {
+async fn commit_resource_blob_keeps_loro_update_and_is_not_indexed() {
     let store = Db::init_temp("commit_row_self_contained").await.unwrap();
     let (_alice, drive) = store.setup("Alice").await.unwrap();
     let subject = store
@@ -4009,11 +4167,11 @@ async fn commit_resource_blob_keeps_loro_update_and_is_indexed_by_subject() {
         .await
         .unwrap();
     assert!(
-        found
+        !found
             .subjects
             .iter()
             .any(|s| s.as_str() == genesis_id.as_str()),
-        "the commit row is indexed by the subject it is about: {:?}",
+        "a creation's commit is found by its id, not by the subject index: {:?}",
         found.subjects
     );
 }
@@ -4098,6 +4256,62 @@ async fn deferred_search_entries_are_added_by_index_pending() {
     assert_eq!(crate::search::index_pending(&store, 10).await.unwrap(), 1);
     assert_eq!(crate::search::index_pending(&store, 10).await.unwrap(), 0);
     assert_eq!(store.search_hits("zebrafish", &opts).unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn removing_an_atom_also_removes_rows_an_older_store_wrote() {
+    use crate::db::trees::{Method, Operation, Transaction, Tree};
+    let store = Db::init_temp("legacy_atom_rows").await.unwrap();
+    let atom = crate::atoms::IndexAtom {
+        subject: Subject::from("did:ad:legacy-subject"),
+        // Not a core property: its key part is the same in old and new stores, so
+        // the reader finds the old row. A core property's old row has the full URL
+        // in its key and is rebuilt by `migrate_index_keys` instead.
+        property: "https://example.com/properties/legacy".to_string(),
+        ref_value: "Legacy Title".to_string(),
+        sort_value: "Legacy Title".to_string(),
+    };
+    let legacy_pvs = crate::db::prop_val_sub_index::propvalsub_legacy_key(&atom);
+    let legacy_vps = crate::db::val_prop_sub_index::valpropsub_legacy_key(&atom);
+    let mut tx = Transaction::new();
+    for (tree, key) in [
+        (Tree::PropValSub, &legacy_pvs),
+        (Tree::ValPropSub, &legacy_vps),
+    ] {
+        tx.push(Operation {
+            tree,
+            method: Method::Insert,
+            key: key.clone(),
+            val: Some(Vec::new()),
+        });
+    }
+    store.apply_transaction(&mut tx).unwrap();
+    // An old row is still read back as the same atom.
+    let found: Vec<_> = crate::db::prop_val_sub_index::find_in_prop_val_sub_index(
+        &store,
+        "https://example.com/properties/legacy",
+        Some(&Value::String("Legacy Title".into())),
+    )
+    .map(|a| a.unwrap())
+    .collect();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].sort_value, "Legacy Title");
+
+    let mut tx = Transaction::new();
+    for op in Operation::remove_atom_from_legacy_indexes(&atom) {
+        tx.push(op);
+    }
+    store.apply_transaction(&mut tx).unwrap();
+    assert!(store
+        .kv
+        .get(Tree::PropValSub, &legacy_pvs)
+        .unwrap()
+        .is_none());
+    assert!(store
+        .kv
+        .get(Tree::ValPropSub, &legacy_vps)
+        .unwrap()
+        .is_none());
 }
 
 /// An `after_commit` extender runs after the commit is persisted, so its
@@ -4311,4 +4525,750 @@ async fn row_inserted_between_two_others_after_the_index_was_built_lists_between
     let order: Vec<String> = res.subjects.iter().map(|s| s.to_string()).collect();
     let expect: Vec<String> = [0, 2, 1].iter().map(|i| subjects[*i].to_string()).collect();
     assert_eq!(order, expect);
+}
+
+/// Prints where the bytes of a 50-message chat go, per tree, with the
+/// compressed trees counted as stored. Run with `--ignored --nocapture`.
+#[tokio::test]
+#[ignore = "measurement, not a check"]
+async fn measure_chat_message_bytes() {
+    let store = Db::init_temp("measure_chat").await.unwrap();
+    let mut chat = Resource::new("did:ad:placeholder".into());
+    chat.set(urls::NAME.into(), Value::String("Chat".into()), &store)
+        .await
+        .unwrap();
+    chat.set(
+        urls::IS_A.into(),
+        Value::ResourceArray(vec![urls::CHATROOM.into()]),
+        &store,
+    )
+    .await
+    .unwrap();
+    let chat = chat
+        .save_as_genesis(&store)
+        .await
+        .unwrap()
+        .resource_new
+        .unwrap();
+    let parent = chat.get_subject().clone();
+    let trees = [
+        Tree::Resources,
+        Tree::LoroSnapshots,
+        Tree::Envelopes,
+        Tree::PropValSub,
+        Tree::ValPropSub,
+        Tree::QueryMembers,
+        Tree::WatchedQueries,
+        Tree::SearchPostings,
+        Tree::SearchDocs,
+        Tree::SearchTrigrams,
+        Tree::DidMapping,
+        Tree::DriveMapping,
+        Tree::Outbox,
+    ];
+    let stored = super::compressed_kv::CompressedKv::new(store.kv.clone());
+    let tally = |store: &Db| {
+        trees
+            .iter()
+            .map(|t| {
+                let (mut n, mut k, mut v) = (0usize, 0usize, 0usize);
+                for kv in store.kv.iter_tree(*t) {
+                    let (key, val) = kv.unwrap();
+                    n += 1;
+                    k += key.len();
+                    v += if super::compressed_kv::is_compressed_tree(*t) {
+                        stored.encoded(*t, &key, &val, &[]).len()
+                    } else {
+                        val.len()
+                    };
+                }
+                (*t, n, k, v)
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = tally(&store);
+    const N: usize = 50;
+    let mut last = None;
+    for i in 0..N {
+        let mut msg = Resource::new("did:ad:placeholder".into());
+        msg.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(parent.clone()),
+            &store,
+        )
+        .await
+        .unwrap();
+        msg.set(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::MESSAGE.into()]),
+            &store,
+        )
+        .await
+        .unwrap();
+        msg.set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown(format!("Hallo dit is bericht nummer {i}, een gewone zin.")),
+            &store,
+        )
+        .await
+        .unwrap();
+        let r = msg.save_as_genesis(&store).await.unwrap();
+        last = r.resource_new;
+    }
+    let after = tally(&store);
+    println!(
+        "{:<16}{:>6}{:>10}{:>10}{:>10}",
+        "tree", "rows", "key B", "val B", "B/msg"
+    );
+    let mut total = 0;
+    for (b, a) in before.iter().zip(after.iter()) {
+        let rows = a.1 - b.1;
+        let kb = a.2 - b.2;
+        let vb = a.3 - b.3;
+        total += kb + vb;
+        println!(
+            "{:<16}{:>6}{:>10}{:>10}{:>10}",
+            format!("{:?}", a.0),
+            rows,
+            kb,
+            vb,
+            (kb + vb) / N
+        );
+    }
+    println!("TOTAL per message: {}", total / N);
+    let _ = last;
+}
+
+/// A drive with a chat in it, and the agent that owns both.
+async fn chat_log_world(id: &str) -> (Db, crate::agents::Agent, String) {
+    let store = Db::init_temp(id).await.unwrap();
+    let (agent, drive) = store.setup("Alice").await.unwrap();
+    let chat = store
+        .create_resource(urls::CHATROOM, &drive, "Chat", None)
+        .await
+        .unwrap();
+    (store, agent, chat)
+}
+
+fn chat_log_opts(agent: &crate::agents::Agent) -> crate::commit::CommitOpts {
+    crate::commit::CommitOpts {
+        validate_signature: true,
+        validate_rights: true,
+        validate_for_agent: Some(agent.subject.to_string()),
+        update_index: true,
+        ..crate::commit::CommitOpts::no_validations_no_index()
+    }
+}
+
+/// A `ChatLog` page under `chat`, created through the real commit path.
+async fn create_chat_log_page(store: &Db, agent: &crate::agents::Agent, chat: &str) -> Subject {
+    let doc = crate::loro::AtomicLoroDoc::new();
+    let parent = Value::AtomicUrl(chat.into());
+    doc.set_property(
+        urls::IS_A,
+        &Value::ResourceArray(vec![urls::CHAT_LOG.into()]),
+    )
+    .unwrap();
+    doc.set_property(urls::PARENT, &parent).unwrap();
+    let mut builder = crate::commit::CommitBuilder::new("placeholder".into());
+    builder.set(urls::PARENT.into(), parent);
+    builder.set_loro_update(doc.export_snapshot());
+    let commit = crate::Commit::create_did(builder, agent, store)
+        .await
+        .unwrap();
+    let subject = commit.subject.clone();
+    store
+        .apply_commit(commit, &chat_log_opts(agent))
+        .await
+        .unwrap();
+    subject
+}
+
+/// Appends one entry to `page` as one signed commit, through the real path.
+/// `doc` is the client's copy of the page; keep it between calls for a stable
+/// Loro peer, like a real client has.
+async fn append_chat_log_entry(
+    store: &Db,
+    agent: &crate::agents::Agent,
+    page: &Subject,
+    doc: &crate::loro::AtomicLoroDoc,
+    text: &str,
+) {
+    let resource = store.get_resource(page).await.unwrap();
+    let vv = doc.oplog_vv();
+    doc.add_entry(&crate::chat_log::Entry::new(
+        agent.subject.to_string(),
+        text,
+        crate::utils::now(),
+    ))
+    .unwrap();
+    doc.commit();
+    let mut builder = crate::commit::CommitBuilder::new(page.clone());
+    builder.set_loro_update(doc.export_updates_since(&vv));
+    let commit = builder.sign(agent, store, &resource).await.unwrap();
+    store
+        .apply_commit(commit, &chat_log_opts(agent))
+        .await
+        .unwrap();
+}
+
+/// Chat log entries live only in the page's Loro document: no propval, no
+/// index row, no search posting.
+#[tokio::test]
+async fn chat_log_entries_are_not_materialized_indexed_or_searched() {
+    let (store, agent, chat) = chat_log_world("chat_log_not_indexed").await;
+    let page = create_chat_log_page(&store, &agent, &chat).await;
+    let needle = "zyxwvuttsrqpon";
+    let doc = store
+        .get_resource(&page)
+        .await
+        .unwrap()
+        .build_state_doc()
+        .unwrap();
+    append_chat_log_entry(
+        &store,
+        &agent,
+        &page,
+        &doc,
+        &format!("hello {needle} world"),
+    )
+    .await;
+
+    let resource = store.get_resource(&page).await.unwrap();
+    assert_eq!(resource.build_state_doc().unwrap().list_entries().len(), 1);
+    for (prop, val) in resource.get_propvals() {
+        if prop == urls::LORO_UPDATE {
+            continue;
+        }
+        assert!(!prop.contains("entries"), "{prop}");
+        assert!(!val.to_string().contains(needle), "{prop} holds the text");
+    }
+
+    // The text sits in the snapshot (compressed) and nowhere else.
+    for tree in [
+        Tree::PropValSub,
+        Tree::ValPropSub,
+        Tree::QueryMembers,
+        Tree::WatchedQueries,
+        Tree::SearchPostings,
+        Tree::SearchDocs,
+        Tree::SearchTrigrams,
+    ] {
+        for kv in store.kv.iter_tree(tree) {
+            let (key, val) = kv.unwrap();
+            let holds = |hay: &[u8]| hay.windows(needle.len()).any(|w| w == needle.as_bytes());
+            assert!(
+                !holds(&key) && !holds(&val),
+                "{tree:?} holds the entry text"
+            );
+        }
+    }
+}
+
+/// Prints where the bytes of a chat go per tree when every message is one
+/// entry of a `ChatLog` page of 256, one signed commit per message, through
+/// the real commit path. Compare with `measure_chat_message_bytes`. Run with
+/// `--ignored --nocapture`.
+#[tokio::test]
+#[ignore = "measurement, not a check"]
+async fn measure_chat_log_entry_bytes() {
+    const N: usize = 500;
+    const PAGE: usize = 256;
+    let (store, agent, chat) = chat_log_world("measure_chat_log").await;
+    let trees = [
+        Tree::Resources,
+        Tree::LoroSnapshots,
+        Tree::Envelopes,
+        Tree::PropValSub,
+        Tree::ValPropSub,
+        Tree::QueryMembers,
+        Tree::WatchedQueries,
+        Tree::SearchPostings,
+        Tree::SearchDocs,
+        Tree::SearchTrigrams,
+        Tree::DidMapping,
+        Tree::DriveMapping,
+        Tree::Outbox,
+    ];
+    let stored = super::compressed_kv::CompressedKv::new(store.kv.clone());
+    let tally = |store: &Db| {
+        trees
+            .iter()
+            .map(|t| {
+                let (mut n, mut k, mut v) = (0usize, 0usize, 0usize);
+                for kv in store.kv.iter_tree(*t) {
+                    let (key, val) = kv.unwrap();
+                    n += 1;
+                    k += key.len();
+                    v += if super::compressed_kv::is_compressed_tree(*t) {
+                        stored.encoded(*t, &key, &val, &[]).len()
+                    } else {
+                        val.len()
+                    };
+                }
+                (*t, n, k, v)
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = tally(&store);
+    let mut page = create_chat_log_page(&store, &agent, &chat).await;
+    let mut doc = store
+        .get_resource(&page)
+        .await
+        .unwrap()
+        .build_state_doc()
+        .unwrap();
+    for i in 0..N {
+        if i > 0 && i % PAGE == 0 {
+            page = create_chat_log_page(&store, &agent, &chat).await;
+            doc = store
+                .get_resource(&page)
+                .await
+                .unwrap()
+                .build_state_doc()
+                .unwrap();
+        }
+        append_chat_log_entry(
+            &store,
+            &agent,
+            &page,
+            &doc,
+            &format!("Hallo dit is bericht nummer {i}, een gewone zin."),
+        )
+        .await;
+    }
+    let after = tally(&store);
+    // What the page's document weighs raw, and how much of it is the server's
+    // own bookkeeping (`lastCommit` is restamped on every commit).
+    let first = store
+        .get_resource(&page)
+        .await
+        .unwrap()
+        .build_state_doc()
+        .unwrap();
+    println!(
+        "last page: {} entries, raw snapshot {} B, {} B/entry; properties: {:?}",
+        first.entries().len(),
+        first.export_snapshot().len(),
+        first.export_snapshot().len() / first.entries().len().max(1),
+        first.get_all_properties().keys().collect::<Vec<_>>()
+    );
+    println!(
+        "{:<16}{:>6}{:>10}{:>10}{:>10}",
+        "tree", "rows", "key B", "val B", "B/msg"
+    );
+    let mut total = 0;
+    for (b, a) in before.iter().zip(after.iter()) {
+        let rows = a.1 as i64 - b.1 as i64;
+        let kb = a.2 as i64 - b.2 as i64;
+        let vb = a.3 as i64 - b.3 as i64;
+        total += kb + vb;
+        println!(
+            "{:<16}{:>6}{:>10}{:>10}{:>10}",
+            format!("{:?}", a.0),
+            rows,
+            kb,
+            vb,
+            (kb + vb) / N as i64
+        );
+    }
+    println!(
+        "TOTAL per message ({N} messages, pages of {PAGE}): {}",
+        total / N as i64
+    );
+}
+
+/// A snapshot is stored as the changes after the genesis commit, and read
+/// back as the same document, also after later edits.
+#[tokio::test]
+#[timeout(120000)]
+async fn snapshot_is_stored_as_a_delta_on_the_genesis_commit() {
+    let store = Db::init_temp("snapshot_delta").await.unwrap();
+    let mut resource = Resource::new("did:ad:placeholder".into());
+    resource
+        .set(urls::NAME.into(), Value::String("hallo".into()), &store)
+        .await
+        .unwrap();
+    resource
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("een gewone zin".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+    let response = resource.save_as_genesis(&store).await.unwrap();
+    let subject = response.resource_new.unwrap().get_subject().clone();
+    let key = subject.pure_id();
+
+    let snapshot = store
+        .kv
+        .get(Tree::LoroSnapshots, key.as_bytes())
+        .unwrap()
+        .unwrap();
+    let stored = super::compressed_kv::CompressedKv::new(store.kv.clone());
+    let packed = stored.encoded(Tree::LoroSnapshots, key.as_bytes(), &snapshot, &[]);
+    assert_eq!(
+        &packed[..2],
+        &[0, 2],
+        "a fresh resource's snapshot is a delta"
+    );
+    assert!(
+        packed.len() * 2 < snapshot.len(),
+        "{} vs {}",
+        packed.len(),
+        snapshot.len()
+    );
+
+    let read = store.get_resource(&subject).await.unwrap();
+    assert_eq!(read.get(urls::NAME).unwrap().to_string(), "hallo");
+
+    // Edits sit on top of the genesis and survive a read.
+    let mut edit = store.get_resource(&subject).await.unwrap();
+    edit.set(urls::NAME.into(), Value::String("edited".into()), &store)
+        .await
+        .unwrap();
+    edit.save_locally(&store).await.unwrap();
+    let read = store.get_resource(&subject).await.unwrap();
+    assert_eq!(read.get(urls::NAME).unwrap().to_string(), "edited");
+    assert_eq!(
+        read.get(urls::DESCRIPTION).unwrap().to_string(),
+        "een gewone zin"
+    );
+
+    // Without the genesis commit there is nothing to be a delta on, so the
+    // whole snapshot is kept.
+    let snapshot = store
+        .kv
+        .get(Tree::LoroSnapshots, key.as_bytes())
+        .unwrap()
+        .unwrap();
+    let orphan = stored.encoded(
+        Tree::LoroSnapshots,
+        b"atomic:no-such-genesis",
+        &snapshot,
+        &[],
+    );
+    assert_ne!(orphan.get(1), Some(&2), "no base, no delta");
+    assert_eq!(
+        stored
+            .get(Tree::LoroSnapshots, key.as_bytes())
+            .unwrap()
+            .unwrap(),
+        snapshot
+    );
+}
+
+// --- Lenses: derived values at materialization ---
+
+mod lenses {
+    use super::*;
+    use crate::commit::{Commit, CommitBuilder, CommitOpts};
+    use crate::datatype::DataType;
+    use crate::lens::lens_id;
+    use crate::property_identity::property_id;
+    use crate::Resource;
+
+    const PARENT: &str = "atomic:ontologylens0";
+
+    fn opts() -> CommitOpts {
+        CommitOpts {
+            update_index: true,
+            ..CommitOpts::no_validations_no_index()
+        }
+    }
+
+    async fn make_property(
+        db: &Db,
+        agent: &crate::agents::Agent,
+        parent: &str,
+        shortname: &str,
+    ) -> String {
+        let id = property_id(parent, shortname, urls::STRING).unwrap();
+        let mut b = CommitBuilder::new(id.as_str().into());
+        b.is_genesis = true;
+        b.set(urls::PARENT.into(), Value::AtomicUrl(parent.into()));
+        b.set(urls::SHORTNAME.into(), Value::Slug(shortname.into()));
+        b.set(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(urls::STRING.into()),
+        );
+        b.set(urls::DESCRIPTION.into(), Value::Markdown(shortname.into()));
+        let commit = b.sign(agent, db, &Resource::new(id.clone())).await.unwrap();
+        db.apply_commit(commit, &opts()).await.unwrap();
+        id
+    }
+
+    async fn lens_commit(
+        db: &Db,
+        agent: &crate::agents::Agent,
+        parent: &str,
+        from: &str,
+        to: &str,
+    ) -> AtomicResult<crate::commit::CommitResponse> {
+        let transform = serde_json::json!({"op": "rename"});
+        let id = lens_id(from, to, &transform).unwrap();
+        let mut b = CommitBuilder::new(id.as_str().into());
+        b.is_genesis = true;
+        b.set(urls::IS_A.into(), Value::from(vec![urls::LENS.to_string()]));
+        b.set(urls::PARENT.into(), Value::AtomicUrl(parent.into()));
+        b.set(urls::LENS_FROM.into(), Value::AtomicUrl(from.into()));
+        b.set(urls::LENS_TO.into(), Value::AtomicUrl(to.into()));
+        b.set(urls::LENS_TRANSFORM.into(), Value::Json(transform));
+        let commit = b.sign(agent, db, &Resource::new(id.clone())).await?;
+        db.apply_commit(commit, &opts()).await
+    }
+
+    async fn indexed(db: &Db, prop: &str, value: &str) -> Vec<String> {
+        crate::db::prop_val_sub_index::find_in_prop_val_sub_index(
+            db,
+            prop,
+            Some(&Value::String(value.into())),
+        )
+        .flatten()
+        .map(|a| a.subject.to_string())
+        .collect()
+    }
+
+    #[tokio::test]
+    #[timeout(120000)]
+    async fn lens_derives_values_on_read_and_in_the_index() {
+        let db = Db::init_temp("lens_derives").await.unwrap();
+        let agent = db.get_default_agent().unwrap();
+        let title = make_property(&db, &agent, PARENT, "title").await;
+        let name = make_property(&db, &agent, PARENT, "name").await;
+
+        // A resource written before the lens exists.
+        let mut b = CommitBuilder::new("placeholder".into());
+        b.set(title.clone(), Value::String("Hello".into()));
+        let created = db
+            .apply_commit(Commit::create_did(b, &agent, &db).await.unwrap(), &opts())
+            .await
+            .unwrap();
+        let subject = created.resource_new.unwrap().get_subject().clone();
+        assert!(db.get_resource(&subject).await.unwrap().get(&name).is_err());
+        assert!(indexed(&db, &name, "Hello").await.is_empty());
+
+        // The lens arrives: reads and the index follow, without a new commit.
+        lens_commit(&db, &agent, PARENT, &title, &name)
+            .await
+            .unwrap();
+        assert_eq!(db.lenses().len(), 1);
+        let read = db.get_resource(&subject).await.unwrap();
+        assert_eq!(read.get(&name).unwrap().to_string(), "Hello");
+        assert_eq!(
+            indexed(&db, &name, "Hello").await,
+            vec![subject.to_string()]
+        );
+
+        // An edit of the old property moves the derived value and its index row.
+        let mut edit = db.get_resource(&subject).await.unwrap();
+        edit.set(title.clone(), Value::String("Hi".into()), &db)
+            .await
+            .unwrap();
+        edit.save_locally(&db).await.unwrap();
+        let read = db.get_resource(&subject).await.unwrap();
+        assert_eq!(read.get(&name).unwrap().to_string(), "Hi");
+        assert!(indexed(&db, &name, "Hello").await.is_empty());
+        assert_eq!(indexed(&db, &name, "Hi").await, vec![subject.to_string()]);
+
+        // A real value of the new property wins and stays when the old changes.
+        let mut edit = db.get_resource(&subject).await.unwrap();
+        edit.set(name.clone(), Value::String("Real".into()), &db)
+            .await
+            .unwrap();
+        edit.save_locally(&db).await.unwrap();
+        let mut edit = db.get_resource(&subject).await.unwrap();
+        edit.set(title.clone(), Value::String("Again".into()), &db)
+            .await
+            .unwrap();
+        edit.save_locally(&db).await.unwrap();
+        let read = db.get_resource(&subject).await.unwrap();
+        assert_eq!(read.get(&name).unwrap().to_string(), "Real");
+        assert_eq!(read.get(&title).unwrap().to_string(), "Again");
+        assert!(indexed(&db, &name, "Hi").await.is_empty());
+        assert_eq!(indexed(&db, &name, "Real").await, vec![subject.to_string()]);
+
+        // The signed doc never held a derived value.
+        let doc = read.build_state_doc().unwrap();
+        assert!(doc.get_all_properties().contains_key(&title));
+
+        // The index is rebuilt from the stored Lens resources.
+        db.update_lenses(|index| *index = Default::default());
+        assert!(db.lenses().is_empty());
+        db.load_lenses().await;
+        assert_eq!(db.lenses().len(), 1);
+    }
+
+    /// A resource that arrives by sync is materialized from its doc without
+    /// derived values; persisting it files the derived ones like real ones.
+    #[tokio::test]
+    #[timeout(120000)]
+    async fn lens_values_are_indexed_for_synced_resources() {
+        let db = Db::init_temp("lens_sync").await.unwrap();
+        let agent = db.get_default_agent().unwrap();
+        let title = make_property(&db, &agent, PARENT, "title").await;
+        let name = make_property(&db, &agent, PARENT, "name").await;
+        lens_commit(&db, &agent, PARENT, &title, &name)
+            .await
+            .unwrap();
+        assert_eq!(db.lenses().len(), 1);
+
+        let doc = crate::loro::AtomicLoroDoc::new();
+        doc.set_property(&title, &Value::String("Synced".into()))
+            .unwrap();
+        let mut replica = Resource::new("atomic:syncedresource0".into());
+        replica.apply_state_doc(doc).unwrap();
+        assert!(replica.get(&name).is_err(), "no lens on a bare apply");
+
+        db.persist_replicated_resource(&replica).await.unwrap();
+        assert_eq!(
+            indexed(&db, &name, "Synced").await,
+            vec!["atomic:syncedresource0".to_string()]
+        );
+        let read = db
+            .get_resource(&replica.get_subject().clone())
+            .await
+            .unwrap();
+        assert_eq!(read.get(&name).unwrap().to_string(), "Synced");
+    }
+
+    #[tokio::test]
+    #[timeout(120000)]
+    async fn lens_only_applies_within_the_ontology_that_owns_its_target() {
+        let db = Db::init_temp("lens_authority").await.unwrap();
+        let agent = db.get_default_agent().unwrap();
+        let title = make_property(&db, &agent, PARENT, "title").await;
+        let name = make_property(&db, &agent, PARENT, "name").await;
+
+        // Claims another ontology owns `name`: stored, never applied.
+        lens_commit(&db, &agent, "atomic:someoneelse", &title, &name)
+            .await
+            .unwrap();
+        assert!(db.lenses().is_empty());
+        assert_eq!(db.pending_lenses.read().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    #[timeout(120000)]
+    async fn lens_identity_is_checked_and_immutable() {
+        let db = Db::init_temp("lens_identity").await.unwrap();
+        let agent = db.get_default_agent().unwrap();
+        let title = make_property(&db, &agent, PARENT, "title").await;
+        let name = make_property(&db, &agent, PARENT, "name").await;
+
+        // A subject that is not the hash of its fields.
+        let wrong = lens_id(&name, &title, &serde_json::json!({"op": "rename"})).unwrap();
+        let mut b = CommitBuilder::new(wrong.as_str().into());
+        b.is_genesis = true;
+        b.set(urls::PARENT.into(), Value::AtomicUrl(PARENT.into()));
+        b.set(
+            urls::LENS_FROM.into(),
+            Value::AtomicUrl(title.as_str().into()),
+        );
+        b.set(urls::LENS_TO.into(), Value::AtomicUrl(name.as_str().into()));
+        b.set(
+            urls::LENS_TRANSFORM.into(),
+            Value::Json(serde_json::json!({"op": "rename"})),
+        );
+        let commit = b
+            .sign(&agent, &db, &Resource::new(wrong.clone()))
+            .await
+            .unwrap();
+        let err = db.apply_commit(commit, &opts()).await.unwrap_err();
+        assert!(err.to_string().contains("Lens ID mismatch"), "{err}");
+
+        // A real lens cannot be pointed somewhere else later.
+        lens_commit(&db, &agent, PARENT, &title, &name)
+            .await
+            .unwrap();
+        let id = lens_id(&title, &name, &serde_json::json!({"op": "rename"})).unwrap();
+        let mut edit = db.get_resource(&id.as_str().into()).await.unwrap();
+        let err = match edit
+            .set(
+                urls::LENS_TO.into(),
+                Value::AtomicUrl(title.as_str().into()),
+                &db,
+            )
+            .await
+        {
+            Err(e) => e,
+            Ok(_) => edit.save_locally(&db).await.unwrap_err(),
+        };
+        assert!(
+            err.to_string().contains("Cannot change the lensTo"),
+            "{err}"
+        );
+        let _ = DataType::String;
+    }
+}
+
+#[tokio::test]
+#[timeout(120000)]
+async fn index_keys_migration_rebuilds_old_rows_in_slices() {
+    use super::prop_val_sub_index::{propvalsub_key, propvalsub_legacy_key};
+
+    let store = Db::init_temp("index-keys-migration").await.unwrap();
+    let mut resource = Resource::new_instance(urls::PARAGRAPH, &store)
+        .await
+        .unwrap();
+    resource
+        .set(
+            urls::PARENT.into(),
+            Value::AtomicUrl("https://localhost/p".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+    resource
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("hallo".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+    resource.save_locally(&store).await.unwrap();
+    let atom = crate::atoms::IndexAtom {
+        property: urls::PARENT.into(),
+        ref_value: "https://localhost/p".into(),
+        sort_value: "https://localhost/p".into(),
+        subject: resource.get_subject().to_string().into(),
+    };
+
+    // An index as an older store left it: the full property URL in the key,
+    // no marker.
+    store.clear_index().unwrap();
+    let old_key = propvalsub_legacy_key(&atom);
+    store.kv.insert(Tree::PropValSub, &old_key, b"").unwrap();
+    store
+        .kv
+        .remove(Tree::PluginMeta, super::index_keys::DONE_KEY)
+        .unwrap();
+    assert!(store.index_migration_pending().unwrap());
+
+    let mut seen = Vec::new();
+    loop {
+        let step = store.migrate_index_keys_step(1).unwrap();
+        seen.push(step.done);
+        if step.finished {
+            assert_eq!(step.done, step.total);
+            break;
+        }
+        assert!(step.total > 0 && step.done <= step.total);
+    }
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]));
+    assert!(
+        seen.len() > 2,
+        "a slice of one resource means several steps"
+    );
+
+    assert!(!store.index_migration_pending().unwrap());
+    assert!(store.kv.get(Tree::PropValSub, &old_key).unwrap().is_none());
+    assert!(store
+        .kv
+        .get(Tree::PropValSub, &propvalsub_key(&atom))
+        .unwrap()
+        .is_some());
+    assert!(propvalsub_key(&atom).len() < old_key.len());
 }

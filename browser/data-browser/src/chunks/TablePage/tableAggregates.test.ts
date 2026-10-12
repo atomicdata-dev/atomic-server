@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Datatype, type JSONValue, type Property } from '@tomic/react';
 import {
+  aggregateRows,
   defaultGranularity,
   formatAggregateValue,
   formatGroupKey,
@@ -229,5 +230,104 @@ describe('formatting', () => {
     expect(formatGroupKey('2026-07-30', 'day')).toContain('2026');
     expect(formatGroupKey('2026-07', 'month')).toContain('2026');
     expect(formatGroupKey('true', 'exact')).toBe('true');
+  });
+});
+
+describe('formatAggregateValue precision', () => {
+  const amount = property(Datatype.FLOAT, 'amount');
+
+  it('does not show a small nonzero total as zero', () => {
+    expect(formatAggregateValue(0.0000375, 'sum', amount)).toBe('0.0000375');
+    expect(formatAggregateValue(0.00001875, 'avg', amount)).toBe('0.0000188');
+  });
+
+  it('keeps two decimals for ordinary totals and a real zero', () => {
+    expect(formatAggregateValue(1.2500125, 'sum', amount)).toBe('1.25');
+    expect(formatAggregateValue(0, 'sum', amount)).toBe('0');
+  });
+});
+
+describe('aggregateRows', () => {
+  const Q = 'https://example.com/property/quantity';
+  const P = 'https://example.com/property/price';
+  const TAG = 'https://example.com/property/tag';
+  const DUE = 'https://example.com/property/due';
+
+  const rows = [
+    { [Q]: 2, [P]: 5, [TAG]: ['a'], [DUE]: '2026-07-01' },
+    { [Q]: 3, [TAG]: ['b', 'a'], [DUE]: '2026-07-20' },
+    { [P]: '4', [TAG]: ['a'], [DUE]: '2026-08-02' },
+  ].map(row => (prop: string) => (row as Record<string, JSONValue>)[prop]);
+
+  const byId = (outcomes: ReturnType<typeof aggregateRows>) =>
+    Object.fromEntries(outcomes.map(o => [o.id, o]));
+
+  it('follows the store: counts rows with a value, skips rows without a number', () => {
+    const out = byId(
+      aggregateRows(rows, {
+        aggregates: [
+          { id: 'rows', function: 'count' },
+          { id: 'sumQ', property: Q, function: 'sum' },
+          { id: 'avgQ', property: Q, function: 'avg' },
+          { id: 'countQ', property: Q, function: 'count' },
+          // A numeric string still sums, as it does in the store.
+          { id: 'sumP', property: P, function: 'sum' },
+          { id: 'latest', property: DUE, function: 'max' },
+          {
+            id: 'amount',
+            expression: { kind: 'product', a: Q, b: P },
+            function: 'sum',
+          },
+        ],
+      }),
+    );
+
+    expect(out.rows.value).toBe(3);
+    expect(out.sumQ).toMatchObject({ value: 5, count: 2 });
+    expect(out.avgQ.value).toBe(2.5);
+    expect(out.countQ.value).toBe(2);
+    expect(out.sumP.value).toBe(9);
+    expect(out.latest.value).toBe(Date.UTC(2026, 7, 2));
+    // Only the first row has both a quantity and a price.
+    expect(out.amount).toMatchObject({ value: 10, count: 1 });
+  });
+
+  it('has no value, rather than zero, when nothing contributed', () => {
+    const [sum, count] = aggregateRows([], {
+      aggregates: [{ property: Q, function: 'sum' }, { function: 'count' }],
+    });
+
+    expect(sum.value).toBeNull();
+    expect(count.value).toBe(0);
+  });
+
+  it('breaks down by the first tag, and by month', () => {
+    const [byTag] = aggregateRows(rows, {
+      aggregates: [{ property: Q, function: 'sum' }],
+      group_by: { property: TAG },
+    });
+
+    expect(byTag.groups).toEqual([
+      { key: 'b', value: 3, count: 1 },
+      { key: 'a', value: 2, count: 1 },
+    ]);
+
+    const [byMonth] = aggregateRows(rows, {
+      aggregates: [{ function: 'count' }],
+      group_by: { property: DUE, granularity: 'month' },
+    });
+
+    expect(byMonth.groups).toEqual([
+      { key: '2026-07', value: 2, count: 2 },
+      { key: '2026-08', value: 1, count: 1 },
+    ]);
+  });
+});
+
+describe('formatAggregateValue for an empty answer', () => {
+  it('reads a count over no rows as 0, but not a sum, and not an unanswered one', () => {
+    expect(formatAggregateValue(null, 'count', undefined)).toBe('0');
+    expect(formatAggregateValue(null, 'sum', undefined)).toBe('—');
+    expect(formatAggregateValue(undefined, 'count', undefined)).toBe('—');
   });
 });

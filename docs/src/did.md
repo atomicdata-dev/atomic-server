@@ -3,4 +3,4 @@
 
 This page has moved to [Identifiers](identifiers.md).
 
-Atomic Data identifiers use the `atomic:` scheme. The legacy `did:ad:` spelling is accepted forever and names the same resource. See [issue #1584](https://github.com/ontola/atomic-server/issues/1584).
+Atomic Data identifiers use the `atomic:` scheme (earlier docs called them "DIDs"). The legacy `did:ad:` spelling is accepted forever and names the same resource. See [issue #1584](https://github.com/ontola/atomic-server/issues/1584).

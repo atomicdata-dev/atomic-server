@@ -15,7 +15,7 @@ And even more important: apps don't need their own back-end. They can use the sa
 
 That store is no longer a server you have to run.
 In the [local-first](../local-first.md) model your personal data store is the device in your hand: an encrypted database owned by your key, with every edit signed by you.
-An always-on [AtomicServer](../atomic-server.md), self-hosted or on Atomic Cloud, is a replica of it that stays reachable while your devices sleep and that a browser can talk to.
+An always-on [AtomicServer](../atomic-server.md), self-hosted or run for you on [atomic.place](https://atomic.place), is a replica of it that stays reachable while your devices sleep and that a browser can talk to.
 Any number of apps, on any of your devices, read and write the same Drives and [sync](../sync.md) with each other.
 
 What still needs work is the developer side: tutorials, published SDKs for every platform, and the ecosystem of apps that makes a shared personal store worth having.

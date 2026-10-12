@@ -30,7 +30,7 @@ const store = new Store({
 
 ### A store without a server
 
-A store with an Agent and no `serverUrl` is a complete [local-first](../local-first.md) client: it mints `did:ad:` identifiers, creates Drives, signs edits and keeps them in an outbox.
+A store with an Agent and no `serverUrl` is a complete [local-first](../local-first.md) client: it mints `atomic:` identifiers, creates Drives, signs edits and keeps them in an outbox.
 
 ```typescript
 const store = new Store({ agent });
@@ -61,7 +61,7 @@ const resource = await store.getResource('https://my-resource-subject');
 ```
 
 `getResource` takes the [subject](../core/concepts.md#subject-field) of the resource as a parameter and returns a promise that resolves to the requested resource.
-The subject can be an `https://` URL or a `did:ad:` identifier; see [URLs and identifiers](../urls.md).
+The subject can be an `https://` URL or a `atomic:` identifier; see [URLs and identifiers](../urls.md).
 The store answers from memory, then from the local database if one is attached, and only then fetches from the server. It subscribes to changes, so subsequent requests return the cached version and updates arrive through the sync connection.
 
 ## Subscribe to changes
@@ -109,7 +109,7 @@ It takes an options object with the following properties:
 
 | Name     | Type                      | Description                                                                                                                       |
 |----------|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| subject  | string                    | **(optional)** The subject the new resource should have. By default a `did:ad:` identifier is minted from a genesis certificate signed by the store's Agent |
+| subject  | string                    | **(optional)** The subject the new resource should have. By default a `atomic:` identifier is minted from a genesis certificate signed by the store's Agent |
 | parent   | string                    | **(optional)** The parent of the new resource, defaults to the store's `serverUrl`. Pass the Drive or folder it belongs in       |
 | isA      | string \| string[]        | **(optional)** The 'type' of the resource. determines what class it is. Supports multiple classes.                                |
 | propVals | Record<string, JSONValue> | **(optional)** Any additional properties you want to set on the resource. Should be an object with subjects of properties as keys |
@@ -142,7 +142,7 @@ await resource.save();
 ## Choosing a subject
 
 `store.newResource()` gives a resource its final subject when it is created, before it is saved.
-For a DID agent that is a `did:ad:` derived from a signed genesis certificate; otherwise it is a random subject under the parent.
+For a DID agent that is a `atomic:` derived from a signed genesis certificate; otherwise it is a random subject under the parent.
 There is no separate step to reserve a subject first: create the resource and read `resource.subject`.
 `store.createSubject()`, which returned a temporary subject that was renamed on first save, is deprecated.
 
@@ -255,4 +255,4 @@ function renderSomeComponent(subject: string) {
 }
 ```
 
-For a real-world example check out how we use it inside [@tomic/react useResource hook](https://github.com/atomicdata-dev/atomic-server/blob/ff8abb8503c72ef040cbb3f88fdd6c0318c16051/browser/react/src/hooks.ts#L36)
+For a real-world example check out how we use it inside [@tomic/react useResource hook](https://github.com/ontola/atomic-server/blob/ff8abb8503c72ef040cbb3f88fdd6c0318c16051/browser/react/src/hooks.ts#L36)

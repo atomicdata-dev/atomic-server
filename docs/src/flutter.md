@@ -10,7 +10,7 @@ On Android and iOS it goes through `dart:ffi`; on the web the same Rust is compi
 
 ## Status
 
-The Dart SDK lives in the repository under [`flutter/lib/atomic`](https://github.com/atomicdata-dev/atomic-server/tree/develop/flutter/lib/atomic), inside **Atomic Canvas**, a collaborative infinite drawing canvas that ships as the reference app.
+The Dart SDK lives in the repository under [`flutter/lib/atomic`](https://github.com/ontola/atomic-server/tree/develop/flutter/lib/atomic), inside **Atomic Canvas**, a collaborative infinite drawing canvas that ships as the reference app.
 It is not yet published on pub.dev.
 The API is still moving, so expect to vendor it or depend on the git path for now; the extraction into a package is planned in `planning/dart-sdk-package.md`.
 The canvas-specific calls (strokes, folders, thumbnails) sit next to the general ones; only the general ones are described here.
@@ -23,10 +23,10 @@ The client is grouped by concern, and everything up to the last group is purely 
 | --- | --- | --- |
 | Database | `openDb(path)` | Open (or create) the local store on disk |
 | Agent | `setup(name)`, `loadAgent(secret)`, `getActiveAgent()` | Create a keypair and a personal Drive, or restore one from a secret. Pure local. |
-| Drive | `createDrive(name)`, `listDrives()`, `setActiveDrive(subject)` | Workspaces, addressed by `did:ad:` identifiers |
+| Drive | `createDrive(name)`, `listDrives()`, `setActiveDrive(subject)` | Workspaces, addressed by `atomic:` identifiers |
 | Resource | `getProperty(subject, property)`, `setProperty(subject, property, value)` | Read and write; a write is signed and applied locally at once |
 | History | `getResourceHistory(subject)`, `getResourceAtVersion(subject, version)` | Time travel over the Resource's Loro oplog, no network needed |
-| Peer sync | `startPeer()`, `getPeerId()`, `peerSync(nodeId)`, `peerAnnounce(drive)`, `peerDiscoverSync(drive)` | Device-to-device over Iroh: pair by scanning a code, or discover a Drive on the DHT |
+| Peer sync | `startPeer()`, `getPeerId()`, `peerSync(nodeId)`, `peerAnnounce(drive)`, `peerDiscoverSync(drive)` | Device-to-device over Iroh: pair by scanning a code, or discover a Drive through the pkarr relay |
 | Server sync | `openWsSync(serverUrl)`, `syncDriveToServer(serverUrl)` | Talk to an always-on device over WebSocket: subscribe to live updates, or push a Drive that was created on this phone so a browser can reach it |
 
 The distinction in the last two rows matters.
@@ -43,8 +43,8 @@ await AtomicClient.openDb('$appDir/atomic.redb');
 
 // 2. Identity. Keep the secret; it is the account.
 final setup = await AtomicClient.setup('Alice');
-// setup.agentSubject  -> did:ad:agent:...
-// setup.driveSubject  -> did:ad:...   (Alice's personal Drive)
+// setup.agentSubject  -> atomic:agent:...
+// setup.driveSubject  -> atomic:...   (Alice's personal Drive)
 // setup.agentSecret   -> store this in secure storage
 
 // 3. Read and write. The write is signed and lands locally immediately.
@@ -92,7 +92,7 @@ See [Authentication](authentication.md#per-request-signing).
 ## Running the reference app
 
 Atomic Canvas targets Android, iOS and web from one codebase.
-The [`flutter/README.md`](https://github.com/atomicdata-dev/atomic-server/blob/develop/flutter/README.md) has the dev loop (`make phone`, `make tablet`, `make web`, hot reload from any terminal) and the pairing walkthrough: open Settings, show a code on one device, scan it on the other, and both devices exchange data regardless of who started.
+The [`flutter/README.md`](https://github.com/ontola/atomic-server/blob/develop/flutter/README.md) has the dev loop (`make phone`, `make tablet`, `make web`, hot reload from any terminal) and the pairing walkthrough: open Settings, show a code on one device, scan it on the other, and both devices exchange data regardless of who started.
 
 ## Compared to the other clients
 

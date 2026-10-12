@@ -29,17 +29,17 @@ Typically, you pass query parameters to these endpoints to specify what you want
 
 <!-- We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-server/master/server/openapi.yml). -->
 
-## Fetching `did:ad:` resources over HTTP
+## Fetching `atomic:` resources over HTTP
 
-Most resources created since the move to [local-first](../local-first.md) are named by a [`did:ad:` identifier](../urls.md) rather than by an HTTP URL.
+Most resources created since the move to [local-first](../local-first.md) are named by a [`atomic:` identifier](../urls.md) rather than by an HTTP URL.
 An AtomicServer that holds such a resource serves it at a `/did` endpoint, and also accepts the identifier as a path:
 
 ```sh
 curl -H "Accept: application/ad+json" "https://atomicdata.dev/did?subject=did%3Aad%3A{genesis}"
-curl -H "Accept: application/ad+json" "https://atomicdata.dev/did:ad:{genesis}"
+curl -H "Accept: application/ad+json" "https://atomicdata.dev/atomic:{genesis}"
 ```
 
-The response's `@id` is the DID, and a `Link: <did:ad:…>; rel="canonical"` header names it too, so a client that arrived through this server's address can remember the location-independent identity.
+The response's `@id` is the DID, and a `Link: <atomic:…>; rel="canonical"` header names it too, so a client that arrived through this server's address can remember the location-independent identity.
 Writes never go through a resource URL: they are signed commits, sent over the [sync](../sync.md) connection or to `/commit`.
 
 ## Libraries or API?

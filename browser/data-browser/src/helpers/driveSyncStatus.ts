@@ -69,3 +69,55 @@ export function hasHostedDriveConnection(
     liveSyncedDrive && managed && enrolled === true && (resourceCount ?? 0) > 0
   );
 }
+
+/**
+ * Is this drive hosted on Cloud Server, as the node itself shows it?
+ *
+ * Hosting belongs to the drive, not to whoever is looking. A managed node only
+ * accepts drives that are enrolled and active, and any member can read the
+ * drive's usage from it. So a drive this device has finished syncing with a
+ * managed node, and that holds data there, is hosted for everyone with
+ * access, whichever account pays for it and whether or not this person is
+ * signed in to the portal. Data alone is not enough (a disabled enrollment
+ * leaves it behind), hence the finished sync on a live connection.
+ */
+export function driveHostedByNode(input: {
+  managed: boolean;
+  liveSyncedDrive: boolean;
+  refusedByServer: boolean;
+  status: StoreSyncStatus;
+  resourceCount: number | undefined;
+}): boolean {
+  return (
+    input.managed &&
+    input.liveSyncedDrive &&
+    !input.refusedByServer &&
+    input.status.serverConnected &&
+    !!currentDriveSync(input.status) &&
+    (input.resourceCount ?? 0) > 0
+  );
+}
+
+/**
+ * Should the Sync page start Cloud Server for this drive by itself?
+ *
+ * An account that already enrolled the drive only needs a switch when this
+ * device still points at some other server. Whether the current server is a
+ * managed node is only known once `/server` has answered (`nodeInfoLoaded`);
+ * until then "not managed" is just the default, and acting on it would
+ * re-enroll and reconnect a drive that is already hosted here (a spurious
+ * "working offline" toast and a "Connected to Cloud Server" toast on every
+ * visit). A paid-but-unenrolled drive has to be enrolled either way.
+ */
+export function shouldAutoEnroll(input: {
+  accountEnrolled: boolean | null;
+  nodeInfoLoaded: boolean;
+  currentServerManaged: boolean;
+  paidPlanActive: boolean;
+}): boolean {
+  if (input.accountEnrolled === true) {
+    return input.nodeInfoLoaded && !input.currentServerManaged;
+  }
+
+  return input.accountEnrolled === false && input.paidPlanActive;
+}

@@ -1,13 +1,21 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by redb (sled only to migrate old stores).
 
+mod ai_chat_migration;
+#[cfg(test)]
+mod ai_chat_migration_test;
 pub mod app_agent;
 pub mod blob_backend;
 mod canonical_scheme;
+mod chat_migration;
+#[cfg(test)]
+mod chat_migration_test;
 #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
 pub mod compaction;
+mod compressed_kv;
 mod encoding;
 pub mod encrypted_backend;
+mod index_keys;
 pub mod kv_store;
 #[cfg(feature = "db-sled")]
 mod migrations;
@@ -22,6 +30,11 @@ pub(crate) mod prop_val_sub_index;
 mod query_index;
 pub mod redb_store;
 pub mod website;
+/// The set of drives [`Db::migrate_messages_step`] may write chat log pages
+/// for, from the drives' subjects in any spelling.
+pub fn chat_migration_drive_set(drives: Vec<String>) -> std::collections::HashSet<String> {
+    drives.iter().map(|d| chat_migration::id_body(d)).collect()
+}
 // `PropVal` is half of `QueryFilter`'s public surface: without it a caller
 // outside this crate can read `filters` but cannot build one.
 pub use query_index::{drive_prefix_from_subject, query_id, PropVal, QueryFilter};
@@ -38,7 +51,10 @@ mod val_prop_sub_index;
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, RwLock},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex, RwLock,
+    },
     vec,
 };
 
@@ -60,7 +76,7 @@ use crate::{
         val_prop_sub_index::find_in_val_prop_sub_index,
     },
     endpoints::{Endpoint, HandleGetContext},
-    errors::{AtomicError, AtomicResult},
+    errors::{AtomicError, AtomicErrorType, AtomicResult},
     hierarchy::RightsCache,
     resources::PropVals,
     storelike::{Query, QueryResult, ResourceResponse, Storelike},
@@ -205,6 +221,19 @@ pub struct DriveUsage {
     pub resource_count: u64,
     pub blob_bytes: u64,
     pub loro_bytes: u64,
+}
+
+/// One resource's share of a drive's storage, for the "where does space go"
+/// view. `blob_bytes` is attributed to the first resource that references a
+/// blob, so shared bytes are counted once, as in [`DriveUsage`].
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ResourceUsage {
+    pub subject: String,
+    pub name: Option<String>,
+    pub parent: Option<String>,
+    pub is_a: Option<String>,
+    pub loro_bytes: u64,
+    pub blob_bytes: u64,
 }
 
 /// Result of loading an agent from a secret.
@@ -465,6 +494,34 @@ pub struct Db {
     /// blob forever, so `note_pending_blob_request` also lazily prunes
     /// anything older than `PENDING_BLOB_REQUEST_TTL`.
     pending_blob_requests: Arc<RwLock<PendingBlobRequests>>,
+    /// How often the full-decode vs propvals-only fetch paths ran. Shared
+    /// across clones; used by tests to pin query-path cost to call counts
+    /// rather than wall clock (snapshots in a fresh store are too small
+    /// to show the difference). See `planning/slow-collection-queries.md`.
+    fetch_counters: Arc<FetchCounters>,
+    /// Lenses by the properties they touch (see [`crate::lens`]). Rebuilt from
+    /// the stored Lens resources when the Db opens, swapped for a new index
+    /// when a Lens commit applies. Readers clone the inner `Arc`.
+    lenses: Arc<RwLock<Arc<crate::lens::LensIndex>>>,
+    /// Lens subjects that are stored but not active yet, because the property
+    /// they write is not in this store (it may sync later).
+    pending_lenses: Arc<RwLock<Vec<String>>>,
+    /// External subjects the remote answered 404/410 for this session. A
+    /// definitive "not found" is asked once: without this, every parse or
+    /// serialize that meets an unknown property fetched it again. Maps the
+    /// subject to when the entry expires, so a resource published later is
+    /// found again after `REMOTE_NOT_FOUND_TTL`.
+    remote_not_found: Arc<Mutex<HashMap<String, web_time::Instant>>>,
+}
+
+#[derive(Default)]
+struct FetchCounters {
+    get_resource: AtomicUsize,
+    get_resource_shallow: AtomicUsize,
+}
+
+fn default_fetch_counters() -> Arc<FetchCounters> {
+    Arc::new(FetchCounters::default())
 }
 
 /// How long an unanswered `BLOB_REQUEST` stays in `pending_blob_requests`
@@ -473,6 +530,9 @@ pub struct Db {
 /// mid-sync, not a normal-latency budget.
 const PENDING_BLOB_REQUEST_TTL: std::time::Duration = std::time::Duration::from_secs(300);
 
+/// How long a remote 404/410 is remembered before the subject is asked for again.
+const REMOTE_NOT_FOUND_TTL: std::time::Duration = std::time::Duration::from_secs(300);
+
 /// The default (permissive) sync policy reference used by every `Db` until a
 /// managed node installs one.
 fn default_sync_policy() -> Arc<RwLock<Arc<dyn crate::sync::policy::SyncPolicy>>> {
@@ -480,13 +540,36 @@ fn default_sync_policy() -> Arc<RwLock<Arc<dyn crate::sync::policy::SyncPolicy>>
 }
 
 impl Db {
+    fn is_remote_not_found(&self, subject: &str) -> bool {
+        let Ok(mut map) = self.remote_not_found.lock() else {
+            return false;
+        };
+        match map.get(subject) {
+            Some(expires) if web_time::Instant::now() < *expires => true,
+            Some(_) => {
+                map.remove(subject);
+                false
+            }
+            None => false,
+        }
+    }
+
+    fn remember_remote_not_found(&self, subject: &str) {
+        if let Ok(mut map) = self.remote_not_found.lock() {
+            map.insert(
+                subject.to_string(),
+                web_time::Instant::now() + REMOTE_NOT_FOUND_TTL,
+            );
+        }
+    }
+
     /// A `Db` over `kv` with every other field at its default. Not usable
     /// until [`Db::open`] has run.
     fn from_kv(path: std::path::PathBuf, kv: Arc<dyn KvStore>, base_domain: Option<String>) -> Db {
         Db {
             path,
             blob_backend: None,
-            kv,
+            kv: Arc::new(compressed_kv::CompressedKv::new(kv)),
             default_agent: Arc::new(Mutex::new(None)),
             node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
@@ -502,6 +585,10 @@ impl Db {
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
+            fetch_counters: default_fetch_counters(),
+            lenses: Default::default(),
+            pending_lenses: Default::default(),
+            remote_not_found: Default::default(),
         }
     }
 
@@ -513,6 +600,14 @@ impl Db {
         // before bootstrap, so any filter-matching commits during bootstrap
         // see the right state.
         self.migrate_canonical_scheme_if_needed()?;
+        // The browser runs this in slices it can show progress for
+        // (`ClientDb.migrateIndexKeysStep`); everywhere else it is done here.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.migrate_index_keys()?;
+        #[cfg(target_arch = "wasm32")]
+        if self.kv.iter_tree(Tree::Resources).next().is_none() {
+            self.migrate_index_keys_step(1)?;
+        }
         self.populate_watched_queries_cache()?;
 
         // Runs on every open, but only writes when the embedded defaults
@@ -522,8 +617,152 @@ impl Db {
         crate::populate::bootstrap(&self)
             .await
             .map_err(|e| format!("Failed to populate base models. {}", e))?;
+        // Old chat messages become entries in chat log pages. The browser runs
+        // this in slices it can show progress for
+        // (`ClientDb.migrateMessagesStep`); everywhere else it is done here,
+        // after the watched queries are loaded so the new pages are indexed.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.migrate_messages().await?;
+        #[cfg(not(target_arch = "wasm32"))]
+        self.migrate_ai_chats().await?;
         crate::search::maybe_rebuild_search_index(&self)?;
+        self.load_lenses().await;
         Ok(self)
+    }
+
+    /// The active lenses. Cheap: clones an `Arc`.
+    pub fn lenses(&self) -> Arc<crate::lens::LensIndex> {
+        self.lenses
+            .read()
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
+    }
+
+    fn update_lenses(&self, change: impl FnOnce(&mut crate::lens::LensIndex)) {
+        if let Ok(mut guard) = self.lenses.write() {
+            let mut next = (**guard).clone();
+            change(&mut next);
+            *guard = Arc::new(next);
+        }
+    }
+
+    /// Rebuild the lens index from the stored Lens resources.
+    async fn load_lenses(&self) {
+        let class = Value::AtomicUrl(urls::LENS.into());
+        let subjects: Vec<Subject> = find_in_prop_val_sub_index(self, urls::IS_A, Some(&class))
+            .flatten()
+            .map(|atom| atom.subject)
+            .collect();
+        for subject in subjects {
+            if let Ok(lens) = Storelike::get_resource(self, &subject).await {
+                self.register_lens(&lens).await;
+            }
+        }
+    }
+
+    /// Make a stored Lens active. Returns the entry when it is. A lens whose
+    /// target property is not in the store yet is remembered and retried when
+    /// a Property is created ([`Self::retry_pending_lenses`]). Never fails a
+    /// commit: an inactive lens is just not applied.
+    pub async fn register_lens(&self, lens: &Resource) -> Option<crate::lens::LensEntry> {
+        let subject = crate::identifiers::canonicalize_scheme(&lens.get_subject().pure_id());
+        match crate::lens::build_entry(self, lens).await {
+            Ok(entry) => {
+                if let Ok(mut pending) = self.pending_lenses.write() {
+                    pending.retain(|p| p != &subject);
+                }
+                self.update_lenses(|index| index.insert(entry.clone()));
+                Some(entry)
+            }
+            Err(e) => {
+                tracing::debug!(lens = %subject, error = %e, "Lens is not active");
+                if let Ok(mut pending) = self.pending_lenses.write() {
+                    if !pending.contains(&subject) {
+                        pending.push(subject);
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    /// Call after a resource landed in the store. A Lens becomes active (and
+    /// its resources are backfilled); a new Property may let a waiting Lens
+    /// become active.
+    pub(crate) async fn note_lens_related(&self, resource: &Resource) {
+        let subject = resource.get_subject().pure_id();
+        if crate::identifiers::is_lens_id(&subject) {
+            if let Some(entry) = self.register_lens(resource).await {
+                self.backfill_lens(&entry).await;
+            }
+        } else if crate::identifiers::is_prop_id(&subject)
+            && self
+                .pending_lenses
+                .read()
+                .map(|p| !p.is_empty())
+                .unwrap_or(false)
+        {
+            self.retry_pending_lenses().await;
+        }
+    }
+
+    /// Stop applying a lens (it was destroyed).
+    pub fn unregister_lens(&self, subject: &str) {
+        let subject = crate::identifiers::canonicalize_scheme(subject);
+        if let Ok(mut pending) = self.pending_lenses.write() {
+            pending.retain(|p| p != &subject);
+        }
+        self.update_lenses(|index| index.remove(&subject));
+    }
+
+    /// Try the lenses that were waiting for a property, now that one arrived.
+    async fn retry_pending_lenses(&self) {
+        let pending: Vec<String> = self
+            .pending_lenses
+            .read()
+            .map(|p| p.clone())
+            .unwrap_or_default();
+        for subject in pending {
+            let Ok(lens) = Storelike::get_resource(self, &subject.as_str().into()).await else {
+                continue;
+            };
+            if let Some(entry) = self.register_lens(&lens).await {
+                self.backfill_lens(&entry).await;
+            }
+        }
+    }
+
+    /// Re-materialize the stored resources that hold a property of this lens,
+    /// so the value index and search see the derived values. Reads already
+    /// apply lenses; this only brings the stored projection and the indexes
+    /// in line. Derived values are not commits: nothing is broadcast.
+    pub async fn backfill_lens(&self, entry: &crate::lens::LensEntry) {
+        let mut subjects: Vec<Subject> = Vec::new();
+        let mut seen = HashSet::new();
+        for prop in [&entry.from, &entry.to] {
+            for atom in find_in_prop_val_sub_index(self, prop, None).flatten() {
+                if seen.insert(atom.subject.to_string()) {
+                    subjects.push(atom.subject);
+                }
+            }
+        }
+        for subject in subjects {
+            let _guard = self.subject_locks.lock(&subject.pure_id()).await;
+            let Ok(resource) = Storelike::get_resource(self, &subject).await else {
+                continue;
+            };
+            let snapshot = self.get_loro_snapshot_bytes(&subject.pure_id());
+            let mut transaction = Transaction::new();
+            let built = self
+                .build_projection_tx(&resource, false, true, true, snapshot, &mut transaction)
+                .await;
+            match built.and_then(|()| self.apply_transaction(&mut transaction)) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::warn!(%subject, error = %e, "Could not backfill lens");
+                }
+            }
+        }
     }
 
     /// Persist already-admitted replica state, including independently created
@@ -608,6 +847,7 @@ impl Db {
         }
         self.apply_transaction(&mut transaction)?;
         for resource in batched {
+            self.note_lens_related(resource).await;
             let _ = self.db_events.send(DbEvent::Changed {
                 subject: resource.get_subject().without_params(),
                 delta: None,
@@ -665,6 +905,7 @@ impl Db {
         if crate::import_identity::identity(resource).is_some() {
             self.flush()?;
         }
+        self.note_lens_related(resource).await;
         let _ = self.db_events.send(DbEvent::Changed {
             subject: resource.get_subject().without_params(),
             delta: None,
@@ -694,6 +935,24 @@ impl Db {
         // However, add_atom uses set_propvals, which skips the validation.
         let subject = self.normalize_subject(resource.get_subject());
         let subject_str = subject.pure_id();
+        // Lenses derive values the doc does not hold; the stored row and the
+        // indexes carry them like real ones. Only a resource that holds a lens
+        // property is copied.
+        let lenses = self.lenses();
+        let derived_resource;
+        let resource = if !lenses.is_empty()
+            && resource
+                .get_propvals()
+                .keys()
+                .any(|prop| lenses.touches(prop))
+        {
+            let mut copy = resource.clone();
+            copy.apply_lenses(&lenses);
+            derived_resource = copy;
+            &derived_resource
+        } else {
+            resource
+        };
         let existing = self
             .get_propvals_canonical(&subject_str)
             .ok()
@@ -1426,20 +1685,32 @@ impl Db {
         let agent = self.get_default_agent()?;
         let agent_resource = self.get_resource(&agent.subject).await?;
 
-        let subjects = match agent_resource.get(urls::DRIVES) {
+        // Keep legacy Agent.drives entries, then include the private home where
+        // create_drive records new drives. Read both during the migration.
+        let mut subjects = match agent_resource.get(urls::DRIVES) {
             Ok(Value::ResourceArray(arr)) => arr.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
             _ => vec![],
         };
-
-        // Fallback: active drive not in agent resource
-        let subjects = if subjects.is_empty() {
-            match self.get_active_drive() {
-                Some(active) => vec![active],
-                None => vec![],
+        if let Ok(personal) = self.private_drive_subject() {
+            if let Ok(home) = self.get_resource(&personal.as_str().into()).await {
+                if !subjects.contains(&personal) {
+                    subjects.push(personal);
+                }
+                if let Ok(Value::ResourceArray(listed)) = home.get(urls::DRIVES) {
+                    for subject in listed {
+                        let subject = subject.to_string();
+                        if !subjects.contains(&subject) {
+                            subjects.push(subject);
+                        }
+                    }
+                }
             }
-        } else {
-            subjects
-        };
+        }
+        if let Some(active) = self.get_active_drive() {
+            if !subjects.contains(&active) {
+                subjects.push(active);
+            }
+        }
 
         let mut drives = Vec::with_capacity(subjects.len());
         for subject in subjects {
@@ -1620,6 +1891,64 @@ impl Db {
         }
 
         Ok(usage.into_values().collect())
+    }
+
+    /// Per-resource storage of one drive: Loro snapshot bytes (history) and the
+    /// blob bytes of attached files. Same accounting as [`Db::per_drive_usage`],
+    /// kept per resource so a client can draw a size map of the drive.
+    pub async fn drive_usage_breakdown(
+        &self,
+        drive_subject: &str,
+    ) -> AtomicResult<Vec<ResourceUsage>> {
+        use std::collections::HashSet;
+
+        let ds: crate::Subject = drive_subject.into();
+        let mut subjects: Vec<String> = crate::sync::engine::collect_drive_subjects(self, &ds)
+            .await
+            .into_iter()
+            .collect();
+        subjects.sort();
+
+        let mut seen_blobs: HashSet<[u8; 32]> = HashSet::new();
+        let mut rows = Vec::new();
+
+        for subject in subjects {
+            let Ok(propvals) = self.get_propvals(&subject) else {
+                continue;
+            };
+            let loro_bytes = self
+                .get_loro_snapshot_bytes(&subject)
+                .map(|s| s.len() as u64)
+                .unwrap_or(0);
+
+            let mut blob_bytes = 0;
+            if let Some(blob_val) = propvals.get(urls::BLOB) {
+                let blob_subject = crate::Subject::from_raw(&blob_val.to_string(), None);
+                if let Some(hash_bytes) = blob_subject
+                    .blob_hash_hex()
+                    .and_then(|h| hex::decode(h).ok())
+                    .filter(|b| b.len() == 32)
+                {
+                    let mut hash = [0u8; 32];
+                    hash.copy_from_slice(&hash_bytes);
+                    if seen_blobs.insert(hash) {
+                        blob_bytes = self.blob_size(&hash).await?.unwrap_or(0);
+                    }
+                }
+            }
+
+            let text = |prop: &str| propvals.get(prop).map(|v| v.to_string());
+            rows.push(ResourceUsage {
+                name: text(urls::NAME).or_else(|| text(urls::FILENAME)),
+                parent: text(urls::PARENT),
+                is_a: text(urls::IS_A).and_then(|c| c.split(',').next().map(str::to_string)),
+                subject,
+                loro_bytes,
+                blob_bytes,
+            });
+        }
+
+        Ok(rows)
     }
 
     /// Get children of a resource, optionally filtered by class.
@@ -1987,6 +2316,11 @@ impl Db {
             else {
                 continue;
             };
+            // `RedbStore::flush` parks its sentinel in this tree, so any open
+            // that ran a flush (the index-key migration does) holds one.
+            if host == "__flush_sentinel__" {
+                continue;
+            }
             out.push((host.to_string(), did.to_string()));
         }
 
@@ -2460,7 +2794,7 @@ impl Db {
 
     /// Finds resource by Subject, return PropVals HashMap
     #[instrument(skip_all)]
-    fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
+    pub(crate) fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
         match self.kv.get(Tree::Resources, subject.as_bytes())? {
             Some(binpropval) => {
                 let propval: PropVals = decode_propvals(&binpropval)?;
@@ -2493,6 +2827,9 @@ impl Db {
     /// CRDT-authoritative state matters. Subject normalization (incl. the DID
     /// drive hint) matches `get_resource`, so ids/subjects stay consistent.
     pub fn get_resource_shallow(&self, subject: &Subject) -> AtomicResult<Resource> {
+        self.fetch_counters
+            .get_resource_shallow
+            .fetch_add(1, Ordering::Relaxed);
         let normalized = self.normalize_subject(subject);
         let (subject_str, propvals) = self.get_propvals_canonical(&normalized.pure_id())?;
 
@@ -2507,6 +2844,27 @@ impl Db {
         }
 
         Ok(Resource::from_propvals(propvals, res_subject))
+    }
+
+    /// Zero the fetch counters. Tests call this after fixture setup so the
+    /// subsequent query's counts aren't mixed with bootstrap / save traffic.
+    pub fn reset_fetch_counters(&self) {
+        self.fetch_counters.get_resource.store(0, Ordering::Relaxed);
+        self.fetch_counters
+            .get_resource_shallow
+            .store(0, Ordering::Relaxed);
+    }
+
+    /// Full-decode [`Storelike::get_resource`] calls since the last reset.
+    pub fn get_resource_call_count(&self) -> usize {
+        self.fetch_counters.get_resource.load(Ordering::Relaxed)
+    }
+
+    /// Propvals-only [`Db::get_resource_shallow`] calls since the last reset.
+    pub fn get_resource_shallow_call_count(&self) -> usize {
+        self.fetch_counters
+            .get_resource_shallow
+            .load(Ordering::Relaxed)
     }
 
     /// Removes all values from the indexes.
@@ -2608,6 +2966,16 @@ impl Db {
     /// would write secrets the winner cannot read.
     pub fn set_node_key(&self, key: [u8; crate::vault::keys::KEK_LEN]) {
         let _ = self.node_key.set(key);
+    }
+
+    /// A 32-byte key for one purpose, derived from the node key, or `None`
+    /// when this node has no key. The node key itself never leaves the store;
+    /// what comes out is bound to `context` (say what it is for, and version
+    /// it), so a key made for signing tokens cannot open a wrapped secret.
+    pub fn derive_node_key(&self, context: &str) -> Option<[u8; 32]> {
+        self.node_key
+            .get()
+            .map(|key| blake3::derive_key(context, key))
     }
 
     /// Wraps a secret for storage, or passes it through when no key is set.
@@ -3004,7 +3372,11 @@ impl Db {
     /// PropValSub index. Scans at most `cap` entries — enough to rank
     /// constraints by selectivity without paying for exact counts.
     fn estimate_prop_val_count(&self, prop: &str, val: Option<&Value>, cap: usize) -> usize {
-        let mut prefix: Vec<u8> = [prop.as_bytes(), &[query_index::SEPARATION_BIT]].concat();
+        let mut prefix: Vec<u8> = [
+            &query_index::property_key_part(prop)[..],
+            &[query_index::SEPARATION_BIT],
+        ]
+        .concat();
         if let Some(value) = val {
             prefix.extend(value.to_sortable_string().as_bytes());
             prefix.extend([query_index::SEPARATION_BIT]);
@@ -3550,6 +3922,9 @@ impl Db {
                 continue;
             }
 
+            // Denied members do not grow `subjects`, so we keep resolving
+            // until the page is full of *authorized* hits — a private streak
+            // must not hide a later readable row.
             if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
                 // Sudo without nested bodies needs no per-member work at all.
                 if q.for_agent == ForAgent::Sudo && !q.include_nested {
@@ -3932,8 +4307,14 @@ impl Db {
         resource: &Resource,
         transaction: &mut Transaction,
     ) -> AtomicResult<()> {
-        for mut index_atom in atom.to_indexable_atoms() {
+        for mut index_atom in atom.to_stored_index_atoms() {
             index_atom.subject = index_atom.subject.pure_id().into();
+            for op in Operation::remove_atom_from_legacy_indexes(&index_atom) {
+                transaction.push(op);
+            }
+            if atom.property == urls::GENESIS {
+                continue;
+            }
             transaction.push(Operation::remove_atom_from_reference_index(&index_atom));
             transaction.push(Operation::remove_atom_from_prop_val_sub_index(&index_atom));
 
@@ -4383,12 +4764,19 @@ impl Storelike for Db {
         // and rights/parent/destroy; drop ordinary content certificates.
         if commit_response.auth_impact().is_critical() {
             store.add_resource_tx(&commit_response.commit_resource, &mut transaction)?;
-            for atom in commit_response.commit_resource.to_atoms() {
-                store.add_atom_to_index(
-                    &atom,
-                    &commit_response.commit_resource,
-                    &mut transaction,
-                )?;
+            // A creation's commit is found by its id (it names the resource),
+            // so its atoms stay out of the indexes: five rows and about
+            // 0.5 KB for every new resource that no query asks for. Later
+            // critical commits (rights, parent, destroy) stay queryable by
+            // the subject they are about.
+            if !commit_response.creates_resource() {
+                for atom in commit_response.commit_resource.to_atoms() {
+                    store.add_atom_to_index(
+                        &atom,
+                        &commit_response.commit_resource,
+                        &mut transaction,
+                    )?;
+                }
             }
         }
 
@@ -4579,6 +4967,16 @@ impl Storelike for Db {
         drop(import_guard);
         drop(subject_guard);
 
+        // A Lens starts (or, destroyed, stops) applying. Not part of the
+        // commit: it cannot fail it.
+        if is_destroy {
+            if crate::identifiers::is_lens_id(&top_level) {
+                store.unregister_lens(&top_level);
+            }
+        } else if let Some(new) = &commit_response.resource_new {
+            store.note_lens_related(new).await;
+        }
+
         // AFTER APPLY COMMIT HANDLERS
         // Commit has been checked and saved.
         // Here you can add side-effects, such as creating new Commits.
@@ -4641,6 +5039,9 @@ impl Storelike for Db {
 
     #[instrument(skip_all)]
     async fn get_resource(&self, subject: &Subject) -> AtomicResult<Resource> {
+        self.fetch_counters
+            .get_resource
+            .fetch_add(1, Ordering::Relaxed);
         let normalized = self.normalize_subject(subject);
         let subject_str = normalized.pure_id();
         if let Ok((subject_str, propvals)) = self.get_propvals_canonical(&subject_str) {
@@ -4673,7 +5074,10 @@ impl Storelike for Db {
                     // a collection query), so the saved export is per-read,
                     // not one-off.
                     Ok(doc) => {
-                        if let Err(e) = resource.apply_state_doc_with_snapshot(doc, snapshot) {
+                        let lenses = self.lenses();
+                        let lenses = (!lenses.is_empty()).then_some(&*lenses);
+                        if let Err(e) = resource.apply_state_doc_with_lenses(doc, snapshot, lenses)
+                        {
                             tracing::warn!(
                                 subject = %subject_str,
                                 error = %e,
@@ -4833,33 +5237,52 @@ impl Storelike for Db {
                     .await;
             }
 
-            if let Ok(resource) = self
+            if self.is_remote_not_found(&resolved_url) {
+                return Err(AtomicError::not_found(format!(
+                    "{} was not found on its server earlier this session",
+                    resolved_url
+                )));
+            }
+
+            match self
                 .fetch_resource(&resolved_url, self.get_default_agent().ok().as_ref())
                 .await
             {
-                // If the resource is external, it's not present in the store.
-                // However, we did fetch it (because the user probably requested it).
-                // So we should add it to the store.
-                // Note that this logic is also in `Store`'s `get_resource`, but it's slightly different there.
-                // We should probably unify this.
-                // Also, this might cause issues if we want to get a resource but NOT save it.
-                self.add_resource_opts(&resource, false, false, true)
-                    .await?;
-                Ok(resource)
-            } else {
-                self.handle_not_found(
-                    &resolved_url,
-                    "Not found in DB".into(),
-                    self.get_default_agent().ok().as_ref(),
-                )
-                .await
+                Ok(resource) => {
+                    // If the resource is external, it's not present in the store.
+                    // However, we did fetch it (because the user probably requested it).
+                    // So we should add it to the store.
+                    // Note that this logic is also in `Store`'s `get_resource`, but it's slightly different there.
+                    // We should probably unify this.
+                    // Also, this might cause issues if we want to get a resource but NOT save it.
+                    self.add_resource_opts(&resource, false, false, true)
+                        .await?;
+                    Ok(resource)
+                }
+                Err(e) => {
+                    // The failed fetch is the answer. The default
+                    // `handle_not_found` would fetch the same URL a second time.
+                    if e.error_type == AtomicErrorType::NotFoundError {
+                        self.remember_remote_not_found(&resolved_url);
+                    }
+                    Err(e)
+                }
             }
         }
+    }
+
+    async fn get_resource_shallow(&self, subject: &Subject) -> AtomicResult<Resource> {
+        Db::get_resource_shallow(self, subject)
     }
 
     fn has_stored_resource(&self, subject: &Subject) -> bool {
         let normalized = self.normalize_subject(subject);
         self.get_propvals(&normalized.pure_id()).is_ok()
+    }
+
+    fn lens_index(&self) -> Option<Arc<crate::lens::LensIndex>> {
+        let lenses = self.lenses();
+        (!lenses.is_empty()).then_some(lenses)
     }
 
     fn get_defaults_fingerprint(&self) -> AtomicResult<Option<String>> {
@@ -4909,6 +5332,32 @@ impl Storelike for Db {
 
             let mut root_subject: Option<String> = None;
 
+            // Response shaping below (`incomplete`, class extenders) writes
+            // dynamic propvals through `Resource::set`, which also records each
+            // write as a Loro op on the doc `get_resource` decoded from the
+            // stored snapshot; serialization would then re-export that doc as
+            // the served `loroUpdate`. Those ops are never persisted, so a
+            // client that seeds its doc from the response builds every later
+            // delta on ops this store does not have, and `apply_commit` parks
+            // them as pending ("Commit's Loro update depends on ops the server
+            // does not have"). Observed as the form builder's Publish never
+            // reaching visitors: the Form extender's `form-submission-summary`
+            // op poisoned every doc hydrated from an HTTP GET. Whatever the
+            // extender does to the doc, the response carries the persisted
+            // snapshot.
+            let persisted_snapshot = match resource.get(crate::urls::LORO_UPDATE) {
+                Ok(crate::Value::LoroDoc(bytes)) => Some(bytes.clone()),
+                _ => None,
+            };
+            let served_id = resource.get_subject().pure_id();
+            let serve_persisted = |shaped: &mut Resource| {
+                if let Some(snapshot) = &persisted_snapshot {
+                    if shaped.get_subject().pure_id() == served_id {
+                        shaped.restore_persisted_state(snapshot.clone());
+                    }
+                }
+            };
+
             let extenders = self
                 .class_extenders
                 .read()
@@ -4938,6 +5387,7 @@ impl Storelike for Db {
                                 self,
                             )
                             .await?;
+                        serve_persisted(&mut resource);
 
                         return Ok(resource.into());
                     }
@@ -4955,10 +5405,12 @@ impl Storelike for Db {
                         // make sure the actual subject matches the one requested - It should not be changed in the logic above
                         match resource_response {
                             ResourceResponse::Resource(mut resource) => {
+                                serve_persisted(&mut resource);
                                 resource.set_subject(subject.to_string());
                                 return Ok(resource.into());
                             }
                             ResourceResponse::ResourceWithReferenced(mut resource, referenced) => {
+                                serve_persisted(&mut resource);
                                 resource.set_subject(subject.to_string());
 
                                 return Ok(ResourceResponse::ResourceWithReferenced(
@@ -5527,5 +5979,87 @@ mod private_drive_tests {
             listed.iter().any(|s| s == &extra),
             "private drive should list {extra}, got {listed:?}"
         );
+        store.set_active_drive(&personal).unwrap();
+        let drives = store.list_drives().await.unwrap();
+        assert_eq!(drives.len(), 2);
+        assert!(drives.iter().any(|d| d.subject == personal));
+        assert!(drives
+            .iter()
+            .any(|d| d.subject == extra && d.name == "Project"));
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod remote_not_found_tests {
+    use super::*;
+    use crate::Storelike;
+    use std::io::{Read, Write};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Serves `status` to every request and counts them.
+    fn serve(status: &'static str) -> (String, Arc<AtomicUsize>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let hits = Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                let mut buf = [0u8; 4096];
+                let _ = stream.read(&mut buf);
+                counter.fetch_add(1, Ordering::SeqCst);
+                let _ = stream.write_all(
+                    format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        .as_bytes(),
+                );
+            }
+        });
+        (url, hits)
+    }
+
+    #[tokio::test]
+    async fn a_404_property_is_fetched_once() {
+        let db = Db::init_temp("remote_not_found_404").await.unwrap();
+        let (server, hits) = serve("404 Not Found");
+        let property = format!("{server}/properties/demo/speaker");
+
+        for _ in 0..3 {
+            assert!(db.get_property(&property).await.is_err());
+        }
+
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn an_expired_404_is_fetched_again() {
+        let db = Db::init_temp("remote_not_found_expiry").await.unwrap();
+        let (server, hits) = serve("404 Not Found");
+        let property = format!("{server}/properties/demo/speaker");
+
+        assert!(db.get_property(&property).await.is_err());
+        assert!(db.get_property(&property).await.is_err());
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+
+        // Backdate the entry: it expires now.
+        db.remote_not_found
+            .lock()
+            .unwrap()
+            .insert(property.clone(), web_time::Instant::now());
+
+        assert!(db.get_property(&property).await.is_err());
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn a_server_error_is_retried() {
+        let db = Db::init_temp("remote_not_found_500").await.unwrap();
+        let (server, hits) = serve("500 Internal Server Error");
+        let property = format!("{server}/properties/demo/speaker");
+
+        for _ in 0..2 {
+            assert!(db.get_property(&property).await.is_err());
+        }
+
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 }

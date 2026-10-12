@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   importCarried: vi.fn(),
   server: vi.fn(),
   sync: vi.fn(),
+  link: vi.fn(),
   binding: vi.fn(),
   archive: vi.fn(),
   guest: true,
@@ -44,6 +45,7 @@ vi.mock('../helpers/managed', () => ({
   localAgentWorkspace: state.workspace,
   evaluateServerReconciliation: state.server,
   syncDeviceDirectory: state.sync,
+  linkAgentToAccount: state.link,
   writeManagedAccountBinding: state.binding,
   clearManagedAccountBinding: vi.fn(),
   logoutManagedSession: vi.fn(),
@@ -155,6 +157,25 @@ it('still routes a current disposable mismatch to unlock', async () => {
   await act(async () => {});
   expect(state.navigate).toHaveBeenCalledWith(
     expect.objectContaining({ to: '/app/welcome' }),
+  );
+  // The account's own identity is about to replace this one: linking this one
+  // would point the account at the identity it is leaving.
+  expect(state.link).not.toHaveBeenCalled();
+});
+
+it('links the identity the account adopted', async () => {
+  state.evaluate.mockResolvedValue({
+    ok: false,
+    issue: { ...mismatch.issue, reason: 'stale_local_agent' },
+  });
+  render(view());
+  await act(async () => {});
+  expect(state.binding).toHaveBeenCalledWith(
+    'a@example.com',
+    'did:ad:agent:old',
+  );
+  expect(state.link).toHaveBeenCalledWith(
+    expect.objectContaining({ subject: 'did:ad:agent:old' }),
   );
 });
 

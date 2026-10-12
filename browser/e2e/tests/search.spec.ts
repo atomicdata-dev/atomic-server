@@ -226,9 +226,25 @@ test.describe('search', async () => {
     const driveSubject = await page.evaluate(() => window.store.getDrive());
     const folderSubject = await getCurrentSubject(page);
 
-    // Add tags via the TagBar
-    const firstTagName = `first-tag`;
-    // Tags live in More until the resource has one.
+    // Add tags via the TagBar. Tags live in More until the resource has one.
+    //
+    // The tag names must be unique per run, the same way the folder name is.
+    // They used to be the literals `first-tag` / `second-tag`, which made this
+    // spec pass only against a near-empty store: the tags are created inside
+    // the drive, but `tag:` search is a Tantivy query across everything the
+    // store has, so every earlier run of this test left another folder carrying
+    // those exact tags. Once enough runs had accumulated, `tag:first-tag`
+    // matched dozens of old folders, this run's folder fell outside the result
+    // list the overlay renders, and `searchAndOpen` timed out looking for it.
+    // That reads as a broken tag search rather than as a spec that outgrew its
+    // own fixtures — and it only reproduces on a store with history, so it
+    // survives every attempt to reproduce it in isolation.
+    //
+    // `stringToSlug` (CreateTagRow) rewrites the input to lowercase
+    // alphanumerics and dashes, so the suffix has to already be slug-shaped or
+    // the assertions below would look for a name the app never stored.
+    const tagRunId = Math.random().toString(36).slice(2, 8);
+    const firstTagName = `first-tag-${tagRunId}`;
     await page.click(contextMenu);
     await page.getByRole('menuitem', { name: 'Tags' }).click();
     await page.getByPlaceholder('New tag').fill(firstTagName);
@@ -237,7 +253,7 @@ test.describe('search', async () => {
       page.locator('[aria-label="navigation"]').getByText(firstTagName),
     ).toBeVisible();
 
-    const secondTagName = `second-tag`;
+    const secondTagName = `second-tag-${tagRunId}`;
     await expect(page.getByPlaceholder('New tag')).toHaveValue('');
     await page.getByPlaceholder('New tag').fill(secondTagName);
     await page.getByTitle('Add tag').click();

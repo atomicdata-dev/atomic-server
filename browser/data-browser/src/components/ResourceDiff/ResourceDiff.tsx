@@ -24,13 +24,13 @@ const ChangeSwitcherChunk = lazy(() =>
 );
 
 export const ResourceDiff: FC<ResourceDiffProps> = props => (
-  <Suspense fallback={<Spinner />}>
+  <Suspense fallback={<Spinner centered />}>
     <ResourceDiffChunk {...props} />
   </Suspense>
 );
 
 export const ChangeSwitcher: FC<ChangeSwitcherProps> = props => (
-  <Suspense fallback={<Spinner />}>
+  <Suspense fallback={<Spinner centered />}>
     <ChangeSwitcherChunk {...props} />
   </Suspense>
 );

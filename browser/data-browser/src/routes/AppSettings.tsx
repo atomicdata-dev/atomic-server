@@ -123,7 +123,7 @@ const AppSettings: React.FunctionComponent = () => {
           <SettingsGroup>
             <SettingsSection
               label='Appearance'
-              childSearchKeywords='language locale panels templates ontology aichats hide templates'
+              childSearchKeywords='language locale panels messages favorites shared with me templates ontology aichats hide templates'
             >
               <Column gap='1rem'>
                 <Column gap='0.5rem'>
@@ -191,6 +191,27 @@ const AppSettings: React.FunctionComponent = () => {
                 </Column>
                 <SettingsSection label='Panels & Templates'>
                   <Column gap='0.5rem'>
+                    <CheckboxLabel>
+                      <Checkbox
+                        checked={enabledPanels.has(Panel.Messages)}
+                        onChange={changePanelPref(Panel.Messages)}
+                      />{' '}
+                      <span>Show Messages panel</span>
+                    </CheckboxLabel>
+                    <CheckboxLabel>
+                      <Checkbox
+                        checked={enabledPanels.has(Panel.Favorites)}
+                        onChange={changePanelPref(Panel.Favorites)}
+                      />{' '}
+                      <span>Show Favorites panel</span>
+                    </CheckboxLabel>
+                    <CheckboxLabel>
+                      <Checkbox
+                        checked={enabledPanels.has(Panel.SharedWithMe)}
+                        onChange={changePanelPref(Panel.SharedWithMe)}
+                      />{' '}
+                      <span>Show Shared with me panel</span>
+                    </CheckboxLabel>
                     <CheckboxLabel>
                       <Checkbox
                         checked={enabledPanels.has(Panel.Ontologies)}

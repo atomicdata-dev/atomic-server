@@ -2,6 +2,7 @@ import {
   hexToBytes,
   isBlobSubject,
   blobHashHex,
+  server,
   type Resource,
 } from '@tomic/lib';
 import { useEffect, useState } from 'react';
@@ -67,24 +68,30 @@ export function useFileObjectUrl(
   fallbackUrl?: string,
 ): string | undefined {
   const blobValue = resource.get(BLOB);
+  const mimetypeValue = resource.get(server.properties.mimetype);
 
   return useBlobObjectUrl(
     typeof blobValue === 'string' ? blobValue : undefined,
     fallbackUrl,
+    typeof mimetypeValue === 'string' ? mimetypeValue : undefined,
   );
 }
 
 /**
  * {@link useFileObjectUrl} for a bare blob reference (`atomic:blob:<hash>`),
  * for places that have no File resource at hand, such as an image in a
- * document, which keeps only its URL.
+ * document, which keeps only its URL. Pass the file's `mimetype` when it is
+ * known: an SVG only renders from an object URL typed `image/svg+xml`.
  */
 export function useBlobObjectUrl(
   blobDid: string | undefined,
   fallbackUrl?: string,
+  mimetype?: string,
 ): string | undefined {
   const store = useStore();
   const clientDb = store.getClientDb?.();
+  // The same bytes with a different type are a different object URL.
+  const cacheKey = blobDid ? `${blobDid}|${mimetype ?? ''}` : undefined;
   const [resolved, setResolved] = useState<{
     blobDid: string;
     clientDb: typeof clientDb;
@@ -94,7 +101,7 @@ export function useBlobObjectUrl(
   useEffect(() => {
     if (!blobDid || !isBlobSubject(blobDid) || !clientDb) return;
 
-    if (cachedUrl(clientDb, blobDid)) return;
+    if (cachedUrl(clientDb, cacheKey!)) return;
 
     let cancelled = false;
 
@@ -106,11 +113,16 @@ export function useBlobObjectUrl(
         const bytes = await clientDb.getBlob(hash);
         if (cancelled) return;
 
+        // The Blob's type becomes the object URL's Content-Type. Without it
+        // an `<img>` can still sniff raster formats, but never SVG: browsers
+        // only render SVG when the type is exactly `image/svg+xml`.
         const url = bytes
-          ? URL.createObjectURL(new Blob([bytes as BlobPart]))
+          ? URL.createObjectURL(
+              new Blob([bytes as BlobPart], mimetype ? { type: mimetype } : {}),
+            )
           : undefined;
 
-        if (url) rememberUrl(clientDb, blobDid, url);
+        if (url) rememberUrl(clientDb, cacheKey!, url);
 
         setResolved({ blobDid, clientDb, url });
       } catch {
@@ -121,11 +133,11 @@ export function useBlobObjectUrl(
     return () => {
       cancelled = true;
     };
-  }, [blobDid, clientDb]);
+  }, [blobDid, cacheKey, clientDb, mimetype]);
 
   if (!blobDid || !isBlobSubject(blobDid) || !clientDb) return fallbackUrl;
 
-  const known = cachedUrl(clientDb, blobDid);
+  const known = cachedUrl(clientDb, cacheKey!);
 
   if (known) return known;
 

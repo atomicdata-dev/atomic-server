@@ -12,6 +12,9 @@ interface FieldProps {
   label?: string;
   /** Rendered before the label text in the label row (e.g. a checkbox). */
   labelPrefix?: React.ReactNode;
+  /** Rendered at the end of the label row (e.g. a button acting on the whole
+   * field, rather than on one of its inputs). */
+  labelAction?: React.ReactNode;
   /** Helper text / collapsible info */
   helper?: React.ReactNode;
   /** If true the helper text will always be visible and no button to toggle it will be shown */
@@ -44,6 +47,7 @@ interface FieldProps {
 function Field({
   label,
   labelPrefix,
+  labelAction,
   helper,
   helperAlwaysVisible,
   children,
@@ -96,6 +100,7 @@ function Field({
               <FaTrash />
             </IconButton>
           )}
+          {labelAction}
         </Row>
         {!!helper && (
           <FieldHelper>

@@ -16,6 +16,12 @@ vi.mock('./api', () => ({
   getManagedApiBase: vi.fn(),
   hasManagedApi: vi.fn(() => true),
 }));
+// The recovery code's Argon2id runs in WASM; the fixture stands in for it.
+vi.mock('../wasmUrls', () => ({
+  wasmJsUrl: () => './test-fixtures/recovery-wasm.ts',
+  wasmBinaryUrl: () => '',
+  atomicWasmSource: async () => '',
+}));
 
 const AGENT = 'atomic:agent:9Hc-J_2n4jIpXqzTZMDSnNFOFB1fWqCsGSk3Wdyy9Bs';
 
@@ -177,5 +183,61 @@ it('an account that turned assisted recovery off gets no new wrapper', async () 
   service.currentKey = 'key-2';
   await decryptEnvelopeWithAssisted(stored(request));
   await new Promise(resolve => setTimeout(resolve, 20));
+  expect(service.appended).toHaveLength(0);
+});
+
+it('a backup from before assisted recovery gets it with its recovery code', async () => {
+  const service = fakeService({ fresh: true });
+  const { buildEnvelopeV2, enableAssistedForBackup } =
+    await import('./recovery');
+  const { recoveryCode, request } = await buildEnvelopeV2({
+    secret: 'the-agent-secret',
+    agentSubject: AGENT,
+  });
+  // As it was stored before the service offered assisted recovery.
+  const old = stored({
+    ...request,
+    wrappers: request.wrappers!.filter(
+      w => w.wrapper_type !== 'atomic-assisted',
+    ),
+  });
+  expect(hasAssistedWrapper(old)).toBe(false);
+  service.appended.length = 0;
+
+  await enableAssistedForBackup(old, recoveryCode);
+
+  expect(service.appended).toHaveLength(1);
+  // What the service would store: the old wrappers plus the new one.
+  const withWrapper = {
+    ...old,
+    wrappers: [
+      ...old.wrappers,
+      { ...(service.appended[0] as object), created_at: 0 },
+    ],
+  } as RecoverySecret;
+  expect(await decryptEnvelopeWithAssisted(withWrapper)).toBe(
+    'the-agent-secret',
+  );
+});
+
+it('a wrong recovery code adds nothing', async () => {
+  const service = fakeService({ fresh: true });
+  const { buildEnvelopeV2, enableAssistedForBackup } =
+    await import('./recovery');
+  const { request } = await buildEnvelopeV2({
+    secret: 's',
+    agentSubject: AGENT,
+  });
+  const old = stored({
+    ...request,
+    wrappers: request.wrappers!.filter(
+      w => w.wrapper_type !== 'atomic-assisted',
+    ),
+  });
+  service.appended.length = 0;
+
+  await expect(
+    enableAssistedForBackup(old, 'AAAA-BBBB-CCCC-DDDD'),
+  ).rejects.toThrow();
   expect(service.appended).toHaveLength(0);
 });

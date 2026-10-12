@@ -1,6 +1,7 @@
 import { useResource } from '@tomic/react';
 import { lazy, Suspense, type JSX } from 'react';
 import { styled } from 'styled-components';
+import { Spinner } from '../../../components/Spinner';
 
 // Same chunk the Dashboard resource page loads, so a table with no dashboard
 // tab never pays for the chart code.
@@ -32,7 +33,7 @@ function LoadedDashboard({ subject }: { subject: string }): JSX.Element {
   const resource = useResource(subject);
 
   return (
-    <Suspense fallback={<Empty>Loading dashboard…</Empty>}>
+    <Suspense fallback={<Spinner centered />}>
       <DashboardPage resource={resource} />
     </Suspense>
   );

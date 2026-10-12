@@ -19,7 +19,7 @@ async function loadOrCreateAgent(): Promise<Agent> {
   }
 
   const keys = await Agent.generateKeyPair();
-  const subject = `did:ad:agent:${keys.publicKey}`;
+  const subject = `atomic:agent:${keys.publicKey}`;
 
   // One string that encodes the private key and the subject. This is the
   // account: whoever holds it, is this Agent.
@@ -30,7 +30,7 @@ async function loadOrCreateAgent(): Promise<Agent> {
 }
 
 const agent = await loadOrCreateAgent();
-console.log(agent.subject); // did:ad:agent:…
+console.log(agent.subject); // atomic:agent:…
 ```
 
 Three things to notice.

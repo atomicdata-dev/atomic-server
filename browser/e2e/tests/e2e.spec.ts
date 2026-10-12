@@ -25,7 +25,6 @@ import {
   openConfigureDrive,
   openNewSubjectWindow,
   openSubject,
-  publicReadRightLocator,
   setTitle,
   signIn,
   timestamp,
@@ -117,8 +116,6 @@ test.describe('data-browser', async () => {
       await signIn(page);
       const { driveURL, driveTitle } = await newDrive(page);
       await currentDriveTitle(page).click();
-      await contextMenuClick('share', page);
-      expect(publicReadRightLocator(page)).not.toBeChecked();
 
       // Initialize unauthorized page for reader. An anonymous user landing on a
       // private drive is redirected to the welcome flow (ErrorPage redirects on
@@ -141,8 +138,9 @@ test.describe('data-browser', async () => {
         page2.getByRole('button', { name: 'Create account' }),
       ).toBeVisible({ timeout: 15000 });
 
-      // Create invite
-      await page.click('button:has-text("Create Invite")');
+      // Create invite: the Share action opens the dialog, which starts with
+      // the profile step.
+      await contextMenuClick('share', page);
       await page.getByLabel('Full name', { exact: true }).fill('Drive Owner');
       const pickerOpened = page.waitForEvent('filechooser');
       await page
@@ -172,7 +170,9 @@ test.describe('data-browser', async () => {
       await page
         .getByRole('button', { name: 'Save and continue', exact: true })
         .click();
-      await expect(page.getByLabel('Allow edits')).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Copy invite link' }),
+      ).toBeVisible();
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       const ownerProfile = await page.evaluate(async () => {
         const subject = window.store!.getAgent()!.subject!;
@@ -184,16 +184,12 @@ test.describe('data-browser', async () => {
         };
       });
       expect(ownerProfile.icon).toBeTruthy();
-      await page.click('button:has-text("Create")');
-      await expect(
-        page.locator('text=Invite created and copied '),
-      ).toBeVisible();
-      const inviteUrl = await page.evaluate(() =>
-        document
-          ?.querySelector('[data-code-content]')
-          ?.getAttribute('data-code-content'),
-      );
-      expect(inviteUrl).not.toBeFalsy();
+      await page.getByRole('button', { name: 'Copy invite link' }).click();
+      const inviteUrl = await page
+        .locator('[data-invite-link]')
+        .getAttribute('data-invite-link');
+      expect(inviteUrl).toBeTruthy();
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
 
       // The invite resource needs to be persisted server-side before the
       // invitee opens its URL — otherwise the server returns 404. Wait for
@@ -264,16 +260,20 @@ test.describe('data-browser', async () => {
         driveTitle,
       );
       await expect(
-        page2.getByRole('heading', { name: 'Agent created!' }),
+        page2.getByRole('heading', { name: 'This is your account' }),
       ).toHaveCount(0);
 
-      // A saved avatar suppresses the profile nudge in both directions.
+      // The inviter already has what the link grants: it opens the drive
+      // instead of asking them to accept their own invite.
       await page.goto(
         `${FRONTEND_URL}${invitePath.pathname}${invitePath.search}`,
       );
-      await page.locator('[data-test="accept-existing"]').click();
       await expect(page.getByTestId('current-drive-title')).toHaveText(
         driveTitle,
+      );
+      await expect(page).not.toHaveURL(/\/app\/invite/);
+      await expect(page.locator('[data-test="accept-existing"]')).toHaveCount(
+        0,
       );
       await expect(
         page.getByRole('heading', { name: 'How your colleagues see you' }),
@@ -348,6 +348,10 @@ test.describe('data-browser', async () => {
     await expect(messageLocator).toBeVisible();
     await expect(
       messageLocator,
+      'A new chat message should be an entry in a chat log page',
+    ).toHaveAttribute('data-entry-key', /^[0-9a-f]+-[0-9a-f]{8}$/);
+    await expect(
+      messageLocator,
       'Message author "Dev User" missing — genesis createdBy not retrievable',
     ).toContainText('Dev User');
     // The visible label is intentionally relative ("now", "1 minute ago").
@@ -400,8 +404,11 @@ test.describe('data-browser', async () => {
       .getByRole('button', { name: 'Save and continue', exact: true })
       .click();
     await page
-      .getByLabel('Role for people who join with the link')
-      .selectOption('write');
+      .getByRole('radiogroup', {
+        name: 'Role for people who join with the link',
+      })
+      .getByRole('radio', { name: 'Write' })
+      .check();
     await page.getByRole('button', { name: 'Copy invite link' }).click();
     const inviteUrl = await page
       .locator('[data-invite-link]')
@@ -692,7 +699,9 @@ test.describe('data-browser', async () => {
     await page.keyboard.type('This is a test class');
     await page.click('button:has-text("Save")');
 
-    await expect(page.locator('text=Resource Saved')).toBeVisible();
+    // Saving leaves the form and shows the new class.
+    await expect(page.getByRole('button', { name: 'Save' })).toBeHidden();
+    await expect(page.getByText('This is a test class').first()).toBeVisible();
   });
 
   test('delete resource', smoke, async ({ page }) => {
@@ -737,7 +746,7 @@ test.describe('data-browser', async () => {
     // some renders before it unmounts, leading to flaky no-ops.
     await page.locator('dialog[open] button:has-text("Delete")').click();
 
-    // A success toast proves the command completed, not that the UI updated.
+    // Completing the command does not mean the UI updated.
     // Require removal from the mounted sidebar before any reload.
     await expect(sidebarParent).toHaveCount(0);
 
@@ -854,7 +863,9 @@ test.describe('data-browser', async () => {
       .getByPlaceholder('Paste your JSON-AD...')
       .pressSequentially(JSON.stringify(importStr));
     await page.getByRole('button', { name: 'Import' }).click();
-    await expect(page.locator('text=Imported!')).toBeVisible();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Imported.' }),
+    ).toBeVisible();
 
     // DID-parent imports get fresh DIDs (signed genesis commits), not a
     // path-derived subject. Navigate to the parent and click through to the
@@ -993,7 +1004,7 @@ test.describe('data-browser', async () => {
     await expect(restore).toBeEnabled({ timeout: 15_000 });
     await restore.click();
 
-    await expect(page.locator('text=Resource version updated')).toBeVisible();
+    await expect(restore).toBeHidden();
     // After restore the page navigates back to the resource. EditableTitle
     // may render either an `<h1>First Title</h1>` or an
     // `<input value="First Title">` depending on whether the resource is in

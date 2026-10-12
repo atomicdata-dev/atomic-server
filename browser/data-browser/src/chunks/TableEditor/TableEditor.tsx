@@ -31,6 +31,7 @@ import {
   ColumnReorderHandler,
   CopyValue,
 } from './types';
+import { useGetSelectedCells } from './hooks/useGetSelectedCells';
 import { useClearCommands } from './hooks/useClearCommands';
 import { usePasteCommand } from './hooks/usePasteCommand';
 import { DndWrapper } from './DndWrapper';
@@ -85,6 +86,19 @@ interface FancyTableProps<T> {
   onCellResize?: (sizes: number[]) => void;
   onColumnReorder?: ColumnReorderHandler;
   onRowExpand?: (index: number) => void;
+  /** Right-click on a row's header cell or on the filler cell after its last column. */
+  onRowContextMenu?: (index: number, e: React.MouseEvent) => void;
+  /**
+   * The menu for right-clicking a multi-cell selection (shift+click or drag).
+   * Rendered while that menu is open; `cells` is what the selection covers.
+   */
+  renderCellSelectionMenu?: (args: {
+    cells: CellIndex<T>[];
+    point: { x: number; y: number };
+    onClose: () => void;
+  }) => React.ReactNode;
+  /** Rendered in each row's header cell, before the expand button. */
+  RowHeaderExtra?: React.ComponentType<{ index: number }>;
   /** See {@link TableCommands.insertRowBelow}. */
   onInsertRowBelow?: (index: number) => boolean;
   /** Fires when the active cell moves (both indexes `undefined` when the
@@ -156,6 +170,9 @@ function FancyTableInner<T>({
   onPasteCommand,
   onColumnReorder,
   onRowExpand = noop,
+  RowHeaderExtra,
+  onRowContextMenu,
+  renderCellSelectionMenu,
   onInsertRowBelow,
   onSelectedCellChange,
   RowHeaderAddonComponent,
@@ -177,7 +194,22 @@ function FancyTableInner<T>({
     readOnly,
     selectedRow,
     selectedColumn,
+    selectionMenuPoint,
+    closeSelectionMenu,
   } = useTableEditorContext();
+  const getSelectedCells = useGetSelectedCells(columns);
+
+  // What the selection covered when its context menu opened. Clicking into a
+  // dialog the menu opens collapses the live selection, which must not shrink
+  // what the menu acts on.
+  const [menuCells, setMenuCells] = useState<CellIndex<T>[]>();
+
+  if (selectionMenuPoint && !menuCells) {
+    setMenuCells(getSelectedCells());
+  } else if (!selectionMenuPoint && menuCells) {
+    setMenuCells(undefined);
+  }
+
   const previousCursorMode = useRef(cursorMode);
 
   const [onScroll, setOnScroll] = useState<OnScroll>(() => undefined);
@@ -367,16 +399,29 @@ function FancyTableInner<T>({
             rowIndex={index}
             columnIndex={0}
             onExpand={onRowExpand}
+            Extra={RowHeaderExtra}
+            onContextMenu={e => onRowContextMenu?.(index, e)}
             RowHeaderAddonComponent={RowHeaderAddonComponent}
           >
             {index + 1}
           </IndexCell>
           {children({ index })}
-          <Cell rowIndex={Infinity} columnIndex={Infinity} disabled />
+          <Cell
+            rowIndex={Infinity}
+            columnIndex={Infinity}
+            disabled
+            onContextMenu={e => onRowContextMenu?.(index, e)}
+          />
         </TableRow>
       );
     },
-    [children, onRowExpand, RowHeaderAddonComponent],
+    [
+      children,
+      onRowExpand,
+      RowHeaderExtra,
+      onRowContextMenu,
+      RowHeaderAddonComponent,
+    ],
   );
 
   const rowProps = useMemo(() => ({}), []);
@@ -481,6 +526,13 @@ function FancyTableInner<T>({
           </div>
         )}
       </Table>
+      {selectionMenuPoint &&
+        menuCells &&
+        renderCellSelectionMenu?.({
+          cells: menuCells,
+          point: selectionMenuPoint,
+          onClose: closeSelectionMenu,
+        })}
     </DndWrapper>
   );
 }

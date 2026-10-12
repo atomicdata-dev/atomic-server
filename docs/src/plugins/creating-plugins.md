@@ -129,6 +129,53 @@ Every field except `schemaVersion` is optional; unknown fields and malformed dec
 - `configSchema`, `defaultConfig`: objects, as in `plugin.json`.
 - `name`, `namespace`, `version`, `description`, `author`: metadata. `name` and `namespace` must be safe path segments.
 
+- `accepts` (version 2): files the host may hand the plugin as `input.upload`, with `extensions`, `mediaTypes`, `as: "text"` and an optional `maxBytes`. The plugin page then shows an Import tab with a file picker instead of Run.
+- `destination` (version 2): where an importer writes. See [Destinations](#destinations-one-table-or-several).
+
+### Destinations: one table or several
+
+A `destination` declares a `schema` (properties and one to eight classes, by shortname) and the tables to create for it.
+The plugin page shows a **Set up** step before the first import.
+Set up adds the schema to the drive's ontology and creates each table beneath the plugin, with a default table view of its `columns`.
+It then stores what it created as the plugin's config, under `config.key` when the manifest declares one.
+
+For one kind of record, declare `table`:
+
+```json
+"destination": {
+  "schema": { "properties": [...], "classes": [...] },
+  "table": { "name": "Bank transactions", "rowClass": "bank-transaction", "columns": ["bank-amount"] }
+}
+```
+
+The config is `{ table, rowClass, properties }`: the table's subject, the subject of its row class, and every schema property's subject by shortname.
+
+For several kinds of record, add `tables`.
+Each table has its own key, and the plugin reads it back under that key:
+
+```json
+"destination": {
+  "schema": { "properties": [...], "classes": [...] },
+  "table": { "name": "Bank transactions", "rowClass": "bank-transaction", "columns": ["bank-amount"] },
+  "tables": {
+    "statements": { "name": "Bank statements", "rowClass": "bank-statement", "columns": ["statement-number"] },
+    "closingBalances": { "name": "Closing balances", "rowClass": "closing-balance", "columns": ["balance-date", "bank-amount"] }
+  }
+}
+```
+
+The config then also has `tables: { statements: { table, rowClass }, closingBalances: { table, rowClass } }`.
+The plugin writes a statement with `parent: config.tables.statements.table, isA: [config.tables.statements.rowClass]`.
+Declaring `table`, `tables` or both is allowed.
+
+- A key starts with a lower-case letter and has only letters and digits, at most 64 characters. Names of `Object.prototype` members, such as `constructor`, are refused.
+- Each table needs its own `rowClass`, so every kind of record lives in its own table and never appears as rows of another table.
+- A manifest that declares only `table` gets the same config, and the same table, as before `tables` existed.
+- Set up resumes. Running it again, or after a release adds a key to `tables`, creates only the tables that are missing. To have Set up run for a new table on existing installations, list `tables` in the manifest's `config.required`. Keep an existing table under `table`: moving it into `tables` creates a new, empty table.
+
+A drive app shown as a view of one of these tables finds the others through `await store.getData()`, which returns `{ table, rowClass, tables }`, with `tables` keyed the same way.
+For every other table, `getData()` returns `{ table, rowClass }` as before.
+
 A schema version 1 manifest is still accepted and is read as version 2 with `runtime: atomic-js/1`, `world: extension` and `entrypoints: { run: true }`.
 Its stored form does not change.
 The server-side validator is `server/src/plugins/manifest.rs`, the browser mirror is `@tomic/lib`'s `validateManifest`, and both are checked against the fixtures in `testdata/plugin-manifest/`.

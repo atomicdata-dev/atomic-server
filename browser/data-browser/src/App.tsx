@@ -5,6 +5,7 @@ import { registerHandlers } from './handlers';
 import { getAgentFromIDB, saveAgentToIDB } from './helpers/agentStorage';
 import { shouldLock } from './helpers/deviceLock';
 import { registerCustomCreateActions } from './components/forms/NewForm/CustomCreateActions';
+import { registerCustomDeleteDialogs } from './components/ResourceContextMenu/customDeleteDialogs';
 import { serverURLStorage } from './helpers/serverURLStorage';
 import { driveStorage } from './helpers/driveStorage';
 import { isRunningInTauri } from './helpers/tauri';
@@ -15,12 +16,16 @@ import {
 } from './helpers/originNode';
 
 import { useEffect, type JSX } from 'react';
-import { reportRepeatedCommitFailures } from './helpers/sentry';
+import {
+  identifyAgentInSentry,
+  reportRepeatedCommitFailures,
+} from './helpers/sentry';
 import { RouterProvider } from '@tanstack/react-router';
 import { ProxyConnectReturn } from './chunks/AppPage/ProxyConnectReturn';
 import { router } from './routes/Router';
 
 import { errorHandler } from './handlers/errorHandler';
+import { registerRefusedDriveHealing } from './helpers/managed/refusedDrive';
 import { PerformanceProfiler, attachStoreToProfiler } from './helpers/profiler';
 
 /**
@@ -244,6 +249,7 @@ declare global {
 // store.preloadPropsAndClasses();
 
 registerCustomCreateActions();
+registerCustomDeleteDialogs();
 // Register global event handlers.
 registerHandlers(store);
 
@@ -255,6 +261,8 @@ window.store = store;
 // dump a snapshot.
 attachStoreToProfiler(store);
 reportRepeatedCommitFailures(store);
+identifyAgentInSentry(store);
+registerRefusedDriveHealing(store);
 
 if (isDev()) {
   const { attachDevtools } = await import('./helpers/devtools');

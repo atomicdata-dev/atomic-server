@@ -148,8 +148,27 @@ pub struct AllowlistPolicy {
 /// while the enrollment propagates to the allowlist.
 const DEFAULT_GRACE: Duration = Duration::from_secs(600);
 
+/// The key a drive is filed under, so one drive is one entry however it is spelled.
+///
+/// The same drive reaches the policy as `did:ad:X` from a client and `atomic:X`
+/// from the store, and a drive that predates DIDs as `http://host/` or
+/// `https://host/` depending on whether the caller saw the boot origin or the
+/// public one. Behind a TLS-terminating proxy those differ by scheme alone; an
+/// exact-string allowlist then refuses the owner's own drive.
+fn drive_key(drive_subject: &str) -> String {
+    let canonical = crate::identifiers::canonicalize_scheme(drive_subject);
+    let rest = canonical
+        .strip_prefix("https://")
+        .or_else(|| canonical.strip_prefix("http://"))
+        .unwrap_or(&canonical);
+    rest.trim_end_matches('/').to_string()
+}
+
 struct AllowlistState {
+    /// Keyed by [`drive_key`].
     allowed: HashMap<String, DrivePolicy>,
+    /// [`drive_key`] -> the spelling the drive was enrolled under.
+    names: HashMap<String, String>,
     usage: HashMap<String, u64>,
     /// First time a *non-allowlisted* drive attempted a write on this node.
     first_seen: HashMap<String, Instant>,
@@ -160,6 +179,7 @@ impl Default for AllowlistState {
     fn default() -> Self {
         Self {
             allowed: HashMap::new(),
+            names: HashMap::new(),
             usage: HashMap::new(),
             first_seen: HashMap::new(),
             grace: DEFAULT_GRACE,
@@ -179,12 +199,17 @@ impl AllowlistPolicy {
         I: IntoIterator<Item = (S, Option<u64>)>,
         S: Into<String>,
     {
-        let map = drives
-            .into_iter()
-            .map(|(subject, quota_bytes)| (subject.into(), DrivePolicy { quota_bytes }))
-            .collect();
+        let mut allowed = HashMap::new();
+        let mut names = HashMap::new();
+        for (subject, quota_bytes) in drives {
+            let subject: String = subject.into();
+            let key = drive_key(&subject);
+            allowed.insert(key.clone(), DrivePolicy { quota_bytes });
+            names.insert(key, subject);
+        }
         if let Ok(mut guard) = self.inner.write() {
-            guard.allowed = map;
+            guard.allowed = allowed;
+            guard.names = names;
         }
     }
 
@@ -196,9 +221,12 @@ impl AllowlistPolicy {
     /// other drive it hosts.
     pub fn enroll(&self, drive_subject: impl Into<String>) {
         if let Ok(mut guard) = self.inner.write() {
+            let drive_subject: String = drive_subject.into();
+            let key = drive_key(&drive_subject);
+            guard.names.entry(key.clone()).or_insert(drive_subject);
             guard
                 .allowed
-                .entry(drive_subject.into())
+                .entry(key)
                 .or_insert_with(DrivePolicy::default);
         }
     }
@@ -208,7 +236,7 @@ impl AllowlistPolicy {
     pub fn allowed_drive_subjects(&self) -> Vec<String> {
         self.inner
             .read()
-            .map(|guard| guard.allowed.keys().cloned().collect())
+            .map(|guard| guard.names.values().cloned().collect())
             .unwrap_or_default()
     }
 
@@ -220,7 +248,7 @@ impl AllowlistPolicy {
     {
         if let Ok(mut guard) = self.inner.write() {
             for (subject, bytes) in usage {
-                guard.usage.insert(subject.into(), bytes);
+                guard.usage.insert(drive_key(&subject.into()), bytes);
             }
         }
     }
@@ -252,7 +280,7 @@ impl AllowlistPolicy {
         let grace = guard.grace;
         let first = *guard
             .first_seen
-            .entry(drive_subject.to_string())
+            .entry(drive_key(drive_subject))
             .or_insert(now);
 
         if now.saturating_duration_since(first) < grace {
@@ -267,7 +295,7 @@ impl SyncPolicy for AllowlistPolicy {
     fn drive_is_allowed(&self, drive_subject: &str) -> bool {
         self.inner
             .read()
-            .map(|guard| guard.allowed.contains_key(drive_subject))
+            .map(|guard| guard.allowed.contains_key(&drive_key(drive_subject)))
             .unwrap_or(false)
     }
 
@@ -275,11 +303,12 @@ impl SyncPolicy for AllowlistPolicy {
         let Ok(guard) = self.inner.read() else {
             return false;
         };
-        let Some(policy) = guard.allowed.get(drive_subject) else {
+        let key = drive_key(drive_subject);
+        let Some(policy) = guard.allowed.get(&key) else {
             return false; // not enrolled — rejected by the allowlist anyway
         };
         match policy.quota_bytes {
-            Some(quota) => guard.usage.get(drive_subject).copied().unwrap_or(0) < quota,
+            Some(quota) => guard.usage.get(&key).copied().unwrap_or(0) < quota,
             None => true,
         }
     }
@@ -409,6 +438,22 @@ mod tests {
 
     fn agent(subject: &str) -> ForAgent {
         ForAgent::AgentSubject(crate::Subject::from_raw(subject, None))
+    }
+
+    #[test]
+    fn one_drive_is_one_entry_however_it_is_spelled() {
+        let p = AllowlistPolicy::new();
+        p.set_grace(Duration::ZERO);
+        p.enroll("atomic:drivekey");
+        p.enroll("http://atomic.example.de/");
+        assert!(p.drive_is_allowed("did:ad:drivekey"));
+        assert!(p.drive_is_allowed("https://atomic.example.de"));
+        assert!(!p.drive_is_allowed("did:ad:otherkey"));
+        assert!(!p.drive_is_allowed("https://other.example.de/"));
+        // And what was enrolled is reported as it was spelled.
+        let mut hosted = p.allowed_drive_subjects();
+        hosted.sort();
+        assert_eq!(hosted, ["atomic:drivekey", "http://atomic.example.de/"]);
     }
 
     #[test]

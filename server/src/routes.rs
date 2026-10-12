@@ -193,6 +193,36 @@ async fn iroh_sync_handler(
     )
 }
 
+/// The hosted MCP endpoint and its OAuth authorization server. See
+/// `crate::mcp`. Registered before the catch-all routes so that the
+/// `.well-known` and `/oauth` paths are not read as resource subjects.
+fn configure_mcp_routes(app: &mut actix_web::web::ServiceConfig) {
+    use crate::mcp::{endpoint, oauth};
+
+    app.service(
+        web::resource("/.well-known/oauth-protected-resource")
+            .route(web::get().to(oauth::protected_resource_metadata)),
+    )
+    .service(
+        web::resource("/.well-known/oauth-protected-resource/mcp")
+            .route(web::get().to(oauth::protected_resource_metadata)),
+    )
+    .service(
+        web::resource("/.well-known/oauth-authorization-server")
+            .route(web::get().to(oauth::authorization_server_metadata)),
+    )
+    .service(web::resource("/oauth/register").route(web::post().to(oauth::register)))
+    .service(web::resource("/oauth/authorize").route(web::get().to(oauth::authorize)))
+    .service(web::resource("/oauth/agent").route(web::post().to(oauth::issue_agent)))
+    .service(web::resource("/oauth/approve").route(web::post().to(oauth::approve)))
+    .service(web::resource("/oauth/token").route(web::post().to(oauth::token)))
+    .service(
+        web::resource("/mcp")
+            .route(web::post().to(endpoint::mcp))
+            .route(web::get().to(endpoint::mcp_get)),
+    );
+}
+
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
@@ -379,8 +409,38 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .guard(guard::Method(Method::POST))
             .to(handlers::post_resource::handle_post_resource),
     )
+    .service(
+        web::resource("/form/{id}/definition")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::get_definition),
+    )
+    .service(
+        web::resource("/form/{id}/submit")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::form::submit_form),
+    )
+    .service(
+        web::resource("/form/{id}/challenge")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::get_challenge),
+    )
+    .service(
+        web::resource("/form/{id}/image")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::form_image),
+    )
+    .service(
+        web::resource("/form/{id}")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::form_page),
+    )
     .service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
+    .service(web::resource("/genesis").route(web::get().to(handlers::genesis::handle_genesis)))
     .service(web::resource("/drive-usage").to(handlers::drive_usage::handle_drive_usage))
+    .service(
+        web::resource("/drive-usage/breakdown")
+            .to(handlers::drive_usage::handle_drive_usage_breakdown),
+    )
     .service(
         web::resource("/history-attribution")
             .to(handlers::history_attribution::handle_history_attribution),
@@ -391,6 +451,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .to(handlers::forget_peer::handle_forget_peer),
     )
     .service(web::resource("/iroh-sync").route(web::post().to(iroh_sync_handler)))
+    .configure(configure_mcp_routes)
     .service(web::resource("/export").to(handlers::export::handle_export))
     .configure(configure_wasm_plugin_routes)
     .service(

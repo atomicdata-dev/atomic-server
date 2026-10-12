@@ -32,6 +32,19 @@ import {
 } from './ResourceFormContext';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { isNeverEditableProp } from '../../helpers/hiddenProperties';
+import { isContentAddressed } from '../../helpers/propertyIdentity';
+
+/** Part of a content-addressed Property's ID: the server rejects a change. */
+const IDENTITY_PROPS: string[] = [
+  core.properties.shortname,
+  core.properties.datatype,
+];
+
+/** Set per class (its `constraints`), never on a content-addressed Property. */
+const PER_CLASS_PROPS: string[] = [
+  core.properties.classtype,
+  core.properties.allowsOnly,
+];
 
 export enum ResourceFormVariant {
   Default,
@@ -92,6 +105,11 @@ export function ResourceForm({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const store = useStore();
   const wasNew: boolean = resource.new;
+  const immutableProperty = isContentAddressed(resource.subject);
+  const isShown = (prop: string) =>
+    !(immutableProperty && PER_CLASS_PROPS.includes(prop));
+  const isLocked = (prop: string) =>
+    immutableProperty && IDENTITY_PROPS.includes(prop);
 
   const onSaveSuccess = useCallback(() => {
     // We need to read the earlier .new state, because the resource is no
@@ -125,7 +143,12 @@ export function ResourceForm({
       // Server-managed, immutable properties (e.g. the genesis certificate) are
       // never shown here, not even in the Advanced section — they cannot be
       // edited by hand.
-      return propIsNotRenderedYet && isEssential && !isNeverEditableProp(prop);
+      return (
+        propIsNotRenderedYet &&
+        isEssential &&
+        !isNeverEditableProp(prop) &&
+        isShown(prop)
+      );
     });
 
     return [...prps, ...tempOtherProps];
@@ -223,21 +246,22 @@ export function ResourceForm({
                 Cannot save edits: Agent does not have edit rights
               </ErrMessage>
             )}
-            {requires.map(property => {
+            {requires.filter(isShown).map(property => {
               return (
                 <ResourceField
                   key={property + ' field'}
+                  disabled={isLocked(property) || undefined}
                   propertyURL={property}
                   resource={resource}
                   required
                 />
               );
             })}
-            {recommends.map(property => {
+            {recommends.filter(isShown).map(property => {
               return (
                 <ResourceField
                   key={property + ' field'}
-                  disabled={!canWrite}
+                  disabled={!canWrite || isLocked(property)}
                   propertyURL={property}
                   resource={resource}
                 />
@@ -247,7 +271,7 @@ export function ResourceForm({
               return (
                 <ResourceField
                   key={property + ' field'}
-                  disabled={!canWrite}
+                  disabled={!canWrite || isLocked(property)}
                   propertyURL={property}
                   resource={resource}
                   handleDelete={() => handleDelete(property)}

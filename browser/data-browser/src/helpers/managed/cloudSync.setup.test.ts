@@ -77,6 +77,9 @@ describe('Cloud Server setup', () => {
       expect(actualOrigin).toBe('https://cloud.example');
     });
     await enableCloudSyncForDrive(args);
+    expect(store.setServerUrl).toHaveBeenCalledWith('https://cloud.example', {
+      connect: false,
+    });
     expect(store.syncDriveToServerAndVerify).toHaveBeenCalledWith(drive);
   });
 

@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { Store, isEmbeddedVocabulary } from './store.js';
 import { taskSchema } from './task-schema.js';
 import { server } from './ontologies/server.js';
+import { forms } from './ontologies/forms.js';
 
 const TODO = taskSchema.tags.Todo;
 
@@ -11,6 +12,8 @@ it('counts the task vocabulary as embedded and a drive resource as not', () => {
   expect(isEmbeddedVocabulary('https://atomicdata.dev/task/v1')).toBe(true);
   expect(isEmbeddedVocabulary(server.classes.installation)).toBe(true);
   expect(isEmbeddedVocabulary(server.classes.release)).toBe(true);
+  expect(isEmbeddedVocabulary(forms.classes.form)).toBe(true);
+  expect(isEmbeddedVocabulary(forms.properties.formFields)).toBe(true);
   expect(isEmbeddedVocabulary('did:ad:whatever')).toBe(false);
   expect(isEmbeddedVocabulary('https://atomicdata.dev/properties/name')).toBe(
     false,

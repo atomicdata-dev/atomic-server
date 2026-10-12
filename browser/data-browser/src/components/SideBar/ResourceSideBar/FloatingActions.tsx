@@ -7,23 +7,28 @@ import { ResourceContextMenu } from '../../ResourceContextMenu';
 export interface FloatingActionsProps {
   subject: string;
   className?: string;
+  /** The menu mounts once the row was hovered or focused. */
+  armed: boolean;
 }
 
 /** Contains actions for a SideBarResource, such as a context menu and a new item button */
 export function FloatingActions({
   subject,
   className,
+  armed,
 }: FloatingActionsProps): JSX.Element {
   const [dropdownActive, setDropdownActive] = useState(false);
 
   return (
     <Wrapper className={className} dropdownActive={dropdownActive}>
-      <ResourceContextMenu
-        simple
-        subject={subject}
-        trigger={SideBarDropDownTrigger}
-        bindActive={setDropdownActive}
-      />
+      {armed && (
+        <ResourceContextMenu
+          simple
+          subject={subject}
+          trigger={SideBarDropDownTrigger}
+          bindActive={setDropdownActive}
+        />
+      )}
     </Wrapper>
   );
 }

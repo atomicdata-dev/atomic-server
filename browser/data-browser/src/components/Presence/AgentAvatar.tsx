@@ -1,5 +1,6 @@
 import { styled } from 'styled-components';
 import { transition } from '../../helpers/transition';
+import { AvatarImg } from '../AvatarImg';
 import {
   useResource,
   useString,
@@ -69,10 +70,9 @@ export function AgentAvatar({
   );
   const localIconUrl = useFileObjectUrl(iconResource, iconDownloadUrl);
   const iconSrc = iconFile ? localIconUrl : undefined;
-
   let circle: React.JSX.Element;
 
-  if (iconSrc) {
+  if (iconFile) {
     circle = (
       <ImageCircle
         $size={size}
@@ -80,7 +80,11 @@ export function AgentAvatar({
         title={following ? undefined : name}
         data-agent-avatar=''
       >
-        <img src={iconSrc} alt={name} />
+        <AvatarImg
+          src={iconSrc}
+          alt={name}
+          fallback={<InitialFill>{name.charAt(0).toUpperCase()}</InitialFill>}
+        />
       </ImageCircle>
     );
   } else if (imageFile) {
@@ -130,6 +134,14 @@ export function AgentAvatar({
     </AvatarWithStatus>
   );
 }
+
+const InitialFill = styled.span`
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-weight: bold;
+`;
 
 const AvatarWithStatus = styled.span`
   position: relative;

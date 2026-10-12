@@ -498,6 +498,20 @@ mod tests {
     /// deleted at the end. Their pages are freed mid-file, where redb's own
     /// tail truncation cannot reach them, so the file keeps its high-water
     /// size. Returns the file's `(length, bytes on disk)` after a clean close.
+    /// Text that deflate cannot shrink: stored values are compressed, and a
+    /// repeated string would leave no dead space to reclaim.
+    fn noise(seed: usize, len: usize) -> String {
+        let mut state = (seed as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        (0..len)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (b'a' + (state % 26) as u8) as char
+            })
+            .collect()
+    }
+
     async fn fill(dir: &std::path::Path) -> (u64, u64) {
         use crate::{urls, Resource, Storelike, Value};
         let store = open(dir, &CompactionPolicy::disabled()).await;
@@ -508,7 +522,7 @@ mod tests {
                 let mut r = Resource::new(subject.clone());
                 r.set_unsafe(
                     urls::DESCRIPTION.into(),
-                    Value::String(format!("t{round}-{j}-").repeat(3_000)),
+                    Value::String(noise(round * THROWAWAY + j, 18_000)),
                 )
                 .unwrap();
                 // No index update: the test is about the file, and indexing

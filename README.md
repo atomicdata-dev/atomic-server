@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./logo-dark.svg">
-  <img alt="Atomic Place" src="./logo.svg">
+  <img alt="atomic.place" src="./logo.svg">
 </picture>
 
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
@@ -8,18 +8,22 @@
 [![MIT licensed](https://img.shields.io/github/license/atomicdata-dev/atomic-server.svg?color=blue&logo=github&logoColor=blue)](./LICENSE)
 [![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-server?style=social)](https://github.com/atomicdata-dev/atomic-server)
 
-**Atomic Place is a local-first workspace for documents, tables, files, chat and apps.**
-It works on your device and can sync through a self-hosted AtomicServer or optional
-[managed services](https://atomic.place). The underlying [Atomic Data](https://docs.atomicdata.dev/atomic-data-overview)
-specification is open.
+**atomic.place is a local-first workspace for documents, tables, files, chat and apps.**
+It works on your device and can sync through a self-hosted AtomicServer or the hosted service at
+[atomic.place](https://atomic.place). The underlying [Atomic Data](https://docs.atomicdata.dev/atomic-data-overview)
+specification is open. It comes in three propositions:
+
+- **[Personal Data Store](https://docs.atomicdata.dev/personal-data-store)**: your identity is a key, your data is encrypted on your own devices, and every edit is signed by you.
+- **[All-in-One Workspace](https://docs.atomicdata.dev/all-in-one-workspace)**: documents, tables, chat, meetings, canvas, websites, AI and apps, with one permission model.
+- **[Local-first Sync Engine](https://docs.atomicdata.dev/sync-engine)**: build apps on the same Loro CRDT store and sync protocol, with no backend of your own.
 
 This repo includes:
 
-- **Atomic Place**, the workspace in the [browser](/browser/data-browser), on [desktop](/desktop)
+- **atomic.place**, the workspace in the [browser](/browser/data-browser), on [desktop](/desktop)
   and on mobile.
 - **AtomicServer**, the [self-hostable server](/server) for storage, search, sharing and sync.
 - [`docs`](docs/README.md) documentation / specification for Atomic Data ([docs.atomicdata.dev](https://docs.atomicdata.dev)).
-- [Atomic Data Browser](/browser/data-browser/README.md), the React front-end for Atomic Place.
+- [Atomic Data Browser](/browser/data-browser/README.md), the React front-end for atomic.place.
 - [`@tomic/lib`](/browser/lib/README.md) JS NPM library.
 - [`@tomic/react`](/browser/react/README.md) React NPM library.
 - [`@tomic/svelte`](/browser/svelte/README.md) Svelte NPM library.
@@ -29,7 +33,7 @@ This repo includes:
 
 _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 
-## Atomic Place
+## Features
 
 <!-- We re-use this table in various places, such as README.md and in the docs repo. Consider this the source. -->
 - 🏠  **Local-first**: works offline in the browser, syncs when you reconnect with [Atomic Sync](https://docs.atomicdata.dev/sync).

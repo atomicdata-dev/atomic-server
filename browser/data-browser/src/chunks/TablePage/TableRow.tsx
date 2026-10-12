@@ -15,11 +15,13 @@ import {
   useMemberFromCollection,
   useResource,
 } from '@tomic/react';
+import { Cell } from '@chunks/TableEditor';
 import { TableCell } from './TableCell';
 import type { TableColumn } from './useTableColumns';
 import { styled, keyframes } from 'styled-components';
 import { useTableEditorContext } from '@chunks/TableEditor/TableEditorContext';
 import { FaTriangleExclamation } from 'react-icons/fa6';
+import { useIsUnsavedDraft } from './draftRow';
 import { useMaterializeWhenDeselected } from './useMaterializeWhenDeselected';
 import { withRowDefaults } from './rowDefaults';
 
@@ -27,6 +29,11 @@ interface TableRowProps {
   collection: Collection;
   index: number;
   columns: TableColumn[];
+  /**
+   * The row's subject when the caller already knows it (the quick filter's
+   * matches), so the row draws at once instead of resolving its index first.
+   */
+  subject?: string;
 }
 
 const WarningIcon = styled(FaTriangleExclamation)`
@@ -76,6 +83,7 @@ export function TableRow({
   collection,
   index,
   columns,
+  subject,
 }: TableRowProps): JSX.Element {
   const resource = useMemberFromCollection(collection, index);
 
@@ -102,9 +110,10 @@ export function TableRow({
   }
 
   const displaySubject =
-    lastKnownRef.current?.index === index
+    subject ??
+    (lastKnownRef.current?.index === index
       ? lastKnownRef.current.subject
-      : undefined;
+      : undefined);
 
   if (!displaySubject) {
     return (
@@ -180,6 +189,8 @@ export function TableNewRow({
   // never remount.
   const resource = useResource(subject, resourceOpts);
 
+  const isDraft = useIsUnsavedDraft(resource);
+
   useMarkings(resource, index);
   useMaterializeWhenDeselected(resource, index);
 
@@ -241,10 +252,21 @@ export function TableNewRow({
             languageTag={column.languageTag}
             onFirstContent={handleFirstContent}
           />
+        ) : column.virtual && !isDraft ? (
+          // Saved while it still renders here, so it has a row to read.
+          <column.virtual.Cell
+            key={column.key}
+            subject={subject}
+            rowIndex={index}
+            columnIndex={cIndex + 1}
+          />
         ) : (
-          // Virtual columns read from a saved row; the trailing draft row has
-          // nothing for them to show yet.
-          <div key={column.key} />
+          // Virtual columns read from a saved row; an unsaved draft has
+          // nothing for them to show yet. It still needs a cell: Tab out of the
+          // last stored column lands here, and with no cell to take focus the
+          // keyboard goes to <body>, the grid never sees the Escape, and the
+          // row stays "in use" for good, so it is never saved.
+          <Cell key={column.key} rowIndex={index} columnIndex={cIndex + 1} />
         ),
       )}
     </>

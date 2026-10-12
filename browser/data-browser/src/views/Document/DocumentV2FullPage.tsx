@@ -14,6 +14,7 @@ import {
   loroDocHasVisibleContent,
   upgradeDocument,
 } from './upgradeDocument';
+import { Spinner } from '../../components/Spinner';
 
 const CollaborativeEditor = lazy(
   () => import('@chunks/RTE/CollaborativeEditor'),
@@ -109,11 +110,11 @@ export const DocumentV2FullPage: React.FC<ResourcePageProps> = ({
       );
     }
 
-    return <div>Loading...</div>;
+    return <Spinner centered />;
   }
 
   if (!yjsMigrated) {
-    return <div>Loading...</div>;
+    return <Spinner centered />;
   }
 
   const focusEditor = () => {
@@ -130,7 +131,7 @@ export const DocumentV2FullPage: React.FC<ResourcePageProps> = ({
           withDecorations
         />
 
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<Spinner centered />}>
           <CollaborativeEditor
             id='document-editor'
             resource={resource}

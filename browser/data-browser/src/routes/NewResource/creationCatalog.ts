@@ -1,4 +1,4 @@
-import { ai, canvas, core, dataBrowser } from '@tomic/lib';
+import { ai, canvas, core, dataBrowser, forms } from '@tomic/lib';
 import { TABLE_TEMPLATES } from '../../chunks/TablePage/tableTemplates';
 import { templates } from '../../components/Template/template';
 
@@ -47,6 +47,11 @@ export const BASIC_CREATIONS = [
     subject: core.classes.ontology,
     title: 'Ontology',
     description: 'Define reusable resource types and properties.',
+  },
+  {
+    subject: forms.classes.form,
+    title: 'Form',
+    description: 'Collect answers from anyone with a link, into a table.',
   },
   {
     subject: ai.classes.aiChat,

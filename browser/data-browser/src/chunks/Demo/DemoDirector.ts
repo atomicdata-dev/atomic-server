@@ -8,6 +8,7 @@ import {
   core,
   dataBrowser,
   type PresenceEntry,
+  type Resource,
   type Store,
 } from '@tomic/react';
 import {
@@ -21,10 +22,10 @@ import {
   type PersonaKey,
 } from './demoWorkspace';
 import { colorForAgent } from '../../components/Presence/AgentAvatar';
-import { getOrCreateMeetingsFolder } from '../../helpers/standardLocations';
 import { simulatePropEdit } from './simulatedEdits';
-import { DEMO_SPEAKER } from './messageSpeaker';
+import { isFollowEntry } from '../../helpers/chatLog';
 import { SimulatedTypist } from './SimulatedTypist';
+import { greetingFor } from './greeting';
 import { YUSUF_LIVE_STROKES } from './moodboardStrokes';
 
 /** Presence entries expire after 30s; refresh well inside that. */
@@ -89,11 +90,14 @@ export class DemoDirector {
   /** The user's own Team-table row (guest DID or a created row), set at the
    *  team-table tour stop — the checkbox `completeSayHi` ticks. */
   private memberRow?: string;
-  /** The "Say hi" payoff, memoized so it runs at most once no matter whether
-   *  the linear script or the reactive chat listener triggers it first — and
-   *  so the script's `await` joins the listener's in-flight run instead of
-   *  racing ahead of it. */
-  private sayHiPromise?: Promise<void>;
+  /** Mara's answer to the user's first message, memoized so it runs at most
+   *  once no matter whether the linear script or the reactive chat listener
+   *  triggers it first — and so the script's `await` joins the listener's
+   *  in-flight run instead of racing ahead of it. */
+  private greetPromise?: Promise<void>;
+  /** Mara has brought the user to the board, where the "Say hi" card lives. */
+  private onBoard = false;
+  private sayHiCardMoved = false;
   private heartbeatTimer?: ReturnType<typeof setInterval>;
   private wanderTimer?: ReturnType<typeof setInterval>;
   private tableWanderTimer?: ReturnType<typeof setInterval>;
@@ -136,32 +140,29 @@ export class DemoDirector {
     this.unsubscribeSaved = this.store.on(
       StoreEvents.ResourceSaved,
       resource => {
-        if (this.selfSaving) return;
         if (!this.store.isLocalOnlySubject(resource.subject)) return;
 
-        // The reactive trigger: a message the user posted into the
-        // meeting chat ("say something"). An open editor re-saving
-        // imported persona ops can't reach this — those aren't Messages
-        // parented to the meeting.
-        // Only something the user typed counts. Joining the meeting and
-        // following Mara also post messages here, as the user: the "Demo
-        // User joined the meeting" and "Viewing …" trail entries. Those
-        // ticked off "Say hi" the moment the user joined, before they had
-        // typed anything. A persona's line carries its speaker, which also
-        // covers overlapping saves the shared `selfSaving` flag misses.
+        // The reactive trigger: a message the user posted into the meeting
+        // chat ("say something"). A message is an entry in a page of the
+        // meeting's chat log. Only something the user typed counts: joining
+        // the meeting and following Mara also post entries here, as the user
+        // ("Demo User joined the meeting", "Viewing …"), but those are
+        // follow events; a persona's line is authored as the persona. That
+        // author check is what tells the user's line from ours, so this must
+        // NOT be gated on `selfSaving`: that flag is raised for the whole
+        // duration of each of our own saves, and a message the user sent
+        // inside such a window was dropped, leaving the chat unanswered.
         if (
           this.meeting &&
           resource.get(core.properties.parent) === this.meeting &&
-          resource.hasClasses(dataBrowser.classes.message) &&
-          !resource.hasClasses(dataBrowser.classes.followEvent) &&
-          !resource.get(DEMO_SPEAKER)
+          resource.hasClasses(dataBrowser.classes.chatLog) &&
+          this.userTyped(resource)
         ) {
           this.userChatted = true;
           this.userChatWaiters.forEach(resolve => resolve());
           this.userChatWaiters = [];
-          // Own the "Say hi" payoff reactively — so it fires the moment the
-          // user chats, even if that's outside the script's wait window
-          // (e.g. they explored first). Idempotent via `sayHiDone`.
+          // Answer reactively — so Mara replies the moment the user chats,
+          // even outside the script's wait window (e.g. they explored first).
           void this.completeSayHi();
         }
       },
@@ -176,6 +177,18 @@ export class DemoDirector {
       console.warn('[Demo] director stopped on error:', e);
       this.stop();
     });
+  }
+
+  /** Whether the chat log page holds a line the signed-in user typed. */
+  private userTyped(page: Resource): boolean {
+    const me = this.store.getAgent()?.subject;
+
+    return (
+      !!me &&
+      page
+        .listChatLogEntries()
+        .some(({ entry }) => entry.a === me && !isFollowEntry(entry))
+    );
   }
 
   public stop(): void {
@@ -209,57 +222,72 @@ export class DemoDirector {
     await this.startWhen;
     if (this.stopped) return;
 
-    // Mara and Yusuf are already here when the user lands.
-    this.announceMara(manifest.welcomeDoc);
+    // The user lands in the onboarding meeting (see `DemoRoute`). Starting it
+    // lists it as live and puts Mara in it, which is what opens the meeting
+    // chat beside them: opening a live meeting is joining it.
+    await this.startTourMeeting();
+    if (this.stopped) return;
+
+    this.announceMara(manifest.meeting);
     this.announce('yusuf', { resource: manifest.moodboard });
     this.startYusufWander();
 
-    // The welcome doc is being written, and it reacts to the
-    // user's arrival.
-    await this.type('mara', manifest.welcomeDoc, [
-      'This workspace is a demo of AtomicServer.',
+    // The meeting notes are being written as the meeting starts; the user
+    // reads along while Mara talks in the chat.
+    const notes = this.type('mara', manifest.meeting, [
+      'This workspace is a demo of atomic.place.',
       'Feel free to edit, remove or create anything you like!',
-    ]);
+    ]).catch(() => undefined);
 
-    // Mara starts a meeting while she types the line that invites the user
-    // into it: the top-bar Join banner lights up mid-sentence, and the
-    // sentence ends in a link to it. No pause between the two.
-    await this.appendMeetingLink(this.startTourMeeting());
-
-    // Wait for the user to Join (open the meeting). If they don't within
-    // ~25s, carry on anyway so the log exists for whenever they do.
-    await this.waitForJoin(25_000);
+    // Give the chat panel a moment to open. If they don't join within a few
+    // seconds, carry on anyway so the log exists for whenever they do.
+    await this.waitForJoin(8_000);
 
     if (this.stopped) return;
 
-    // Joining takes them straight to the board, where their first task is
-    // waiting, and that task is to say hi. The tour only moves on once they
-    // have (or after a while), so nothing changes page while they are still
-    // finding the chat.
-    this.announceMara(manifest.checklist.table, {
-      row: manifest.checklist.rows[ROW_SAY_HI],
-      column: manifest.checklist.statusColumn,
-    });
-    await this.narrate('Welcome to your onboarding meeting! 👋');
     await this.narrate(
-      'First things first: say hi in this chat. That ticks off “Say hi in the meeting chat” on the board.',
+      'Welcome to atomic.place! 👋 I’m Mara, glad you’re here.',
+    );
+    await this.narrate(
+      'First things first: say hi in this chat. I’ll show you the rest of the workspace after that.',
     );
 
-    if (await this.waitForUserChat(45_000)) {
+    // Nothing changes page until they have said hi (or a while has passed),
+    // so they are never mid-sentence in the chat when the page moves.
+    const saidHi = await this.waitForUserChat(45_000);
+
+    if (this.stopped) return;
+
+    if (saidHi) {
       await this.completeSayHi();
+    } else {
+      await this.narrate(
+        'No rush, say hi whenever you like. Let’s have a look around.',
+      );
     }
 
     if (this.stopped) return;
 
+    await notes;
     await this.sleep(STEP_PAUSE_MS);
     // Call out the Meeting feature itself while we're in one.
     await this.narrate(
       'This is a Meeting 🎥. Anyone on the team can start one to chat with colleagues and look at the same thing at the same time.',
     );
     await this.narrate(
-      'You’re following me right now, so we’re looking at the same thing. I’ll walk you through the rest.',
+      'You’re following me right now, so we’re looking at the same thing. Come along, I’ll walk you through the rest.',
     );
     await this.sleep(STEP_PAUSE_MS);
+
+    // Mara moves to the board and the user follows. Their first task is
+    // waiting there: if they said hi, it ticks off in front of them.
+    this.announceMara(manifest.checklist.table, {
+      row: manifest.checklist.rows[ROW_SAY_HI],
+      column: manifest.checklist.statusColumn,
+    });
+    this.onBoard = true;
+    await this.sleep(STEP_PAUSE_MS);
+    await this.tickSayHiCard();
 
     // ── Tour stop 1: the board (the long, lively, meta stop) ──
     this.announceMara(manifest.checklist.table, {
@@ -313,7 +341,7 @@ export class DemoDirector {
     this.startTableWander();
     await this.narrate('This is where we keep track of our members!');
     await this.narrate(
-      'Tables in AtomicServer are pretty powerful, you can define custom columns, filters and views.',
+      'Tables in atomic.place are pretty powerful, you can define custom columns, filters and views.',
     );
     await this.sleep(1_500);
     await this.narrate(
@@ -392,49 +420,6 @@ export class DemoDirector {
     this.leave('mara');
   }
 
-  /** Close the welcome doc with a link to the tour meeting — the single
-   *  most important thing to point a new teammate at. */
-  private async appendMeetingLink(
-    meetingStarted: Promise<void>,
-  ): Promise<void> {
-    const resource = await this.getBeatResource(this.manifest.welcomeDoc);
-
-    if (!resource || this.stopped) return;
-
-    const doc = this.manifest.welcomeDoc;
-    const typist = new SimulatedTypist(
-      this.store,
-      resource,
-      this.manifest.personas.mara,
-      this.cursorUser('mara'),
-    );
-
-    try {
-      await typist.start();
-      this.touch(doc);
-      typist.appendParagraph();
-
-      await this.typeText(
-        typist,
-        doc,
-        'I’m about to start a tour to show you around. Join it here: ',
-      );
-
-      await meetingStarted;
-      const meeting = this.meeting;
-
-      if (this.stopped || !meeting) return;
-
-      this.touch(doc);
-      typist.appendInline({
-        type: 'atomic-data-resource-inline',
-        attrs: { subject: meeting },
-      });
-    } finally {
-      typist.stop();
-    }
-  }
-
   // ─── Presence ────────────────────────────────────────────────────
 
   /** Mara's announces carry `allowFollow` plus, once the tour meeting
@@ -451,8 +436,9 @@ export class DemoDirector {
       ...(data !== undefined ? { data } : {}),
     });
 
-    // While the meeting is live, log each stop as a trail entry.
-    if (moved && this.meeting) {
+    // While the meeting is live, log each stop as a trail entry. The meeting
+    // itself is not a stop: it is where the trail is kept.
+    if (moved && this.meeting && resource !== this.meeting) {
       void this.postTrail(viewingMessage(this.store, resource));
     }
   }
@@ -651,6 +637,28 @@ export class DemoDirector {
     }
   }
 
+  /**
+   * `newResource` reads the parent's drive from memory. A parent that is not
+   * loaded makes the child claim the parent itself as its drive, so the store
+   * no longer sees it as local-only and posts its genesis to the server, which
+   * answers 404 on every outbox retry. Load the parent (from the local
+   * database) first, and refuse to create under one that is really gone.
+   *
+   * A local-only subject can only be read once the local database has opened,
+   * and that can still be underway while the demo starts. Wait for it, and when
+   * it never opens, carry on as before rather than failing the demo on a
+   * read that could not have succeeded.
+   */
+  private async loadParent(subject: string): Promise<void> {
+    const dbReady = (await this.store.getClientDb()?.waitForReady()) ?? false;
+    const parent = await this.store.getResource(subject).catch(() => undefined);
+
+    if (parent && !parent.error) return;
+    if (!dbReady) return;
+
+    throw new Error(`Demo parent ${subject} is not in the local demo drive`);
+  }
+
   private touch(subject: string): void {
     this.recentlyTouched.set(subject, Date.now());
   }
@@ -771,23 +779,25 @@ export class DemoDirector {
     });
   }
 
-  /** The "Say hi" payoff: welcome the user, tick their onboarding checkbox,
-   *  and drag the "Say hi in the meeting chat" card to Done. Idempotent and
-   *  callable from either the linear script or the reactive chat listener —
-   *  whichever sees the user's first message first. Best-effort throughout
-   *  (a missing meeting just skips the chatter; the card still moves). */
+  /** Mara's answer to the user's first message: greet them by name, and tick
+   *  their onboarding checkbox when their Team-table row exists. Idempotent
+   *  and callable from either the linear script or the reactive chat
+   *  listener, whichever sees the message first. Best-effort throughout (a
+   *  missing meeting just skips the chatter). The "Say hi" card is ticked
+   *  separately, once Mara has brought the user to the board. */
   private completeSayHi(): Promise<void> {
-    if (!this.sayHiPromise) {
-      this.sayHiPromise = this.runSayHi();
+    if (!this.greetPromise) {
+      this.greetPromise = this.runSayHi();
     }
 
-    return this.sayHiPromise;
+    return this.greetPromise;
   }
 
   private async runSayHi(): Promise<void> {
     if (this.stopped) return;
 
-    await this.narrate('there they are! welcome aboard 🎉');
+    // A direct, prompt reply: this is an answer to what they just typed.
+    await this.narrate(greetingFor(await this.userName()), { reply: true });
     await this.postChat('yusuf', 'the new teammate speaks 🎉');
 
     // Tick their "Completed onboarding" checkbox — Mara flips it, the same
@@ -811,11 +821,32 @@ export class DemoDirector {
       }
     }
 
+    // They said hi after Mara had already moved on to the board.
+    await this.tickSayHiCard();
+  }
+
+  /** Drag "Say hi in the meeting chat" to Done, once the user has said hi and
+   *  Mara has brought them to the board. At most once. */
+  private async tickSayHiCard(): Promise<void> {
+    if (this.sayHiCardMoved || !this.userChatted || !this.onBoard) return;
+    this.sayHiCardMoved = true;
+
     await this.moveCard(
       'mara',
       this.manifest.checklist.rows[ROW_SAY_HI],
       'Done',
     );
+  }
+
+  /** The signed-in user's display name, if their agent has one. */
+  private async userName(): Promise<string | undefined> {
+    const subject = this.store.getAgent()?.subject;
+
+    if (!subject) return undefined;
+
+    const agent = await this.getBeatResource(subject);
+
+    return agent?.title;
   }
 
   /** Yusuf draws the second creature's face onto the moodboard, one
@@ -891,6 +922,7 @@ export class DemoDirector {
       const agent = agentSubject
         ? await this.store.getResource(agentSubject)
         : undefined;
+      await this.loadParent(team.table);
       const row = await this.store.newResource({
         parent: team.table,
         isA: team.rowClass,
@@ -930,6 +962,7 @@ export class DemoDirector {
 
     try {
       const tag = this.manifest.checklist.statusTags[status];
+      await this.loadParent(this.manifest.checklist.table);
       const card = await this.store.newResource({
         parent: this.manifest.checklist.table,
         isA: this.manifest.checklist.rowClass,
@@ -996,12 +1029,19 @@ export class DemoDirector {
    *  length-proportional compose pause — a beat to think, then typing
    *  time — so back-to-back narration paces like a person chatting
    *  instead of a script dumping lines. */
-  private async narrate(text: string): Promise<void> {
+  private async narrate(
+    text: string,
+    { reply = false }: { reply?: boolean } = {},
+  ): Promise<void> {
     if (this.stopped || !this.meeting) return;
 
     // Show "Mara is typing…" while she composes, then clear it as she sends.
+    // A reply to something the user just typed composes quickly and does not
+    // wait for the tab to be visible: it must land when they expect it.
     this.setMaraTyping(true);
-    await this.sleep(700 + text.length * 40 + Math.random() * 500);
+    await (reply
+      ? this.sleep(500 + Math.random() * 300, { pauseWhenHidden: false })
+      : this.sleep(700 + text.length * 40 + Math.random() * 500));
     this.setMaraTyping(false);
 
     if (this.stopped || !this.meeting) return;
@@ -1022,51 +1062,26 @@ export class DemoDirector {
 
   // ─── Meeting ─────────────────────────────────────────────────────
 
-  /** Mara starts the tour Meeting and lists it in the
-   *  drive's `currentMeetings`, which lights up the Join banner. The
-   *  drive/meeting genesis is user-signed (only the user's agent can),
-   *  guarded against the reactive triggers. */
+  /** Mara starts the tour Meeting: lists it in the drive's `currentMeetings`,
+   *  which makes it live (and, for a visitor who has it open, joins them to
+   *  it and opens its chat). The Meeting itself was made with the workspace.
+   *  The drive update is user-signed (only the user's agent can), guarded
+   *  against the reactive triggers. */
   private async startTourMeeting(): Promise<void> {
     if (this.meeting || this.stopped) return;
     this.selfSaving = true;
 
     try {
-      // Same standard location real meetings use: the drive's Meetings
-      // folder, found (or created) via its `meetingsFolder` pointer.
-      const meetingsFolder = await getOrCreateMeetingsFolder(
-        this.store,
-        this.manifest.drive,
-      );
-
-      const meeting = await this.store.newResource({
-        parent: meetingsFolder,
-        isA: dataBrowser.classes.meeting,
-        propVals: {
-          [core.properties.name]: 'Onboarding meeting',
-          [dataBrowser.properties.meetingStartedAt]: Date.now(),
-          [dataBrowser.properties.meetingLeader]: this.manifest.personas.mara,
-        },
-      });
-      await meeting.save();
-
+      const meeting = this.manifest.meeting;
       const drive = await this.store.getResource(this.manifest.drive);
-      drive.push(
-        dataBrowser.properties.currentMeetings,
-        [meeting.subject],
-        true,
-      );
+      drive.push(dataBrowser.properties.currentMeetings, [meeting], true);
       await drive.save();
 
-      this.meeting = meeting.subject;
+      this.meeting = meeting;
     } catch (e) {
       console.warn('[Demo] could not start meeting:', e);
     } finally {
       this.selfSaving = false;
-    }
-
-    // Re-announce so Mara's presence session now points at the meeting.
-    if (this.personas.mara.entry) {
-      this.announceMara(this.personas.mara.entry.resource!);
     }
   }
 
@@ -1111,12 +1126,15 @@ export class DemoDirector {
 
   // ─── Timing ──────────────────────────────────────────────────────
 
-  private sleep(ms: number): Promise<void> {
+  private sleep(
+    ms: number,
+    { pauseWhenHidden = true }: { pauseWhenHidden?: boolean } = {},
+  ): Promise<void> {
     return new Promise(resolve => {
       const finish = () => {
         // Pause while the tab is hidden: resume (and only then resolve)
         // once the user is back, so they don't miss the show.
-        if (document.hidden && !this.stopped) {
+        if (pauseWhenHidden && document.hidden && !this.stopped) {
           const onVisible = () => {
             document.removeEventListener('visibilitychange', onVisible);
             resolve();

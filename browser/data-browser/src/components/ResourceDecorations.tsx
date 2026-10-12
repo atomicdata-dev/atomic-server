@@ -460,14 +460,14 @@ export function TitleDecorationAffordances({
             onPickExisting={openFilePicker}
             Trigger={
               <AffordanceTrigger>
-                <FaFaceSmile aria-hidden /> Add icon
+                <FaFaceSmile key='icon' aria-hidden /> Add icon
               </AffordanceTrigger>
             }
           />
         )}
         {!cover && (
           <Button ghost onClick={() => setShowPicker(true)}>
-            <FaImage aria-hidden /> Add cover
+            <FaImage key='cover' aria-hidden /> Add cover
           </Button>
         )}
       </AffordanceRow>

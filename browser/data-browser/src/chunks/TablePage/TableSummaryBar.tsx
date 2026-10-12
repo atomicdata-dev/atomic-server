@@ -5,6 +5,7 @@ import { ResourceInline } from '@views/ResourceInline';
 import { usePropertyTitles } from './helpers/usePropertyTitles';
 import type { DerivedColumnSpec } from './derivedColumns';
 import {
+  AGGREGATE_FUNCTION_LABELS,
   aggregateKey,
   BREAKDOWN_ROWS_ID,
   formatAggregateValue,
@@ -74,6 +75,16 @@ export function TableSummaryBar({
     );
   };
 
+  const aggregateLabel = (aggregate: TableAggregate) => {
+    const name = aggregate.derived
+      ? byDerived.get(aggregate.derived)?.label
+      : aggregate.property
+        ? titles.get(aggregate.property)
+        : undefined;
+
+    return `${AGGREGATE_FUNCTION_LABELS[aggregate.function]}${name ? ` of ${name}` : ''}`;
+  };
+
   // Buckets come from the row count: every aggregate is grouped by the same
   // property, but only the count sees every row, so it alone reports each
   // group's size (a sum's `count` is just the rows that had a number).
@@ -99,6 +110,18 @@ export function TableSummaryBar({
     <Wrapper data-testid='table-summary'>
       <Breakdown data-testid='table-breakdown'>
         <caption>Per {titles.get(groupByColumn!) ?? ''}</caption>
+        {/* Without headings a bare 1 could be a sum, an average or a count. */}
+        <thead>
+          <tr>
+            <th scope='col'>{titles.get(groupByColumn!) ?? ''}</th>
+            {aggregates.map(aggregate => (
+              <th scope='col' key={aggregate.id}>
+                {aggregateLabel(aggregate)}
+              </th>
+            ))}
+            <th scope='col'>Rows</th>
+          </tr>
+        </thead>
         <tbody>
           {groups.map(group => (
             <tr key={group.key} data-testid={`group-${group.key}`}>
@@ -151,6 +174,18 @@ const Breakdown = styled.table`
     color: ${p => p.theme.colors.textLight};
     font-size: 0.8rem;
     padding-bottom: 0.2rem;
+  }
+
+  th {
+    color: ${p => p.theme.colors.textLight};
+    font-size: 0.8rem;
+    font-weight: normal;
+    padding: 0 0.75rem 0.15rem 0;
+    text-align: right;
+  }
+
+  th:first-child {
+    text-align: left;
   }
 
   td {

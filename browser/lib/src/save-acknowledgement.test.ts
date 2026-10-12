@@ -5,7 +5,7 @@ import { testStore } from './test-store.js';
 import { AtomicError, ErrorType, RequestCancelledError } from './error.js';
 import { BLOCK_AFTER_FAILURES } from './local-outbox.js';
 import { ErrorCode } from './ws-v2.js';
-import type { Store } from './store.js';
+import { StoreEvents, type Store } from './store.js';
 
 function localDatabase(store: Store, unsupportedEnvironment = false) {
   const putResourceWithSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -219,6 +219,58 @@ describe('explicit save acknowledgement', () => {
 
     await expect(doc.save()).rejects.toBe(error);
     expect(postCommitSpy).toHaveBeenCalledTimes(attempts);
+    store.setServerConnected(false);
+  });
+
+  it('re-arms a write parked for a missing parent when its drive finishes a resync', async () => {
+    const { store, postCommitSpy } = await testStore();
+    const doc = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Drive',
+      noParent: true,
+    });
+    const refusal =
+      'Parent of atomic:a (atomic:b) not found: Resource not found.';
+    postCommitSpy.mockRejectedValue(new Error(refusal));
+    await doc.save().catch(() => undefined);
+    const entry = store.outbox.getEntry(doc.subject)!;
+    entry.failures = BLOCK_AFTER_FAILURES;
+    entry.blocked = true;
+    entry.lastAttemptError = refusal;
+
+    // Another drive finishing its sync says nothing about this one's parent.
+    store.finishDriveSync('did:ad:some-other-drive', 1, Date.now());
+    expect(entry.blocked).toBe(true);
+
+    store.finishDriveSync(doc.subject, 1, Date.now());
+    expect(entry.blocked).toBe(false);
+    expect(entry.failures).toBe(0);
+    store.setServerConnected(false);
+  });
+
+  it('reports writes refused for a missing parent once per workspace', async () => {
+    const { store } = await testStore();
+    const drive = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Drive',
+      noParent: true,
+    });
+    const refusal =
+      'Parent of atomic:a (atomic:b) not found: Resource not found.';
+    const errors: string[] = [];
+    store.on(StoreEvents.Error, e => errors.push(e.message));
+    const notify = (subject: string) =>
+      (
+        store as unknown as {
+          notifyBlockedSync(subject: string, message: string): void;
+        }
+      ).notifyBlockedSync(subject, refusal);
+
+    notify(drive.subject);
+    notify(drive.subject);
+    notify(drive.subject);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('workspace');
+    expect(errors[0]).not.toContain('Not retrying; edit again');
     store.setServerConnected(false);
   });
 

@@ -33,6 +33,16 @@
     "https://atomicdata.dev/properties/shortname": "about"
   },
   {
+    "@id": "https://atomicdata.dev/properties/demo/speaker",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Which demo persona a scripted guest-demo message is shown as. Presentation only: the message is still signed by the visitor's own identity.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "demo-speaker"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/commentsFolder",
     "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Folder",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
@@ -42,6 +52,27 @@
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
     "https://atomicdata.dev/properties/shortname": "comments-folder"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/trashFolder",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Folder",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "Points to the Folder in this Drive that holds resources moved to the Trash.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "trash-folder"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/trashedFrom",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The parent a resource had before it was moved to the Trash. Restoring moves it back there.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "trashed-from"
   },
   {
     "@id": "https://atomicdata.dev/properties/followSessionsChatroom",
@@ -96,6 +127,21 @@
       "https://atomicdata.dev/properties/parent"
     ],
     "https://atomicdata.dev/properties/shortname": "message"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/ChatLog",
+    "https://atomicdata.dev/properties/description": "One page of a chat log: up to 256 entries (messages) kept in the `entries` map of the page's own Loro document instead of as one resource per message. The page is a child (`parent`) of the chat. Entries are not properties: they are not indexed and not materialized. Each entry records its author, and the server only accepts entry changes from that author, unless the signer has `write` on the page (inherited from the chat). Creating a page needs `append` on the parent but does not grant the creator `write`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/about"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/parent"
+    ],
+    "https://atomicdata.dev/properties/shortname": "chat-log"
   },
   {
     "@id": "https://atomicdata.dev/classes/FollowEvent",

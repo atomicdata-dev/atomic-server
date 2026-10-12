@@ -8,6 +8,7 @@ import {
   server,
   dataBrowser,
   collections,
+  commits,
   useArray,
   ai,
 } from '@tomic/react';
@@ -35,6 +36,7 @@ import { MeetingCard } from './MeetingCard';
 import { HideInPrint } from '@components/HideInPrint';
 import { useOnValueChange } from '@helpers/useOnValueChange';
 import { FolderCard } from './FolderCard';
+import { Spinner } from '../../components/Spinner';
 
 interface ResourceCardProps extends CardViewPropsBase {
   /** The subject URL - the identifier of the resource. */
@@ -93,7 +95,7 @@ function ResourceCardInner(props: ResourceCardProps): JSX.Element {
   const [klass] = useString(resource, core.properties.isA);
 
   if (resource.loading) {
-    return <p>Loading...</p>;
+    return <Spinner size='1.5rem' />;
   }
 
   if (resource.error) {
@@ -134,6 +136,17 @@ function ResourceCardInner(props: ResourceCardProps): JSX.Element {
   }
 }
 
+/**
+ * Bookkeeping a reader of a card (a record embedded in a document, say) has no
+ * use for: when and where the resource was made, and its position in a table.
+ */
+const cardHiddenProps = [
+  ...defaultHiddenProps,
+  commits.properties.createdAt,
+  dataBrowser.properties.sortOrder,
+  'https://atomicdata.dev/properties/drive',
+];
+
 export function ResourceCardDefault({
   resource,
   small,
@@ -141,6 +154,7 @@ export function ResourceCardDefault({
   const [isA] = useArray(resource, core.properties.isA);
   const isAResource = useResource(isA[0]);
   const [tags] = useArray(resource, dataBrowser.properties.tags);
+  const [description] = useString(resource, core.properties.description);
 
   return (
     <Column gap='0.5rem'>
@@ -157,17 +171,22 @@ export function ResourceCardDefault({
           <Tag subject={tag} key={tag} />
         ))}
       </Row>
-      <DescriptionWrapper>
-        <ValueForm
-          resource={resource}
-          propertyURL={core.properties.description}
-        />
-      </DescriptionWrapper>
+      {/* Without a description there is nothing to show; an empty form field
+       * here reads as a stray "Empty" line above the real properties. */}
+      {description && (
+        <DescriptionWrapper>
+          <ValueForm
+            resource={resource}
+            propertyURL={core.properties.description}
+          />
+        </DescriptionWrapper>
+      )}
       {!small && (
         <AllProps
           basic
+          labelByName
           resource={resource}
-          except={defaultHiddenProps}
+          except={cardHiddenProps}
           editable
         />
       )}

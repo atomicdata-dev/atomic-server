@@ -9,10 +9,10 @@ Since 2026 the answer is simpler. Your data lives **on your device**, and a serv
 
 ## What local-first means here
 
-- **Your identity is a key, not an account.** An [Agent](agents.md) is an Ed25519 keypair. Its identifier, `did:ad:agent:{publicKey}`, is derived from the key, so nobody issues it and nobody can take it away. There is no sign-up form and no server that has to exist first.
+- **Your identity is a key, not an account.** An [Agent](agents.md) is an Ed25519 keypair. Its identifier, `atomic:agent:{publicKey}`, is derived from the key, so nobody issues it and nobody can take it away. There is no sign-up form and no server that has to exist first.
 - **Your data is a local database.** The web app keeps an encrypted store in the browser (WASM plus OPFS). The desktop and mobile apps keep one on disk (redb). Reading and writing never wait on a network.
 - **Every edit is signed by you.** A change is a [Commit](commits/intro.md): a Loro CRDT delta plus your signature. Anyone can verify who made it without asking a server, and nobody can forge one in your name.
-- **Resources have location-independent names.** A `did:ad:` identifier is derived from a signature, so the same Resource keeps the same name on your phone, your laptop and a replica in a data center. See [URLs and identifiers](urls.md).
+- **Resources have location-independent names.** A `atomic:` identifier is derived from a signature, so the same Resource keeps the same name on your phone, your laptop and a replica in a data center. See [URLs and identifiers](urls.md).
 - **Sync is optional and additive.** Devices that have been introduced to each other [reconcile](sync.md) whenever they can reach each other. Edits made apart merge without conflicts. Being offline is a state, not an error.
 
 ## Where the server fits
@@ -27,7 +27,7 @@ An always-on device is useful for exactly the things a phone in a pocket cannot 
 
 None of that requires the server to be trusted with authorship.
 Any node can replicate a Drive without holding the Drive owner's key, because every commit it forwards carries its own signature.
-You can run that node yourself, use [Atomic Place](https://atomic.place), or do both.
+You can run that node yourself, use [atomic.place](https://atomic.place), or do both.
 
 ## What this means for a person
 

@@ -11,6 +11,7 @@ import { zIndex } from '../styling';
 import { Row } from './Row';
 import { IconButton } from './IconButton/IconButton';
 import { useSettings } from '../helpers/AppSettings';
+import { shortenSubjects } from '../helpers/shortenSubjects';
 
 import { useRef, type JSX } from 'react';
 
@@ -73,8 +74,12 @@ interface ToastMessageProps {
 function ToastMessage({ icon, message, t }: ToastMessageProps) {
   const textRef = useRef<HTMLDivElement>(null);
 
+  const resolved = resolveValue(message, t);
+  // Long subject URLs are cut for display; copying still gives the full text.
+  const fullText = typeof resolved === 'string' ? resolved : undefined;
+
   function handleCopy() {
-    const text = textRef.current?.textContent;
+    const text = fullText ?? textRef.current?.textContent;
 
     if (text === undefined) {
       toast.error('Nothing to copy.');
@@ -91,7 +96,7 @@ function ToastMessage({ icon, message, t }: ToastMessageProps) {
     <StyledRow gap='1ch' center>
       {icon}
       <div ref={textRef} style={{ display: 'contents' }}>
-        {resolveValue(message, t)}
+        {fullText === undefined ? resolved : shortenSubjects(fullText)}
       </div>
       {t.type !== 'loading' && (
         <div

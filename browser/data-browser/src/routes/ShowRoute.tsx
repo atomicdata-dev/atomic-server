@@ -1,5 +1,12 @@
 import * as React from 'react';
-import { Client, useResource, useStore } from '@tomic/react';
+import {
+  Client,
+  core,
+  dataBrowser,
+  useResource,
+  useStore,
+  useString,
+} from '@tomic/react';
 import ResourcePage from '../views/ResourcePage';
 import { Search } from './Search/SearchRoute';
 import { About } from './AboutRoute';
@@ -23,6 +30,7 @@ export type ShowRouteSearch = {
    * browser history. Absent = the table's default view.
    */
   view?: string;
+  editColumn?: string;
 };
 
 export const ShowRoute = createRoute({
@@ -36,6 +44,7 @@ export const ShowRoute = createRoute({
         ? search.drive
         : undefined,
     view: (search.view as string) || undefined,
+    editColumn: (search.editColumn as string) || undefined,
   }),
 });
 
@@ -93,6 +102,24 @@ export const ShowComponent: React.FunctionComponent = () => {
     isDriveSignInError(resource, agent, baseURL, {
       originWithoutNode: isOriginWithoutNode(store.getServerUrl()),
     });
+
+  // A table View is configuration; the person wants its rows. A link or mention
+  // that points at the View itself opens the table with that view selected, the
+  // same address the table's own tab uses.
+  const [viewParent] = useString(resource, core.properties.parent);
+  const isTableView = resource.hasClasses(dataBrowser.classes.view);
+
+  React.useEffect(() => {
+    if (!isTableView || !viewParent || view) {
+      return;
+    }
+
+    navigate({
+      to: paths.show,
+      search: { subject: viewParent, view: subject },
+      replace: true,
+    });
+  }, [isTableView, viewParent, view, subject, navigate]);
 
   React.useEffect(() => {
     if (

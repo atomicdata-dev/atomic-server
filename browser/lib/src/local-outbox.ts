@@ -102,6 +102,12 @@ export interface OutboxEntry {
    *  scheduler stops waking for it. Cleared by `markDirty` — a fresh local edit
    *  is a new signal worth re-attempting (rights may have since been granted). */
   blocked?: boolean;
+  /** Set once a finished drive resync has re-armed this entry after the server
+   *  refused it for a missing parent. One automatic re-arm per entry: if the
+   *  resync did not deliver the parent, a second block is final until the next
+   *  edit, instead of a retry round on every reconnect. Cleared with the block
+   *  by a fresh edit. */
+  rearmedAfterResync?: boolean;
 }
 
 /** Exponential backoff before re-attempting a failed drain: 1s, 2s, 4s … capped
@@ -243,6 +249,31 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
 }
 
 /**
+ * Pattern-match the server's pending-deps rejection: "your Loro delta
+ * depends on ops I never received". Retrying the same delta can never
+ * succeed (the missing base ops won't materialize server-side), but the
+ * write is fully recoverable — the drain reacts by clearing the resource's
+ * save cursor so the next attempt exports a self-contained snapshot, which
+ * the server can always merge. So: not terminal (don't drop), not blocking
+ * (don't park); the caller resets the cursor and lets backoff retry.
+ */
+export function isPendingDepsCommitErrorMessage(message: string): boolean {
+  // Server emits: "Commit's Loro update depends on ops the server does not
+  // have — the update was parked as pending ..." (lib/src/commit.rs).
+  return message.includes('parked as pending');
+}
+
+/** A managed node's refusal of a drive it does not host ("not enrolled"). */
+export function isNotEnrolledMessage(message: string | undefined): boolean {
+  return !!message?.includes('is not enrolled for sync on this node');
+}
+
+/** The server refused a commit because it does not hold the commit's parent. */
+export function isMissingParentMessage(message: string): boolean {
+  return /Parent of .+ not found/.test(message);
+}
+
+/**
  * Pattern-match server errors that mean "this drain cannot succeed by
  * retrying, but the user write is not necessarily lost." Unlike
  * {@link isTerminalCommitErrorMessage} (which drops the entry), a match here
@@ -254,11 +285,6 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
  * Retrying spins the server (see the 401-flood); the only resolutions are a
  * rights change or the user abandoning the edit — neither helped by hammering.
  */
-/** A managed node's refusal of a drive it does not host ("not enrolled"). */
-export function isNotEnrolledMessage(message: string | undefined): boolean {
-  return !!message?.includes('is not enrolled for sync on this node');
-}
-
 export function isUnrecoverableCommitErrorMessage(message: string): boolean {
   // A causality rejection is deterministic for the same Loro update. Keep the
   // local edit visible, but stop sending it once the bounded retry window ends.
@@ -296,8 +322,9 @@ export function isUnrecoverableCommitErrorMessage(message: string): boolean {
   // (`resources.rs` get_parent). The node does not hold the commit's parent,
   // e.g. a drive that was switched to a node without its root ever being
   // copied. Every retry fails identically, so park the entry (keep the edit)
-  // instead of spinning; a resync of the drive re-arms it.
-  if (/Parent of .+ not found/.test(message)) {
+  // instead of spinning; a finished resync of the drive re-arms it
+  // (`LocalOutbox.rearmParentBlocked`).
+  if (isMissingParentMessage(message)) {
     return true;
   }
 
@@ -762,6 +789,7 @@ export class LocalOutbox {
       if (existing.blocked) {
         existing.blocked = false;
         existing.failures = 0;
+        existing.rearmedAfterResync = false;
       }
 
       this.changed(subject);
@@ -774,6 +802,37 @@ export class LocalOutbox {
       enqueuedAt: Date.now(),
     });
     this.changed(subject);
+  }
+
+  /**
+   * Re-arm the entries parked because the server lacked their parent, for the
+   * subjects `inDrive` accepts. A drive resync is what delivers a parent the
+   * server never received (a drive root, after switching a drive to a node),
+   * so once one has finished the same commit can succeed. Each entry is
+   * re-armed once: a resync that did not deliver the parent leaves it parked
+   * until the next edit. Returns how many entries were re-armed.
+   */
+  rearmParentBlocked(inDrive: (subject: string) => boolean): number {
+    let rearmed = 0;
+
+    for (const entry of this.entries.values()) {
+      if (
+        !entry.blocked ||
+        entry.rearmedAfterResync ||
+        !isMissingParentMessage(entry.lastAttemptError ?? '') ||
+        !inDrive(entry.subject)
+      ) {
+        continue;
+      }
+
+      entry.blocked = false;
+      entry.failures = 0;
+      entry.rearmedAfterResync = true;
+      rearmed++;
+      this.changed(entry.subject);
+    }
+
+    return rearmed;
   }
 
   /** Clear the dirty bit for a subject. Called by the drain after the
@@ -1448,7 +1507,10 @@ export function isSettledDestroyErrorMessage(message: string): boolean {
   return (
     message.includes('was already applied here; refusing replay') ||
     message.includes("predates the resource's genesis") ||
-    message.includes('is_genesis: false, but the resource does not exist yet')
+    message.includes(
+      'is_genesis: false, but the resource does not exist yet',
+    ) ||
+    message.includes('has no such resource to destroy')
   );
 }
 

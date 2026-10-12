@@ -7,6 +7,7 @@ import prismjs from 'vite-plugin-prismjs';
 import { prismjsOptimizeDeps, prismjsOptions } from './prismDeps';
 import wasm from 'vite-plugin-wasm';
 import { wuchale } from 'wuchale/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -26,6 +27,13 @@ const isVitest = process.env.VITEST === 'true';
 // setting, so day-to-day debugging is unaffected; set SOURCEMAP=1 to put them
 // back into a production build when you need to read a minified stack trace.
 const wantSourcemaps = process.env.SOURCEMAP === '1';
+
+// Readable stack traces in Sentry without shipping the maps. With a token, the
+// build writes hidden source maps (no `sourceMappingURL` comment), uploads them
+// under the release the SDK reports, and deletes them, so the dist stays as
+// small as above. Without a token, nothing changes. Add `SENTRY_AUTH_TOKEN`
+// to the environment of every build that is served to users.
+const uploadSourcemaps = Boolean(process.env.SENTRY_AUTH_TOKEN) && !isVitest;
 
 const repoLibDefaults = path.resolve(__dirname, '../../lib/defaults');
 const ciLibDefaults = path.resolve(__dirname, '../lib-defaults');
@@ -94,6 +102,16 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_ATOMIC_SERVER_URL ??
     env.VITE_ATOMIC_SERVER_URL ??
     'http://localhost:9883';
+  // The hosted distribution (atomic.place) carries its own name. A build from
+  // source is the self-hostable server and keeps a neutral one.
+  const hostedFlag =
+    process.env.VITE_ATOMIC_HOSTED_DISTRIBUTION ??
+    env.VITE_ATOMIC_HOSTED_DISTRIBUTION;
+  const hosted = hostedFlag === '1' || hostedFlag === 'true';
+  const appName = hosted ? 'atomic.place' : 'AtomicServer';
+  const appDescription = hosted
+    ? 'Your own place for documents, tables, meetings and chat. Local-first and open source, with optional cloud backup and sync.'
+    : 'The easiest way to create, share and model Linked Atomic Data.';
 
   return {
     define: {
@@ -256,6 +274,14 @@ export default defineConfig(({ mode }) => {
         transformIndexHtml: (html: string) =>
           html.replaceAll('__WASM_VERSION__', wasmVersionHash),
       },
+      {
+        // The tab title, description and splash caption before the bundle runs.
+        name: 'atomic-app-name-html',
+        transformIndexHtml: (html: string) =>
+          html
+            .replaceAll('__APP_NAME__', appName)
+            .replaceAll('__APP_DESCRIPTION__', appDescription),
+      },
       !isVitest && webfontDownload(),
       !isVitest && wuchale(),
       // Native React Compiler (oxc-transform-react). Must run before JSX
@@ -264,7 +290,14 @@ export default defineConfig(({ mode }) => {
       // is released (vitejs/vite-plugin-react#1419). The compiler transform is
       // skipped under Vitest — unit tests call `transformSync` directly — but
       // the oxc styled-components options still apply so displayName works.
-      ...oxcReactCompiler({ compile: !isVitest }),
+      // The app compiles `@tomic/react` too: it is linked from outside
+      // `node_modules`, so the compiler sees its hooks. Tests compile just
+      // that package, so a hook the compiler would cache wrongly fails here.
+      ...oxcReactCompiler(
+        isVitest
+          ? { only: /\/browser\/react\/src\// }
+          : { compile: true },
+      ),
       react(),
       !isVitest &&
         !isTauri &&
@@ -272,10 +305,9 @@ export default defineConfig(({ mode }) => {
           registerType: 'autoUpdate',
           injectRegister: 'auto',
           manifest: {
-            name: 'Atomic Data Browser',
-            short_name: 'Atomic',
-            description:
-              'The easiest way to create, share and model Linked Atomic Data.',
+            name: appName,
+            short_name: hosted ? 'atomic.place' : 'Atomic',
+            description: appDescription,
             theme_color: '#ffffff',
             icons: [
               {
@@ -423,6 +455,29 @@ export default defineConfig(({ mode }) => {
           },
         }),
       !isVitest && prismjs(prismjsOptions),
+      uploadSourcemaps &&
+        sentryVitePlugin({
+          org: 'ontola',
+          project: 'atomic-browser',
+          url: 'https://us.sentry.io',
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          telemetry: false,
+          // Must equal the `release` that `initSentry` passes to the SDK.
+          release: {
+            name: `atomic-data-browser@${appVersion}+${gitCommit}`,
+            inject: false,
+            setCommits: false,
+          },
+          sourcemaps: {
+            filesToDeleteAfterUpload: wantSourcemaps
+              ? undefined
+              : [`${isTauri ? 'dist-tauri' : 'dist'}/**/*.map`],
+          },
+          // A Sentry outage must not fail a deploy.
+          errorHandler: err => {
+            console.warn(`[sentry] source map upload failed: ${err.message}`);
+          },
+        }),
     ],
     optimizeDeps: {
       // React Compiler emits `import { c as _c } from "react/compiler-runtime"`
@@ -545,7 +600,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'baseline-widely-available',
       outDir: isTauri ? 'dist-tauri' : 'dist',
-      sourcemap: wantSourcemaps,
+      sourcemap: wantSourcemaps ? true : uploadSourcemaps ? 'hidden' : false,
       // Don't inline worker scripts as `data:` URLs — the production CSP is
       // `worker-src 'self'` and would block them, killing the ClientDb. Below
       // the default 4096-byte limit, Vite would otherwise inline our 1.7KB

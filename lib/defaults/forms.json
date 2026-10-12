@@ -1,0 +1,473 @@
+[
+  {
+    "@id": "https://atomicdata.dev/properties/form-data-class",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The data Class of submission rows, generated for a standalone form or reused from an existing table.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-data-class"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-target-table",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Table",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Table that submissions to this form are written to.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-target-table"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-owns-schema",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether this form owns its generated table schema. False or absent means existing table columns are read-only in the builder.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-owns-schema"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-pages",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormPage",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The pages of a Form, in display order.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-pages"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-published-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a resource was published. Absence means it is not published / not publicly available.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-published-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-open-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a published form starts accepting responses. Absent means it is open as soon as it is published. Before this moment visitors see a 'not open yet' page instead of the form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-open-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-close-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a published form stops accepting responses. Absent means it stays open until it is unpublished. From this moment on visitors see a 'closed' page instead of the form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-close-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-settings",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Miscellaneous Form settings, stored as a JSON object (e.g. whether to show a progress bar, the confirmation message shown after submitting).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-settings"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-publish-id",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Short public slug used in share links (e.g. /form/<slug>), minted by the server on first publish.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-publish-id",
+    "https://atomicdata.dev/properties/isDynamic": true
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-styling",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round), showProgressBar (boolean, defaults to true) toggles the multi-page progress bar, animatePageTransitions (boolean, defaults to false) turns on the Next/Back page animation (always skipped for visitors who prefer reduced motion).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-styling"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-custom-css",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Custom CSS for a published Form, written by the form owner. Injected into the `atomic-form-custom` cascade layer and scoped to the form's root element, so it overrides the renderer's own styles without needing `!important`, and cannot affect anything outside the form. Inside it, `:scope` is the form root (that is where the `--atomic-form-*` theme variables are overridden; `:root` is out of reach). The class names it targets are documented by the renderer's stylesheet: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/form-renderer/src/style.css . `@import` rules are stripped when the form is served.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-custom-css"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-access",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Who can open a published Form. One of: public (anyone with the link; the default when absent), invite-only (a valid, unused FormInviteCode is required to view and submit).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-access"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-code",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The code value of a FormInviteCode, matched against the `code` a visitor presents when opening or submitting an invite-only Form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-code"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/used-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a resource was used or consumed. Absence means it is still unused.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "used-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormInviteCode",
+    "https://atomicdata.dev/properties/description": "A single-use invite code for an invite-only Form. Stored as a child of the Form (its `parent`), so hierarchy rights keep codes readable by form editors only. `used-at` set means the code has been consumed by a submission; revoking a code is simply destroying it.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/used-at"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-code"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-invite-code"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-submission-summary",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Aggregated submission statistics (response count, per-question counts/bins/answer samples), computed by the server when a Form is fetched. Ephemeral: never persisted, never written by clients.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/isDynamic": true,
+    "https://atomicdata.dev/properties/shortname": "form-submission-summary"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Form",
+    "https://atomicdata.dev/properties/description": "A form or survey that can be published and shared with a link. Submissions are collected as rows in `form-target-table`, one Property per question on `form-data-class`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-open-at",
+      "https://atomicdata.dev/properties/form-close-at",
+      "https://atomicdata.dev/properties/form-settings",
+      "https://atomicdata.dev/properties/form-publish-id",
+      "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/form-custom-css",
+      "https://atomicdata.dev/properties/form-access",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-owns-schema"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-data-class",
+      "https://atomicdata.dev/properties/form-target-table",
+      "https://atomicdata.dev/properties/form-pages"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-fields",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The fields of a FormPage, in display order. Mixes form fields (e.g. FormField) with layout blocks (e.g. FormHeading, FormParagraph, FormInfoBox); no classtype since multiple class-types aren't supported.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-fields"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/cover-image",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/File",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "A cover image shown alongside or behind a resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "cover-image"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/image-position",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Where a cover-image is positioned relative to its content. One of: top, left, right, behind (full-page image behind the content card), full (content rendered directly on the image, no card).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "image-position"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormPage",
+    "https://atomicdata.dev/properties/description": "A single page of a Form, holding a list of fields and layout blocks.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-fields"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-page"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-maps-to",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Property on the Form's data class that this field's answers are written to.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-maps-to"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/required",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether a value must be provided.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "required"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-field-type",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The kind of question a FormField renders and validates as. One of: short-text, long-text, email, phone, url, number, currency, date, datetime, checkbox, radio, dropdown, multi-select, dropdown-multi, picture-choice, likert, rating, choice-matrix, table-input, address, country.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-field-type"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-field-options",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Type-specific settings for a FormField (e.g. placeholder, min/max, choice options), stored as a JSON object whose shape depends on `form-field-type`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-field-options"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormField",
+    "https://atomicdata.dev/properties/description": "A single question in a Form. Its type is tagged by `form-field-type` and its type-specific settings live in `form-field-options`, so changing the question type only ever requires one property write.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description",
+      "https://atomicdata.dev/properties/required",
+      "https://atomicdata.dev/properties/form-field-options",
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-maps-to",
+      "https://atomicdata.dev/properties/form-field-type"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-field"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormHeading",
+    "https://atomicdata.dev/properties/description": "A heading layout block inside a FormPage's `form-fields` list.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-heading"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormParagraph",
+    "https://atomicdata.dev/properties/description": "A paragraph layout block inside a FormPage's `form-fields` list, rendered as markdown.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-paragraph"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormInfoBox",
+    "https://atomicdata.dev/properties/description": "A callout layout block inside a FormPage's `form-fields` list. Its body (`description`) is rendered as markdown, with an optional title (`name`), inside a box styled by `form-info-box-style`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-info-box-style",
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-info-box"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-info-box-style",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How a FormInfoBox is styled. One of: info, note, tip, success, warning, danger. Defaults to `info` when unset. Unenforced at the store (plain String, same limitation as form-field-type); the form builder and renderer fall back to `info` for anything else.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-info-box-style"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-conditions",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormCondition",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Visibility conditions on a FormPage, FormField, or layout block. All conditions must match (AND) for the item to be shown; an empty list means always visible. Each entry is a FormCondition.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-conditions"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-field",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormField",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The FormField whose answer this FormCondition inspects.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-field"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-operator",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How a FormCondition compares the referenced field's answer to `form-condition-value`. One of: equals, not-equals, contains, greater-than, less-than. Unenforced at the store (plain String, same limitation as form-field-type); the form builder and submission validator check the enum.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-operator"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-value",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "The comparison value for a FormCondition. Shape depends on the referenced field (string, number, boolean, ...).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-value"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormCondition",
+    "https://atomicdata.dev/properties/description": "A single visibility predicate: show the parent page/field/block when `form-condition-field`'s answer matches `form-condition-value` under `form-condition-operator`. Stored as a child of the thing it hides, listed in that resource's `form-conditions` array. Multiple conditions on one parent are ANDed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-condition-value"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-condition-field",
+      "https://atomicdata.dev/properties/form-condition-operator"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-condition"
+  },
+  {
+    "@id": "https://atomicdata.dev/ontology/forms",
+    "https://atomicdata.dev/properties/description": "Describes the classes and properties needed for Atomic Forms.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/",
+    "https://atomicdata.dev/properties/shortname": "forms",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/classes": [
+      "https://atomicdata.dev/classes/Form",
+      "https://atomicdata.dev/classes/FormPage",
+      "https://atomicdata.dev/classes/FormField",
+      "https://atomicdata.dev/classes/FormHeading",
+      "https://atomicdata.dev/classes/FormParagraph",
+      "https://atomicdata.dev/classes/FormInfoBox",
+      "https://atomicdata.dev/classes/FormInviteCode",
+      "https://atomicdata.dev/classes/FormCondition"
+    ],
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/properties/form-data-class",
+      "https://atomicdata.dev/properties/form-target-table",
+      "https://atomicdata.dev/properties/form-pages",
+      "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-open-at",
+      "https://atomicdata.dev/properties/form-close-at",
+      "https://atomicdata.dev/properties/form-settings",
+      "https://atomicdata.dev/properties/form-publish-id",
+      "https://atomicdata.dev/properties/form-fields",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-maps-to",
+      "https://atomicdata.dev/properties/required",
+      "https://atomicdata.dev/properties/form-field-type",
+      "https://atomicdata.dev/properties/form-field-options",
+      "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/form-custom-css",
+      "https://atomicdata.dev/properties/form-submission-summary",
+      "https://atomicdata.dev/properties/form-access",
+      "https://atomicdata.dev/properties/form-code",
+      "https://atomicdata.dev/properties/used-at",
+      "https://atomicdata.dev/properties/form-conditions",
+      "https://atomicdata.dev/properties/form-condition-field",
+      "https://atomicdata.dev/properties/form-condition-operator",
+      "https://atomicdata.dev/properties/form-condition-value",
+      "https://atomicdata.dev/properties/form-info-box-style"
+    ]
+  }
+]

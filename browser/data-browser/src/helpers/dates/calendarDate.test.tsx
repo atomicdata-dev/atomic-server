@@ -11,7 +11,11 @@ import {
 } from '../../chunks/TablePage/tableAggregates';
 import { toDisplayData } from '../../chunks/TablePage/EditorCells/DateCell';
 import { formatDiffDate } from '../../chunks/ResourceDiff/ResourceDiff';
-import { calendarDateToLocalDate, formatCalendarDate } from './calendarDate';
+import {
+  calendarDateToLocalDate,
+  formatCalendarDate,
+  localCalendarDate,
+} from './calendarDate';
 
 // A civil date has no zone, so it must read the same everywhere. Run each case
 // east and west of Greenwich: east is where `new Date('2026-10-02')` grows a
@@ -109,3 +113,20 @@ for (const zone of ZONES) {
     });
   });
 }
+
+describe('localCalendarDate', () => {
+  it('names the local day, also just after local midnight', () => {
+    // 00:24 on 9 October in whatever zone this runs in: in a zone ahead of UTC
+    // the UTC day is still the 8th, which is what a "stamp today" button wrote.
+    const justAfterMidnight = new Date(2026, 9, 9, 0, 24);
+
+    expect(localCalendarDate(justAfterMidnight)).toBe('2026-10-09');
+    expect(
+      calendarDateToLocalDate(localCalendarDate(justAfterMidnight)),
+    ).toEqual(new Date(2026, 9, 9));
+  });
+
+  it('pads short years, months and days', () => {
+    expect(localCalendarDate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+  });
+});

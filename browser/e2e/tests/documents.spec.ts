@@ -100,7 +100,8 @@ test.describe('documents', async () => {
       page2.getByRole('heading', { name: teststring }),
       'First paragraph title not visible in second tab. Not a websocket issue',
     ).toBeVisible({ timeout: 15000 });
-    expect(await page2.title()).toEqual(title);
+    // The tab names the page first and closes with the product name.
+    expect(await page2.title()).toEqual(`${title} · AtomicServer`);
 
     await page2.getByLabel('Rich Text Editor').focus();
     await page2.keyboard.press('End');

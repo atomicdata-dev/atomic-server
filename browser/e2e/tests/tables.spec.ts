@@ -571,6 +571,8 @@ test.describe('tables', async () => {
       .toBe('3');
     await enterGridEdit(page);
     await typeInActiveGridCell(page, 'rowINSERTED');
+    // Commit the persisted cell before leaving edit mode.
+    await page.keyboard.press('Tab');
     await page.keyboard.press('Escape');
     await waitForSynced(page);
 
@@ -651,5 +653,171 @@ test.describe('tables', async () => {
     await page.reload();
     await expect(page.getByTestId('editable-title').first()).toBeVisible();
     await expectOrder();
+  });
+
+  test('tick rows and delete them in one go', async ({ page }) => {
+    test.slow();
+    await createBlankTable(page, 'Bulk Delete Test');
+
+    await focusCell(page, page.getByRole('gridcell').first());
+
+    for (const value of ['rowA', 'rowB', 'rowC', 'rowD']) {
+      await enterGridEdit(page);
+      await typeInActiveGridCell(page, value);
+      await page.keyboard.press('Enter');
+    }
+
+    await page.keyboard.press('Escape');
+    await waitForSynced(page);
+    await reloadGrid(page);
+
+    // Rows are found by their content, not their position.
+    const tick = (name: string) =>
+      page
+        .getByRole('row')
+        .filter({ has: page.getByRole('gridcell', { name }) })
+        .getByRole('checkbox');
+
+    const toolbar = page.getByRole('toolbar', { name: 'Selected rows' });
+
+    // No toolbar until a row is ticked.
+    await expect(toolbar).toBeHidden();
+
+    // The tick appears on hover; ticking one row starts select mode.
+    await page
+      .getByRole('row')
+      .filter({ has: page.getByRole('gridcell', { name: 'rowB' }) })
+      .getByRole('rowheader')
+      .hover();
+    await tick('rowB').click();
+    await expect(toolbar).toContainText('1 selected');
+
+    // In select mode every row shows its tick without hovering.
+    await expect(tick('rowD')).toBeVisible();
+    await tick('rowD').click();
+    await expect(toolbar).toContainText('2 selected');
+
+    await page.getByRole('button', { name: 'Delete selected rows' }).click();
+
+    await expect(page.getByRole('gridcell', { name: 'rowB' })).toBeHidden();
+    await expect(page.getByRole('gridcell', { name: 'rowD' })).toBeHidden();
+    await expect(page.getByRole('gridcell', { name: 'rowA' })).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: 'rowC' })).toBeVisible();
+    await expect(toolbar).toBeHidden();
+  });
+
+  test('right-click a row header and a multi-cell selection', async ({
+    page,
+  }) => {
+    test.slow();
+    await createBlankTable(page, 'Context Menu Test');
+
+    await focusCell(page, page.getByRole('gridcell').first());
+
+    for (const value of ['one', 'two', 'three', 'four']) {
+      await enterGridEdit(page);
+      await typeInActiveGridCell(page, value);
+      await page.keyboard.press('Enter');
+    }
+
+    await page.keyboard.press('Escape');
+    await waitForSynced(page);
+    await reloadGrid(page);
+
+    const nameCell = (row: number) =>
+      page.locator(`[aria-rowindex="${row}"] > [aria-colindex="2"]`);
+
+    // A row's header cell opens the row's resource menu.
+    await page
+      .locator('[aria-rowindex="3"] > [role="rowheader"]')
+      .click({ button: 'right' });
+    await expect(
+      page.getByRole('menuitem', { name: 'Data View' }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    const selectThree = async () => {
+      await nameCell(2).click();
+      await nameCell(4).click({ modifiers: ['Shift'] });
+      await nameCell(3).click({ button: 'right' });
+    };
+
+    // Right-clicking inside a multi-cell selection opens a menu for all of it.
+    await selectThree();
+    await page.getByRole('menuitem', { name: 'Set value…' }).click();
+    await page.getByLabel('Value').fill('same');
+    await page.getByRole('button', { name: 'Set', exact: true }).click();
+    await expect(page.getByRole('gridcell', { name: 'same' })).toHaveCount(3);
+
+    await selectThree();
+    await page.getByRole('menuitem', { name: 'Clear values' }).click();
+    await expect(page.getByRole('gridcell', { name: 'same' })).toHaveCount(0);
+    await expect(page.getByRole('gridcell', { name: 'four' })).toBeVisible();
+
+    await selectThree();
+    await page.getByRole('menuitem', { name: 'Delete 3 rows' }).click();
+    await page
+      .locator('dialog[open]')
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
+    await expect(page.getByRole('gridcell', { name: 'four' })).toBeVisible();
+    await expect(page.locator('[aria-rowindex="3"]')).toContainText('2');
+  });
+
+  test('drag view tabs to reorder them', async ({ page }) => {
+    test.slow();
+    await createBlankTable(page, 'View Order Test');
+
+    // The tab shows up as soon as the view is linked, but switching to it
+    // (`?view=`, a `replace` navigation) waits for the table's saves, seconds
+    // on a loaded machine. A menu opened before that lands loses its history
+    // entry to the replace and closes under the click, so each view is awaited
+    // until the URL has moved to it before the next menu is opened.
+    const viewParam = () => new URL(page.url()).searchParams.get('view');
+
+    for (const kind of ['Kanban', 'Calendar']) {
+      const viewBefore = viewParam();
+      await page.getByTitle('Add view').click();
+      await page.getByRole('menuitem', { name: kind }).click();
+      await expect(page.getByRole('tab', { name: kind })).toBeVisible();
+      await expect.poll(viewParam).not.toBe(viewBefore);
+    }
+
+    await waitForSynced(page);
+
+    // The table's own view comes first and has a name that has changed before;
+    // only the order of the two views added here is under test.
+    const tabNames = () =>
+      page
+        .getByRole('tab')
+        .evaluateAll(tabs => tabs.map(t => t.textContent))
+        .then(names => names.filter(n => n === 'Kanban' || n === 'Calendar'));
+
+    await expect.poll(tabNames).toEqual(['Kanban', 'Calendar']);
+
+    const kanban = (await page
+      .getByRole('tab', { name: 'Kanban' })
+      .boundingBox())!;
+    const calendar = (await page
+      .getByRole('tab', { name: 'Calendar' })
+      .boundingBox())!;
+
+    await page.mouse.move(calendar.x + calendar.width / 2, calendar.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(
+      calendar.x + calendar.width / 2 - 20,
+      calendar.y + 10,
+      {
+        steps: 5,
+      },
+    );
+    await page.mouse.move(kanban.x + 5, kanban.y + 10, { steps: 15 });
+    await page.mouse.up();
+
+    await expect.poll(tabNames).toEqual(['Calendar', 'Kanban']);
+
+    await waitForSynced(page);
+    await page.reload();
+    await expect.poll(tabNames).toEqual(['Calendar', 'Kanban']);
   });
 });

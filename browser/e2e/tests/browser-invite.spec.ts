@@ -92,8 +92,11 @@ test('joins an unhosted drive through its signed browser invitation', async ({
       .getByRole('button', { name: 'Save and continue', exact: true })
       .click();
     await owner
-      .getByLabel('Role for people who join with the link')
-      .selectOption('write');
+      .getByRole('radiogroup', {
+        name: 'Role for people who join with the link',
+      })
+      .getByRole('radio', { name: 'Write' })
+      .check();
     await owner
       .getByRole('button', { name: 'Copy invite link', exact: true })
       .click();

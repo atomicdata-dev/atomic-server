@@ -84,4 +84,4 @@ When any of these manufacturers would publish a safety warning about a product t
 
 Before we have this, well need to:
 
-- Build notifications support (see [issue](https://github.com/atomicdata-dev/atomic-server/issues/77))
+- Build notifications support (see [issue](https://github.com/ontola/atomic-server/issues/77))

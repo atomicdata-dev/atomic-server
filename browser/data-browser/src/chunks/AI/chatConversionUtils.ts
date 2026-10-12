@@ -4,17 +4,16 @@ import {
   type Store,
   ai,
   core,
-  server,
-  type JSONValue,
   dataBrowser,
+  newChatLogEntryKey,
+  type ChatLogEntry,
 } from '@tomic/react';
-import {
-  isToolUIPart,
-  type FileUIPart,
-  type ReasoningUIPart,
-  type SourceUrlUIPart,
-  type TextUIPart,
-  type ToolUIPart,
+import type {
+  FileUIPart,
+  ReasoningUIPart,
+  SourceUrlUIPart,
+  TextUIPart,
+  ToolUIPart,
 } from 'ai';
 import { newContextItem } from '@components/AI/AISidebarContext';
 import {
@@ -22,10 +21,23 @@ import {
   type AIMCPResourceMessageContext,
   type AIMessageContext,
   type AtomicUIMessage,
-  isAtomicResourceContext,
 } from './types';
-import { restoreToolPart, toolPartValues } from './toolHistory';
+import { restoreToolPart } from './toolHistory';
 import { userTiming } from '@helpers/userTiming';
+import {
+  hideMigrated,
+  knownPages,
+  mergePages,
+  pageWithRoom,
+  parseEntryId,
+  queryPages,
+  rememberPage,
+  scopeKey,
+  toEntryId,
+  type PageInfo,
+  type Timed,
+} from '@helpers/chatLog';
+import { entryToMessage, messageToEntry } from './aiChatEntries';
 
 const TAG_TO_ROLE_MAPPING = {
   'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/tag/user': 'user',
@@ -37,145 +49,106 @@ const TAG_TO_ROLE_MAPPING = {
   'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/tag/summary': 'summary',
 } as const;
 
-const roleToTagMapping = Object.fromEntries(
-  Object.entries(TAG_TO_ROLE_MAPPING).map(([tag, role]) => [role, tag]),
-);
+/**
+ * Where a saved message lives. Messages are entries of the chat's `ChatLog`
+ * pages (planning/chat-log.md); a `resource` is an old `ai-message` that has
+ * not been migrated yet (a cache of a hosted drive, until its server has).
+ */
+export type AiMessageRef =
+  | { kind: 'entry'; page: string; key: string }
+  | { kind: 'resource'; resource: Resource<Ai.AiMessage> };
 
-/** Push a locally-built message (and its parts) to the server. */
-export const persistMessageResourceToServer = async (
-  messageResource: Resource<Ai.AiMessage>,
-  store: Store,
-): Promise<void> => {
-  const partSubjects = messageResource.props.parts ?? [];
+/** Where a chat's pages are found. */
+const scopeOf = (chat: Resource) =>
+  scopeKey(core.properties.parent, chat.subject);
 
-  for (const subject of partSubjects) {
-    const partResource = await store.getResource(subject);
-    // Always call save(): draft parts from `persistToServer: false` may have a
-    // stashed genesis with no dirty flag — skipping save leaves them local-only.
-    await partResource.save();
-  }
+interface ChatState {
+  /** Refs of messages written in this session, by UI message id. */
+  refs: Map<string, AiMessageRef>;
+  /** The newest `c` this client knows of: a new entry goes after it. */
+  lastC: number;
+  /** Pages were asked from the server once. */
+  queried: boolean;
+}
 
-  await messageResource.save();
-};
+const chatStates = new WeakMap<Resource, ChatState>();
 
-export const uiMessageToResource = async (
-  message: AtomicUIMessage,
-  parent: Resource<Ai.AiChat>,
-  store: Store,
-  {
-    persistToServer = true,
-    existingResource,
-  }: {
-    persistToServer?: boolean;
-    existingResource?: Resource<Ai.AiMessage>;
-  } = {},
-): Promise<Resource<Ai.AiMessage>> => {
-  // Summary messages are stored with role 'summary' regardless of their UI role.
-  const persistedRole = message.metadata?.isSummary ? 'summary' : message.role;
+const stateOf = (chat: Resource): ChatState => {
+  let state = chatStates.get(chat);
 
-  // `content` (parts) is required on ai-message. For a DID drive the subject is
-  // derived from the genesis SIGNATURE, while parts are children whose `parent`
-  // is that very subject — so real parts can't exist before the genesis is
-  // signed. The genesis therefore MUST seed an empty list and push the part
-  // subjects in a follow-up commit. An empty `content` is valid: the server
-  // materializes an empty list as `ResourceArray([])` (loro.rs) and the required
-  // check only tests presence (resources.rs), so the constraint is satisfied.
-  // NOTE: if a server ever drops empty arrays, this genesis is rejected on every
-  // attempt — that was the ai-message ingest loop. The outbox now classifies
-  // "missing. Is required in class" as terminal (local-outbox.ts) so a malformed
-  // commit is dropped instead of retried forever.
-  const messageResource =
-    existingResource ??
-    (await store.newResource<Ai.AiMessage>({
-      isA: ai.classes.aiMessage,
-      parent: parent.subject,
-      propVals: {
-        [ai.properties.role]: roleToTag(persistedRole),
-        [ai.properties.parts]: [],
-      },
-    }));
-
-  // A message description records why this reply stopped; its received parts
-  // remain normal parts and survive provider failures and reloads.
-  if (
-    message.role === 'assistant' &&
-    message.metadata &&
-    'error' in message.metadata
-  ) {
-    if (message.metadata?.error === undefined) {
-      messageResource.remove(core.properties.description);
-    } else {
-      await messageResource.set(
-        core.properties.description,
-        message.metadata.error,
-      );
-    }
-  }
-
-  const context = message.metadata?.userContext;
-
-  if (context && context.length > 0) {
-    // Skill context is ephemeral (already inlined into the outgoing message)
-    // and has no persisted resource counterpart, so skip it here.
-    const persistableContext = context.filter(c => c.type !== 'skill');
-    const subjects = await Promise.all(
-      persistableContext.map(c => contextToResource(c, messageResource, store)),
+  if (!state) {
+    chatStates.set(
+      chat,
+      (state = { refs: new Map(), lastC: 0, queried: false }),
     );
-
-    messageResource.props.providedContext = subjects;
   }
 
-  if (message.metadata?.serverContext) {
-    messageResource.props.serverProvidedContext =
-      message.metadata.serverContext;
-  }
-
-  const priorParts = messageResource.props.parts ?? [];
-  const partSubjects: string[] = [];
-
-  for (const [index, part] of message.parts
-    .filter(p => p.type !== 'step-start')
-    .entries()) {
-    const spec = messagePartSpec(part);
-    const existing = priorParts[index]
-      ? await store.getResource(priorParts[index])
-      : undefined;
-    let partResource: Resource;
-
-    if (existing?.hasClasses(spec.isA)) {
-      partResource = existing;
-
-      for (const [property, value] of Object.entries(spec.propVals)) {
-        if (
-          JSON.stringify(partResource.get(property)) !== JSON.stringify(value)
-        ) {
-          await partResource.set(property, value);
-        }
-      }
-    } else {
-      partResource = await store.newResource({
-        ...spec,
-        parent: messageResource.subject,
-      });
-    }
-
-    if (persistToServer) await partResource.save();
-    partSubjects.push(partResource.subject);
-  }
-
-  await messageResource.set(ai.properties.parts, partSubjects);
-
-  if (!persistToServer) {
-    return messageResource;
-  }
-
-  await messageResource.save();
-
-  return messageResource;
+  return state;
 };
 
-// Serialize checkpoints per chat so an older partial reply cannot overwrite
-// its completed version, and concurrent saves cannot append duplicate messages.
+/** The pages of a chat, oldest first: the ones the server lists and the ones made here. */
+async function pagesOf(chat: Resource, store: Store): Promise<string[]> {
+  const state = stateOf(chat);
+  const scope = scopeOf(chat);
+
+  // A draft chat has no server side yet, so nothing to ask.
+  if (!state.queried && !chat.new) {
+    state.queried = true;
+
+    try {
+      const drive = chat.get('https://atomicdata.dev/properties/drive');
+      const queried = await queryPages(
+        store,
+        core.properties.parent,
+        chat.subject,
+        typeof drive === 'string' ? drive : undefined,
+      );
+      queried.forEach(page => rememberPage(store, scope, page));
+    } catch (error) {
+      // Offline: the pages this client knows are the best there is.
+      console.warn('Could not list the pages of the chat', error);
+      state.queried = false;
+    }
+  }
+
+  return mergePages(store, scope, knownPages(store, scope));
+}
+
+/** The newest page that has room, or a new one (not saved yet). */
+async function pageForNewEntry(
+  chat: Resource,
+  store: Store,
+): Promise<{ page: Resource; created: boolean }> {
+  const infos: PageInfo[] = [];
+
+  // Only the newest few matter: older pages are full.
+  for (const subject of (await pagesOf(chat, store)).slice(-3)) {
+    const page = await store.getResource(subject);
+
+    if (page.error) continue;
+
+    infos.push({
+      subject,
+      entries: page.countChatLogEntries(),
+      createdAt: page.getCreatedAt() ?? 0,
+    });
+  }
+
+  const target = pageWithRoom(infos);
+
+  if (target) return { page: await store.getResource(target), created: false };
+
+  const page = await store.newResource({
+    parent: chat.subject,
+    isA: dataBrowser.classes.chatLog,
+  });
+  rememberPage(store, scopeOf(chat), page.subject);
+
+  return { page, created: true };
+}
+
+// Serialize writes per chat so an older partial reply cannot overwrite its
+// completed version, and concurrent saves cannot append duplicate messages.
 const chatWrites = new WeakMap<Resource, Promise<unknown>>();
 
 /**
@@ -198,77 +171,181 @@ export const queueChatWrite = <T>(
   return next;
 };
 
-const chatMessageResources = new WeakMap<
-  Resource,
-  Map<string, Resource<Ai.AiMessage>>
->();
+/** Sends what a message needs to the server: its page, or its old resources. */
+export const persistMessageResourceToServer = async (
+  ref: AiMessageRef,
+  store: Store,
+): Promise<void> => {
+  if (ref.kind === 'entry') {
+    const page = await store.getResource(ref.page);
+    // Always call save(): a draft page has a stashed genesis and no dirty flag
+    // of its own, and skipping it leaves it local-only.
+    await page.save();
+    void store.notifyResourceManuallyCreated(page);
 
+    return;
+  }
+
+  const messageResource = ref.resource;
+
+  for (const subject of messageResource.props.parts ?? []) {
+    await (await store.getResource(subject)).save();
+  }
+
+  await messageResource.save();
+};
+
+/**
+ * Writes a message as an entry of the chat's log: a new one at the end, or,
+ * for a message already written (a checkpoint of a streaming reply, a retry),
+ * the same entry again with its key and time kept, so the order does not move.
+ * With `persistToServer: false` (a draft chat) the page only changes locally.
+ */
 export const addMessageToChatResource = async (
   message: AtomicUIMessage,
   chatResource: Resource<Ai.AiChat>,
   store: Store,
-  {
-    saveChat = true,
-    persistToServer = true,
-  }: { saveChat?: boolean; persistToServer?: boolean } = {},
-): Promise<Resource<Ai.AiMessage>> => {
+  { persistToServer = true }: { persistToServer?: boolean } = {},
+): Promise<AiMessageRef> => {
   const snapshot = structuredClone(message);
 
   return queueChatWrite(chatResource, async () => {
-    let known = chatMessageResources.get(chatResource);
+    const state = stateOf(chatResource);
+    const author = store.getAgent()?.subject;
 
-    if (!known) {
-      known = new Map();
-      chatMessageResources.set(chatResource, known);
+    if (!author) throw new Error('Sign in to save this chat');
+
+    const known = state.refs.get(snapshot.id);
+    const parsed = known ?? entryRefFromId(snapshot.id);
+    let page: Resource | undefined;
+    let key: string | undefined;
+    let created = false;
+    let entry: ChatLogEntry;
+
+    const previous =
+      parsed?.kind === 'entry'
+        ? await store.getResource(parsed.page).then(p => {
+            const found = p.getChatLogEntry(parsed.key);
+
+            if (found) {
+              page = p;
+              key = parsed.key;
+            }
+
+            return found;
+          })
+        : undefined;
+
+    if (previous && page && key) {
+      entry = messageToEntry(snapshot, previous.a, previous.c);
+    } else {
+      const c = Math.max(Date.now(), state.lastC + 1);
+      ({ page, created } = await pageForNewEntry(chatResource, store));
+      key = newChatLogEntryKey(c);
+      entry = messageToEntry(snapshot, author, c);
     }
 
-    const existingResource = known.get(snapshot.id);
-    const messageResource = await uiMessageToResource(
-      snapshot,
-      chatResource,
-      store,
-      {
-        persistToServer,
-        existingResource,
-      },
-    );
-    known.set(snapshot.id, messageResource);
+    state.lastC = Math.max(state.lastC, entry.c);
+    page.putChatLogEntry(key, entry);
 
-    if (!chatResource.props.messages?.includes(messageResource.subject)) {
-      chatResource.push(ai.properties.messages, [messageResource.subject]);
+    if (persistToServer) {
+      await page.save();
+
+      if (created) void store.notifyResourceManuallyCreated(page);
     }
 
-    if (saveChat) await chatResource.save();
+    const ref: AiMessageRef = { kind: 'entry', page: page.subject, key };
+    state.refs.set(snapshot.id, ref);
 
-    return messageResource;
+    return ref;
   });
 };
 
-export const removeMessageFromChatResource = async (
-  messageResource: Resource,
-  chatResource: Resource<Ai.AiChat>,
-  { saveChat = true }: { saveChat?: boolean } = {},
-): Promise<void> => {
-  await chatResource.set(
-    ai.properties.messages,
-    chatResource.props.messages?.filter(
-      subject => subject !== messageResource.subject,
-    ),
-  );
+function entryRefFromId(id: string): AiMessageRef | undefined {
+  const parsed = parseEntryId(id);
 
-  if (saveChat) {
-    await chatResource.save();
+  return parsed
+    ? { kind: 'entry', page: parsed.page, key: parsed.key }
+    : undefined;
+}
+
+/** Removes messages from the chat: entries from their pages, old resources destroyed. */
+async function removeRefs(
+  refs: AiMessageRef[],
+  chatResource: Resource<Ai.AiChat>,
+  store: Store,
+  persist: boolean,
+): Promise<void> {
+  const state = stateOf(chatResource);
+  const byPage = new Map<string, string[]>();
+  const resources: Resource[] = [];
+
+  for (const ref of refs) {
+    if (ref.kind === 'entry') {
+      byPage.set(ref.page, [...(byPage.get(ref.page) ?? []), ref.key]);
+    } else {
+      resources.push(ref.resource);
+    }
   }
 
-  await messageResource.destroy();
-};
+  for (const [pageSubject, keys] of byPage) {
+    const page = await store.getResource(pageSubject);
+
+    for (const key of keys) page.removeChatLogEntry(key);
+
+    if (persist) await page.save();
+  }
+
+  if (resources.length > 0) {
+    const gone = new Set(resources.map(r => r.subject));
+    await chatResource.set(
+      ai.properties.messages,
+      chatResource.props.messages?.filter(subject => !gone.has(subject)),
+    );
+
+    if (persist) await chatResource.save();
+
+    for (const resource of resources) {
+      try {
+        await resource.destroy();
+      } catch (error) {
+        console.error('Error removing message:', error);
+      }
+    }
+  }
+
+  for (const [id, known] of state.refs) {
+    if (
+      refs.some(
+        ref =>
+          ref.kind === known.kind &&
+          (ref.kind === 'entry' && known.kind === 'entry'
+            ? ref.page === known.page && ref.key === known.key
+            : ref === known),
+      )
+    ) {
+      state.refs.delete(id);
+    }
+  }
+}
+
+export const removeMessageFromChatResource = (
+  ref: AiMessageRef,
+  chatResource: Resource<Ai.AiChat>,
+  store: Store,
+  { persist = true }: { persist?: boolean } = {},
+): Promise<void> =>
+  queueChatWrite(chatResource, () =>
+    removeRefs([ref], chatResource, store, persist),
+  );
 
 export const removeFollowingMessagesFromChatResource = async (
   message: AtomicUIMessage,
   messages: AtomicUIMessage[],
-  messageToResourceMap: Map<AtomicUIMessage, Resource>,
+  messageToRefMap: Map<AtomicUIMessage, AiMessageRef>,
   chatResource: Resource<Ai.AiChat>,
-  { saveChat = true }: { saveChat?: boolean } = {},
+  store: Store,
+  { persist = true }: { persist?: boolean } = {},
 ): Promise<AtomicUIMessage[]> => {
   const messageIndex = messages.findIndex(x => x.id === message.id);
 
@@ -276,66 +353,133 @@ export const removeFollowingMessagesFromChatResource = async (
     throw new Error(`Message not found: ${message.id}`);
   }
 
-  const nextMessages = messages.slice(messageIndex + 1);
-  const destroySubjects: string[] = [];
+  const refs: AiMessageRef[] = [];
 
-  for (const m of nextMessages) {
-    const r = messageToResourceMap.get(m);
+  for (const m of messages.slice(messageIndex + 1)) {
+    const ref = messageToRefMap.get(m);
 
-    if (r) {
-      destroySubjects.push(r.subject);
+    if (!ref) throw new Error(`Message not saved: ${m.id}`);
 
-      try {
-        await r.destroy();
-      } catch (error) {
-        console.error('Error removing message:', error);
-      }
-    } else {
-      throw new Error(`Resource not found for message: ${m.id}`);
-    }
+    refs.push(ref);
   }
 
-  await chatResource.set(
-    ai.properties.messages,
-    chatResource.props.messages?.filter(x => !destroySubjects.includes(x)),
+  await queueChatWrite(chatResource, () =>
+    removeRefs(refs, chatResource, store, persist),
   );
-
-  if (saveChat) {
-    await chatResource.save();
-  }
 
   return messages.slice(0, messageIndex + 1);
 };
 
-const contextToResource = async (
-  context: AIMessageContext,
-  message: Resource<Ai.AiMessage>,
+const compareKeys = (a: AiMessageRef, b: AiMessageRef) =>
+  a.kind === 'entry' && b.kind === 'entry' && a.key !== b.key
+    ? a.key < b.key
+      ? -1
+      : 1
+    : 0;
+
+interface Placed {
+  message: AtomicUIMessage;
+  ref: AiMessageRef;
+  at: number;
+}
+
+/** Two lists that are each in order, merged by time; `first` goes first on a tie. */
+export function mergeByTime<T extends { at: number }>(
+  first: T[],
+  second: T[],
+): T[] {
+  const merged: T[] = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < first.length || j < second.length) {
+    if (
+      j >= second.length ||
+      (i < first.length && first[i].at <= second[j].at)
+    ) {
+      merged.push(first[i++]);
+    } else {
+      merged.push(second[j++]);
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Everything a chat holds, oldest first: the entries of its pages and the old
+ * `ai-message` resources that are not in a page yet. An old message whose
+ * deterministic entry key exists in a page has been migrated; the entry counts
+ * and the stale copy is not shown.
+ */
+export const loadChatMessages = async (
+  chatResource: Resource<Ai.AiChat>,
   store: Store,
-): Promise<string> => {
-  if (isAtomicResourceContext(context)) {
-    return context.subject;
+): Promise<Map<AtomicUIMessage, AiMessageRef>> => {
+  const timing = userTiming('chat:load');
+  const state = stateOf(chatResource);
+  const pages = await pagesOf(chatResource, store);
+  const seen = new Set<string>();
+  const logged: Placed[] = [];
+
+  for (const subject of pages) {
+    const page = await store.getResource(subject);
+
+    if (page.error) continue;
+
+    for (const { key, entry } of page.listChatLogEntries()) {
+      // One key on two pages (two peers migrated the same message) is one message.
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      const id = toEntryId(page.subject, key);
+      const message = entryToMessage(id, entry);
+
+      if (message) {
+        logged.push({
+          message,
+          ref: { kind: 'entry', page: page.subject, key },
+          at: entry.c,
+        });
+      }
+
+      state.lastC = Math.max(state.lastC, entry.c);
+    }
   }
 
-  if (context.type !== 'mcp-resource') {
-    throw new Error(`Cannot persist context of type: ${context.type}`);
+  logged.sort((a, b) => a.at - b.at || compareKeys(a.ref, b.ref));
+  timing.step('entries');
+
+  const oldSubjects = chatResource.props.messages ?? [];
+  const placed: Placed[] = [];
+
+  if (oldSubjects.length > 0) {
+    const resources = await store.getResources(oldSubjects);
+    const timed: Timed[] = oldSubjects.map((id, i) => ({
+      id,
+      at: resources[i].getCreatedAt() ?? 0,
+    }));
+    const shown = new Set(hideMigrated(timed, seen).shown.map(t => t.id));
+    const atOf = new Map(timed.map(t => [t.id, t.at]));
+    const old = await messageResourcesToDisplayMessages(
+      oldSubjects.filter(subject => shown.has(subject)),
+      store,
+    );
+
+    for (const [message, resource] of old) {
+      placed.push({
+        message,
+        ref: { kind: 'resource', resource },
+        at: atOf.get(resource.subject) ?? 0,
+      });
+    }
   }
 
-  const contextResource = await store.newResource<Ai.AiMessage>({
-    isA: ai.classes.mcpResource,
-    parent: message.subject,
-    propVals: {
-      [core.properties.name]: context.name,
-      [ai.properties.mcpUri]: context.uri,
-      [ai.properties.mcpServerId]: context.serverId,
-      ...(context.mimetype
-        ? { [server.properties.mimetype]: context.mimetype }
-        : {}),
-    },
-  });
+  timing.step('convert');
 
-  contextResource.save();
-
-  return contextResource.subject;
+  return new Map(
+    mergeByTime(placed, logged).map(({ message, ref }) => [message, ref]),
+  );
 };
 
 /**
@@ -553,16 +697,6 @@ const tagToRole = (subject: string) => {
   return tag;
 };
 
-const roleToTag = (role: string) => {
-  const tag = roleToTagMapping[role as keyof typeof roleToTagMapping];
-
-  if (!tag) {
-    throw new Error(`Unknown message role: ${role}`);
-  }
-
-  return tag;
-};
-
 const toFilePart = (resource: Resource<Ai.FilePart>): FileUIPart => {
   return {
     type: 'file',
@@ -595,40 +729,6 @@ const toSourceUrlPart = (
   url: resource.props.url,
   title: resource.props.name,
 });
-
-function messagePartSpec(part: AtomicUIMessage['parts'][number]): {
-  isA: string;
-  propVals: Record<string, JSONValue>;
-} {
-  if (part.type === 'file')
-    return {
-      isA: ai.classes.filePart,
-      propVals: {
-        [ai.properties.data]: part.url,
-        [server.properties.mimetype]: part.mediaType,
-        ...(part.filename
-          ? { [server.properties.filename]: part.filename }
-          : {}),
-      },
-    };
-  if (part.type === 'text' || part.type === 'reasoning')
-    return {
-      isA:
-        part.type === 'text' ? ai.classes.textPart : ai.classes.reasoningPart,
-      propVals: { [core.properties.description]: part.text },
-    };
-  if (isToolUIPart(part))
-    return { isA: ai.classes.toolCallPart, propVals: toolPartValues(part) };
-  if (part.type === 'source-url')
-    return {
-      isA: ai.classes.sourceUrlPart,
-      propVals: {
-        [dataBrowser.properties.url]: part.url,
-        ...(part.title ? { [core.properties.name]: part.title } : {}),
-      },
-    };
-  throw new Error(`Unknown content type: ${part.type}`);
-}
 
 const resourceIsFilePart = (
   resource: Resource,

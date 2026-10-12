@@ -81,7 +81,9 @@ it.each(
           },
     );
     expect(order).toEqual(
-      kind === 'blob' ? ['blob', 'flush'] : ['properties and snapshot', 'flush'],
+      kind === 'blob'
+        ? ['blob', 'flush']
+        : ['properties and snapshot', 'flush'],
     );
     expect(db.putResource).not.toHaveBeenCalled();
     expect(response.type).toBe(fail ? 'error' : 'ok');

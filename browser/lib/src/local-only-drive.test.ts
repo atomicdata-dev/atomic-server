@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, it, vi } from 'vitest';
 import {
   core,
   commits,
@@ -14,6 +14,40 @@ import { testStore, attachTestDb } from './test-store.js';
  * or enrolled in the outbox.
  */
 describe('Local-only drives', () => {
+  it('waits for a readable root before asking for the server inventory', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    const drive = 'atomic:uploading-drive';
+    const ws = {
+      readyState: WebSocket.OPEN,
+      resyncDrive: vi.fn(async () => {}),
+      fetch: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Root not found yet'))
+        .mockResolvedValue({}),
+      driveInventory: vi.fn(async () => [{ subject: drive, vv: { peer: 1 } }]),
+    };
+    vi.spyOn(store, 'getDefaultWebSocket').mockReturnValue(ws as never);
+    vi.spyOn(store, 'getClientDb').mockReturnValue({
+      flush: vi.fn(async () => {}),
+      getVersionVectorsForDrive: vi.fn(async () => ({ [drive]: { peer: 1 } })),
+    } as never);
+    vi.spyOn(store, 'subscribeWebSocket').mockImplementation(() => {});
+    vi.useFakeTimers();
+
+    try {
+      const upload = store.syncDriveToServerAndVerify(drive);
+      await vi.waitFor(() => expect(ws.fetch).toHaveBeenCalledTimes(1));
+      expect(ws.driveInventory).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2000);
+      await upload;
+      expect(ws.driveInventory).toHaveBeenCalledExactlyOnceWith(drive, '');
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+  });
   it('saves the drive without POSTing or enrolling the outbox', async ({
     expect,
   }) => {

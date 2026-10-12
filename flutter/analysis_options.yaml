@@ -27,3 +27,8 @@ linter:
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
+
+# Cargokit is a vendored standalone Dart package, checked in its own context.
+analyzer:
+  exclude:
+    - rust_builder/cargokit/**

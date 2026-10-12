@@ -16,7 +16,7 @@ use atomic_lib::{
     vault::store::{MemoryVaultStore, VaultObjectStore},
     vault::sync::{
         commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch,
-        CheckpointPolicy, SegmentKind,
+        CheckpointPolicy, HistoryKeep, SegmentKind,
     },
     Db, Resource, Subject, Value,
 };
@@ -704,6 +704,81 @@ impl ClientDb {
         Ok(done as u32)
     }
 
+    /// Whether the atom indexes still have to be rebuilt for the current key
+    /// layout (`Db::index_migration_pending`). The worker runs
+    /// `migrateIndexKeysStep` until it is done before it serves anything.
+    #[wasm_bindgen(js_name = "indexMigrationPending")]
+    pub fn index_migration_pending(&self) -> Result<bool, JsError> {
+        self.db().index_migration_pending().map_err(to_js_err)
+    }
+
+    /// Rebuild the indexes for up to `limit` more resources. Returns
+    /// `{ "done": n, "total": n, "finished": bool }` as JSON.
+    #[wasm_bindgen(js_name = "migrateIndexKeysStep")]
+    pub fn migrate_index_keys_step(&self, limit: u32) -> Result<String, JsError> {
+        let step = self
+            .db()
+            .migrate_index_keys_step(limit as usize)
+            .map_err(to_js_err)?;
+        serde_json::to_string(&step).map_err(to_js_err)
+    }
+
+    /// Whether old chat `Message` resources may still have to be moved into
+    /// chat log pages (`Db::message_migration_pending`).
+    #[wasm_bindgen(js_name = "messageMigrationPending")]
+    pub fn message_migration_pending(&self) -> Result<bool, JsError> {
+        self.db().message_migration_pending().map_err(to_js_err)
+    }
+
+    /// Move the old messages of whole chats into pages, until about `limit`
+    /// messages are done. Returns `{ "done": n, "total": n, "finished": bool }`
+    /// as JSON. `local_only_drives_json` is a JSON array of the drives that
+    /// exist only in this store: pages are written for those alone. A drive a
+    /// server hosts gets its pages from the server; for those this only drops
+    /// cached `Message`s whose entry is already in a page it holds.
+    #[wasm_bindgen(js_name = "migrateMessagesStep")]
+    pub async fn migrate_messages_step(
+        &self,
+        limit: u32,
+        local_only_drives_json: &str,
+    ) -> Result<String, JsError> {
+        let drives: Vec<String> =
+            serde_json::from_str(local_only_drives_json).map_err(to_js_err)?;
+        let create_in = atomic_lib::db::chat_migration_drive_set(drives);
+        let step = self
+            .db()
+            .migrate_messages_step(limit as usize, Some(&create_in))
+            .await
+            .map_err(to_js_err)?;
+        serde_json::to_string(&step).map_err(to_js_err)
+    }
+
+    /// Whether old `ai-message` resources may still have to be moved into chat
+    /// log pages (`Db::ai_chat_migration_pending`).
+    #[wasm_bindgen(js_name = "aiChatMigrationPending")]
+    pub fn ai_chat_migration_pending(&self) -> Result<bool, JsError> {
+        self.db().ai_chat_migration_pending().map_err(to_js_err)
+    }
+
+    /// Like `migrateMessagesStep`, for the messages of AI chats
+    /// (`Db::migrate_ai_chats_step`).
+    #[wasm_bindgen(js_name = "migrateAiChatsStep")]
+    pub async fn migrate_ai_chats_step(
+        &self,
+        limit: u32,
+        local_only_drives_json: &str,
+    ) -> Result<String, JsError> {
+        let drives: Vec<String> =
+            serde_json::from_str(local_only_drives_json).map_err(to_js_err)?;
+        let create_in = atomic_lib::db::chat_migration_drive_set(drives);
+        let step = self
+            .db()
+            .migrate_ai_chats_step(limit as usize, Some(&create_in))
+            .await
+            .map_err(to_js_err)?;
+        serde_json::to_string(&step).map_err(to_js_err)
+    }
+
     /// The retained signed envelopes of each subject, as
     /// `{ "<subject>": ["<commit JSON-AD>", ...] }`, to ride along a
     /// `SYNC_PUSH` (`atomic_lib::envelopes::for_subjects`). `subjects_json`
@@ -1267,6 +1342,110 @@ pub fn vault_generate_key() -> Vec<u8> {
     DriveVaultKey::generate(1).expose_secret().to_vec()
 }
 
+/// The agent's public encryption key, base64url, derived from its vault proof.
+///
+/// Published on the Agent resource as `encryptionKey`, so others can start an
+/// encrypted conversation with it. See `atomic_lib::conversation`.
+#[wasm_bindgen(js_name = "conversationEncryptionKey")]
+pub fn conversation_encryption_key(vault_proof: &[u8]) -> Result<String, JsError> {
+    check_agent_proof(vault_proof)?;
+    Ok(atomic_lib::conversation::encryption_public_key(vault_proof))
+}
+
+/// Adds an epoch with a fresh key to a conversation keyring, wrapped to
+/// `members_json` (`[{agent, encryptionKey}]`). Pass an empty string to start
+/// a new keyring. Returns the updated keyring JSON.
+#[wasm_bindgen(js_name = "conversationAddEpoch")]
+pub fn conversation_add_epoch(keyring_json: &str, members_json: &str) -> Result<String, JsError> {
+    use atomic_lib::conversation::{Keyring, Member};
+    let mut keyring = if keyring_json.is_empty() {
+        Keyring::default()
+    } else {
+        Keyring::from_json(keyring_json).map_err(to_js_err)?
+    };
+    let members: Vec<Member> = serde_json::from_str(members_json)
+        .map_err(|e| JsError::new(&format!("invalid members: {e}")))?;
+    keyring.add_epoch(&members).map_err(to_js_err)?;
+    keyring.to_json().map_err(to_js_err)
+}
+
+/// Seals a message payload for `conversation` with the keyring's newest epoch.
+#[wasm_bindgen(js_name = "conversationSeal")]
+pub fn conversation_seal(
+    keyring_json: &str,
+    agent: &str,
+    vault_proof: &[u8],
+    conversation: &str,
+    plaintext: &str,
+) -> Result<String, JsError> {
+    use atomic_lib::conversation::{seal_message, Keyring};
+    check_agent_proof(vault_proof)?;
+    let key = Keyring::from_json(keyring_json)
+        .map_err(to_js_err)?
+        .open_current(agent, vault_proof)
+        .map_err(to_js_err)?;
+    seal_message(&key, conversation, plaintext.as_bytes()).map_err(to_js_err)
+}
+
+/// Opens sealed messages of one conversation. Returns one entry per input, in
+/// order: the plaintext, or `null` when that message cannot be opened (an
+/// epoch before the reader joined, or altered data). One keyring unwrap for a
+/// whole page of messages.
+#[wasm_bindgen(js_name = "conversationOpen")]
+pub fn conversation_open(
+    keyring_json: &str,
+    agent: &str,
+    vault_proof: &[u8],
+    conversation: &str,
+    sealed: Vec<String>,
+) -> Result<Vec<JsValue>, JsError> {
+    use atomic_lib::conversation::{open_message, Keyring};
+    check_agent_proof(vault_proof)?;
+    let keys = Keyring::from_json(keyring_json)
+        .map_err(to_js_err)?
+        .open(agent, vault_proof)
+        .map_err(to_js_err)?;
+    Ok(sealed
+        .iter()
+        .map(|s| {
+            open_message(&keys, conversation, s)
+                .ok()
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .map_or(JsValue::NULL, |text| JsValue::from_str(&text))
+        })
+        .collect())
+}
+
+/// Encrypts an attachment for `conversation` under a fresh random key.
+/// Returns `{ key, ciphertext }`: the base64url file key (to put inside the
+/// sealed message that references the file) and the bytes to upload.
+#[wasm_bindgen(js_name = "conversationSealFile")]
+pub fn conversation_seal_file(conversation: &str, plaintext: &[u8]) -> Result<JsValue, JsError> {
+    let (key, ciphertext) =
+        atomic_lib::conversation::seal_file(conversation, plaintext).map_err(to_js_err)?;
+    let sealed = js_sys::Object::new();
+    js_sys::Reflect::set(&sealed, &"key".into(), &JsValue::from_str(&key))
+        .map_err(|_| JsError::new("could not build the sealed file"))?;
+    js_sys::Reflect::set(
+        &sealed,
+        &"ciphertext".into(),
+        &js_sys::Uint8Array::from(ciphertext.as_slice()).into(),
+    )
+    .map_err(|_| JsError::new("could not build the sealed file"))?;
+    Ok(sealed.into())
+}
+
+/// Decrypts what `conversationSealFile` produced. Throws when the key is wrong,
+/// the bytes were altered, or the file belongs to another conversation.
+#[wasm_bindgen(js_name = "conversationOpenFile")]
+pub fn conversation_open_file(
+    conversation: &str,
+    key: &str,
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, JsError> {
+    atomic_lib::conversation::open_file(conversation, key, ciphertext).map_err(to_js_err)
+}
+
 /// The proof must be a 64-byte Ed25519 signature.
 ///
 /// Not the private key: the browser's `CryptoProvider` exposes signing rather
@@ -1315,6 +1494,10 @@ impl ClientDb {
     /// segments predate the anchor; pass an empty object when it is unavailable
     /// and the anchor simply orders every segment after itself.
     ///
+    /// `current_state_only` makes a checkpoint carry each resource as a shallow
+    /// snapshot (current values, no edit history) and no signed envelopes.
+    /// It only matters when this pass is a checkpoint. Omit for the default.
+    ///
     /// The returned bytes are already encrypted: the control plane and the
     /// bucket only ever see ciphertext.
     #[wasm_bindgen(js_name = "vaultExport")]
@@ -1330,6 +1513,7 @@ impl ClientDb {
         checkpoint_n: u64,
         drive_has_checkpoint: bool,
         observed_lanes: JsValue,
+        current_state_only: Option<bool>,
     ) -> Result<JsValue, JsError> {
         let key = drive_key(key_bytes, key_epoch)?;
         let subject = Subject::from_raw(drive_subject, self.db().get_base_domain().as_deref());
@@ -1353,7 +1537,14 @@ impl ClientDb {
             checkpoint_n,
             drive_has_checkpoint,
             &observed,
-            CheckpointPolicy::default(),
+            CheckpointPolicy {
+                history: if current_state_only.unwrap_or(false) {
+                    HistoryKeep::CurrentStateOnly
+                } else {
+                    HistoryKeep::Full
+                },
+                ..CheckpointPolicy::default()
+            },
         )
         .await
         .map_err(to_js_err)?;

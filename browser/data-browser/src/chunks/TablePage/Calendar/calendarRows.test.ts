@@ -7,6 +7,8 @@ import { Datatype } from '@tomic/lib';
 import {
   allDayRowTime,
   calendarRowTime,
+  daysSpanned,
+  endDayFor,
   localTimeInput,
   readRecurrencePayload,
   rowRecord,
@@ -168,5 +170,22 @@ describe('time inputs', () => {
     expect(timedValue('2026-12-01', '09:30', 'Europe/Amsterdam')).toBe(
       '2026-12-01T09:30:00+01:00',
     );
+  });
+});
+
+describe('multi-day timed events', () => {
+  it('counts the days between the start day and the stored end', () => {
+    expect(daysSpanned('2026-10-11', '2026-10-15T12:00:00+00:00')).toBe(4);
+    expect(daysSpanned('2026-10-11', '2026-10-11T12:00:00+00:00')).toBe(0);
+    expect(daysSpanned('2026-10-11', undefined)).toBe(0);
+  });
+
+  it('keeps a multi-day end on its day when only the time changes', () => {
+    expect(endDayFor('2026-10-11', 4, '14:00', '11:01')).toBe('2026-10-15');
+  });
+
+  it('puts a same-day end at or before the start on the next day', () => {
+    expect(endDayFor('2026-10-10', 0, '22:30', '06:45')).toBe('2026-10-11');
+    expect(endDayFor('2026-10-10', 0, '09:00', '10:00')).toBe('2026-10-10');
   });
 });

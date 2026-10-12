@@ -8,18 +8,14 @@ import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useLastSeenComments } from '../../hooks/useLastSeenComments';
 import { getResourcesDrive } from '../../helpers/getResourcesDrive';
 import { getOrCreateCommentsFolder } from '../../helpers/standardLocations';
-import {
-  ChatView,
-  sendChatMessage,
-  useChatMessages,
-} from '../../views/ChatRoom/ChatRoomView';
+import { ChatView, useChatMessages } from '../../views/ChatRoom/ChatRoomView';
 import { Column } from '../Row';
 
 /**
  * Right-side panel showing the comments on the current resource. Comments are
- * plain Message resources whose `about` points at the resource — there is no
- * chatroom container, so the thread needs no setup step and the first comment
- * is just a regular client-signed commit.
+ * entries in ChatLog pages whose `about` points at the resource (older ones are
+ * Message resources) — there is no chatroom container, so the thread needs no
+ * setup step and the first comment is just a regular client-signed commit.
  */
 export const CommentsPanelContainer: React.FC = () => {
   const [pageSubject] = useCurrentSubject();
@@ -73,8 +69,10 @@ function ThreadSubtitle({ subject }: { subject: string }) {
 function Comments({ subject }: { subject: string }) {
   const store = useStore();
   const resource = useResource(subject);
-  const { messages, loading, invalidate, olderCount, loadOlder } =
-    useChatMessages(subject, dataBrowser.properties.about);
+  const { messages, loading, olderCount, loadOlder, send } = useChatMessages(
+    subject,
+    dataBrowser.properties.about,
+  );
   const [, markSeen] = useLastSeenComments(subject);
 
   // Everything in the thread is visible while the panel is open — mark the
@@ -91,13 +89,7 @@ function Comments({ subject }: { subject: string }) {
     // their read rights can differ from the commented resource itself.
     const drive = await getResourcesDrive(resource, store);
     const commentsFolder = await getOrCreateCommentsFolder(store, drive);
-    await sendChatMessage(store, {
-      parent: commentsFolder,
-      about: subject,
-      text,
-      replyTo,
-    });
-    invalidate();
+    await send(text, { parent: commentsFolder, replyTo });
   };
 
   return (

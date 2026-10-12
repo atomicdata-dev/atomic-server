@@ -31,7 +31,7 @@ This can be done, because the groceries app can easily check detailed informatio
 
 ## How to achieve all this
 
-1. The governing body (e.g. the European Commision) should set up an [Atomic Server](https://github.com/atomicdata-dev/atomic-server/) and host it on some recognizable domain.
+1. The governing body (e.g. the European Commision) should set up an [Atomic Server](https://github.com/ontola/atomic-server/) and host it on some recognizable domain.
 1. Create the [Class](https://atomicdata.dev/classes/Class) for a food product, containing the same (or more) information that is shown on food packages.
 1. Create the Class for Ingredient.
 1. Create instances for various Ingredients. Start with the E-numbers, work your way up to all kinds of used ingredients. Add Translations.

@@ -22,8 +22,8 @@ import { createOllama } from 'ollama-ai-provider-v2';
 import { addFieldsIf } from '@helpers/addIf';
 import { stringifyTree, useGetDriveStructure } from './useGetDriveStructure';
 import { useSettings } from '@helpers/AppSettings';
-import { shortenSubject } from '@helpers/subjectRefs';
-import { getClassesOnDrive } from './atomicSchemaHelpers';
+import { shortenSubject } from '@tomic/react';
+import { getClassesOnDrive } from '@tomic/react';
 import { createHostedModel } from './hostedModel';
 import { hostedVoiceModel } from './hostedVoiceModel';
 

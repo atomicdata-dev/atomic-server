@@ -11,13 +11,13 @@ import {
   commits,
   server,
   classes,
-  Datatype,
   type JSONValue,
   type Resource,
   type Store,
 } from '@tomic/react';
 import { buildTableFromSpec } from '../TablePage/createTableFromSpec';
-import { DEMO_SPEAKER } from './messageSpeaker';
+import { sendLogEntry } from '../../helpers/chatLog';
+import { getOrCreateMeetingsFolder } from '../../helpers/standardLocations';
 import { MOODBOARD_BAKED_STROKES } from './moodboardStrokes';
 
 /**
@@ -35,6 +35,10 @@ export type ChecklistStatus = 'Todo' | 'Doing' | 'Done';
 
 export interface DemoManifest {
   drive: string;
+  /** The onboarding Meeting: where the visitor lands. It exists (and holds
+   *  its start time) from the first frame, but is only listed as live — which
+   *  opens its chat for the visitor — once the director starts the scenario. */
+  meeting: string;
   welcomeDoc: string;
   assetsFolder: string;
   moodboard: string;
@@ -156,7 +160,12 @@ const TEAM_CHAT_SEED: Array<{ author: PersonaKey; text: string }> = [
   },
 ];
 
-/** Create local scripted speech while preserving the real genesis creator. */
+/**
+ * Scripted speech as an entry of the chat's log, authored as the persona. The
+ * demo drive is local-only (nothing checks the entry's author against a
+ * signer), and the personas have no keys of their own, so the visitor's guest
+ * identity writes the commit.
+ */
 export async function createDemoMessage(
   store: Store,
   opts: {
@@ -165,20 +174,15 @@ export async function createDemoMessage(
     text: string;
     extraClasses?: string[];
   },
-): Promise<Resource> {
-  const message = await store.newResource({
+): Promise<void> {
+  await sendLogEntry(store, {
     parent: opts.parent,
-    isA: [dataBrowser.classes.message, ...(opts.extraClasses ?? [])],
-    propVals: {
-      [core.properties.description]: opts.text,
-    },
+    text: opts.text,
+    author: opts.author,
+    kind: opts.extraClasses?.includes(dataBrowser.classes.followEvent)
+      ? dataBrowser.classes.followEvent
+      : undefined,
   });
-  // The speaker property is local to the demo and not published on
-  // atomicdata.dev, so validating it would fetch a 404 for every message.
-  await message.set(DEMO_SPEAKER, opts.author, true, Datatype.STRING);
-  await message.save();
-
-  return message;
 }
 
 /** Mirrors `useAddToOntology` for imperative (non-hook) callers: parent
@@ -415,6 +419,21 @@ export async function createDemoWorkspace(
     personas[key] = teamResult.rowSubjects[index];
   });
 
+  // The visitor's first stop. Created up front so the route can open it
+  // straight away; the director lists it in `currentMeetings` when the show
+  // starts. It carries its start time already so it never shows as an
+  // unstarted agenda with a "Start meeting" button.
+  const meeting = await store.newResource({
+    parent: await getOrCreateMeetingsFolder(store, drive.subject),
+    isA: dataBrowser.classes.meeting,
+    propVals: {
+      [core.properties.name]: 'Onboarding meeting',
+      [dataBrowser.properties.meetingStartedAt]: Date.now(),
+      [dataBrowser.properties.meetingLeader]: personas.mara,
+    },
+  });
+  await meeting.save();
+
   const moodboard = await store.newResource({
     parent: drive.subject,
     isA: canvas.classes.canvas,
@@ -461,6 +480,7 @@ export async function createDemoWorkspace(
 
   const manifest: DemoManifest = {
     drive: drive.subject,
+    meeting: meeting.subject,
     welcomeDoc: welcomeDoc.subject,
     assetsFolder: assetsFolder.subject,
     moodboard: moodboard.subject,

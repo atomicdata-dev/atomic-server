@@ -82,6 +82,11 @@ export interface TableEditorContext {
     cb: TableEventHandlers[T],
   ): () => void;
   emitInteractionsFired(interactions: KeyboardInteraction[]): void;
+  /** Where the multi-cell context menu is open, if it is. */
+  selectionMenuPoint: { x: number; y: number } | undefined;
+  /** Opens the multi-cell context menu at the pointer. */
+  openSelectionMenu: (e: React.MouseEvent) => void;
+  closeSelectionMenu: () => void;
 }
 
 const initial: TableEditorContext = {
@@ -116,6 +121,9 @@ const initial: TableEditorContext = {
   setMarkings: emptySetState,
   registerEventListener: () => () => undefined,
   emitInteractionsFired: () => undefined,
+  selectionMenuPoint: undefined,
+  openSelectionMenu: () => undefined,
+  closeSelectionMenu: () => undefined,
 };
 
 const TableEditorContext = createContext<TableEditorContext>(initial);
@@ -185,6 +193,21 @@ export function TableEditorContextProvider({
     [],
   );
 
+  const [selectionMenuPoint, setSelectionMenuPoint] = useState<
+    { x: number; y: number } | undefined
+  >();
+
+  const openSelectionMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectionMenuPoint({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const closeSelectionMenu = useCallback(
+    () => setSelectionMenuPoint(undefined),
+    [],
+  );
+
   const exitEditMode = useCallback(() => {
     setCursorMode(CursorMode.Visual);
   }, []);
@@ -247,6 +270,9 @@ export function TableEditorContextProvider({
       emitInteractionsFired,
       markings,
       setMarkings,
+      selectionMenuPoint,
+      openSelectionMenu,
+      closeSelectionMenu,
     }),
     [
       clearCell,
@@ -270,6 +296,9 @@ export function TableEditorContextProvider({
       readOnly,
       mouseDown,
       markings,
+      selectionMenuPoint,
+      openSelectionMenu,
+      closeSelectionMenu,
     ],
   );
 

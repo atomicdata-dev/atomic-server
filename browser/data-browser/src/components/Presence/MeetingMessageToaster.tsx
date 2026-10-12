@@ -17,6 +17,12 @@ import { useFollow } from './FollowContext';
 import { AgentAvatar } from './AgentAvatar';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
 import { useChatMessages } from '../../views/ChatRoom/ChatRoomView';
+import {
+  isFollowEntry,
+  parseEntryId,
+  readLogEntry,
+} from '../../helpers/chatLog';
+import { useChatLogEntry } from '../../hooks/useChatLog';
 
 /**
  * Surfaces new meeting-chat messages as toasts when the meeting panel isn't
@@ -63,6 +69,28 @@ export function MeetingMessageToaster(): null {
     seenRef.current = messages.length;
 
     for (const subject of fresh) {
+      // A message in the chat log: its author and kind are on the entry.
+      if (parseEntryId(subject)) {
+        const logged = readLogEntry(store, subject)?.entry;
+
+        // System lines ("Viewing …", "Started/ended") and my own messages.
+        if (isFollowEntry(logged) || logged?.a === agent?.subject) continue;
+
+        toast.custom(
+          t => (
+            <MeetingToast
+              subject={subject}
+              onOpen={() => {
+                openMeetingPanel(meeting);
+                toast.dismiss(t.id);
+              }}
+            />
+          ),
+          { duration: 5000 },
+        );
+        continue;
+      }
+
       const res = store.getResourceLoading(subject);
       const isA = (res.get(core.properties.isA) as string[] | undefined) ?? [];
 
@@ -103,9 +131,14 @@ function MeetingToast({
   subject: string;
   onOpen: () => void;
 }) {
-  const resource = useResource(subject);
-  const [text] = useString(resource, core.properties.description);
-  const author = useCreatedBy(resource);
+  const resource = useResource(
+    parseEntryId(subject) ? unknownSubject : subject,
+  );
+  const { entry } = useChatLogEntry(subject);
+  const [resourceText] = useString(resource, core.properties.description);
+  const resourceAuthor = useCreatedBy(resource);
+  const text = entry ? entry.t : resourceText;
+  const author = entry ? entry.a : resourceAuthor;
   const authorResource = useResource(author ?? unknownSubject);
   const [authorName] = useTitle(authorResource);
 

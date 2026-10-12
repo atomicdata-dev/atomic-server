@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import * as Sentry from '@sentry/react';
-import { ai, type Ai, useStore } from '@tomic/react';
+import { type Ai, useStore } from '@tomic/react';
 import {
   Dialog,
   DialogActions,
@@ -15,7 +15,7 @@ import {
   TextAreaStyled,
 } from '@components/forms/InputStyles';
 import { submitFeedback } from '@helpers/feedback';
-import { messageResourcesToDisplayMessages } from './chatConversionUtils';
+import { loadChatMessages } from './chatConversionUtils';
 import {
   formatAIChatReport,
   MAX_AI_CHAT_REPORT_LENGTH,
@@ -60,12 +60,7 @@ export default function ReportAIChatDialog({
     void (async () => {
       try {
         const chat = await store.getResource<Ai.AiChat>(subject);
-        const subjects =
-          (chat.get(ai.properties.messages) as string[] | undefined) ?? [];
-        const messages = await messageResourcesToDisplayMessages(
-          subjects,
-          store,
-        );
+        const messages = await loadChatMessages(chat, store);
         const report = formatAIChatReport(
           chat.title,
           Array.from(messages.keys()),

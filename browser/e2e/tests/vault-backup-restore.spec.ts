@@ -115,7 +115,10 @@ async function completeOnboarding(
   // Explicit wait rather than the 10s action timeout: this is the first paint
   // after the magic-link redirect, so it also pays for the WASM ClientDb boot,
   // which on a loaded machine takes longer than a click is allowed to wait.
-  const profileStep = page.getByRole('button', { name: 'Save & continue' });
+  const profileStep = page.getByRole('button', {
+    name: 'Save and continue',
+    exact: true,
+  });
   await profileStep.waitFor({ state: 'visible', timeout: 60_000 });
   await profileStep.click();
 
@@ -309,9 +312,7 @@ test.describe('Cloud Vault backup and restore', () => {
     await page.evaluate(() => {
       const store = window.store;
       const drive = store.getDrive();
-
-      if (!drive) throw new Error('Vault test needs a selected drive');
-
+      if (!drive) throw new Error('Onboarding did not select a drive');
       store.registerLocalOnlyDrive(drive);
       store.getDefaultWebSocket()?.close();
     });

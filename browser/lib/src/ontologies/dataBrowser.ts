@@ -10,6 +10,7 @@ export const dataBrowser = {
     article: 'https://atomicdata.dev/classes/Article',
     bookmark: 'https://atomicdata.dev/class/Bookmark',
     chatroom: 'https://atomicdata.dev/classes/ChatRoom',
+    chatLog: 'https://atomicdata.dev/classes/ChatLog',
     currencyProperty:
       'https://atomicdata.dev/ontology/data-browser/class/currency-property',
     dateFormat: 'https://atomicdata.dev/classes/DateFormat',
@@ -40,6 +41,8 @@ export const dataBrowser = {
     about: 'https://atomicdata.dev/properties/about',
     color: 'https://atomicdata.dev/properties/color',
     commentsFolder: 'https://atomicdata.dev/properties/commentsFolder',
+    trashFolder: 'https://atomicdata.dev/properties/trashFolder',
+    trashedFrom: 'https://atomicdata.dev/properties/trashedFrom',
     coverImage: 'https://atomicdata.dev/properties/coverImage',
     coverImageFocus: 'https://atomicdata.dev/properties/coverImageFocus',
     followSessionsChatroom:
@@ -130,6 +133,10 @@ export const dataBrowser = {
     ['https://atomicdata.dev/classes/ChatRoom']: [
       'https://atomicdata.dev/properties/name',
       'https://atomicdata.dev/properties/messages',
+    ],
+    ['https://atomicdata.dev/classes/ChatLog']: [
+      'https://atomicdata.dev/properties/parent',
+      'https://atomicdata.dev/properties/about',
     ],
     ['https://atomicdata.dev/ontology/data-browser/class/currency-property']: [
       'https://atomicdata.dev/ontology/data-browser/property/currency',
@@ -253,6 +260,7 @@ export namespace DataBrowser {
   export type Article = typeof dataBrowser.classes.article;
   export type Bookmark = typeof dataBrowser.classes.bookmark;
   export type Chatroom = typeof dataBrowser.classes.chatroom;
+  export type ChatLog = typeof dataBrowser.classes.chatLog;
   export type CurrencyProperty = typeof dataBrowser.classes.currencyProperty;
   export type DateFormat = typeof dataBrowser.classes.dateFormat;
   export type DisplayStyle = typeof dataBrowser.classes.displayStyle;
@@ -301,6 +309,10 @@ declare module '../index.js' {
     [dataBrowser.classes.chatroom]: {
       requires: BaseProps | 'https://atomicdata.dev/properties/name';
       recommends: typeof dataBrowser.properties.messages;
+    };
+    [dataBrowser.classes.chatLog]: {
+      requires: BaseProps | 'https://atomicdata.dev/properties/parent';
+      recommends: typeof dataBrowser.properties.about;
     };
     [dataBrowser.classes.currencyProperty]: {
       requires: BaseProps | typeof dataBrowser.properties.currency;
@@ -474,6 +486,8 @@ declare module '../index.js' {
     [dataBrowser.properties.about]: string;
     [dataBrowser.properties.color]: string;
     [dataBrowser.properties.commentsFolder]: string;
+    [dataBrowser.properties.trashFolder]: string;
+    [dataBrowser.properties.trashedFrom]: string;
     [dataBrowser.properties.coverImage]: string;
     [dataBrowser.properties.coverImageFocus]: number;
     [dataBrowser.properties.followSessionsChatroom]: string;
@@ -597,6 +611,8 @@ declare module '../index.js' {
     [dataBrowser.properties.about]: 'about';
     [dataBrowser.properties.color]: 'color';
     [dataBrowser.properties.commentsFolder]: 'commentsFolder';
+    [dataBrowser.properties.trashFolder]: 'trashFolder';
+    [dataBrowser.properties.trashedFrom]: 'trashedFrom';
     [dataBrowser.properties.coverImage]: 'coverImage';
     [dataBrowser.properties.coverImageFocus]: 'coverImageFocus';
     [dataBrowser.properties.followSessionsChatroom]: 'followSessionsChatroom';

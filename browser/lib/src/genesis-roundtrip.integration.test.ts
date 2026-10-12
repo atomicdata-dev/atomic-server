@@ -15,7 +15,7 @@ import { identifierBody, isAtomicIdentifier } from './subject.js';
  * Skips if no server is reachable, so it never fails the normal suite. Run
  * explicitly: `pnpm vitest run src/genesis-roundtrip.integration.test.ts`.
  */
-const SERVER = 'http://localhost:9883';
+const SERVER = process.env.ATOMIC_SERVER_URL ?? 'http://localhost:9883';
 
 async function serverUp(): Promise<boolean> {
   try {

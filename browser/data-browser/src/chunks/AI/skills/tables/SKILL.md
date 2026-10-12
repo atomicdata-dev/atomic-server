@@ -137,7 +137,7 @@ recipe read `/creating-tables`.
 
 ## Changing an existing table
 
-Three tools, and none of them need ontology knowledge:
+Before creating a new row class for a table, call `find_schema`: a class for these rows may already exist and should be reused. Three tools, and none of them need ontology knowledge:
 
 - **`describe_table`** — read back the row class, every column (datatype +
   select options) and every view's settings. Do this _before_ changing a view;

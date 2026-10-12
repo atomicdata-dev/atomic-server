@@ -13,6 +13,7 @@ import { Providers } from '../Providers';
 import { IdentityReconcileGate } from '../components/IdentityReconcileGate';
 import { DeviceLockWatcher } from '../components/DeviceLockWatcher';
 import { CloudVaultWatcher } from '../components/CloudVaultWatcher';
+import { EncryptionKeyPublisher } from '../components/EncryptionKeyPublisher';
 import { PairingLinkHandler } from '../components/PairingLinkHandler';
 import { PairingFlowProvider } from '../components/pairing/PairingFlowProvider';
 import ResourcePage from '../views/ResourcePage';
@@ -52,6 +53,8 @@ export const rootRoute = createRootRoute({
             edits (no-op without an account session). */}
         <CloudVaultWatcher />
         <BrowserPeerWatcher />
+        {/* Lets others start an encrypted conversation with this agent. */}
+        <EncryptionKeyPublisher />
       </PairingFlowProvider>
       {/* Uncomment to get Tanstack Router Devtools */}
       {/* <TanStackRouterDevtools position='bottom-right' /> */}

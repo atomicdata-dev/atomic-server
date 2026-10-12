@@ -133,6 +133,20 @@ describe('WSClient handshake', () => {
     vi.useRealTimers();
   });
 
+  it.each([
+    'atomic:workspace',
+    'did:ad:workspace',
+    'https://example.com/drive',
+  ])('attributes a rejected sync to the complete subject %s', async drive => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = vi.spyOn(store, 'failDriveSync');
+    const message = `SYNC_PUSH rejected for drive ${drive}: not enrolled`;
+    socket.receive(encodeError(0, ErrorCode.SYNC_REJECTED, message));
+    await vi.waitFor(() => assert(failed).toHaveBeenCalledWith(drive, message));
+    client.close();
+  });
+
   it('cancels authentication when closed while awaiting the server challenge', async ({
     expect,
   }) => {

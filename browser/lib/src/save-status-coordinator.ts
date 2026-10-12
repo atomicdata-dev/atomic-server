@@ -1,4 +1,4 @@
-import { ResourceEvents, type Resource } from './resource.js';
+import { ResourceEvents, SaveQueuedError, type Resource } from './resource.js';
 import {
   ScheduledSave,
   ResourceSaveStateKind,
@@ -35,7 +35,15 @@ export class SaveStatusCoordinator {
 
     return new ScheduledSave(
       async () => {
-        if (options.shouldSave?.() !== false) await target.save();
+        if (options.shouldSave?.() === false) return;
+
+        try {
+          await target.save();
+        } catch (error) {
+          // A queued edit is a normal state, visible through getState.
+          if (error instanceof SaveQueuedError) return;
+          throw error;
+        }
       },
       delta => {
         this.scheduledByResource.set(

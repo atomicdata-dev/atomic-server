@@ -20,6 +20,8 @@ pub struct DownloadParams {
     pub f: Option<String>,
 }
 
+const DEFAULT_MIMETYPE: &str = "application/octet-stream";
+
 /// Downloads the File of the Resource that matches the same URL minus the `/download` path.
 #[tracing::instrument(skip(appstate, req))]
 pub async fn handle_download(
@@ -42,17 +44,31 @@ pub async fn handle_download(
     // Content-addressed URLs identify blob bytes, not a File resource at
     // `/files/<hash>`. This remains true when requesting an image rendition:
     // uploads have DID resources, and peers can hold the blob without metadata.
+    // The mimetype is not carried by the hash alone, so it is recovered from
+    // any File resource sharing this `internalId` — falling back to
+    // `application/octet-stream` only when none exists (see
+    // `mimetype_by_internal_id`; without the real mimetype, `nosniff` makes
+    // browsers refuse to render an uploaded SVG inline).
     if let Some(hash_hex) = subject_path.strip_prefix("/files/") {
         if hash_hex.len() == 64 && hex::decode(hash_hex).is_ok() {
-            let bytes = match blob_by_hash_hex(hash_hex, &appstate).await? {
-                Some(bytes) => Some(bytes),
-                None => chunked_file_by_internal_id(hash_hex, &appstate).await?,
+            let (bytes, mimetype) = match blob_by_hash_hex(hash_hex, &appstate).await? {
+                Some(bytes) => (
+                    Some(bytes),
+                    mimetype_by_internal_id(hash_hex, &appstate).await,
+                ),
+                None => match chunked_file_by_internal_id(hash_hex, &appstate).await? {
+                    Some(file) => (
+                        Some(reconstruct_file_bytes(&file, &appstate).await?),
+                        mimetype_of(&file),
+                    ),
+                    None => (None, DEFAULT_MIMETYPE.to_string()),
+                },
             };
             let bytes = bytes.ok_or_else(|| {
                 atomic_lib::errors::AtomicError::not_found(format!("Blob not found: {hash_hex}"))
             })?;
             if params.q.is_none() && params.w.is_none() && params.f.is_none() {
-                return Ok(user_blob_response("application/octet-stream", bytes));
+                return Ok(user_blob_response(mimetype, bytes));
             }
             let hash_bytes = hex::decode(hash_hex).expect("validated hash");
             return serve_processed_image(&bytes, &hash_bytes, &params, &appstate).await;
@@ -65,7 +81,9 @@ pub async fn handle_download(
     if subject.is_blob_did() {
         if let Some(hash_hex) = subject.blob_hash_hex() {
             if let Some(bytes) = blob_by_hash_hex(hash_hex, &appstate).await? {
-                return Ok(user_blob_response("application/octet-stream", bytes));
+                let mimetype = mimetype_by_internal_id(hash_hex, &appstate).await;
+
+                return Ok(user_blob_response(mimetype, bytes));
             }
         }
     }
@@ -172,25 +190,61 @@ async fn reconstruct_file_bytes(
         .ok_or_else(|| format!("Blob not found: {}", internal_id).into())
 }
 
-/// Find a chunked File by its whole-file `internalId` and reconstruct its bytes,
-/// so the content-addressed `/download/files/{hash}` URL works for chunked files
-/// (whose whole-file blob is never stored). `None` if no such chunked File.
-async fn chunked_file_by_internal_id(
+/// Every File resource whose whole-file `internalId` is this hash. Lets the
+/// content-addressed `/download/files/{hash}` route recover the metadata
+/// (mimetype, chunk list) that the hash alone does not carry. More than one
+/// File can share a hash — the same bytes uploaded twice are stored once.
+async fn files_by_internal_id(
     hash_hex: &str,
     appstate: &AppState,
-) -> AtomicServerResult<Option<Vec<u8>>> {
+) -> AtomicServerResult<Vec<Resource>> {
     let result = appstate
         .store
         .query(&Query::new_prop_val(urls::INTERNAL_ID, hash_hex))
         .await?;
 
-    for resource in result.resources {
-        if matches!(resource.get(urls::CHUNKS), Ok(Value::ResourceArray(c)) if !c.is_empty()) {
-            return Ok(Some(reconstruct_file_bytes(&resource, appstate).await?));
-        }
-    }
+    Ok(result.resources)
+}
 
-    Ok(None)
+/// Find a chunked File by its whole-file `internalId`, so the content-addressed
+/// URL works for chunked files (whose whole-file blob is never stored).
+/// `None` if no such chunked File.
+async fn chunked_file_by_internal_id(
+    hash_hex: &str,
+    appstate: &AppState,
+) -> AtomicServerResult<Option<Resource>> {
+    Ok(files_by_internal_id(hash_hex, appstate)
+        .await?
+        .into_iter()
+        .find(|r| matches!(r.get(urls::CHUNKS), Ok(Value::ResourceArray(c)) if !c.is_empty())))
+}
+
+/// The File's stored `mimetype`, or `application/octet-stream` when it has none.
+fn mimetype_of(resource: &Resource) -> String {
+    resource
+        .get(urls::MIMETYPE)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|_| DEFAULT_MIMETYPE.to_string())
+}
+
+/// The mimetype of the File whose `internalId` is this hash.
+///
+/// The content-addressed routes are handed nothing but a hash, but they must
+/// still answer with the real mimetype: `user_blob_response` sets `nosniff`, so
+/// an `application/octet-stream` answer makes the browser refuse to render the
+/// bytes in an `<img>` — which is exactly how every client-uploaded file is
+/// referenced, since `downloadURL` points at `/download/files/{hash}`.
+async fn mimetype_by_internal_id(hash_hex: &str, appstate: &AppState) -> String {
+    let Ok(files) = files_by_internal_id(hash_hex, appstate).await else {
+        return DEFAULT_MIMETYPE.to_string();
+    };
+
+    // Duplicate uploads of the same bytes all carry the same mimetype, so any
+    // File that has one answers for the hash; skip those that don't.
+    files
+        .iter()
+        .find_map(|f| f.get(urls::MIMETYPE).ok().map(|v| v.to_string()))
+        .unwrap_or_else(|| DEFAULT_MIMETYPE.to_string())
 }
 
 pub async fn download_file_handler_partial(
@@ -208,10 +262,7 @@ pub async fn download_file_handler_partial(
         .unwrap_or_default();
     let hash_bytes = hex::decode(&internal_id).unwrap_or_default();
 
-    let mimetype = resource
-        .get(urls::MIMETYPE)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "application/octet-stream".to_string());
+    let mimetype = mimetype_of(resource);
 
     // No params: serve the original bytes verbatim.
     if params.q.is_none() && params.w.is_none() && params.f.is_none() {

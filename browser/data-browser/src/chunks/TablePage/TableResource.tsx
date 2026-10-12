@@ -3,6 +3,7 @@ import {
   dataBrowser,
   unknownSubject,
   type AggregateFunction,
+  type Aggregation,
   useCanWrite,
   useStore,
   type DataBrowser,
@@ -53,6 +54,9 @@ import { DEFAULT_SIZE_PX } from '@chunks/TableEditor/hooks/useCellSizes';
 import { NewColumnButton } from './NewColumnButton';
 import { TableHeading } from './TableHeading';
 import { TableFilterBar } from './TableFilterBar';
+import { RowSelectCheckbox } from './RowSelectCheckbox';
+import { CellSelectionMenu } from './CellSelectionMenu';
+import { useResourceContextMenu } from '@components/ResourceContextMenu/ResourceContextMenuContext';
 import { TableViewTabs } from './TableViewTabs';
 import { VIEW_KIND_LABELS } from './tableViewKinds';
 import { ExpandedRowDialog } from './ExpandedRowDialog';
@@ -82,6 +86,7 @@ import type { AggregateTarget } from './tablePageContext';
 import type { DerivedColumnSpec } from './derivedColumns';
 import { TablePresenceContext, useTablePresence } from './TablePresence';
 import { withRowDefaults } from './rowDefaults';
+import { useQuickFilter, useQuickFilterAggregates } from './useQuickFilter';
 
 interface TableResourceProps {
   resource: Resource<DataBrowser.Table>;
@@ -104,6 +109,8 @@ const columnToKey = (column: TableColumn) => column.key;
 
 /** Draft rows minted ahead, so adding a row never waits on a signature. */
 const DRAFT_POOL_SIZE = 2;
+
+const NO_ROWS: string[] = [];
 
 /**
  * Which rows a query asks for, as one comparable string — so the collection in
@@ -152,6 +159,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     setViewKind,
     duplicateView,
     deleteView,
+    reorderViews,
     collection,
     ready,
     invalidateCollection,
@@ -192,6 +200,46 @@ export const TableResource: React.FC<TableResourceProps> = ({
     viewSplitLanguages,
   );
   const calendarRow = useTableCalendarRow(tableClass, allColumns);
+
+  // The toolbar's quick filter. Session state, not View configuration: it is
+  // tagged with the view it was typed in, so switching views (or leaving the
+  // table) starts that view unfiltered. See `quickFilter.ts`.
+  const [quickFilterState, setQuickFilterState] = useState<{
+    view: string | undefined;
+    text: string;
+  }>({ view: undefined, text: '' });
+  const quickFilterText =
+    quickFilterState.view === activeView ? quickFilterState.text : '';
+  const setQuickFilterText = useCallback(
+    (text: string) => setQuickFilterState({ view: activeView, text }),
+    [activeView],
+  );
+
+  // A dashboard or an app shows no rows of its own, so there's nothing to narrow.
+  const showsRows = appView === undefined && viewKind !== 'dashboard';
+
+  // The visible stored columns, each language of a split column on its own:
+  // what the quick filter reads a row's text from.
+  const quickFilterSources = useMemo(
+    () =>
+      columns.flatMap(c =>
+        c.property
+          ? [{ property: c.property, languageTag: c.languageTag }]
+          : [],
+      ),
+    [columns],
+  );
+
+  // Narrows the view's own (column-filtered, sorted) rows. Every row view below
+  // reads `quickFilter.collection`, which is the view's collection while the
+  // field is empty.
+  const quickFilter = useQuickFilter(
+    collection,
+    quickFilterSources,
+    showsRows ? quickFilterText : '',
+  );
+  const rowCollection = quickFilter.collection;
+  const quickFilterQuery = quickFilterText.trim();
 
   // The rendered column's property, per grid index (split columns repeat
   // theirs) — for consumers that need index alignment (presence). Virtual
@@ -491,24 +539,41 @@ export const TableResource: React.FC<TableResourceProps> = ({
     [gridColumns, setViewColumnOrder, setViewColumns],
   );
 
-  // Totals ride their own query so they can be re-read on every edit without
-  // clearing the grid's pages. See `useTableAggregates`.
-  const aggregateOutcomes = useTableAggregates({
-    property: core.properties.parent,
-    value: resource.subject,
-    filters: queryFilters,
-    expressionFilters: queryExpressionFilters,
-    aggregation: toAggregation(
+  // Rebuilt every render (it carries a quantized `now`), so keyed on content.
+  const aggregationKey = JSON.stringify(
+    toAggregation(
       viewAggregates,
       viewGroupByColumn,
       viewGroupGranularity,
       derivedSpecs,
-    ),
+    ) ?? null,
+  );
+  const aggregation = useMemo(
+    () => (JSON.parse(aggregationKey) as Aggregation | null) ?? undefined,
+    [aggregationKey],
+  );
+
+  // Totals ride their own query so they can be re-read on every edit without
+  // clearing the grid's pages. See `useTableAggregates`.
+  const viewAggregateOutcomes = useTableAggregates({
+    property: core.properties.parent,
+    value: resource.subject,
+    filters: queryFilters,
+    expressionFilters: queryExpressionFilters,
+    aggregation,
     drive: store.getDrive(),
     server: resource.subject.startsWith('http')
       ? new URL(resource.subject).origin
       : undefined,
   });
+
+  // Under the quick filter, the totals cover the rows that match — the rows on
+  // screen, and the ones the footer counts.
+  const aggregateOutcomes = useQuickFilterAggregates(
+    quickFilter,
+    aggregation,
+    viewAggregateOutcomes,
+  );
 
   const [columnSizes, handleColumnResize] = useHandleColumnResize(resource);
 
@@ -576,7 +641,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
 
   const handlePaste = useHandlePaste(
     resource,
-    collection,
+    rowCollection,
     tableClass,
     invalidateCollection,
     addItemsToHistoryStack,
@@ -709,6 +774,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
   );
 
   const baselineMemberCountRef = useRef<number | null>(null);
+  const deletedSessionRowsRef = useRef(0);
   const baselineQueryKeyRef = useRef<string | null>(null);
 
   // What the grid is asking for, and what the collection in hand answers.
@@ -739,6 +805,21 @@ export const TableResource: React.FC<TableResourceProps> = ({
     isSavedDraft(store.getResourceLoading(subject)),
   ).length;
 
+  // Session rows the person deleted: they left `newRowSubjects` at once, but the
+  // collection still counts them until its own removal lands. Without this the
+  // gap reads as a row from somewhere else, the baseline is raised for it, and
+  // the grid draws a member that no longer exists (a duplicated neighbour).
+  // Bounded by what the collection really has in excess, so it drains itself.
+  deletedSessionRowsRef.current = Math.min(
+    deletedSessionRowsRef.current,
+    Math.max(
+      0,
+      collection.totalMembers -
+        (baselineMemberCountRef.current ?? 0) -
+        materialisedSessionRows,
+    ),
+  );
+
   // Freeze the count only once the collection actually answers what was asked.
   // Edits land faster than collections arrive — change a filter's operator and
   // then type its value, and the collection built for the operator-only query
@@ -757,7 +838,9 @@ export const TableResource: React.FC<TableResourceProps> = ({
   ) {
     baselineMemberCountRef.current = Math.max(
       0,
-      collection.totalMembers - materialisedSessionRows,
+      collection.totalMembers -
+        materialisedSessionRows -
+        deletedSessionRowsRef.current,
     );
     baselineQueryKeyRef.current = requestedQuery;
   }
@@ -789,7 +872,9 @@ export const TableResource: React.FC<TableResourceProps> = ({
   // (`itemKey` offsets by `memberCount`), so nothing remounts.
   if (baselineMemberCountRef.current !== null) {
     const accountedFor =
-      baselineMemberCountRef.current + materialisedSessionRows;
+      baselineMemberCountRef.current +
+      materialisedSessionRows +
+      deletedSessionRowsRef.current;
 
     if (collection.totalMembers > accountedFor) {
       baselineMemberCountRef.current += collection.totalMembers - accountedFor;
@@ -798,7 +883,12 @@ export const TableResource: React.FC<TableResourceProps> = ({
 
   const memberCount = Math.min(
     baselineMemberCountRef.current ??
-      Math.max(0, collection.totalMembers - materialisedSessionRows),
+      Math.max(
+        0,
+        collection.totalMembers -
+          materialisedSessionRows -
+          deletedSessionRowsRef.current,
+      ),
     collection.totalMembers,
   );
 
@@ -870,7 +960,10 @@ export const TableResource: React.FC<TableResourceProps> = ({
    */
   const handleInsertRowBelow = useCallback(
     (index: number): boolean => {
+      // Rows hidden by the quick filter sit between the visible ones, so
+      // "directly below" has no position to stand for.
       if (
+        quickFilter.active ||
         sorting.prop !== dataBrowser.properties.sortOrder ||
         sorting.sortDesc
       ) {
@@ -949,6 +1042,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     },
     [
       sorting,
+      quickFilter.active,
       memberCount,
       newRowSubjects,
       sessionSortOrders,
@@ -968,15 +1062,29 @@ export const TableResource: React.FC<TableResourceProps> = ({
     );
   }, [withSessionRow]);
 
+  // What the grid draws. Under the quick filter: the matching rows and nothing
+  // else — no session rows, since a row being typed would vanish the moment it
+  // stopped matching. The session rows are kept, and come back on clearing.
+  const gridMemberCount = quickFilter.active
+    ? quickFilter.matches.length
+    : memberCount;
+  const gridNewRowSubjects = quickFilter.active ? NO_ROWS : newRowSubjects;
+
   const itemKey = useCallback(
     (index: number) => {
+      if (quickFilter.active) {
+        // By subject: the same row keeps its cells while the matches around it
+        // come and go.
+        return `match-${quickFilter.matches[index] ?? index}`;
+      }
+
       if (index < memberCount) {
         return `member-${index}`;
       }
 
       return newRowSubjects[index - memberCount] ?? `new-row-fallback-${index}`;
     },
-    [memberCount, newRowSubjects],
+    [quickFilter.active, quickFilter.matches, memberCount, newRowSubjects],
   );
 
   // See `TablePageContextType.rowSource`. The SAME index→row mapping the grid
@@ -984,18 +1092,19 @@ export const TableResource: React.FC<TableResourceProps> = ({
   // come from the collection, session rows from `newRowSubjects`. A session row
   // keeps its `_new:` key for its whole life here — materializing does not turn
   // it into a member — so resolving everything through the collection would
-  // address the wrong row.
+  // address the wrong row. Under the quick filter the grid draws the matches,
+  // so this follows `rowCollection` and the grid's counts too.
   const rowSource = useCallback(
     (index: number): RowSource | undefined => {
-      if (index < memberCount) {
-        return { kind: 'member', collection, index };
+      if (index < gridMemberCount) {
+        return { kind: 'member', collection: rowCollection, index };
       }
 
-      const key = newRowSubjects[index - memberCount];
+      const key = gridNewRowSubjects[index - gridMemberCount];
 
       return key ? { kind: 'session', key } : undefined;
     },
-    [collection, memberCount, newRowSubjects],
+    [rowCollection, gridMemberCount, gridNewRowSubjects],
   );
 
   const [showExpandedRowDialog, setShowExpandedRowDialog] = useState(false);
@@ -1003,15 +1112,174 @@ export const TableResource: React.FC<TableResourceProps> = ({
 
   const handleRowExpand = useCallback(
     async (index: number) => {
-      const row = await collection.getMemberWithIndex(index);
+      const row = await rowCollection.getMemberWithIndex(index);
       setExpandedRowSubject(row);
       setShowExpandedRowDialog(true);
     },
-    [collection],
+    [rowCollection],
+  );
+
+  // Rows ticked in the row header, by subject. A change of view, filter or
+  // sorting changes which rows are visible, so the ticks would point at rows
+  // the person can no longer see: they only count for the query they were made
+  // under.
+  const [selection, setSelection] = useState<{
+    queryKey: string;
+    rows: ReadonlySet<string>;
+  }>({ queryKey, rows: new Set() });
+  const selectedRows = useMemo<ReadonlySet<string>>(
+    () => (selection.queryKey === queryKey ? selection.rows : new Set()),
+    [selection, queryKey],
+  );
+
+  const toggleRowSelected = useCallback(
+    (subject: string) => {
+      setSelection(prev => {
+        const next = new Set(prev.queryKey === queryKey ? prev.rows : []);
+
+        if (!next.delete(subject)) {
+          next.add(subject);
+        }
+
+        return { queryKey, rows: next };
+      });
+    },
+    [queryKey],
+  );
+
+  const clearRowSelection = useCallback(
+    () => setSelection({ queryKey, rows: new Set() }),
+    [queryKey],
+  );
+
+  const deleteRowSubjects = useCallback(
+    async (subjects: string[]) => {
+      const resources = subjects
+        .map(subject => store.getResourceLoading(subject))
+        .filter(row => !isUnsavedDraft(row));
+
+      clearRowSelection();
+
+      // Rows added this session are drawn from `newRowSubjects`; drop them from
+      // the render list right away, like `handleDeleteRow` does.
+      const sessionSubjects = new Set(newRowSubjects);
+      const doomed = new Set(subjects);
+
+      for (const subject of sessionSubjects) {
+        if (
+          doomed.has(subject) &&
+          isSavedDraft(store.getResourceLoading(subject))
+        ) {
+          deletedSessionRowsRef.current += 1;
+        }
+      }
+
+      setNewRowSubjects(prev => prev.filter(s => !doomed.has(s)));
+
+      if (resources.length === 0) {
+        return;
+      }
+
+      // One undo step restores the whole batch.
+      addItemsToHistoryStack(resources.map(createResourceDeletedHistoryItem));
+
+      for (const row of resources) {
+        await row.destroy();
+
+        if (!sessionSubjects.has(row.subject)) {
+          decrementMemberCount();
+        }
+      }
+    },
+    [
+      newRowSubjects,
+      store,
+      clearRowSelection,
+      addItemsToHistoryStack,
+      decrementMemberCount,
+    ],
+  );
+
+  const deleteSelectedRows = useCallback(
+    () => deleteRowSubjects([...selectedRows]),
+    [deleteRowSubjects, selectedRows],
+  );
+
+  // The subject of the row at a grid index: a collection member, or a row
+  // added this session.
+  const subjectAtRow = useCallback(
+    async (index: number): Promise<string | undefined> =>
+      index < memberCount
+        ? await collection.getMemberWithIndex(index)
+        : newRowSubjects[index - memberCount],
+    [collection, memberCount, newRowSubjects],
+  );
+
+  const { openResourceMenu } = useResourceContextMenu();
+
+  // Right-click on a row's header cell: the same resource menu a right-click on
+  // one of its cells opens. The subject is looked up asynchronously, so keep
+  // what the menu needs from the event.
+  const handleRowContextMenu = useCallback(
+    (index: number, e: React.MouseEvent) => {
+      e.preventDefault();
+
+      const { clientX, clientY } = e;
+
+      void subjectAtRow(index).then(subject => {
+        if (subject) {
+          openResourceMenu(subject, {
+            clientX,
+            clientY,
+            preventDefault: () => undefined,
+            stopPropagation: () => undefined,
+          } as React.MouseEvent);
+        }
+      });
+    },
+    [subjectAtRow, openResourceMenu],
+  );
+
+  const deleteRowsByIndex = useCallback(
+    async (indexes: number[]) => {
+      const subjects = await Promise.all(indexes.map(subjectAtRow));
+
+      await deleteRowSubjects(
+        subjects.filter((s): s is string => s !== undefined),
+      );
+    },
+    [subjectAtRow, deleteRowSubjects],
+  );
+
+  const RowHeaderExtra = useCallback(
+    ({ index }: { index: number }) => {
+      if (!canWrite) {
+        return null;
+      }
+
+      if (index < memberCount) {
+        return <RowSelectCheckbox collection={collection} index={index} />;
+      }
+
+      // The trailing empty row is the entry placeholder, not a row yet.
+      const newRowIndex = index - memberCount;
+      const subject = newRowSubjects[newRowIndex];
+
+      if (!subject || newRowIndex === newRowSubjects.length - 1) {
+        return null;
+      }
+
+      return <RowSelectCheckbox subject={subject} index={index} />;
+    },
+    [canWrite, collection, memberCount, newRowSubjects],
   );
 
   const tablePageContext: TablePageContextType = useMemo(
     () => ({
+      selectedRows,
+      toggleRowSelected,
+      clearRowSelection,
+      deleteSelectedRows,
       tableSubject: resource.subject,
       tableClassSubject: tableClass.subject,
       sorting,
@@ -1032,7 +1300,9 @@ export const TableResource: React.FC<TableResourceProps> = ({
       removeRowAction,
       aggregates: viewAggregates,
       aggregateOutcomes,
-      rowCount: collection.totalMembers,
+      // The rows on screen: under the quick filter, the ones that match.
+      rowCount: rowCollection.totalMembers,
+      rowsLoading: !ready,
       setColumnAggregate,
       removeAggregateRow,
       canWriteTable: canWrite,
@@ -1044,8 +1314,13 @@ export const TableResource: React.FC<TableResourceProps> = ({
       removeDerivedColumn,
       addItemsToHistoryStack,
       rowSource,
+      viewKind,
     }),
     [
+      selectedRows,
+      toggleRowSelected,
+      clearRowSelection,
+      deleteSelectedRows,
       resource.subject,
       tableClass.subject,
       sorting,
@@ -1062,7 +1337,8 @@ export const TableResource: React.FC<TableResourceProps> = ({
       allColumns,
       viewAggregates,
       aggregateOutcomes,
-      collection.totalMembers,
+      rowCollection.totalMembers,
+      ready,
       setColumnAggregate,
       removeAggregateRow,
       canWrite,
@@ -1074,6 +1350,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
       removeDerivedColumn,
       addItemsToHistoryStack,
       rowSource,
+      viewKind,
     ],
   );
 
@@ -1084,10 +1361,10 @@ export const TableResource: React.FC<TableResourceProps> = ({
       // Using `collection.getMemberWithIndex` for everything would mis-resolve
       // session rows (they are drafts, not addressed by collection index
       // here).
-      const isMember = index < memberCount;
+      const isMember = index < gridMemberCount;
       const subject = isMember
-        ? await collection.getMemberWithIndex(index)
-        : newRowSubjects[index - memberCount];
+        ? await rowCollection.getMemberWithIndex(index)
+        : gridNewRowSubjects[index - gridMemberCount];
 
       if (!subject) {
         return;
@@ -1095,6 +1372,10 @@ export const TableResource: React.FC<TableResourceProps> = ({
 
       // Drop a session row from the render list immediately (optimistic).
       if (!isMember) {
+        if (isSavedDraft(store.getResourceLoading(subject))) {
+          deletedSessionRowsRef.current += 1;
+        }
+
         setNewRowSubjects(prev => prev.filter(s => s !== subject));
       }
 
@@ -1123,11 +1404,11 @@ export const TableResource: React.FC<TableResourceProps> = ({
       // update back to the pre-delete state.
     },
     [
-      collection,
+      rowCollection,
       store,
       addItemsToHistoryStack,
-      memberCount,
-      newRowSubjects,
+      gridMemberCount,
+      gridNewRowSubjects,
       decrementMemberCount,
     ],
   );
@@ -1137,15 +1418,20 @@ export const TableResource: React.FC<TableResourceProps> = ({
   // cards via TablePresenceContext).
   const { presenceValue, handleSelectedCellChange } = useTablePresence(
     resource.subject,
-    { collection, columns: columnProperties, memberCount, newRowSubjects },
+    {
+      collection: rowCollection,
+      columns: columnProperties,
+      memberCount: gridMemberCount,
+      newRowSubjects: gridNewRowSubjects,
+    },
   );
 
   const handleClearCells = useHandleClearCells(
-    collection,
+    rowCollection,
     addItemsToHistoryStack,
   );
 
-  const handleCopyCommandByProperty = useHandleCopyCommand(collection);
+  const handleCopyCommandByProperty = useHandleCopyCommand(rowCollection);
 
   // The grid works in rendered (TableColumn) cells; the copy helper works
   // per property, so unwrap at the boundary.
@@ -1161,14 +1447,34 @@ export const TableResource: React.FC<TableResourceProps> = ({
     [handleCopyCommandByProperty],
   );
 
+  const renderCellSelectionMenu = useCallback(
+    (args: {
+      cells: CellIndex<TableColumn>[];
+      point: { x: number; y: number };
+      onClose: () => void;
+    }) =>
+      canWrite ? (
+        <CellSelectionMenu
+          {...args}
+          onClear={handleClearCells}
+          onSetValue={handlePaste}
+          onDeleteRows={deleteRowsByIndex}
+        />
+      ) : null,
+    [canWrite, handleClearCells, handlePaste, deleteRowsByIndex],
+  );
+
   const Row = useCallback(
     ({ index }: { index: number }) => {
-      if (index < memberCount) {
+      if (index < gridMemberCount) {
         return (
           <TableRow
-            collection={collection}
+            collection={rowCollection}
             index={index}
             columns={gridColumns}
+            subject={
+              quickFilter.active ? quickFilter.matches[index] : undefined
+            }
           />
         );
       }
@@ -1194,8 +1500,11 @@ export const TableResource: React.FC<TableResourceProps> = ({
     // Resource can update a lot but its internals are stable so removing it from the array saves a lot of rerenders and shouldn't cause issues.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      collection,
+      rowCollection,
+      quickFilter.active,
+      quickFilter.matches,
       gridColumns,
+      gridMemberCount,
       memberCount,
       newRowSubjects,
       resource.subject,
@@ -1217,6 +1526,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               setViewKind={setViewKind}
               duplicateView={duplicateView}
               deleteView={deleteView}
+              reorderViews={reorderViews}
               viewName={viewName}
               renameView={renameView}
               allColumns={allColumns}
@@ -1229,6 +1539,11 @@ export const TableResource: React.FC<TableResourceProps> = ({
               canWrite={canWrite}
               quickAdd={viewQuickAdd}
               setQuickAdd={setViewQuickAdd}
+              quickFilter={
+                showsRows
+                  ? { value: quickFilterText, onChange: setQuickFilterText }
+                  : undefined
+              }
             />
           )}
           {/* Above the view switch, not inside the table branch: the filter
@@ -1238,9 +1553,17 @@ export const TableResource: React.FC<TableResourceProps> = ({
           {!embedded && (
             <TableFilterBar
               columns={uniqueColumnProperties}
+              allColumns={allColumns}
               derivedColumns={derivedSpecs}
             />
           )}
+          {quickFilter.active &&
+            !quickFilter.loading &&
+            quickFilter.matches.length === 0 && (
+              <NoMatches role='status'>
+                {`No rows show “${quickFilterQuery}”.`}
+              </NoMatches>
+            )}
           {/* Above the view switch on purpose: a grocery board wants its "Add
            *  item" as much as the list does. Writers only — a create button that
            *  will be rejected is worse than none. */}
@@ -1279,7 +1602,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               tableClass={tableClass}
               allColumns={allColumns}
               columns={uniqueColumnProperties}
-              collection={collection}
+              collection={rowCollection}
               ready={ready}
               viewGroupBy={viewGroupBy}
               setViewGroupBy={setViewGroupBy}
@@ -1290,7 +1613,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               tableSubject={resource.subject}
               tableClass={tableClass}
               allColumns={allColumns}
-              collection={collection}
+              collection={rowCollection}
               ready={ready}
               viewGroupBy={viewGroupBy}
               setViewGroupBy={setViewGroupBy}
@@ -1301,7 +1624,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               tableSubject={resource.subject}
               tableClass={tableClass}
               allColumns={allColumns}
-              collection={collection}
+              collection={rowCollection}
               ready={ready}
               viewGroupBy={viewGroupBy}
               setViewGroupBy={setViewGroupBy}
@@ -1323,6 +1646,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               )}
               <FancyTable
                 readOnly={!canWrite}
+                busy={!ready}
                 columns={gridColumns}
                 columnSizes={gridColumnSizes}
                 // The session's empty entry row is local state: it needs
@@ -1334,7 +1658,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
                 // seconds with no row to type into. Members that arrive during
                 // load shift the row's index, not its key (`itemKey` offsets by
                 // `memberCount`), so nothing remounts.
-                itemCount={memberCount + newRowSubjects.length}
+                itemCount={gridMemberCount + gridNewRowSubjects.length}
                 itemKey={itemKey}
                 columnToKey={columnToKey}
                 labelledBy={titleId}
@@ -1346,6 +1670,9 @@ export const TableResource: React.FC<TableResourceProps> = ({
                 onUndoCommand={undoLastItem}
                 onColumnReorder={handleColumnReorder}
                 onRowExpand={handleRowExpand}
+                RowHeaderExtra={RowHeaderExtra}
+                onRowContextMenu={handleRowContextMenu}
+                renderCellSelectionMenu={renderCellSelectionMenu}
                 onInsertRowBelow={handleInsertRowBelow}
                 onSelectedCellChange={handleSelectedCellChange}
                 RowHeaderAddonComponent={RowCommentButton}
@@ -1356,7 +1683,8 @@ export const TableResource: React.FC<TableResourceProps> = ({
                 {Row}
               </FancyTable>
               {/* Under the grid, where a spreadsheet's totals live. The numbers
-               *  come from the store, over every row the view matches. Not
+               *  come from the store, over every row the view matches (under
+               *  a quick filter, over the rows that match it). Not
                *  mounted at all without totals: it resolves a title per column,
                *  and a table with no totals should pay nothing for that. */}
               {viewAggregates.length > 0 && viewGroupByColumn && (
@@ -1389,6 +1717,12 @@ export const TableResource: React.FC<TableResourceProps> = ({
  * stays reachable. An iframe cannot report how tall its document is, so the
  * box has to be decided out here.
  */
+const NoMatches = styled.p`
+  margin: 0;
+  padding-block: 0.5rem;
+  color: ${p => p.theme.colors.textLight};
+`;
+
 const AppViewWrapper = styled.div`
   display: flex;
   flex-direction: column;

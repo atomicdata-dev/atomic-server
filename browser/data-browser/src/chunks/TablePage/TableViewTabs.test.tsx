@@ -95,6 +95,7 @@ function Harness({
             views={views}
             activeView={active}
             setActiveView={setActive}
+            reorderViews={setViews}
             createView={createView}
             setViewKind={setViewKind}
             duplicateView={() => undefined}

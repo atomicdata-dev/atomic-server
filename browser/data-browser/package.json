@@ -1,5 +1,5 @@
 {
-  "version": "0.41.0-beta.7",
+  "version": "0.41.0-beta.8",
   "author": {
     "email": "joep@ontola.io",
     "name": "Joep Meindertsma"
@@ -9,6 +9,7 @@
     "@bugsnag/core": "^8.9.0",
     "@bugsnag/js": "^8.9.0",
     "@bugsnag/plugin-react": "^8.9.0",
+    "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lint": "^6.9.6",
     "@codemirror/state": "^6.6.0",
@@ -51,6 +52,7 @@
     "@tiptap/starter-kit": "^3.30.4",
     "@tiptap/suggestion": "^3.30.4",
     "@tomic/edit-mode": "workspace:*",
+    "@tomic/form-renderer": "workspace:*",
     "@tomic/lib": "workspace:*",
     "@tomic/plugin": "workspace:*",
     "@tomic/react": "workspace:*",
@@ -60,6 +62,7 @@
     "@zip.js/zip.js": "^2.8.26",
     "ai": "^6.0.191",
     "ajv": "^8.20.0",
+    "best-effort-json-parser": "1.4.0",
     "clsx": "^2.1.1",
     "codemirror-json-schema": "^0.8.1",
     "diff": "^8.0.4",
@@ -73,6 +76,7 @@
     "ollama-ai-provider-v2": "^3.5.1",
     "polished": "^4.3.1",
     "prismjs": "^1.30.0",
+    "qrcode": "^1.5.4",
     "quick-score": "^0.2.0",
     "react": "^19.2.6",
     "react-colorful": "^5.7.0",
@@ -106,10 +110,12 @@
     "@tomic/service-ui": "workspace:*"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.4.1",
     "@tanstack/router-devtools": "^1.167.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/prismjs": "^1.26.6",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
@@ -142,7 +148,7 @@
     "build:website-runtime": "node scripts/build-website-runtime.mjs",
     "build": "if [ \"$SKIP_WASM_BUILD\" = \"1\" ]; then echo 'SKIP_WASM_BUILD=1, skipping wasm-pack'; else pnpm build:wasm; fi && vite build",
     "build:tauri": "pnpm --filter \"@tomic/lib\" --filter \"@tomic/react\" run build && pnpm build:wasm && TAURI=1 vite build",
-    "build:wasm": "cd ../../wasm && export CARGO_TARGET_DIR=../target/wasm-pack && cargo run -q --package cargo-bin -- wasm-pack --version && env -u CARGO_ENCODED_RUSTFLAGS -u RUSTFLAGS cargo run -q --package cargo-bin -- wasm-pack build --target web --out-dir pkg && cp pkg/atomic_wasm.js pkg/atomic_wasm_bg.wasm ../browser/data-browser/public/wasm/",
+    "build:wasm": "cd ../../wasm && export CARGO_TARGET_DIR=../target/wasm-pack CARGO_BUILD_BUILD_DIR=../target/wasm-pack/build && cargo run -q --package cargo-bin -- wasm-pack --version && env -u CARGO_ENCODED_RUSTFLAGS -u RUSTFLAGS cargo run -q --package cargo-bin -- wasm-pack build --target web --out-dir pkg && cp pkg/atomic_wasm.js pkg/atomic_wasm_bg.wasm ../browser/data-browser/public/wasm/",
     "dev": "vite",
     "dev:tauri": "pnpm --filter \"@tomic/lib\" --filter \"@tomic/react\" run build && TAURI=1 vite",
     "format-check": "oxfmt -c ../.oxfmtrc.json --check ./src",

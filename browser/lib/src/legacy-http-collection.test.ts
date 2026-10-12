@@ -15,7 +15,11 @@ function setup(localSubjects: string[] = []) {
     subjects: localSubjects,
     count: localSubjects.length,
   }));
-  store.setClientDb({ isReady: true, query } as unknown as ClientDbWorker);
+  store.setClientDb({
+    isReady: true,
+    waitForInit: async () => {},
+    query,
+  } as unknown as ClientDbWorker);
   const requests: URL[] = [];
   store.injectFetch(async input => {
     const url = new URL(String(input));

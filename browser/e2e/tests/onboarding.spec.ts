@@ -29,13 +29,15 @@ test.describe('onboarding', () => {
 
     // Wait for the profile step (after identity is created)
     await expect(
-      page.getByRole('heading', { name: 'Set your profile name!' }),
+      page.getByRole('heading', { name: 'How your colleagues see you' }),
     ).toBeVisible({ timeout: 10000 });
 
     // Set a profile name — a private home drive is created automatically
-    await page.getByLabel('Profile Name').fill('Test User');
+    await page.getByLabel('Full name', { exact: true }).fill('Test User');
 
-    await page.getByRole('button', { name: 'Save & continue' }).click();
+    await page
+      .getByRole('button', { name: 'Save and continue', exact: true })
+      .click();
 
     await expect(page.getByText('Creating your private drive')).toBeVisible({
       timeout: 5000,

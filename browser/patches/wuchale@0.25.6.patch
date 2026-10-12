@@ -1,0 +1,55 @@
+diff --git a/dist/adapter-utils/mixed-visitor.js b/dist/adapter-utils/mixed-visitor.js
+index 0a7d3e50aeb385e2e3bee3578df16bca4063e396..fff30ac2af09e02119cc4bd9eda7537cdaf4d547 100644
+--- a/dist/adapter-utils/mixed-visitor.js
++++ b/dist/adapter-utils/mixed-visitor.js
+@@ -22,6 +22,8 @@ function trimText(msgStr) {
+ export class MixedVisitor {
+     #props;
+     #mod = { markup: newMod(), attribute: newMod() };
++    /** set while visiting a direct element child, which uses the childMod prepared for it */
++    #visitingChild = false;
+     constructor(props) {
+         this.#props = props;
+     }
+@@ -208,7 +210,31 @@ export class MixedVisitor {
+             this.#props.mstr.appendRight(lastChildEnd, end);
+         };
+     }
++    // Patched (see browser/patches/README.md). A JSX tree that is not a
++    // direct child of the level being built (inside `{cond && ...}`, a
++    // ternary, `.map(...)` or an attribute) was visited against that level's
++    // mod. A text-less element there (`{a && <p>{x}</p>}`) applied and
++    // replaced the mod early, silently dropping the messages of every later
++    // sibling; other trees had their text folded into the enclosing level, so
++    // sentences were extracted as fragments. Give each such tree its own mods.
+     visit(props) {
++        const isChild = this.#visitingChild;
++        this.#visitingChild = false;
++        if (isChild) {
++            return this.#visit(props);
++        }
++        const prevMod = this.#mod;
++        this.#mod = { markup: newMod(), attribute: newMod() };
++        try {
++            const msgs = this.#visit(props);
++            msgs.push(...this.applyMod(props.scope));
++            return msgs;
++        }
++        finally {
++            this.#mod = prevMod;
++        }
++    }
++    #visit(props) {
+         if (props.children.length === 0) {
+             return [];
+         }
+@@ -273,7 +299,9 @@ export class MixedVisitor {
+                     // elements, components and other things as well
+                     const childMod = newMod(props.nestable && mod.building, !alreadyInsideUnit && props.commentDirectives.unit);
+                     this.#mod[props.scope] = childMod;
++                    this.#visitingChild = true;
+                     msgs.push(...this.#props.visitFunc(child));
++                    this.#visitingChild = false;
+                     this.#mod[props.scope] = mod;
+                     mod.children.push(childMod);
+                     let nestedNeedsCtx = false;

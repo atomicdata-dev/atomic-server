@@ -108,6 +108,20 @@ impl std::fmt::Debug for AtomicLoroDoc {
 pub struct LoroDiff {
     pub add_atoms: Vec<Atom>,
     pub remove_atoms: Vec<Atom>,
+    /// True when the imported update contained ops whose causal
+    /// dependencies are missing from this doc. Loro parks such ops as
+    /// "pending": they don't advance the version vector and contribute
+    /// nothing to state, so accepting a commit in that condition silently
+    /// discards the client's writes.
+    pub imported_pending_ops: bool,
+    /// Every `properties` key whose raw Loro value was added, changed or
+    /// removed (also those that do not materialize into an atom).
+    pub changed_property_keys: Vec<String>,
+    /// True when the `datatypes` map changed.
+    pub datatypes_changed: bool,
+    /// The `entries` keys (chat log) added, changed or removed. Entries are
+    /// not properties: they produce no atoms.
+    pub entry_changes: Vec<crate::chat_log::EntryChange>,
 }
 
 impl AtomicLoroDoc {
@@ -144,10 +158,25 @@ impl AtomicLoroDoc {
 
     /// Import a binary update (from a commit's loroUpdate field).
     pub fn import_update(&self, update: &[u8]) -> AtomicResult<()> {
-        self.doc
+        self.import_update_status(update).map(|_| ())
+    }
+
+    /// Import a binary update and report whether any of its ops were parked
+    /// as *pending* — ops whose causal dependencies are missing from this
+    /// doc. Pending ops don't advance the version vector and contribute
+    /// nothing to state; callers that must not lose data (the `/commit`
+    /// apply path) should treat `true` as a hard error rather than a
+    /// successful no-op.
+    pub fn import_update_status(&self, update: &[u8]) -> AtomicResult<bool> {
+        let status = self
+            .doc
             .import(update)
             .map_err(|e| format!("Failed to import Loro update: {e}"))?;
-        Ok(())
+        let has_pending = status
+            .pending
+            .as_ref()
+            .is_some_and(|range| range.iter().next().is_some());
+        Ok(has_pending)
     }
 
     /// Export a snapshot of the full document state.
@@ -155,9 +184,41 @@ impl AtomicLoroDoc {
         self.doc.export(ExportMode::Snapshot).unwrap()
     }
 
+    /// Export the current state with the edit history before it dropped.
+    ///
+    /// A *shallow snapshot* at this doc's own frontiers: every property value
+    /// survives, the oplog before the frontiers does not. Importing it into an
+    /// empty doc yields a shallow doc; importing it into a doc that already
+    /// holds the history just merges. Falls back to a full snapshot if Loro
+    /// refuses (an empty doc has no frontiers to cut at).
+    pub fn export_shallow_snapshot(&self) -> Vec<u8> {
+        let frontiers = self.doc.oplog_frontiers();
+        self.doc
+            .export(ExportMode::shallow_snapshot(&frontiers))
+            .unwrap_or_else(|_| self.export_snapshot())
+    }
+
+    /// Whether this doc was built from a shallow snapshot, i.e. lacks the
+    /// history before some frontier.
+    pub fn is_shallow(&self) -> bool {
+        !self.doc.shallow_since_vv().is_empty()
+    }
+
     /// Export only the updates since a given version.
     pub fn export_updates_since(&self, version: &VersionVector) -> Vec<u8> {
-        self.doc.export(ExportMode::updates(version)).unwrap()
+        // A shallow doc cannot export from a version older than its cut: the
+        // ops are gone. The peer asking is behind the cut, so what it needs is
+        // the state itself; a shallow snapshot merges into any doc that
+        // shares our ancestry.
+        // Loro does not always error here: a peer with nothing gets only the
+        // ops after the cut, which it would park as pending. So check the
+        // peer's version against the cut ourselves.
+        if self.is_shallow() && !version.includes_vv(&self.doc.shallow_since_vv().to_vv()) {
+            return self.export_shallow_snapshot();
+        }
+        self.doc
+            .export(ExportMode::updates(version))
+            .unwrap_or_else(|_| self.export_shallow_snapshot())
     }
 
     /// Returns the current version of the document.
@@ -171,6 +232,16 @@ impl AtomicLoroDoc {
     /// place, so time-travelling does not strand whoever else is holding it.
     pub fn fork_at(&self, version: &VersionID) -> AtomicResult<Self> {
         let frontiers = version.to_frontiers()?;
+        if self.is_shallow() {
+            // Loro cannot fork a shallow doc to a past version. The current
+            // state is still readable; anything earlier was discarded.
+            if frontiers == self.doc.oplog_frontiers() {
+                return Self::from_snapshot(&self.export_snapshot());
+            }
+            return Err(AtomicError::other_error(
+                "This resource's earlier edit history was discarded (shallow snapshot).".into(),
+            ));
+        }
         let doc = self
             .doc
             .fork_at(&frontiers)
@@ -376,6 +447,38 @@ impl AtomicLoroDoc {
                 ControlFlow::Continue(())
             });
         messages
+    }
+
+    /// The version of the newest *tokened* change and everything it builds on.
+    ///
+    /// A signed commit's change carries a token message (`c-…`, or the
+    /// creator's subject for genesis). Changes without a message are local
+    /// bookkeeping a node writes after applying a commit (the `lastCommit`
+    /// stamp) that no signed commit has carried yet. Exporting a delta from
+    /// the full version would leave those out, while the next change builds
+    /// on them: the receiver would park it as pending for a missing
+    /// dependency. Exporting from this version carries them along.
+    /// `None` when no change is tokened (legacy docs).
+    pub fn tokened_base_vv(&self) -> Option<VersionVector> {
+        let frontier_ids: Vec<loro::ID> = self.doc.oplog_frontiers().iter().collect();
+        if frontier_ids.is_empty() {
+            return None;
+        }
+        let mut found: Option<loro::ID> = None;
+        let _ = self
+            .doc
+            .travel_change_ancestors(&frontier_ids, &mut |change| {
+                if change.message.as_ref().is_some_and(|m| !m.is_empty()) {
+                    found = Some(loro::ID::new(
+                        change.id.peer,
+                        change.id.counter + change.len.saturating_sub(1) as i32,
+                    ));
+                    return ControlFlow::Break(());
+                }
+                ControlFlow::Continue(())
+            });
+        let id = found?;
+        self.doc.frontiers_to_vv(&loro::Frontiers::from_id(id))
     }
 
     /// The `[start, end)` version range an update or snapshot blob covers.
@@ -804,12 +907,27 @@ impl AtomicLoroDoc {
     /// Compares the properties map before and after the import.
     pub fn import_update_with_diff(&self, update: &[u8], subject: &str) -> AtomicResult<LoroDiff> {
         let before = self.get_all_properties();
-        self.import_update(update)?;
+        let datatypes_before = self.get_all_datatypes();
+        let entries_before = self.entries();
+        let imported_pending_ops = self.import_update_status(update)?;
         let after = self.get_all_properties();
+        let entry_changes = crate::chat_log::diff_entries(&entries_before, &self.entries());
         // Tags are per-property and stable; one read after the import covers
         // both the before and after value of every property.
         let datatypes = self.get_all_datatypes();
         let tag_of = |key: &str| datatypes.get(key).map(String::as_str);
+        let datatypes_changed = datatypes != datatypes_before;
+        let mut changed_property_keys: Vec<String> = after
+            .iter()
+            .filter(|(key, val)| before.get(*key) != Some(*val))
+            .map(|(key, _)| key.clone())
+            .collect();
+        changed_property_keys.extend(
+            before
+                .keys()
+                .filter(|key| !after.contains_key(*key))
+                .cloned(),
+        );
 
         let mut add_atoms = Vec::new();
         let mut remove_atoms = Vec::new();
@@ -848,6 +966,10 @@ impl AtomicLoroDoc {
         Ok(LoroDiff {
             add_atoms,
             remove_atoms,
+            imported_pending_ops,
+            changed_property_keys,
+            datatypes_changed,
+            entry_changes,
         })
     }
 }
@@ -867,6 +989,17 @@ impl AtomicLoroDoc {
 ///   untagged as the default.
 pub fn datatype_tag(value: &Value) -> Option<&'static str> {
     match value {
+        // Pin strings that legacy untagged readers would reinterpret as JSON
+        // or references (Audio uses JSON-array strings as stable entity IDs).
+        Value::String(s)
+            if s.starts_with('[')
+                || s.starts_with('{')
+                || crate::identifiers::is_atomic_identifier(s)
+                || s.starts_with("http://")
+                || s.starts_with("https://") =>
+        {
+            Some("string")
+        }
         Value::AtomicUrl(_) => Some("atomicUrl"),
         Value::ResourceArray(_) => Some("resourceArray"),
         Value::Json(_) => Some("json"),
@@ -900,6 +1033,7 @@ pub fn loro_value_to_atomic_value_tagged(lv: &loro::LoroValue, tag: Option<&str>
 /// Returns `None` if the tag and primitive shape disagree (caller falls back).
 fn atomic_value_from_tag(lv: &loro::LoroValue, tag: &str) -> Option<Value> {
     match (tag, lv) {
+        ("string", loro::LoroValue::String(s)) => Some(Value::String(s.to_string())),
         ("atomicUrl", loro::LoroValue::String(s)) => Some(Value::AtomicUrl(
             crate::identifiers::canonicalize_scheme(s).into(),
         )),
@@ -1113,7 +1247,10 @@ fn json_value_to_loro_map(json: &serde_json::Value, map: &loro::LoroMap) -> Atom
                         .map_err(|e| format!("Loro insert_container error: {e}"))?;
                     json_value_to_loro_map(val, &nested)?;
                 }
-                serde_json::Value::Null => {}
+                serde_json::Value::Null => {
+                    map.insert(key, loro::LoroValue::Null)
+                        .map_err(|e| format!("Loro map insert error: {e}"))?;
+                }
             }
         }
     }
@@ -1154,7 +1291,10 @@ fn json_value_to_loro_list_item(
                 .map_err(|e| format!("Loro push_container error: {e}"))?;
             json_value_to_loro_map(json, &nested)?;
         }
-        serde_json::Value::Null => {}
+        serde_json::Value::Null => {
+            list.push(loro::LoroValue::Null)
+                .map_err(|e| format!("Loro list push error: {e}"))?;
+        }
     }
     Ok(())
 }
@@ -1194,7 +1334,10 @@ fn insert_json_value_into_loro_list(
                 .map_err(|e| format!("Loro insert_container error: {e}"))?;
             json_value_to_loro_map(json, &nested)?;
         }
-        serde_json::Value::Null => {}
+        serde_json::Value::Null => {
+            list.insert(index, loro::LoroValue::Null)
+                .map_err(|e| format!("Loro list insert error: {e}"))?;
+        }
     }
     Ok(())
 }
@@ -1542,6 +1685,147 @@ mod test {
             Value::Json(json) => assert_eq!(json, serde_json::json!([300, 214])),
             other => panic!("expected Json array, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn ambiguous_strings_preserve_their_declared_type() {
+        for text in [
+            r#"["track","parameter","osc","shape"]"#,
+            r#"{"literal":true}"#,
+            "atomic:literal",
+            "https://example.com",
+        ] {
+            let doc = AtomicLoroDoc::new();
+            doc.set_property("urn:literal", &Value::String(text.into()))
+                .unwrap();
+            let read = AtomicLoroDoc::from_snapshot(&doc.export_snapshot()).unwrap();
+            let props = read.get_all_properties();
+            let tags = read.get_all_datatypes();
+            assert!(
+                matches!(loro_value_to_atomic_value_tagged(&props["urn:literal"], Some(&tags["urn:literal"])), Some(Value::String(value)) if value == text)
+            );
+        }
+    }
+
+    /// Shared with the TS test `datatypes.test.ts`: both sides must agree on
+    /// which plain strings get the `string` tag.
+    #[test]
+    fn string_datatype_tag_matches_shared_fixture() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/string-datatype-tags.json"))
+                .unwrap();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert!(!cases.is_empty());
+        for case in cases {
+            let value = case["value"].as_str().unwrap();
+            let expected = case["tagged"].as_bool().unwrap().then_some("string");
+            assert_eq!(
+                datatype_tag(&Value::String(value.into())),
+                expected,
+                "tag for {value:?}"
+            );
+        }
+    }
+
+    /// Legacy behaviour, unchanged: a snapshot written before the `string`
+    /// tag existed has no `datatypes` entry, so a string that looks like a
+    /// JSON array still materializes through the heuristic.
+    #[test]
+    fn old_untagged_snapshot_still_uses_the_heuristic() {
+        let doc = AtomicLoroDoc::new();
+        let props = doc.doc().get_map("properties");
+        props.insert("urn:arr", r#"["a","b"]"#).unwrap();
+        props.insert("urn:link", "https://example.com/x").unwrap();
+        props.insert("urn:plain", "hello").unwrap();
+        doc.doc().commit();
+
+        let read = AtomicLoroDoc::from_snapshot(&doc.export_snapshot()).unwrap();
+        assert!(read.get_all_datatypes().is_empty());
+        let values = read.get_all_properties();
+        let mat = |k: &str| loro_value_to_atomic_value_tagged(&values[k], None);
+        assert!(matches!(
+            mat("urn:arr"),
+            Some(Value::ResourceArray(a)) if a.len() == 2
+        ));
+        assert!(matches!(mat("urn:link"), Some(Value::AtomicUrl(_))));
+        assert!(matches!(mat("urn:plain"), Some(Value::String(s)) if s == "hello"));
+    }
+
+    /// An unknown tag is ignored and the value goes through the heuristic.
+    /// This is the path a reader that predates the `string` tag takes on a
+    /// new doc: `atomic_value_from_tag` returns `None` for a tag it does not
+    /// know and the caller falls back (checked against origin/develop).
+    #[test]
+    fn unknown_datatype_tag_falls_back_to_the_heuristic() {
+        let doc = AtomicLoroDoc::new();
+        doc.doc()
+            .get_map("properties")
+            .insert("urn:arr", r#"["a","b"]"#)
+            .unwrap();
+        doc.doc()
+            .get_map("datatypes")
+            .insert("urn:arr", "someFutureTag")
+            .unwrap();
+        doc.doc().commit();
+
+        let read = AtomicLoroDoc::from_snapshot(&doc.export_snapshot()).unwrap();
+        let tags = read.get_all_datatypes();
+        assert_eq!(tags["urn:arr"], "someFutureTag");
+        let values = read.get_all_properties();
+        assert!(matches!(
+            loro_value_to_atomic_value_tagged(&values["urn:arr"], Some(&tags["urn:arr"])),
+            Some(Value::ResourceArray(a)) if a.len() == 2
+        ));
+        // A known tag on a mismatched primitive also falls back, not errors.
+        assert!(matches!(
+            loro_value_to_atomic_value_tagged(&loro::LoroValue::I64(3), Some("string")),
+            Some(Value::Integer(3))
+        ));
+    }
+
+    /// Null inside nested maps and lists reads without error. The reader
+    /// functions (`loro_value_to_json`, `loro_value_to_atomic_value`,
+    /// `atomic_value_from_tag`) are unchanged from origin/develop (only the
+    /// writers changed), so this also covers readers that predate the fix.
+    #[test]
+    fn snapshot_with_null_in_nested_containers_reads_without_error() {
+        let doc = AtomicLoroDoc::new();
+        let props = doc.doc().get_map("properties");
+        let map = props
+            .insert_container("urn:map", loro::LoroMap::new())
+            .unwrap();
+        map.insert("a", loro::LoroValue::Null).unwrap();
+        let list = map.insert_container("l", loro::LoroList::new()).unwrap();
+        list.push("x").unwrap();
+        list.push(loro::LoroValue::Null).unwrap();
+        let top = props
+            .insert_container("urn:list", loro::LoroList::new())
+            .unwrap();
+        top.push(loro::LoroValue::Null).unwrap();
+        doc.doc().commit();
+
+        let read = AtomicLoroDoc::from_snapshot(&doc.export_snapshot()).unwrap();
+        let values = read.get_all_properties();
+        assert_eq!(
+            loro_value_to_json(&values["urn:map"]),
+            serde_json::json!({"a": null, "l": ["x", null]})
+        );
+        for k in ["urn:map", "urn:list"] {
+            // Must not panic; the result itself is not asserted.
+            let _ = loro_value_to_atomic_value_tagged(&values[k], None);
+            let _ = loro_value_to_atomic_value_tagged(&values[k], Some("json"));
+        }
+    }
+
+    #[test]
+    fn json_null_is_preserved_in_nested_maps_and_lists() {
+        let json = serde_json::json!({"a": null, "b": ["x", null, {"c": null}]});
+        let doc = AtomicLoroDoc::new();
+        doc.set_property("urn:nested", &Value::Json(json.clone()))
+            .unwrap();
+        let read = AtomicLoroDoc::from_snapshot(&doc.export_snapshot()).unwrap();
+        let props = read.get_all_properties();
+        assert_eq!(loro_value_to_json(&props["urn:nested"]), json);
     }
 
     #[test]
@@ -2048,6 +2332,7 @@ mod test {
         // Apply the commit
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: true,
             validate_timestamp: true,
             validate_rights: false,
@@ -2092,6 +2377,7 @@ mod test {
 
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: true,
             validate_timestamp: true,
             validate_rights: false,

@@ -12,7 +12,7 @@ use actix_web::{
     web::Data,
     App,
 };
-use atomic_lib::{urls, Storelike};
+use atomic_lib::{agents::ForAgent, urls, Storelike};
 use base64::Engine;
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
@@ -824,6 +824,21 @@ async fn upload_reports_a_broken_multipart_body() {
 }
 
 /// Gets the body from the response as a String. Why doen't actix provide this?
+/// Every visitor-facing form response must forbid HTTP caching — see
+/// `handlers::form::NO_STORE`.
+fn assert_cache_control_no_store(resp: &ServiceResponse, what: &str) {
+    let cache_control = resp
+        .headers()
+        .get("Cache-Control")
+        .unwrap_or_else(|| panic!("{what}: missing Cache-Control header"))
+        .to_str()
+        .unwrap();
+    assert!(
+        cache_control.contains("no-store"),
+        "{what}: Cache-Control should contain no-store, got {cache_control}"
+    );
+}
+
 fn get_body(resp: ServiceResponse) -> String {
     let boxbody = resp.into_body();
     let bytes = boxbody.try_into_bytes().unwrap();
@@ -1065,6 +1080,19 @@ async fn upload_download_with_backend(
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
+    // The content-addressed route only gets a hash, but it must still answer
+    // with the File's real mimetype: the response carries `nosniff`, so an
+    // `application/octet-stream` answer makes the browser refuse to render the
+    // bytes in an `<img>` — and `downloadURL` for every client-uploaded file
+    // points here.
+    assert_eq!(
+        resp.headers()
+            .get(actix_web::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok()),
+        Some("text/plain"),
+        "content-addressed download must serve the uploaded mimetype"
+    );
+
     let downloaded_bytes = test::read_body(resp).await;
     assert_eq!(downloaded_bytes, test_content.as_slice());
 }
@@ -1159,6 +1187,28 @@ async fn drive_usage_endpoint() {
         "blobBytes should equal the uploaded content length: {body}"
     );
     assert!(json.get("loroBytes").is_some(), "loroBytes missing: {body}");
+
+    // The per-resource breakdown must add up to the drive totals, with the
+    // uploaded file's bytes attributed to exactly one resource.
+    let req = build_request_authenticated(
+        &format!(
+            "/drive-usage/breakdown?subject={}",
+            urlencoding::encode(drive_did.as_str())
+        ),
+        &appstate,
+    )
+    .to_request();
+    let resp = test::call_service(&app, req).await;
+    let status = resp.status();
+    let body = get_body(resp);
+    assert!(status.is_success(), "breakdown status {status}: {body}");
+    let breakdown: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let rows = breakdown["resources"].as_array().unwrap();
+    let blob_total: u64 = rows.iter().map(|r| r["blobBytes"].as_u64().unwrap()).sum();
+    let loro_total: u64 = rows.iter().map(|r| r["loroBytes"].as_u64().unwrap()).sum();
+    assert_eq!(blob_total, test_content.len() as u64, "{body}");
+    assert_eq!(rows.len() as u64, json["resourceCount"].as_u64().unwrap());
+    assert_eq!(loro_total, json["loroBytes"].as_u64().unwrap());
 }
 
 /// `GET /server` describes the node itself as a `Server` resource, replacing the
@@ -1279,4 +1329,1104 @@ async fn server_info_endpoint_with_home_drive() {
         Some("http://localhost/"),
         "homeDrive should be the configured drive: {body}"
     );
+}
+
+/// Phase 3 of `planning/atomic-forms.md`: builds a Form + FormPage + FormField
+/// graph pointing at a Table/Class pair (mirroring what the Phase 2
+/// data-browser builder produces), then drives the two new HTTP endpoints
+/// end to end: publish gating, slug minting + resolution, a valid
+/// submission landing as a table row, and the required-field / honeypot /
+/// unpublished rejection paths.
+#[actix_rt::test]
+async fn form_submission_flow() {
+    use atomic_lib::{Resource, Value};
+
+    let unique_string = atomic_lib::utils::random_string(10);
+    use clap::Parser;
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
+    ]);
+
+    let mut config = config::build_config(opts).expect("failed init config");
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    let appstate = crate::appstate::AppState::init(config.clone())
+        .await
+        .expect("failed init appstate");
+
+    let data = Data::new(appstate.clone());
+    let app = test::init_service(
+        App::new()
+            .app_data(data)
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+    let store = &appstate.store;
+
+    // Class + Property + Table (mirrors what NewFormDialog/useFormFieldPropertySync build client-side)
+    let mut class = Resource::new_instance(urls::CLASS, store).await.unwrap();
+    class
+        .set(
+            urls::SHORTNAME.into(),
+            Value::Slug("submission".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    class
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("A form submission row".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    class.save_locally(store).await.unwrap();
+
+    let mut email_prop = Resource::new_instance(urls::PROPERTY, store).await.unwrap();
+    email_prop
+        .set(urls::SHORTNAME.into(), Value::Slug("email".into()), store)
+        .await
+        .unwrap();
+    email_prop
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("Respondent email".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    email_prop
+        .set(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(urls::STRING.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    email_prop.save_locally(store).await.unwrap();
+
+    let mut table = Resource::new_instance(urls::TABLE, store).await.unwrap();
+    table
+        .set(
+            urls::NAME.into(),
+            Value::String("Submissions".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    table
+        .set(
+            urls::CLASSTYPE_PROP.into(),
+            Value::AtomicUrl(class.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    table.save_locally(store).await.unwrap();
+
+    // FormField -> FormPage -> Form
+    let mut field = Resource::new_instance(urls::FORM_FIELD, store)
+        .await
+        .unwrap();
+    field
+        .set(urls::NAME.into(), Value::String("Email".into()), store)
+        .await
+        .unwrap();
+    field
+        .set(
+            urls::FORM_MAPS_TO.into(),
+            Value::AtomicUrl(email_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    field
+        .set(
+            urls::FORM_FIELD_TYPE.into(),
+            Value::String("email".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    field
+        .set(urls::REQUIRED.into(), Value::Boolean(true), store)
+        .await
+        .unwrap();
+    field.save_locally(store).await.unwrap();
+
+    let mut page = Resource::new_instance(urls::FORM_PAGE, store)
+        .await
+        .unwrap();
+    page.set(
+        urls::FORM_FIELDS.into(),
+        Value::ResourceArray(vec![field.get_subject().to_string().into()]),
+        store,
+    )
+    .await
+    .unwrap();
+    page.save_locally(store).await.unwrap();
+
+    let mut form = Resource::new_instance(urls::FORM, store).await.unwrap();
+    form.set(urls::NAME.into(), Value::String("Feedback".into()), store)
+        .await
+        .unwrap();
+    form.set(
+        urls::FORM_DATA_CLASS.into(),
+        Value::AtomicUrl(class.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_TARGET_TABLE.into(),
+        Value::AtomicUrl(table.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_PAGES.into(),
+        Value::ResourceArray(vec![page.get_subject().to_string().into()]),
+        store,
+    )
+    .await
+    .unwrap();
+    // Filed under its results table, like "Create form from this table" does,
+    // so the form and the table share a drive (see `forms::FormScope`).
+    form.set(
+        urls::PARENT.into(),
+        Value::AtomicUrl(table.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    // DID (genesis) subject — matches how forms are actually created by the
+    // data-browser client, and exercises the slug bootstrap fallback below.
+    form.save_as_genesis(store).await.unwrap();
+    let form_did_id = form.get_subject().pure_id();
+
+    // 1. Unpublished -> 410
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "unpublished form should 410");
+    // A 410 is cacheable by default. Chromium replayed a cached "not
+    // accepting responses" for the definition of a form that had since been
+    // published, so every visitor-facing answer must forbid caching.
+    assert_cache_control_no_store(&resp, "410 definition");
+
+    // 1b. The unpublished HTML page (`not_available_page`) still allows
+    // embedding — Phase 6 "Embedding": a stale snippet should show the
+    // friendly closed-form card inside the iframe, not a browser-blocked
+    // blank frame.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.headers().get("Content-Security-Policy").unwrap(),
+        "frame-ancestors *",
+        "unpublished form page should allow embedding"
+    );
+
+    // 2. Publish, GET by DID -> 200, slug gets minted
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "definition fetch after publish failed: {:?}",
+        resp.status()
+    );
+    assert_cache_control_no_store(&resp, "200 definition");
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    let slug = body["id"]
+        .as_str()
+        .expect("slug should be minted")
+        .to_string();
+    assert!(!slug.is_empty());
+
+    // 2b. A GET must serve the *persisted* Loro state. The Form class
+    // extender adds `form-submission-summary` to every fetched Form; it used
+    // to do so through `set`, which also recorded a Loro op on the doc the
+    // response re-exported as `loroUpdate`. A client that seeded its doc from
+    // that response built every later delta on an op this store never
+    // persisted, and `apply_commit` parked them ("Commit's Loro update
+    // depends on ops the server does not have") — in the builder, Publish
+    // after a reload, and Unpublish → Publish, stopped reaching visitors.
+    let served = store
+        .get_resource_extended(form.get_subject(), false, &ForAgent::Sudo)
+        .await
+        .unwrap()
+        .to_single();
+    assert!(
+        served.get(urls::FORM_SUBMISSION_SUMMARY).is_ok(),
+        "the extender should still shape the response"
+    );
+    let served_json: serde_json::Value =
+        serde_json::from_str(&served.to_json_ad(None).unwrap()).unwrap();
+    let served_snapshot = base64::engine::general_purpose::STANDARD
+        .decode(served_json[urls::LORO_UPDATE].as_str().unwrap())
+        .unwrap();
+    let persisted_doc = store
+        .get_resource(form.get_subject())
+        .await
+        .unwrap()
+        .build_state_doc()
+        .unwrap();
+    let persisted_vv = persisted_doc.oplog_vv_map();
+    persisted_doc.import_update(&served_snapshot).unwrap();
+    assert_eq!(
+        persisted_vv,
+        persisted_doc.oplog_vv_map(),
+        "the served loroUpdate carried Loro ops the store has not persisted"
+    );
+    assert_eq!(
+        body["pages"][0]["blocks"][0]["mapsTo"],
+        email_prop.get_subject().to_string()
+    );
+    assert_eq!(
+        body["captcha"]["challengeUrl"],
+        format!("/form/{slug}/challenge"),
+        "definition should carry the captcha client config"
+    );
+
+    // 3. GET by the minted slug -> same definition
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "definition fetch by slug failed"
+    );
+
+    // 3b. Phase 6 "Embedding": the published HTML page allows framing from
+    // any origin (forms have no auth boundary once published — same trust
+    // level as the direct share link).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+    let csp = resp
+        .headers()
+        .get("Content-Security-Policy")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        csp.contains("frame-ancestors *"),
+        "published form page should allow embedding: {csp}"
+    );
+
+    // 3c. Captcha: fetch a challenge and solve it natively (difficulty is
+    // lowered under cfg(test) — see `crate::captcha`), mirroring what the
+    // ALTCHA widget does in the visitor's browser.
+    macro_rules! solve_captcha {
+        () => {{
+            let req = test::TestRequest::get()
+                .uri(&format!("/form/{}/challenge", slug))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success(), "challenge fetch failed");
+            let challenge: altcha::Challenge =
+                serde_json::from_str(&get_body(resp)).expect("challenge should parse");
+            let solution =
+                altcha::solve_challenge(altcha::SolveChallengeOptions::new(&challenge))
+                    .unwrap()
+                    .expect("challenge should be solvable");
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(
+                serde_json::to_vec(&serde_json::json!({
+                    "challenge": challenge,
+                    "solution": solution,
+                }))
+                .unwrap(),
+            )
+        }};
+    }
+
+    // 3d. Picture-choice option images: the definition rewrites File subjects
+    // into publish-gated `/form/{id}/image?file=` URLs (the visitor has no
+    // agent, so `/download` is unreachable), and that route only serves images
+    // this form actually references — otherwise it would be an open proxy for
+    // anything the server agent can read.
+    let mut picture_prop = Resource::new_instance(urls::PROPERTY, store).await.unwrap();
+    picture_prop
+        .set(urls::SHORTNAME.into(), Value::Slug("pick".into()), store)
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("Picture choice".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(urls::RESOURCE_ARRAY.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::CLASSTYPE_PROP.into(),
+            Value::AtomicUrl(urls::TAG.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop.save_locally(store).await.unwrap();
+
+    // Options are Tags in the data class's constraints; a picture-choice
+    // option's image is the Tag's `cover-image`.
+    // A real File in the form's drive: the definition only keeps images it
+    // can see the form may show (`forms::FormScope`).
+    let mut cat_file = Resource::new_instance(urls::FILE, store).await.unwrap();
+    cat_file
+        .set(
+            urls::DOWNLOAD_URL.into(),
+            Value::String("https://example.com/files/cat".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    cat_file
+        .set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(table.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    cat_file.save_locally(store).await.unwrap();
+    let cat_file_subject = cat_file.get_subject().to_string();
+    let referenced_image = cat_file_subject.as_str();
+    let mut tag_subjects = Vec::new();
+    for (name, image) in [("Cat", Some(referenced_image)), ("Dog", None)] {
+        let mut tag = Resource::new_instance(urls::TAG, store).await.unwrap();
+        tag.set(urls::NAME.into(), Value::String(name.into()), store)
+            .await
+            .unwrap();
+        tag.set(
+            urls::SHORTNAME.into(),
+            Value::Slug(name.to_lowercase()),
+            store,
+        )
+        .await
+        .unwrap();
+        if let Some(image) = image {
+            tag.set(
+                urls::COVER_IMAGE.into(),
+                Value::AtomicUrl(image.into()),
+                store,
+            )
+            .await
+            .unwrap();
+        }
+        tag.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(picture_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+        tag.save_locally(store).await.unwrap();
+        tag_subjects.push(tag.get_subject().to_string());
+    }
+    // The options are the `enum` of the data class's constraint for the
+    // column, and a single pick is `maxItems: 1`.
+    let mut data_class = store
+        .get_resource(&class.get_subject().to_string().into())
+        .await
+        .unwrap();
+    data_class
+        .set(
+            urls::CONSTRAINTS.into(),
+            Value::Json(serde_json::json!({
+                picture_prop.get_subject().to_string(): {
+                    "enum": tag_subjects,
+                    "maxItems": 1,
+                },
+            })),
+            store,
+        )
+        .await
+        .unwrap();
+    data_class.save_locally(store).await.unwrap();
+    let mut picture_field = Resource::new_instance(urls::FORM_FIELD, store)
+        .await
+        .unwrap();
+    picture_field
+        .set(urls::NAME.into(), Value::String("Pick one".into()), store)
+        .await
+        .unwrap();
+    picture_field
+        .set(
+            urls::FORM_MAPS_TO.into(),
+            Value::AtomicUrl(picture_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_field
+        .set(
+            urls::FORM_FIELD_TYPE.into(),
+            Value::String("picture-choice".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_field.save_locally(store).await.unwrap();
+
+    page.set(
+        urls::FORM_FIELDS.into(),
+        Value::ResourceArray(vec![
+            field.get_subject().to_string().into(),
+            picture_field.get_subject().to_string().into(),
+        ]),
+        store,
+    )
+    .await
+    .unwrap();
+    page.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    assert_eq!(
+        body["pages"][0]["blocks"][1]["options"]["options"],
+        serde_json::json!([
+            {
+                "value": tag_subjects[0],
+                "label": "Cat",
+                "image": format!(
+                    "/form/{}/image?file={}",
+                    slug,
+                    urlencoding::encode(referenced_image)
+                ),
+            },
+            { "value": tag_subjects[1], "label": "Dog" },
+        ]),
+        "tags resolve into inline options, with image subjects rewritten into gated URLs"
+    );
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/form/{}/image?file={}",
+            slug,
+            urlencoding::encode("https://example.com/files/not-referenced")
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        404,
+        "the image route must not serve files the form doesn't reference"
+    );
+
+    // 4. Valid submission (with solved captcha) -> 201, row lands under the table
+    let captcha_payload = solve_captcha!();
+    let submit_body = serde_json::json!({
+        "values": { email_prop.get_subject().to_string(): "visitor@example.com" },
+        "altcha": captcha_payload,
+    });
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "valid submission should succeed: {}",
+        get_body(resp)
+    );
+
+    let query =
+        atomic_lib::storelike::Query::new_prop_val(urls::PARENT, table.get_subject().as_str());
+    // Rows only: the form and its image File are filed under the table too.
+    let not_rows = [form.get_subject().to_string(), cat_file_subject.clone()];
+    let count_rows = |result: &atomic_lib::storelike::QueryResult| {
+        result
+            .subjects
+            .iter()
+            .filter(|s| !not_rows.contains(&s.to_string()))
+            .count()
+    };
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(
+        count_rows(&result),
+        1,
+        "submission row should exist under the table"
+    );
+
+    // 4b. Missing captcha payload -> 400
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor2@example.com" }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        400,
+        "captcha-less submission should be rejected"
+    );
+
+    // 4c. Replayed captcha payload (already consumed by step 4) -> 400
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor2@example.com" },
+            "altcha": captcha_payload,
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "replayed captcha should be rejected");
+
+    // 5. Missing required field -> 400 with a field error (fresh captcha —
+    // field validation runs after captcha verification)
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({ "values": {}, "altcha": solve_captcha!() }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    assert!(body["errors"][0]["message"].as_str().is_some());
+
+    // 6. Honeypot filled -> 400 (checked before the captcha, so no payload needed)
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "bot@example.com" },
+            "hp": "i-am-a-bot",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        400,
+        "honeypot-filled submission should be rejected"
+    );
+
+    // Only the one valid submission from step 4 should have landed.
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(count_rows(&result), 1);
+
+    // 7. Unpublish -> submit now 410
+    form.remove_propval(urls::FORM_PUBLISHED_AT).unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit to unpublished form should 410");
+
+    // 7b. Scheduling (Phase 7): a published form still obeys its
+    // `form-open-at` / `form-close-at` window, on every visitor-facing
+    // route. Republish first — step 7 left it unpublished.
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+
+    let hour = 3_600_000;
+    let opens_at = atomic_lib::utils::now() + hour;
+    form.set(urls::FORM_OPEN_AT.into(), Value::Timestamp(opens_at), store)
+        .await
+        .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        410,
+        "form scheduled to open later should 410"
+    );
+    let body = get_body(resp);
+    assert!(
+        body.contains("isn't open yet"),
+        "a not-yet-open form needs its own wording, got: {body}"
+    );
+    // The message spells the moment out in UTC (a request carries no
+    // timezone), and rides the raw moment along so the visitor's browser can
+    // restate it locally — `form-app`'s `localizeMoment`.
+    assert!(
+        body.contains("momentMs") && body.contains("momentUtc"),
+        "a scheduled 410 must carry the moment for client-side localization, got: {body}"
+    );
+
+    // The HTML page localizes it itself: the UTC text sits in a `<time>` the
+    // inline script rewrites in the visitor's timezone.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "not-yet-open form page should 410");
+    let page = get_body(resp);
+    assert!(
+        page.contains("<time datetime=") && page.contains("data-ms="),
+        "the not-available page must mark the moment up for localization, got: {page}"
+    );
+    assert!(
+        page.contains("Intl.DateTimeFormat"),
+        "the not-available page must ship the localization script, got: {page}"
+    );
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit before open-at should 410");
+
+    // Open-at in the past -> open again.
+    form.set(
+        urls::FORM_OPEN_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now() - hour),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "form past its open-at should be reachable: {:?}",
+        resp.status()
+    );
+
+    // A close-at in the past shuts it again, with closed-specific wording.
+    let closed_at = atomic_lib::utils::now() - 1;
+    form.set(
+        urls::FORM_CLOSE_AT.into(),
+        Value::Timestamp(closed_at),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "form past its close-at should 410");
+    let body = get_body(resp);
+    assert!(
+        body.contains("closed"),
+        "a closed form needs its own wording, got: {body}"
+    );
+
+    // The HTML page renders the friendly card (not a blank frame) and stays
+    // embeddable, same as the unpublished case in step 1b.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "closed form page should 410");
+    assert_eq!(
+        resp.headers().get("Content-Security-Policy").unwrap(),
+        "frame-ancestors *",
+        "closed form page should allow embedding"
+    );
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit after close-at should 410");
+
+    // Clear the schedule so the invite-code steps below run against a
+    // plainly-open form.
+    form.remove_propval(urls::FORM_OPEN_AT).unwrap();
+    form.remove_propval(urls::FORM_CLOSE_AT).unwrap();
+    form.save_locally(store).await.unwrap();
+
+    // 8. Private links (Phase 6): republish and switch to invite-only.
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_ACCESS.into(),
+        Value::String("invite-only".into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    // Definition without / with an unknown code -> 403 (the questions must
+    // not leak to someone holding only the share URL).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only definition without code should 403"
+    );
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition?code=wrong", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only definition with unknown code should 403"
+    );
+
+    // The HTML page is gated the same way (the definition is injected inline).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only form page without code should 403"
+    );
+
+    // Mint an invite code, child of the form (as the builder UI does).
+    let mut invite = Resource::new_instance(urls::FORM_INVITE_CODE, store)
+        .await
+        .unwrap();
+    invite
+        .set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(form.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    invite
+        .set(
+            urls::FORM_CODE.into(),
+            Value::String("secret-code".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    invite.save_locally(store).await.unwrap();
+
+    // Definition with the code -> 200, and fetching does NOT consume it.
+    for _ in 0..2 {
+        let req = test::TestRequest::get()
+            .uri(&format!("/form/{}/definition?code=secret-code", slug))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(
+            resp.status().is_success(),
+            "invite-only definition with valid code should succeed: {:?}",
+            resp.status()
+        );
+    }
+
+    // Submit without a code -> 403 (pre-check runs before captcha
+    // verification, so no solved payload is needed).
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor3@example.com" }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only submit without code should 403"
+    );
+
+    // Submit with the code -> 201, and the code is now consumed.
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "invited@example.com" },
+            "altcha": solve_captcha!(),
+            "code": "secret-code",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "invite-only submit with valid code should succeed: {}",
+        get_body(resp)
+    );
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(
+        count_rows(&result),
+        2,
+        "invited submission should land in the table"
+    );
+    let invite = store
+        .get_resource(&invite.get_subject().clone())
+        .await
+        .unwrap();
+    assert!(
+        invite.get(urls::USED_AT).is_ok(),
+        "the invite code should be marked used after the submission"
+    );
+
+    // Replaying the consumed code -> 403 on both submit and definition.
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "sneaky@example.com" },
+            "code": "secret-code",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "used code should be rejected at submit");
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition?code=secret-code", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "used code should be rejected at definition"
+    );
+
+    // No row landed for the rejected replay.
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(count_rows(&result), 2);
+
+    // Switching back to public opens the plain link again.
+    form.set(
+        urls::FORM_ACCESS.into(),
+        Value::String("public".into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "public definition should work again after switching back"
+    );
+
+    // Pointing the form at a table in another drive must not let visitors
+    // write there: the server, not the form's editor, would sign the row.
+    let mut foreign_table = Resource::new_instance(urls::TABLE, store).await.unwrap();
+    foreign_table
+        .set(urls::NAME.into(), Value::String("Not yours".into()), store)
+        .await
+        .unwrap();
+    foreign_table
+        .set(
+            urls::CLASSTYPE_PROP.into(),
+            Value::AtomicUrl(class.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    foreign_table
+        .set_unsafe(
+            urls::DRIVE_PROP.into(),
+            Value::AtomicUrl("did:ad:someone-elses-drive".into()),
+        )
+        .unwrap();
+    foreign_table.save_locally(store).await.unwrap();
+    form.set(
+        urls::FORM_TARGET_TABLE.into(),
+        Value::AtomicUrl(foreign_table.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor3@example.com" },
+            "altcha": solve_captcha!(),
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "a target table outside the form's drive should be refused"
+    );
+    let foreign_rows = store
+        .query(&atomic_lib::storelike::Query::new_prop_val(
+            urls::PARENT,
+            foreign_table.get_subject().as_str(),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        foreign_rows.subjects.is_empty(),
+        "no row lands in the other drive"
+    );
+}
+
+/// `GET /genesis` hands out a drive's genesis certificate to anyone, and
+/// nothing else: a client that learned of this server from a public pkarr
+/// record uses it to check the server really holds the drive.
+#[actix_rt::test]
+async fn genesis_route_serves_only_the_certificate_of_a_drive() {
+    use clap::Parser;
+    let unique_string = atomic_lib::utils::random_string(10);
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
+    ]);
+    let mut config = config::build_config(opts).expect("failed init config");
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    config.vector_search_index_path =
+        format!("./.temp/{}/vector_search_index", unique_string).into();
+    let appstate = crate::appstate::AppState::init(config)
+        .await
+        .expect("failed init appstate");
+    atomic_lib::test_utils::setup_test_env(&appstate.store)
+        .await
+        .unwrap();
+    let store = &appstate.store;
+    let app = test::init_service(
+        App::new()
+            .app_data(Data::new(appstate.clone()))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+
+    // A private drive with content that must never leak.
+    let agent = store.get_default_agent().unwrap();
+    let mut builder = atomic_lib::commit::CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        atomic_lib::Value::ResourceArray(vec![urls::DRIVE.into()]),
+    );
+    builder.set(
+        urls::DESCRIPTION.into(),
+        atomic_lib::Value::Markdown("top secret plans".into()),
+    );
+    builder.set(
+        urls::READ.into(),
+        atomic_lib::Value::ResourceArray(vec![agent.subject.to_string().into()]),
+    );
+    let commit = atomic_lib::commit::Commit::create_did(builder, &agent, store)
+        .await
+        .unwrap();
+    let drive_did = commit.subject.clone();
+    let opts = atomic_lib::commit::CommitOpts {
+        validate_schema: false,
+        validate_constraints: false,
+        validate_signature: true,
+        validate_timestamp: false,
+        validate_rights: false,
+        validate_loro_causality: false,
+        update_index: true,
+        validate_for_agent: None,
+        source_id: None,
+    };
+    store.apply_commit(commit, &opts).await.unwrap();
+
+    // Anonymous: the drive itself is refused...
+    let path = format!("/did?subject={}", urlencoding::encode(drive_did.as_str()));
+    let req = test::TestRequest::with_uri(&path)
+        .insert_header(("Accept", "application/ad+json"))
+        .to_request();
+    assert_eq!(test::call_service(&app, req).await.status(), 401);
+
+    // ...but its certificate is served, and verifies against the identifier.
+    let path = format!(
+        "/genesis?subject={}",
+        urlencoding::encode(drive_did.as_str())
+    );
+    let req = test::TestRequest::with_uri(&path).to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body = get_body(resp);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let object = json.as_object().unwrap();
+    let mut keys: Vec<&String> = object.keys().collect();
+    keys.sort();
+    assert_eq!(keys, ["@id", urls::GENESIS], "only the certificate: {body}");
+    assert!(!body.contains("top secret"), "{body}");
+
+    let cert_b64 = object[urls::GENESIS].as_str().unwrap();
+    let cert_bytes = atomic_lib::agents::decode_base64(cert_b64).unwrap();
+    let cert = atomic_lib::genesis::GenesisCert::decode(&cert_bytes).unwrap();
+    let signature = atomic_lib::identifiers::identifier_body(drive_did.as_str()).unwrap();
+    cert.verify_signed_bytes(&cert_bytes, signature)
+        .expect("the served certificate must verify against the drive's identifier");
+
+    // Anything that is not a drive held here is a plain 404.
+    let agent = store.get_default_agent().unwrap().subject.to_string();
+    let fake_drive = format!("did:ad:{}", atomic_lib::agents::encode_base64(&[9u8; 64]));
+    for subject in [
+        "https://example.com/drive",
+        "did:ad:agent:abc",
+        "did:ad:tooshort",
+        agent.as_str(),
+        fake_drive.as_str(),
+        "",
+    ] {
+        let path = format!("/genesis?subject={}", urlencoding::encode(subject));
+        let req = test::TestRequest::with_uri(&path).to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            404,
+            "{subject:?}"
+        );
+    }
 }

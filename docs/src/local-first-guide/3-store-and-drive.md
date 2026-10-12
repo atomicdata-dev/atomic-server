@@ -19,7 +19,7 @@ Every Agent has a *personal* Drive whose identifier is derived from the Agent's 
 const drive = await store.createDrive('Reading list', { localOnly: true });
 store.setDrive(drive.subject);
 
-console.log(drive.subject); // did:ad:…
+console.log(drive.subject); // atomic:…
 ```
 
 `localOnly: true` tells the sync engine to leave this Drive alone even if a server is connected later.
@@ -47,10 +47,10 @@ async function addBook(title: string, note: string) {
 }
 
 const book = await addBook('The Dispossessed', 'Recommended by Anna');
-console.log(book.subject); // did:ad:… (a fresh identifier, minted here)
+console.log(book.subject); // atomic:… (a fresh identifier, minted here)
 ```
 
-`newResource` mints a `did:ad:` identifier from a genesis certificate signed by your Agent.
+`newResource` mints a `atomic:` identifier from a genesis certificate signed by your Agent.
 `save()` writes to the Resource's Loro document, marks it dirty in the outbox, and applies it locally at once.
 There is no server to wait for, so the Promise resolves as soon as the local write is done.
 

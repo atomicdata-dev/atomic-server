@@ -19,6 +19,33 @@ export interface MessageFacts {
   replyTo?: string;
 }
 
+/**
+ * Facts about one entry of a ChatLog page, as if it were a Message resource:
+ * its id is `<page>#<key>`, the author and time are the entry's own, and the
+ * chat (`parent`) or the commented item (`about`) are the page's.
+ */
+export function entryFacts(
+  pageSubject: string,
+  page: Pick<MessageFacts, 'parent' | 'about'>,
+  key: string,
+  entry: { a: string; c: number; r?: string; k?: unknown },
+): MessageFacts {
+  return {
+    subject: `${pageSubject}#${key}`,
+    isA: [
+      dataBrowser.classes.message,
+      ...(entry.k === dataBrowser.classes.followEvent
+        ? [dataBrowser.classes.followEvent]
+        : []),
+    ],
+    createdBy: entry.a,
+    createdAt: entry.c,
+    parent: page.parent,
+    about: page.about,
+    replyTo: entry.r,
+  };
+}
+
 export interface MessageContext {
   /** The signed-in agent. Without one there is nobody to notify. */
   me?: string;

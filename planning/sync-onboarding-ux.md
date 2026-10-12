@@ -101,10 +101,10 @@ Keep these in step. A change to one is usually a change to its twin.
 
 | Concern | Browser | Flutter |
 | --- | --- | --- |
-| sync screen | `data-browser/src/routes/SyncRoute.tsx` | `flutter/lib/atomic/widgets/server_settings_section.dart` |
-| settings shell | (same route) | `flutter/lib/atomic/widgets/agent_settings_dialog.dart` |
+| sync screen | `data-browser/src/routes/SyncRoute.tsx` | `packages/atomic_flutter/lib/src/server_settings_section.dart` |
+| settings shell | (same route) | `packages/atomic_flutter/lib/src/agent_settings_dialog.dart` |
 | onboarding, data elsewhere | `data-browser/src/views/getting-started/ConnectDeviceStep.tsx` | `flutter/lib/screens/login_screen.dart` |
-| pairing code, show / scan | `components/PairingCode.tsx`, `ConnectToDeviceForm.tsx` | `flutter/lib/screens/pair_screen.dart` |
+| pairing code, show / scan | `components/PairingCode.tsx`, `ConnectToDeviceForm.tsx` (`ScanCodeButton`), shown by `ConnectDevice.tsx` | `flutter/lib/screens/pair_screen.dart` |
 | pairing code, format | `browser/lib/src/pairing.ts` | `pair_screen.dart` (`_parsePairingUri`) |
 | URL rules (scheme, local address) | `data-browser/src/helpers/serverUrl.ts` | `flutter/lib/atomic/server_url.dart` |
 | what a machine says about itself | `data-browser/src/helpers/managedServer.ts` | `flutter/lib/atomic/server_info.dart` |
@@ -202,6 +202,23 @@ Existing records retain unknown consent; no consent is inferred from a drive
 being present. Browser switcher rows carry compact service state labels, with
 one Storage and hosting action for details. Unknown cloud status stays explicit.
 
+### Plan steps and automatic hosting (2026-10-05)
+
+The Sync page's account card is a header (atomic.place, email, recovery,
+Manage account) over "Your plan": Cloud Vault, then Cloud Server, both drawn
+by the same `ServiceRow` (`components/Cloud/ServiceRow.tsx`): name and a
+Current / Included / Offered badge, one fixed tagline, selling points while
+off, one status line with a coloured dot, a `details` slot, then actions,
+primary first. Cloud Server is the step up and includes Cloud Vault. The
+managed node itself is listed under Devices with every other server.
+
+There is no "Finish setup". A drive with a paid plan (`source: stripe` from
+`/api/billing/subscription`), or one already enrolled, enrolls and switches by
+itself and shows "Moving…"; a failure shows the reason and Try again. Consent
+is asked only for a plan nobody bought (`source: grant`, or no `source` from an
+older control plane), because hosting stores a readable copy. The checkout is
+where a buyer agrees to that. Flutter has no plan UI, so nothing changes there.
+
 ## Desktop workspace discovery (2026-09-08)
 
 A restored Tauri identity now inspects its personal drive's PKARR peer before
@@ -228,3 +245,54 @@ homepage panel, the app's sign-in and restore steps) renders the same
 adds only what the portal cannot do, pasting an agent secret. Native builds that
 cannot hold the account cookie link the device with a code instead. Flutter has
 no account sign-in yet.
+
+## Shared Flutter settings package
+
+`packages/atomic_flutter` now owns the Canvas settings and Devices widgets.
+Canvas delegates storage and transport through `flutter/lib/atomic/settings_backend.dart`.
+Atomic Audio can provide its own adapter without copying the dialog. The browser
+SyncRoute remains the visual/wording twin; this extraction changes no browser
+behavior. Pairing and authentication screens remain host-owned for now.
+
+## Sync page layout (2026-10-08)
+
+Top to bottom: a **sync problem banner** (only when something is wrong), the
+account card, then Devices, then one **Connect a device** section, then
+Developer.
+
+- **Plan rows share one `details` slot.** Both rows draw usage with
+  `UsageMeter` (bar plus "X MB of Y GB"). When Cloud Server is the current
+  service, the Cloud Vault row ("Included") shows no bar and no quota, only
+  "N objects · X MB backed up" and a muted note that the backup is part of the
+  Cloud Server plan: the vault's allowance there is a Cloud Server entitlement
+  (50 GiB, against 100 MB for free Cloud Vault), and quoting it on the vault
+  row reads as the vault's own limit. The bar returns at 90% of the quota even
+  when included. Cloud Vault adds a **Manage storage**
+  action in its row actions (subtle, like Restore and Turn off) that opens the
+  breakdown inside the row. Cloud Server, once on, shows
+  `CloudServerDetails`: the usage meter with "(see where space goes)", a line
+  "N resources · Synced <ago>", and the drive's web address
+  (`DriveAddress`, backed by `helpers/managed/aliases.ts` against the portal's
+  `/api/aliases`: reserve, rename, release, debounced availability check,
+  "Setting up" until a node confirms). Control plane routes that do not exist
+  yet (HTML or 404) become one plain sentence, never a parse error.
+- **Devices.** The managed node is a bordered card like "This device" and every
+  other server: title, status pill, Disconnect. Usage and the address live on
+  its plan row, not on the device card.
+- **Connect a device** (`components/ConnectDevice.tsx`) always renders below the
+  device list, as one card of two halves. "Show this device" (QR and copyable
+  code) keeps its old gating: a peer node, or a server that is not
+  mid-hosting. "Add a device" is one input that takes a pairing code (handed
+  to `deliverDeepLink`, native only) or a server address (added as before);
+  `helpers/connectInput.ts` decides which. A browser tab cannot take a code,
+  so a pasted code answers with where it can be entered. A Scan button shows on
+  mobile Tauri. `focusConnectDevice()` is the one way other screens lead here.
+- **Sync problem banner** (`components/SyncProblemBanner.tsx`, wording in
+  `helpers/syncProblem.ts`). The sidebar's warning icon links to it
+  (`/app/sync#sync-problem`). It separates *ours* (unexpected errors, commits
+  that keep failing: "a problem on our side", Try again, reported to Sentry
+  once) from *yours* (the server does not hold the workspace: Connect a device
+  or turn off server sync; no write access; plan full: storage) and plain
+  connection loss (Try again). A commit that keeps failing is reported by the
+  outbox (`reportRepeatedCommitFailures`); the page reports only what that does
+  not cover (`reportSyncProblem`). Flutter has no equivalent banner.

@@ -83,7 +83,7 @@ const links: {
   {
     icon: <FaGlobe />,
     label: 'Site',
-    description: 'Atomic Place: hosted workspaces and pricing.',
+    description: 'atomic.place: hosted workspaces and pricing.',
     href: 'https://atomic.place',
   },
 ];

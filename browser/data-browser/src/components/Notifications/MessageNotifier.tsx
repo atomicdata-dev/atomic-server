@@ -15,8 +15,10 @@ import { useRightPanel } from '../RightPanel/RightPanelContext';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
+import { parseEntryId } from '../../helpers/chatLog';
 import {
   classifyMessage,
+  entryFacts,
   isCandidate,
   type MessageFacts,
   type MessageNotification,
@@ -220,13 +222,128 @@ export function MessageNotifier(): null {
     return !n.openComments || activePanel === 'comments';
   });
 
+  const announce = useEffectEvent(
+    async (facts: MessageFacts, text: string): Promise<void> => {
+      const subject = facts.subject;
+      const ctx = { me: agent?.subject, since: APP_STARTED };
+
+      // Replies can point at an entry; its author is on the entry's page.
+      const replyPage = facts.replyTo && parseEntryId(facts.replyTo)?.page;
+      const related = await loadAll(store, [
+        facts.parent,
+        facts.about,
+        replyPage || facts.replyTo,
+        facts.createdBy,
+      ]);
+      const n = classifyMessage(facts, {
+        ...ctx,
+        classesOf: s =>
+          related.get(s)?.get(core.properties.isA) as string[] | undefined,
+        creatorOf: s => {
+          const entry = parseEntryId(s);
+
+          return entry
+            ? related.get(entry.page)?.getChatLogEntry(entry.key)?.a
+            : related.get(s)?.getCreatedBy();
+        },
+      });
+
+      if (!n) return;
+
+      if (isLookingAt(n)) {
+        // Another open device may still record it; read that copy too.
+        const seenAt = Date.now();
+        setTimeout(() => readAbout(n.target, seenAt), 3000);
+
+        return;
+      }
+
+      const authorName = related.get(n.author)?.title ?? 'Someone';
+      const targetTitle = related.get(n.target)?.title ?? '';
+      const title = headline(n.kind, authorName, targetTitle);
+      const body =
+        text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text;
+
+      if (privateDrive) {
+        const before = recording.current.get(n.target);
+        const record = recordNotification(store, privateDrive, {
+          source: subject,
+          about: n.target,
+          kind: n.kind,
+          actor: n.author,
+          title,
+          body,
+          occurredAt: facts.createdAt ?? Date.now(),
+        }).catch(e => console.error('Could not add to the inbox:', e));
+        const all = Promise.all([before, record]);
+        recording.current.set(n.target, all);
+        void all.then(() => {
+          if (recording.current.get(n.target) === all) {
+            recording.current.delete(n.target);
+          }
+        });
+      }
+
+      if (!document.hidden && document.hasFocus()) {
+        toast.custom(
+          t => (
+            <ToastCard
+              type='button'
+              onClick={() => {
+                open(n);
+                toast.dismiss(t.id);
+              }}
+            >
+              <AgentAvatar agentSubject={n.author} size='1.8rem' />
+              <ToastBody>
+                <ToastTitle>{title}</ToastTitle>
+                <ToastText>{body}</ToastText>
+              </ToastBody>
+            </ToastCard>
+          ),
+          { duration: 6000, id: subject },
+        );
+
+        return;
+      }
+
+      if (shouldOfferOsNotifications()) missed.current += 1;
+
+      showOsNotification({ title, body, tag: subject, onClick: () => open(n) });
+    },
+  );
+
   const onUpdate = useEffectEvent(async (resource: Resource) => {
     const subject = resource.stable.subject;
+    const ctx = { me: agent?.subject, since: APP_STARTED };
+    const classes =
+      (resource.stable.get(core.properties.isA) as string[] | undefined) ?? [];
+
+    // A page of a chat log: its entries are the messages. Every update asks
+    // about all of them; the ones already handled (and edits of those) are
+    // skipped.
+    if (classes.includes(dataBrowser.classes.chatLog)) {
+      const page = resource.stable;
+
+      for (const { key, entry } of page.listChatLogEntries()) {
+        const facts = entryFacts(page.subject, factsOf(page), key, entry);
+
+        if (handled.current.has(facts.subject)) continue;
+
+        // Not decidable yet: the page's own metadata hasn't arrived.
+        if (isCandidate(facts, ctx) === undefined) continue;
+
+        handled.current.add(facts.subject);
+
+        if (isCandidate(facts, ctx)) await announce(facts, entry.t);
+      }
+
+      return;
+    }
 
     if (handled.current.has(subject)) return;
 
     const facts = factsOf(resource);
-    const ctx = { me: agent?.subject, since: APP_STARTED };
     const candidate = isCandidate(facts, ctx);
 
     // Not decidable yet: its genesis hasn't arrived. A later update will ask again.
@@ -236,84 +353,12 @@ export function MessageNotifier(): null {
 
     if (!candidate) return;
 
-    const related = await loadAll(store, [
-      facts.parent,
-      facts.about,
-      facts.replyTo,
-      facts.createdBy,
-    ]);
-    const n = classifyMessage(facts, {
-      ...ctx,
-      classesOf: s =>
-        related.get(s)?.get(core.properties.isA) as string[] | undefined,
-      creatorOf: s => related.get(s)?.getCreatedBy(),
-    });
-
-    if (!n) return;
-
-    if (isLookingAt(n)) {
-      // Another open device may still record it; read that copy too.
-      const seenAt = Date.now();
-      setTimeout(() => readAbout(n.target, seenAt), 3000);
-
-      return;
-    }
-
-    const authorName = related.get(n.author)?.title ?? 'Someone';
-    const targetTitle = related.get(n.target)?.title ?? '';
-    const title = headline(n.kind, authorName, targetTitle);
-    const text =
+    await announce(
+      facts,
       (resource.stable.get(core.properties.description) as
         | string
-        | undefined) ?? '';
-    const body = text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text;
-
-    if (privateDrive) {
-      const before = recording.current.get(n.target);
-      const record = recordNotification(store, privateDrive, {
-        source: subject,
-        about: n.target,
-        kind: n.kind,
-        actor: n.author,
-        title,
-        body,
-        occurredAt: facts.createdAt ?? Date.now(),
-      }).catch(e => console.error('Could not add to the inbox:', e));
-      const all = Promise.all([before, record]);
-      recording.current.set(n.target, all);
-      void all.then(() => {
-        if (recording.current.get(n.target) === all) {
-          recording.current.delete(n.target);
-        }
-      });
-    }
-
-    if (!document.hidden && document.hasFocus()) {
-      toast.custom(
-        t => (
-          <ToastCard
-            type='button'
-            onClick={() => {
-              open(n);
-              toast.dismiss(t.id);
-            }}
-          >
-            <AgentAvatar agentSubject={n.author} size='1.8rem' />
-            <ToastBody>
-              <ToastTitle>{title}</ToastTitle>
-              <ToastText>{body}</ToastText>
-            </ToastBody>
-          </ToastCard>
-        ),
-        { duration: 6000, id: subject },
-      );
-
-      return;
-    }
-
-    if (shouldOfferOsNotifications()) missed.current += 1;
-
-    showOsNotification({ title, body, tag: subject, onClick: () => open(n) });
+        | undefined) ?? '',
+    );
   });
 
   // Things shared with you out of drives you can't open are only delivered to

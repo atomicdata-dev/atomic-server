@@ -26,16 +26,15 @@ const renderInput = () =>
     </ThemeProvider>,
   );
 
-it('leaves focus on the role select when it is clicked', () => {
-  const { getByLabelText } = renderInput();
+it('leaves focus on the role switch when it is clicked', () => {
+  const { getByLabelText, getByRole } = renderInput();
   const input = getByLabelText('Add people by email');
-  const select = getByLabelText('Role for invited people');
+  const read = getByRole('radio', { name: 'Read' });
 
-  select.focus();
-  fireEvent.click(select);
+  read.focus();
+  fireEvent.click(read);
 
-  // Focusing the input here would blur the select and close its option list.
-  expect(document.activeElement).toBe(select);
+  expect(document.activeElement).toBe(read);
   expect(document.activeElement).not.toBe(input);
 });
 

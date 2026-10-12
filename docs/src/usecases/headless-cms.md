@@ -11,16 +11,16 @@ This approach has some issues regarding performance and flexibility that headles
 
 ## Atomic Server
 
-The [Atomic-Server](https://github.com/atomicdata-dev/atomic-server/blob/master/server/README.md) project may be the right choice for you if you're looking for a Headless CMS:
+The [Atomic-Server](https://github.com/ontola/atomic-server/blob/master/server/README.md) project may be the right choice for you if you're looking for a Headless CMS:
 
-<!-- List copied from https://github.com/atomicdata-dev/atomic-server/blob/master/README.md -->
+<!-- List copied from https://github.com/ontola/atomic-server/blob/master/README.md -->
 - **Free and open source**. MIT licensed, no strings attached.
 - **Easy to use API**. Atomic-Server is built using the [Atomic Data specification](../atomic-data-overview.md). It is well-documented, and uses conventions that most web developers are already familiar with.
 - **Typescript & React libraries**. Use the existing react hooks to make your own fully editable, live-reloaded web application.
 - **Fast**. 1ms responses on my laptop. It's written in Rust, so it squeezes out every cycle of your server.
-- **Lightweight**. It's a single 8MB binary, no external dependencies needed.
+- **Lightweight**. It's a single ~70MB binary (server, web app, search and database), no external dependencies needed.
 - **Easy to setup**. Just run the binary and open the address. Even HTTPS support is built-in.
-- **Clean, powerful admin GUI**. The Atomic-Data-Browser front-end gives you a very easy interface to manage your content.
+- **Clean, powerful admin GUI**. The built-in web app gives you a very easy interface to manage your content.
 - **Share your data models**. Atomic Data is designed to achieve a more decentralized web. You can easily re-use existing data models, or share the ones you built.
 - **Files / Attachments**. Upload and preview files.
 - **Pagination / sorting / filtering**. Query your data.
@@ -40,13 +40,13 @@ Declare `defaultLanguage` (and optionally `languages`) on your website or drive,
 
 ## Limitations
 
-- No support for image resizing, [as of now](https://github.com/atomicdata-dev/atomic-server/issues/257)
-- No GraphQL support [(see issue)](https://github.com/atomicdata-dev/atomic-server/issues/251)
+- No support for image resizing, [as of now](https://github.com/ontola/atomic-server/issues/257)
+- No GraphQL support [(see issue)](https://github.com/ontola/atomic-server/issues/251)
 
 ## Setting up the server
 
 - One-liners: `cargo install atomic-server` or `docker run -p 80:80 -v atomic-storage:/atomic-storage ghcr.io/ontola/atomic-server`
-- Check out the [readme!](https://github.com/atomicdata-dev/atomic-server)
+- Check out the [readme!](https://github.com/ontola/atomic-server)
 
 ## Using the data in your (React / NextJS) app
 

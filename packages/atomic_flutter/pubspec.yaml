@@ -1,0 +1,19 @@
+name: atomic_flutter
+description: Shared Atomic account, device sync, and drive settings UI from Atomic Canvas.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.44.0'
+dependencies:
+  http: ^1.6.0
+  cryptography: ^2.9.0
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

@@ -452,8 +452,14 @@ export const CanvasPage: React.FC<ResourcePageProps> = ({ resource }) => {
     setStrokes(parseCanvasStrokes(res.get(canvas.properties.strokeData)));
   }, []);
 
-  /** Persist the undo / redo stacks + branches under the canvas subject. */
-  const persistHistory = useCallback(() => {
+  const persistTimerRef = useRef<number | undefined>(undefined);
+
+  const writeHistoryNow = useCallback(() => {
+    if (persistTimerRef.current !== undefined) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = undefined;
+    }
+
     saveCanvasHistory(resource.subject, {
       undo: undoStackRef.current,
       redo: redoStackRef.current,
@@ -461,6 +467,36 @@ export const CanvasPage: React.FC<ResourcePageProps> = ({ resource }) => {
       bootstrapped: bootstrappedRef.current,
     });
   }, [resource.subject]);
+
+  /** Persist the undo / redo stacks + branches under the canvas subject.
+   *  Serializing up to 400 full stroke snapshots is the expensive part of an
+   *  undo, so it runs once things settle instead of on every press; it is
+   *  flushed when the page is hidden or the canvas closes. */
+  const persistHistory = useCallback(() => {
+    if (persistTimerRef.current !== undefined) {
+      window.clearTimeout(persistTimerRef.current);
+    }
+
+    persistTimerRef.current = window.setTimeout(writeHistoryNow, 500);
+  }, [writeHistoryNow]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') writeHistoryNow();
+    };
+
+    window.addEventListener('pagehide', writeHistoryNow);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('pagehide', writeHistoryNow);
+      document.removeEventListener('visibilitychange', onVisibility);
+
+      if (persistTimerRef.current !== undefined) {
+        writeHistoryNow();
+      }
+    };
+  }, [writeHistoryNow]);
 
   useEffect(() => {
     // Reset the wheel-session gate baseline on mount and on canvas-to-

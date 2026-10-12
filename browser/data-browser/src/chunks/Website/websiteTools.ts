@@ -9,7 +9,7 @@ import {
   websiteConfigSchema,
 } from './websiteModel';
 import { buildWebsiteArtifact } from './websiteExport';
-import { expandSubject, shortenRefsDeep } from '@helpers/subjectRefs';
+import { expandSubject, shortenRefsDeep } from '@tomic/react';
 
 export function websiteTools(store: Store, drive: string) {
   const expandConfig = (raw: z.infer<typeof websiteConfigSchema>) => ({

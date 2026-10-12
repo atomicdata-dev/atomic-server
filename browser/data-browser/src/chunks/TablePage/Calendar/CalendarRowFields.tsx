@@ -1,4 +1,3 @@
-import { nextCalendarDate } from '@tomic/lib';
 import {
   anchorOf,
   buildRecurrence,
@@ -16,6 +15,8 @@ import { ValueForm } from '@components/forms/ValueForm';
 import {
   calendarRowTime,
   isNativePayload,
+  daysSpanned,
+  endDayFor,
   localTimeInput,
   readRecurrencePayload,
   rowRecord,
@@ -179,8 +180,8 @@ export function readRowRepeat(
 }
 
 /** Stores a row's times, or makes it all day again. The date stays the
- * row's Day; End day is left as it is. An end at or before the start is
- * taken to be the next day. */
+ * row's Day. An event that spans several days keeps its length in days; a
+ * same-day one whose end is at or before the start ends the next day. */
 async function saveTimes(
   resource: Resource,
   calendar: CalendarRowContext,
@@ -202,11 +203,21 @@ async function saveTimes(
   const day = valueToDayKey(resource.get(dateProp.subject), dateProp.datatype);
   if (!day) throw new Error('The event has no date');
   const zone = viewerTimeZone();
+  // Read before `ensureTimeProps`/`set` touch it: a multi-day event keeps the
+  // date its end is on, whatever time of day is edited.
+  const previousEnd = calendar.endProp
+    ? resource.get(calendar.endProp.subject)
+    : undefined;
   const props = await calendar.ensureTimeProps();
   await resource.set(props.start, timedValue(day, next.start, zone));
 
   if (next.end) {
-    const endDay = next.end > next.start ? day : nextCalendarDate(day);
+    const endDay = endDayFor(
+      day,
+      daysSpanned(day, previousEnd),
+      next.start,
+      next.end,
+    );
     await resource.set(props.end, timedValue(endDay, next.end, zone));
   } else {
     resource.remove(props.end);

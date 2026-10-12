@@ -62,3 +62,37 @@ pub async fn handle_drive_usage(
         loro_bytes: row.loro_bytes,
     }))
 }
+
+/// `GET /drive-usage/breakdown?subject=<drive>` — every resource in the drive
+/// with its history (Loro) and file (blob) bytes, so a client can draw a size
+/// map of where the space goes. Same auth and read check as `/drive-usage`.
+#[tracing::instrument(skip_all)]
+pub async fn handle_drive_usage_breakdown(
+    appstate: web::Data<AppState>,
+    params: web::Query<DriveUsageParams>,
+    req: HttpRequest,
+) -> AtomicServerResult<HttpResponse> {
+    let store = &appstate.store;
+    let origin = RequestContext::new(&req, &appstate).origin;
+    let subject = params.subject.clone();
+
+    let full_url = format!("{}{}", origin, req.uri());
+    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+
+    let drive = store.get_resource(&Subject::from(subject.as_str())).await?;
+    atomic_lib::hierarchy::check_read(store, &drive, &for_agent).await?;
+
+    let rows = store.drive_usage_breakdown(&subject).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "driveSubject": subject,
+        "resources": rows.iter().map(|r| serde_json::json!({
+            "subject": r.subject,
+            "name": r.name,
+            "parent": r.parent,
+            "isA": r.is_a,
+            "loroBytes": r.loro_bytes,
+            "blobBytes": r.blob_bytes,
+        })).collect::<Vec<_>>(),
+    })))
+}

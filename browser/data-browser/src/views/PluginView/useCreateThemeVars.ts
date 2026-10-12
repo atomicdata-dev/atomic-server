@@ -1,11 +1,27 @@
-import { useTheme } from 'styled-components';
+import { useTheme, type DefaultTheme } from 'styled-components';
+
+/** Whether the host is drawn light or dark, as frames are told it. */
+export type FrameColorScheme = 'light' | 'dark';
+
+/** The host's actual theme, not a guess from its background colour. */
+export function frameColorScheme(theme: DefaultTheme): FrameColorScheme {
+  return theme.darkMode ? 'dark' : 'light';
+}
+
+/** {@link frameColorScheme} for the current theme. */
+export function useFrameColorScheme(): FrameColorScheme {
+  return frameColorScheme(useTheme());
+}
 
 /**
  * Returns a stylesheet that adds all our theme variables to an iframe's document as css variables.
  */
 export function useCreateThemeVars() {
-  const theme = useTheme();
+  return frameStylesheet(useTheme());
+}
 
+/** The stylesheet {@link useCreateThemeVars} returns, for a given theme. */
+export function frameStylesheet(theme: DefaultTheme): string {
   const themeVars: Record<string, string> = {
     '--t-container-width': `${theme.containerWidth}rem`,
     '--t-container-width-wide': theme.containerWidthWide,
@@ -41,6 +57,7 @@ export function useCreateThemeVars() {
     '--t-color-alert': theme.colors.alert,
     '--t-color-alert-light': theme.colors.alertLight,
     '--t-color-warning': theme.colors.warning,
+    '--t-color-success': theme.colors.success,
     // Spacing / Sizes
     '--t-size-1': theme.size(1),
     '--t-size-2': theme.size(2),
@@ -61,6 +78,7 @@ export function useCreateThemeVars() {
 
   return `
   :root {
+    color-scheme: ${frameColorScheme(theme)};
     ${Object.entries(themeVars)
       .map(([key, value]) => `${key}: ${value};`)
       .join('\n')}

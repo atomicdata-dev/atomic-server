@@ -44,12 +44,12 @@ caller may read:
 
 ```json
 {
-  "subject": "did:ad:…",
+  "subject": "atomic:…",
   "retention": "all",
   "complete": true,
   "attributions": [
     {
-      "signer": "did:ad:agent:…",
+      "signer": "atomic:agent:…",
       "created_at": 1757060000000,
       "signature": "…",
       "verified": true,

@@ -1,4 +1,4 @@
-import { standardClassAlias } from './standardClassAlias';
+import { ensureOntologyFromJsonSchema, findSchemas } from './schemaTools';
 import { updateTableRows } from './updateTableRows';
 // @wc-ignore-file
 import { websiteTools } from '@chunks/Website/websiteTools';
@@ -6,15 +6,20 @@ import { useAppSetup } from '../../components/AppSetup/AppSetupProvider';
 import { listAppSetups } from '../../components/AppSetup/registry';
 import { previewEventSchema, previewTrigger } from './previewTrigger';
 import {
-  Client,
-  commits,
   core,
-  dataBrowser,
-  server,
+  createResourceFromCompact,
+  expandSubject,
+  getClassesOnDrive,
+  queryResources,
+  readResourceCompact,
+  semanticSearch,
+  setResourceProperty,
+  shortenRefsDeep,
+  shortenSubject,
+  toClassObject,
   useStore,
   type JSONValue,
   type Resource,
-  type Store,
 } from '@tomic/react';
 import { findSchema, pluginSchema } from '@tomic/lib';
 import { discoverIntegrations } from './discoverIntegrations';
@@ -25,6 +30,19 @@ import { appCheckReport } from '@chunks/AppPage/appCheckReport';
 import { CREATE_APP_DESCRIPTION } from '@chunks/AppPage/createAppDescription';
 import { handOverAppKey } from '@chunks/AppPage/appAgent';
 import { tool } from 'ai';
+import {
+  describeForm,
+  configureForm,
+  configureFormSchema,
+  configureFormPage,
+  configureFormPageSchema,
+  configureFormField,
+  configureFormFieldSchema,
+} from '../FormBuilder/formOps';
+import {
+  buildFormFromSpec,
+  formSpecSchema,
+} from '../FormBuilder/createFormFromSpec';
 import { z } from 'zod';
 import { useSettings } from '@helpers/AppSettings';
 import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
@@ -45,23 +63,8 @@ import {
   resolveView,
 } from '@chunks/TablePage/tableOps';
 import { TABLE_TEMPLATES } from '@chunks/TablePage/tableTemplates';
-import {
-  expandSubject,
-  shortenRefsDeep,
-  shortenSubject,
-} from '@helpers/subjectRefs';
-import { getClassesOnDrive, toClassObject } from './atomicSchemaHelpers';
 import { useDocumentEditAgent } from './documentEditAgent';
 import { getClassContextForAgent } from './resourceContextProviders';
-import {
-  buildClassContext,
-  coerceValueIn,
-  compactValueOut,
-  describeClassCompact,
-  fromCompact,
-  resolveKey,
-  toCompact,
-} from './jsonAdCompact';
 import type { AIModelIdentifier } from './types';
 import {
   buildDashboardFromSpec,
@@ -84,13 +87,19 @@ export const TOOL_NAMES = {
   GET_ATOMIC_RESOURCE: 'get_atomic_resource',
   READ_FILE_RESOURCE: 'read_file_resource',
   GET_SCHEMA: 'get_schema',
-  GET_USER_CLASSES: 'get_user_classes',
+  FIND_SCHEMA: 'find_schema',
+  ENSURE_ONTOLOGY: 'ensure_ontology',
   EDIT_ATOMIC_RESOURCE: 'edit_atomic_resource',
   EDIT_DOCUMENT_RESOURCE: 'edit_document_resource',
   CHANGE_THEME: 'change_theme',
   NAVIGATE_TO_RESOURCE: 'navigate_to_resource',
   CREATE_RESOURCE: 'create_resource',
   CREATE_TABLE: 'create_table',
+  CREATE_FORM: 'create_form',
+  DESCRIBE_FORM: 'describe_form',
+  CONFIGURE_FORM: 'configure_form',
+  CONFIGURE_FORM_PAGE: 'configure_form_page',
+  CONFIGURE_FORM_FIELD: 'configure_form_field',
   DESCRIBE_TABLE: 'describe_table',
   LIST_TABLE_TEMPLATES: 'list_table_templates',
   CREATE_TABLE_FROM_TEMPLATE: 'create_table_from_template',
@@ -440,21 +449,6 @@ const viewConfigShape = {
     ),
 };
 
-const getClassesString = async (
-  resource: Resource,
-  store: Store,
-): Promise<string> => {
-  const classes = [];
-
-  for await (const cls of resource
-    .getClasses()
-    .map(async x => store.getResource(x))) {
-    classes.push(cls.title);
-  }
-
-  return classes.join(', ');
-};
-
 interface UseAtomicMCPToolsProps {
   onResourceEdited?: (originalResource: Resource) => void;
   editModel: AIModelIdentifier;
@@ -518,51 +512,6 @@ export function useAtomicMCPTools({
   };
   const { verifyApp } = useAppVerifier();
 
-  /** Resolves a `@class` shortname (or title) to a class subject on the
-   *  current drive. Full URLs and `#refs` pass through/expand. */
-  const resolveClass = async (nameOrRef: string): Promise<string> => {
-    const nameOrSubject = expandSubject(nameOrRef);
-
-    if (Client.isValidSubject(nameOrSubject)) {
-      return nameOrSubject;
-    }
-
-    const standard = standardClassAlias(nameOrSubject);
-    if (standard) return standard;
-
-    const classSubjects = await getClassesOnDrive(drive, store);
-    const wanted = nameOrSubject.toLowerCase();
-    const matches: string[] = [];
-
-    for (const subject of classSubjects) {
-      const resource = await store.getResource(subject);
-      const shortname = resource.get(core.properties.shortname) as
-        | string
-        | undefined;
-
-      if (
-        shortname?.toLowerCase() === wanted ||
-        resource.title.toLowerCase() === wanted
-      ) {
-        matches.push(subject);
-      }
-    }
-
-    if (matches.length === 1) {
-      return matches[0];
-    }
-
-    if (matches.length > 1) {
-      throw new Error(
-        `Ambiguous class "${nameOrSubject}": ${matches.join(', ')}. Use the full class URL.`,
-      );
-    }
-
-    throw new Error(
-      `Unknown class "${nameOrSubject}". Use get_user_classes to list available classes, or pass a full class URL.`,
-    );
-  };
-
   /** Resolves a table reference and checks it really is a table. */
   const resolveTable = async (reference: string) => {
     const table = await store.getResource(expandSubject(reference));
@@ -616,33 +565,14 @@ export function useAtomicMCPTools({
             )
             .optional(),
         }),
-        execute: async ({ query, limit, parents, text_query }) => {
-          if (limit < 1 || limit > 50) {
-            throw new Error('Limit must be between 1 and 50');
-          }
-
-          const results = await store.semanticSearch(query, {
-            limit,
-            parents:
-              parents && parents.length !== 0
-                ? parents.map(expandSubject)
-                : [drive],
-            text_query,
-          });
-
-          return await Promise.all(
-            results.map(async res => {
-              const r = await store.getResource(res.subject);
-
-              return {
-                subject: shortenSubject(res.subject),
-                title: r.title,
-                classes: await getClassesString(r, store),
-                chunk: res.chunk,
-              };
+        execute: async ({ query, limit, parents, text_query }) =>
+          shortenRefsDeep(
+            await semanticSearch(store, query, {
+              limit,
+              parents: parents && parents.length !== 0 ? parents : [drive],
+              textQuery: text_query,
             }),
-          );
-        },
+          ),
         strict: true,
       }),
       [TOOL_NAMES.QUERY]: tool({
@@ -676,82 +606,14 @@ export function useAtomicMCPTools({
             .describe('The max number of results to return. Default is 30.')
             .default(30),
         }),
-        execute: async ({
-          select = [
-            core.properties.name,
-            core.properties.shortname,
-            server.properties.filename,
-          ],
-          where,
-          limit,
-          class: classRef,
-        }) => {
+        execute: async ({ select, where, limit, class: classRef }) => {
           try {
-            const classSubject = classRef
-              ? await resolveClass(classRef)
-              : undefined;
-            const ctx = classSubject
-              ? await buildClassContext(store, [classSubject])
-              : undefined;
-
-            const whereObj: Record<string, string | number | string[]> = {};
-            const filterProps: string[] = [];
-
-            for (const { property, value } of where) {
-              if (!ctx && !Client.isValidSubject(property)) {
-                return `Error: Invalid property subject in where clause: '${property}'. Pass \`class\` to use shortnames.`;
-              }
-
-              const info = ctx
-                ? resolveKey(ctx, property)
-                : { subject: property, shortname: property, datatype: '' };
-              const coerced = coerceValueIn(info, value as JSONValue);
-              // The query index matches array membership on scalars.
-              whereObj[info.subject] = (
-                Array.isArray(coerced) && coerced.length === 1
-                  ? coerced[0]
-                  : coerced
-              ) as string | number | string[];
-              filterProps.push(info.subject);
-            }
-
-            if (classSubject) {
-              whereObj[core.properties.isA] = classSubject;
-            }
-
-            const results = await store.search('', {
-              filters: whereObj,
-              limit,
-              include: true,
-            });
-
-            const resources = await Promise.all(
-              results.map(subject => store.getResource(subject)),
-            );
-
-            const selectProps = ctx
-              ? select.map(s => resolveKey(ctx, s).subject)
-              : select;
-            const props = Array.from(new Set([...selectProps, ...filterProps]));
-
             return shortenRefsDeep(
-              resources.map(res => {
-                const obj: Record<string, unknown> = {
-                  '@id': res.subject,
-                };
-
-                for (const prop of props) {
-                  const val = res.get(prop);
-
-                  if (val) {
-                    const info = ctx?.bySubject.get(prop);
-                    obj[info?.shortname ?? prop] = info
-                      ? compactValueOut(info, val as JSONValue)
-                      : val;
-                  }
-                }
-
-                return obj;
+              await queryResources(store, drive, {
+                class: classRef,
+                where: where as { property: string; value: JSONValue }[],
+                select,
+                limit,
               }),
             );
           } catch (error) {
@@ -784,22 +646,18 @@ export function useAtomicMCPTools({
 
             for (const subjectOrRef of subjects) {
               const subject = expandSubject(subjectOrRef);
-              const res = await store.getResource(subject);
+              let entry: Record<string, unknown>;
 
-              if (res.error) {
-                result[subject] = `Error: ${res.error.message}`;
+              try {
+                entry = await readResourceCompact(store, subject, {
+                  includeCommitData,
+                });
+              } catch (error) {
+                result[subject] = `Error: ${(error as Error).message}`;
                 continue;
               }
 
-              const classes = res.getClasses();
-              const ctx = await buildClassContext(store, classes);
-              const compact = await toCompact(store, res, {
-                includeCommitData,
-                context: ctx,
-              });
-
-              const entry: Record<string, unknown> = compact;
-              entry._schema = classes.map(c => describeClassCompact(ctx, c));
+              const res = await store.getResource(subject);
 
               // Class-specific view context: documents get _documentContent,
               // tables/chatrooms/folders/ontologies get a _view block — the
@@ -843,23 +701,34 @@ export function useAtomicMCPTools({
         },
         strict: true,
       }),
-      [TOOL_NAMES.GET_USER_CLASSES]: tool({
+      [TOOL_NAMES.FIND_SCHEMA]: tool({
         description:
-          'List all classes defined on the current drive. Returns each class as `<shortname>: <subject>`. Use this to discover available classes, then call `get_schema` for details on a specific class.',
-        inputSchema: z.object({}),
-        execute: async () => {
-          const classSubjects = await getClassesOnDrive(drive, store);
+          'Search the classes (schemas) on the current drive, including its default ontology, by words. Returns for each match the class subject, its ontology and the class as a JSON Schema (properties, required, constraints like enum and minimum). ALWAYS call this before making a new schema and reuse a class that fits instead of creating a duplicate. An empty query lists every class. Use `get_schema` for the full property details of one class.',
+        inputSchema: z.object({
+          query: z
+            .string()
+            .describe(
+              'Words to look for in class and ontology names and descriptions, e.g. "invoice customer". Empty lists all classes.',
+            ),
+          limit: z
+            .number()
+            .optional()
+            .describe('Maximum number of matches (default 10).'),
+        }),
+        execute: async ({ query, limit }) => {
+          try {
+            const classSubjects = await getClassesOnDrive(drive, store);
+            const { matches, total } = await findSchemas(
+              store,
+              classSubjects,
+              query,
+              limit,
+            );
 
-          return await Promise.all(
-            classSubjects.map(async cls => {
-              const resource = await store.getResource(cls);
-
-              return {
-                shortname: resource.title,
-                subject: shortenSubject(cls),
-              };
-            }),
-          );
+            return shortenRefsDeep({ total, matches });
+          } catch (error) {
+            return `Error finding schema: ${error}`;
+          }
         },
         strict: true,
       }),
@@ -1019,19 +888,19 @@ export function useAtomicMCPTools({
           const originalResource = resource.clone();
 
           try {
-            const ctx = await buildClassContext(store, resource.getClasses());
-            const info = resolveKey(ctx, property);
-            const coerced = coerceValueIn(info, value as JSONValue);
-
-            await resource.set(info.subject, coerced);
+            const { property: resolvedProperty, value: coerced } =
+              await setResourceProperty(store, subject, property, value, {
+                // The person reviews assistant edits before they are saved.
+                save: false,
+              });
 
             // Notify parent component about the edited resource
             onResourceEdited?.(originalResource);
 
             const propertyEcho =
-              info.subject === property
+              resolvedProperty === property
                 ? property
-                : `${property} (${info.subject})`;
+                : `${property} (${resolvedProperty})`;
 
             return `Changed property ${propertyEcho} on resource ${subject} to ${JSON.stringify(coerced)}`;
           } catch (error) {
@@ -1122,42 +991,8 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             ),
         }),
         execute: async ({ jsonAD }) => {
-          const createOne = async (data: Record<string, JSONValue>) => {
-            const { isA, parent, propVals, resolved } = await fromCompact(
-              store,
-              data,
-              { resolveClass },
-            );
-
-            const parentResource = await store.getResource(parent);
-
-            if (parentResource.hasClasses(dataBrowser.classes.table)) {
-              // The parent is a table meaning the resource that is being created is a row. We should add a createdAt property to it.
-              const createdAt = propVals[commits.properties.createdAt];
-
-              if (createdAt === null || createdAt === undefined) {
-                propVals[commits.properties.createdAt] = Date.now();
-              }
-            }
-
-            const resource = await store.newResource({
-              parent,
-              isA,
-              propVals,
-            });
-
-            await resource.save();
-
-            if (
-              !parentResource.hasClasses(core.classes.ontology) &&
-              !parentResource.hasClasses(dataBrowser.classes.table)
-            ) {
-              // Notify the store that we created a resource but not if the parent is an ontology or table as in that case we don't want them to show in the sidebar.
-              await store.notifyResourceManuallyCreated(resource);
-            }
-
-            return { subject: resource.subject, resolved };
-          };
+          const createOne = (data: Record<string, JSONValue>) =>
+            createResourceFromCompact(store, drive, data);
 
           let data: unknown;
 
@@ -1706,7 +1541,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
         description:
           "Create or update a plugin: JavaScript that proposes changes for the user to review. Use this for imports from an external service, or any repeatable transformation of the user's data. " +
           'For a new automation, pass its workspace and explicit connections (an empty array when none). Workspace association does not change permissions or start any job. For an attached automation draft, read it and the referenced integration first, then update that draft by passing its plugin subject. Preserve its event filters and automation-integrations references; do not replace the integration source or duplicate the draft. Use run_plugin to test, and leave change approval and automatic enablement to the user. Integrations can sync without automations; do not modify their sync schedule as part of automation authoring. ' +
-          "A plugin returns proposed Atomic changes. Manual preview runs do not execute integration writes, even when the automation has an automatic-action grant. It must `export function run(ctx)` returning `{ intents: [...], problems: [...] }`. Intents are the only way to change data: `{op:'create', localId, parent, isA:[classSubject], set:{[propertySubject]: value}}`, `{op:'set', subject, set:{...}}`, `{op:'remove', subject, properties:[...]}`, `{op:'destroy', subject}`. Refer to something the same run creates as `'local:<localId>'` — links resolve in any order. Default to nested app data: create app-owned tables and supporting resources beneath the plugin (`ctx.trigger.subject`), and rows beneath their table. The drive is an authorization scope, not the default parent for every imported record. Preserve explicitly selected existing destinations and shared resources; do not move them or populate the drive root unless the user asks. Property and class keys are full subjects; use get_user_classes or create a table first if you need them. Problems are `{severity:'error'|'warning', message}`; an error blocks the whole run. \n\nWhat ctx gives you: `ctx.trigger.at` (the ONLY clock — Date.now() is frozen to it and Math.random is seeded, so runs are reproducible), `ctx.http({method,url,headers,body})` returning `{status, body}`, `ctx.read(subject)`, `ctx.query(property, value)`. Server-side automations can also call `ctx.integration({connection, release, call:{action, arguments, id}})` for an explicitly referenced integration. Discover its named actions and pinned release first with list_integration_actions. Use a stable event-derived id for retries. Reads return provider data. In manual previews, writes return needs_review and require review on the integration connection. Scheduled and event runs can execute writes under an existing automatic-action grant. Never claim a prepared write was sent. App-scoped callers need an explicit connection/action grant. Grants are tied to the actual code and connection, expire after 30 days, and may require each write to be reviewed or allow automatic writes. The host suspends runs waiting for integration approval and resumes the same queued event after approval; completed calls reuse their receipts. Never enable a grant through an assistant tool. There is no fetch, no process, no filesystem. \n\nCredentials: put `'Bearer secret:<name>'` in a HEADER VALUE and the host substitutes the real value; the plugin never sees it. A `secret:` handle in a URL or body is refused. DECLARE every secret you use, or the user has to work out what to enter: `export const manifest = { secrets: [{ name: 'google', origin: 'https://www.googleapis.com', description: 'Google Calendar token' }] };` — the plugin page then shows one labelled field per declared secret, and the origin allowlist comes from this. `manifest` and `run` are the only exports that mean anything; anything else you export is ignored. You cannot store a secret yourself, so write the plugin, then tell the user to open it and fill in the fields. If the user wants this to happen regularly rather than on a button press, call schedule_plugin afterwards; `ctx.trigger.kind` is then `'cron'` instead of `'manual'`, and a scheduled run's changes wait for the user to review rather than being written.",
+          "A plugin returns proposed Atomic changes. Manual preview runs do not execute integration writes, even when the automation has an automatic-action grant. It must `export function run(ctx)` returning `{ intents: [...], problems: [...] }`. Intents are the only way to change data: `{op:'create', localId, parent, isA:[classSubject], set:{[propertySubject]: value}}`, `{op:'set', subject, set:{...}}`, `{op:'remove', subject, properties:[...]}`, `{op:'destroy', subject}`. Refer to something the same run creates as `'local:<localId>'` — links resolve in any order. Default to nested app data: create app-owned tables and supporting resources beneath the plugin (`ctx.trigger.subject`), and rows beneath their table. The drive is an authorization scope, not the default parent for every imported record. Preserve explicitly selected existing destinations and shared resources; do not move them or populate the drive root unless the user asks. Property and class keys are full subjects; use find_schema or create a table first if you need them. Problems are `{severity:'error'|'warning', message}`; an error blocks the whole run. \n\nWhat ctx gives you: `ctx.trigger.at` (the ONLY clock — Date.now() is frozen to it and Math.random is seeded, so runs are reproducible), `ctx.http({method,url,headers,body})` returning `{status, body}`, `ctx.read(subject)`, `ctx.query(property, value)`. Server-side automations can also call `ctx.integration({connection, release, call:{action, arguments, id}})` for an explicitly referenced integration. Discover its named actions and pinned release first with list_integration_actions. Use a stable event-derived id for retries. Reads return provider data. In manual previews, writes return needs_review and require review on the integration connection. Scheduled and event runs can execute writes under an existing automatic-action grant. Never claim a prepared write was sent. App-scoped callers need an explicit connection/action grant. Grants are tied to the actual code and connection, expire after 30 days, and may require each write to be reviewed or allow automatic writes. The host suspends runs waiting for integration approval and resumes the same queued event after approval; completed calls reuse their receipts. Never enable a grant through an assistant tool. There is no fetch, no process, no filesystem. \n\nCredentials: put `'Bearer secret:<name>'` in a HEADER VALUE and the host substitutes the real value; the plugin never sees it. A `secret:` handle in a URL or body is refused. DECLARE every secret you use, or the user has to work out what to enter: `export const manifest = { secrets: [{ name: 'google', origin: 'https://www.googleapis.com', description: 'Google Calendar token' }] };` — the plugin page then shows one labelled field per declared secret, and the origin allowlist comes from this. `manifest` and `run` are the only exports that mean anything; anything else you export is ignored. You cannot store a secret yourself, so write the plugin, then tell the user to open it and fill in the fields. If the user wants this to happen regularly rather than on a button press, call schedule_plugin afterwards; `ctx.trigger.kind` is then `'cron'` instead of `'manual'`, and a scheduled run's changes wait for the user to review rather than being written.",
         inputSchema: z.object({
           name: z.string().describe('Display name of the plugin.'),
           source: z
@@ -1885,6 +1720,152 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             return { error: (e as Error).message };
           }
         },
+      }),
+      [TOOL_NAMES.DESCRIBE_FORM]: tool({
+        description:
+          'Read a complete form in one call: settings, styling, response table/class, available columns, ordered pages and questions, option Tags with stable subjects, and conditions. Use before editing a form. Names can be ambiguous; subjects uniquely identify pages, fields and Tags.',
+        inputSchema: z.object({
+          form: z.string().describe('Form subject or #ref.'),
+        }),
+        execute: async ({ form }) => {
+          try {
+            return shortenRefsDeep(
+              await describeForm(store, expandSubject(form)),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM]: tool({
+        description:
+          'Edit form name, description, settings, appearance, custom CSS or page order. Only supplied values change; JSON patches merge keys and null removes a key. Read describe_form first. Does not change publishing, access rights, response table or schema.',
+        inputSchema: configureFormSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureForm(store, {
+                ...config,
+                form: expandSubject(config.form),
+                pageOrder: config.pageOrder?.map(ref =>
+                  ref.startsWith('#') ? expandSubject(ref) : ref,
+                ),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM_PAGE]: tool({
+        description:
+          'Add a page (omit page), edit its name/description, reorder its fields, or remove an empty page. Read describe_form first. Order lists must contain every current item exactly once; conditional questions must stay after their dependencies.',
+        inputSchema: configureFormPageSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureFormPage(store, {
+                ...config,
+                form: expandSubject(config.form),
+                page: config.page?.startsWith('#')
+                  ? expandSubject(config.page)
+                  : config.page,
+                fieldOrder: config.fieldOrder?.map(ref =>
+                  ref.startsWith('#') ? expandSubject(ref) : ref,
+                ),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CONFIGURE_FORM_FIELD]: tool({
+        description:
+          'Add a question/layout block (omit field), edit label, required flag, compatible presentation, options, or form-owned choice Tags, or remove it. Read describe_form first. Reuse Tag subjects when renaming choices to preserve past answers. Removal preserves Properties, Tags and response data. Shared table columns are never changed. Conditions/options sources are inspected here but edited in the builder.',
+        inputSchema: configureFormFieldSchema,
+        execute: async config => {
+          try {
+            return shortenRefsDeep(
+              await configureFormField(store, {
+                ...config,
+                form: expandSubject(config.form),
+                page: config.page.startsWith('#')
+                  ? expandSubject(config.page)
+                  : config.page,
+                field: config.field?.startsWith('#')
+                  ? expandSubject(config.field)
+                  : config.field,
+                column: config.column?.startsWith('#')
+                  ? expandSubject(config.column)
+                  : config.column,
+                choices: config.choices?.map(choice => ({
+                  ...choice,
+                  subject: choice.subject
+                    ? expandSubject(choice.subject)
+                    : undefined,
+                })),
+              }),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.CREATE_FORM]: tool({
+        description:
+          'Create a complete editable form in ONE call: response table and class, properties and choice tags, ordered pages and fields. Or reuse an existing table with column mappings. Prefer this over manually creating form resources. Creates a draft; publishing and public access are configured separately in the form builder. Returns subjects for follow-up editing and navigation.',
+        inputSchema: formSpecSchema,
+        execute: async spec => {
+          try {
+            return shortenRefsDeep(
+              await buildFormFromSpec(
+                store,
+                {
+                  ...spec,
+                  parent: spec.parent ? expandSubject(spec.parent) : undefined,
+                  table: spec.table ? expandSubject(spec.table) : undefined,
+                  pages: spec.pages.map(page => ({
+                    ...page,
+                    fields: page.fields.map(field => ({
+                      ...field,
+                      column: field.column?.startsWith('#')
+                        ? expandSubject(field.column)
+                        : field.column,
+                    })),
+                  })),
+                },
+                { driveSubject: drive, addToOntology },
+              ),
+            );
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
+      }),
+      [TOOL_NAMES.ENSURE_ONTOLOGY]: tool({
+        description:
+          'Create or update a schema from a JSON Schema (draft 2020-12): every object schema in `$defs` becomes a class, every property a property, `required` becomes required properties, and keywords like enum, minimum, maxLength and pattern become constraints on the class. A `$ref` to "#/$defs/Name" links to another class. Run find_schema first and reuse existing classes. Idempotent: calling it again with the same schema changes nothing. Changing a property\'s shortname or type makes a NEW property. Returns the shortname to subject map of the classes and properties, or an `error` naming the JSON pointer to fix in your schema (unsupported: oneOf/anyOf/allOf, nullable types, nested object schemas; move those to `$defs`).',
+        inputSchema: z.object({
+          schema: z
+            .record(z.string(), z.any())
+            .describe(
+              'The JSON Schema object. Example: {"title":"Shop","$defs":{"customer":{"type":"object","properties":{"name":{"type":"string","minLength":1}},"required":["name"]}}}',
+            ),
+          shortname: z
+            .string()
+            .optional()
+            .describe(
+              "Shortname (lowercase slug) of the ontology. Defaults to the schema's `x-atomic-ontology`, then its `title`, then the drive's default ontology.",
+            ),
+        }),
+        execute: async ({ schema, shortname }) =>
+          shortenRefsDeep(
+            await ensureOntologyFromJsonSchema(store, drive, {
+              schema,
+              shortname,
+            }),
+          ),
       }),
       [TOOL_NAMES.CREATE_TABLE]: tool({
         description:

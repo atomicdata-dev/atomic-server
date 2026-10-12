@@ -1,6 +1,8 @@
 {{#title Atomic Data}}
 ![# Atomic Data Docs - Overview](assets/atomic_data_logo_stroke.svg)
 
+Atomic is a [personal data store, an all-in-one workspace and a local-first sync engine](why-atomic.md), built on an open specification.
+
 **Atomic Data is a modular specification for sharing, modifying and modeling graph data. It combines the ease of use of JSON, the connectivity of RDF (linked data) and the reliability of type-safety.**
 
 ![Venn diagram showing Atomic Data is the combination of JSON, RDF and Type-Safety](assets/venn.svg)
@@ -30,7 +32,7 @@ It is type-safe (you know if something is a `string`, `number`, `date`, `URL`, e
 The default serialization format for Atomic Data is [JSON-AD](core/json-ad.md), which is simply JSON where each key is a URL of an Atomic Property.
 These Properties are responsible for setting the `datatype` (to ensure type-safety) and setting `shortnames` (which help to keep names short, for example in JSON serialization) and `descriptions` (which provide semantic explanations of what a property should be used for).
 
-Every Resource, Property and Class is named by a URL. Which URL shapes exist, from `https://` vocabularies to location-independent `did:ad:` identifiers, is explained in [URLs and identifiers](urls.md); read that first if you are new here.
+Every Resource, Property and Class is named by a URL. Which URL shapes exist, from `https://` vocabularies to location-independent `atomic:` identifiers, is explained in [URLs and identifiers](urls.md); read that first if you are new here.
 
 [Read more about Atomic Data Core](core/concepts.md)
 
@@ -42,9 +44,9 @@ Atomic Data Extended is a set of extra modules (on top of Atomic Data Core) that
 
 ## Tools & libraries
 
-- [Atomic Cloud](https://atomicserver.eu) is the place to start: the web app, an always-on device for your data, and the app downloads, all in one place
-- The **web app**: documents, tables, chat, files and an ontology editor, working offline in the browser ([demo on atomicdata.dev](https://atomicdata.dev))
-- The **desktop and mobile apps** (macOS, Windows, Linux, Android and iOS), built with Tauri: the same app with a full node inside, so it can be paired with directly and act as an always-on device. Download them from [atomicserver.eu](https://atomicserver.eu) or the [GitHub releases](https://github.com/atomicdata-dev/atomic-server/releases)
+- [atomic.place](https://atomic.place) is the place to start: the hosted web app, plus the app downloads
+- The **web app**: documents, tables, chat, files and an ontology editor, working offline in the browser
+- The **desktop and mobile apps**, built with Tauri: the same app with a full node inside, so it can be paired with directly and act as an always-on device. Download them from [atomic.place](https://atomic.place) or the [GitHub releases](https://github.com/ontola/atomic-server/releases)
 - Build a web app with [@tomic/lib](js.md), [@tomic/react](usecases/react.md) or [@tomic/svelte](svelte.md), or a native app with [Flutter / Dart](flutter.md), on top of the same Rust core
 - Prefer to run your own always-on device? [Self-host atomic-server](atomicserver/installation.md), a single binary
 - The command line tool [atomic-cli](rust-cli.md) and the Rust library [atomic_lib](rust-lib.md)

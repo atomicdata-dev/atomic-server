@@ -6,6 +6,7 @@ import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import './helpers/restartDemoOnReload';
 import App from './App';
 import { initSentry } from './helpers/sentry';
+import { reloadOnStaleChunk } from './helpers/staleChunkReload';
 import { afterNextPaint, hideBootSplash } from './helpers/bootSplash';
 import { getManagedApiBase, hasManagedApi } from './helpers/managed/api';
 // Side-effect import: installs a global capture-phase `wheel` listener
@@ -69,6 +70,7 @@ if (
 
 // Before the first render, so errors thrown while mounting are reported too.
 initSentry();
+reloadOnStaleChunk();
 
 const root = createRoot(document.getElementById('root')!, {
   onCaughtError: reactErrorHandler(),

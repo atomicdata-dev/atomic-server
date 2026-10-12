@@ -15,8 +15,8 @@ import {
   useStore,
   StoreEvents,
   Client,
+  loadLenses,
 } from '@tomic/react';
-import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { serverURLStorage } from './serverURLStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -83,6 +83,14 @@ export const AppSettingsContextProvider = (
 
   useEffect(() => {
     store.setDrive(drive);
+  }, [drive, store]);
+
+  // Lenses carry values from a renamed or retyped property to its successor.
+  // The store only applies the ones it has loaded, so bring in the drive's.
+  useEffect(() => {
+    if (drive) {
+      loadLenses(store, drive).catch(() => undefined);
+    }
   }, [drive, store]);
 
   // == ACCESSIBILITY ==
@@ -213,18 +221,10 @@ export const AppSettingsContextProvider = (
     [innerSetDrive, setBaseURL],
   );
 
-  const setAgentAndShowToast = useCallback(
+  const setAgentSafely = useCallback(
     (newAgent: Agent | undefined) => {
       try {
         setAgent(newAgent);
-
-        if (newAgent?.subject) {
-          toast.success('Signed in!');
-        }
-
-        if (newAgent === undefined) {
-          toast.success('Signed out.');
-        }
       } catch (e) {
         errorHandler(new Error('Agent setting failed: ' + e.message));
       }
@@ -246,7 +246,7 @@ export const AppSettingsContextProvider = (
       sideBarLocked,
       setSideBarLocked,
       agent,
-      setAgent: setAgentAndShowToast,
+      setAgent: setAgentSafely,
       viewTransitionsEnabled,
       setViewTransitionsEnabled,
       sidebarKeyboardDndEnabled,
@@ -274,7 +274,7 @@ export const AppSettingsContextProvider = (
       sideBarLocked,
       setSideBarLocked,
       agent,
-      setAgentAndShowToast,
+      setAgentSafely,
       viewTransitionsEnabled,
       setViewTransitionsEnabled,
       sidebarKeyboardDndEnabled,

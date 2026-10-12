@@ -1,8 +1,10 @@
 {{#title AtomicServer: the always-on device for your Atomic Data}}
 # AtomicServer
 
-[`AtomicServer`](https://github.com/atomicdata-dev/atomic-server) is the _reference implementation_ of the Atomic Data Core + Extended specification: a single binary that is a graph database, a real-time headless CMS and a web app.
+[`AtomicServer`](https://github.com/ontola/atomic-server) is the _reference implementation_ of the Atomic Data Core + Extended specification: a single binary that is a graph database, a real-time headless CMS and a web app.
 It was developed parallel to this specification, and it served as a testing ground for various ideas (some of which didn't work, and some of which ended up in the spec).
+
+AtomicServer is how you self-host the three things described in [Why Atomic](why-atomic.md): a [Personal Data Store](personal-data-store.md) that is always reachable, the [All-in-One Workspace](all-in-one-workspace.md) served as a web app, and the always-on peer of the [Local-first Sync Engine](sync-engine.md).
 
 ## The always-on device
 
@@ -15,7 +17,7 @@ That is AtomicServer's job: it is the device that never sleeps.
 - It holds a **backup** that survives a lost phone, without holding your key: every commit it stores is signed by the Agent that made it, so the server can replicate but never author.
 - It serves the same data over **HTTP**, for `curl`, static site generators and search engines, next to the sync connection the apps use.
 
-You can run one on a laptop, a Raspberry Pi, a VPS or a home NAS. [Atomic Cloud](https://atomicserver.eu) runs one for you.
+You can run one on a laptop, a Raspberry Pi, a VPS or a home NAS. [atomic.place](https://atomic.place) can run one for you.
 The same `atomic_lib` also runs inside the browser and in [Flutter apps](flutter.md), which is why a phone can act as an always-on device for another phone, but a server is the shape most people want for the role.
 
 If you are here to build an app, the [local-first guide](local-first-guide/1-index.md) starts without a server and adds one in step 4; the rest of this chapter is about running and using the server itself.

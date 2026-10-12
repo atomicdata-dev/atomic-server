@@ -434,6 +434,22 @@ pub async fn handle_frame_full_for_caps(
             // readable subjects both so it can match the client's and so an
             // anonymous socket learns nothing about a drive it cannot read.
             Some(sync) if sync.probe => {
+                // A first upload has no readable root here yet. Invite its
+                // full reconcile only when the same admission gate used by
+                // SYNC_PUSH allows bootstrapping it. Existing private drives
+                // still go through the read check below; no inventory or
+                // resource is created by this probe.
+                let drive =
+                    crate::Subject::from_raw(&sync.drive, store.get_base_domain().as_deref());
+                if store.get_resource(&drive).await.is_err_and(|error| {
+                    error.error_type == crate::errors::AtomicErrorType::NotFoundError
+                }) && admit_unknown_drive(store, &sync.drive, agent)
+                {
+                    return HandleOutput {
+                        frames: vec![protocol::encode_sync_resend(&wire.subject(&sync.drive))],
+                        ..Default::default()
+                    };
+                }
                 match drive_sync_hash_for_wire_version(
                     store,
                     &sync.drive,
@@ -725,6 +741,9 @@ pub struct CommitIngestOpts {
     /// for peer replicas — hosting subjects the node does not own is what
     /// replication is.
     pub enforce_subject_ownership: bool,
+    /// Hub semantics: check values against class `constraints`. Off for peer
+    /// replicas, which must keep what another node already accepted.
+    pub validate_constraints: bool,
     /// Origin used to resolve `internal:/` subjects in the response JSON-AD.
     /// `None` falls back to the store's base domain.
     pub response_origin: Option<String>,
@@ -738,6 +757,7 @@ impl CommitIngestOpts {
             source_id,
             validate_loro_causality: true,
             enforce_subject_ownership: true,
+            validate_constraints: true,
             response_origin,
         }
     }
@@ -756,6 +776,7 @@ impl CommitIngestOpts {
             source_id: None,
             validate_loro_causality: false,
             enforce_subject_ownership: false,
+            validate_constraints: false,
             response_origin: None,
         }
     }
@@ -861,7 +882,14 @@ pub async fn ingest_commit(
         let is_internal = incoming_commit.subject.is_internal();
         let is_did = incoming_commit.subject.is_did();
         let matches_base = if let Some(base) = store.get_base_domain() {
-            incoming_commit.subject.as_str().contains(&base)
+            // The base domain is the origin this store was booted with, scheme
+            // included. Behind a TLS-terminating proxy that is `http://host`
+            // while clients name the resource `https://host/…`: same server,
+            // so compare the host, not the scheme.
+            let host = base
+                .trim_start_matches("http://")
+                .trim_start_matches("https://");
+            incoming_commit.subject.as_str().contains(host)
         } else {
             false
         };
@@ -895,6 +923,7 @@ pub async fn ingest_commit(
 
     let commit_opts = crate::commit::CommitOpts {
         validate_schema: true,
+        validate_constraints: opts.validate_constraints,
         validate_signature: true,
         // Rejects commits stamped in the future. This is NOT an age bound —
         // a bulk reconcile legitimately re-sends old destroy envelopes to a
@@ -2182,6 +2211,66 @@ mod bootstrap_and_sub_tests {
     use crate::sync::policy::OwnerPolicy;
     use crate::sync::protocol::{self, error_code, tag};
     use std::sync::Arc;
+
+    #[tokio::test]
+    async fn sync_probe_bootstraps_an_admitted_missing_drive_only() {
+        use crate::sync::policy::AllowlistPolicy;
+        let db = Db::init_temp("probe_bootstrap").await.unwrap();
+        let (alice, private_drive) = db.setup("Alice").await.unwrap();
+        let missing = "atomic:admitted-new-drive";
+        let unlisted = "atomic:unlisted-new-drive";
+        let policy = Arc::new(AllowlistPolicy::new());
+        policy.set_grace(std::time::Duration::ZERO);
+        policy.set_drive_policies([(missing, Some(1024)), (private_drive.as_str(), None)]);
+        db.set_sync_policy(policy.clone());
+        let mut owner = ForAgent::from(alice);
+        for frame in [
+            protocol::encode_sync_probe(missing, "local"),
+            protocol::encode_sync_probe_v2(missing, "local"),
+        ] {
+            let answer = handle_frame(&frame, &db, &mut owner).await;
+            assert_eq!(
+                answer[0][0],
+                tag::SYNC_RESEND,
+                "an admitted missing drive must be offered a full reconcile"
+            );
+        }
+        assert_eq!(
+            handle_frame(
+                &protocol::encode_sync_probe(unlisted, "local"),
+                &db,
+                &mut owner
+            )
+            .await[0][0],
+            tag::ERROR
+        );
+        let mut public = ForAgent::Public;
+        for drive in [missing, private_drive.as_str()] {
+            assert_eq!(
+                handle_frame(
+                    &protocol::encode_sync_probe(drive, "local"),
+                    &db,
+                    &mut public
+                )
+                .await[0][0],
+                tag::ERROR
+            );
+        }
+        policy.record_drive_usage([(missing, 2048)]);
+        assert_eq!(
+            handle_frame(
+                &protocol::encode_sync_probe(missing, "local"),
+                &db,
+                &mut owner
+            )
+            .await[0][0],
+            tag::ERROR
+        );
+        assert!(
+            db.get_resource(&missing.into()).await.is_err(),
+            "a probe does not create a resource"
+        );
+    }
 
     fn empty_push(drive: &str) -> protocol::DecodedSyncPush {
         let frame = protocol::encode_sync_push(drive, &[], true);

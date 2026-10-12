@@ -785,6 +785,112 @@ describe('LocalOutbox blocking', () => {
     }
   });
 
+  describe('an entry parked because the server lacks its parent', () => {
+    const PARENT_MISSING =
+      'Parent of atomic:kfyvO_ (atomic:5JhFDF6v) not found: Resource not found. ' +
+      'DID Resource atomic:5JhFDF6v not found locally';
+    const everySubject = () => true;
+
+    it('is re-armed by a finished resync, and drains once the parent exists', async ({
+      expect,
+    }) => {
+      vi.useFakeTimers();
+
+      try {
+        const outbox = new LocalOutbox();
+        outbox.markDirty(SUBJECT);
+        let parentOnServer = false;
+        const drainSubject = vi.fn(async (subject: string) => {
+          if (!parentOnServer) throw new Error(PARENT_MISSING);
+          // What the real drain does once the commit is acked.
+          outbox.clearDirty(subject);
+        });
+        const ctx = blockingCtx(drainSubject);
+
+        await drainUntilBlocked(outbox, ctx);
+        expect(outbox.getEntry(SUBJECT)?.blocked).toBe(true);
+
+        // The resync delivered the parent.
+        parentOnServer = true;
+        expect(outbox.rearmParentBlocked(everySubject)).toBe(1);
+        expect(outbox.getEntry(SUBJECT)?.blocked).toBe(false);
+        expect(outbox.nextDueAt()).toBe(0);
+
+        await outbox.drain(ctx);
+        expect(outbox.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('is re-armed only once when the resync did not deliver the parent', async ({
+      expect,
+    }) => {
+      vi.useFakeTimers();
+
+      try {
+        const outbox = new LocalOutbox();
+        outbox.markDirty(SUBJECT);
+        const drainSubject = vi.fn(async () => {
+          throw new Error(PARENT_MISSING);
+        });
+        const ctx = blockingCtx(drainSubject);
+
+        await drainUntilBlocked(outbox, ctx);
+        expect(outbox.rearmParentBlocked(everySubject)).toBe(1);
+
+        await drainUntilBlocked(outbox, ctx);
+        expect(outbox.getEntry(SUBJECT)?.blocked).toBe(true);
+
+        // A second resync leaves it parked: no retry round per reconnect.
+        expect(outbox.rearmParentBlocked(everySubject)).toBe(0);
+        expect(outbox.getEntry(SUBJECT)?.blocked).toBe(true);
+
+        // A fresh edit is a new signal and earns another automatic re-arm.
+        outbox.markDirty(SUBJECT);
+        await drainUntilBlocked(outbox, ctx);
+        expect(outbox.rearmParentBlocked(everySubject)).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('leaves entries of other drives and other refusals parked', async ({
+      expect,
+    }) => {
+      vi.useFakeTimers();
+
+      try {
+        const outbox = new LocalOutbox();
+        outbox.markDirty(SUBJECT);
+        const ctx = blockingCtx(alwaysUnauthorized());
+
+        await drainUntilBlocked(outbox, ctx);
+
+        // Blocked for lack of rights, not a missing parent.
+        expect(outbox.rearmParentBlocked(everySubject)).toBe(0);
+        expect(outbox.getEntry(SUBJECT)?.blocked).toBe(true);
+
+        const other = new LocalOutbox();
+        other.markDirty(SUBJECT);
+        await drainUntilBlocked(
+          other,
+          blockingCtx(
+            vi.fn(async () => {
+              throw new Error(PARENT_MISSING);
+            }),
+          ),
+        );
+
+        // The resync that finished belongs to a different drive.
+        expect(other.rearmParentBlocked(() => false)).toBe(0);
+        expect(other.getEntry(SUBJECT)?.blocked).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it('markDirty re-arms a blocked entry for another attempt', async ({
     expect,
   }) => {

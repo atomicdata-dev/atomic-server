@@ -623,3 +623,54 @@ async fn entry_without_a_resource_is_not_listed() {
         subjects(&hits)
     );
 }
+
+/// Timing probe for short queries on a big multi-drive store. Run with
+/// `BENCH_DOCS=10000 cargo test -p atomic_lib --features db-redb --lib --release -- --ignored --nocapture bench_short_query`.
+#[tokio::test]
+#[ignore]
+async fn bench_short_query_scoped_to_one_drive() {
+    let (store, _drive) = setup_store("bench").await;
+    let drives: Vec<String> = (0..4).map(|i| format!("atomic:bench-drive-{i}")).collect();
+    let per_drive: usize = std::env::var("BENCH_DOCS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10_000);
+    let words = [
+        "budget", "board", "brief", "build", "backlog", "bravo", "beta", "notes", "plan", "report",
+        "meeting", "design", "alpha", "review", "tasks",
+    ];
+    let mut resources = Vec::new();
+    for (d, drv) in drives.iter().enumerate() {
+        for i in 0..per_drive {
+            let name = format!(
+                "{} {} {}",
+                words[(i * 7 + d) % words.len()],
+                words[(i * 3 + 1) % words.len()],
+                i
+            );
+            let desc = format!("{} item {}", words[(i + d) % words.len()], i);
+            let subject = format!("atomic:bench-{d}-{i}");
+            let r = plain(&store, drv, &subject, &name, &desc);
+            let _ = store.add_resource_opts(&r, false, false, false).await;
+            resources.push(r);
+        }
+    }
+    let t = std::time::Instant::now();
+    super::index_resources(&store, &resources, 500).unwrap();
+    println!("indexed {} docs in {:?}", resources.len(), t.elapsed());
+
+    for (label, q) in [("1-char", "b"), ("3-char", "bud"), ("full", "budget")] {
+        let opts = SearchOpts {
+            parents: Some(vec![drives[0].clone()]),
+            limit: Some(30),
+            ..Default::default()
+        };
+        let _ = query(&store, q, &opts).unwrap();
+        let t = std::time::Instant::now();
+        let mut n = 0;
+        for _ in 0..3 {
+            n = query(&store, q, &opts).unwrap().len();
+        }
+        println!("BENCH q={q:?} ({label}) hits={n} avg={:?}", t.elapsed() / 3);
+    }
+}

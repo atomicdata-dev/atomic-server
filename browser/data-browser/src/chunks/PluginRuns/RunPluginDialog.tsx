@@ -157,11 +157,11 @@ export function RunPluginDialog({
     }
 
     const { report } = result;
-    toast.success(
-      report.failed > 0
-        ? `Applied ${report.applied}, ${report.failed} failed`
-        : `Applied ${report.applied} changes`,
-    );
+
+    if (report.failed > 0) {
+      toast.error(`Applied ${report.applied}, ${report.failed} failed`);
+    }
+
     if (report.failed === 0 && !report.stoppedEarly) onReviewed?.();
     closeDialog(true);
   }, [prepared, store, subject, drive, closeDialog, onReviewed]);

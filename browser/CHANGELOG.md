@@ -4,7 +4,96 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+## [v0.41.0-beta.8] - 2026-10-10
+
+- Phones: the chat view no longer scrolls sideways by a few pixels, the "more" menu no longer opens the on-screen keyboard, and the Back button closes an open dropdown menu.
+- Schemas (#2151): `ensureOntology` creates or updates an ontology with content-addressed properties, classes and class constraints, and running it twice writes nothing; `ensureSchema` is now a deprecated alias. `ontologyFromJsonSchema` and `ontologyToJsonSchema` convert JSON Schema draft 2020-12 to and from that input. New: `propertyId`, `getEffectiveConstraint`, `setClassConstraint`, `useEffectiveConstraint`, `ensureLens`, `loadLenses`, and `store.newResource({ contentAddressedProperty: true })`.
+- `ad-generate ontology push | lock | check` writes the same lockfile as `atomic-cli schema` (#2151).
+- Tables, kanban, the ontology editor and forms store select options, single pick, limits and linked classes on the class instead of on the Property; each property in a class card has a Constraints section. Renaming a property's shortname or changing its datatype creates a new property and a lens that keeps old values visible (#2151).
+- AI assistant: `find_schema` returns matching classes as JSON Schema (replaces `get_user_classes`), and `ensure_ontology` creates an ontology from a JSON Schema (#2151).
+
+- Calendar: the repeat "Last day" date keeps focus while you type and is saved when you leave the field or press Enter, instead of after every keystroke (#2137).
+- Documents: after mentioning a resource with `@` or the toolbar button, the caret sits in a paragraph after the card (one is added if needed), so typing no longer replaces the card (#2139).
+
+- Forms: without a server the Summary tab says that summaries need a server, instead of suggesting to check the connection (#2119).
+- Dashboard: a Count over no rows shows 0 instead of an em dash (#2111).
+
+- Share dialog: the role for new invites (email field and Copy invite link) is a single-click Read / Write switch in the same style as the Public switch, instead of a Can write dropdown.
+- Calendar: changing only the start or end time of a multi-day timed event keeps its end date (#2089).
+- Tables: a JSON filter value is normalized (keys sorted, no whitespace) when you leave the field, so the exact text of a saved value matches its row (#2093).
+- Invites: opening an invite link uses the server in the link instead of whichever server the browser had saved, so an invitee with a stale saved server no longer gets "Unrecognized token '<'". When the link points at a host that runs no server, a plain message says so. Creating a link for a drive whose server runs no node fails up front.
+- Tables: a computed duration reads a date-only start as local midnight, like a local date-and-time, so it no longer differs by the timezone offset (#2083).
+- Tables: clearing a Localized Text cell removes that language, so the fallback and the missing-translation marker come back (#2084).
+- Calendar: the date filter explains that a repeating entry is matched on its first date (#2087).
+- Cards: a record embedded in a document shows property names instead of slugs, hides created-at, drive and sort-order, and no longer shows an empty description line (#2081).
+- Tables: hiding a column no longer hides its active filter chip, so a filter that still excludes rows stays visible and removable.
+
+- New package `@tomic/mcp`: lets Claude Code, Claude Desktop, Cursor and other
+  MCP clients that run a local process read and edit your Atomic Data. It is a
+  small stdio bridge to your node's own `/mcp` endpoint, which is the one
+  implementation of the tools (see the server changelog). `atomic-mcp connect`
+  signs in with OAuth (PKCE, a loopback redirect): the approval page in the app
+  asks which drives it may reach and whether it may edit, so your own secret is
+  never shared, and the token is kept in a file only you can read. Account
+  settings lists connected apps under **Connected apps**, with Revoke.
+- Apps with a key of their own can still connect without OAuth through
+  `/app/connect-agent`: `connectAgentUrl` builds the link (optionally asking for
+  edit rights or specific resources), `waitForGrant` waits for Allow, and
+  `publishAgentName` sets the name the person sees. The grants are the ACLs
+  themselves (`grantAgent`, `grantsTo`, `revokeAgent` in `@tomic/lib`).
+  `@tomic/lib/node` has `loadOrCreateLocalAgent` for the key file. `@tomic/cli`
+  gets `ad-generate connect`, so private ontologies no longer need an agent
+  secret in `atomic.config.json`.
+- `@tomic/lib` now also exports the data verbs behind the in-app assistant
+  (`readResourceCompact`, `queryResources`, `textSearch`, `semanticSearch`,
+  `listDriveClasses`, `setResourceProperty`, `createResourceFromCompact`), plus
+  the compact JSON-AD helpers (`toCompact`, `fromCompact`, ...) and short subject
+  refs (`shortenSubject`, `expandSubject`) that used to live in the data-browser.
+
+- Forms (beta): build a form or survey and share a link; guests fill it in
+  without an account and each answer becomes a table row. Create one with
+  New > Form, or from a table with "Create form from this table" (pick its
+  columns). The builder has 21 question types, pages, drag-to-reorder,
+  "Show when" rules that hide questions and pages based on earlier answers,
+  required fields and limits, a Results tab (the table) and a Summary tab
+  (charts). Settings cover public or invite-only access, an open/close
+  schedule, a thank-you message, appearance and custom CSS. Share with a
+  link, QR code or embed snippet. Guests get a small separate app
+  (`@tomic/form-app`, built on the new `@tomic/form-renderer`) with a
+  progress bar and answers saved on their device until they submit.
+  [#875](https://github.com/ontola/atomic-server/issues/875)
+- Forms: share links use the server that hosts the workspace. Without one, the
+  builder says forms need a server instead of offering a link guests cannot open.
+- `@tomic/lib`: the forms ontology (`forms`) is exported and, like
+  `notifications`, fetched from the host rather than atomicdata.dev.
+- Fix: after the server refuses a commit that depends on ops it never
+  received, the next save resends the whole history instead of dropping the
+  edit.
+- Fix: uploaded SVG files display in the data browser.
+
+- The per-group summary under a table has column headings, such as "Sum of Plus ones" and "Rows", so a bare number says what it measures.
+- Tables: deleting a row you typed in the same session no longer shows its
+  neighbour twice until you reload.
+- Sidebar: notifications and sync have their own icon buttons next to Settings
+  (they stay in the account menu too), in the same muted color as the menu's
+  items, with an unread dot on the bell. The dividers in the menu are gone.
+- Share: names under "People with access" open that person's profile.
+- Error toasts: long subject URLs are shortened in the message. Copy still
+  copies the full text.
+- Tables: right-click a row's number to get the same menu as right-clicking one
+  of its cells. Select several cells with shift+click or by dragging and
+  right-click them for a menu that acts on all of them: clear the values, set
+  one value in all of them, or delete the rows they touch. Delete is one undo
+  step.
+- Tables: drag a view's tab to change the order of the views.
+- Tables: tick rows to delete several at once. Hover a row's number (or look
+  left of it on a touch screen) for a checkbox. Once one row is ticked every
+  row shows its checkbox, and the toolbar next to the filter button shows how
+  many are ticked with a delete button. Undo brings all of them back at once.
+
 - Signing in with an account whose identity is stored under the older `atomic:agent:` spelling no longer fails to keep the previous identity on this device ("no stored key for ..."). The same agent is now recognised in either spelling.
+- A link or mention that points at a table View now opens the table with that view selected, instead of the view's configuration.
+- A Number column's total or average no longer shows a small nonzero value as 0, and a Number filter typed as `2.5e-5` or with trailing zeros finds the same rows as the plain number.
 - The shared sign-in card no longer says "This browser does not support passkeys".
   Where a passkey cannot work it shows no passkey option at all, and the
   portal and the app now decide that the same way.
@@ -52,6 +141,23 @@ This changelog covers all five packages, as they are (for now) updated as a whol
   list), and leaves the drive channel alone when it can't read the drive. One
   tab is one session across channels (`Store.presenceSessionId`), so nobody
   shows up twice.
+- Signed in to a hosted account, the app now links its identity to that
+  account (`/api/agent-link`), once per session and only after the identity
+  check has settled on it. Services that only ever see a signature, like the
+  integration proxy, can then tell which account a request is for, also when
+  the account has no drive or paid plan. An account service without agent
+  links, an email that was never confirmed, or an identity linked to another
+  account are left alone. Builds that know no account service make no
+  requests for it.
+- Messages: send someone a direct message that only the two of you can
+  read. Pick "Message" on anyone's avatar, or start one from the new Messages
+  section in the sidebar with their Atomic ID. The server that holds the
+  conversation stores it encrypted. It can see who talks to whom and when,
+  not what is said. Someone who has never opened the app since this release
+  has no key yet, and the app says so.
+- `@tomic/lib`: the `conversations` ontology, and `Store.subscribeLive` to
+  keep a resource outside the open drive live.
+
 - Notifications are less noisy. The Notifications page shows one row per
   conversation ("Sanne and Polle: 3 new messages in Team chat") with names and
   titles as they are now, in your language. Coming back to the window while
@@ -117,6 +223,10 @@ This changelog covers all five packages, as they are (for now) updated as a whol
   demo that does finish after the notice sends a second, informational report
   with its total time. The notice fires at a fixed 45 seconds, so until now a
   slow machine and a stuck one looked the same in Sentry (`ATOMIC-BROWSER-1J`).
+- Settings → Integrations: the proxy and plugin catalog URL fields only show
+  a Save button below them. Resetting to the default is now a small Reset
+  button at the end of the field, shown only while the value differs from the
+  default.
 
 - Pasting an agent secret that opens a different agent than the signed-in
   account no longer signs that account out on its own. The app now says which
@@ -374,7 +484,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
   fresh one.
 
 - The data-browser no longer reports to Sentry from a dev server. Vite's hot
-  reload legitimately throws while swapping modules ("_s is not a function",
+  reload legitimately throws while swapping modules ("\_s is not a function",
   "Cannot access X before initialization", all with `@react-refresh` frames),
   which is not a defect in anything shipped, and those arrived rated above
   every real bug in the backlog. `initSentry` returns early when the resolved
@@ -561,10 +671,10 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - **One-tap create.** A button above the rows that makes one: type "Milk" and press, or press once and the moment is recorded. Configure it from a view's tab menu — a label, optionally a field to type into, and optionally one value the new row starts with, which reuses the same four verbs the row actions use (so "Log set" can stamp today's date and create in a single press). With no field it is the whole interaction; with one it clears after each press, and Enter works, so a shopping list can be filled at speed. Stored on the View as `view-quick-add`, so two views of a table can offer different buttons, and `create_table` / `configure_view` take `quickAdd`. Shipped on the Grocery list ("Add item"), Plant care ("Add plant") and Workout log ("Log set").
 - **Row actions: a button on every row, as configuration rather than code.** The verb a mini-app is mostly made of — "Watered", "Mark done", "+1", "Got it". Four kinds, and deliberately only four: stamp the current time into a date column, write one fixed value, flip a checkbox, or add a fixed amount to a number (use −1 for a "one fewer" button). Add one from **Add column → Action**, edit or remove it from its column heading. A button that records state reads as engaged once it has, so it doubles as the readout, and it goes busy then confirms while the commit is in flight. Every press is an ordinary commit on that row: rights-checked, synced, in history, undoable — and no buttons render at all for someone who cannot write, since an action that is going to be rejected is worse than none. Stored on the View as `view-row-actions`, so two views of a table can offer different buttons. The Plant care template now ships **Watered**, Inventory **+1 / −1**, and the Grocery list **Got it**. `create_table` and `configure_view` take `rowActions`, and `describe_table` reads them back.
 - Fix: a computed column now updates as soon as the column it derives from changes. It used to show whatever it computed when it was first drawn — edit the quantity and its "Quantity × Unit price" stayed put until you reloaded the page; press a row action that stamps a date and the "days since" beside it did not move. The React Compiler was caching the computation against a resource identity that never changes, because the store mutates resources in place. Computed columns are now functions of the values they read, and each cell subscribes to exactly those. The timer's Start/Stop button had the same latent problem and is fixed with it. (A computed cell is still blank on the trailing row you are typing into, until that row is saved and redrawn.)
-- Fix: the Grocery list template could not be created at all. Its "Meat & fish" aisle option became the shortname `meat--fish`, which the slug rule rejects — `stringToSlug` stripped the `&` only *after* collapsing repeated dashes, leaving the two dashes it had been sitting between. Any name with punctuation between words hit this.
-- Fix: a dash could not be typed into a shortname field. The slug rule above is a *final* form — it drops leading and trailing dashes — and the input applied it to every keystroke, so the `-` you were typing was trailing for exactly as long as it took to press the next key: "is-valid" came out as "isvalid". Hyphenated shortnames were untypeable, in the ontology editor and every New Resource form. The field now keeps a single trailing dash while you type and settles it on blur, validating the settled value so no "Invalid Slug" flashes between the words of a name.
+- Fix: the Grocery list template could not be created at all. Its "Meat & fish" aisle option became the shortname `meat--fish`, which the slug rule rejects — `stringToSlug` stripped the `&` only _after_ collapsing repeated dashes, leaving the two dashes it had been sitting between. Any name with punctuation between words hit this.
+- Fix: a dash could not be typed into a shortname field. The slug rule above is a _final_ form — it drops leading and trailing dashes — and the input applied it to every keystroke, so the `-` you were typing was trailing for exactly as long as it took to press the next key: "is-valid" came out as "isvalid". Hyphenated shortnames were untypeable, in the ontology editor and every New Resource form. The field now keeps a single trailing dash while you type and settles it on blur, validating the settled value so no "Invalid Slug" flashes between the words of a name.
 
-- **Dashboards.** A new kind of page that composes blocks over your data: a number, a chart, an embedded table, a note — arranged on a grid. Four block kinds in v1. A **number** is a sum, count, average, min or max computed by the store over *every* row a view matches, so it is exact regardless of paging, and it can measure a computed column (a total duration, quantity × price) as well as a stored one. A **chart** is the same number per bucket, drawn as horizontal bars, bucketed exactly or per day or month. A **table** block embeds the real table — cells stay editable, columns sortable — rather than a snapshot. A **note** is markdown. Blocks are resources of their own, so the same dashboard can be built by hand and by the assistant: `create_dashboard` builds one in a call (resolving column and view names, laying blocks out automatically), `describe_dashboard` reads it back, and `configure_block` changes one field without disturbing the rest — everything the tools can write, the per-block Configure dialog can change. A stat or chart block points at one of the table's *views* and borrows its filters, so "open issues" is the open-issues view plus a count instead of a filter restated in two places. Create one from the New menu.
+- **Dashboards.** A new kind of page that composes blocks over your data: a number, a chart, an embedded table, a note — arranged on a grid. Four block kinds in v1. A **number** is a sum, count, average, min or max computed by the store over _every_ row a view matches, so it is exact regardless of paging, and it can measure a computed column (a total duration, quantity × price) as well as a stored one. A **chart** is the same number per bucket, drawn as horizontal bars, bucketed exactly or per day or month. A **table** block embeds the real table — cells stay editable, columns sortable — rather than a snapshot. A **note** is markdown. Blocks are resources of their own, so the same dashboard can be built by hand and by the assistant: `create_dashboard` builds one in a call (resolving column and view names, laying blocks out automatically), `describe_dashboard` reads it back, and `configure_block` changes one field without disturbing the rest — everything the tools can write, the per-block Configure dialog can change. A stat or chart block points at one of the table's _views_ and borrows its filters, so "open issues" is the open-issues view plus a count instead of a filter restated in two places. Create one from the New menu.
 
 - Fix: a filtered view kept a row whose value had stopped matching it. Raise a "Quantity at most 3" row to 40 and it stayed in the Low stock view — across a reload, because the local database's index still listed it as a member. Editing a row out of a filtered view now removes it, editing one into a filter still adds it in the right sorted position, and an edit that keeps a row in the view but changes what it sorts by no longer lists it twice.
 
@@ -573,7 +683,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - [#1238](https://github.com/ontola/atomic-server/issues/1238) **Eleven new table templates**, and not one of them ships a renderer: Expenses, Deals (CRM), Job applications, Project tasks, Reading list, Grocery list, Workout log, Plant care, Inventory, Guest list and Bookmarks, next to Issue Tracker and Time tracker. Each arrives configured — kanban and calendar layouts, computed columns (days since you last contacted a deal, when a plant is next due, quantity × price), totals broken down per month or category, its own column order, and a filtered view like Inventory's "Low stock". They are available to the assistant through `list_table_templates` / `create_table_from_template`, which now also reports what each view already computes, so it can start from the closest one and adapt it rather than deriving a schema from scratch. The New Table dialog gives each an icon and scrolls, instead of pushing the name field off the dialog.
 - Columns can be `decimal`, not just whole `number`: money, prices, hours and measurements keep their cents. It's a float carrying the FormattedNumber shape the property form writes, so switching one to a currency or a different precision afterwards works as usual. `create_table` takes it too — an amount asked for as `number` would have silently rounded.
 - [#1236](https://github.com/ontola/atomic-server/issues/1236) Timer view for tables, alongside table / kanban / calendar. It **is** the table: the same grid, so cells stay editable, columns sortable, resizable and reorderable, keyboard navigation works and long histories stay virtualised. On top of it the timer adds a toolbar — name a thing and hit Start — and two columns: a live-ticking Duration and a Start/Stop button. "One at a time" (on by default) stops the running entry when another starts; turn it off to track several things at once. Its start property lives in the View's `view-group-by` slot, its end in the new `view-end-prop`, and the toggle in `view-timer-exclusive`; a class without timestamp properties gets "Start" and "End" created for it.
-- [#1238](https://github.com/ontola/atomic-server/issues/1238) **The assistant can now change a table, not just create one.** Five tools: `describe_table` reads back the row class, every column and every view's settings (sort, filters, visible columns, computed columns, totals); `configure_view` changes a view in place and touches only the fields it's given, so setting a sort can't drop the filters; `add_table_columns` adds columns to an existing class *and* appends them to the views that keep an explicit column list (a column missing from that list is hidden, which is why adding a property alone wasn't enough); and `list_table_templates` / `create_table_from_template` start from the catalogue instead of re-deriving a schema. `create_table` grew to match: per-view `sortByColumn` / `sortDesc` / `filters` / `columns` / `columnOrder`, and `relation` columns can name their target class so the cell picks from that class instead of searching everything. Column names are resolved case-insensitively by name, shortname or subject throughout, and a select filter accepts an option's name. The whole chain is covered end-to-end by an e2e test that scripts the model and lets the tools run for real.
+- [#1238](https://github.com/ontola/atomic-server/issues/1238) **The assistant can now change a table, not just create one.** Five tools: `describe_table` reads back the row class, every column and every view's settings (sort, filters, visible columns, computed columns, totals); `configure_view` changes a view in place and touches only the fields it's given, so setting a sort can't drop the filters; `add_table_columns` adds columns to an existing class _and_ appends them to the views that keep an explicit column list (a column missing from that list is hidden, which is why adding a property alone wasn't enough); and `list_table_templates` / `create_table_from_template` start from the catalogue instead of re-deriving a schema. `create_table` grew to match: per-view `sortByColumn` / `sortDesc` / `filters` / `columns` / `columnOrder`, and `relation` columns can name their target class so the cell picks from that class instead of searching everything. Column names are resolved case-insensitively by name, shortname or subject throughout, and a select filter accepts an option's name. The whole chain is covered end-to-end by an e2e test that scripts the model and lets the tools run for real.
 - **Column order is per-view configuration now**, and covers every kind of column. Drag any heading — including a computed column or the timer's Start/Stop — and the order is saved on the View (`view-column-order`, a list of column keys), so two views of the same table can arrange the same columns differently. A column added after the order was saved appears at the end rather than disappearing, and a LocalizedText property split per language still moves as one column. The timer view now leads with its Duration and Start/Stop: timing something is the point of that view, so its controls sit where the eye starts instead of past four columns of data.
 - Fix: columns a view adds (a computed column, the timer's Start/Stop) could not be resized, and rendered at the 300px default rather than the width they asked for. Two separate bugs: the table re-imposed their default width on every render, throwing away the resize it had just stored; and the grid's size list, when the column count and the stored widths changed in the same commit, appended defaults over the widths using a stale copy. Their heading also matched the header cell's bold instead of a property heading's regular weight, and the grid's 100px minimum column width made dragging a 70px button column snap wider instead of resizing it — the floor is now 40px. Default widths themselves are unchanged: narrow is right for a duration or a button.
 - Fix: switching between views whose column counts differ painted the previous view's column widths for a frame, which churned the grid while it settled. The width list is now ignored when it doesn't match the columns on screen, rather than rendered.
@@ -582,7 +692,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - **More than one totals row.** Add rows from the totals menu and give a column a different statistic in each, so Amount can show a sum on one line and an average on the next. Stored per aggregate as a `row` index; `configure_view` takes it too. A row you add holds nothing until you fill a cell in it, so an empty one is never persisted.
 - **Totals now live in a footer row under the grid**, each under the column it describes — click a column's footer cell and pick Sum / Average / Min / Max / Count, the way a spreadsheet does. The row is always in view (the rows scroll inside their own box) and scrolls sideways with the columns, so a total stays under its column. Its left cell shows how many rows the view matches and carries the "break down by…" menu. This replaces the Σ button in the top-right corner and the free-floating totals strip: a number is much easier to read directly beneath its column than in a labelled list somewhere else.
 - Fix: totals didn't update when the data changed — they came from the row collection, which patches its pages surgically on an edit rather than re-querying. They now ride a small query of their own (one row plus the numbers), re-read on save/delete with a short debounce. That also means refreshing them no longer clears the grid's pages under the cursor.
-- [#1238](https://github.com/ontola/atomic-server/issues/1238) **Totals under the table**, computed by the server: a sum, count, average, min or max over **every** row a view matches — filters included, paging excluded — plus an optional breakdown giving one subtotal per distinct value of a column (per project, per status, per day, per month). This is a new query capability rather than a client-side add-up: `Query` carries an `aggregation`, the store walks its own index and returns a handful of numbers on the Collection's new `collection/aggregates` property, and because the browser's local database runs the same Rust code, an offline table shows the same totals. Configure it from the Σ button next to the table's filters, or ask `create_table` for `aggregates` / `breakdownColumn`. Day and month buckets use your timezone, not UTC. Stored on the View as `view-aggregates` / `view-group-by-column` / `view-group-granularity`. Note that a `count` counts the rows you can actually read, which can be lower than `totalMembers` (that one counts raw index hits). Aggregating a *derived* column isn't possible yet — those aren't stored.
+- [#1238](https://github.com/ontola/atomic-server/issues/1238) **Totals under the table**, computed by the server: a sum, count, average, min or max over **every** row a view matches — filters included, paging excluded — plus an optional breakdown giving one subtotal per distinct value of a column (per project, per status, per day, per month). This is a new query capability rather than a client-side add-up: `Query` carries an `aggregation`, the store walks its own index and returns a handful of numbers on the Collection's new `collection/aggregates` property, and because the browser's local database runs the same Rust code, an offline table shows the same totals. Configure it from the Σ button next to the table's filters, or ask `create_table` for `aggregates` / `breakdownColumn`. Day and month buckets use your timezone, not UTC. Stored on the View as `view-aggregates` / `view-group-by-column` / `view-group-granularity`. Note that a `count` counts the rows you can actually read, which can be lower than `totalMembers` (that one counts raw index hits). Aggregating a _derived_ column isn't possible yet — those aren't stored.
 - [#1238](https://github.com/ontola/atomic-server/issues/1238) **Derived columns**: a table view can show columns computed from each row rather than stored on it — a live duration, a days-since, an amount, a next-due date. They are configuration, not code: the View lists them in the new `view-derived-columns` (JSON), any view kind renders them, and `create_table` can build them, so a mini-app that needs one is a template rather than a renderer. Five fixed generators, deliberately not a formula language: `difference` (to − from), `elapsed` (the ticking variant, stopping once its end is stamped), `daysSince`, `product` (either factor may be a literal, e.g. a rate) and `offset` (a date plus a number of days). The timer's Duration is now one of them — an `elapsed` over the two timestamps the view already knew about, seeded by the Time tracker template — so it renders in a plain table view too, and the timer keeps only its Start/Stop column. Add one from **Add column → Computed**: the dialog is generated from the generator itself, so it only offers columns that fit each argument (date columns for a duration, number columns for a multiplication) and lets you type a fixed number where one makes sense. Its heading carries the menu that edits or removes it again. See `planning/table-templates-and-mini-apps.md`.
 - Table columns may now be **virtual** — rendered by the view rather than read off a Property (`TableColumn.virtual`). The grid stack was already generic over its column type, so this cost the editor nothing, and it's the seam that future derived columns and row actions plug into. See `planning/table-templates-and-mini-apps.md`.
 - The table's filter and property menus are both plain dropdowns now, instead of one dropdown and one popover full of checkboxes. Each has a header saying what it does, whole rows are the click target rather than a small checkbox, shown properties are marked with a check, and both label properties by their human title. Toggling a property leaves the menu open — `DropdownMenu` items take a new `keepOpen` for menus that toggle state rather than navigate away. Properties a view is structurally built on (a timer's name/start/end, a kanban's or calendar's group-by) are shown locked with a reason instead of offering a toggle that the view would ignore.

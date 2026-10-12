@@ -1,4 +1,4 @@
-- [Decentralized Identifiers](did.md): `did:ad:` identifiers name Resources, Agents, Commits, blobs and nodes independently of where they are hosted. See also [URLs and identifiers](urls.md).
+- [Decentralized Identifiers](did.md): `atomic:` identifiers name Resources, Agents, Commits, blobs and nodes independently of where they are hosted. See also [URLs and identifiers](urls.md).
 - [Agents](agents.md) are Users that enable [authentication](authentication.md). An Agent is an Ed25519 keypair; its identifier is derived from the public key, so nobody has to issue it.
 - [Hierarchies](hierarchy.md) used for authorization and keeping data organized. Similar to folder structures on file-systems. Rights are checked on every device and every transport.
 - [Invites](invitations.md): create new users and provide them with rights.

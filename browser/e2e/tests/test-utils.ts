@@ -13,9 +13,30 @@ import {
   registerPerfPage,
 } from './perf-attach';
 import { installEmptyDiscoveryRoom } from './fixtures';
+import type { DiagnosticCollector } from './diagnostic-collector';
 
 /** Playwright tag for the light CI gate (`pnpm test-e2e:light` / `--grep @smoke`). */
 export const smoke = { tag: '@smoke' } as const;
+
+/**
+ * A secret signed in on a server that has none of its data makes the app ask
+ * the pkarr relay which server hosts the drive. The relay answers 404 when no
+ * record exists, which is the normal case for a throwaway identity, and the
+ * browser logs every 404 as a console error. Optional: offline or sandboxed
+ * runs never get that far. Two calls at most: the home and a derived retry.
+ */
+export function expectPkarrLookupMiss(
+  browserDiagnostics: Pick<DiagnosticCollector, 'expect'>,
+): void {
+  browserDiagnostics.expect(
+    'error',
+    /^Failed to load resource: the server responded with a status of 404 \(Not Found\)$/,
+    'The pkarr relay has no record for a drive nobody announced.',
+    2,
+    /^https:\/\/dns\.iroh\.link\/pkarr\/[a-z0-9]+$/,
+    { optional: true },
+  );
+}
 
 export const PROPERTIES = {
   isA: 'https://atomicdata.dev/properties/isA',
@@ -132,12 +153,6 @@ export const topBarShareButton = (page: Page) =>
 export const editableTitle = (page: Page) => page.getByTestId('editable-title');
 export const currentDriveTitle = (page: Page) =>
   page.getByTestId('current-drive-title');
-export const publicReadRightLocator = (page: Page) =>
-  page
-    .locator(
-      '[data-test="right-public"] input[type="checkbox"]:not([disabled])',
-    )
-    .first();
 export const contextMenu = '[data-test="context-menu"]';
 /**
  * The search input inside the search overlay (modal). Only visible after the
@@ -622,10 +637,37 @@ export async function signIn(page: Page, secret?: string) {
  * Returns the agent secret so other pages/contexts can sign in as the same user.
  */
 export async function devDrive(page: Page): Promise<string> {
+  // The route sits on a splash until the drive exists; when it never does, the
+  // timeout alone says nothing, so keep what the page printed to say why.
+  const printed: string[] = [];
+
+  const remember = (m: ConsoleMessage) => {
+    if (['error', 'warning'].includes(m.type()))
+      printed.push(`${m.type()}: ${m.text()}`.slice(0, 300));
+  };
+
+  page.on('console', remember);
+  page.on('pageerror', e => printed.push(`pageerror: ${e}`.slice(0, 300)));
+
   await page.goto(`${FRONTEND_URL}/app/dev-drive`);
-  await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
-    timeout: 30000,
-  });
+
+  try {
+    await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
+      timeout: 30000,
+    });
+  } catch (e) {
+    const shown = await page
+      .evaluate(() => document.body.innerText.slice(0, 300))
+      .catch(() => '(page unreadable)');
+
+    throw new Error(
+      `devDrive never reached the drive: ${page.url()} shows ${JSON.stringify(shown)}; page printed ${JSON.stringify(printed.slice(-10))}`,
+      { cause: e },
+    );
+  } finally {
+    page.off('console', remember);
+  }
+
   await expect(currentDriveTitle(page)).toBeVisible({ timeout: 15000 });
 
   const secret = await page.evaluate(() =>
@@ -690,21 +732,33 @@ export async function newDrive(page: Page) {
 export async function makeDrivePublic(page: Page) {
   await currentDriveTitle(page).click();
   await page.click(contextMenu);
-  await page.getByRole('menuitem', { name: 'Permissions & Invites' }).click();
+  await page.getByRole('menuitem', { name: 'Share', exact: true }).click();
+
+  const dialog = page.locator('dialog[open]');
+  const publicAccess = dialog.locator('[data-test="share-public"]');
+  const profileStep = dialog.getByRole('button', {
+    name: 'Save and continue',
+    exact: true,
+  });
+
+  // A first Share starts with the optional profile step.
+  await expect(publicAccess.or(profileStep)).toBeVisible({ timeout: 15000 });
+
+  if (await profileStep.isVisible()) {
+    await dialog.getByLabel('Full name', { exact: true }).fill('Drive Owner');
+    await profileStep.click();
+  }
+
+  const read = publicAccess.getByRole('radio', { name: 'Read', exact: true });
   await expect(
-    publicReadRightLocator(page),
+    publicAccess.getByRole('radio', { name: 'Off', exact: true }),
     'The drive was public from the start',
-  ).not.toBeChecked();
-  await publicReadRightLocator(page).click();
-  // The permission toggle dirties the resource asynchronously (validation
-  // fetch + LocalChange event), so wait for Save to enable instead of
-  // racing the default 5s click timeout.
-  const saveBtn = page
-    .locator('main')
-    .getByRole('button', { name: 'Save', exact: true });
-  await expect(saveBtn).toBeEnabled({ timeout: 15000 });
-  await saveBtn.click();
-  await expect(page.locator('text="Share settings saved"')).toBeVisible();
+  ).toBeChecked();
+  // The dialog saves each change at once: no Save button.
+  await read.check();
+  await expect(read).toBeChecked({ timeout: 15000 });
+  await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 }
 
 export async function openSubject(page: Page, subject: string) {
@@ -1047,7 +1101,6 @@ export async function editProfileAndCommit(page: Page) {
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
   await nameInput.fill(username);
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('text=Resource saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
   await page.reload();
   await expect(page.locator(`text=${username}`).first()).toBeVisible({
@@ -2307,9 +2360,9 @@ export async function acceptInvite(page: Page) {
   // plugin.spec.ts's install flow.
   await inDialog(
     page,
-    async (dialog, closeDialog) => {
+    async dialog => {
       await expect(
-        dialog.getByRole('heading', { name: 'Agent created!' }),
+        dialog.getByRole('heading', { name: 'This is your account' }),
       ).toBeVisible();
       await expect(dialog.getByLabel('Agent Name')).toHaveCount(0);
       await dialog
@@ -2320,14 +2373,18 @@ export async function acceptInvite(page: Page) {
       ).toBeVisible();
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(
-        dialog.getByRole('heading', { name: 'Agent created!' }),
+        dialog.getByRole('heading', { name: 'This is your account' }),
       ).toBeVisible();
       await expect(page.locator('html')).not.toHaveAttribute(
         'data-duplicate-invite-acceptance',
         'true',
       );
       await dialog.getByRole('button', { name: 'Copy to clipboard' }).click();
-      await closeDialog('Continue');
+      // The shared secret step carries its own confirm button, not a footer.
+      await dialog
+        .getByRole('button', { name: "Yes, I've stored it safely" })
+        .click();
+      await expect(dialog).toBeHidden({ timeout: 40000 });
     },
     40000,
   );

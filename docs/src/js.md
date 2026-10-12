@@ -63,7 +63,7 @@ const newResource = await store.newResource({
   },
 });
 
-// Sign the genesis and save. The subject is a did:ad: identifier minted here.
+// Sign the genesis and save. The subject is a atomic: identifier minted here.
 await newResource.save();
 ```
 

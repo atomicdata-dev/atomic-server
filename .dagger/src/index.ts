@@ -542,6 +542,11 @@ export class AtomicServer {
           dag.cacheVolume('flutter-pub-cache'),
         )
         .withDirectory('/workspace/flutter', this.source.directory('flutter'))
+        // `flutter/pubspec.yaml` points at ../packages/atomic_flutter.
+        .withDirectory(
+          '/workspace/packages',
+          this.source.directory('packages'),
+        )
         .withWorkdir('/workspace/flutter')
         .withExec([
           'bash',
@@ -676,11 +681,14 @@ export class AtomicServer {
         .withWorkdir('/app')
         // 2. Packages reached through node_modules need a `dist`. Building
         //    only lib and react left `@tomic/plugin`, `@tomic/service-ui` and
-        //    `@tomic/edit-mode/react` unresolvable. All five build from
-        //    TypeScript alone, so this stays in the cheap static tier beside
-        //    lint and `cargo fmt`: no WASM, no Rust.
+        //    `@tomic/edit-mode/react` unresolvable, and `@tomic/form-app`
+        //    needs `@tomic/form-renderer`. All six build from TypeScript
+        //    alone, so this stays in the cheap static tier beside lint and
+        //    `cargo fmt`: no WASM, no Rust.
         .withExec([
           'pnpm',
+          '--filter',
+          '@tomic/form-renderer',
           '--filter',
           '@tomic/lib',
           '--filter',
@@ -815,6 +823,11 @@ export class AtomicServer {
         ])
         .withDirectory('/workspace/lib', this.source.directory('lib'))
         .withDirectory('/workspace/flutter', this.source.directory('flutter'))
+        // `flutter/pubspec.yaml` points at ../packages/atomic_flutter.
+        .withDirectory(
+          '/workspace/packages',
+          this.source.directory('packages'),
+        )
         .withMountedCache('/workspace/flutter/rust/target', flutterRustTarget, {
           sharing: CacheSharingMode.Locked,
         })
@@ -966,6 +979,13 @@ export class AtomicServer {
           this.source.directory('atomic-plugin'),
         )
         .withDirectory('/code/tools', this.source.directory('tools'))
+        // `server/src/forms.rs` pins its validation verdicts to the cases the
+        // browser form renderer shares (`include_str!`), so the Rust tests need
+        // this one file from `browser/`.
+        .withFile(
+          '/code/browser/form-renderer/shared/validation-cases.json',
+          this.source.file('browser/form-renderer/shared/validation-cases.json'),
+        )
         .withMountedCache('/code/target', this.targetCache('rust-slim-target-v3'))
         .with(touchWorkspaceSources)
         .withWorkdir('/code')
@@ -1087,6 +1107,10 @@ export class AtomicServer {
         browser.file('plugin/package.json'),
       )
       .withFile(
+        '/repo/browser/mcp/package.json',
+        browser.file('mcp/package.json'),
+      )
+      .withFile(
         '/repo/browser/e2e/package.json',
         browser.file('e2e/package.json'),
       )
@@ -1115,11 +1139,11 @@ export class AtomicServer {
       .withExec(['pnpm', 'install', '--frozen-lockfile']);
 
     // Drop in @tomic/lib source. Other packages are unused by the
-    // integration tests, so we don't bother mounting them.
-    const withSource = installed.withDirectory(
-      '/repo/browser/lib',
-      browser.directory('lib'),
-    );
+    // integration tests, except @tomic/mcp: hosted-mcp.integration.test.ts
+    // imports its bridge from `../../mcp/src`.
+    const withSource = installed
+      .withDirectory('/repo/browser/lib', browser.directory('lib'))
+      .withDirectory('/repo/browser/mcp', browser.directory('mcp'));
 
     return withSource
       .withFile('/repo/target/debug/atomic-server', binary, {
@@ -1332,6 +1356,18 @@ export class AtomicServer {
       )
       .withFile('/app/plugin/package.json', browser.file('plugin/package.json'))
       .withFile('/app/e2e/package.json', browser.file('e2e/package.json'))
+      // The published-form runtime and its renderer. Without their manifests
+      // here, the install gives `form-app` no node_modules and no link to
+      // `@tomic/form-renderer`, so its typecheck and build cannot resolve
+      // either (or `altcha`).
+      .withFile(
+        '/app/form-app/package.json',
+        browser.file('form-app/package.json'),
+      )
+      .withFile(
+        '/app/form-renderer/package.json',
+        browser.file('form-renderer/package.json'),
+      )
       // Cache pnpm's content-addressable store across CI runs. Without
       // this, every push re-downloaded all node_modules from the
       // registry — adding ~30-60s per run depending on registry latency.
@@ -1378,6 +1414,13 @@ export class AtomicServer {
         this.source.directory('lib/test_files/loro-compat'),
       )
       .withFile('/Cargo.lock', this.source.file('Cargo.lock'))
+      // Fixtures shared by the Rust and TS twins (class constraints, lenses,
+      // JSON Schema interop, schema lockfiles), read by repository-root
+      // path. Same /lib collision: mount only that directory.
+      .withDirectory(
+        '/lib/tests/fixtures',
+        this.source.directory('lib/tests/fixtures'),
+      )
       // Tests read shared fixtures directly from the repository-root paths.
       // Include the manifest and planner corpus as well as pairing fixtures.
       .withDirectory('/testdata', this.source.directory('testdata'))
@@ -1475,16 +1518,61 @@ export class AtomicServer {
       )
       .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
       .withDirectory('/code/tools', source.directory('tools'))
+      // See the slim container above: the form validation cases are shared
+      // with the browser and `include_str!`d by the Rust tests.
+      .withFile(
+        '/code/browser/form-renderer/shared/validation-cases.json',
+        source.file('browser/form-renderer/shared/validation-cases.json'),
+      )
       .withMountedCache('/code/target', this.targetCache('rust-target-v3'))
       .with(touchWorkspaceSources)
       .withWorkdir('/code')
       .withExec(['cargo', 'fetch', '--locked']);
 
-    const browserDir = this.jsBuild(e2e).directory('/app/data-browser/dist');
-    const containerWithAssets = sourceContainer.withDirectory(
-      '/code/server/assets_tmp',
-      browserDir,
-    );
+    const jsContainer = this.jsBuild(e2e);
+    const formAppDist = jsContainer.directory('/app/form-app/dist');
+    // The published-form runtime (`browser/form-app`) is a SECOND bundle,
+    // separate from the data-browser one. `server/build.rs::copy_form_assets`
+    // copies it from `../browser/form-app/dist` into
+    // `assets_tmp/form-assets/`, which `handlers/form.rs` `include_str!`s and
+    // `static_files::generate()` serves at `/form-assets/*`. Mounting only
+    // `data-browser/dist` left that path absent, so every dagger-built server
+    // — the e2e one AND the release binary this same function produces —
+    // embedded build.rs's placeholder shell: `/form/{id}` answered with an
+    // inert "form runtime not built" page carrying no <script>. Silent,
+    // because a missing form-app build is only a `cargo:warning` (it has to
+    // be: the fmt/clippy/nextest containers stub `assets_tmp` and run no JS
+    // build at all).
+    //
+    // Both halves are needed. The mount under `/code/browser` is what
+    // `copy_form_assets` reads — without it, a build.rs that DOES run
+    // overwrites any bundle we place with the placeholder. Pre-placing the
+    // same bundle inside `assets_tmp` covers the opposite case: `/code/target`
+    // is a cache volume shared across runs, and cargo will happily treat the
+    // build script as fresh (replaying its stored output) while still
+    // recompiling the lib — leaving `include_str!` to read whatever the
+    // mounted `assets_tmp` holds.
+    //
+    // Only `dist` goes under `/code/browser`, deliberately: mounting
+    // `form-app/src` too would add JS sources to what `should_build()`
+    // compares.
+    //
+    // Even so, that mount is what creates `/code/browser` in this container,
+    // so `build.rs` no longer takes its "no browser folder, skip the JS
+    // build" path. It finds no `data-browser/dist` but does find its other
+    // watched sources (`lib/src`, `wasm/src`), and runs `pnpm install`, which
+    // this container does not have (run 36717450608). The JS is already
+    // built above and placed in `assets_tmp`, so say so: with
+    // `ATOMICSERVER_SKIP_JS_BUILD`, `build.rs` leaves the mounted
+    // `assets_tmp` as it is and still refreshes `form-assets/` from the
+    // mounted `form-app/dist`.
+    const assetsDir = jsContainer
+      .directory('/app/data-browser/dist')
+      .withDirectory('form-assets', formAppDist);
+    const containerWithAssets = sourceContainer
+      .withDirectory('/code/server/assets_tmp', assetsDir)
+      .withDirectory('/code/browser/form-app/dist', formAppDist)
+      .withEnvVariable('ATOMICSERVER_SKIP_JS_BUILD', 'true');
 
     // Scope the build to `atomic-server` so cargo doesn't try to build
     // workspace siblings like the wasm cdylib plugin examples — which
@@ -1665,6 +1753,13 @@ export class AtomicServer {
         .withFile(
           '/code/browser/lib/src/authentication_v2_vectors.json',
           source.file('browser/lib/src/authentication_v2_vectors.json'),
+        )
+        // server/src/forms.rs `include_str!`s the shared form validation
+        // cases (also read by the TypeScript form-renderer tests). Mount only
+        // that file, for the same reason as the plugin zip above.
+        .withFile(
+          '/code/browser/form-renderer/shared/validation-cases.json',
+          source.file('browser/form-renderer/shared/validation-cases.json'),
         )
         .withDirectory('/code/server', source.directory('server'))
         .withDirectory('/code/integrations', source.directory('integrations'))

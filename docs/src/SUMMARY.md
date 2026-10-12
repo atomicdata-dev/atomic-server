@@ -1,5 +1,12 @@
 ## Table of contents
 
+# Why Atomic
+
+- [Why Atomic](why-atomic.md)
+  - [Personal Data Store](personal-data-store.md)
+  - [All-in-One Workspace](all-in-one-workspace.md)
+  - [Local-first Sync Engine](sync-engine.md)
+
 # What is Atomic Data
 
 - [Atomic Data Overview](atomic-data-overview.md)
@@ -20,6 +27,7 @@
   - [Plugins](plugins.md)
     - [Creating Plugins](plugins/creating-plugins.md)
     - [Custom Views](plugins/custom-views.md)
+  - [Atomic drive skill for coding agents](atomicserver/atomic-drive-skill.md)
   - [API](atomicserver/API.md)
   - [Creating a JSON-AD file](create-json-ad.md)
   - [FAQ & troubleshooting](atomicserver/faq.md)
@@ -80,7 +88,11 @@
   - [Schema](schema/intro.md)
     - [Classes](schema/classes.md)
     - [Datatypes](schema/datatypes.md)
+    - [Property identity](schema/property-identity.md)
+    - [Lenses](schema/lenses.md)
+    - [JSON Schema](schema/json-schema.md)
     - [Translations & Localization](schema/translations.md)
+    - [Forms](schema/forms.md)
     - [FAQ](schema/faq.md)
 
 - [Atomic Data Extended](extended.md)

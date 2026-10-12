@@ -46,6 +46,8 @@ test('settings detects local Ollama and accepts it with one click', async ({
       /Each child in a list should have a unique.*key.*AISettings/s,
       'Existing Wuchale React key warning when expanding AI settings in Vite',
       1,
+      undefined,
+      { optional: true },
     );
   }
 
@@ -72,6 +74,8 @@ test('settings detects local Ollama and accepts it with one click', async ({
       /Each child in a list should have a unique.*key.*AISettings/s,
       'Existing Wuchale React key warning when expanding AI settings in Vite',
       1,
+      undefined,
+      { optional: true },
     );
   }
 

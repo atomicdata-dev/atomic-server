@@ -1,0 +1,22 @@
+name: Atomic Flutter package
+on:
+  pull_request:
+    paths: ['packages/atomic_flutter/**', 'flutter/**', '.github/workflows/atomic-flutter.yml']
+  push:
+    paths: ['packages/atomic_flutter/**', 'flutter/**', '.github/workflows/atomic-flutter.yml']
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: packages/atomic_flutter
+      - run: flutter analyze
+        working-directory: packages/atomic_flutter
+      - run: flutter test
+        working-directory: packages/atomic_flutter

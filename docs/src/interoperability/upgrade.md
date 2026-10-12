@@ -40,7 +40,7 @@ Make sure that when the user requests some URL, that you return that resource as
 
 You can go all out, and implement Commits, Hierarchies, Authentication, Collections and [more](https://docs.atomicdata.dev/extended.html).
 I'd suggest starting with [Commits](../commits/intro.md), as these allow users to modify data whilst maintaining versioning and auditability.
-Check out the [Atomic-Server source code](https://github.com/atomicdata-dev/atomic-server/tree/master/server) to get inspired on how to do this.
+Check out the [Atomic-Server source code](https://github.com/ontola/atomic-server/tree/master/server) to get inspired on how to do this.
 
 ## Reach out for help
 

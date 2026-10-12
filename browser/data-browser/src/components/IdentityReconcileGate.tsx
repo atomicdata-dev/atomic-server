@@ -1,3 +1,4 @@
+import { signInAccountWithAgent } from '../helpers/managed/agentSession';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore, type Store } from '@tomic/react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
@@ -8,6 +9,7 @@ import {
   clearManagedAccountBinding,
   evaluateIdentityReconciliation,
   evaluateServerReconciliation,
+  linkAgentToAccount,
   localAgentWorkspace,
   logoutManagedSession,
   PRODUCT_NAME,
@@ -204,6 +206,14 @@ export function IdentityReconcileGate({
       const isCurrent = () =>
         !signal.aborted &&
         localAgent === (store.getAgent()?.subject ?? undefined);
+      // One sign-in: an unlocked identity with no account session signs the
+      // account in by itself, and the check runs again once it has. In the
+      // background, so the app never waits on the account server for it.
+      void signInAccountWithAgent(store.getAgent() ?? undefined).then(
+        signedIn => {
+          if (signedIn && isCurrent()) setReconcileAttempt(n => n + 1);
+        },
+      );
       const result = await evaluateIdentityReconciliation(localAgent);
       if (!isCurrent()) return;
 
@@ -296,6 +306,10 @@ export function IdentityReconcileGate({
       // drive (zero-scan pairing — no manual "Sync now"). Fire-and-forget:
       // routing hints only, must never delay or gate the app.
       void syncDeviceDirectory(store.getDrive(), store.getAgent());
+      // Tell the account which identity it now uses, so services that only
+      // see a signature (the integration proxy) can tell whose account it is.
+      // Fire-and-forget too: it never throws, and tries once per session.
+      void linkAgentToAccount(store.getAgent());
 
       setConflict(null);
       setChecking(false);

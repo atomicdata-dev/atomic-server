@@ -115,7 +115,7 @@ export interface MentionProps {
  */
 export const Mention: FC<MentionProps> = ({ id, label, variant }) => {
   const isSkill = variant === 'skill';
-  const isAtomic = !isSkill && id.startsWith('http');
+  const isAtomic = !isSkill && /^(https?:|did:ad:)/.test(id);
   const resource = useResource(isAtomic ? id : '');
 
   const displayLabel = useMemo(() => {

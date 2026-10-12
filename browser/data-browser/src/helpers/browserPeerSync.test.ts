@@ -169,6 +169,8 @@ it('automatically connects stored drives once, without bootstrapping unknown dri
   const store = {
     getAgent: () => agent,
     getClientDb: () => db,
+    getServerUrl: () => '',
+    isLiveSyncedDrive: () => true,
     resources,
   } as unknown as Store;
   vi.mocked(BrowserPeerSync).mockImplementation(function () {
@@ -204,4 +206,47 @@ it('keeps node-hosted staging apps on staging discovery', () => {
   expect(configuredPeerSignalingUrl()).toBe(
     'wss://staging.atomicserver.eu/webrtc-signal',
   );
+});
+
+it('does not dial peers for a drive that syncs through a Cloud Server', async () => {
+  const { discoverPeerDrives, stopPeerLinks } =
+    await import('./browserPeerSync');
+  vi.stubGlobal('window', {
+    location: { hostname: 'localhost' },
+    dispatchEvent: vi.fn(),
+  });
+  vi.stubEnv('VITE_ATOMIC_SIGNALING_URL', 'wss://community.example/signal');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        'https://atomicdata.dev/properties/server/managed': true,
+      }),
+    })),
+  );
+  const agent = { subject: 'did:ad:agent:test' };
+  const db = {
+    getResourceWithSnapshot: vi.fn(async () => ({ snapshot: 'snapshot' })),
+  };
+  const store = {
+    getAgent: () => agent,
+    getClientDb: () => db,
+    getServerUrl: () => 'https://node1.cloud.example',
+    isLiveSyncedDrive: () => true,
+    resources: new Map([
+      [
+        'did:ad:hosted',
+        {
+          subject: 'did:ad:hosted',
+          isReady: () => true,
+          hasClasses: (cls: string) => cls === server.classes.drive,
+        },
+      ],
+    ]),
+  } as unknown as Store;
+  vi.mocked(BrowserPeerSync).mockClear();
+  await discoverPeerDrives(store);
+  expect(BrowserPeerSync).not.toHaveBeenCalled();
+  stopPeerLinks(store);
 });

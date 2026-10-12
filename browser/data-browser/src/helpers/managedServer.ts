@@ -75,6 +75,9 @@ export async function fetchManagedInfo(
   try {
     const res = await fetch(new URL('/server', serverUrl).toString(), {
       headers: { Accept: 'application/ad+json' },
+      // Cookies are shared across localhost ports. This public request can
+      // ask a different node from the one the active auth cookie signs for.
+      credentials: 'omit',
     });
 
     if (!res.ok) return DEFAULT;

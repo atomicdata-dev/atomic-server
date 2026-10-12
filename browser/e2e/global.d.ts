@@ -189,4 +189,12 @@ declare global {
       maxTimerLagMs: number;
     };
   }
+
+  /** Opaque ranges over a form control's value — new enough that `lib.dom`
+   * has no typing for it and most browsers no implementation. Optional here
+   * for the same reason it is in `form-renderer/src/overflowHighlight.ts`:
+   * the only interesting question is whether it exists. */
+  interface HTMLInputElement {
+    createValueRange?(start: number, end: number): AbstractRange;
+  }
 }

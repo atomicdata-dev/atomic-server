@@ -3,7 +3,7 @@
 # @tomic/react: Using Atomic Data in a JS / TS React project
 
 Atomic Data has been designed with front-end development in mind.
-The open source [Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-data-browser), which is feature-packed with chatrooms, a real-time collaborative rich text editor, tables and more, is powered by two libraries:
+The open source [Atomic-Data-Browser](https://github.com/ontola/atomic-server/tree/develop/browser), which is feature-packed with chatrooms, a real-time collaborative rich text editor, tables and more, is powered by two libraries:
 
 - `@tomic/lib` ([docs](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_lib.html)) is the core library, containing logic for fetching and storing data, keeping things in sync using websockets, and signing [commits](../commits/intro.md).
 - `@tomic/react` ([docs](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)) is the react library, featuring various useful hooks that mimic `useState`, giving you real-time updates through your app.

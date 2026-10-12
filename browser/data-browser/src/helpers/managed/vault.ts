@@ -236,6 +236,12 @@ export type VaultCapableDb = {
     checkpointN: number,
     driveHasCheckpoint: boolean,
     observedLanes: Record<string, number>,
+    /**
+     * A checkpoint keeps only each resource's current state (shallow
+     * snapshots, no signed envelopes). Ignored by delta packs. Omit for the
+     * default, which keeps the whole edit history.
+     */
+    currentStateOnly?: boolean,
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
@@ -274,6 +280,41 @@ export class VaultSessionEndedError extends Error {
   }
 }
 
+/** The control plane does not offer this route (yet): a 404 or a non-JSON page. */
+export class VaultNotAvailableError extends Error {
+  constructor() {
+    super(vaultNotAvailableMessage());
+    this.name = /* @wc-ignore */ 'VaultNotAvailableError';
+  }
+}
+
+function vaultNotAvailableMessage(): string {
+  return 'This is not available on your account yet.';
+}
+
+function storageNotAvailableMessage(): string {
+  return 'Storage details are not available on your account yet.';
+}
+
+/** Turn "the route is missing" into a plain sentence about storage. */
+async function storageApi<T>(
+  path: string,
+  init?: RequestInit & { body?: string },
+): Promise<T> {
+  try {
+    return await api<T>(path, init);
+  } catch (e) {
+    if (
+      e instanceof VaultNotAvailableError ||
+      (e instanceof Error && /\(404\)$/.test(e.message))
+    ) {
+      throw new Error(storageNotAvailableMessage());
+    }
+
+    throw e;
+  }
+}
+
 async function api<T>(
   path: string,
   init?: RequestInit & { body?: string },
@@ -298,7 +339,13 @@ async function api<T>(
     );
   }
 
-  return (await response.json()) as T;
+  // A control plane that does not have this route yet can answer with its
+  // HTML app shell and a 200. Never let a parse error reach a person.
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new VaultNotAvailableError();
+  }
 }
 
 export async function enrollVault(
@@ -479,6 +526,115 @@ export async function getVaultState(
   });
 }
 
+/** One row of the storage breakdown, from `GET /api/cloud-vault/{drive}/usage`. */
+export type VaultUsageCategory = {
+  kind: string;
+  objects: number;
+  bytes: number;
+};
+
+/**
+ * What a drive's Cloud Vault storage is made of. The host is blind, so this is
+ * by kind of object, never by file or note.
+ */
+export type VaultUsage = {
+  used_bytes: number;
+  quota_bytes: number;
+  by_kind: VaultUsageCategory[];
+  /** Superseded history and unused files; freeing these loses nothing. */
+  reclaimable_bytes: number;
+  reclaimable_objects: number;
+  /** Extra bytes kept only so a recently deleted item can come back. */
+  undo_window_bytes: number;
+  undo_window_objects: number;
+  pending_bytes: number;
+  unaccounted_bytes: number;
+};
+
+export type VaultFreeUpResult = {
+  pruned: number;
+  blobs_pruned: number;
+  bytes_reclaimed: number;
+  delete_failures: number;
+};
+
+export async function getVaultUsage(
+  drivePseudonym: string,
+  signal?: AbortSignal,
+): Promise<VaultUsage> {
+  return storageApi<VaultUsage>(`/cloud-vault/${drivePseudonym}/usage`, {
+    signal,
+  });
+}
+
+/**
+ * Free reclaimable storage now. `includeUndoWindow` also gives up the chance to
+ * bring back recently deleted items, so it is only ever passed when the person
+ * chose that.
+ */
+export async function freeUpVaultStorage(
+  drivePseudonym: string,
+  includeUndoWindow: boolean,
+): Promise<VaultFreeUpResult> {
+  return storageApi<VaultFreeUpResult>(
+    `/cloud-vault/${drivePseudonym}/free-up`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ include_undo_window: includeUndoWindow }),
+    },
+  );
+}
+
+/** What {@link compactVaultBackup} did, for the screen to report. */
+export type CompactResult = {
+  freed: VaultFreeUpResult;
+  /** Bytes of the checkpoint written first, so the net gain can be shown. */
+  checkpointBytes: number;
+};
+
+/**
+ * Collapse the backup's change chain into one fresh checkpoint, then free what
+ * that checkpoint made redundant.
+ *
+ * The order is the safety property. The control plane only prunes a delta once
+ * a *published* checkpoint covers it, and this device only calls free-up after
+ * its own checkpoint pass finished, so a failure at any step leaves the old
+ * chain intact. In particular, if the checkpoint does not happen, free-up is
+ * never called: freeing against an older anchor would still be safe, but
+ * "compress" would then report success while doing none of what was asked.
+ *
+ * `includeUndoWindow` is the irreversible variant; it must only be passed after
+ * the person confirmed it, and it also makes the new checkpoint a shallow one:
+ * the backup keeps each item's current state and none of its edit history.
+ * Devices keep the history they hold. Plain compression keeps the history.
+ * This touches the backup only, never the live drive.
+ */
+export async function compactVaultBackup({
+  runBackup,
+  drivePseudonym,
+  includeUndoWindow,
+}: {
+  /**
+   * Runs one backup pass with `forceCheckpoint: true`, and with
+   * `currentStateOnly` as given.
+   */
+  runBackup: (options: { currentStateOnly: boolean }) => Promise<BackupOutcome>;
+  drivePseudonym: string;
+  includeUndoWindow: boolean;
+}): Promise<CompactResult> {
+  const outcome = await runBackup({ currentStateOnly: includeUndoWindow });
+
+  if (outcome.status !== 'backed-up' || outcome.kind !== 'checkpoint') {
+    throw new Error(
+      'The backup could not be compressed right now, so nothing was removed.',
+    );
+  }
+
+  const freed = await freeUpVaultStorage(drivePseudonym, includeUndoWindow);
+
+  return { freed, checkpointBytes: outcome.bytes };
+}
+
 /**
  * The segment number this device should write next.
  *
@@ -526,6 +682,8 @@ export async function backupDrive({
   segment,
   checkpointN,
   driveHasCheckpoint,
+  forceCheckpoint = false,
+  currentStateOnly = false,
   observedLanes,
   collisionRetries = 0,
   beforeNetworkWrite,
@@ -542,6 +700,19 @@ export async function backupDrive({
   segment: number;
   checkpointN: number;
   driveHasCheckpoint: boolean;
+  /**
+   * Make this pass a full checkpoint even though the vault already has an
+   * anchor. Done by telling the exporter there is none, which is the one input
+   * it already treats as "this pass must be an anchor": the cursors, lane
+   * state and coverage logic all run unchanged, so nothing here needs its own
+   * path.
+   */
+  forceCheckpoint?: boolean;
+  /**
+   * With a checkpoint, drop the edit history and keep only the current state
+   * ("Discard history"). Deltas are unaffected: they carry just the new ops.
+   */
+  currentStateOnly?: boolean;
   observedLanes: Record<string, number>;
 }): Promise<BackupOutcome> {
   signal?.throwIfAborted();
@@ -553,8 +724,9 @@ export async function backupDrive({
     devicePubkey,
     segment,
     checkpointN,
-    driveHasCheckpoint,
+    driveHasCheckpoint && !forceCheckpoint,
     observedLanes,
+    currentStateOnly,
   );
 
   signal?.throwIfAborted();
@@ -627,6 +799,8 @@ export async function backupDrive({
       driveKey,
       keyEpoch,
       driveHasCheckpoint,
+      forceCheckpoint,
+      currentStateOnly,
       observedLanes,
       checkpointN: isCheckpoint ? checkpointN + 1 : checkpointN,
       segment: isCheckpoint ? segment : segment + 1,
@@ -727,43 +901,30 @@ export async function backupDrive({
 /** Matches `MAX_URL_BATCH` in the control plane's vault API. */
 const DOWNLOAD_URL_BATCH = 64;
 
-/**
- * Restore a drive from its vault into this device's store.
- *
- * Objects are listed from the control plane rather than guessed: keys are
- * reconstructible from the format, but the ids `download-urls` needs are not,
- * so a device that lost its local state can only learn them by asking.
- *
- * The list arrives ordered by key and is applied in that order. Out of order, a
- * later segment's deletion would be applied before the earlier pack that
- * re-creates the resource, and the delete would be undone.
- */
-export async function restoreDrive({
-  db,
-  drivePseudonym,
-  devicePubkey,
-  driveKey,
-  keyEpoch = 1,
-  onProgress,
-}: {
-  db: VaultCapableDb;
-  drivePseudonym: string;
-  devicePubkey: string;
-  driveKey: Uint8Array;
-  keyEpoch?: number;
-  onProgress?: (downloaded: number, total: number) => void;
-}): Promise<RestoreOutcome> {
-  const objects = await listVaultObjects(drivePseudonym);
+/** One sealed object as the importer takes it. */
+export type SealedObject = { objectKey: string; sealed: Uint8Array };
 
-  if (objects.length === 0) {
-    return {
-      packsRead: 0,
-      resourcesRestored: 0,
-      tombstonesApplied: 0,
-      objectsSkipped: 0,
-      objectsUnreadable: 0,
-    };
-  }
+/**
+ * Where restore reads its sealed objects from: the cloud vault, or a backup
+ * file on this device. It must return them in the order they are to be applied.
+ */
+export type RestoreSource = (
+  onProgress?: (done: number, total: number) => void,
+) => Promise<SealedObject[]>;
+
+/**
+ * Download every listed object's body, at most four at a time, in listing order.
+ *
+ * `read` decides what a body becomes: bytes for a restore, a `Blob` for a
+ * backup file (the browser may keep those on disk rather than in memory).
+ */
+export async function downloadVaultObjects<T>(
+  drivePseudonym: string,
+  objects: VaultObject[],
+  read: (response: Response) => Promise<T>,
+  onProgress?: (done: number, total: number) => void,
+): Promise<T[]> {
+  if (objects.length === 0) return [];
 
   // The control plane signs at most DOWNLOAD_URL_BATCH objects per request,
   // and a drive with a longer history refused to restore at all.
@@ -784,9 +945,7 @@ export async function restoreDrive({
   // Preserve the server's ordering: `download-urls` answers per request and is
   // not required to echo the order back.
   const urlByKey = new Map(downloads.map(d => [d.object_key, d.url]));
-  const fetched = new Array<{ objectKey: string; sealed: Uint8Array }>(
-    objects.length,
-  );
+  const fetched = new Array<T>(objects.length);
   let next = 0;
   let completed = 0;
   let failed = false;
@@ -811,10 +970,7 @@ export async function restoreDrive({
             );
           }
 
-          fetched[index] = {
-            objectKey: object.object_key,
-            sealed: new Uint8Array(await response.arrayBuffer()),
-          };
+          fetched[index] = await read(response);
           completed++;
           if (!failed) onProgress?.(completed, objects.length);
         } catch (error) {
@@ -824,6 +980,71 @@ export async function restoreDrive({
       }
     }),
   );
+
+  return fetched;
+}
+
+/** The cloud vault as a {@link RestoreSource}. */
+export function cloudRestoreSource(drivePseudonym: string): RestoreSource {
+  return async onProgress => {
+    const objects = await listVaultObjects(drivePseudonym);
+
+    const bodies = await downloadVaultObjects(
+      drivePseudonym,
+      objects,
+      async response => new Uint8Array(await response.arrayBuffer()),
+      onProgress,
+    );
+
+    return objects.map((object, i) => ({
+      objectKey: object.object_key,
+      sealed: bodies[i],
+    }));
+  };
+}
+
+/**
+ * Restore a drive from its vault into this device's store.
+ *
+ * Objects are listed from the control plane rather than guessed: keys are
+ * reconstructible from the format, but the ids `download-urls` needs are not,
+ * so a device that lost its local state can only learn them by asking.
+ *
+ * The list arrives ordered by key and is applied in that order. Out of order, a
+ * later segment's deletion would be applied before the earlier pack that
+ * re-creates the resource, and the delete would be undone.
+ *
+ * `source` replaces the cloud vault, e.g. with a backup file; whatever it
+ * returns goes through exactly the same import.
+ */
+export async function restoreDrive({
+  db,
+  drivePseudonym,
+  devicePubkey,
+  driveKey,
+  keyEpoch = 1,
+  onProgress,
+  source = cloudRestoreSource(drivePseudonym),
+}: {
+  db: VaultCapableDb;
+  drivePseudonym: string;
+  devicePubkey: string;
+  driveKey: Uint8Array;
+  keyEpoch?: number;
+  onProgress?: (downloaded: number, total: number) => void;
+  source?: RestoreSource;
+}): Promise<RestoreOutcome> {
+  const fetched = await source(onProgress);
+
+  if (fetched.length === 0) {
+    return {
+      packsRead: 0,
+      resourcesRestored: 0,
+      tombstonesApplied: 0,
+      objectsSkipped: 0,
+      objectsUnreadable: 0,
+    };
+  }
 
   // Every lane, not just this device's: each device appends only to its own,
   // so importing one would silently drop the rest of the drive's history.
@@ -1009,10 +1230,23 @@ export function runVaultBackup(args: {
    * read, which is the exact hole the epoch exists to close.
    */
   refreshDriveKey?: () => Promise<DriveKeyHandle>;
+  /** Force this pass to be a full checkpoint. See {@link backupDrive}. */
+  forceCheckpoint?: boolean;
+  /** Make that checkpoint keep only the current state. See {@link backupDrive}. */
+  currentStateOnly?: boolean;
 }): Promise<BackupOutcome> {
   const existing = inFlight.get(args.drivePseudonym);
 
-  if (existing) return existing;
+  if (existing) {
+    if (!args.forceCheckpoint) return existing;
+
+    // Joining a pass that is only a delta would hand back something other
+    // than the checkpoint that was asked for. Wait for it, then run our own.
+    return existing.then(
+      () => runVaultBackup(args),
+      () => runVaultBackup(args),
+    );
+  }
 
   const pass = (async () => {
     args.signal?.throwIfAborted();

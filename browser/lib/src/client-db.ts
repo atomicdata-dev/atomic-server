@@ -25,6 +25,10 @@
  * ```
  */
 
+import {
+  publishIndexMigration,
+  type IndexMigrationProgress,
+} from './client-db-migration.js';
 import { RequestCancelledError } from './error.js';
 import { versionVectorRecords } from './version-vector-records.js';
 import {
@@ -77,6 +81,26 @@ function isStorageBlockedDbError(error: unknown): boolean {
 /** `name` of the init error when the browser refuses this site storage, so a
  *  caller that cannot work without it (the demo) can say so in its own words. */
 export const STORAGE_BLOCKED_ERROR_NAME = 'StorageBlockedError';
+
+/**
+ * Drives that exist only in this browser, as `Store.registerLocalOnlyDrive`
+ * stored them. A worker has no `localStorage`, so the page reads them for it.
+ * Anything unreadable counts as none: the chat migration then writes no pages
+ * and only drops cached messages that already have their entry, which is the
+ * safe side.
+ */
+function readLocalOnlyDrives(): string[] {
+  try {
+    const raw = localStorage.getItem('atomic.localOnlyDrives');
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+
+    return Array.isArray(parsed)
+      ? parsed.filter((d): d is string => typeof d === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function asInitError(e: unknown): Error {
   const message = e instanceof Error ? e.message : String(e);
@@ -185,6 +209,19 @@ const DEFAULT_DB_NAME = 'atomic_data.redb';
 // only owns *its* OPFS file, and cross-tab RPC must stay within one DB.
 const LEADER_LOCK_PREFIX = 'atomic-db-leader';
 const RPC_CHANNEL_PREFIX = 'atomic-db-rpc';
+
+/**
+ * Point reads that answer in milliseconds from a healthy leader. One that has
+ * gone unanswered this long means the leader's database is stuck, and the
+ * caller is better served by an error it can fall back from (to the server)
+ * than by half a minute of nothing.
+ */
+const POINT_READ_TIMEOUT_MS = 10_000;
+const POINT_READ_TYPES = new Set([
+  'getResource',
+  'getResourceWithSnapshot',
+  'getLoroSnapshot',
+]);
 
 /** Operations whose result remains valid when repeated by a new DB owner. */
 const REPEATABLE_RPC_TYPES = new Set([
@@ -691,6 +728,14 @@ export class ClientDbWorker {
     endSpawn();
 
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      if ((event.data as { type: string }).type === 'migration-progress') {
+        const { done, total, finished, phase } =
+          event.data as unknown as IndexMigrationProgress;
+        publishIndexMigration({ done, total, finished, phase });
+
+        return;
+      }
+
       const { id, type, ...rest } = event.data;
       const pending = this.pending.get(String(id));
       if (!pending) return;
@@ -718,6 +763,7 @@ export class ClientDbWorker {
       dbKey: this.opts.dbKey,
       migrateLegacy: this.opts.migrateLegacy,
       discardUndecryptable: this.opts.discardUndecryptable,
+      localOnlyDrives: readLocalOnlyDrives(),
     })) as ClientDbInitTimings | undefined;
     endWorkerInit(timings);
 
@@ -1233,6 +1279,7 @@ export class ClientDbWorker {
     checkpointN: number,
     driveHasCheckpoint: boolean,
     observedLanes: Record<string, number>,
+    currentStateOnly = false,
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
@@ -1253,6 +1300,7 @@ export class ClientDbWorker {
       checkpointN,
       driveHasCheckpoint,
       observedLanes,
+      currentStateOnly,
     });
 
     return (r ?? null) as {
@@ -1500,8 +1548,39 @@ export class ClientDbWorker {
 
     const id = String(this.nextId++);
 
+    // A worker that died without an `error` event (the browser killed it under
+    // memory pressure, say) never answers. The leader's own callers would wait
+    // forever, and so would every follower behind it, because this tab keeps
+    // answering `leader-ping`. Point reads take milliseconds, so give up on
+    // them and let the caller fall back to the server.
+    const limit =
+      typeof msg.type === 'string' && POINT_READ_TYPES.has(msg.type)
+        ? POINT_READ_TIMEOUT_MS
+        : undefined;
+
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer =
+        limit === undefined
+          ? undefined
+          : setTimeout(() => {
+              if (!this.pending.delete(id)) return;
+              reject(
+                new Error(
+                  `ClientDb worker did not answer ${msg.type} within ${limit / 1000}s — the local database is not responding.`,
+                ),
+              );
+            }, limit);
+
+      this.pending.set(id, {
+        resolve: (data: unknown) => {
+          clearTimeout(timer);
+          resolve(data);
+        },
+        reject: (e: Error) => {
+          clearTimeout(timer);
+          reject(e);
+        },
+      });
       this.worker!.postMessage({ ...msg, id } as unknown as WorkerRequest);
     });
   }
@@ -1551,6 +1630,10 @@ export class ClientDbWorker {
     }
 
     const id = String(this.nextId++);
+    const timeoutMs =
+      typeof msg.type === 'string' && POINT_READ_TYPES.has(msg.type)
+        ? POINT_READ_TIMEOUT_MS
+        : 30_000;
 
     return new Promise((resolve, reject) => {
       // If the leader tab dies between sending the request and the
@@ -1569,11 +1652,11 @@ export class ClientDbWorker {
           this.pending.delete(id);
           reject(
             new Error(
-              `ClientDb sendToLeader timed out after 30s — leader tab may have closed.`,
+              `ClientDb sendToLeader timed out after ${timeoutMs / 1000}s — leader tab may have closed.`,
             ),
           );
         }
-      }, 30_000);
+      }, timeoutMs);
 
       this.pending.set(id, {
         onLeaderChanged: () => {

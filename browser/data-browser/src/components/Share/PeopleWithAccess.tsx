@@ -7,6 +7,7 @@ import { RoleSelect, roleLabel, type ShareRole } from './RoleSelect';
 import type { DirectRight } from './useShareRights';
 import type { MergedRight } from '../../routes/Share/useRights';
 import { useClassLabel } from './useClassLabel';
+import { AtomicLink } from '../AtomicLink';
 
 interface PeopleWithAccessProps {
   rights: DirectRight[];
@@ -89,9 +90,6 @@ function PersonRoleSelect({
 
     try {
       await onSetRole(right.agentSubject, role);
-      toast.success(
-        role === 'remove' ? `Removed ${name}` : `${name} ${roleLabel(role)}`,
-      );
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -131,7 +129,9 @@ function PersonRow({
       <AgentAvatar agentSubject={agentSubject} size='2.6rem' />
       <Who>
         <Name>
-          {name}
+          <ProfileLink subject={agentSubject} clean>
+            {name}
+          </ProfileLink>
           {isYou && ' (you)'}
         </Name>
         {detail && <Detail>{detail}</Detail>}
@@ -265,6 +265,16 @@ const Name = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const ProfileLink = styled(AtomicLink)`
+  color: inherit;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
 `;
 
 const Detail = styled.span`

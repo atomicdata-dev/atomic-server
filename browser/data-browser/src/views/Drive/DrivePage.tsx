@@ -23,7 +23,7 @@ import { styled } from 'styled-components';
 import InputSwitcher from '@components/forms/InputSwitcher';
 import { SettingsGroup, SettingsSection } from '@components/Settings';
 
-import { lazy, Suspense, useEffect, useState, type JSX } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type JSX } from 'react';
 import { PluginList } from './PluginList';
 import { Tag } from '@components/Tag/Tag';
 import { CreateTagRow } from '@components/Tag/CreateTagRow';
@@ -32,6 +32,7 @@ import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition
 import { FaXmark } from 'react-icons/fa6';
 import { QuickCreateRow } from '@components/NewInstanceButton';
 import { ResourceSideBar } from '@components/SideBar/ResourceSideBar/ResourceSideBar';
+import { SidebarSelectionProvider } from '@components/SideBar/ResourceSideBar/SidebarSelection';
 import { ScrollArea } from '@components/ScrollArea';
 import { useChildren } from '@tomic/react';
 
@@ -48,6 +49,7 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
   const store = useStore();
   const { subjects: subResources } = useChildren(resource.subject);
   const [ancestry, setAncestry] = useState<string[]>([]);
+  const driveHierarchy = useMemo(() => [resource.subject], [resource.subject]);
 
   useEffect(() => {
     store.getResourceAncestry(resource).then(result => {
@@ -104,16 +106,20 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
             <SettingsGroup>
               <SettingsSection label='Resources'>
                 <DriveSubResourcesSection>
-                  <ScrollArea>
-                    {subResources.map(child => (
-                      <ResourceSideBar
-                        key={child}
-                        subject={child}
-                        renderedHierarchy={[resource.subject]}
-                        ancestry={ancestry}
-                      />
-                    ))}
-                  </ScrollArea>
+                  <SidebarSelectionProvider
+                    current={resource.subject}
+                    ancestry={ancestry}
+                  >
+                    <ScrollArea>
+                      {subResources.map(child => (
+                        <ResourceSideBar
+                          key={child}
+                          subject={child}
+                          renderedHierarchy={driveHierarchy}
+                        />
+                      ))}
+                    </ScrollArea>
+                  </SidebarSelectionProvider>
                 </DriveSubResourcesSection>
               </SettingsSection>
               <SettingsSection label='Tags'>

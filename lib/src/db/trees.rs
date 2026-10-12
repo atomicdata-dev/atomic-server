@@ -1,6 +1,9 @@
 use crate::atoms::IndexAtom;
 
-use super::{prop_val_sub_index::propvalsub_key, val_prop_sub_index::valpropsub_key};
+use super::{
+    prop_val_sub_index::{propvalsub_key, propvalsub_legacy_key},
+    val_prop_sub_index::{valpropsub_key, valpropsub_legacy_key},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tree {
@@ -177,6 +180,25 @@ impl Operation {
             key: propvalsub_key(index_atom),
             val: None,
         }
+    }
+
+    /// Deletes of the keys an older store wrote for this atom (a sort part that
+    /// repeats the reference value), so its rows go when the atom does.
+    pub fn remove_atom_from_legacy_indexes(index_atom: &IndexAtom) -> [Self; 2] {
+        [
+            Operation {
+                tree: Tree::ValPropSub,
+                method: Method::Delete,
+                key: valpropsub_legacy_key(index_atom),
+                val: None,
+            },
+            Operation {
+                tree: Tree::PropValSub,
+                method: Method::Delete,
+                key: propvalsub_legacy_key(index_atom),
+                val: None,
+            },
+        ]
     }
 
     pub fn remove_resource(subject: &str) -> Self {

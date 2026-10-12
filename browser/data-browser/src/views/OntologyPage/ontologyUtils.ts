@@ -41,10 +41,17 @@ export async function newClass(
   return subject;
 }
 
+/**
+ * Creates a content-addressed Property. Its ID derives from the ontology
+ * (`parent`), `shortname` and `datatype`, so those must be chosen before this
+ * is called and cannot change afterwards. Returns the existing Property when
+ * the ontology already has one with the same shortname and datatype.
+ */
 export async function newProperty(
   shortname: string,
   parent: Resource,
   store: Store,
+  datatype: Datatype = Datatype.STRING,
 ) {
   const resource = await store.newResource({
     parent: parent.subject,
@@ -52,11 +59,14 @@ export async function newProperty(
     propVals: {
       [core.properties.shortname]: shortname,
       [core.properties.description]: 'a property',
-      [core.properties.datatype]: Datatype.STRING,
+      [core.properties.datatype]: datatype,
     },
+    contentAddressedProperty: true,
   });
 
-  await resource.save();
+  if (resource.new) {
+    await resource.save();
+  }
 
   return resource.subject;
 }

@@ -7,6 +7,11 @@ import {
   Suspense,
   type JSX,
 } from 'react';
+import { core, useString, useResource, useCanWrite } from '@tomic/react';
+import { useNavigate } from '@tanstack/react-router';
+import { ShowRoute } from '../../routes/ShowRoute';
+import { useTableFormColumns } from '../FormBuilder/useTableFormColumns';
+import { EditPropertyDialog } from './PropertyForm/EditPropertyDialog';
 import { styled } from 'styled-components';
 import { ContainerFull } from '@components/Containers';
 import { EditableTitle } from '@components/EditableTitle';
@@ -14,6 +19,7 @@ import { ResourceCoverImage } from '@components/ResourceDecorations';
 import type { ResourcePageProps } from '@views/ResourcePage';
 import { Row as FlexRow, Column } from '@components/Row';
 import { FaFileCsv, FaPlug, FaWandMagicSparkles } from 'react-icons/fa6';
+import { TableForms } from './TableForms';
 import { TableExportDialog } from './TableExportDialog';
 import { TableResource } from './TableResource';
 import { useCustomContextItems } from '@components/ResourceContextMenu/CustomContextItemsContext';
@@ -29,6 +35,16 @@ const WorkspaceControls = lazy(() =>
 
 export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   const titleId = useId();
+  const search = ShowRoute.useSearch();
+  const navigate = useNavigate();
+  const column = useResource(search.editColumn);
+  const [classSubject] = useString(resource, core.properties.classtype);
+  const { columns } = useTableFormColumns(classSubject ?? '');
+  const canWrite = useCanWrite(resource);
+  const editColumn =
+    !!search.editColumn &&
+    canWrite &&
+    columns.some(p => p.subject === search.editColumn);
 
   const { drive } = useSettings();
 
@@ -89,6 +105,20 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <>
       <ResourceCoverImage resource={resource} />
+      {editColumn && (
+        <EditPropertyDialog
+          resource={column}
+          showDialog
+          bindShow={visible => {
+            if (!visible)
+              void navigate({
+                to: ShowRoute.fullPath,
+                search: { ...search, editColumn: undefined },
+                replace: true,
+              });
+          }}
+        />
+      )}
       <BoundedHeightContainer>
         <Column>
           <FlexRow justify='space-between'>
@@ -100,6 +130,7 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
             />
           </FlexRow>
           <TableResource resource={resource} />
+          <TableForms table={resource} />
         </Column>
         {workspaceSection && (
           <Suspense fallback={null}>

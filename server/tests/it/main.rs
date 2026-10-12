@@ -7,6 +7,7 @@
 mod common;
 
 mod blob_sync;
+mod conversations;
 mod drive_presence;
 mod drive_presence_shared;
 mod file_search_repro;

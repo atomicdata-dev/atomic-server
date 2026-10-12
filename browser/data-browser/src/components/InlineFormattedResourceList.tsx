@@ -18,7 +18,10 @@ export function InlineFormattedResourceList({
   RenderComp,
 }: InlineFormattedResourceListProps): JSX.Element {
   // There are rare cases where a resource array can locally have an undefined value, we filter these out to prevent the formatter from throwing an error.
-  const filteredSubjects = subjects.filter(subject => subject !== undefined);
+  // The formatter, and the subject lookup below it, throw for anything that is not a string.
+  const filteredSubjects = subjects.filter(
+    subject => typeof subject === 'string',
+  );
   const parts = formatter.formatToParts(filteredSubjects);
 
   return (

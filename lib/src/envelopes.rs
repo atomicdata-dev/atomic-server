@@ -138,6 +138,29 @@ pub fn record_ops(
     let json = response.commit_resource.to_json_ad(None)?;
     let new_key = key(subject, response.commit.created_at, signature);
 
+    if genesis_is_kept_as_row(response) {
+        return Ok(());
+    }
+    // Later commits: under `All` the genesis envelope is history that has to
+    // stay, so write it out before something newer sits beside it.
+    if store.envelope_retention() == EnvelopeRetention::All {
+        let nothing_stored = store
+            .kv
+            .scan_prefix(Tree::Envelopes, &prefix(subject))
+            .next()
+            .is_none();
+        if nothing_stored {
+            if let Some(genesis) = genesis_envelope_from_row(store, subject) {
+                transaction.push(Operation {
+                    tree: Tree::Envelopes,
+                    method: Method::Insert,
+                    key: key(subject, genesis.created_at, &genesis.signature),
+                    val: Some(genesis.json.into_bytes()),
+                });
+            }
+        }
+    }
+
     if store.envelope_retention() == EnvelopeRetention::Latest {
         for existing in store.kv.scan_prefix(Tree::Envelopes, &prefix(subject)) {
             let (old_key, _) = existing?;
@@ -163,12 +186,59 @@ pub fn record_ops(
 
 /// Every retained envelope of a resource, oldest first.
 pub fn envelopes(store: &Db, subject: &str) -> Vec<StoredEnvelope> {
-    store
+    let mut rows: Vec<StoredEnvelope> = store
         .kv
         .scan_prefix(Tree::Envelopes, &prefix(subject))
         .filter_map(|entry| entry.ok())
         .filter_map(|(k, v)| decode(&k, v))
-        .collect()
+        .collect();
+    if rows.is_empty() {
+        rows.extend(genesis_envelope_from_row(store, subject));
+    }
+    rows
+}
+
+/// The signature that names `subject`, when it is a resource whose id was
+/// derived from its genesis commit.
+fn genesis_signature(subject: &str) -> Option<String> {
+    let pure = crate::Subject::from_raw(subject, None).pure_id();
+    let canonical = crate::identifiers::canonicalize_scheme(&pure);
+    if !crate::identifiers::is_resource_id(&canonical) {
+        return None;
+    }
+    crate::identifiers::identifier_body(&canonical).map(str::to_string)
+}
+
+/// A resource's genesis commit is stored as a row of its own (the durable
+/// record, see `apply_commit`), so its envelope would hold the same signed
+/// bytes a second time: about 2.4 KB for every chat message. It is not
+/// written. While nothing newer has replaced it, this rebuilds the envelope
+/// from that row: the row is the commit resource the envelope was written
+/// from, so the JSON is the same.
+fn genesis_envelope_from_row(store: &Db, subject: &str) -> Option<StoredEnvelope> {
+    let signature = genesis_signature(subject)?;
+    let commit_id = crate::identifiers::commit_subject(&signature);
+    let propvals = store.get_propvals(&commit_id).ok()?;
+    let row = crate::Resource::from_propvals(propvals, crate::Subject::from_raw(&commit_id, None));
+    let created_at = row.get(crate::urls::CREATED_AT).ok()?.to_int().ok()?;
+    let json = row.to_json_ad(None).ok()?;
+    Some(StoredEnvelope {
+        subject: subject.to_string(),
+        created_at,
+        signature,
+        json,
+    })
+}
+
+/// Whether `response` is the genesis commit of its resource, whose
+/// `Tree::Resources` row already keeps it.
+fn genesis_is_kept_as_row(response: &CommitResponse) -> bool {
+    let Some(signature) = response.commit.signature.as_deref() else {
+        return false;
+    };
+    response.auth_impact().genesis
+        && response.resource_new.is_some()
+        && genesis_signature(response.commit.subject.as_str()).as_deref() == Some(signature)
 }
 
 /// The envelope that produced the resource's current state, if kept.
@@ -907,5 +977,76 @@ mod tests {
             "expected the replay guard, got: {err}"
         );
         assert!(db.has_resource_locally(&subject.pure_id()));
+    }
+
+    /// The genesis commit is kept as a `Tree::Resources` row, so its envelope
+    /// is not written a second time; it is rebuilt from the row, and is the
+    /// same JSON the envelope would have held.
+    #[tokio::test]
+    async fn genesis_envelope_is_rebuilt_from_the_commit_row_not_stored() {
+        let db = Db::init_temp("envelopes_genesis_not_stored").await.unwrap();
+        let mut resource = crate::Resource::new("did:ad:placeholder".into());
+        resource
+            .set(urls::NAME.into(), Value::String("hallo".into()), &db)
+            .await
+            .unwrap();
+        let response = resource.save_as_genesis(&db).await.unwrap();
+        let subject = response
+            .resource_new
+            .as_ref()
+            .unwrap()
+            .get_subject()
+            .clone();
+        let written = response.commit_resource.to_json_ad(None).unwrap();
+
+        assert!(
+            db.kv
+                .scan_prefix(Tree::Envelopes, &prefix(subject.as_str()))
+                .next()
+                .is_none(),
+            "nothing is stored in the envelope tree for a fresh resource"
+        );
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 1);
+        assert_eq!(
+            kept[0].json, written,
+            "the rebuilt envelope is the commit as signed"
+        );
+        assert_eq!(
+            kept[0].commit_id(),
+            response.commit_resource.get_subject().as_str().to_string()
+        );
+
+        // Once an edit replaces it, `latest` keeps only the edit.
+        signed_edit(&db, &subject, "edited").await;
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 1);
+        assert_ne!(kept[0].json, written);
+    }
+
+    /// Under `all` the genesis envelope is history: the edit that follows
+    /// writes it out so it stays beside the new one.
+    #[tokio::test]
+    async fn all_retention_keeps_the_genesis_envelope_through_an_edit() {
+        let db = Db::init_temp("envelopes_genesis_all").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let mut resource = crate::Resource::new("did:ad:placeholder".into());
+        resource
+            .set(urls::NAME.into(), Value::String("hallo".into()), &db)
+            .await
+            .unwrap();
+        let response = resource.save_as_genesis(&db).await.unwrap();
+        let subject = response
+            .resource_new
+            .as_ref()
+            .unwrap()
+            .get_subject()
+            .clone();
+        let written = response.commit_resource.to_json_ad(None).unwrap();
+
+        signed_edit(&db, &subject, "edited").await;
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 2, "genesis and the edit");
+        assert_eq!(kept[0].json, written);
     }
 }

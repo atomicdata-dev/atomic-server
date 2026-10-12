@@ -37,3 +37,39 @@ Added in #1463. Disables the Chromium `PreventCrossWorldServiceWorkerResourceReu
 feature, which confuses `null` and `MainWorld()` in service-worker preload
 matching on Chromium 153 and breaks E2E runs. Remove once the browser Playwright
 bundles includes `chromium/chromium@4df9ee2790a4`.
+
+## wuchale@0.25.6.patch
+
+Fixes message extraction for JSX that sits inside an expression rather than
+directly in its parent's children (`{cond && <X/>}`, a ternary, `.map(...)`,
+an attribute such as `title={<span>...</span>}`). Wuchale visited those trees
+against the enclosing level's pending state. A text-less element there, as in
+`{a && <p>{x}</p>}`, applied and reset that state early, so the messages of
+every later sibling were silently dropped: they rendered untranslated and
+never reached the `.po` files, and `pnpm clean-translations` removed their
+entries (for example "Fetch workspace", "Restore version"). Other trees had
+their text folded into the enclosing level and were extracted as sentence
+fragments ("Searching for", "for"). The patch gives each such tree its own
+state and applies it when the tree ends. It applies to the CLI and the vite
+plugin alike, since both use `MixedVisitor`.
+
+Upstream: not yet reported; the same code shape is still in wuchale 0.26.7.
+Remove when an upstream release isolates expression children in
+`adapter-utils/mixed-visitor.js`, then re-run `pnpm clean-translations` and
+check that no entries move.
+
+## @wuchale/jsx@0.12.5.patch
+
+The runtime component that renders a message with markup in it (an icon next
+to a label, a link inside a sentence) returns the pieces as an array, and the
+elements in it carry no key. In development React logs "Each child in a list
+should have a unique key" for every such message, with the owner named after
+the surrounding component (for example `TitleDecorationAffordances`). The
+patch wraps each piece in a `Fragment` keyed by its position, which cannot
+change for a given message. Production builds never logged it, but a Vite dev
+server does, and the atomic-saas portal e2e runs one and fails on any console
+error. `Children.toArray` does not help: React still warns for elements it
+keys that way.
+
+Upstream: not yet reported. Remove when the `@wuchale/jsx` runtime keys the
+pieces it returns; `src/locales/wuchaleRuntime.test.tsx` fails if it does not.

@@ -354,6 +354,47 @@ mod test {
     }
 
     #[tokio::test]
+    async fn populate_forms_ontology() {
+        let store = init_store().await;
+        for url in [
+            urls::FORM,
+            urls::FORM_PAGE,
+            urls::FORM_FIELD,
+            urls::FORM_HEADING,
+            urls::FORM_PARAGRAPH,
+            urls::FORM_INFO_BOX,
+            urls::FORM_INFO_BOX_STYLE,
+            urls::FORM_CONDITION,
+            urls::FORM_CONDITIONS,
+            urls::FORM_CONDITION_FIELD,
+            urls::FORM_CONDITION_OPERATOR,
+            urls::FORM_CONDITION_VALUE,
+            urls::FORM_OPEN_AT,
+            urls::FORM_CLOSE_AT,
+            urls::FORM_OWNS_SCHEMA,
+        ] {
+            store.get_resource(&url.into()).await.unwrap();
+        }
+        let class = store.get_class(urls::FORM_CONDITION).await.unwrap();
+        assert_eq!(class.shortname, "form-condition");
+        let form = store.get_resource(&urls::FORM.into()).await.unwrap();
+        assert!(form
+            .get(urls::RECOMMENDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()
+            .contains(&urls::FORM_OWNS_SCHEMA.to_string()));
+        let ownership = store
+            .get_resource(&urls::FORM_OWNS_SCHEMA.into())
+            .await
+            .unwrap();
+        assert_eq!(
+            ownership.get(urls::DATATYPE_PROP).unwrap().to_string(),
+            urls::BOOLEAN
+        );
+    }
+
+    #[tokio::test]
     async fn single_get_empty_server_to_class() {
         let store = Store::init().await.unwrap();
         crate::populate::populate_base_models(&store).await.unwrap();

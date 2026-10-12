@@ -11,12 +11,17 @@ import {
   ai,
   core,
   dataBrowser,
+  forms,
   useResource,
   useCanWrite,
   unknownSubject,
 } from '@tomic/react';
 import { useChildren } from '@tomic/react';
-import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
+// Evaluated here, ahead of the row's context menu, on purpose: the module cycle
+// routes > Dropdown > ResourceContextMenu only loads in an order that works
+// when this comes first ("Cannot access 'DIVIDER' before initialization").
+import '../../../helpers/useCurrentSubject';
+import { useAncestryIfAncestor, useIsCurrentSubject } from './SidebarSelection';
 import { SideBarItem } from '../SideBarItem';
 import { AtomicLink } from '../../AtomicLink';
 import { styled } from 'styled-components';
@@ -36,14 +41,13 @@ import { transition } from '../../../helpers/transition';
 interface ResourceSideBarProps {
   subject: string;
   renderedHierarchy: string[];
-  ancestry: string[];
   /** When a SideBar item is clicked, we should close the SideBar (on mobile devices) */
   onClick?: () => unknown;
 }
 
 /** Renders a Resource as a nav item for in the sidebar. */
 export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
-  ({ subject, renderedHierarchy, ancestry, onClick }) => {
+  ({ subject, renderedHierarchy, onClick }) => {
     if (renderedHierarchy.length === 0) {
       throw new Error('renderedHierarchy should not be empty');
     }
@@ -60,17 +64,18 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
     }
 
     const resource = useResource(subject, { allowIncomplete: true });
-    const [currentUrl] = useCurrentSubject();
     const canWrite = useCanWrite(resource);
-    const active = currentUrl === subject;
+    const active = useIsCurrentSubject(subject);
+    const ancestryWhenAncestor = useAncestryIfAncestor(subject);
     const [open, setOpen] = useState(active);
 
     // Classes that own their children's display in their own UI — skip the
     // sidebar tree for them. Tables show rows in the grid view, chatrooms
     // and meetings show messages in the timeline, AI chats show messages
     // in the AI panel, ontologies show classes/properties in their
-    // dedicated panel. Listing those children again in the sidebar would
-    // be noisy and confuses drop targeting.
+    // dedicated panel, forms show their results table via the builder's
+    // Results tab. Listing those children again in the sidebar would be
+    // noisy and confuses drop targeting.
     //
     // `allowIncomplete` means `classes` is `[]` until `isA` hydrates. Treat
     // that as hidden too: otherwise `useChildren` fetches every table row
@@ -85,7 +90,8 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
       classes.includes(dataBrowser.classes.chatroom) ||
       classes.includes(dataBrowser.classes.meeting) ||
       classes.includes(ai.classes.aiChat) ||
-      classes.includes(core.classes.ontology);
+      classes.includes(core.classes.ontology) ||
+      classes.includes(forms.classes.form);
 
     const { subjects: subResources, total: totalChildren } = useChildren(
       hideChildren ? undefined : subject,
@@ -178,7 +184,10 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
     );
     const isDragging = draggingNode?.id === subject;
     const isHoveringOver = over?.data.current?.parent === subject;
-    const hierarchyWithItself = [...renderedHierarchy, subject];
+    const hierarchyWithItself = useMemo(
+      () => [...renderedHierarchy, subject],
+      [renderedHierarchy, subject],
+    );
 
     useEffect(() => {
       if (isDragging) {
@@ -187,10 +196,10 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
     }, [isDragging]);
 
     useEffect(() => {
-      if (ancestry.includes(subject) && ancestry[0] !== subject) {
+      if (ancestryWhenAncestor) {
         setOpen(true);
       }
-    }, [ancestry, subject]);
+    }, [ancestryWhenAncestor]);
 
     if (!subject || subject === unknownSubject) {
       return null;
@@ -253,7 +262,6 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
                   <ResourceSideBar
                     subject={child}
                     renderedHierarchy={hierarchyWithItself}
-                    ancestry={ancestry}
                     onClick={onClick}
                   />
                   {!websiteClass && (

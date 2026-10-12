@@ -8,6 +8,7 @@ import { useFilePicker } from './useFilePicker';
 import type { UIPluginData } from '@components/CustomViewProvider';
 import { useRequestPermissionDialog } from './useRequestPermissionDialog';
 import { useHostUI } from '@components/HostUI/hostUI';
+import type { ColorScheme } from '@helpers/extensions/FrameBridge';
 import {
   LegacyViewAdapter,
   resourceToUIPluginResource,
@@ -16,6 +17,7 @@ import {
 export function usePluginRPC(
   pluginData: UIPluginData,
   css: string,
+  colorScheme?: ColorScheme,
 ): [React.RefObject<HTMLIFrameElement | null>, React.ReactNode] {
   const store = useStore();
   const navigate = useNavigateWithTransition();
@@ -119,7 +121,7 @@ export function usePluginRPC(
       agent: agent?.subject ?? '',
     };
     serverRef.current.pluginResource = pluginResource.stable;
-    serverRef.current.setStyle(css);
+    serverRef.current.setStyle(css, colorScheme);
   });
 
   return [

@@ -42,7 +42,9 @@ export function useDriveHostingStates() {
       }
 
       const [response, vaults] = await Promise.all([
-        managedFetch('/sync-enrollments', {}),
+        // Opening the menu is an explicit refresh. A short metadata cache
+        // can still hold the empty placement from before the first upload.
+        managedFetch('/sync-enrollments', { cache: 'no-store' }),
         listVaultDrives(),
       ]);
 

@@ -101,7 +101,6 @@ export const NumberPropertyForm = ({
         resource={resource}
         minProp={dataBrowser.properties.min}
         maxProp={dataBrowser.properties.max}
-        constraintClass={dataBrowser.classes.rangeProperty}
       />
     </Suspense>
   );

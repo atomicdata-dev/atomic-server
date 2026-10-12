@@ -1,3 +1,5 @@
+// Command-line proxy; stdout is its user interface.
+// ignore_for_file: avoid_print
 // Reverse proxy that adds COOP/COEP headers for SharedArrayBuffer support.
 // Usage: dart run web_proxy.dart <flutter_port> [proxy_port]
 

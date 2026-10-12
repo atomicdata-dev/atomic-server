@@ -30,7 +30,7 @@ A config file called `atomic.config.json` has been generated, it should look som
 ```
 
 Now let's add the subject of our ontology to the `ontologies` list.
-To get the subject, open the ontology in the Atomic Data browser and copy the `did:ad:…` identifier from the search bar at the bottom (or from `?subject=` in the address bar) — not the `https://…/did:ad:…` URL.
+To get the subject, open the ontology in the Atomic Data browser and copy the `atomic:…` identifier from the search bar at the bottom (or from `?subject=` in the address bar) — not the `https://…/atomic:…` URL.
 Set `serverUrl` to the origin of your Atomic Server.
 
 ```json
@@ -38,7 +38,7 @@ Set `serverUrl` to the origin of your Atomic Server.
   "outputFolder": "./src/ontologies",
   "moduleAlias": "@tomic/lib",
   "serverUrl": "http://localhost:9883",
-  "ontologies": ["did:ad:<your-ontology-id>"]
+  "ontologies": ["atomic:<your-ontology-id>"]
 }
 ```
 

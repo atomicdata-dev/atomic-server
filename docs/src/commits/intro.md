@@ -14,7 +14,7 @@ See [concepts](concepts.md) for the field list.
 - **Verifiable writes**: cryptographic proof of who changed what, and when.
 - **Traceable origin**: every applied write is attributable to an Agent.
 - **CRDT merge**: concurrent edits merge deterministically via Loro. There is no linear commit chain to enforce.
-- **Identifiable**: a commit has an id (`did:ad:commit:{signature}`). That id may be retained as a receipt; it is not required as a refetchable resource.
+- **Identifiable**: a commit has an id (`atomic:commit:{signature}`). That id may be retained as a receipt; it is not required as a refetchable resource.
 - **Decentralized**: envelopes can move over HTTP `/commit`, WebSocket `COMMIT`, or a peer sync path that carries the same signature.
 - **ACID-compliant**: a commit is applied only if signature, rights, and schema checks pass.
 - **Atomic**: all Atomic Data design goals also apply here.
@@ -23,7 +23,7 @@ See [concepts](concepts.md) for the field list.
 
 - Not the source of current state. Loro is.
 - Not a Git-style parent chain. `previousCommit` is optional audit metadata.
-- Not a product surface. The `/commits` class collection is not created. UI reads author and dates from the resource's genesis certificate, not by fetching `did:ad:commit:…`.
+- Not a product surface. The `/commits` class collection is not created. UI reads author and dates from the resource's genesis certificate, not by fetching `atomic:commit:…`.
 - Not required to stay on disk after apply, except genesis and rights / parent / destroy.
 
 ## How a write lands

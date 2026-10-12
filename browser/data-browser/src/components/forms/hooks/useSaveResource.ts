@@ -32,7 +32,6 @@ export const useSaveResource = (
         await resource.save();
         setSaving(false);
         onSaveSucces?.();
-        toast.success('Resource saved');
 
         if (resource.new) {
           store.notifyResourceManuallyCreated(resource);

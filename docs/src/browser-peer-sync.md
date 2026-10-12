@@ -2,7 +2,7 @@
 
 This is the browser-to-browser transport of [Atomic Sync](sync.md): the same signed commits and the same rights checks as over WebSocket or Iroh, carried over a WebRTC data channel because a browser tab cannot be dialed by a peer.
 
-The Sync page can connect up to eight browsers without an Atomic Cloud Server subscription.
+The Sync page can connect up to eight browsers without a server holding the data.
 Create a peer link in the source drive's Sync page, share it with the other person,
 and connect from that link. Give a different agent access through Share first;
 a peer link introduces devices but does not grant read or write permission.
@@ -47,11 +47,9 @@ storage replica. Browser execution can be suspended in background tabs.
 
 ## Operator configuration
 
-The signaling endpoint is served by the **Atomic Place managed service**, separately
-from an AtomicServer data node. It requires no account login, drive enrollment or Cloud Server subscription.
-The browser uses `VITE_MANAGED_PORTAL_URL` for its managed environment, defaulting to
-`https://atomicserver.eu` (or the staging SaaS origin for the staging app). Users
-do not select a data node to discover peers.
+The signaling endpoint is a small WebSocket service, separate from an AtomicServer data node.
+It only introduces tabs to each other and never stores data. The app on [atomic.place](https://atomic.place)
+uses the one that service runs; a build points elsewhere with `VITE_MANAGED_PORTAL_URL`.
 
 `VITE_ATOMIC_SIGNALING_URL` overrides discovery for self-hosted/community
 services. Use WSS outside loopback development. Local portal Vite proxies

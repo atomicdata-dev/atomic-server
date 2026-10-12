@@ -31,6 +31,7 @@ import {
   AccountPasskeyUnsupportedError,
   buildEnvelopeV2,
   buildEnvelopeWithPasskeyAndCode,
+  enableAssistedForBackup,
   envelopeWrapperKinds,
   getRecoverySecret,
   isPasskeySupported,
@@ -110,6 +111,8 @@ export function AccountRecoveryCard({
   /** Assisted recovery: offered here at all, and whether it is on. */
   const [assistedOffered, setAssistedOffered] = useState(false);
   const [assistedOn, setAssistedOn] = useState(true);
+  /** The recovery code typed to give an older backup the assisted key. */
+  const [assistedCode, setAssistedCode] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -599,6 +602,43 @@ export function AccountRecoveryCard({
     }
   }
 
+  /**
+   * A backup made before assisted recovery has no assisted key, so signing in
+   * does not open it yet, however the switch is set. Only something that
+   * already opens it can add one: one passkey prompt, or the code.
+   */
+  const assistedMissing =
+    assistedOffered &&
+    assistedOn &&
+    !deviceOnly &&
+    !hasAccount &&
+    (hasPasskey || hasCode);
+
+  async function handleEnableAssisted() {
+    if (backup.phase !== 'ready') return;
+
+    const current = backup;
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const saved = await enableAssistedForBackup(
+        current.secret,
+        hasPasskey ? undefined : assistedCode.trim(),
+      );
+      setBackup({ ...current, secret: saved });
+      setAssistedCode('');
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message.trim()
+          ? e.message
+          : 'Could not turn this on. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <Column gap='0.75rem'>
       {error && <ErrorLook role='alert'>{error}</ErrorLook>}
@@ -631,13 +671,47 @@ export function AccountRecoveryCard({
             Let {PRODUCT_NAME} help me recover
           </CheckboxLabel>
           <Hint>
-            {assistedOn
-              ? `Signing in to your ${PRODUCT_NAME} account is enough to open your identity on a new device. ${PRODUCT_NAME} holds a key for that. Turn it off to rely only on your passkey or recovery code.`
-              : `Only your passkey or recovery code opens your identity. ${PRODUCT_NAME} cannot.`}
+            {assistedMissing
+              ? hasPasskey
+                ? `Signing in to your ${PRODUCT_NAME} account does not open this identity yet: this backup was made before that was possible. Confirm once with your passkey to turn it on.`
+                : `Signing in to your ${PRODUCT_NAME} account does not open this identity yet: this backup was made before that was possible. Confirm once with your recovery code to turn it on.`
+              : assistedOn
+                ? `Signing in to your ${PRODUCT_NAME} account is enough to open your identity on a new device. ${PRODUCT_NAME} holds a key for that. Turn it off to rely only on your passkey or recovery code.`
+                : `Only your passkey or recovery code opens your identity. ${PRODUCT_NAME} cannot.`}
             {assistedOn && !hasPasskey && !hasCode
               ? ' Add a passkey or recovery code first.'
               : null}
           </Hint>
+          {assistedMissing ? (
+            <Row gap='0.5rem' wrapItems>
+              {hasPasskey ? null : (
+                <InputWrapper hasPrefix>
+                  <FaKey />
+                  <InputStyled
+                    value={assistedCode}
+                    onChange={e => setAssistedCode(e.target.value)}
+                    placeholder='Recovery code'
+                    aria-label='Recovery code'
+                    autoComplete='off'
+                    spellCheck={false}
+                    disabled={loading}
+                    data-test='enable-assisted-code'
+                  />
+                </InputWrapper>
+              )}
+              <Button
+                onClick={() => void handleEnableAssisted()}
+                disabled={loading || (!hasPasskey && !assistedCode.trim())}
+                data-test='enable-assisted'
+              >
+                {loading
+                  ? 'Turning on…'
+                  : hasPasskey
+                    ? 'Confirm with your passkey'
+                    : 'Confirm with your code'}
+              </Button>
+            </Row>
+          ) : null}
         </Column>
       ) : null}
 

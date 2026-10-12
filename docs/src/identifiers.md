@@ -10,7 +10,7 @@ This makes resources portable, self-authenticating, and resolvable over both the
 
 - **Self-sovereign**: Identifiers don't depend on any server or domain name. You generate a keypair, and you have an identity.
 - **Portable**: Resources can move between servers without changing their identifier.
-- **Multi-transport**: The same identifier can be resolved over the internet (Mainline DHT) or local mesh networks (Reticulum).
+- **Multi-transport**: The same identifier can be resolved by asking paired devices, an always-on replica, or the pkarr relay network for peers that hold the Drive (a mesh transport over Reticulum is planned, not built).
 - **Verifiable**: Trust comes from [Commit](commits/intro.md) signatures, not from who hosts the data.
 - **Replicatable**: Any node can replicate and serve a Drive without holding the Drive's private key.
 
@@ -70,7 +70,7 @@ For most operations, agents don't need to be "resolved" at all:
 - **Displaying profile info** (name, avatar): Drives cache agent metadata when agents interact with them (e.g. accepting an [Invite](invitations.md), making a [Commit](commits/intro.md)). The drive you're connected to typically already has it.
 
 If a client encounters an unknown agent, it can show the truncated public key as a fallback.
-More sophisticated resolution (e.g. using [Mainline DHT](#3-mainline-dht-internet) or [Reticulum](#2-reticulum-mesh-resolution) announces) can be layered on later without changing the identifier format.
+More sophisticated resolution (e.g. announcing agent profiles over [peer discovery](#3-peer-discovery-pkarr-relay)) can be layered on later without changing the identifier format.
 
 ### Commit identifiers
 
@@ -119,7 +119,7 @@ Like resources and commits, blob identifiers accept a routing hint pointing at a
 atomic:blob:{blake3}?drive=atomic:{drive_genesis}
 ```
 
-A client looks up peers for the Drive via Mainline DHT or Reticulum, then asks any of them for the blob. Over the v2 sync protocol, blobs travel as raw 32-byte hashes inside `BLOB_REQUEST`/`BLOB_RESPONSE` frames — the identifier is for *identity*, the bytes on the wire are the underlying hash. (This parallels commits: the identifier is `atomic:commit:{sig}`, but the wire never re-prepends the prefix.)
+A client looks up peers for the Drive through [peer discovery](#3-peer-discovery-pkarr-relay), then asks any of them for the blob. Over the v2 sync protocol, blobs travel as raw 32-byte hashes inside `BLOB_REQUEST`/`BLOB_RESPONSE` frames — the identifier is for *identity*, the bytes on the wire are the underlying hash. (This parallels commits: the identifier is `atomic:commit:{sig}`, but the wire never re-prepends the prefix.)
 
 The HTTP form `<origin>/download/files/{blake3}` is a deployment-specific alias for `atomic:blob:{blake3}` and remains supported for browsers and existing tooling.
 
@@ -175,16 +175,9 @@ atomic:4f7ba2...910?drive=atomic:7e6a9d...038
 
 A Drive is a first-class resource identified by its own `atomic:` identifier.
 
-When a Drive is used as a routing hint (the `?drive=` parameter), network nodes derive an **internal discovery hash** for lookups on decentralized networks (Mainline DHT or Reticulum). This hash is never stored as an explicit property; it is derived on-the-fly when needed for discovery.
-
-The formula for the discovery hash is:
-```text
-discovery_hash = HASH(drive_did_string)
-```
-
-The specific hash algorithm depends on the transport protocol:
-- **Mainline DHT**: Uses `SHA1(drive_did_string)` to produce a 20-byte ID.
-- **Reticulum**: Uses `truncated_SHA256(drive_did_string)` to produce a 16-byte destination.
+When a Drive is used as a routing hint (the `?drive=` parameter), discovery needs a key to publish and look up under.
+It is derived on the fly from the Drive's identifier and never stored as a property: a [pkarr](https://github.com/Pubky/pkarr) keypair seeded from the first 32 bytes of the Drive's genesis signature.
+Because anyone who knows the identifier can derive the same keypair, replicas can announce themselves without holding the Drive owner's key. Trust never comes from who published the record; it comes from the Commit signatures in the data.
 
 This ensures:
 - **Consistency**: Everything is a `atomic:` identifier.
@@ -198,8 +191,8 @@ Trust comes from [Commit signatures](commits/intro.md), not from who serves the 
 
 1. The Drive owner creates resources and signs [Commits](commits/intro.md) with their Agent key.
 2. A replica node syncs the data and verifies every Commit signature.
-3. The replica announces itself as a peer for this Drive (on Mainline DHT, Reticulum, or both) using the discovery hash derived from the Drive's identifier string.
-4. Clients fetching data derive the same hash from the `?drive=` hint and look up peers.
+3. The replica announces itself as a peer for this Drive (as an Iroh node ID, published through the pkarr relay) under the key derived from the Drive's identifier.
+4. Clients fetching data derive the same key from the `?drive=` hint and look up peers.
 5. Clients fetch data and verify Commit signatures themselves — they don't need to trust the serving node.
 
 ## Resolution
@@ -211,30 +204,26 @@ Multiple resolution strategies can be tried in order:
 
 If the resource has been fetched before, serve it from the local store.
 
-### 2. Reticulum mesh resolution
+### 2. Paired devices and always-on replicas
 
-[Reticulum](https://reticulum.network/) is a mesh networking stack that works over any medium — radio, LoRa, serial, TCP, UDP, and more.
-Its addressing model is a natural fit for `atomic:`:
+If the Drive was shared with or paired to this device, ask those devices first. Over [Atomic Sync](sync.md) a paired peer or an AtomicServer answers with exactly the Resources the asking Agent may read.
 
-- Reticulum destinations are 16-byte hashes.
-- To reach a Drive on a Reticulum mesh, a client sends a **path request** for the 16-byte destination derived from the Drive's identifier string. Any Transport Node that has seen an announce for that destination can route the request.
-- The Drive node (or any replica) announces its destination on the mesh, making it reachable within minutes even on slow, multi-hop networks.
+### 3. Peer discovery (pkarr relay)
 
-This means two Atomic Server nodes on a Reticulum mesh (e.g. over LoRa radio) can exchange and resolve resources **without any internet access**, using the exact same `atomic:` identifiers they would use online.
+For a Drive you only know by identifier, a node holding the Drive publishes its Iroh node ID to the [pkarr](https://github.com/Pubky/pkarr) relay network under the key derived from the Drive (see [Drive identity](#drive-identity)), and a client looks that key up:
 
-### 3. Mainline DHT (internet)
+1. A node hosting a Drive publishes `drive identifier -> [node ID, ...]`. Several replicas can be listed at once.
+2. A client resolving the Drive reads the list and dials a node over Iroh. Addressing (relay URL, direct addresses) is handled by Iroh.
+3. The client requests the Resource and verifies the Commit signatures itself.
 
-[Mainline DHT](https://en.wikipedia.org/wiki/Mainline_DHT) is the BitTorrent distributed hash table — a decentralized network with millions of active nodes.
-It provides a way for any node to announce that it hosts a given Drive, and for clients to discover those nodes:
+The same record can also carry a second TXT value, `_atomic_http`: a JSON array of the public `https://` origins of servers hosting the Drive. A browser cannot dial Iroh, but it can read the relay over HTTPS (`GET https://dns.iroh.link/pkarr/<z-base-32 public key>`, answered with CORS enabled). A client that holds only the person's secret derives the key from the Drive's identifier, verifies the signed packet against that key, and checks that each origin serves the Drive's genesis certificate before using it (see the threat model below). Servers skip origins that are not reachable from outside (plain `http`, `localhost`, IP addresses, single-label or `.local` hosts) and publish again every hour, because the record expires. As with node IDs the record is only a hint: anyone who knows the identifier can write to it, so clients ignore unusable origins and still verify Commit signatures.
 
-1. A node hosting a Drive calls `announce_peer(SHA1(drive_did_string))` on the Mainline DHT.
-2. A client resolving a Drive calls `get_peers(SHA1(drive_did_string))` and receives a list of IP:port pairs.
-3. The client connects to any discovered peer and requests the resource using the original identifier.
-4. Commit signatures are verified client-side.
+**Threat model.** The key is derived from the public identifier, so anyone who knows a Drive's identifier can publish a newer `_atomic_http` record for it, naming their own server. That is accepted: the record is a hint, never proof. A malicious record can make a client contact a server of the attacker's choosing, waste a few requests, or hide the honest entries (denial of discovery). It cannot make the client accept data that is not signed by the Drive's owner, and it cannot make the client follow a server that does not hold the Drive. Before a client moves to an announced origin it fetches the Drive's genesis certificate from that origin with `GET /genesis?subject=<identifier>`, an anonymous request that refuses redirects, and checks that the certificate signs to the Drive's identifier. The identifier is that signature, so only a holder of the owner's key can produce one; a server that is merely a node, or serves another Drive, is skipped. At most three origins are tried per lookup.
 
-No special signing keys (BEP44) are needed at the DHT layer.
-The DHT is a pure _discovery_ mechanism — all trust and authenticity comes from the Commit signatures in the data itself.
-Any node — the original or a replica — can announce itself as a peer.
+`/genesis` is a read-only route that any visitor may call, even for a private Drive, because the client has no credentials the candidate server could be trusted with yet. It answers `{"@id": <identifier>, "https://atomicdata.dev/properties/genesis": <certificate>}` and nothing else. The certificate reveals the signer's public key, the creation time, a random nonce and the `parent` / `drive` fields it was minted with, and the route confirms that this server holds a Drive with that identifier. It never reads the Drive's other properties, children or history, and it is not subject to the Drive's read rights. Only Drives answer; any other subject (a resource inside a Drive, an agent, an URL, an unknown or malformed identifier) is a plain 404, so the route cannot be used to look for private resources. A Drive minted before genesis certificates existed has none to serve and cannot be verified this way. Whatever server is chosen this way is remembered as an inferred choice, not a pinned one: it does not outrank a server the person picked or a device's own node later, and Commit signatures are still verified on everything fetched.
+
+The relay speaks HTTP, so this works through NAT and in places where raw UDP does not. It is a pure _discovery_ mechanism: all trust and authenticity comes from the Commit signatures in the data.
+Reticulum, for resolution over a mesh without internet access, is planned but not implemented.
 
 ### 4. Direct connection
 
@@ -255,13 +244,13 @@ This header provides several benefits:
 
 ## Relationship to the internal `Subject` type
 
-Internally, AtomicServer uses the [`Subject`](https://github.com/atomicdata-dev/atomic-server/blob/main/lib/src/subject.rs) enum to represent resource identifiers.
+Internally, AtomicServer uses the [`Subject`](https://github.com/ontola/atomic-server/blob/main/lib/src/subject.rs) enum to represent resource identifiers.
 The three variants map to different resolution strategies:
 
 | `Subject` variant | Format | Use case |
 |---|---|---|
 | `Internal` | `internal:/path` | Local resources on this server. Resolved to an absolute URL using the server's origin for serialization. |
-| `Did` | `atomic:...` | Agents (by public key), Commits (by signature), Blobs (by BLAKE3 hash), Nodes (as routing identities), and Resources in Drives (by genesis commit signature). Routing hints (`?drive=atomic:...`) are used for peer discovery via Reticulum or Mainline DHT. |
+| `Did` | `atomic:...` | Agents (by public key), Commits (by signature), Blobs (by BLAKE3 hash), Nodes (as routing identities), and Resources in Drives (by genesis commit signature). Routing hints (`?drive=atomic:...`) are used for peer discovery through the pkarr relay. |
 | `External` | `https://...` | Resources on other servers. Resolved via HTTP. Used for backward compatibility and external linked data. |
 
 When serializing to [JSON-AD](core/json-ad.md), `Internal` subjects are resolved to absolute URLs using the server's configured origin.
@@ -272,7 +261,7 @@ When serializing to [JSON-AD](core/json-ad.md), `Internal` subjects are resolved
 | | `atomic:` | `atomic:web` | `atomic:dht` | `did:key` |
 |---|---|---|---|---|
 | **Decentralized** | ✅ No server dependency | ❌  Depends on DNS | ✅ Mainline DHT | ✅ Self-contained |
-| **Mesh-capable** | ✅ Native Reticulum | ❌ | ❌ | ✅ But no routing |
+| **Mesh-capable** | 🚧 Reticulum planned | ❌ | ❌ | ✅ But no routing |
 | **Updatable** | ✅ Drive can move | ✅ Update DNS | ✅ Mutable records | ❌ Static |
 | **Replicatable** | ✅ Any node can serve | ❌ Single server | ❌ Key holder only | N/A |
 | **Trust model** | Commit signatures | TLS + DNS | BEP44 signatures | Key-based |
@@ -304,7 +293,6 @@ The scheme is opaque (no `//`). There are no reserved words such as `open`, `pai
 - A **node** identifier with query hints is a pairing code: `atomic:node:{id}?v=1&drives=*`.
 - Any other `atomic:` identifier navigates to that resource.
 - Legacy `atomic://pair` and `atomic://open` still parse.
-- A shareable HTTPS form is `https://atomicserver.eu/node/{id}?…`.
 
 ## Sync capability
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   accountCreationTarget,
   forgetServerPeer,
+  fetchManagedInfo,
   isAtomicServer,
   EMPTY_NODE_INFO,
   type ManagedInfo,
@@ -13,6 +14,20 @@ import {
 vi.mock('@tomic/react', () => ({
   signRequest: vi.fn(async (url: string) => ({ 'x-atomic-signed-url': url })),
 }));
+
+describe('public node metadata', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('omits cookies belonging to a different localhost server', async () => {
+    const fetcher = vi.fn(async () => new Response('{}'));
+    vi.stubGlobal('fetch', fetcher);
+    await fetchManagedInfo('http://localhost:9894');
+    expect(fetcher).toHaveBeenCalledWith('http://localhost:9894/server', {
+      headers: { Accept: 'application/ad+json' },
+      credentials: 'omit',
+    });
+  });
+});
 
 describe('accountCreationTarget', () => {
   it("managed node with a portal URL → the portal's sign-in form", () => {

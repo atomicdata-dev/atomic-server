@@ -218,3 +218,26 @@ export function calendarRowTime(
     ranged && endDayProp ? get(endDayProp.subject) : undefined,
   );
 }
+
+/** How many days after `day` a stored end instant falls (0 for none, or an
+ * end on the same day). */
+export function daysSpanned(day: string, end: unknown): number {
+  if (typeof end !== 'string' || !isCalendarInstant(end)) return 0;
+
+  return Math.max(0, daysBetween(day, localDayKey(new Date(end))));
+}
+
+/** The day an event ends on: `span` days after it starts, or, for a same-day
+ * event, the next day when the end time is at or before the start time. */
+export function endDayFor(
+  day: string,
+  span: number,
+  start: string,
+  end: string,
+): string {
+  let endDay = day;
+
+  for (let i = 0; i < span; i++) endDay = nextCalendarDate(endDay);
+
+  return span === 0 && end <= start ? nextCalendarDate(endDay) : endDay;
+}

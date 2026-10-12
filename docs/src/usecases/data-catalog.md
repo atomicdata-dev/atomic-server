@@ -41,4 +41,4 @@ Most datacatalogs only have metadata. However, if you convert your existing CSV 
 ## What we should add to Atomic-Server before it's a decent Data Catalog
 
 - Add a model for datasets. This is absolutely essential. It could be based on (and link to) DCAT, but needs to be described using Atomic Schema. This step means we can generate forms for Datasets and we can validate their fields.
-- Add views for datasets. Atomic-Server already renders decent views for unknown resources, but a specific view should be created for Datasets. [Add a PR](https://github.com/atomicdata-dev/atomic-data-browser) if you have a React view!
+- Add views for datasets. Atomic-Server already renders decent views for unknown resources, but a specific view should be created for Datasets. [Add a PR](https://github.com/ontola/atomic-server/tree/develop/browser) if you have a React view!

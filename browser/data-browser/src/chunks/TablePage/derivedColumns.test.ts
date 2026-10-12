@@ -5,6 +5,7 @@ import {
   DERIVED_COLUMN_KINDS,
   MAX_DERIVED_ARGS,
   isDerivedColumnComplete,
+  readInstant,
   parseDerivedColumnSpecs,
   propertyFitsArg,
 } from './derivedColumns';
@@ -219,5 +220,19 @@ describe('parseDerivedColumnSpecs', () => {
   it('is empty for unset or non-array config', () => {
     expect(parseDerivedColumnSpecs(undefined)).toEqual([]);
     expect(parseDerivedColumnSpecs('{}' as unknown as JSONValue)).toEqual([]);
+  });
+});
+
+describe('readInstant', () => {
+  it('reads a civil date as local midnight, like a local timestamp', () => {
+    const localMidnight = new Date(2026, 0, 1).getTime();
+
+    expect(readInstant({ d: '2026-01-01' }, 'd')).toBe(localMidnight);
+  });
+
+  it('still reads a full timestamp string', () => {
+    expect(readInstant({ d: '2026-01-01T10:00:00.000Z' }, 'd')).toBe(
+      Date.UTC(2026, 0, 1, 10),
+    );
   });
 });

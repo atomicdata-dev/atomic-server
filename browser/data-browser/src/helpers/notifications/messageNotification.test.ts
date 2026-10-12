@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { dataBrowser } from '@tomic/react';
 import {
   classifyMessage,
+  entryFacts,
   isCandidate,
   type MessageContext,
   type MessageFacts,
@@ -81,5 +82,67 @@ describe('message notifications', () => {
   it('ignores messages under something that is not a chat room', () => {
     const folder = 'https://example.com/folder';
     expect(classifyMessage(msg({ parent: folder }), ctx)).toBeUndefined();
+  });
+});
+
+describe('notifications for chat log entries', () => {
+  const PAGE = 'did:ad:page';
+  const entry = (extra = {}) => ({ a: THEM, c: START + 10, ...extra });
+  const facts = (
+    page: { parent?: string; about?: string },
+    e = entry(),
+    key = '19e-0000000a',
+  ) => entryFacts(PAGE, page, key, e);
+
+  it('addresses the entry as page#key and takes author and time from it', () => {
+    expect(facts({ parent: ROOM })).toMatchObject({
+      subject: `${PAGE}#19e-0000000a`,
+      createdBy: THEM,
+      createdAt: START + 10,
+      parent: ROOM,
+      isA: [dataBrowser.classes.message],
+    });
+  });
+
+  it('announces a new entry in a chat room', () => {
+    expect(classifyMessage(facts({ parent: ROOM }), ctx)).toMatchObject({
+      kind: 'chat',
+      target: ROOM,
+      openComments: false,
+    });
+  });
+
+  it('announces an entry in the comments on something I made', () => {
+    expect(classifyMessage(facts({ about: DOC }), ctx)).toMatchObject({
+      kind: 'comment',
+      target: DOC,
+      openComments: true,
+    });
+  });
+
+  it('skips my own entries and the backlog', () => {
+    expect(isCandidate(facts({ parent: ROOM }, entry({ a: ME })), ctx)).toBe(
+      false,
+    );
+    expect(
+      isCandidate(facts({ parent: ROOM }, entry({ c: START - 1 })), ctx),
+    ).toBe(false);
+  });
+
+  it('announces a reply to my entry, found by its entry id', () => {
+    const mine = `${PAGE}#19e-00000001`;
+    const withMine: MessageContext = {
+      ...ctx,
+      creatorOf: s => (s === mine ? ME : THEM),
+    };
+    expect(
+      classifyMessage(facts({ parent: ROOM }, entry({ r: mine })), withMine),
+    ).toMatchObject({ kind: 'reply' });
+  });
+
+  it('does not announce an entry in something that is not a chat', () => {
+    expect(
+      classifyMessage(facts({ parent: 'https://example.com/folder' }), ctx),
+    ).toBeUndefined();
   });
 });

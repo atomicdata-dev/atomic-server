@@ -30,7 +30,8 @@ impl RequestContext {
         // from the headers; anything else falls back to the configured origin.
         let origin = match host {
             Some(h) if host_is_served_by(h, appstate) => {
-                let p = proto.unwrap_or(if appstate.config.opts.https {
+                let configured = appstate.config.get_origin();
+                let p = proto.unwrap_or(if configured.starts_with("https://") {
                     "https"
                 } else {
                     "http"
@@ -72,13 +73,15 @@ pub(crate) fn host_is_served_here(host: &str, opts: &crate::config::Opts) -> boo
     {
         return true;
     }
-    for suffix in [
-        opts.base_domain.as_deref(),
-        opts.served_domain_suffix.as_deref(),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    // `--served-domain-suffix` takes a comma-separated list: a node that is
+    // moving from one domain to another answers for both while links to the
+    // old one are still around.
+    for suffix in opts.base_domain.as_deref().into_iter().chain(
+        opts.served_domain_suffix
+            .as_deref()
+            .unwrap_or("")
+            .split(','),
+    ) {
         let suffix = suffix.trim().trim_start_matches('.').to_ascii_lowercase();
         if !suffix.is_empty() && (hostname == suffix || hostname.ends_with(&format!(".{suffix}"))) {
             return true;
@@ -163,6 +166,22 @@ mod tests {
         // The same near-misses the base-domain path rejects.
         assert!(!host_is_served_here("notatomicserver.eu", &o));
         assert!(!host_is_served_here("atomicserver.eu.evil.example", &o));
+        assert!(!host_is_served_here("evil.example", &o));
+    }
+
+    /// A node moving between domains is given both, comma separated, and
+    /// answers for names under either.
+    #[test]
+    fn several_served_domain_suffixes_are_all_served() {
+        let o = opts_with_served_suffix("node1.atomicserver.eu", "atomicserver.eu, atomic.place");
+
+        assert!(host_is_served_here("node1.atomicserver.eu", &o));
+        assert!(host_is_served_here("acme.atomicserver.eu", &o));
+        assert!(host_is_served_here("node1.atomic.place", &o));
+        assert!(host_is_served_here("NODE1.Atomic.Place:443", &o));
+
+        assert!(!host_is_served_here("notatomic.place", &o));
+        assert!(!host_is_served_here("atomic.place.evil.example", &o));
         assert!(!host_is_served_here("evil.example", &o));
     }
 

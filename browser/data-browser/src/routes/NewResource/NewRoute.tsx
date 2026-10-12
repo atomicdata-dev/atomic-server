@@ -14,7 +14,6 @@ import {
   FaMagnifyingGlass,
   FaXmark,
 } from 'react-icons/fa6';
-import toast from 'react-hot-toast';
 import { createRoute } from '@tanstack/react-router';
 import { appRoute } from '../RootRoutes';
 import { pathNames } from '../paths';
@@ -161,7 +160,6 @@ function NewResourceSelector() {
 
   const onUploadComplete = useCallback(
     (files: string[]) => {
-      toast.success(`Uploaded ${files.length} files.`);
       navigate(constructOpenURL(files.length === 1 ? files[0] : destination));
     },
     [destination, navigate],

@@ -42,12 +42,14 @@ pub mod bookmark;
 pub mod chatroom;
 #[cfg(feature = "wasm-plugins")]
 pub mod connection_state;
+pub mod conversations;
 pub mod did;
 pub mod egress;
 pub mod export;
 #[cfg(feature = "wasm-plugins")]
 pub mod external;
 pub mod files;
+pub mod form;
 #[cfg(feature = "wasm-plugins")]
 pub mod host_core;
 pub mod importer;

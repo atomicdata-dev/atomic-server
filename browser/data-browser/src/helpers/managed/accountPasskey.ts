@@ -1,6 +1,6 @@
 // @wc-ignore-file
 import { hasManagedApi, managedFetch } from './api';
-import { getManagedAccount } from './session';
+import { getManagedAccount, noteManagedSessionChanged } from './session';
 
 function decode(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c =>
@@ -15,14 +15,19 @@ function encode(value: ArrayBuffer): string {
     .replace(/=+$/, '');
 }
 
-async function request(path: string, body?: unknown) {
+async function request(path: string, body?: unknown, ceremony?: string) {
   const response = await managedFetch(
     `/passkeys${path}`,
     body === undefined
       ? {}
       : {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // A linked device has no ceremony cookie, so the id travels back
+            // in a header. The portal still accepts the cookie.
+            ...(ceremony ? { 'X-Passkey-Ceremony': ceremony } : {}),
+          },
           body: JSON.stringify(body),
         },
   );
@@ -67,7 +72,7 @@ export async function accountPasskey(
     throw new Error('Could not check your account passkeys.');
   const existing = !createNew && status.credential_ids.length > 0;
   const operation = existing ? 'use' : 'register';
-  const { publicKey } = await request(`/${operation}/start`, {});
+  const { publicKey, ceremony } = await request(`/${operation}/start`, {});
   const common = {
     ...publicKey,
     challenge: decode(publicKey.challenge),
@@ -116,7 +121,7 @@ export async function accountPasskey(
         },
         clientExtensionResults: {},
       };
-  await request(`/${operation}/finish`, payload);
+  await request(`/${operation}/finish`, payload, ceremony);
 
   return {
     credential,
@@ -172,6 +177,8 @@ export async function signInWithAccountPasskey(email = ''): Promise<boolean> {
       'That passkey is not linked to an account. Use Google or an email link instead.',
     );
   }
+
+  noteManagedSessionChanged();
 
   return true;
 }

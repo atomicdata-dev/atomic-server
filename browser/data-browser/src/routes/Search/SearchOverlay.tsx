@@ -13,6 +13,8 @@ import { base64StringToFilter } from './searchUtils';
 import { InlineFormattedResourceList } from '../../components/InlineFormattedResourceList';
 import { ErrorBoundary } from '../../views/ErrorPage';
 import { useOnValueChange } from '@helpers/useOnValueChange';
+import { Spinner } from '../../components/Spinner';
+import { LoaderBlock } from '../../components/Loader';
 import { useSearchOverlay } from '../../components/Searchbar/SearchOverlayContext';
 
 const OverlayBackdrop = styled.div`
@@ -125,6 +127,11 @@ const HeadingRow = styled.div`
 const HeadingIcon = styled.span`
   display: flex;
   align-items: center;
+`;
+
+const SkeletonRow = styled(LoaderBlock)`
+  height: 3.25rem;
+  flex-shrink: 0;
 `;
 
 const TagHeading = styled.span`
@@ -316,9 +323,16 @@ function SearchOverlayContent({
       ) : (
         <>
           {heading && (
-            <HeadingRow>
+            <HeadingRow
+              role={loading ? 'status' : undefined}
+              data-testid={loading ? 'search-overlay-loading' : undefined}
+            >
               <HeadingIcon>
-                <FaMagnifyingGlass size={12} />
+                {loading ? (
+                  <Spinner size='0.9rem' inheritColor />
+                ) : (
+                  <FaMagnifyingGlass size={12} />
+                )}
               </HeadingIcon>
               {heading}
             </HeadingRow>
@@ -346,6 +360,13 @@ function SearchOverlayContent({
 
           <ResultsArea ref={resultsRef}>
             <Column gap='0.5rem'>
+              {loading && results.length === 0 && (
+                <>
+                  <SkeletonRow aria-hidden />
+                  <SkeletonRow aria-hidden />
+                  <SkeletonRow aria-hidden />
+                </>
+              )}
               {results.map((subject, index) => (
                 <SelectableResult
                   key={subject}

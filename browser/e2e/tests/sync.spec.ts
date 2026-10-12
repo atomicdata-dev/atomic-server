@@ -252,8 +252,8 @@ test.describe('sync', () => {
       timeout: 15000,
     });
 
-    // The sidebar updates optimistically; finish the online setup's saves
-    // before disconnecting so this test isolates edits made while offline.
+    // Sidebar text is optimistic; finish the online save before deliberately
+    // cutting the connection so this tests offline edits, not an aborted save.
     await waitForSynced(page);
 
     // 2. Go offline using Playwright's network control + close the WS
@@ -410,7 +410,7 @@ test.describe('sync', () => {
     // without POSTing; `waitForSearchable` hid that via the local index.)
     await expect
       .poll(async () => page2.title(), { timeout: 60000, intervals: [500] })
-      .toBe('Synced From Offline');
+      .toBe('Synced From Offline · AtomicServer');
 
     await context2.close();
   });

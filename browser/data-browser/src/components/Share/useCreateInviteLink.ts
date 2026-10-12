@@ -9,17 +9,20 @@ import {
   resumePeerLinks,
 } from '../../helpers/browserPeerSync';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
+import { isOriginWithoutNode } from '../../helpers/originNode';
 
 export interface InviteLinkOptions {
   write: boolean;
   /** Unix ms timestamp after which the invite no longer works */
   expiresAt?: number;
+  /** How many people may use the link. The server enforces it. */
+  maxUsages?: number;
 }
 
 /**
  * Returns a function that signs an invite token for `target` and builds the
  * `/app/invite` URL for it. Shared by the Share dialog (link and email
- * invites) and the Permissions & Invites page.
+ * invites).
  */
 export function useCreateInviteLink(
   target: Resource,
@@ -28,7 +31,7 @@ export function useCreateInviteLink(
   const [agent] = useCurrentAgent();
   const isSaas = !!getManagedPortalUrl();
 
-  return async ({ write, expiresAt }) => {
+  return async ({ write, expiresAt, maxUsages }) => {
     if (!agent) {
       throw new Error('No agent found');
     }
@@ -71,6 +74,7 @@ export function useCreateInviteLink(
       expiresAt,
       undefined,
       browserPeer,
+      maxUsages,
     );
 
     if (browserPeer) {
@@ -86,6 +90,14 @@ export function useCreateInviteLink(
 
     if (browserPeer) {
       return `${window.location.origin}/app/invite?token=${encodeURIComponent(tokenBase64)}`;
+    }
+
+    // A link to a host that runs no node opens a page that cannot find the
+    // invite. Better to say so now than to hand over a link that never works.
+    if (isOriginWithoutNode(serverUrl)) {
+      throw new Error(
+        'This drive is not on a server this app can reach, so it cannot be shared with a link yet. Open it from its own server and try again.',
+      );
     }
 
     return `${inviteLinkPrefix(serverUrl)}${encodeURIComponent(tokenBase64)}${inviteLinkSuffix(serverUrl)}`;

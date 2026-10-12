@@ -22,45 +22,147 @@ use crate::errors::AtomicResult;
 /// The pkarr relay URL to use for publishing and resolving.
 const RELAY_URL: &str = "https://dns.iroh.link/pkarr";
 
-/// Publish an Iroh NodeID for a drive via the pkarr relay.
-/// The record is keyed by a pkarr keypair derived from the drive's DID.
-/// Multiple NodeIDs (one per replica) are stored as a JSON array in a TXT record.
-pub async fn publish_node_id(drive_did: &str, iroh_node_id: &str) -> AtomicResult<()> {
+/// TXT label holding the JSON array of Iroh NodeIDs.
+const NODES_LABEL: &str = "_atomic_nodes";
+/// TXT label holding the JSON array of public https origins. A browser tab
+/// cannot dial Iroh, but it can read the relay over https and fetch from these.
+pub const HTTP_LABEL: &str = "_atomic_http";
+const NODES_TTL: u32 = 300;
+const HTTP_TTL: u32 = 3600;
+
+/// What a drive's pkarr record holds: where its replicas can be reached.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct DriveRecord {
+    /// Iroh NodeIDs (`_atomic_nodes`).
+    pub node_ids: Vec<String>,
+    /// Public https origins (`_atomic_http`), normalized.
+    pub http_origins: Vec<String>,
+}
+
+/// Turn a configured public URL into the origin we may announce, or `None`
+/// when it is not reachable by anyone else: not https, `localhost`, an IP
+/// address, a single-label or `.local` host, or not a URL at all.
+pub fn public_https_origin(url: &str) -> Option<String> {
+    let parsed = url::Url::parse(url.trim()).ok()?;
+    if parsed.scheme() != "https" {
+        return None;
+    }
+    let host = match parsed.host()? {
+        url::Host::Domain(d) => d.to_ascii_lowercase(),
+        url::Host::Ipv4(_) | url::Host::Ipv6(_) => return None,
+    };
+    let host = host.trim_end_matches('.');
+    if !host.contains('.')
+        || host == "localhost"
+        || host.ends_with(".localhost")
+        || host.ends_with(".local")
+        || host.ends_with(".internal")
+    {
+        return None;
+    }
+    Some(match parsed.port() {
+        Some(port) => format!("https://{host}:{port}"),
+        None => format!("https://{host}"),
+    })
+}
+
+/// Add `item` to `list` unless it is already there.
+fn push_unique(list: &mut Vec<String>, item: &str) {
+    if !list.iter().any(|i| i == item) {
+        list.push(item.to_string());
+    }
+}
+
+/// Build the signed packet for a drive. Both TXT records are written when
+/// their list is not empty.
+fn build_packet(
+    keypair: &pkarr::Keypair,
+    record: &DriveRecord,
+) -> AtomicResult<pkarr::SignedPacket> {
+    let mut builder = pkarr::SignedPacket::builder();
+    let nodes = serde_json::to_string(&record.node_ids)
+        .map_err(|e| format!("Failed to serialize NodeID list: {e}"))?;
+    let origins = serde_json::to_string(&record.http_origins)
+        .map_err(|e| format!("Failed to serialize origin list: {e}"))?;
+    if !record.node_ids.is_empty() {
+        builder = builder.txt(
+            NODES_LABEL.try_into().unwrap(),
+            nodes
+                .as_str()
+                .try_into()
+                .map_err(|e| format!("NodeID list does not fit a TXT record: {e}"))?,
+            NODES_TTL,
+        );
+    }
+    if !record.http_origins.is_empty() {
+        builder = builder.txt(
+            HTTP_LABEL.try_into().unwrap(),
+            origins
+                .as_str()
+                .try_into()
+                .map_err(|e| format!("Origin list does not fit a TXT record: {e}"))?,
+            HTTP_TTL,
+        );
+    }
+    builder
+        .build(keypair)
+        .map_err(|e| format!("Failed to build signed packet: {e}").into())
+}
+
+/// Publish this replica for a drive: its Iroh NodeID and / or its public https
+/// origin. Existing entries (other replicas, and the record this call does not
+/// touch) are kept, so the packet always carries every known value.
+/// `http_origin` goes through [`public_https_origin`]; an unusable one is
+/// skipped. Does nothing when there is nothing to publish.
+pub async fn publish_drive_record(
+    drive_did: &str,
+    iroh_node_id: Option<&str>,
+    http_origin: Option<&str>,
+) -> AtomicResult<()> {
+    let origin = http_origin.and_then(public_https_origin);
+    if iroh_node_id.is_none() && origin.is_none() {
+        return Ok(());
+    }
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
-
-    // Resolve existing record to merge NodeIDs
     let client = build_client()?;
-    let existing_node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
+    let mut record = resolve_record_raw(&client, &keypair.public_key()).await;
 
-    let mut node_ids = existing_node_ids;
-    if !node_ids.iter().any(|id| id == iroh_node_id) {
-        node_ids.push(iroh_node_id.to_string());
+    if let Some(id) = iroh_node_id {
+        push_unique(&mut record.node_ids, id);
+    }
+    if let Some(origin) = &origin {
+        push_unique(&mut record.http_origins, origin);
     }
 
-    let value = serde_json::to_string(&node_ids)
-        .map_err(|e| format!("Failed to serialize NodeID list: {e}"))?;
-
-    let packet = pkarr::SignedPacket::builder()
-        .txt(
-            "_atomic_nodes".try_into().unwrap(),
-            value.as_str().try_into().unwrap(),
-            300,
-        )
-        .build(&keypair)
-        .map_err(|e| format!("Failed to build signed packet: {e}"))?;
-
+    let packet = build_packet(&keypair, &record)?;
     client
         .publish(&packet, None)
         .await
         .map_err(|e| format!("Failed to publish to pkarr relay: {e}"))?;
 
     tracing::debug!(
-        "Discovery: published NodeID {} for drive {} (total: {} peers)",
-        iroh_node_id,
+        "Discovery: published drive {} ({} NodeIDs, {} origins)",
         drive_did,
-        node_ids.len()
+        record.node_ids.len(),
+        record.http_origins.len()
     );
     Ok(())
+}
+
+/// Publish an Iroh NodeID for a drive via the pkarr relay.
+/// The record is keyed by a pkarr keypair derived from the drive's DID.
+/// Multiple NodeIDs (one per replica) are stored as a JSON array in a TXT record.
+pub async fn publish_node_id(drive_did: &str, iroh_node_id: &str) -> AtomicResult<()> {
+    publish_drive_record(drive_did, Some(iroh_node_id), None).await
+}
+
+/// Resolve the public https origins announced for a drive.
+pub async fn resolve_http_origins(drive_did: &str) -> AtomicResult<Vec<String>> {
+    let keypair = drive_did_to_pkarr_keypair(drive_did)?;
+    let client = build_client()?;
+    Ok(resolve_record_raw(&client, &keypair.public_key())
+        .await
+        .http_origins)
 }
 
 /// Resolve Iroh NodeIDs for a drive via the pkarr relay.
@@ -117,27 +219,42 @@ async fn resolve_node_ids_raw(
     client: &pkarr::Client,
     public_key: &pkarr::PublicKey,
 ) -> Vec<String> {
+    resolve_record_raw(client, public_key).await.node_ids
+}
+
+/// Resolve both lists from the pkarr relay for a given public key.
+async fn resolve_record_raw(client: &pkarr::Client, public_key: &pkarr::PublicKey) -> DriveRecord {
     match client.resolve(public_key).await {
-        Some(packet) => {
-            for record in packet.all_resource_records() {
-                if !record.name.to_string().contains("_atomic_nodes") {
-                    continue;
-                }
-                let raw = format!("{:?}", record.rdata);
-                if let Some(data_start) = raw.find("data: \"") {
-                    let after = &raw[data_start + 7..];
-                    if let Some(data_end) = after.find("\" }") {
-                        let content = &after[..data_end];
-                        let unescaped = content.replace("\\\"", "\"");
-                        if let Ok(ids) = serde_json::from_str::<Vec<String>>(&unescaped) {
-                            return ids;
-                        }
-                    }
+        Some(packet) => parse_record(&packet),
+        None => DriveRecord::default(),
+    }
+}
+
+/// The JSON string array in the TXT record named `label`, or empty.
+fn txt_json_list(packet: &pkarr::SignedPacket, label: &str) -> Vec<String> {
+    for record in packet.all_resource_records() {
+        if record.name.to_string().split('.').next() != Some(label) {
+            continue;
+        }
+        if let pkarr::dns::rdata::RData::TXT(txt) = &record.rdata {
+            if let Ok(content) = String::try_from(txt.clone()) {
+                if let Ok(list) = serde_json::from_str::<Vec<String>>(&content) {
+                    return list;
                 }
             }
-            vec![]
         }
-        None => vec![],
+    }
+    vec![]
+}
+
+fn parse_record(packet: &pkarr::SignedPacket) -> DriveRecord {
+    DriveRecord {
+        node_ids: txt_json_list(packet, NODES_LABEL),
+        // Re-normalize: the packet is public, anyone may have written to it.
+        http_origins: txt_json_list(packet, HTTP_LABEL)
+            .iter()
+            .filter_map(|o| public_https_origin(o))
+            .collect(),
     }
 }
 
@@ -207,6 +324,132 @@ mod tests {
         let k1 = drive_did_to_pkarr_keypair(&did).unwrap();
         let k2 = drive_did_to_pkarr_keypair(&did).unwrap();
         assert_eq!(k1.public_key().to_string(), k2.public_key().to_string());
+    }
+
+    #[test]
+    fn packet_carries_both_txt_records() {
+        let keypair = drive_did_to_pkarr_keypair(&fake_drive_did(0x21)).unwrap();
+        let record = DriveRecord {
+            node_ids: vec!["aa".repeat(32)],
+            http_origins: vec!["https://a.example.com".into()],
+        };
+        let packet = build_packet(&keypair, &record).unwrap();
+        assert_eq!(parse_record(&packet), record);
+        let names: Vec<String> = packet
+            .all_resource_records()
+            .map(|r| r.name.to_string())
+            .collect();
+        assert!(names.iter().any(|n| n.starts_with("_atomic_nodes.")));
+        assert!(names.iter().any(|n| n.starts_with("_atomic_http.")));
+        assert_eq!(packet.public_key(), keypair.public_key());
+    }
+
+    #[test]
+    fn packet_with_only_origins_has_no_nodes_record() {
+        let keypair = drive_did_to_pkarr_keypair(&fake_drive_did(0x22)).unwrap();
+        let record = DriveRecord {
+            node_ids: vec![],
+            http_origins: vec!["https://a.example.com".into()],
+        };
+        let packet = build_packet(&keypair, &record).unwrap();
+        assert_eq!(parse_record(&packet), record);
+    }
+
+    #[test]
+    fn merging_keeps_other_origins_and_does_not_duplicate() {
+        let mut origins = vec!["https://other.example.org".to_string()];
+        push_unique(&mut origins, "https://mine.example.com");
+        push_unique(&mut origins, "https://mine.example.com");
+        assert_eq!(
+            origins,
+            vec!["https://other.example.org", "https://mine.example.com"]
+        );
+    }
+
+    #[test]
+    fn many_origins_survive_txt_chunking() {
+        let keypair = drive_did_to_pkarr_keypair(&fake_drive_did(0x23)).unwrap();
+        let origins: Vec<String> = (0..8)
+            .map(|i| format!("https://replica-number-{i}.example.com"))
+            .collect();
+        let record = DriveRecord {
+            node_ids: vec![],
+            http_origins: origins,
+        };
+        let packet = build_packet(&keypair, &record).unwrap();
+        assert_eq!(parse_record(&packet), record);
+    }
+
+    #[test]
+    fn unusable_origins_are_skipped() {
+        for bad in [
+            "http://atomic.example.com",
+            "https://localhost",
+            "https://localhost:9884",
+            "https://foo.localhost",
+            "https://127.0.0.1",
+            "https://192.168.1.4:9884",
+            "https://[::1]",
+            "https://intranet",
+            "https://printer.local",
+            "not a url",
+            "",
+        ] {
+            assert_eq!(public_https_origin(bad), None, "{bad}");
+        }
+        assert_eq!(
+            public_https_origin("https://Atomic.Example.com/some/path?x=1").as_deref(),
+            Some("https://atomic.example.com")
+        );
+        assert_eq!(
+            public_https_origin("https://atomic.example.com:8443/").as_deref(),
+            Some("https://atomic.example.com:8443")
+        );
+        assert_eq!(
+            public_https_origin("https://atomic.example.com:443/").as_deref(),
+            Some("https://atomic.example.com")
+        );
+    }
+
+    #[test]
+    fn parsing_drops_bad_origins_from_a_public_packet() {
+        let keypair = drive_did_to_pkarr_keypair(&fake_drive_did(0x24)).unwrap();
+        let record = DriveRecord {
+            node_ids: vec![],
+            http_origins: vec![
+                "http://insecure.example.com".into(),
+                "https://ok.example.com".into(),
+            ],
+        };
+        let packet = build_packet(&keypair, &record).unwrap();
+        assert_eq!(
+            parse_record(&packet).http_origins,
+            vec!["https://ok.example.com"]
+        );
+    }
+
+    /// Prints a packet for the TypeScript fixture. Run with
+    /// `cargo test -p atomic_lib --features db-redb --lib print_ts_fixture -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn print_ts_fixture() {
+        let did = fake_drive_did(0x42);
+        let keypair = drive_did_to_pkarr_keypair(&did).unwrap();
+        let record = DriveRecord {
+            node_ids: vec!["aa".repeat(32)],
+            http_origins: vec![
+                "https://atomic.example.com".into(),
+                "https://replica.example.org:8443".into(),
+            ],
+        };
+        let packet = build_packet(&keypair, &record).unwrap();
+        println!("DID={did}");
+        println!("Z32={}", keypair.public_key().to_z32());
+        println!("HEX={}", hex_of(packet.as_bytes()));
+    }
+
+    fn hex_of(b: &[u8]) -> String {
+        b.iter().map(|x| format!("{x:02x}")).collect()
     }
 
     #[test]

@@ -3,7 +3,7 @@
 # JSON-AD: The Atomic Data serialization format
 
 Although you can use various serialization formats for Atomic Data, `JSON-AD` is the _default_ and _only required_ serialization format.
-It is what the current [Rust](https://github.com/atomicdata-dev/atomic-data-browser) and [Typescript / React](https://github.com/atomicdata-dev/atomic-data-browser) implementations use to communicate.
+It is what the current [Rust](https://github.com/ontola/atomic-server/tree/develop/browser) and [Typescript / React](https://github.com/ontola/atomic-server/tree/develop/browser) implementations use to communicate.
 It is designed to feel familiar to developers and to be easy and performant to parse and serialize.
 It is inspired by [JSON-LD](https://json-ld.org/).
 

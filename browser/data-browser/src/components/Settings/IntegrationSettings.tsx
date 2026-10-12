@@ -9,6 +9,7 @@ import {
   ErrMessage,
 } from '@components/forms/InputStyles';
 import { Button } from '@components/Button';
+import { FaRotateLeft } from 'react-icons/fa6';
 import { SettingsSection } from './SettingsSection';
 import {
   defaultIntegrationProxy,
@@ -107,26 +108,24 @@ function ProxyForm({ proxy }: { proxy: string }) {
             aria-invalid={!!error}
             aria-describedby={error ? 'integration-proxy-error' : undefined}
           />
+          {value !== defaultIntegrationProxy && (
+            <ResetButton
+              onClick={() => {
+                setIntegrationProxy('');
+                setValue(defaultIntegrationProxy);
+                setError('');
+              }}
+            />
+          )}
         </InputWrapper>
         {error && (
           <ErrMessage id='integration-proxy-error' role='alert'>
             {error}
           </ErrMessage>
         )}
-        <Row gap='0.5rem'>
+        <Row>
           <Button type='submit' disabled={value === proxy}>
             Save
-          </Button>
-          <Button
-            type='button'
-            subtle
-            onClick={() => {
-              setIntegrationProxy('');
-              setValue(defaultIntegrationProxy);
-              setError('');
-            }}
-          >
-            Reset to default
           </Button>
         </Row>
       </Column>
@@ -172,32 +171,47 @@ function CatalogUrlForm({ catalogUrl }: { catalogUrl: string }) {
             aria-invalid={!!error}
             aria-describedby={error ? 'plugin-catalog-url-error' : undefined}
           />
+          {value !== defaultPluginCatalogUrl && (
+            <ResetButton
+              onClick={() => {
+                setPluginCatalogUrl('');
+                setValue(defaultPluginCatalogUrl);
+                setError('');
+              }}
+            />
+          )}
         </InputWrapper>
         {error && (
           <ErrMessage id='plugin-catalog-url-error' role='alert'>
             {error}
           </ErrMessage>
         )}
-        <Row gap='0.5rem'>
+        <Row>
           <Button type='submit' disabled={value === catalogUrl}>
             Save
-          </Button>
-          <Button
-            type='button'
-            subtle
-            onClick={() => {
-              setPluginCatalogUrl('');
-              setValue(defaultPluginCatalogUrl);
-              setError('');
-            }}
-          >
-            Reset to default
           </Button>
         </Row>
       </Column>
     </form>
   );
 }
+
+/** Small end-aligned button inside a field that restores its default value. */
+function ResetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <InlineReset ghost type='button' title='Reset to default' onClick={onClick}>
+      <FaRotateLeft aria-hidden />
+      Reset
+    </InlineReset>
+  );
+}
+
+const InlineReset = styled(Button)`
+  flex: none;
+  margin-inline: 0.25rem;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.4rem;
+`;
 
 const SectionTitle = styled.h3`
   margin: 0;

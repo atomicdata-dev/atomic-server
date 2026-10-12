@@ -1,4 +1,5 @@
 import {
+  Datatype,
   Property,
   core,
   isAtomicIdentifier,
@@ -45,7 +46,7 @@ export function TableFilterChip({
   column,
   derived,
 }: TableFilterChipProps): JSX.Element {
-  const { setFilterValue, setFilterOperator, removeFilter } =
+  const { setFilterValue, setFilterOperator, removeFilter, viewKind } =
     useContext(TablePageContext);
   // A computed column has no property resource to read a title from.
   const propResource = useResource(column?.subject ?? unknownSubject);
@@ -127,6 +128,14 @@ export function TableFilterChip({
             onChange={value => setFilterValue(key, value)}
           />
         )}
+        {viewKind === 'calendar' &&
+          (column?.datatype === Datatype.DATE ||
+            column?.datatype === Datatype.TIMESTAMP) && (
+            <ScopeHint>
+              This filters on each entry's own date. A repeating entry is
+              matched on its first date, not on the days it repeats on.
+            </ScopeHint>
+          )}
       </PopoverInner>
     </Popover>
   );
@@ -269,4 +278,11 @@ const RemoveButton = styled.button`
     color: ${p => p.theme.colors.alert};
     background-color: ${p => p.theme.colors.bg1};
   }
+`;
+
+const ScopeHint = styled.p`
+  margin: 0;
+  max-width: 18rem;
+  font-size: 0.8rem;
+  color: ${p => p.theme.colors.textLight};
 `;

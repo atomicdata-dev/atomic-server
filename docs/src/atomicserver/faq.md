@@ -2,7 +2,7 @@
 
 ## I can't find my question, I need support
 
-- Create an [issue on github](https://github.com/atomicdata-dev/atomic-server/issues) or [join the discord](https://discord.gg/a72Rv2P)!
+- Create an [issue on github](https://github.com/ontola/atomic-server/issues) or [join the discord](https://discord.gg/a72Rv2P)!
 
 ## Do I need NGINX or something?
 

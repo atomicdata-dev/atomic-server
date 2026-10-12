@@ -1457,7 +1457,8 @@ fn register_live_peer_with_pending(
                                 // this one (security audit C16). The WS
                                 // announcer ignores it, so the local browser
                                 // still sees the merged state.
-                                let _ = super::ws_apply::import_scope(
+                                let admitted_drive = resolved.drive_subject.clone();
+                                let persisted = super::ws_apply::import_scope(
                                     Some(read_peer_id.clone()),
                                     super::ws_apply::persist_update(
                                         &store,
@@ -1466,6 +1467,42 @@ fn register_live_peer_with_pending(
                                     ),
                                 )
                                 .await;
+                                // A File introduced during a live link needs
+                                // the same blob request as a bulk SYNC_PUSH. Request
+                                // only after admission and successful persistence,
+                                // and only from the peer that supplied this resource.
+                                if persisted.is_ok() {
+                                    let subject = crate::Subject::from_raw(
+                                        &decoded.subject,
+                                        store.get_base_domain().as_deref(),
+                                    );
+                                    if let Ok(resource) = store.get_resource(&subject).await {
+                                        if let Ok(value) = resource.get(crate::urls::BLOB) {
+                                            let blob =
+                                                crate::Subject::from_raw(&value.to_string(), None);
+                                            if let Some(hash_hex) = blob.blob_hash_hex() {
+                                                if let Ok(bytes) = hex::decode(hash_hex) {
+                                                    if let Ok(hash) = <[u8; 32]>::try_from(bytes) {
+                                                        if !store
+                                                            .has_blob(&hash)
+                                                            .await
+                                                            .unwrap_or(false)
+                                                        {
+                                                            store.note_pending_blob_request(
+                                                                hash,
+                                                                admitted_drive,
+                                                            );
+                                                            let frame = super::protocol::encode_blob_request(&hash);
+                                                            let _ = tx_for_read
+                                                                .send(frame_with_len(&frame))
+                                                                .await;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 tracing::trace!(
                                     "[live] imported update for {} from {}",
                                     &decoded.subject[..decoded.subject.len().min(20)],

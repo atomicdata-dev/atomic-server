@@ -28,4 +28,4 @@ Options:
 Visit https://atomicdata.dev for more info
 ```
 
-[Repository](https://github.com/atomicdata-dev/atomic-server/tree/develop/cli)
+[Repository](https://github.com/ontola/atomic-server/tree/develop/cli)

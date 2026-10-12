@@ -1,0 +1,22 @@
+diff --git a/dist/runtime.jsx b/dist/runtime.jsx
+index e2a8f79..0d73fd3 100644
+--- a/dist/runtime.jsx
++++ b/dist/runtime.jsx
+@@ -1,3 +1,4 @@
++import { Fragment, createElement } from 'react';
+ export function selectFragment({ n, x, t, a }, i) {
+     if (typeof x === 'string') {
+         return x;
+@@ -16,6 +17,11 @@ export function selectFragment({ n, x, t, a }, i) {
+         return tag(x);
+     }
+ }
++// Patched (see browser/patches/README.md): the pieces of a message come back
++// as an array, and the elements in it (an icon beside a label, a link inside
++// a sentence) carry no key, so React dev builds warn "Each child in a list
++// should have a unique key" for every message that mixes text and markup.
++// The order of the pieces never changes, so the index is a sound key.
+ export default (props) => {
+-    return props.x.map((fragment, i) => selectFragment({ ...props, x: fragment }, i));
++    return props.x.map((fragment, i) => createElement(Fragment, { key: i }, selectFragment({ ...props, x: fragment }, i)));
+ };

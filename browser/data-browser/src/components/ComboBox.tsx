@@ -10,9 +10,14 @@ import { InputStyled, InputWrapper } from './forms/InputStyles';
 import { IconButton } from './IconButton/IconButton';
 import { FaChevronDown } from 'react-icons/fa6';
 import { useCombobox } from 'downshift';
-import { Column } from './Row';
+import { Column, Row } from './Row';
 import styled, { css } from 'styled-components';
 import { QuickScore } from 'quick-score';
+
+/** What the menu widens to when the trigger is narrower and there is room. */
+const PREFERRED_MENU_WIDTH = 400;
+/** Breathing room kept between the menu and the edge of the window. */
+const MENU_VIEWPORT_MARGIN = 8;
 
 const supportsAnchorPositioning =
   'anchorName' in document.documentElement.style;
@@ -21,6 +26,9 @@ export type ComboBoxOption = {
   label: string;
   searchLabel: string;
   description?: string;
+  /** Rendered before the label on the same row, muted — for a short code
+   * that identifies the option (a country's `NL`, say). */
+  prefix?: string;
   value: string;
 };
 
@@ -46,6 +54,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
   const menuRef = useRef<HTMLUListElement>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const [menuAboveInput, setMenuAboveInput] = useState(false);
+  const [menuWidth, setMenuWidth] = useState<number>();
   const [isFocused, setIsFocused] = useState(false);
 
   const [items, setItems] = useState(options);
@@ -117,6 +126,21 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
 
     const isNearBottom = inputWrapperPosition.bottom > window.innerHeight - 320;
     setMenuAboveInput(isNearBottom);
+
+    // The menu is a popover, so it lives in the top layer and percentage
+    // widths resolve against the viewport, not the input it hangs off —
+    // which is why this is measured here instead of being `min-width: 100%`.
+    // A narrow trigger widens to PREFERRED_MENU_WIDTH so options aren't
+    // cramped, but only where the whole of it fits beside the window edge:
+    // otherwise the menu takes the trigger's own width and lines up with it,
+    // rather than sticking out by whatever room happens to be left.
+    const roomToTheRight =
+      window.innerWidth - inputWrapperPosition.left - MENU_VIEWPORT_MARGIN;
+    setMenuWidth(
+      roomToTheRight >= PREFERRED_MENU_WIDTH
+        ? Math.max(inputWrapperPosition.width, PREFERRED_MENU_WIDTH)
+        : inputWrapperPosition.width,
+    );
   }, []);
 
   useEffect(() => {
@@ -214,6 +238,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
       </StyledInputWrapper>
       <List
         $open={isOpen}
+        $width={menuWidth}
         anchorName={anchorName}
         {...menuRest}
         ref={setMenuRef}
@@ -228,12 +253,15 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
                 data-selected={index === highlightedIndex}
                 {...getItemProps({ item, index })}
               >
-                <Column gap='0.2rem'>
-                  <span>{item.label}</span>
-                  {item.description && (
-                    <Description>{item.description}</Description>
-                  )}
-                </Column>
+                <Row gap='0.5rem' center>
+                  {item.prefix && <Prefix>{item.prefix}</Prefix>}
+                  <Column gap='0.2rem'>
+                    <span>{item.label}</span>
+                    {item.description && (
+                      <Description>{item.description}</Description>
+                    )}
+                  </Column>
+                </Row>
               </ListItem>
             ))}
             {items.length === 0 && (
@@ -282,7 +310,18 @@ const Description = styled.span`
   color: ${p => p.theme.colors.textLight};
 `;
 
-const List = styled.ul<{ $open: boolean; anchorName: string }>`
+const Prefix = styled.span`
+  color: ${p => p.theme.colors.textLight};
+  /* Codes are short but proportionally spaced, so without a floor the labels
+     after them come out ragged. */
+  min-width: 3ch;
+`;
+
+const List = styled.ul<{
+  $open: boolean;
+  $width?: number;
+  anchorName: string;
+}>`
   max-height: ${p => p.theme.size(15)};
   overflow: auto;
   margin: 0;
@@ -293,6 +332,7 @@ const List = styled.ul<{ $open: boolean; anchorName: string }>`
   top: anchor(bottom);
   left: anchor(left);
   bottom: unset;
+  width: ${p => (p.$width ? `${p.$width}px` : 'max-content')};
   box-sizing: border-box;
   min-width: 0;
   max-width: calc(100vw - 16px);

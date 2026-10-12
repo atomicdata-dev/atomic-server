@@ -37,6 +37,21 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 STORE="${ATOMIC_E2E_STORE:-$REPO_ROOT/.e2e-store}"
+
+# Where does `cargo build` actually put the binary? NOT necessarily
+# `$REPO_ROOT/target`: `CARGO_TARGET_DIR`, or a `build.target-dir` in any
+# cargo config (commonly `~/.cargo/config.toml`, to share one target dir
+# across checkouts or park it on a faster disk), moves it elsewhere. Guessing
+# `$REPO_ROOT/target` is worse than it sounds — that path usually still holds
+# a binary from before the config existed, so the suite starts, serves stale
+# code, and fails specs for behaviour that was fixed weeks ago. Ask cargo
+# instead of guessing; fall back to the conventional path when cargo can't
+# answer (not installed, or a workspace it won't parse).
+target_dir() {
+  cargo metadata --no-deps --format-version 1 2>/dev/null \
+    | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p'
+}
+
 # Prefer the `e2e` cargo profile, because that is what CI runs. `.dagger` builds
 # the e2e server with `cargo build --locked --profile e2e`, and the workspace
 # Cargo.toml defines that profile as release brought down to opt-level 2 with
@@ -56,11 +71,16 @@ STORE="${ATOMIC_E2E_STORE:-$REPO_ROOT/.e2e-store}"
 # opt-level 0 passes at opt-level 2. A red is not evidence of anything.
 if [[ -n "${ATOMIC_E2E_BINARY:-}" ]]; then
   BINARY="$ATOMIC_E2E_BINARY"
-elif [[ -x "$REPO_ROOT/target/e2e/atomic-server" ]]; then
-  BINARY="$REPO_ROOT/target/e2e/atomic-server"
 else
-  BINARY="$REPO_ROOT/target/debug/atomic-server"
+  TARGET_DIR="$(cd "$REPO_ROOT" && target_dir)"
+  TARGET_DIR="${TARGET_DIR:-$REPO_ROOT/target}"
+  if [[ -x "$TARGET_DIR/e2e/atomic-server" ]]; then
+    BINARY="$TARGET_DIR/e2e/atomic-server"
+  else
+    BINARY="$TARGET_DIR/debug/atomic-server"
+  fi
 fi
+
 ENV_DIR="$REPO_ROOT/browser/data-browser"
 
 # The same files vite loads, in the same order it loads them: a developer's own
@@ -206,12 +226,23 @@ fi
 # another everywhere else, and the specs that cross the boundary fail for
 # reasons visible nowhere in their output. Checked against source mtimes rather
 # than a commit date, so switching branches and editing a file both count.
+
+# Generated files live under `src/` but are not sources: wuchale rewrites the
+# locale catalogs (`src/locales/data.js`, `src/locales/main.loader.js`,
+# `src/locales/.wuchale/*`) on every vite start, byte-for-byte identical.
+# Counting those as "newer sources" made both checks below fire every time
+# anyone had run `pnpm start`, which teaches you to pass `--stale-ok` reflexively
+# — and that is the flag that lets a genuinely stale build through.
 stale_source() {
   find "$REPO_ROOT/server/src" \
        "$REPO_ROOT/lib/src" \
        "$REPO_ROOT/browser/data-browser/src" \
        "$REPO_ROOT/browser/lib/src" \
-       -type f -newer "$BINARY" -print -quit 2>/dev/null
+       -type f \
+       -not -path "*/src/locales/.wuchale/*" \
+       -not -path "*/src/locales/data.js" \
+       -not -path "*/src/locales/main.loader.js" \
+       -newer "$BINARY" -print -quit 2>/dev/null
 }
 
 # The binary being fresh is not the same as the EMBEDDED BUNDLE being fresh:
@@ -224,7 +255,11 @@ stale_bundle() {
 
   find "$REPO_ROOT/browser/data-browser/src" \
        "$REPO_ROOT/browser/lib/src" \
-       -type f -newer "$BUNDLE" -print -quit 2>/dev/null
+       -type f \
+       -not -path "*/src/locales/.wuchale/*" \
+       -not -path "*/src/locales/data.js" \
+       -not -path "*/src/locales/main.loader.js" \
+       -newer "$BUNDLE" -print -quit 2>/dev/null
 }
 
 if [[ "$STALE_OK" != true ]] && [[ -n "$(stale_bundle)" ]]; then

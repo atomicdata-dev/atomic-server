@@ -29,7 +29,10 @@ import { Dialog, useDialog } from '../Dialog';
 import { Button } from '../Button';
 import { ErrorLook } from '../ErrorLook';
 import { TeamProfileStep } from '../TeamProfileStep';
-import { profileReviewedBefore, rememberProfileReviewed } from '../InviteForm';
+import {
+  profileReviewedBefore,
+  rememberProfileReviewed,
+} from './profileReviewed';
 import { useIsPrivateDrive } from '@hooks/useIsPrivateDrive';
 import { useInheritedRights } from '../../routes/Share/useInheritedRights';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
@@ -39,12 +42,20 @@ import {
 } from '../../helpers/managed/session';
 import { sendShareInvites } from '../../helpers/managed/shareInvites';
 import { EmailInviteInput, isEmailAddress } from './EmailInviteInput';
+import { describeEditorSeats, useEditorSeats } from './useEditorSeats';
 import { PeopleWithAccess, effectiveRole } from './PeopleWithAccess';
+import { ResourceLinkNavigationContext } from '../ResourceLinkNavigationContext';
 import { PublicAccess } from './PublicAccess';
-import { RoleSelect, type ShareRole } from './RoleSelect';
+import { RoleSwitch, type ShareRole } from './RoleSelect';
 import { useShareRights } from './useShareRights';
 import { useClassLabel } from './useClassLabel';
 import { inviteLinkPrefix, useCreateInviteLink } from './useCreateInviteLink';
+import {
+  UNLIMITED,
+  UsageLimitField,
+  parseMaxUsages,
+  type UsageLimitState,
+} from './UsageLimit';
 
 export interface ShareDialogProps {
   subject: string;
@@ -190,6 +201,7 @@ function ShareOverview({
   const [rights, setRole] = useShareRights(resource);
   const inheritedRights = useInheritedRights(resource);
   const createInviteLink = useCreateInviteLink(resource);
+  const editorSeats = useEditorSeats(resource);
   const agentDetail = useCurrentAgentDetail(agent?.subject, isSaas);
   const agentResource = useResource(agent?.subject);
   const [agentName] = useTitle(agentResource);
@@ -276,6 +288,9 @@ function ShareOverview({
               disabled={sending}
             />
           )}
+          {canWrite && isSaas && editorSeats && (
+            <SeatsNote>{describeEditorSeats(editorSeats)}</SeatsNote>
+          )}
           {canWrite && !isSaas && (
             <InviteLinkField createInviteLink={createInviteLink} />
           )}
@@ -296,19 +311,22 @@ function ShareOverview({
             </MessageField>
           ) : (
             <>
-              <PeopleWithAccess
-                rights={rights}
-                inheritedRights={inheritedRights}
-                currentAgent={agent?.subject}
-                currentRole={effectiveRole(
-                  agent?.subject,
-                  rights,
-                  inheritedRights,
-                  canWrite,
-                )}
-                currentAgentDetail={agentDetail}
-                onSetRole={canWrite ? setRole : undefined}
-              />
+              {/* Opening a profile closes the dialog behind it. */}
+              <ResourceLinkNavigationContext.Provider value={onDone}>
+                <PeopleWithAccess
+                  rights={rights}
+                  inheritedRights={inheritedRights}
+                  currentAgent={agent?.subject}
+                  currentRole={effectiveRole(
+                    agent?.subject,
+                    rights,
+                    inheritedRights,
+                    canWrite,
+                  )}
+                  currentAgentDetail={agentDetail}
+                  onSetRole={canWrite ? setRole : undefined}
+                />
+              </ResourceLinkNavigationContext.Provider>
               <PublicAccess
                 level={publicRight?.role ?? 'off'}
                 inherited={
@@ -366,8 +384,9 @@ type CreateInviteLink = ReturnType<typeof useCreateInviteLink>;
 async function copyInviteLink(
   createInviteLink: CreateInviteLink,
   role: ShareRole,
+  maxUsages?: number,
 ): Promise<string> {
-  const link = await createInviteLink({ write: role === 'write' });
+  const link = await createInviteLink({ write: role === 'write', maxUsages });
 
   try {
     await navigator.clipboard.writeText(link);
@@ -410,10 +429,9 @@ function CopyInviteLinkSplit({
       >
         Copy invite link
       </SplitButton>
-      <RoleSelect
-        plain
+      <RoleSwitch
         value={role}
-        onChange={r => r !== 'remove' && setRole(r)}
+        onChange={setRole}
         aria-label='Role for people who join with the link'
       />
     </Split>
@@ -433,6 +451,7 @@ function InviteLinkField({
 }): JSX.Element {
   const store = useStore();
   const [role, setRole] = useState<ShareRole>('write');
+  const [limit, setLimit] = useState<UsageLimitState>(UNLIMITED);
   const [link, setLink] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<Error>();
@@ -442,7 +461,8 @@ function InviteLinkField({
     setErr(undefined);
 
     try {
-      setLink(await copyInviteLink(createInviteLink, role));
+      const maxUsages = parseMaxUsages(limit);
+      setLink(await copyInviteLink(createInviteLink, role, maxUsages));
     } catch (e) {
       setErr(e as Error);
     }
@@ -462,10 +482,9 @@ function InviteLinkField({
           >
             {link ?? inviteLinkPrefix(store.getServerUrl())}
           </LinkText>
-          <RoleSelect
+          <RoleSwitch
             value={role}
             onChange={r => {
-              if (r === 'remove') return;
               setRole(r);
               setLink(undefined);
             }}
@@ -476,6 +495,14 @@ function InviteLinkField({
           {busy ? 'Preparing invite…' : 'Copy invite link'}
         </Button>
       </LinkRow>
+      <UsageLimitField
+        limit={limit}
+        onChange={next => {
+          setLimit(next);
+          setLink(undefined);
+        }}
+        disabled={busy}
+      />
       {err && <ErrorLook>{err.message}</ErrorLook>}
     </>
   );
@@ -593,25 +620,25 @@ const MessageField = styled.div`
   }
 `;
 
+const SeatsNote = styled.p`
+  margin: 0;
+  font-size: 0.9em;
+  color: ${p => p.theme.colors.textLight};
+`;
+
 const Optional = styled.span`
   color: ${p => p.theme.colors.textLight};
 `;
 
 const Split = styled.div`
   display: inline-flex;
-  align-items: stretch;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  overflow: hidden;
-
-  & > span {
-    border-left: 1px solid ${p => p.theme.colors.bg2};
-    border-radius: 0;
-  }
+  align-items: center;
+  gap: 0.75rem;
 `;
 
 const SplitButton = styled.button`
-  border: none;
+  border: 1px solid ${p => p.theme.colors.bg2};
+  border-radius: ${p => p.theme.radius};
   background: ${p => p.theme.colors.bg};
   color: ${p => p.theme.colors.text};
   font: inherit;

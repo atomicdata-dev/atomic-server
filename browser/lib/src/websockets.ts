@@ -504,14 +504,70 @@ export class WSClient {
       ws.addEventListener('message', event => {
         if (!signal.aborted) this.handleMessage(event);
       });
+      let ended = false;
+      let rejectOpen: (error: AtomicError) => void = () => undefined;
+
+      // Tears this socket down and schedules the next attempt. Runs at most
+      // once per socket: normally from `close`, but also from `error` when the
+      // socket never opened, because Node's WebSocket (undici) fires only
+      // `error` on a refused connection, never `close`. Waiting for `close`
+      // there left the client without a retry and `openPromise` pending, so a
+      // client whose first attempt hit a server that was not up yet stayed
+      // offline for good.
+      const end = (error: string | undefined) => {
+        if (ended) return;
+        ended = true;
+        // Explicit close already tears down this client synchronously. Its
+        // later event must not overwrite a replacement socket's live state.
+        if (this._closed || ws !== this.ws) return;
+        this.connection.abort(new RequestCancelledError('WebSocket closed'));
+
+        if (!opened) {
+          // A socket that dies before opening must REJECT `openPromise`, not
+          // leave it pending forever. `authenticate()` awaits it while
+          // holding `isAuthenticating`, and its `finally` (the only thing
+          // that clears that flag) is downstream of this await. A
+          // never-settling promise therefore pins the flag for the lifetime
+          // of the client: the retry loop reconnects, the new socket opens,
+          // and its `authenticate()` takes the `if (this.isAuthenticating)
+          // await this.authPromise` branch onto the dead promise and waits
+          // forever. Auth never completes, so `reportConnected(true)` never
+          // fires and the app sits on "Offline" next to a server answering
+          // in milliseconds. Reproduced on a cold start where the webview is
+          // ready before the embedded server binds.
+          rejectOpen(
+            new AtomicError(
+              `WebSocket to ${wsURL.origin} closed before it opened`,
+              ErrorType.Server,
+            ),
+          );
+        }
+
+        this.reportConnected(false, error);
+        this.rejectAllPending('WebSocket closed before response arrived');
+        this.stopLiveness();
+        this._serverCaps = [];
+        this._challengeNonce = undefined;
+        this._subscribedDrive = undefined;
+
+        this._retryTimer = setTimeout(() => {
+          this.authenticatedWith = undefined;
+          createSocket();
+        }, this._retryDelay);
+        this._retryDelay = Math.min(this._retryDelay * 2, 30000);
+      };
+
       ws.addEventListener('error', () => {
         if (this._closed || ws !== this.ws) return;
-        this.connection.abort(new RequestCancelledError('WebSocket error'));
 
         if (!opened) {
           console.warn('[WS] Connection failed');
+          end(connectionFailedMessage(wsURL));
+
+          return;
         }
 
+        this.connection.abort(new RequestCancelledError('WebSocket error'));
         this.reportConnected(false, connectionFailedMessage(wsURL));
         // Some environments fire error without an immediately-following
         // close. Reject anyway — if close does fire later, the second
@@ -519,10 +575,7 @@ export class WSClient {
         this.rejectAllPending('WebSocket error before response arrived');
       });
       ws.addEventListener('close', (ev: CloseEvent) => {
-        // Explicit close already tears down this client synchronously. Its
-        // later event must not overwrite a replacement socket's live state.
         if (this._closed || ws !== this.ws) return;
-        this.connection.abort(new RequestCancelledError('WebSocket closed'));
 
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
@@ -532,59 +585,20 @@ export class WSClient {
         // tells us if the closing handshake completed. Without this the
         // user-visible "Connection ... closed" line gives no signal of
         // what actually killed the connection.
-        if (!this._closed) {
+        if (!ended) {
           console.warn(
             `[WS] close code=${ev.code} reason=${JSON.stringify(ev.reason)} wasClean=${ev.wasClean} opened=${opened}`,
           );
         }
 
-        const error = this._closed
-          ? undefined
-          : opened
+        end(
+          opened
             ? `Connection to ${wsURL.origin} closed (code=${ev.code}${ev.reason ? `, reason=${ev.reason}` : ''}).`
-            : connectionFailedMessage(wsURL);
-
-        this.reportConnected(false, error);
-        this.rejectAllPending('WebSocket closed before response arrived');
-        this.stopLiveness();
-        this._serverCaps = [];
-        this._challengeNonce = undefined;
-        this._subscribedDrive = undefined;
-
-        if (!this._closed) {
-          this._retryTimer = setTimeout(() => {
-            this.authenticatedWith = undefined;
-            createSocket();
-          }, this._retryDelay);
-          this._retryDelay = Math.min(this._retryDelay * 2, 30000);
-        }
+            : connectionFailedMessage(wsURL),
+        );
       });
       this.openPromise = new Promise((resolve, reject) => {
-        // A socket that dies before opening must REJECT this, not leave it
-        // pending forever. `authenticate()` awaits it while holding
-        // `isAuthenticating`, and its `finally` — the only thing that clears
-        // that flag — is downstream of this await. A never-settling promise
-        // therefore pins the flag for the lifetime of the client: the retry
-        // loop reconnects, the new socket opens, and its `authenticate()`
-        // takes the `if (this.isAuthenticating) await this.authPromise` branch
-        // onto the dead promise and waits forever. Auth never completes, so
-        // `reportConnected(true)` never fires and the app sits on "Offline"
-        // next to a server answering in milliseconds, with every `ws.fetch`
-        // hung because `REQUEST_TIMEOUT` only starts after auth.
-        //
-        // Reproduced on a cold start where the webview is ready before the
-        // embedded server binds: one `close code=1006 opened=false`, and no
-        // recovery until a reload builds a fresh client.
-        ws.addEventListener('close', () => {
-          if (!opened) {
-            reject(
-              new AtomicError(
-                `WebSocket to ${wsURL.origin} closed before it opened`,
-                ErrorType.Server,
-              ),
-            );
-          }
-        });
+        rejectOpen = reject;
         ws.addEventListener('open', () => {
           opened = true;
           this._retryDelay = 1000;

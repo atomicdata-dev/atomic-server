@@ -25,6 +25,7 @@ import {
 import { ErrorLook } from '../components/ErrorLook';
 import { DrivesCard } from '../components/Drives/DrivesCard';
 import { AccountRecoveryCard } from '../components/AccountRecoveryCard';
+import { ConnectedAppsCard } from '../components/ConnectedAppsCard';
 import { AgentProfileHeader } from '../components/AgentProfileHeader';
 import { DeviceLockCard } from '../components/DeviceLockCard';
 import { NewInstanceButton } from '../components/NewInstanceButton';
@@ -33,10 +34,7 @@ import { useDriveHistory } from '../hooks/useDriveHistory';
 import { usePrivateDrive } from '../hooks/usePrivateDrive';
 import { constructOpenURL } from '../helpers/navigation';
 import { paths } from './paths';
-import {
-  forgetCachedRecoverySecret,
-  logoutManagedSession,
-} from '../helpers/managed';
+import { signOutEverywhere } from '../helpers/managed/signOut';
 import { clearHeartbeat } from '../helpers/deviceLock';
 
 export const AgentSettingsRoute = createRoute({
@@ -56,7 +54,7 @@ const SettingsAgent: React.FunctionComponent = () => {
   const navigate = useNavigateWithTransition();
   const leavingAccount = useRef(false);
 
-  const { privateDrive } = usePrivateDrive();
+  const { privateDrive, loading: privateDriveLoading } = usePrivateDrive();
   const [savedDrives] = useSavedDrives();
   const [history, addToHistory, removeFromHistory] =
     useDriveHistory(savedDrives);
@@ -103,8 +101,7 @@ const SettingsAgent: React.FunctionComponent = () => {
    * borrowed machines.
    */
   function handleSignOutAndForget() {
-    forgetCachedRecoverySecret(effectiveAgent?.subject);
-    handleSignOut();
+    handleSignOut({ forget: true });
   }
 
   /**
@@ -122,12 +119,11 @@ const SettingsAgent: React.FunctionComponent = () => {
     navigate({ to: paths.welcome, replace: true });
   }
 
-  async function handleSignOut() {
+  async function handleSignOut({ forget = false } = {}) {
     const currentDrive = drive;
     // Finish clearing the cookie before a subsequent sign-in can set a new one.
     // A late logout response otherwise invalidates the newly-created session.
-    await logoutManagedSession();
-    await saveAgentToIDB(undefined);
+    await signOutEverywhere({ agentSubject: effectiveAgent?.subject, forget });
 
     // Everything that makes the UI say "signed out" happens now, synchronously.
     // `store.setAgent` drives a `useSyncExternalStore`, so the app re-renders
@@ -203,7 +199,7 @@ const SettingsAgent: React.FunctionComponent = () => {
                 <Button
                   subtle
                   title='Sign out of this device.'
-                  onClick={handleSignOut}
+                  onClick={() => void handleSignOut()}
                   data-test='sign-out'
                 >
                   Sign out
@@ -309,9 +305,22 @@ const SettingsAgent: React.FunctionComponent = () => {
                 <Heading as='h2'>Account recovery</Heading>
                 <InfoHint title='How you get back in on a new device — and where to find your agent secret.' />
               </Row>
+              <AddPasskeyLanding />
               <AccountRecoveryCard agentSubject={effectiveAgent.subject} />
 
               <Margin />
+
+              {!privateDriveLoading && (privateDrive ?? drive) && (
+                <>
+                  <Row center gap='1ch'>
+                    <Heading as='h2'>Connected apps</Heading>
+                    <InfoHint title='Apps you let use your data, such as an AI assistant. Each has its own key; revoke one to cut it off.' />
+                  </Row>
+                  <ConnectedAppsCard home={(privateDrive ?? drive)!} />
+
+                  <Margin />
+                </>
+              )}
 
               <Row center gap='1ch'>
                 <Heading as='h2'>This device</Heading>
@@ -372,3 +381,29 @@ const InfoHintIcon = styled.span`
   cursor: help;
   font-size: 0.9rem;
 `;
+
+/**
+ * atomic.place sends someone here to add a passkey when their backup has no
+ * assisted wrapper (`?add=passkey`): only this app holds the identity, so only
+ * here can a new passkey also open the backup. Say so, and bring the recovery
+ * card into view, instead of leaving them on a settings page with no clue.
+ */
+function AddPasskeyLanding() {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [fromPortal] = useState(
+    () => new URLSearchParams(window.location.search).get('add') === 'passkey',
+  );
+
+  useEffect(() => {
+    if (fromPortal) ref.current?.scrollIntoView({ block: 'start' });
+  }, [fromPortal]);
+
+  if (!fromPortal) return null;
+
+  return (
+    <p ref={ref} data-test='add-passkey-landing'>
+      Add your passkey here. A passkey added in the app also unlocks your
+      encrypted backup, which only the app can do.
+    </p>
+  );
+}

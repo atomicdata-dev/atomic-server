@@ -13,7 +13,6 @@ import { Column } from '../Row';
 import { useCallback, useEffect, useState } from 'react';
 import Markdown from '../datatypes/Markdown';
 import { useStore } from '@tomic/react';
-import toast from 'react-hot-toast';
 import { InlineErrMessage } from '../forms/InputStyles';
 import { useSettings } from '../../helpers/AppSettings';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -78,7 +77,6 @@ export function ApplyTemplateDialog({
       }
 
       close();
-      toast.success('Template applied!');
       navigate(constructOpenURL(rootSubject));
     } catch (err) {
       setApplying(false);

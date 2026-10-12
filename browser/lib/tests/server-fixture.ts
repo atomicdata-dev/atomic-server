@@ -97,13 +97,23 @@ function parseConfigToml(text: string): MinimalConfigToml {
 export function serverBinaryPath(): string {
   if (process.env.ATOMIC_SERVER_BINARY) return process.env.ATOMIC_SERVER_BINARY;
 
-  const target = JSON.parse(
-    execFileSync('cargo', ['metadata', '--format-version=1', '--no-deps'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }),
-  ).target_directory;
-  return path.join(target, 'debug/atomic-server');
+  // Respect Cargo's configured target directory, just like e2e-server.sh.
+  // CI may provide only a prebuilt binary, without Cargo installed.
+  let target = process.env.CARGO_TARGET_DIR || path.join(REPO_ROOT, 'target');
+
+  try {
+    target = JSON.parse(
+      execFileSync('cargo', ['metadata', '--format-version=1', '--no-deps'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    ).target_directory;
+  } catch {
+    // Use the supplied target directory or CI's conventional binary location.
+  }
+
+  return path.resolve(REPO_ROOT, target, 'debug/atomic-server');
 }
 
 export async function startServer(): Promise<ServerHandle> {

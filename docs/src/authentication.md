@@ -164,5 +164,5 @@ Atomic Data uses [Hierarchies](hierarchy.md) to describe who gets to access some
 ## Limitations / considerations
 
 - Since we need the Private Key to sign Commits and requests, the client should have this available. This means the client software as well as the user should deal with key management, and that can be a security risk in some contexts (such as a web browser). [See issue #49](https://github.com/ontola/atomic-data-docs/issues/49).
-- Decentralized Identifiers (DIDs) are now fully implemented. Agents are represented as `did:ad:agent:{publicKey}` (URL-safe base64 encoded Ed25519 public key), making identities completely server-independent and self-sovereign. The public key is embedded directly in the DID, enabling local verification of signatures without any network calls.
+- Decentralized Identifiers (DIDs) are now fully implemented. Agents are represented as `atomic:agent:{publicKey}` (URL-safe base64 encoded Ed25519 public key), making identities completely server-independent and self-sovereign. The public key is embedded directly in the DID, enabling local verification of signatures without any network calls.
 - We'll probably also introduce some form of token-based-authentication created server side in the future. [See #87](https://github.com/ontola/atomic-data-docs/issues/87)

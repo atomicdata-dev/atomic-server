@@ -104,7 +104,6 @@ export function ForkBar({ resource }: ForkBarProps): React.JSX.Element | null {
 
     try {
       const merged = await resource.mergeIntoOriginal();
-      toast.success('Fork merged');
       navigate(constructOpenURL(merged.subject));
     } catch (error) {
       toast.error((error as Error).message);
@@ -114,7 +113,6 @@ export function ForkBar({ resource }: ForkBarProps): React.JSX.Element | null {
   const discard = async () => {
     try {
       await resource.destroy();
-      toast.success('Fork discarded');
       navigate(constructOpenURL(original));
     } catch (error) {
       toast.error((error as Error).message);

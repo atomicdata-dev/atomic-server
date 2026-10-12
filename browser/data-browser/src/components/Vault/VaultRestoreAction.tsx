@@ -33,7 +33,13 @@ export function VaultRestoreAction({
   return (
     <Offer data-testid='vault-restore-offer'>
       <p>This workspace has an encrypted backup in Cloud Vault.</p>
-      {vault.error && <ErrorText role='alert'>{vault.error}</ErrorText>}
+      {vault.error && (
+        <ErrorText role='alert'>
+          {/ClientDb/.test(vault.error)
+            ? "This device's storage isn't responding. Close other atomic.place windows or tabs, then try again."
+            : vault.error}
+        </ErrorText>
+      )}
       {vault.restoreProgress !== null && (
         <p>Restoring… {Math.round(vault.restoreProgress * 100)}%</p>
       )}

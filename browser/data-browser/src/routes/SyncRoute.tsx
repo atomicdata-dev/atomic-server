@@ -1,24 +1,17 @@
-import {
-  ServiceGroup,
-  ServiceSection,
-  ServiceIcon,
-  ServiceBody,
-  ServiceTitle,
-  ServiceDescription,
-  CLOUD_SERVER_DESCRIPTION,
-  CLOUD_SERVER_PLAN_DESCRIPTION,
-  CLOUD_SERVER_SETUP,
-} from '@tomic/service-ui';
+import { ServiceGroup, ServiceSection } from '@tomic/service-ui';
 import '@tomic/service-ui/styles.css';
 import { Checkbox } from '../components/forms/Checkbox';
 import { resumePeerLinks } from '../helpers/browserPeerSync';
 import { syncSummary, showSavedServer } from '../helpers/syncPresentation';
 import { driveBillingUrl } from '../helpers/driveBillingUrl';
+import { reportUserFacingFailure } from '../helpers/sentry';
 import {
   deriveNodeStatuses,
   currentDriveSync,
+  driveHostedByNode,
   currentDriveValue,
   hasHostedDriveConnection,
+  shouldAutoEnroll,
   type ScopedDriveValue,
   type NodeStatus,
 } from '../helpers/driveSyncStatus';
@@ -26,7 +19,9 @@ import { BrowserPeerPanel } from '../components/BrowserPeerPanel';
 import { HostingPaymentRequiredError } from '../helpers/managed/enrollment';
 import { DiscoverWorkspace } from '../views/getting-started/DiscoverWorkspace';
 import {
+  Fragment,
   useEffect,
+  useRef,
   useState,
   type JSX,
   type MouseEvent,
@@ -39,6 +34,9 @@ import {
   type StoreSyncStatus,
   type CommitLogEntry,
   useStore,
+  useResource,
+  useString,
+  core,
   useProperty,
   truncateUrl,
   Datatype,
@@ -54,6 +52,7 @@ import {
   CARD_TITLE_FONT,
 } from '../components/cardSurface';
 import { openExternal } from '../helpers/openExternal';
+import { formatBytes } from '../helpers/formatBytes';
 import { AICreditsService } from '../components/Vault/AICreditsService';
 import {
   FaLaptop,
@@ -63,14 +62,22 @@ import {
   FaQuestion,
   FaCircleExclamation,
   FaCloud,
-  FaPlus,
   FaMobileScreenButton,
   FaCloudArrowUp,
   FaKey,
 } from 'react-icons/fa6';
 import { Button } from '../components/Button';
-import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { VaultPanel } from '../components/Vault/VaultPanel';
+import {
+  ServiceRow,
+  ServiceRows,
+  type ServiceStanding,
+  type ServiceTone,
+} from '../components/Cloud/ServiceRow';
+import { CloudServerDetails } from '../components/Cloud/CloudServerDetails';
+import { SyncProblemBanner } from '../components/SyncProblemBanner';
+import { describeSyncProblem, notHostedTitle } from '../helpers/syncProblem';
+import { isErrorReportingEnabled, reportSyncProblem } from '../helpers/sentry';
 import { LinkProviderPanel } from '../components/Vault/LinkProviderPanel';
 import { isDeviceLinked } from '../helpers/managed/deviceLink';
 import {
@@ -85,6 +92,7 @@ import {
 import {
   envelopeWrapperKinds,
   getRecoverySecret,
+  isAssistedRecoveryAvailable,
   readCachedBackups,
   sameAgent,
 } from '../helpers/managed/recovery';
@@ -102,23 +110,13 @@ import {
 } from '../helpers/managedServer';
 import { isOriginWithoutNode } from '../helpers/originNode';
 import { getDriveUsage } from '../helpers/managedUsage';
-import {
-  normalizeServerUrl,
-  sameOrigin,
-  serverLabel,
-} from '../helpers/serverUrl';
+import { sameOrigin, serverLabel } from '../helpers/serverUrl';
 import { ResourceInline } from '../views/ResourceInline';
 import { AtomicLink } from '../components/AtomicLink';
 import { formatTimeAgo } from '../helpers/formatTimeAgo';
-import {
-  getLocalServerOrigin,
-  isMobileTauri,
-  isRunningInTauri,
-} from '../helpers/tauri';
+import { getLocalServerOrigin, isRunningInTauri } from '../helpers/tauri';
 import { deviceHasDriveData } from '../helpers/driveData';
-import { deliverDeepLink } from '../helpers/deepLinkQueue';
-import { PairingCode } from '../components/PairingCode';
-import { ConnectToDeviceForm } from '../components/ConnectToDeviceForm';
+import { ConnectDevice, focusConnectDevice } from '../components/ConnectDevice';
 import {
   decodePairingEnvelope,
   PairingEnvelopeError,
@@ -197,20 +195,6 @@ function statusLabel(status: NodeStatus): string {
     case 'unknown':
       return 'Connecting…';
   }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
 type ServerCardProps = {
@@ -312,16 +296,6 @@ function ServerCard({
   const serverHostname = status.serverUrl
     ? new URL(status.serverUrl).hostname
     : undefined;
-  const usagePct =
-    nodeUsage && quotaBytes
-      ? Math.min(
-          100,
-          Math.round(
-            ((nodeUsage.blobBytes + nodeUsage.loroBytes) / quotaBytes) * 100,
-          ),
-        )
-      : null;
-
   const driveSync = isActive ? currentDriveSync(status) : undefined;
   const syncedAgo = driveSync
     ? formatTimeAgo(new Date(driveSync.timestamp))
@@ -346,20 +320,43 @@ function ServerCard({
    * dropped string is not an error, it is simply never translated — which is
    * the quiet failure, so it is worth knowing about.
    */
-  const facts: string[] = [];
+  const facts: ReactNode[] = [];
 
-  if (nodeUsage && usedBytes !== null) {
+  // A Cloud Server's resource count, space and storage link live on its row in
+  // the plan card, where the portal shows them too. The device card keeps what
+  // is true of the device.
+  if (nodeUsage && usedBytes !== null && !isCloud) {
     facts.push(`${nodeUsage.resourceCount.toLocaleString()} resources`);
+
+    const usedText = quotaBytes
+      ? `${formatBytes(usedBytes)} of ${formatBytes(quotaBytes)}`
+      : formatBytes(usedBytes);
+
+    // The link to the size map sits right behind the space count.
     facts.push(
-      quotaBytes
-        ? `${formatBytes(usedBytes)} of ${formatBytes(quotaBytes)}`
-        : formatBytes(usedBytes),
+      isActive ? (
+        <span key='space'>
+          {usedText}{' '}
+          <ManagedLink
+            as={Link}
+            to={paths.storage}
+            data-testid='storage-map-link'
+          >
+            (see where space goes)
+          </ManagedLink>
+        </span>
+      ) : (
+        usedText
+      ),
     );
   }
 
-  if (driveSync) {
-    facts.push(syncedAgo ? `Synced ${syncedAgo}` : 'Synced just now');
-  }
+  // Shown next to the "in use" line at the top of the card.
+  const syncedFact = driveSync
+    ? syncedAgo
+      ? `Synced ${syncedAgo}`
+      : 'Synced just now'
+    : null;
 
   async function toggleWorkspaceSync(next: boolean) {
     const drive = status.drive;
@@ -370,7 +367,6 @@ function ServerCard({
     try {
       if (next) {
         await store.promoteLocalDrive(drive);
-        toast.success('Syncing this workspace…');
       } else {
         await store.makeDriveLocal(drive);
         resumePeerLinks(store);
@@ -391,8 +387,6 @@ function ServerCard({
   return (
     <SyncCard
       active={isActive}
-      provider={isCloud}
-      embedded={isCloud}
       icon={isCloud ? <FaCloud /> : <FaServer />}
       iconTone={isCloud ? 'provider' : 'neutral'}
       title={isCloud ? 'Cloud Server' : serverLabel(server)}
@@ -439,7 +433,7 @@ function ServerCard({
         isActive
           ? isCloud
             ? serverHostname
-            : 'Always-on · in use'
+            : ['Always-on · in use', syncedFact].filter(Boolean).join(' · ')
           : 'Always-on device'
       }
       facts={isActive ? facts : undefined}
@@ -451,15 +445,7 @@ function ServerCard({
           : undefined
       }
       footer={
-        isCloud && managedInfo.portalUrl ? (
-          <ManagedLink
-            {...externalLinkProps(
-              driveBillingUrl(managedInfo.portalUrl, status.drive),
-            )}
-          >
-            {'Manage this drive’s plan →'}
-          </ManagedLink>
-        ) : !isSelectedServer ? (
+        !isSelectedServer ? (
           // Removing the server you're using would strand the app.
           <NodeActionSubtle onClick={() => onRemove(server)}>
             Remove
@@ -467,12 +453,6 @@ function ServerCard({
         ) : undefined
       }
     >
-      {isCloud && (
-        <ConnMeta>
-          This status describes data synchronization. View this drive’s
-          subscription and price in billing.
-        </ConnMeta>
-      )}
       {refusedByServer && (
         <ConnError role='alert'>
           <FaCircleExclamation aria-hidden />
@@ -524,15 +504,6 @@ function ServerCard({
           <span>{status.serverConnectionError}</span>
         </ConnError>
       )}
-
-      {isActive && usagePct !== null && (
-        <UsageBar
-          aria-label={`${usagePct}% of storage used`}
-          title={`${usagePct}% used`}
-        >
-          <UsageFill style={{ width: `${usagePct}%` }} />
-        </UsageBar>
-      )}
     </SyncCard>
   );
 }
@@ -565,17 +536,15 @@ interface SyncCardProps {
   subtitle?: ReactNode;
   /** What is true of this connection, joined by dots. Empty entries drop out,
    *  so callers can build the list conditionally without filtering. */
-  facts?: (string | false | undefined | null)[];
-  /** Anything between the facts and the node id: errors, a usage bar. */
+  facts?: ReactNode[];
+  /** Anything between the facts and the node id, such as errors. */
   children?: ReactNode;
   /** Rendered as a click-to-copy row. Pass the full `did:ad:node:…`. */
   nodeId?: string;
   footer?: ReactNode;
   active?: boolean;
-  provider?: boolean;
   /** The standalone spacing "This device" uses; the list cards sit tighter. */
   spacious?: boolean;
-  embedded?: boolean;
 }
 
 function SyncCard({
@@ -591,20 +560,13 @@ function SyncCard({
   nodeId,
   footer,
   active,
-  provider,
   spacious,
-  embedded,
 }: SyncCardProps): JSX.Element {
   const store = useStore();
-  const shown = (facts ?? []).filter((f): f is string => !!f);
+  const shown = (facts ?? []).filter(f => !!f);
 
   return (
-    <ConnCard
-      $active={active}
-      $provider={provider}
-      $spacious={spacious}
-      $embedded={embedded}
-    >
+    <ConnCard $active={active} $spacious={spacious}>
       <CardIcon $tone={iconTone}>{icon}</CardIcon>
       <ConnBody>
         <ConnTopRow>
@@ -629,7 +591,16 @@ function SyncCard({
 
         {children}
 
-        {shown.length > 0 && <ConnMeta>{shown.join(' · ')}</ConnMeta>}
+        {shown.length > 0 && (
+          <ConnMeta>
+            {shown.map((fact, i) => (
+              <Fragment key={i}>
+                {i > 0 && ' · '}
+                {fact}
+              </Fragment>
+            ))}
+          </ConnMeta>
+        )}
 
         {nodeId && (
           <NodeIdRow>
@@ -682,7 +653,6 @@ function SyncPage() {
   const [clientDbOn, setClientDbOn] = useState(() => isClientDbEnabled());
   const { setServer, setDrive, baseURL } = useSettings();
   const { drive: requestedDrive } = SyncRoute.useSearch();
-  const [confirmCloud, setConfirmCloud] = useState(false);
   const [hostedCopy, setHostedCopy] = useState<{
     drive: string;
     origin: string;
@@ -705,12 +675,8 @@ function SyncPage() {
     setKnownServers(serverURLStorage.getKnownServers());
   }, [baseURL]);
 
-  // Switching + adding happen inline in the Devices section (not a separate
-  // dialog): `showAddServer` reveals the add-a-device form. An always-on device
-  // is added by address; one you carry is added by pairing with its code.
-  const [showAddServer, setShowAddServer] = useState(false);
-  const [serverInput, setServerInput] = useState('');
   const [localNodeId, setLocalNodeId] = useState<string | null>(null);
+  const [syncRetrying, setSyncRetrying] = useState(false);
   const [peerSyncing, setPeerSyncing] = useState(false);
   const [peerSyncResult, setPeerSyncResult] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
@@ -719,12 +685,21 @@ function SyncPage() {
   // `true` = already enrolled (hide it).
   const [cloudEnrollment, setCloudEnrollment] =
     useState<ScopedDriveValue<boolean> | null>(null);
-  const cloudEnrolled = currentDriveValue(
+  // Only what THIS account has enrolled. Hosting belongs to the drive, so a
+  // member who isn't the subscriber (or isn't signed in) can't learn it here;
+  // `cloudEnrolled` below folds in what the node itself says about the drive.
+  const accountEnrolled = currentDriveValue(
     cloudEnrollment,
     status.drive,
     status.serverUrl,
   );
   const [cloudBusy, setCloudBusy] = useState(false);
+  // Why the automatic Cloud Server start failed, so the row can say so and
+  // offer a retry instead of sitting on "Moving…" forever.
+  const [autoEnrollError, setAutoEnrollError] = useState<string | null>(null);
+  // The drive this page already tried to start Cloud Server for by itself.
+  // Once per drive per visit: a failure gets a button, not a loop.
+  const autoEnrollTried = useRef<string | null>(null);
   // Resolved in an effect rather than read off a Resource during render: the
   // React Compiler memoizes on the proxy identity, so a resource that finishes
   // loading would never re-render this.
@@ -748,6 +723,11 @@ function SyncPage() {
   // `managed:false` and no portal link is shown; anything plan/billing-specific
   // lives behind the link, on the operator's portal.
   const [managedInfo, setManagedInfo] = useState<ManagedInfo>(EMPTY_NODE_INFO);
+  // Which server `managedInfo` was actually read from; `EMPTY_NODE_INFO` is
+  // also what an unanswered poll looks like.
+  const [managedInfoServer, setManagedInfoServer] = useState<string | null>(
+    null,
+  );
 
   // Cloud Vault. Assembling its prerequisites (wasm key ops, this install's
   // lane id, the signing agent) lives in the hook, which the wiped-device
@@ -784,9 +764,21 @@ function SyncPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
     null,
   );
+  const [serverAccessGranted, setServerAccessGranted] = useState(false);
+  /**
+   * Who made this drive's plan: `stripe` when the account paid for it, `grant`
+   * when an operator added it by hand. Unknown from a control plane that does
+   * not say yet, which is treated like a grant: asking once too often is
+   * cheaper than hosting a readable copy nobody agreed to.
+   */
+  const [subscriptionSource, setSubscriptionSource] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setSubscriptionStatus(null);
+    setSubscriptionSource(null);
+    setServerAccessGranted(false);
     if (!managedAccount || !status.drive) return;
     const drive = status.drive;
     const controller = new AbortController();
@@ -799,8 +791,17 @@ function SyncPage() {
         const subscription = await response.json();
 
         if (!controller.signal.aborted) {
+          setServerAccessGranted(
+            typeof subscription.server_access?.quota_bytes === 'number' &&
+              subscription.server_access.quota_bytes > 0,
+          );
           setSubscriptionStatus(
             subscription.plan === 'server' ? subscription.status : 'free',
+          );
+          setSubscriptionSource(
+            typeof subscription.source === 'string'
+              ? subscription.source
+              : null,
           );
         }
       })
@@ -835,7 +836,13 @@ function SyncPage() {
    */
   const [recoveryState, setRecoveryState] = useState<{
     account: ManagedAccount;
-    value: 'stored' | 'passkey-only' | 'device-only' | 'none' | null;
+    value:
+      | 'stored'
+      | 'sign-in-not-on'
+      | 'passkey-only'
+      | 'device-only'
+      | 'none'
+      | null;
   } | null>(null);
   const recoveryBackup =
     recoveryState?.account === managedAccount
@@ -858,9 +865,31 @@ function SyncPage() {
         if (cancelled) return;
 
         if (stored) {
-          const { hasPasskey, hasCode } = envelopeWrapperKinds(stored);
+          const { hasPasskey, hasCode, hasAccount } =
+            envelopeWrapperKinds(stored);
 
-          setRecoveryBackup(hasPasskey && !hasCode ? 'passkey-only' : 'stored');
+          if (hasAccount) {
+            setRecoveryBackup('stored');
+
+            return;
+          }
+
+          // A backup from before assisted recovery: signing in does not open
+          // it yet, which is the whole promise of this row. Settings adds the
+          // key with one passkey prompt or the code.
+          const assisted =
+            !managedAccount.assisted_recovery_off &&
+            (await isAssistedRecoveryAvailable().catch(() => false));
+
+          if (cancelled) return;
+
+          setRecoveryBackup(
+            assisted
+              ? 'sign-in-not-on'
+              : hasPasskey && !hasCode
+                ? 'passkey-only'
+                : 'stored',
+          );
 
           return;
         }
@@ -942,7 +971,10 @@ function SyncPage() {
 
     const poll = () =>
       fetchManagedInfo(serverUrl).then(info => {
-        if (!cancelled) setManagedInfo(prev => sameInfo(prev, info));
+        if (cancelled) return;
+
+        setManagedInfo(prev => sameInfo(prev, info));
+        setManagedInfoServer(serverUrl);
       });
 
     void poll();
@@ -975,6 +1007,17 @@ function SyncPage() {
     status.serverUrl,
   );
 
+  // Hosting belongs to the drive: a member sees it whether or not their own
+  // account pays for it, or is signed in at all.
+  const hostedByNode = driveHostedByNode({
+    managed: managedInfo.managed,
+    liveSyncedDrive: !!status.drive && store.isLiveSyncedDrive(status.drive),
+    refusedByServer: store.isDriveRefusedByServer(status.drive),
+    status,
+    resourceCount: nodeUsage?.resourceCount,
+  });
+  const cloudEnrolled = hostedByNode ? true : accountEnrolled;
+
   // Sign in with a secret on a fresh device and you get the identity but none
   // of the data. Detect that so the page can lead with "pair a device".
   useEffect(() => {
@@ -1005,7 +1048,13 @@ function SyncPage() {
     const agent = store.getAgent();
 
     // A local-only drive isn't on the server — asking for its usage 500s.
-    if (!drive || !serverUrl || !agent || store.isLocalOnlyDrive(drive)) {
+    if (
+      !drive ||
+      !serverUrl ||
+      !agent ||
+      cloudBusy ||
+      store.isLocalOnlyDrive(drive)
+    ) {
       setNodeUsageState(null);
 
       return;
@@ -1026,7 +1075,13 @@ function SyncPage() {
     return () => {
       cancelled = true;
     };
-  }, [status.drive, status.serverUrl, status.lastDriveSync?.timestamp, store]);
+  }, [
+    status.drive,
+    status.serverUrl,
+    status.lastDriveSync?.timestamp,
+    cloudBusy,
+    store,
+  ]);
 
   // Plan quota — managed nodes only, from the control plane. Billing stays a
   // managed concern; the usage numbers above are generic to every node.
@@ -1222,7 +1277,11 @@ function SyncPage() {
     }
 
     if (cloudEnrolled === null) {
-      return 'Checking whether this workspace is hosted…';
+      // The enrollment list needs a portal session. Without one the answer
+      // never arrives, so say what would get it instead of waiting forever.
+      return managedAccount
+        ? 'Checking whether this workspace is hosted…'
+        : `Sign in to ${PRODUCT_NAME} to see whether this workspace is hosted.`;
     }
 
     if (!isAtomicIdentifier(status.drive)) {
@@ -1308,7 +1367,6 @@ function SyncPage() {
 
     try {
       await store.promoteLocalDrive(status.drive);
-      toast.success('Syncing this workspace…');
     } catch (e) {
       store.notifyError(e as Error);
     } finally {
@@ -1316,7 +1374,14 @@ function SyncPage() {
     }
   }
 
-  async function backupToCloud() {
+  /**
+   * Enroll this drive with Cloud Server and point this device at it.
+   *
+   * `auto` is the run nobody clicked: a paid plan, or an enrollment this
+   * device has not caught up with. It must not open a sign-in window or leave
+   * for checkout on its own, so those cases become an error on the row.
+   */
+  async function backupToCloud({ auto = false }: { auto?: boolean } = {}) {
     const drive = status.drive;
     const agent = store.getAgent();
     // Enrollment is keyed on the agent's subject: without one there is no
@@ -1344,11 +1409,23 @@ function SyncPage() {
       };
       let result = await enableCloudSyncForDrive(args);
 
+      if (!result.ok && auto) {
+        setAutoEnrollError(
+          `Sign in to your ${PRODUCT_NAME} account to start Cloud Server.`,
+        );
+
+        return;
+      }
+
       if (!result.ok) {
         // No account/session yet. Open the portal (in-app window on desktop,
         // popup on web) so the user signs in / creates an account there; it
         // shares our cookie jar, so once done we just retry — no token handoff.
         if (!result.portalUrl) {
+          reportUserFacingFailure('Cloud Server setup: no portal configured', {
+            drive,
+            server: status.serverUrl,
+          });
           toast.error(
             `No ${PRODUCT_NAME} portal is configured for this server.`,
           );
@@ -1367,6 +1444,11 @@ function SyncPage() {
         result = await enableCloudSyncForDrive(args);
 
         if (!result.ok) {
+          reportUserFacingFailure('Cloud Server setup failed after sign-in', {
+            drive,
+            server: status.serverUrl,
+            reason: result.reason,
+          });
           toast.error(`Could not set up Cloud Server.`);
 
           return;
@@ -1380,13 +1462,36 @@ function SyncPage() {
       });
       if (result.replicated)
         setHostedCopy({ drive, origin: result.httpOrigin });
-      toast.success(
-        result.replicated
-          ? 'Cloud Server received this workspace. Your source server is still connected.'
-          : 'Connected to Cloud Server. Syncing this workspace…',
-      );
+
+      // A manual run shows its result in the connection card. The automatic
+      // run nobody clicked is announced.
+      if (auto) {
+        toast.success(
+          result.replicated
+            ? 'Cloud Server received this workspace. Your source server is still connected.'
+            : 'Connected to Cloud Server. Syncing this workspace…',
+        );
+      }
     } catch (e) {
-      if (e instanceof HostingPaymentRequiredError) {
+      // The manual path ends in `store.notifyError`, which Sentry already
+      // gets. The automatic one only fills an inline message.
+      if (auto && !(e instanceof HostingPaymentRequiredError)) {
+        reportUserFacingFailure('Cloud Server setup failed on its own', {
+          drive,
+          server: status.serverUrl,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+
+      if (auto) {
+        setAutoEnrollError(
+          e instanceof HostingPaymentRequiredError
+            ? 'This drive’s plan does not include Cloud Server yet.'
+            : e instanceof Error
+              ? e.message
+              : 'Could not start Cloud Server.',
+        );
+      } else if (e instanceof HostingPaymentRequiredError) {
         if (!accountPortalUrl) {
           store.notifyError(
             new Error(
@@ -1412,6 +1517,221 @@ function SyncPage() {
       setCloudBusy(false);
     }
   }
+
+  const cloudTier: CloudTier =
+    managedServer || hostedCopyOrigin
+      ? 'server'
+      : vault.status.state === 'on'
+        ? 'vault'
+        : 'local';
+  const planActive =
+    subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+  /**
+   * Cloud Server should just work for a drive whose owner paid for it (the
+   * checkout already said what hosting means), and for a drive that is
+   * enrolled but that this device has not switched to yet. Either way there is
+   * nothing left for the person to decide, so no button.
+   */
+  const autoEnroll =
+    !managedServer &&
+    !hostedCopyOrigin &&
+    !cloudServerBlocked &&
+    !!managedAccount &&
+    // The account's own enrollment: a member of someone else's hosted drive
+    // has nothing to start.
+    shouldAutoEnroll({
+      accountEnrolled,
+      nodeInfoLoaded: managedInfoServer === status.serverUrl,
+      currentServerManaged: managedInfo.managed,
+      paidPlanActive: planActive && subscriptionSource === 'stripe',
+    });
+  /**
+   * The one case that still asks: a plan that was not bought, such as Cloud
+   * Server added by hand by an operator. Hosting stores the drive readable on
+   * our servers, so it waits for the owner's word.
+   */
+  const needsHostingConsent =
+    !managedServer &&
+    !hostedCopyOrigin &&
+    !cloudServerBlocked &&
+    cloudEnrolled === false &&
+    (serverAccessGranted || (planActive && subscriptionSource !== 'stripe'));
+
+  useEffect(() => {
+    const drive = status.drive;
+
+    if (!autoEnroll || !drive || cloudBusy) return;
+
+    if (autoEnrollTried.current === drive) return;
+
+    autoEnrollTried.current = drive;
+    setAutoEnrollError(null);
+    void backupToCloud({ auto: true });
+  }, [autoEnroll, status.drive, cloudBusy]);
+
+  /** Point the app at `server` and reconnect. `setServer` runs through
+   * `store.setServerUrl`, which reopens the WebSocket — the connection card
+   * then reflects the new server's status. */
+  function switchToServer(server: string) {
+    if (server === baseURL) {
+      return;
+    }
+
+    try {
+      setServer(server);
+    } catch (e) {
+      store.notifyError(e as Error);
+    }
+  }
+
+  /**
+   * Cloud Server's row, as one state. Each state fills the same slots of
+   * `ServiceRow`, so the row only ever changes what it says, never its shape.
+   */
+  const serverRow: {
+    state: 'on' | 'copied' | 'moving' | 'failed' | 'offered' | 'off';
+    standing: ServiceStanding | null;
+    status: { tone: ServiceTone; text: ReactNode } | null;
+    details?: ReactNode;
+    actions: ReactNode;
+  } = (() => {
+    const managePlan = accountPortalUrl && status.drive && (
+      <Button
+        subtle
+        data-testid='cloud-server-manage'
+        onClick={() =>
+          void openExternal(driveBillingUrl(accountPortalUrl, status.drive))
+        }
+      >
+        Manage plan
+      </Button>
+    );
+
+    if (managedServer) {
+      const tone = nodes.server;
+
+      return {
+        state: 'on',
+        standing: 'current',
+        status: {
+          tone:
+            tone === 'synced'
+              ? 'ok'
+              : tone === 'offline'
+                ? 'error'
+                : tone === 'unknown'
+                  ? 'muted'
+                  : 'busy',
+          text: `${statusLabel(tone)} · ${serverHostname ?? managedServer}`,
+        },
+        details: status.drive ? (
+          <CloudServerDetails
+            key={status.drive}
+            drive={status.drive}
+            usage={nodeUsage}
+            quotaBytes={quotaBytes}
+            signedIn={!!managedAccount}
+          />
+        ) : undefined,
+        actions: managePlan,
+      };
+    }
+
+    if (hostedCopyOrigin) {
+      return {
+        state: 'copied',
+        standing: 'current',
+        status: {
+          tone: 'waiting',
+          text: 'This workspace is on Cloud Server. This device still syncs with its old server.',
+        },
+        actions: (
+          <>
+            <Button onClick={() => switchToServer(hostedCopyOrigin)}>
+              Use Cloud Server
+            </Button>
+            {managePlan}
+          </>
+        ),
+      };
+    }
+
+    if (autoEnroll && autoEnrollError) {
+      return {
+        state: 'failed',
+        standing: 'current',
+        status: { tone: 'error', text: autoEnrollError },
+        actions: (
+          <>
+            <Button
+              onClick={() => {
+                setAutoEnrollError(null);
+                void backupToCloud();
+              }}
+              disabled={cloudBusy}
+            >
+              {cloudBusy ? 'Trying again…' : 'Try again'}
+            </Button>
+            {managePlan}
+          </>
+        ),
+      };
+    }
+
+    if (autoEnroll || cloudBusy) {
+      return {
+        state: 'moving',
+        standing: 'current',
+        status: {
+          tone: 'busy',
+          text: 'Moving this workspace to Cloud Server. It switches on by itself; you can keep working.',
+        },
+        actions: managePlan,
+      };
+    }
+
+    if (needsHostingConsent) {
+      return {
+        state: 'offered',
+        standing: 'offered',
+        status: {
+          tone: 'waiting',
+          text:
+            serverAccessGranted || subscriptionSource === 'grant'
+              ? `${PRODUCT_NAME} added Cloud Server to this workspace. It waits for your consent.`
+              : 'This workspace’s plan includes Cloud Server. It waits for your consent.',
+        },
+        actions: (
+          <Button
+            data-testid='cloud-server-accept'
+            onClick={() => void backupToCloud()}
+            disabled={cloudBusy}
+          >
+            Turn on Cloud Server
+          </Button>
+        ),
+      };
+    }
+
+    return {
+      state: 'off',
+      standing: null,
+      status: cloudServerBlocked
+        ? { tone: 'muted', text: cloudServerBlocked }
+        : null,
+      actions:
+        !cloudServerBlocked && accountPortalUrl && status.drive ? (
+          <Button
+            data-testid='cloud-server-upgrade'
+            onClick={() =>
+              void openExternal(driveBillingUrl(accountPortalUrl, status.drive))
+            }
+          >
+            Upgrade to Cloud Server
+          </Button>
+        ) : undefined,
+    };
+  })();
 
   function savePeers(peers: KnownPeer[]) {
     setKnownPeers(peers);
@@ -1549,26 +1869,75 @@ function SyncPage() {
     savePeers(knownPeers.filter(p => p.nodeId !== nodeId));
   }
 
-  /** Point the app at `server` and reconnect. `setServer` runs through
-   * `store.setServerUrl`, which reopens the WebSocket — the connection card
-   * then reflects the new server's status. The toast is the immediate feedback
-   * (the reconnect itself is async). */
-  function switchToServer(server: string) {
-    if (server === baseURL) {
-      return;
-    }
-
-    try {
-      setServer(server);
-      toast.success(`Switching to ${serverLabel(server)}…`);
-    } catch (e) {
-      store.notifyError(e as Error);
-    }
-  }
-
   function removeServer(server: string) {
     serverURLStorage.removeKnownServer(server);
     setKnownServers(serverURLStorage.getKnownServers());
+  }
+
+  // Why this workspace is not syncing, if it is not. A local-only workspace is
+  // not supposed to be, so it has nothing to explain.
+  const syncProblemInput = {
+    status,
+    refusedByServer: store.isDriveRefusedByServer(status.drive),
+    entries: store.outbox.pending(),
+    serverName: serverLabel(status.serverUrl ?? ''),
+    driveOf: (subject: string) => store.driveOfSubject(subject),
+  };
+  const described = localOnlyDrive
+    ? null
+    : describeSyncProblem(syncProblemInput);
+  // A problem can be about another workspace than the one in view; name it by
+  // its title, which can only be loaded once the problem says which one it is.
+  const problemDriveResource = useResource(described?.otherDrive);
+  const [problemDriveName] = useString(
+    problemDriveResource,
+    core.properties.name,
+  );
+  const syncProblem =
+    described?.otherDrive && problemDriveName
+      ? { ...described, title: notHostedTitle(problemDriveName) }
+      : described;
+  const syncProblemKey = syncProblem?.key;
+  const syncProblemOurs = syncProblem?.cause === 'ours';
+  const syncProblemReported = syncProblem?.reported ?? true;
+  const syncProblemDetail = syncProblem?.detail;
+
+  // A commit that keeps failing is already reported by the outbox. Everything
+  // else we own is reported here, once.
+  useEffect(() => {
+    if (syncProblemKey && syncProblemOurs && !syncProblemReported) {
+      reportSyncProblem({
+        key: syncProblemKey,
+        server: status.serverUrl,
+        detail: syncProblemDetail,
+      });
+    }
+  }, [
+    syncProblemKey,
+    syncProblemOurs,
+    syncProblemReported,
+    syncProblemDetail,
+    status.serverUrl,
+  ]);
+
+  async function tryAgainSync() {
+    if (syncRetrying) return;
+
+    setSyncRetrying(true);
+
+    // A parked change is only sent again after a fresh signal. Reconnecting
+    // repeats the workspace handshake, which also retries a refused sync.
+    for (const entry of store.outbox.pending()) {
+      if (entry.blocked) store.outbox.markDirty(entry.subject);
+    }
+
+    try {
+      await store.reconnect();
+    } catch (e) {
+      store.notifyError(e as Error);
+    }
+
+    setSyncRetrying(false);
   }
 
   return (
@@ -1576,6 +1945,14 @@ function SyncPage() {
       <ContainerNarrow>
         <h1>Sync</h1>
         <Lead>{summaryLine()}</Lead>
+        {syncProblem && (
+          <SyncProblemBanner
+            problem={syncProblem}
+            notified={isErrorReportingEnabled()}
+            retrying={syncRetrying}
+            onTryAgain={() => void tryAgainSync()}
+          />
+        )}
         {/* Everything our paid services own, in one card.
 
             These used to be loose entries in the Devices list, on the reasoning
@@ -1591,6 +1968,19 @@ function SyncPage() {
             control plane renders none of it. That URL comes from a managed
             node, a build-time override, or one a node named earlier — never
             from anything hardcoded here. */}
+        {/* Everything our paid services own, in one card.
+
+            The top is the account, not a service: whose services these are,
+            who is signed in and whether email recovery is set up, with the
+            way out to the portal. Below it, the drive's place on one ladder:
+            on this device, then Cloud Vault (encrypted backup we cannot read),
+            then Cloud Server (hosting on top of that backup). Cloud Server is
+            the step up from Cloud Vault, not a second product next to it.
+
+            Gated on a portal being known at all, so a self-hosted node with no
+            control plane renders none of it. That URL comes from a managed
+            node, a build-time override, or one a node named earlier, never
+            from anything hardcoded here. */}
         {accountPortalUrl && (
           <ProviderCard data-testid='provider-card'>
             <ProviderHeader>
@@ -1601,26 +1991,15 @@ function SyncPage() {
                 <AccountLabel>{PRODUCT_NAME}</AccountLabel>
                 <AccountEmail data-testid='provider-account'>
                   {managedAccount
-                    ? subscriptionStatus === 'active'
-                      ? 'Your Cloud Server subscription is active'
-                      : subscriptionStatus === 'trialing'
-                        ? 'Your Cloud Server trial is active'
-                        : 'Your cloud services'
-                    : 'Cloud services for this workspace'}
+                    ? recoveryBackup === 'stored'
+                      ? `${managedAccount.email} · Email recovery on`
+                      : managedAccount.email
+                    : 'Not signed in'}
                 </AccountEmail>
               </AccountBody>
-              {/* The way out to the portal, in both states. It used to appear
-                  only once you were signed in, which left the card naming a
-                  provider with no route to it: everything you can do about
-                  these services other than switch them on lives over there,
-                  including having an account in the first place.
-
-                  Signed in, that is the dashboard rather than the portal root,
-                  because a signed-in visitor gets the marketing page at `/` and
-                  would land on a sales pitch instead of the account the link
-                  promises to manage. Signed out, `/signin` is the bare
-                  magic-link form, which both creates an account and returns to
-                  an existing one. */}
+              {/* Signed in, the dashboard rather than the portal root, which
+                  is the marketing page. Signed out, `/signin` both creates an
+                  account and returns to an existing one. */}
               <ManagedLink
                 data-testid='provider-portal-link'
                 {...externalLinkProps(
@@ -1633,228 +2012,139 @@ function SyncPage() {
               </ManagedLink>
             </ProviderHeader>
 
-            {/* Email recovery. Blue when it is actually set up, which is the
-                rule for every row here: colour answers "is this on", not "does
-                this exist". Left neutral while unknown too, since a failed
-                check must not be drawn as a missing backup.
+            {/* Only when it needs you: signed out, or no backup that gets you
+                back in on a new device. Set up, it is one phrase in the
+                header; unknown, the header just shows the account. */}
+            {(!managedAccount ||
+              recoveryBackup === 'none' ||
+              recoveryBackup === 'device-only' ||
+              recoveryBackup === 'sign-in-not-on' ||
+              recoveryBackup === 'passkey-only') && (
+              <ProviderService data-testid='recovery-row'>
+                <CardIcon
+                  $tone={
+                    managedAccount && recoveryBackup === 'stored'
+                      ? 'provider'
+                      : 'neutral'
+                  }
+                >
+                  <FaKey />
+                </CardIcon>
+                <ConnBody>
+                  <ConnTitle>Email recovery</ConnTitle>
+                  <ConnSub>
+                    {!managedAccount
+                      ? `Sign in to your ${PRODUCT_NAME} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account.`
+                      : recoveryBackup === null
+                        ? `Signed in as ${managedAccount.email}.`
+                        : recoveryBackup === 'stored'
+                          ? `${managedAccount.email}. We hold your key sealed, so this email gets you back in on a new device.`
+                          : recoveryBackup === 'sign-in-not-on'
+                            ? `${managedAccount.email}. We hold your key sealed, but signing in does not open it yet. Confirm once with your passkey or recovery code to turn that on.`
+                            : recoveryBackup === 'passkey-only'
+                              ? `${managedAccount.email}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would.`
+                              : recoveryBackup === 'device-only'
+                                ? `${managedAccount.email}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in.`
+                                : `${managedAccount.email}. No recovery backup stored, so losing every device loses this workspace.`}
+                  </ConnSub>
+                  {/* Signed out, the account itself is the missing piece, and it
+                      is made in the portal: on a device that cannot hold our
+                      cookie the sign-in is approved from a browser anyway.
 
-                Rendered signed out as well, like the two rows below it. Hiding
-                it made the one service that protects against losing every
-                device the only one you could not find out about until after you
-                had an account, and it left the card looking like it had two
-                offers when it has three. */}
-            <ProviderService data-testid='recovery-row'>
-              <CardIcon
-                $tone={
-                  managedAccount && recoveryBackup === 'stored'
-                    ? 'provider'
-                    : 'neutral'
-                }
-              >
-                <FaKey />
-              </CardIcon>
-              <ConnBody>
-                <ConnTitle>Email recovery</ConnTitle>
-                <ConnSub>
-                  {!managedAccount
-                    ? `Sign in to your ${PRODUCT_NAME} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account.`
-                    : recoveryBackup === null
-                      ? `Signed in as ${managedAccount.email}.`
-                      : recoveryBackup === 'stored'
-                        ? `${managedAccount.email}. We hold your key sealed, so this email gets you back in on a new device.`
-                        : recoveryBackup === 'passkey-only'
-                          ? `${managedAccount.email}. We hold your key sealed, but only your passkey opens it. A browser your passkey has not synced to cannot get you back in — a recovery code would.`
-                          : recoveryBackup === 'device-only'
-                            ? `${managedAccount.email}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in.`
-                            : `${managedAccount.email}. No recovery backup stored, so losing every device loses this workspace.`}
-                </ConnSub>
-                {/* Signed out, the account itself is the missing piece, and it
-                    is made in the portal: on a device that cannot hold our
-                    cookie the sign-in is approved from a browser anyway.
+                      Signed in with nothing stored, the flow is in settings,
+                      where the rest of account recovery already lives. It asks
+                      for the agent secret, which this page has no business
+                      collecting in a status row, and it cannot avoid asking: the
+                      key is non-extractable in the browser, so the copy the user
+                      saved at setup is the only one that can still be sealed.
 
-                    Signed in with nothing stored, the flow is in settings,
-                    where the rest of account recovery already lives. It asks
-                    for the agent secret, which this page has no business
-                    collecting in a status row, and it cannot avoid asking: the
-                    key is non-extractable in the browser, so the copy the user
-                    saved at setup is the only one that can still be sealed.
-
-                    Nothing to press once it is on. Rotating a code or reading
-                    the secret back are settings' business, and this row's job
-                    is answering whether you are covered. */}
-                {!managedAccount ? (
-                  <ConnActions>
-                    <LearnMore
-                      {...externalLinkProps(`${accountPortalUrl}/signin`)}
-                    >
-                      Sign in to check recovery
-                    </LearnMore>
-                  </ConnActions>
-                ) : recoveryBackup === 'none' ||
-                  recoveryBackup === 'device-only' ||
-                  recoveryBackup === 'passkey-only' ? (
-                  <ConnActions>
-                    <LearnMoreLink
-                      to={paths.agentSettings}
-                      data-testid='recovery-row-action'
-                    >
-                      {recoveryBackup === 'device-only'
-                        ? 'Store it with ' + PRODUCT_NAME
-                        : recoveryBackup === 'passkey-only'
-                          ? 'Add a recovery code'
-                          : 'Set up email recovery'}
-                    </LearnMoreLink>
-                  </ConnActions>
-                ) : null}
-              </ConnBody>
-            </ProviderService>
-
-            {/* Unconditional, like the other two: a service that disappears
-                when it is off cannot be found, and the question this card
-                answers is "is this on". `VaultPanel` renders every state
-                itself, including the seconds it spends deciding. */}
-            <ProviderService>
-              <VaultPanel
-                vault={vault}
-                embedded
-                offerUrl={tierOfferUrl(accountPortalUrl, 'vault')}
-                onOfferClick={url => void openExternal(url)}
-                onRestored={() => window.location.reload()}
-              />
-            </ProviderService>
-
-            {/* On: the managed node itself, rendered by the same function the
-                Devices list uses, so the two cannot drift. Off: the offer,
-                which stays on the page in every other state — with the reason
-                in place of the button when there is nothing to press. */}
-            {managedServer ? (
-              <ProviderService data-testid='cloud-server-row'>
-                <ServerCard
-                  server={managedServer}
-                  status={status}
-                  managedInfo={managedInfo}
-                  cloudHosted={cloudHosted}
-                  cloudEnrolled={cloudEnrolled}
-                  serverStatus={nodes.server}
-                  hasWorkingLocalStore={hasWorkingLocalStore}
-                  nodeUsage={nodeUsage}
-                  quotaBytes={quotaBytes}
-                  serverNodeId={serverNodeId}
-                  onSwitch={switchToServer}
-                  onRemove={removeServer}
-                />
-              </ProviderService>
-            ) : (
-              <ProviderService data-testid='cloud-server-row'>
-                {/* Neutral, like every other service that is off. This was
-                    blue on the reasoning that an offer should still look like
-                    one of ours, but the reader scans this column to find out
-                    what they have, and the header above already says whose
-                    services these are. */}
-                <ServiceIcon kind='server' active={!!hostedCopyOrigin} />
-                <ServiceBody>
-                  <ServiceTitle>
-                    {hostedCopyOrigin ? 'Cloud Server is on' : 'Cloud Server'}
-                  </ServiceTitle>
-                  <ServiceDescription>
-                    {CLOUD_SERVER_DESCRIPTION}
-                  </ServiceDescription>
-                  <ConnMeta>
-                    {cloudEnrolled === true && !hostedCopyOrigin
-                      ? 'Setting up Cloud Server. Your workspace is being copied over; this turns on by itself once it has arrived.'
-                      : subscriptionStatus === 'active' ||
-                          subscriptionStatus === 'trialing'
-                        ? 'Included in your plan. Turn it on to start hosting this drive; nothing more to buy.'
-                        : CLOUD_SERVER_PLAN_DESCRIPTION}
-                  </ConnMeta>
-                  {hostedCopyOrigin && (
-                    <ConnMeta>
-                      This workspace has been copied to Cloud Server. You’re
-                      still using the source server.
-                    </ConnMeta>
-                  )}
-                  {cloudServerBlocked && (
-                    <ConnMeta>{cloudServerBlocked}</ConnMeta>
-                  )}
-                  <ConnActions>
-                    {hostedCopyOrigin && (
-                      <Button onClick={() => switchToServer(hostedCopyOrigin)}>
-                        Use Cloud Server
-                      </Button>
-                    )}
-                    {!cloudServerBlocked && (
-                      <Button
-                        onClick={() => setConfirmCloud(true)}
-                        disabled={cloudBusy}
+                      Nothing to press once it is on. Rotating a code or reading
+                      the secret back are settings' business, and this row's job
+                      is answering whether you are covered. */}
+                  {!managedAccount ? (
+                    <ConnActions>
+                      <LearnMore
+                        {...externalLinkProps(`${accountPortalUrl}/signin`)}
                       >
-                        {cloudBusy
-                          ? 'Setting up…'
-                          : hostedCopyOrigin
-                            ? 'Sync again'
-                            : cloudEnrolled
-                              ? 'Sync again'
-                              : subscriptionStatus === 'active' ||
-                                  subscriptionStatus === 'trialing'
-                                ? 'Turn on Cloud Server'
-                                : CLOUD_SERVER_SETUP}
-                      </Button>
-                    )}
-                    {/* This tier costs money and reads our copy of your data,
-                        so "what am I agreeing to" deserves an answer that
-                        isn't a paragraph on this card. The sales page already
-                        explains the tiers side by side.
-
-                        Linked off the *account's* portal, not the connected
-                        node's: the states that most need a price are the ones
-                        where this device is talking to a node that has never
-                        heard of a portal. */}
-                    <LearnMore
-                      {...externalLinkProps(
-                        tierOfferUrl(accountPortalUrl, 'server'),
-                      )}
-                    >
-                      See plans
-                    </LearnMore>
-                  </ConnActions>
-                </ServiceBody>
+                        Sign in to check recovery
+                      </LearnMore>
+                    </ConnActions>
+                  ) : recoveryBackup === 'none' ||
+                    recoveryBackup === 'device-only' ||
+                    recoveryBackup === 'sign-in-not-on' ||
+                    recoveryBackup === 'passkey-only' ? (
+                    <ConnActions>
+                      <LearnMoreLink
+                        to={paths.agentSettings}
+                        data-testid='recovery-row-action'
+                      >
+                        {recoveryBackup === 'device-only'
+                          ? 'Store it with ' + PRODUCT_NAME
+                          : recoveryBackup === 'sign-in-not-on'
+                            ? 'Turn it on'
+                            : recoveryBackup === 'passkey-only'
+                              ? 'Add a recovery code'
+                              : 'Set up email recovery'}
+                      </LearnMoreLink>
+                    </ConnActions>
+                  ) : null}
+                </ConnBody>
               </ProviderService>
             )}
+
+            {/* The plan as steps: Cloud Vault, then Cloud Server on top of
+                it. Both are the same `ServiceRow`, so they read the same way:
+                name and standing, what it is, what you get, how it is doing,
+                what you can do. Where the drive's data syncs is the Devices
+                list's business, further down. */}
+            <PlanLabelRow data-testid='cloud-tier' data-tier={cloudTier}>
+              <PlanLabel>Your plan</PlanLabel>
+              <LearnMore
+                {...externalLinkProps(tierOfferUrl(accountPortalUrl, 'server'))}
+              >
+                See plans
+              </LearnMore>
+            </PlanLabelRow>
+            <ServiceRows>
+              <VaultPanel
+                vault={vault}
+                included={serverRow.standing === 'current'}
+                onRestored={() => window.location.reload()}
+              />
+              <ServiceRow
+                data-testid='cloud-server-row'
+                data-state={serverRow.state}
+                kind='server'
+                title='Cloud Server'
+                standing={serverRow.standing}
+                tagline='Everything in Cloud Vault, plus a hosted workspace on atomic.place, always online. Our servers process what you put here.'
+                points={[
+                  'Shareable links and API access',
+                  'Search across everything',
+                  'No need for another device to be awake',
+                ]}
+                status={serverRow.status}
+                details={serverRow.details}
+                notice={
+                  serverRow.state === 'offered' ? (
+                    <>
+                      <strong>Before you turn it on:</strong> unlike Cloud
+                      Vault, Cloud Server stores a readable, unencrypted copy of
+                      this workspace on our servers, so we can run search,
+                      shareable links and the API for it. Your sharing
+                      permissions still control who else sees it, and you can
+                      turn it off at any time.
+                    </>
+                  ) : undefined
+                }
+                actions={serverRow.actions}
+              />
+            </ServiceRows>
             {/* Credits belong to the account, not to a plan or a drive: shown
                 with or without a Cloud Server, only while signed in. */}
             {managedAccount && <ProviderAICredits />}
           </ProviderCard>
         )}
-
-        <ConfirmationDialog
-          title={CLOUD_SERVER_SETUP}
-          confirmLabel='Agree and enable Cloud Server'
-          show={confirmCloud}
-          bindShow={setConfirmCloud}
-          onConfirm={() => void backupToCloud()}
-        >
-          <p>
-            Keep this workspace available when your devices are offline, with
-            shareable links, search, and API access.
-          </p>
-          <p>
-            <strong>Local:</strong> data stays on your devices unless you
-            connect a service or share it.
-          </p>
-          <p>
-            <strong>Cloud Vault:</strong> an encrypted backup that the provider
-            cannot read. It does not host your workspace.
-          </p>
-          <p>
-            <strong>Cloud Server:</strong> you agree to us storing and
-            processing a readable copy of this drive to provide hosting. Your
-            sharing permissions still control other users’ access.
-          </p>
-          <p>
-            Existing content stays in this drive. Hosting uses the Server plan
-            or invitation for this drive. If a purchase is needed, you will see
-            the price at checkout before paying.
-          </p>
-        </ConfirmationDialog>
 
         {/* A failed read gives no evidence about copies on other devices. */}
         {driveMissing && (
@@ -1884,7 +2174,7 @@ function SyncPage() {
                   </ConnSub>
                   <ConnActions>
                     {!pairNodeId && (
-                      <Button onClick={() => setShowAddServer(true)}>
+                      <Button onClick={focusConnectDevice}>
                         Connect a device
                       </Button>
                     )}
@@ -1932,7 +2222,7 @@ function SyncPage() {
           </LocalDriveNotice>
         )}
 
-        <Section>
+        <Section id='sync-devices'>
           <SectionTitle>Devices</SectionTitle>
 
           {/* Devices only. The hosted services moved up into the provider
@@ -1999,15 +2289,14 @@ function SyncPage() {
               </EmptyConnections>
             )}
 
-          {/* Servers we do not own — one stable list; the active one is marked,
-              not moved. A managed node is deliberately absent: it moved up into
-              the account card, because "what am I paying for" and "where does
-              this drive live" are different questions and it was answering the
-              second while looking like the first. */}
+          {/* Every server, Cloud Server included, in one stable list; the
+              active one is marked, not moved. The plan card above answers
+              "what am I paying for"; this list answers "where does this drive
+              sync", for ours and everyone else's alike. */}
           {connectionServers
             .filter(
               server =>
-                !isManagedServer(server) &&
+                isManagedServer(server) ||
                 showSavedServer({
                   managed: isCloudSyncAvailable(managedInfo),
                   activeForDrive:
@@ -2136,115 +2425,25 @@ function SyncPage() {
               {peerSyncResult}
             </PeerSyncResult>
           )}
-
-          {/* Add-a-server: inline (no dialog) — the same act as the switch
-              cards above, so it lives in the same list. */}
-          <AddRow>
-            {showAddServer ? (
-              <AddServerForm
-                onSubmit={e => {
-                  e.preventDefault();
-
-                  if (!serverInput.trim()) {
-                    return;
-                  }
-
-                  setServer(normalizeServerUrl(serverInput));
-                  setServerInput('');
-                  setShowAddServer(false);
-                }}
-              >
-                {/* Only promise the code when there is one to scan. It is
-                    rendered from the connected node's id, so a node that never
-                    reported one (offline, or an older server) leaves the whole
-                    pairing section out and this line pointing at nothing. */}
-                <AddServerExplainer>
-                  {pairNodeId
-                    ? 'An always-on device has an address. One you carry has a code instead, shown below.'
-                    : 'An always-on device has an address. Type it here.'}
-                </AddServerExplainer>
-                <ServerInputRow>
-                  <ServerInput
-                    autoFocus
-                    autoComplete='off'
-                    placeholder='localhost:9883 or your-server.example'
-                    value={serverInput}
-                    onChange={e => setServerInput(e.target.value)}
-                  />
-                  <Button type='submit' disabled={!serverInput.trim()}>
-                    Connect
-                  </Button>
-                  <NodeAction
-                    type='button'
-                    onClick={() => {
-                      setShowAddServer(false);
-                      setServerInput('');
-                    }}
-                  >
-                    Cancel
-                  </NodeAction>
-                </ServerInputRow>
-                <DocsLink
-                  href='https://docs.atomicdata.dev/atomicserver/installation.html'
-                  target='_blank'
-                  rel='noopener'
-                >
-                  How to run your own server
-                </DocsLink>
-              </AddServerForm>
-            ) : (
-              <AddButton onClick={() => setShowAddServer(true)}>
-                <FaPlus aria-hidden /> <span>Connect a device</span>
-              </AddButton>
-            )}
-          </AddRow>
         </Section>
 
         {/* Pairing is the point of this page on a peer node, so it's shown
             outright rather than hidden behind a button: the code is routing
-            only, and safe to leave on screen. */}
-        {pairNodeId &&
-          (isNode ||
-            (showServerConn &&
-              (!isCloudSyncAvailable(managedInfo) ||
-                cloudEnrolled === true))) && (
-            <Section>
-              <SectionTitle>Sync a device</SectionTitle>
-              {/* One line, not three: the card above already said what
-                `localhost:9883` is, and a paragraph on how keys work belongs
-                where someone asks — not over a QR they came here to scan. */}
-              <ConnNote>
-                {isNode
-                  ? 'Codes only route — your key still decides what syncs. Show yours, or take theirs.'
-                  : `Scan from your other device to sync with ${serverLabel(status.serverUrl ?? '')}. Safe to show: a code only routes.`}
-              </ConnNote>
-              <PairCard>
-                <PairSide>
-                  {isNode && <PairLabel>Show this code</PairLabel>}
-                  <QrCentered>
-                    <PairingCode nodeDid={rawToNodeDid(pairNodeId)} />
-                  </QrCentered>
-                </PairSide>
-
-                {/* Taking someone else's code needs a node to dial from, which a
-                  browser tab is not. */}
-                {isNode && (
-                  <>
-                    <PairDivider aria-hidden />
-
-                    <PairSide>
-                      <PairLabel>
-                        {isMobileTauri() ? 'Or scan theirs' : 'Or paste theirs'}
-                      </PairLabel>
-                      {/* Same path a scanned deep link takes (PairingLinkHandler):
-                        validate, persist the peer, start a sync. */}
-                      <ConnectToDeviceForm onCode={deliverDeepLink} />
-                    </PairSide>
-                  </>
-                )}
-              </PairCard>
-            </Section>
-          )}
+            only, and safe to leave on screen. The section itself always
+            renders, in the same place, because adding a device is always
+            possible; only the "show this device" half is gated. */}
+        <ConnectDevice
+          pairNodeDid={pairNodeId ? rawToNodeDid(pairNodeId) : null}
+          showPairing={
+            !!pairNodeId &&
+            (isNode ||
+              (showServerConn &&
+                (!isCloudSyncAvailable(managedInfo) || cloudEnrolled === true)))
+          }
+          canTakeCode={isNode}
+          serverName={serverLabel(status.serverUrl ?? '')}
+          onAddServer={setServer}
+        />
 
         {/* Developer: diagnostics + advanced toggles, tucked away. */}
         <DevDetails>
@@ -2574,6 +2773,25 @@ const ProviderAICredits = styled(AICreditsService)`
   ${providerRowCss}
 `;
 
+type CloudTier = 'local' | 'vault' | 'server';
+
+const PlanLabelRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 0.2rem;
+  border-top: 1px solid ${p => `${p.theme.colors.main}33`};
+`;
+
+const PlanLabel = styled.span`
+  color: ${p => p.theme.colors.textLight};
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+`;
+
 const ProviderService = styled(ServiceSection)`
   display: flex;
   align-items: flex-start;
@@ -2732,43 +2950,22 @@ const NodeIdValue = styled.button`
   }
 `;
 
-/** `$active` marks the server actually in use. The list order is stable across
- *  switches, so this accent is the only thing that changes — which is the point:
- *  a reshuffling list is far harder to follow than a highlighted row. */
 /**
- * Blue means "one of the provider's services", not "the one in use".
+ * One device or server card. `$active` marks the server in use with a neutral
+ * emphasis. The list order is stable across switches, so that accent is the
+ * only thing that changes: a reshuffling list is far harder to follow than a
+ * highlighted row.
  *
- * These used to be the same thing, because the accent keyed off `$active`. A
- * self-hosted node someone runs on their own hardware is not a hosted product
- * no matter how live it is, and painting it the same blue as the account card
- * said it was. Being in use is still worth showing, so it keeps a neutral
- * emphasis, and the "In sync" badge next to the title carries the state.
+ * Every device looks like this, Cloud Server included. The provider's blue
+ * belongs to the plan card above, which is where it is bought and managed.
  */
 const ConnCard = styled.div<{
   $active?: boolean;
-  $provider?: boolean;
   $spacious?: boolean;
-  $embedded?: boolean;
 }>`
   ${cardBase}
   margin-bottom: ${p => (p.$spacious ? '1.5rem' : '0.6rem')};
-  border-color: ${p =>
-    p.$provider
-      ? p.theme.colors.main
-      : p.$active
-        ? p.theme.colors.textLight
-        : undefined};
-  background: ${p => (p.$provider ? `${p.theme.colors.main}0a` : undefined)};
-  ${p =>
-    p.$embedded &&
-    css`
-      border: 0;
-      background: transparent;
-      padding: 0;
-      margin: 0;
-      width: 100%;
-      box-shadow: none;
-    `}
+  border-color: ${p => (p.$active ? p.theme.colors.textLight : undefined)};
 `;
 
 /** A call to action, but still one of the cards in this list. The button
@@ -2782,56 +2979,6 @@ const ConnNote = styled.p`
   margin: 0 0 0.6rem;
   color: ${p => p.theme.colors.textLight};
   font-size: 0.82rem;
-`;
-
-/** The two halves of pairing, side by side — one card, not two columns. */
-const PairCard = styled.div`
-  ${cardBase}
-  align-items: stretch;
-  gap: 1.5rem;
-
-  /* Below this the two halves read better stacked; the divider turns with
-     them. A container query would be truer, but the page has a single column
-     whose width tracks the viewport. */
-  @media (max-width: 40rem) {
-    flex-direction: column;
-    gap: 1.1rem;
-  }
-`;
-
-const PairSide = styled.div`
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-`;
-
-/** The QR is a fixed square; centre it rather than letting it hug the edge. */
-const QrCentered = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-`;
-
-const PairDivider = styled.div`
-  flex-shrink: 0;
-  align-self: stretch;
-  width: 1px;
-  background: ${p => p.theme.colors.bg2};
-
-  @media (max-width: 40rem) {
-    width: auto;
-    height: 1px;
-  }
-`;
-
-const PairLabel = styled.span`
-  align-self: flex-start;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: ${p => p.theme.colors.textLight};
 `;
 
 const ConnBody = styled.div`
@@ -2962,21 +3109,6 @@ const StatusPill = styled.span<{ $status: NodeStatus }>`
   }
 `;
 
-const UsageBar = styled.div`
-  margin-top: 0.5rem;
-  height: 6px;
-  border-radius: 3px;
-  background: ${p => p.theme.colors.bg2};
-  overflow: hidden;
-`;
-
-const UsageFill = styled.div`
-  height: 100%;
-  border-radius: 3px;
-  background: ${p => p.theme.colors.main};
-  transition: width 0.3s ease;
-`;
-
 const EmptyConnections = styled.div`
   padding: 1rem 1.1rem;
   border-radius: ${p => p.theme.radius};
@@ -2992,73 +3124,6 @@ const EmptyConnections = styled.div`
   p + p {
     margin-top: 0.4rem;
   }
-`;
-
-const AddRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-`;
-
-const AddButton = styled.button`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 1px dashed ${p => p.theme.colors.bg2};
-  background: none;
-  color: ${p => p.theme.colors.main};
-  border-radius: ${p => p.theme.radius};
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-
-  svg {
-    font-size: 0.7rem;
-  }
-
-  &:hover {
-    border-color: ${p => p.theme.colors.main};
-    background: ${p => p.theme.colors.main}0d;
-  }
-`;
-
-const AddServerForm = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 100%;
-`;
-
-const AddServerExplainer = styled.p`
-  color: ${p => p.theme.colors.textLight};
-  font-size: 0.8rem;
-  margin: 0;
-`;
-
-const ServerInputRow = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const ServerInput = styled.input`
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  padding: 0.45rem 0.6rem;
-  font-size: 0.85rem;
-  background: ${p => p.theme.colors.bg};
-  color: ${p => p.theme.colors.text};
-  flex: 1;
-  min-width: 12rem;
-`;
-
-const DocsLink = styled.a`
-  font-size: 0.8rem;
-  color: ${p => p.theme.colors.textLight};
-  display: inline-block;
 `;
 
 // --- Developer disclosure ---

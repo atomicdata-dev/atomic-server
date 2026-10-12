@@ -31,11 +31,13 @@ export function NetworkIndicator() {
   }, []);
 
   useEffect(() => {
-    const userDisconnected = localStorage.getItem('ws-disconnected') === '1';
-
     const unsub = store.on(
       StoreEvents.ConnectionChanged,
       (connected: boolean) => {
+        // Read per event: the user can disconnect by hand after this mounted.
+        const userDisconnected =
+          localStorage.getItem('ws-disconnected') === '1';
+
         if (connected) {
           wasEverConnected.current = true;
           toast.dismiss('connection-status');

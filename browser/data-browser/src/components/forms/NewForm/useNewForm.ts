@@ -68,6 +68,12 @@ export const useNewForm = ({
 
     let cancelled = false;
 
+    // NOTE: a Property created through this generic form keeps an ordinary
+    // genesis subject (legacy). A content-addressed ID needs parent, shortname
+    // and datatype before the subject exists, which this form only learns
+    // while the user fills it in. Table columns, ontology properties and the
+    // form builder create content-addressed Properties instead.
+    //
     // The genesis is signed on the first save, so it carries everything the
     // user fills in, and a form that is never saved sends nothing.
     store

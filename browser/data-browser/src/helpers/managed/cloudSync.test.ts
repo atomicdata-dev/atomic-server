@@ -4,6 +4,8 @@ import {
   isCloudSyncAvailable,
   enableCloudSyncForDrive,
 } from './cloudSync';
+import * as session from './session';
+import * as enrollment from './enrollment';
 
 // The portal URL is node-driven (or an explicit build-time override) — never
 // hardcoded — so a pure self-hosted node resolves to null and the CTA hides.
@@ -109,6 +111,45 @@ describe('enableCloudSyncForDrive', () => {
   afterEach(() => {
     globalThis.fetch = realFetch;
     vi.restoreAllMocks();
+  });
+
+  it('syncs only the enrolled workspace and keeps the standalone agent local', async () => {
+    vi.spyOn(session, 'getManagedAccount').mockResolvedValue({
+      email: 'owner@example.com',
+    });
+    vi.spyOn(enrollment, 'createManagedSyncEnrollment').mockResolvedValue({
+      http_origin: 'https://cloud.example',
+    } as never);
+    const agentSubject = 'did:ad:agent:abc';
+    const drive = 'did:ad:personal-drive';
+    const store = {
+      isLocalOnlyDrive: vi.fn(() => true),
+      getAgent: vi.fn(() => ({ subject: agentSubject })),
+      getResource: vi.fn(async () => ({ get: () => undefined })),
+      setServerUrl: vi.fn(),
+      reconnect: vi.fn(async () => undefined),
+      promoteLocalDrive: vi.fn(async () => {
+        throw new Error('Standalone agent is not enrolled');
+      }),
+      syncDriveToServerAndVerify: vi.fn(async () => undefined),
+    };
+    await expect(
+      enableCloudSyncForDrive({
+        store: store as never,
+        drive,
+        agentSubject,
+        setServer: vi.fn(),
+        hostingConsentAccepted: true,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      httpOrigin: 'https://cloud.example',
+      replicated: false,
+    });
+    expect(store.promoteLocalDrive).not.toHaveBeenCalled();
+    expect(store.syncDriveToServerAndVerify).toHaveBeenCalledExactlyOnceWith(
+      drive,
+    );
   });
 
   it('bails to the portal (never throws) when there is no managed session', async () => {

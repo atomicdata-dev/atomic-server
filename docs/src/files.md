@@ -94,7 +94,7 @@ A consequence of content-addressed storage is that an attacker who already knows
 ## Discussion
 
 - [Discussion on specification](https://github.com/ontola/atomic-data-docs/issues/57)
-- [Discussion on Rust server implementation](https://github.com/atomicdata-dev/atomic-server/issues/72)
+- [Discussion on Rust server implementation](https://github.com/ontola/atomic-server/issues/72)
 - [Discussion on Typescript client implementation](https://github.com/atomicdata-dev/atomic-data-browser/issues/121)
 
 ## Server file storage

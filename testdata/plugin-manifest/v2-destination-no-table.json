@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "name": "money",
+  "namespace": "example",
+  "version": "0.1.0",
+  "secrets": [],
+  "operations": [],
+  "destination": {
+    "schema": {
+      "properties": [
+        {
+          "shortname": "bank-amount",
+          "name": "Amount",
+          "description": "Exact decimal string.",
+          "datatype": "https://atomicdata.dev/datatypes/string"
+        },
+        {
+          "shortname": "statement-number",
+          "name": "Statement number",
+          "description": "Number and sequence of the statement.",
+          "datatype": "https://atomicdata.dev/datatypes/string"
+        },
+        {
+          "shortname": "balance-date",
+          "name": "Balance date",
+          "description": "Date of the closing balance.",
+          "datatype": "https://atomicdata.dev/datatypes/date"
+        }
+      ],
+      "classes": [
+        {
+          "shortname": "bank-transaction",
+          "name": "Bank transaction",
+          "description": "One booked entry.",
+          "requires": [
+            "bank-amount"
+          ]
+        },
+        {
+          "shortname": "bank-statement",
+          "name": "Bank statement",
+          "description": "One imported statement.",
+          "requires": [
+            "statement-number"
+          ]
+        },
+        {
+          "shortname": "closing-balance",
+          "name": "Closing balance",
+          "description": "A balance at the end of a statement.",
+          "requires": [
+            "bank-amount",
+            "balance-date"
+          ]
+        }
+      ]
+    }
+  }
+}

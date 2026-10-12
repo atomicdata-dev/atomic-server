@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   agentVaultProof,
   enrollVault,
+  getVaultUsage,
+  freeUpVaultStorage,
   vaultLaneId,
   backupDrive,
   restoreDrive,
@@ -9,6 +11,7 @@ import {
   recoverDriveKey,
   nextSegmentFor,
   runVaultBackup,
+  compactVaultBackup,
   type VaultCapableDb,
   type VaultKeyOps,
   type VaultDriveState,
@@ -1626,5 +1629,283 @@ describe('vaultLaneId', () => {
     expect(await vaultLaneId('device-a')).not.toBe(
       await vaultLaneId('device-b'),
     );
+  });
+});
+
+describe('storage routes the control plane does not have yet', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('answers an HTML page with a plain sentence, not a parse error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<!doctype html><html></html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+
+    await expect(getVaultUsage('pseudonym')).rejects.toThrow(
+      'Storage details are not available on your account yet.',
+    );
+  });
+
+  it('answers a 404 with the same sentence', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('Not found', { status: 404 }),
+    );
+
+    await expect(freeUpVaultStorage('pseudonym', false)).rejects.toThrow(
+      'Storage details are not available on your account yet.',
+    );
+  });
+});
+
+describe('compacting the backup', () => {
+  const CKPT = `vault/${PSEUDONYM}/checkpoints/ckpt-000002.loro`;
+
+  /** Upload route that hands out the checkpoint slot, plus a recording of calls. */
+  function storageMock(freeUp: () => unknown = () => undefined) {
+    return mockFetch(url => {
+      if (url.endsWith('/upload-urls')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            uploads: [
+              {
+                object_id: 'ckpt-obj',
+                object_key: CKPT,
+                url: 'https://s3.test/put',
+                method: 'PUT',
+                headers: [],
+                size_bytes: 8,
+              },
+            ],
+          }),
+        };
+      }
+
+      if (url.endsWith('/free-up')) return freeUp();
+
+      if (url.endsWith('/state')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrollment: {
+              id: 'e1',
+              drive_subject: 'did:ad:drive',
+              drive_pseudonym: PSEUDONYM,
+              status: 'active',
+              used_bytes: 0,
+              quota_bytes: 100,
+              last_backup_at: null,
+            },
+            lanes: { [DEVICE]: 5 },
+            // The vault already has an anchor: only a forced pass will
+            // produce a checkpoint.
+            checkpoints: [{ checkpoint_n: 1, coverage: { [DEVICE]: 2 } }],
+            pending_uploads: 0,
+            confirmed_objects: 0,
+          }),
+        };
+      }
+
+      return undefined;
+    });
+  }
+
+  function dbWith(kind: 'checkpoint' | 'pack') {
+    return {
+      vaultExport: vi.fn(async (..._args: unknown[]) =>
+        kind === 'checkpoint'
+          ? sealedCheckpoint(CKPT, { [DEVICE]: 5 })
+          : sealedPack(CKPT),
+      ),
+      vaultImport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+    } satisfies VaultCapableDb;
+  }
+
+  const args = (db: VaultCapableDb) => ({
+    db,
+    driveSubject: 'did:ad:drive',
+    drivePseudonym: PSEUDONYM,
+    devicePubkey: DEVICE,
+    driveKey: KEY,
+  });
+
+  it('tells the exporter there is no anchor when a checkpoint is forced', async () => {
+    const db = dbWith('checkpoint');
+    storageMock();
+
+    await runVaultBackup({ ...args(db), forceCheckpoint: true });
+
+    // Argument 8 is driveHasCheckpoint. The vault has one, yet it is false.
+    expect(db.vaultExport.mock.calls[0][7]).toBe(false);
+    // Cursors and lane state still advance through the normal commit.
+    expect(db.vaultCommitSegment).toHaveBeenCalledWith(PSEUDONYM, DEVICE, 6);
+  });
+
+  it('leaves the cadence alone when nothing is forced', async () => {
+    const db = dbWith('pack');
+    storageMock();
+
+    await runVaultBackup(args(db));
+
+    expect(db.vaultExport.mock.calls[0][7]).toBe(true);
+  });
+
+  it('does not join an ordinary pass that is already running', async () => {
+    const db = dbWith('checkpoint');
+    storageMock();
+
+    const ordinary = runVaultBackup(args(db));
+    const forced = runVaultBackup({ ...args(db), forceCheckpoint: true });
+    await Promise.all([ordinary, forced]);
+
+    expect(db.vaultExport).toHaveBeenCalledTimes(2);
+    expect(db.vaultExport.mock.calls[1][7]).toBe(false);
+  });
+
+  it('publishes the checkpoint before it frees anything', async () => {
+    const db = dbWith('checkpoint');
+    const calls = storageMock(() => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        packs_pruned: 3,
+        checkpoints_pruned: 1,
+        blobs_pruned: 0,
+        bytes_reclaimed: 900,
+        delete_failures: 0,
+      }),
+    }));
+
+    const result = await compactVaultBackup({
+      drivePseudonym: PSEUDONYM,
+      includeUndoWindow: false,
+      runBackup: () => runVaultBackup({ ...args(db), forceCheckpoint: true }),
+    });
+
+    const order = calls.map(c => c.url.split('/').pop());
+    expect(order.indexOf('checkpoint')).toBeGreaterThan(-1);
+    expect(order.indexOf('checkpoint')).toBeLessThan(order.indexOf('free-up'));
+    expect(result.freed.bytes_reclaimed).toBe(900);
+    expect(result.checkpointBytes).toBe(8);
+  });
+
+  it('requests a current-state-only checkpoint only when discarding history', async () => {
+    for (const discard of [false, true]) {
+      const db = dbWith('checkpoint');
+      storageMock();
+
+      await compactVaultBackup({
+        drivePseudonym: PSEUDONYM,
+        includeUndoWindow: discard,
+        runBackup: ({ currentStateOnly }) =>
+          runVaultBackup({
+            ...args(db),
+            forceCheckpoint: true,
+            currentStateOnly,
+          }),
+      });
+
+      // Argument 10 is currentStateOnly: "Compress now" keeps the history.
+      expect(db.vaultExport.mock.calls[0][9]).toBe(discard);
+    }
+  });
+
+  it('keeps history unless asked otherwise', async () => {
+    const db = dbWith('pack');
+    storageMock();
+
+    await runVaultBackup(args(db));
+
+    expect(db.vaultExport.mock.calls[0][9]).toBe(false);
+  });
+
+  it('passes the undo-window choice through to free-up', async () => {
+    const db = dbWith('checkpoint');
+    let body: unknown;
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/free-up')) body = JSON.parse(String(init?.body));
+
+      if (url.endsWith('/upload-urls')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            uploads: [
+              {
+                object_id: 'o',
+                object_key: CKPT,
+                url: 'https://s3.test/put',
+                method: 'PUT',
+                headers: [],
+                size_bytes: 8,
+              },
+            ],
+          }),
+        };
+      }
+
+      return undefined;
+    });
+
+    await compactVaultBackup({
+      drivePseudonym: PSEUDONYM,
+      includeUndoWindow: true,
+      runBackup: () =>
+        backupDrive({ db, ...PASS, driveHasCheckpoint: false, checkpointN: 2 }),
+    });
+
+    expect(body).toEqual({ include_undo_window: true });
+    expect(calls.some(c => c.url.endsWith('/free-up'))).toBe(true);
+  });
+
+  it('never frees when the checkpoint pass fails', async () => {
+    const calls = mockFetch(url =>
+      url.endsWith('/upload-urls')
+        ? { ok: false, status: 500, json: async () => ({}) }
+        : undefined,
+    );
+    const db = dbWith('checkpoint');
+
+    await expect(
+      compactVaultBackup({
+        drivePseudonym: PSEUDONYM,
+        includeUndoWindow: true,
+        runBackup: () =>
+          backupDrive({ db, ...PASS, driveHasCheckpoint: false }),
+      }),
+    ).rejects.toThrow();
+
+    expect(calls.some(c => c.url.endsWith('/free-up'))).toBe(false);
+  });
+
+  it('never frees when the pass wrote no checkpoint', async () => {
+    const calls = mockFetch(() => undefined);
+
+    for (const outcome of [
+      { status: 'nothing-to-do' as const },
+      {
+        status: 'backed-up' as const,
+        kind: 'pack' as const,
+        resources: 1,
+        unchanged: 0,
+        bytes: 4,
+        objectKey: 'k',
+      },
+    ]) {
+      await expect(
+        compactVaultBackup({
+          drivePseudonym: PSEUDONYM,
+          includeUndoWindow: false,
+          runBackup: async () => outcome,
+        }),
+      ).rejects.toThrow(/nothing was removed/);
+    }
+
+    expect(calls).toEqual([]);
   });
 });

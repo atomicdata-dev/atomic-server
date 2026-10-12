@@ -51,6 +51,8 @@ import {
   LabelButton,
   NAV_BUTTON_HEIGHT,
   NAV_BUTTON_RADIUS,
+  COMPACT_MEDIA,
+  TOUCH_TARGET,
 } from './NavBarButton';
 import { useCommentCount } from '../hooks/useCommentCount';
 import { AIIcon } from './AI/AIIcon';
@@ -284,7 +286,14 @@ export function NavBar({ resource: resourceProp }: NavBarProps): JSX.Element {
   const navRef = useRef<HTMLElement>(null);
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const collapseWidthRef = useRef(0);
-  const [iconOnly, setIconOnly] = useState(false);
+  // Start compact on small / touch screens so the first paint is already icons
+  // only instead of flashing labels until the first measurement.
+  const [iconOnly, setIconOnly] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(COMPACT_MEDIA).matches,
+  );
 
   const measureNav = useCallback(() => {
     const nav = navRef.current;
@@ -524,12 +533,25 @@ const NavIconButton = styled(IconButton)`
       color: ${p => p.theme.colors.text};
     }
   }
+
+  @media (pointer: coarse) {
+    height: ${TOUCH_TARGET};
+    min-width: ${TOUCH_TARGET};
+    font-size: 1.25rem;
+  }
 `;
 
 const SearchButton = styled(LabelButton)<{ $iconOnly: boolean }>`
   /* Narrow bars keep only the icon; the label and hint return when there is
    * room. */
   @container breadcrumb-bar (max-width: 600px) {
+    & > span,
+    & > kbd {
+      display: none;
+    }
+  }
+
+  @media ${COMPACT_MEDIA} {
     & > span,
     & > kbd {
       display: none;

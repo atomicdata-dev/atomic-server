@@ -2,6 +2,8 @@ import {
   Datatype,
   type AggregateFunction,
   type AggregateGrouping,
+  type AggregateGroup,
+  type AggregateOutcome,
   type Aggregate,
   type Aggregation,
   type JSONValue,
@@ -14,6 +16,9 @@ import {
 import {
   DERIVED_COLUMN_GENERATORS,
   toExpression,
+  type ArgValues,
+  type DerivedColumnArg,
+  type DerivedColumnKind,
   type DerivedColumnSpec,
 } from './derivedColumns';
 
@@ -22,6 +27,7 @@ import {
  * (`view-aggregates`), computed by the store over **every** row the view
  * matches — filters included, paging excluded. So a "Sum of Amount" is the
  * answer for the whole table, not for the rows that happen to be loaded.
+ * A quick filter narrows it to the rows that match (`aggregateRows`).
  */
 export interface TableAggregate {
   /** Stable identity within the view. */
@@ -294,6 +300,13 @@ export function formatAggregateValue(
   /** The computed column the number came from, when it wasn't a property. */
   derived?: DerivedColumnSpec,
 ): string {
+  // An answered count over no rows is zero: it is how an empty queue reads. The
+  // store reports it as `null`, "no resource had a value", which for a count is
+  // the same thing.
+  if (fn === 'count' && value === null) {
+    return '0';
+  }
+
   if (value === null || value === undefined) {
     // Nothing to compute is not zero, and must not read as zero.
     return '—';
@@ -323,7 +336,18 @@ export function formatAggregateValue(
       : date.toLocaleString();
   }
 
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const rounded = value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  // A nonzero total must not read as zero: 0.0000375 is a real measurement, and
+  // two decimals would show it as "0". Keep three significant digits instead.
+  if (value !== 0 && Number(value.toFixed(2)) === 0) {
+    return value.toLocaleString(undefined, {
+      maximumSignificantDigits: 3,
+      maximumFractionDigits: 20,
+    });
+  }
+
+  return rounded;
 }
 
 /** Formats a bucket key for display. Subjects are resolved by the caller. */
@@ -357,4 +381,216 @@ export function formatGroupKey(
   }
 
   return key;
+}
+
+/** Reads one property's value off a row. */
+export type RowValueReader = (property: string) => JSONValue | undefined;
+
+/** The store's default number of buckets per breakdown (`DEFAULT_GROUP_LIMIT`). */
+const DEFAULT_GROUP_LIMIT = 100;
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})/;
+
+/** A stored value as a number, the way the store reads one (`value_as_number`). */
+function valueAsNumber(value: JSONValue | undefined): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  // `Number('')` is 0; the store's parse fails on it, and so must this.
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) {
+    return Number(trimmed);
+  }
+
+  // A DATE is UTC midnight of its day.
+  const day = ISO_DAY.exec(trimmed);
+
+  return day
+    ? Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]))
+    : undefined;
+}
+
+/** The bucket a row falls into, the way the store buckets it (`group_key`). */
+function groupKeyOf(
+  value: JSONValue | undefined,
+  grouping: AggregateGrouping,
+): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  // A select column's first tag, so the groups still add up to the total.
+  if (Array.isArray(value)) {
+    const first = value[0];
+
+    return typeof first === 'string' ? first : '';
+  }
+
+  const granularity = grouping.granularity ?? 'exact';
+
+  if (typeof value === 'number') {
+    if (granularity === 'exact') {
+      return String(value);
+    }
+
+    const shifted = new Date(
+      value + (grouping.tz_offset_minutes ?? 0) * 60_000,
+    ).toISOString();
+
+    return granularity === 'month' ? shifted.slice(0, 7) : shifted.slice(0, 10);
+  }
+
+  if (typeof value === 'string' && ISO_DAY.test(value)) {
+    return granularity === 'month' ? value.slice(0, 7) : value;
+  }
+
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+
+/** Running state of one statistic: the store's `Accumulator`. */
+class Accumulator {
+  sum = 0;
+  count = 0;
+  min: number | undefined;
+  max: number | undefined;
+
+  add(number: number) {
+    this.sum += number;
+    this.count += 1;
+    this.min = this.min === undefined ? number : Math.min(this.min, number);
+    this.max = this.max === undefined ? number : Math.max(this.max, number);
+  }
+
+  finish(fn: AggregateFunction): number | null {
+    if (fn === 'count') return this.count;
+    if (this.count === 0) return null;
+    if (fn === 'sum') return this.sum;
+    if (fn === 'avg') return this.sum / this.count;
+
+    return (fn === 'min' ? this.min : this.max) ?? null;
+  }
+}
+
+const compareKeys = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * Computes an aggregation over rows the client already holds, by the rules the
+ * store applies to a query (`aggregate.rs`, `Db::aggregate`): `count` counts the
+ * rows that have a value (every row when it names nothing), the other functions
+ * skip rows without a number, and a computed column is evaluated per row.
+ *
+ * For the rows the quick filter leaves, which the store cannot be asked about:
+ * under a quick filter the totals describe the rows on screen.
+ */
+export function aggregateRows(
+  rows: Iterable<RowValueReader>,
+  aggregation: Aggregation,
+): AggregateOutcome[] {
+  const { aggregates, group_by: grouping } = aggregation;
+  const now = aggregation.now_ms ?? Date.now();
+  const totals = aggregates.map(() => new Accumulator());
+  const perGroup = aggregates.map(() => new Map<string, Accumulator>());
+
+  for (const read of rows) {
+    const group = grouping ? groupKeyOf(read(grouping.property), grouping) : '';
+
+    aggregates.forEach((aggregate, index) => {
+      let present = true;
+      let number: number | undefined;
+
+      if (aggregate.expression) {
+        // An expression is a computed column's kind and arguments, flattened
+        // (`toExpression`), so the column's own generator evaluates it.
+        const { kind, ...args } = aggregate.expression as {
+          kind: DerivedColumnKind;
+        } & Record<string, DerivedColumnArg>;
+        const values: ArgValues = {};
+
+        for (const arg of Object.values(args)) {
+          if (typeof arg === 'string' && arg !== '') {
+            values[arg] = read(arg);
+          }
+        }
+
+        number = DERIVED_COLUMN_GENERATORS[kind]?.compute(values, args, now);
+        present = number !== undefined;
+      } else if (aggregate.property) {
+        const value = read(aggregate.property);
+        present = value !== undefined && value !== null;
+        number = valueAsNumber(value);
+      }
+
+      const accumulate = (acc: Accumulator) => {
+        if (aggregate.function === 'count') {
+          if (present) acc.count += 1;
+
+          return;
+        }
+
+        if (number !== undefined) acc.add(number);
+      };
+
+      accumulate(totals[index]);
+
+      if (grouping) {
+        let acc = perGroup[index].get(group);
+
+        if (!acc) {
+          acc = new Accumulator();
+          perGroup[index].set(group, acc);
+        }
+
+        accumulate(acc);
+      }
+    });
+  }
+
+  return aggregates.map((aggregate, index): AggregateOutcome => {
+    const outcome: AggregateOutcome = {
+      id: aggregate.id,
+      property: aggregate.property,
+      function: aggregate.function,
+      value: totals[index].finish(aggregate.function),
+      count: totals[index].count,
+    };
+
+    if (!grouping) {
+      return outcome;
+    }
+
+    const groups: AggregateGroup[] = [...perGroup[index]].map(([key, acc]) => ({
+      key,
+      value: acc.finish(aggregate.function),
+      count: acc.count,
+    }));
+
+    // Chronological for day and month buckets, biggest-first otherwise.
+    if ((grouping.granularity ?? 'exact') === 'exact') {
+      groups.sort(
+        (a, b) =>
+          (b.value ?? -Infinity) - (a.value ?? -Infinity) ||
+          compareKeys(a.key, b.key),
+      );
+    } else {
+      groups.sort((a, b) => compareKeys(a.key, b.key));
+    }
+
+    const limit = grouping.limit ?? DEFAULT_GROUP_LIMIT;
+
+    return {
+      ...outcome,
+      groups: groups.slice(0, limit),
+      groups_truncated: groups.length > limit,
+    };
+  });
 }

@@ -5,6 +5,7 @@ import {
   type Property,
   type Resource,
 } from '@tomic/react';
+import { calendarDateToLocalDate } from '@helpers/dates/calendarDate';
 import { formatClock } from './helpers/formatDuration';
 
 /**
@@ -154,6 +155,14 @@ export function readInstant(
   }
 
   if (typeof value === 'string') {
+    // A civil date has no zone: read it as local midnight, like the local
+    // date-and-time inputs, not as the UTC midnight `Date.parse` gives.
+    const local = calendarDateToLocalDate(value);
+
+    if (local) {
+      return local.getTime();
+    }
+
     const parsed = Date.parse(value);
 
     return Number.isNaN(parsed) ? undefined : parsed;

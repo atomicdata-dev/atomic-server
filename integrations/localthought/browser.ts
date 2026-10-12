@@ -471,13 +471,15 @@ export class BrowserIntegrations {
           if (response.status !== 429 || retries >= 3) break;
           const retryAfter = response.headers.get('retry-after');
           const seconds = retryAfter === null ? NaN : Number(retryAfter);
-          const retryAt = Number.isFinite(seconds)
-            ? Date.now() + Math.max(0, seconds) * 1000
+          // Seconds are relative: reading the clock twice would shave a
+          // millisecond off whenever it ticks in between.
+          const wait = Number.isFinite(seconds)
+            ? Math.max(0, seconds) * 1000
             : retryAfter
-              ? Date.parse(retryAfter)
+              ? Date.parse(retryAfter) - Date.now()
               : NaN;
-          if (!Number.isFinite(retryAt)) break;
-          const delay = Math.max(0, retryAt - Date.now());
+          if (!Number.isFinite(wait)) break;
+          const delay = Math.max(0, wait);
           if (delay > deadline - Date.now())
             throw new Error('API retry delay exceeds remaining import time');
           retries++;

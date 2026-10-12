@@ -7,6 +7,7 @@ import { IntegrationStoreRoute } from './IntegrationStore';
 import { EditRoute } from './EditRoute';
 import { DataRoute } from './DataRoute';
 import { ShortcutsRoute } from './ShortcutsRoute';
+import { StorageRoute } from './StorageRoute';
 import { AboutRoute } from './AboutRoute';
 import { NotificationsRoute } from './NotificationsRoute';
 import { AgentSettingsRoute } from './SettingsAgent';
@@ -21,10 +22,13 @@ import { unavailableLazyRoute } from './UnavailableLazyRoute';
 import { ImportRoute } from './ImportRoute';
 import { HistoryRoute } from './History/HistoryRoute';
 import { InviteRoute } from './InviteRoute';
+import { AuthorizeMcpRoute } from './AuthorizeMcpRoute';
+import { ConnectAgentRoute } from './ConnectAgentRoute';
 import { LinkOpenRouter } from './LinkOpenRouter';
 import { OnboardingRoute } from './OnboardingRoute';
 import { WelcomeRoute } from './WelcomeRoute';
 import { NewDriveRoute } from './NewDriveRoute';
+import { SignOutRoute } from './SignOutRoute';
 
 const DevDriveRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -70,12 +74,14 @@ const SandboxRoute = createRoute({
 const routeTree = rootRoute.addChildren({
   appRoute: appRoute.addChildren({
     WelcomeRoute,
+    SignOutRoute,
     ShowRoute,
     SearchRoute,
     AppSettingsRoute,
     IntegrationStoreRoute,
     SyncRoute,
     ShortcutsRoute,
+    StorageRoute,
     AgentSettingsRoute,
     ServerSettingsRoute,
     DataRoute,
@@ -94,6 +100,8 @@ const routeTree = rootRoute.addChildren({
     DevDriveRoute,
     DemoRoute,
     InviteRoute,
+    ConnectAgentRoute,
+    AuthorizeMcpRoute,
     LinkOpenRouter,
   }),
   topRoute,

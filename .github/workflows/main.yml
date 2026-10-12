@@ -145,12 +145,24 @@ jobs:
           # old claude/project-thread-* branches after their PRs merge, and building
           # one of those fails on its stale Cargo.lock rather than on this commit.
           if [ "$BRANCH" != "develop" ] && gh api "repos/ontola/atomic-saas/branches/$BRANCH" >/dev/null 2>&1; then
-            open=$(gh api "repos/ontola/atomic-saas/pulls?state=open&head=ontola:$BRANCH" -q length 2>/dev/null || echo 0)
-            if [ "${open:-0}" -gt 0 ]; then
-              ref="$BRANCH"
-              source="paired branch '$BRANCH'"
+            # A failed lookup (e.g. a token without pull-request read access)
+            # must not read as "no open PR": that silently builds main, whose
+            # lockfile cannot match a branch that adds dependencies. Ask the
+            # commit's own PR list first, which a token that can read the
+            # branch may also read; only when both lookups fail, pair with the
+            # namesake and say so.
+            if open=$(gh api "repos/ontola/atomic-saas/pulls?state=open&head=ontola:$BRANCH" -q length 2>"$RUNNER_TEMP/pulls.err") \
+              || open=$(gh api "repos/ontola/atomic-saas/commits/$BRANCH/pulls" -q "[.[] | select(.state == \"open\" and .head.ref == \"$BRANCH\")] | length" 2>>"$RUNNER_TEMP/pulls.err"); then
+              if [ "${open:-0}" -gt 0 ]; then
+                ref="$BRANCH"
+                source="paired branch '$BRANCH'"
+              else
+                source="main (namesake '$BRANCH' has no open PR)"
+              fi
             else
-              source="main (namesake '$BRANCH' has no open PR)"
+              echo "::warning::Could not list atomic-saas PRs for '$BRANCH' ($(head -c 300 "$RUNNER_TEMP/pulls.err")); pairing with the namesake anyway."
+              ref="$BRANCH"
+              source="paired branch '$BRANCH' (open-PR check failed)"
             fi
           fi
           sha=$(gh api "repos/ontola/atomic-saas/commits/$ref" -q .sha)
@@ -215,6 +227,9 @@ jobs:
         working-directory: atomic-saas
         run: |
           set -euo pipefail
+          # Repeated here: the pick step's line falls outside the log tail
+          # the API returns once the embed builds have run.
+          echo "atomic-saas $(git rev-parse HEAD)"
           cargo check --locked --all-targets
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked --all-targets

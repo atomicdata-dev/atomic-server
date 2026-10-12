@@ -91,6 +91,14 @@ async function existingAccount(
 async function guestWorkspace(page: Page): Promise<string> {
   await page.goto(`${FRONTEND_URL}/app/demo`);
   await expect(page).not.toHaveURL(/\/app\/demo/, { timeout: 90_000 });
+  // Leave the demo document: its scripted teammates keep moving their
+  // cursors, and under load the editor logs each cursor it cannot place yet.
+  await page.goto(`${FRONTEND_URL}/app/settings`);
+  await expect
+    .poll(() => page.evaluate(() => !!window.store?.getAgent()), {
+      timeout: 30_000,
+    })
+    .toBe(true);
 
   return page.evaluate(async () => {
     const store = window.store;

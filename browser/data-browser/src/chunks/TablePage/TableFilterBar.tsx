@@ -13,6 +13,11 @@ import { ColumnFilterDropdown } from './ColumnFilterDropdown';
 
 interface TableFilterBarProps {
   columns: Property[];
+  /**
+   * Every column of the table, hidden ones included. An active filter on a
+   * hidden column keeps its chip, since it still excludes rows.
+   */
+  allColumns?: Property[];
   /** The view's computed columns — filterable like any other. */
   derivedColumns: DerivedColumnSpec[];
 }
@@ -26,13 +31,14 @@ const AddFilterTrigger = buildDefaultTrigger(<FaPlus />, 'Add filter');
  */
 export function TableFilterBar({
   columns,
+  allColumns = columns,
   derivedColumns,
 }: TableFilterBarProps): JSX.Element | null {
   const { filters, addFilter } = useContext(TablePageContext);
 
   const columnBySubject = useMemo(
-    () => new Map(columns.map(c => [c.subject, c])),
-    [columns],
+    () => new Map(allColumns.map(c => [c.subject, c])),
+    [allColumns],
   );
 
   const derivedById = useMemo(
@@ -80,7 +86,7 @@ export function TableFilterBar({
           ? columnBySubject.get(filter.property)
           : undefined;
 
-        // A filter whose column is gone (hidden, or a computed column that was
+        // A filter whose column is gone (a computed column that was
         // removed) renders nothing rather than an unlabelled chip.
         if (!column && !derived) {
           return null;

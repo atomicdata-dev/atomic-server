@@ -35,6 +35,19 @@ impl Atom {
 
     /// Converts one Atom to a series of stringified values that can be indexed.
     pub fn to_indexable_atoms(&self) -> Vec<IndexAtom> {
+        if self.property == crate::urls::GENESIS {
+            return Vec::new();
+        }
+        self.to_stored_index_atoms()
+    }
+
+    /// Every index atom the atom could ever have been stored under, including
+    /// the ones [`Self::to_indexable_atoms`] no longer writes. Removal uses
+    /// this so rows an older store holds are deleted with the resource.
+    pub(crate) fn to_stored_index_atoms(&self) -> Vec<IndexAtom> {
+        // `to_indexable_atoms` leaves out the genesis certificate: a ~340-byte
+        // blob only ever read off the resource, which put an ~800-byte key in
+        // both atom indexes for every resource (about 1.6 KB of ~12 KB).
         // Using sort_value causes issues but we really need to look at how to do this properly.
         // let sort_value = self.value.to_sortable_string();
         let index_atoms: Vec<IndexAtom> = match &self.value.to_reference_index_strings() {
@@ -83,5 +96,26 @@ impl std::fmt::Display for Atom {
             self.subject, self.property, self.value
         ))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn genesis_certificate_is_not_indexed() {
+        let genesis = Atom::new(
+            "did:ad:abc".into(),
+            crate::urls::GENESIS.into(),
+            Value::String("AQBKG29d".into()),
+        );
+        assert!(genesis.to_indexable_atoms().is_empty());
+        let name = Atom::new(
+            "did:ad:abc".into(),
+            crate::urls::NAME.into(),
+            Value::String("A title".into()),
+        );
+        assert_eq!(name.to_indexable_atoms().len(), 1);
     }
 }

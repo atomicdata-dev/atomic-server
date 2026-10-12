@@ -66,6 +66,8 @@ pub mod agents;
 pub mod aggregate;
 pub mod atoms;
 pub mod authentication;
+pub mod chat_log;
+pub mod class_constraints;
 #[cfg(feature = "db")]
 pub mod class_extender;
 pub mod client;
@@ -73,11 +75,15 @@ pub mod collections;
 pub mod commit;
 #[cfg(feature = "config")]
 pub mod config;
+#[cfg(feature = "db")]
+pub mod conversation;
 pub mod datatype;
 #[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "discovery")]
 pub mod discovery;
+#[doc(hidden)]
+pub mod document_markdown;
 #[cfg(feature = "db")]
 pub mod endpoints;
 #[cfg(feature = "db")]
@@ -89,7 +95,6 @@ pub mod hierarchy;
 pub mod history;
 pub mod identifiers;
 pub mod import_identity;
-#[doc(hidden)]
 pub mod loro;
 pub mod mapping;
 pub mod metrics;
@@ -98,7 +103,9 @@ pub mod parse;
 pub mod plugins;
 pub mod website;
 
+pub mod lens;
 pub mod populate;
+pub mod property_identity;
 pub mod resources;
 /// The node runtime boundary (`AtomicNode`). Wraps `Db`, so it needs `db`.
 #[cfg(feature = "db")]
@@ -124,7 +131,9 @@ pub mod vault;
 pub use atoms::Atom;
 pub use commit::Commit;
 #[cfg(feature = "db")]
-pub use db::{AgentLoadResult, Db, DbEvent, DriveInfo, DriveUsage, ReplicationTarget};
+pub use db::{
+    AgentLoadResult, Db, DbEvent, DriveInfo, DriveUsage, ReplicationTarget, ResourceUsage,
+};
 pub use errors::AtomicError;
 pub use errors::AtomicErrorType;
 pub use identifiers::{

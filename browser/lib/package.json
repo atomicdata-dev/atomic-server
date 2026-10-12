@@ -1,6 +1,6 @@
 {
   "name": "@tomic/lib",
-  "version": "0.41.0-beta.7",
+  "version": "0.41.0-beta.8",
   "author": "Joep Meindertsma",
   "homepage": "https://docs.atomicdata.dev/js",
   "repository": {
@@ -53,6 +53,16 @@
       "require": {
         "types": "./dist/src/index.d.cts",
         "default": "./dist/index.cjs"
+      }
+    },
+    "./node": {
+      "import": {
+        "types": "./dist/src/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "require": {
+        "types": "./dist/src/node.d.ts",
+        "default": "./dist/node.cjs"
       }
     },
     "./ontologies/*.js": {

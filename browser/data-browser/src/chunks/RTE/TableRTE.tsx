@@ -22,7 +22,7 @@ export const TableRTE: React.FC<TableRTEProps> = ({ subject }) => {
   return (
     <HideInPrint>
       <div>
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<Spinner centered />}>
           <TableResource resource={resource} />
         </Suspense>
         <TableTitle subject={resource.subject}>

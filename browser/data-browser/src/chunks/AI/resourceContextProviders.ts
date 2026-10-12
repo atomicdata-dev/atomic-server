@@ -20,10 +20,10 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
-import { shortenSubject } from '@helpers/subjectRefs';
+import { shortenSubject } from '@tomic/react';
 import { getDocumentContentForAgent } from './getDocumentContentForAgent';
 import { hasDocumentContent } from '@chunks/RTE/readDocumentV2TiptapJson';
-import { buildClassContext, describeClassCompact } from './jsonAdCompact';
+import { buildClassContext, describeClassCompact } from '@tomic/react';
 import { getTableContextForAgent } from './tableContextProvider';
 
 const MESSAGE_SAMPLE_LIMIT = 10;

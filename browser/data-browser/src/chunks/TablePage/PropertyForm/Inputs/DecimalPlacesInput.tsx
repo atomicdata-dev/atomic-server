@@ -14,14 +14,12 @@ export function DecimalPlacesInput({
 }: DecimalPlacesInputProps): JSX.Element {
   const id = useId();
   const { error, setError, setTouched } = useValidation();
-  const [_, setDataType] = useString(resource, urls.properties.datatype, {
-    commit: true,
-  });
+  // No `commit`: the dialog saves (or creates a new property) on confirm.
+  const [_, setDataType] = useString(resource, urls.properties.datatype);
 
   const [decimalPlaces, setDecimalPlaces] = useNumber(
     resource,
     urls.properties.constraints.decimalPlaces,
-    { commit: true },
   );
 
   const handleDecimalPointChange = useCallback(

@@ -1,0 +1,1380 @@
+{
+  "cases": [
+    {
+      "name": "shop: every mapping, exact round trip",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Shop",
+        "description": "Invoices and customers.",
+        "x-atomic-ontology": "shop",
+        "$defs": {
+          "customer": {
+            "type": "object",
+            "description": "Someone who pays.",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "description": "Full name."
+              },
+              "email": {
+                "type": "string",
+                "pattern": "^[^@]+@[^@]+$"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "pattern": "^INV-[0-9]{4}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "sent",
+                  "paid"
+                ]
+              },
+              "amount": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 100000
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 99
+              },
+              "issued": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "due": {
+                "type": "string",
+                "format": "date"
+              },
+              "paid": {
+                "type": "boolean"
+              },
+              "website": {
+                "type": "string",
+                "format": "uri"
+              },
+              "notes": {
+                "type": "string",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/markdown"
+              },
+              "customer": {
+                "$ref": "#/$defs/customer",
+                "description": "Who is billed."
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/line-item"
+                },
+                "minItems": 1,
+                "maxItems": 50
+              }
+            },
+            "required": [
+              "number",
+              "customer"
+            ]
+          },
+          "line-item": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "price": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "notes": {
+                "type": "string",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/markdown"
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "shop",
+        "name": "Shop",
+        "description": "Invoices and customers.",
+        "classes": [
+          {
+            "shortname": "customer",
+            "name": "customer",
+            "description": "Someone who pays.",
+            "properties": [
+              {
+                "shortname": "name",
+                "datatype": "https://atomicdata.dev/datatypes/string",
+                "description": "Full name."
+              },
+              {
+                "shortname": "email",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              }
+            ],
+            "requires": [
+              "name"
+            ],
+            "recommends": [
+              "email"
+            ],
+            "constraints": {
+              "name": {
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "email": {
+                "pattern": "^[^@]+@[^@]+$"
+              }
+            }
+          },
+          {
+            "shortname": "invoice",
+            "name": "invoice",
+            "properties": [
+              {
+                "shortname": "number",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              },
+              {
+                "shortname": "status",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              },
+              {
+                "shortname": "amount",
+                "datatype": "https://atomicdata.dev/datatypes/float"
+              },
+              {
+                "shortname": "quantity",
+                "datatype": "https://atomicdata.dev/datatypes/integer"
+              },
+              {
+                "shortname": "issued",
+                "datatype": "https://atomicdata.dev/datatypes/timestamp"
+              },
+              {
+                "shortname": "due",
+                "datatype": "https://atomicdata.dev/datatypes/date"
+              },
+              {
+                "shortname": "paid",
+                "datatype": "https://atomicdata.dev/datatypes/boolean"
+              },
+              {
+                "shortname": "website",
+                "datatype": "https://atomicdata.dev/datatypes/atomicURL"
+              },
+              {
+                "shortname": "notes",
+                "datatype": "https://atomicdata.dev/datatypes/markdown"
+              },
+              {
+                "shortname": "customer",
+                "datatype": "https://atomicdata.dev/datatypes/atomicURL",
+                "description": "Who is billed."
+              },
+              {
+                "shortname": "lines",
+                "datatype": "https://atomicdata.dev/datatypes/resourceArray"
+              }
+            ],
+            "requires": [
+              "number",
+              "customer"
+            ],
+            "recommends": [
+              "status",
+              "amount",
+              "quantity",
+              "issued",
+              "due",
+              "paid",
+              "website",
+              "notes",
+              "lines"
+            ],
+            "constraints": {
+              "number": {
+                "pattern": "^INV-[0-9]{4}$"
+              },
+              "status": {
+                "enum": [
+                  "draft",
+                  "sent",
+                  "paid"
+                ]
+              },
+              "amount": {
+                "minimum": 0,
+                "exclusiveMaximum": 100000
+              },
+              "quantity": {
+                "minimum": 1,
+                "maximum": 99
+              },
+              "customer": {
+                "class": "customer"
+              },
+              "lines": {
+                "class": "line-item",
+                "minItems": 1,
+                "maxItems": 50
+              }
+            }
+          },
+          {
+            "shortname": "line-item",
+            "name": "line-item",
+            "properties": [
+              {
+                "shortname": "label",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              },
+              {
+                "shortname": "price",
+                "datatype": "https://atomicdata.dev/datatypes/float"
+              },
+              {
+                "shortname": "notes",
+                "datatype": "https://atomicdata.dev/datatypes/markdown"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "label",
+              "price",
+              "notes"
+            ],
+            "constraints": {
+              "price": {
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "inventory: camelCase, titles, json and external links normalise",
+      "schema": {
+        "x-atomic-ontology": "inventory",
+        "$defs": {
+          "StockItem": {
+            "type": "object",
+            "title": "Stock item",
+            "properties": {
+              "unitPrice": {
+                "type": "number"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "meta": {
+                "type": "object"
+              },
+              "supplier": {
+                "type": "string",
+                "format": "uri",
+                "x-atomic-class": "https://example.com/classes/Supplier"
+              },
+              "related": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri",
+                  "x-atomic-class": "stock-item"
+                }
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "inventory",
+        "classes": [
+          {
+            "shortname": "stock-item",
+            "name": "Stock item",
+            "properties": [
+              {
+                "shortname": "unit-price",
+                "datatype": "https://atomicdata.dev/datatypes/float"
+              },
+              {
+                "shortname": "tags",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "meta",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "supplier",
+                "datatype": "https://atomicdata.dev/datatypes/atomicURL"
+              },
+              {
+                "shortname": "related",
+                "datatype": "https://atomicdata.dev/datatypes/resourceArray"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "unit-price",
+              "tags",
+              "meta",
+              "supplier",
+              "related"
+            ],
+            "constraints": {
+              "supplier": {
+                "class": "https://example.com/classes/Supplier"
+              },
+              "related": {
+                "class": "stock-item"
+              }
+            }
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "x-atomic-ontology": "inventory",
+        "$defs": {
+          "stock-item": {
+            "type": "object",
+            "title": "Stock item",
+            "properties": {
+              "unit-price": {
+                "type": "number"
+              },
+              "tags": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              "meta": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              "supplier": {
+                "type": "string",
+                "format": "uri",
+                "x-atomic-class": "https://example.com/classes/Supplier"
+              },
+              "related": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/stock-item"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "notes: a root object is a class",
+      "schema": {
+        "title": "Note",
+        "x-atomic-ontology": "notes",
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "x-atomic-datatype": "https://atomicdata.dev/datatypes/markdown"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "plan": {
+        "shortname": "notes",
+        "name": "Note",
+        "classes": [
+          {
+            "shortname": "note",
+            "name": "Note",
+            "properties": [
+              {
+                "shortname": "body",
+                "datatype": "https://atomicdata.dev/datatypes/markdown"
+              },
+              {
+                "shortname": "pinned",
+                "datatype": "https://atomicdata.dev/datatypes/boolean"
+              }
+            ],
+            "requires": [
+              "body"
+            ],
+            "recommends": [
+              "pinned"
+            ],
+            "constraints": {}
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Note",
+        "x-atomic-ontology": "notes",
+        "$defs": {
+          "Note": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "type": "string",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/markdown"
+              },
+              "pinned": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "body"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "tasks: shortname from the title",
+      "schema": {
+        "title": "Task list",
+        "$defs": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "done": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "task-list",
+        "name": "Task list",
+        "classes": [
+          {
+            "shortname": "task",
+            "name": "task",
+            "properties": [
+              {
+                "shortname": "done",
+                "datatype": "https://atomicdata.dev/datatypes/boolean"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "done"
+            ],
+            "constraints": {}
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Task list",
+        "x-atomic-ontology": "task-list",
+        "$defs": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "done": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "options: a given shortname wins",
+      "options": {
+        "shortname": "given"
+      },
+      "schema": {
+        "x-atomic-ontology": "declared",
+        "$defs": {
+          "a": {
+            "type": "object"
+          }
+        }
+      },
+      "plan": {
+        "shortname": "given",
+        "classes": [
+          {
+            "shortname": "a",
+            "name": "a",
+            "properties": [],
+            "requires": [],
+            "recommends": [],
+            "constraints": {}
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "x-atomic-ontology": "given",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "things: const, bare enum, more datatypes",
+      "schema": {
+        "x-atomic-ontology": "things",
+        "$defs": {
+          "thing": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "box"
+              },
+              "size": {
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              "ratio": {
+                "enum": [
+                  0.5,
+                  1.5
+                ]
+              },
+              "flag": {
+                "enum": [
+                  true
+                ]
+              },
+              "palette": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri",
+                  "enum": [
+                    "atomic:tag:red"
+                  ]
+                }
+              },
+              "handle": {
+                "type": "string",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/slug"
+              },
+              "homepage": {
+                "type": "string",
+                "format": "uri",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/uri"
+              },
+              "caption": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/localizedText"
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "things",
+        "classes": [
+          {
+            "shortname": "thing",
+            "name": "thing",
+            "properties": [
+              {
+                "shortname": "kind",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              },
+              {
+                "shortname": "size",
+                "datatype": "https://atomicdata.dev/datatypes/integer"
+              },
+              {
+                "shortname": "ratio",
+                "datatype": "https://atomicdata.dev/datatypes/float"
+              },
+              {
+                "shortname": "flag",
+                "datatype": "https://atomicdata.dev/datatypes/boolean"
+              },
+              {
+                "shortname": "palette",
+                "datatype": "https://atomicdata.dev/datatypes/resourceArray"
+              },
+              {
+                "shortname": "handle",
+                "datatype": "https://atomicdata.dev/datatypes/slug"
+              },
+              {
+                "shortname": "homepage",
+                "datatype": "https://atomicdata.dev/datatypes/uri"
+              },
+              {
+                "shortname": "caption",
+                "datatype": "https://atomicdata.dev/datatypes/localizedText"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "kind",
+              "size",
+              "ratio",
+              "flag",
+              "palette",
+              "handle",
+              "homepage",
+              "caption"
+            ],
+            "constraints": {
+              "kind": {
+                "enum": [
+                  "box"
+                ]
+              },
+              "size": {
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              "ratio": {
+                "enum": [
+                  0.5,
+                  1.5
+                ]
+              },
+              "flag": {
+                "enum": [
+                  true
+                ]
+              },
+              "palette": {
+                "enum": [
+                  "atomic:tag:red"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "x-atomic-ontology": "things",
+        "$defs": {
+          "thing": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "box"
+                ]
+              },
+              "size": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              "ratio": {
+                "type": "number",
+                "enum": [
+                  0.5,
+                  1.5
+                ]
+              },
+              "flag": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "palette": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri",
+                  "enum": [
+                    "atomic:tag:red"
+                  ]
+                }
+              },
+              "handle": {
+                "type": "string",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/slug"
+              },
+              "homepage": {
+                "type": "string",
+                "format": "uri",
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/uri"
+              },
+              "caption": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/localizedText"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "pets: annotations and open objects are read and dropped",
+      "schema": {
+        "x-atomic-ontology": "pets",
+        "$defs": {
+          "pet": {
+            "type": "object",
+            "additionalProperties": false,
+            "$comment": "x",
+            "properties": {
+              "name": {
+                "type": "string",
+                "default": "Rex",
+                "examples": [
+                  "a"
+                ],
+                "$comment": "y",
+                "deprecated": false
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "pets",
+        "classes": [
+          {
+            "shortname": "pet",
+            "name": "pet",
+            "properties": [
+              {
+                "shortname": "name",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "name"
+            ],
+            "constraints": {}
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "x-atomic-ontology": "pets",
+        "$defs": {
+          "pet": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "name": "oneOf on a property",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/oneOf",
+      "message": "unsupported keyword 'oneOf'"
+    },
+    {
+      "name": "anyOf on a class",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": [
+                  "a"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "pointer": "/$defs/a/anyOf",
+      "message": "unsupported keyword 'anyOf'"
+    },
+    {
+      "name": "allOf at the root",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "allOf": [
+          {}
+        ]
+      },
+      "pointer": "/allOf",
+      "message": "unsupported keyword 'allOf'"
+    },
+    {
+      "name": "not on a property",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "not": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/not",
+      "message": "unsupported keyword 'not'"
+    },
+    {
+      "name": "if on a property",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "if": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/if",
+      "message": "unsupported keyword 'if'"
+    },
+    {
+      "name": "patternProperties on a class",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "patternProperties": {
+              "^a": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/patternProperties",
+      "message": "unsupported keyword 'patternProperties'"
+    },
+    {
+      "name": "remote $ref",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "$ref": "https://example.com/s.json"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/$ref",
+      "message": "only local"
+    },
+    {
+      "name": "unresolved $ref",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "$ref": "#/$defs/missing"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/$ref",
+      "message": "does not name an object schema"
+    },
+    {
+      "name": "nullable type array",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/type",
+      "message": "type arrays"
+    },
+    {
+      "name": "type null",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/type",
+      "message": "unsupported type"
+    },
+    {
+      "name": "format email",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/format",
+      "message": "unsupported format"
+    },
+    {
+      "name": "required without property",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {},
+            "required": [
+              "x"
+            ]
+          }
+        }
+      },
+      "pointer": "/$defs/a/required/0",
+      "message": "not in properties"
+    },
+    {
+      "name": "unknown extension keyword",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "x-custom": 1
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/x-custom",
+      "message": "unknown extension keyword"
+    },
+    {
+      "name": "schema-valued additionalProperties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/additionalProperties",
+      "message": "only a boolean"
+    },
+    {
+      "name": "enum on an array",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "enum": [
+                  [
+                    "a"
+                  ]
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/enum",
+      "message": "constrains the whole array"
+    },
+    {
+      "name": "a def that is not an object",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "s": {
+            "type": "string"
+          }
+        }
+      },
+      "pointer": "/$defs/s",
+      "message": "only object schemas"
+    },
+    {
+      "name": "no ontology shortname",
+      "schema": {
+        "$defs": {
+          "a": {
+            "type": "object"
+          }
+        }
+      },
+      "pointer": "",
+      "message": "ontology's shortname"
+    },
+    {
+      "name": "two keys, one shortname",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "first_name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/first_name",
+      "message": "both become the shortname"
+    },
+    {
+      "name": "two classes, one shortname",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "LineItem": {
+            "type": "object"
+          },
+          "line_item": {
+            "type": "object"
+          }
+        }
+      },
+      "pointer": "/$defs/line_item",
+      "message": "class shortname"
+    },
+    {
+      "name": "one shortname, two datatypes",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          },
+          "b": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/b/properties/id",
+      "message": "cannot hold two properties"
+    },
+    {
+      "name": "nested properties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties",
+      "message": "unsupported keyword 'properties'"
+    },
+    {
+      "name": "items with properties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/items/properties",
+      "message": "unsupported keyword 'properties'"
+    },
+    {
+      "name": "other dialect",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "x-atomic-ontology": "o"
+      },
+      "pointer": "/$schema",
+      "message": "only https://json-schema.org/draft/2020-12/schema"
+    },
+    {
+      "name": "keyword next to $ref",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "b": {
+            "type": "object"
+          },
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "$ref": "#/$defs/b",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/minimum",
+      "message": "unsupported keyword 'minimum'"
+    },
+    {
+      "name": "no type at all",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {}
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x",
+      "message": "cannot tell the datatype"
+    },
+    {
+      "name": "boolean schema",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": true
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x",
+      "message": "expected a schema object"
+    },
+    {
+      "name": "negative minLength",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "minLength": -1
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x",
+      "message": "non-negative integer"
+    },
+    {
+      "name": "invalid pattern",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "pattern": "("
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x",
+      "message": "not a valid regex"
+    },
+    {
+      "name": "enum of mixed types",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "enum": [
+                  1,
+                  "a"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x",
+      "message": "mixed types"
+    },
+    {
+      "name": "unknown Atomic datatype",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "x-atomic-datatype": "https://example.com/nope"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/x-atomic-datatype",
+      "message": "unknown Atomic datatype"
+    },
+    {
+      "name": "required at a root without properties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "required": [
+          "a"
+        ]
+      },
+      "pointer": "/required",
+      "message": "root has none"
+    }
+  ]
+}

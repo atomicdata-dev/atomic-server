@@ -153,7 +153,6 @@ function NewDrivePage(): JSX.Element {
                 },
               );
             setDrive(resource.subject);
-            toast.success('Drive created');
             navigate(constructOpenURL(resource.subject));
           }}
         />

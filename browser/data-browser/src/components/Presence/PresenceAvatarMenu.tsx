@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
-import { useDrivePresence, useResource, useTitle } from '@tomic/react';
-import { FaLocationArrow, FaUser } from 'react-icons/fa6';
+import {
+  useDrivePresence,
+  useResource,
+  useStore,
+  useTitle,
+} from '@tomic/react';
+import { FaEnvelope, FaLocationArrow, FaUser } from 'react-icons/fa6';
 import { DropdownMenu, type DropdownItem } from '../Dropdown';
 import type { DropdownTriggerProps } from '../Dropdown/DropdownTrigger';
 import { AgentAvatar } from './AgentAvatar';
@@ -8,6 +13,7 @@ import { FollowingIndicator } from './FollowingIndicator';
 import { useFollow } from './FollowContext';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
+import { findOrStartConversation } from '../../helpers/conversations/useConversations';
 
 interface PresenceAvatarMenuProps {
   agentSubject: string;
@@ -35,6 +41,8 @@ export function PresenceAvatarMenu({
   chip = true,
 }: PresenceAvatarMenuProps): React.JSX.Element {
   const navigate = useNavigateWithTransition();
+  const store = useStore();
+  const isMe = store.getAgent()?.subject === agentSubject;
   const { followedAgent, follow, unfollow, isFollowDisabledFor } = useFollow();
   const presence = useDrivePresence();
   const agentResource = useResource(agentSubject);
@@ -55,6 +63,19 @@ export function PresenceAvatarMenu({
         onClick: () => navigate(constructOpenURL(agentSubject)),
       },
     ];
+
+    if (!isMe) {
+      result.push({
+        id: 'message',
+        label: 'Message',
+        icon: <FaEnvelope />,
+        onClick: () => {
+          findOrStartConversation(store, [agentSubject])
+            .then(subject => navigate(constructOpenURL(subject)))
+            .catch(error => store.notifyError(error));
+        },
+      });
+    }
 
     // Presence excludes this tab's own session, so even the same agent subject
     // represents another live tab or device that can be followed.
@@ -77,6 +98,8 @@ export function PresenceAvatarMenu({
     return result;
   }, [
     agentSubject,
+    isMe,
+    store,
     isFollowing,
     online,
     followDisabled,

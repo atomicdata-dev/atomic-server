@@ -16,8 +16,8 @@ This means that concurrent edits from multiple clients merge automatically witho
 The **required fields** are:
 
 - `subject` - The thing being changed. A Resource Subject URL that the Commit is changing. Must not contain query parameters.
-- `signer` - Who's making the change. The DID of the Agent (`did:ad:agent:{publicKey}`).
-- `signature` - Cryptographic proof of the change. An Ed25519 signature of the deterministically serialized Commit (without the `signature` field). The signature is also used as the identifier of the commit (`did:ad:commit:{signature}`).
+- `signer` - Who's making the change. The DID of the Agent (`atomic:agent:{publicKey}`).
+- `signature` - Cryptographic proof of the change. An Ed25519 signature of the deterministically serialized Commit (without the `signature` field). The signature is also used as the identifier of the commit (`atomic:commit:{signature}`).
 - `created-at` - When the change was made. A UNIX timestamp in milliseconds.
 
 The **optional fields** are:
@@ -25,7 +25,7 @@ The **optional fields** are:
 - `loroUpdate` - A [Loro CRDT](https://loro.dev) binary update, encoded as a base64 string. This is the primary way to carry property changes. The server imports this update into the resource's Loro document, materializes the properties, and computes index diffs.
 - `destroy` - If true, the entire Resource will be removed.
 - `previousCommit` - Optional audit pointer at an earlier envelope. **Not a causal gate** — concurrent edits merge via Loro. Clients may still send it; servers do not require it.
-- `isGenesis` - If true, this is the first commit for a DID resource. The subject DID is derived from either the self-verifying genesis certificate signature (`did:ad:<sig_of_cert>`) or, in legacy mode, the signature of the genesis commit itself.
+- `isGenesis` - If true, this is the first commit for a DID resource. The subject DID is derived from either the self-verifying genesis certificate signature (`atomic:<sig_of_cert>`) or, in legacy mode, the signature of the genesis commit itself.
 
 ### Loro CRDT updates
 
@@ -67,16 +67,16 @@ Here is an example Commit with a Loro update:
 
 ```json
 {
-  "@id": "did:ad:commit:4BHIig/9/JdmT1QeMXEe...",
+  "@id": "atomic:commit:4BHIig/9/JdmT1QeMXEe...",
   "https://atomicdata.dev/properties/createdAt": 1775492021374,
   "https://atomicdata.dev/properties/isA": [
     "https://atomicdata.dev/classes/Commit"
   ],
   "https://atomicdata.dev/properties/loroUpdate": "bG9ybwAAAAAAAA...",
   "https://atomicdata.dev/properties/signature": "4BHIig/9/JdmT1QeMXEe...",
-  "https://atomicdata.dev/properties/signer": "did:ad:agent:HkPPFpaVesldOutQqQioozu1yblBDIT2t7hYWJWBJyw=",
-  "https://atomicdata.dev/properties/previousCommit": "did:ad:commit:hgtP8Smpew2ciWBW9pa2...",
-  "https://atomicdata.dev/properties/subject": "did:ad:Nca6liMVPNgXtv..."
+  "https://atomicdata.dev/properties/signer": "atomic:agent:HkPPFpaVesldOutQqQioozu1yblBDIT2t7hYWJWBJyw=",
+  "https://atomicdata.dev/properties/previousCommit": "atomic:commit:hgtP8Smpew2ciWBW9pa2...",
+  "https://atomicdata.dev/properties/subject": "atomic:Nca6liMVPNgXtv..."
 }
 ```
 

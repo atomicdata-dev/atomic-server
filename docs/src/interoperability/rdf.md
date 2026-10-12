@@ -275,7 +275,7 @@ This tooling should help to create URLs, Properties, and host everything on an e
 ## Convert Atomic data to RDF
 
 Since all Atomic Data is also valid RDF, it's trivial to convert / serialize Atoms to RDF.
-This is why [atomic](https://github.com/atomicdata-dev/atomic-data-browser) can serialize Atomic Data to RDF. (For example, try `atomic-cli get https://atomicdata.dev/properties/description --as n3`)
+This is why [atomic](https://github.com/ontola/atomic-server/tree/develop/browser) can serialize Atomic Data to RDF. (For example, try `atomic-cli get https://atomicdata.dev/properties/description --as n3`)
 
 However, contrary to Atomic Data, RDF has optional Language and Datatype elements in every statement.
 It is good practice to use these RDF concepts when serializing Atomic Data into Turtle / RDF/XML, or other [RDF serialization formats](https://ontola.io/blog/rdf-serialization-formats/).

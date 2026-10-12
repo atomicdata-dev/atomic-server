@@ -1,12 +1,12 @@
 // @wc-ignore-file
 import type { Store } from '@tomic/react';
 import type { AIMessageContext } from './types';
-import { shortenRefsDeep } from '@helpers/subjectRefs';
+import { shortenRefsDeep } from '@tomic/react';
 import {
   buildClassContext,
   describeClassCompact,
   toCompact,
-} from './jsonAdCompact';
+} from '@tomic/react';
 import { getClassContextForAgent } from './resourceContextProviders';
 
 /**

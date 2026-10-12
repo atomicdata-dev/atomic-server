@@ -1,7 +1,7 @@
 import { useRef, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaXmark } from 'react-icons/fa6';
-import { RoleSelect, type ShareRole } from './RoleSelect';
+import { RoleSwitch, type ShareRole } from './RoleSelect';
 
 /** Loose on purpose: the server decides, this only catches typos early. */
 export const isEmailAddress = (value: string): boolean =>
@@ -81,12 +81,12 @@ export function EmailInviteInput({
 
   /**
    * Clicking the empty part of the field focuses the input, like a textbox.
-   * Clicks on the controls inside it (the role select, the chip buttons, the
+   * Clicks on the controls inside it (the role switch, the chip buttons, the
    * input itself) are left alone: moving focus away from a native select right
    * after it opened blurs it, which closes its option list again.
    */
   const handleFieldClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as Element).closest('select, button, input')) return;
+    if ((e.target as Element).closest('label, button, input')) return;
 
     inputRef.current?.focus();
   };
@@ -130,9 +130,9 @@ export function EmailInviteInput({
           data-test='share-email-input'
         />
       </Chips>
-      <RoleSelect
+      <RoleSwitch
         value={role}
-        onChange={r => r !== 'remove' && onRoleChange(r)}
+        onChange={onRoleChange}
         aria-label='Role for invited people'
         disabled={disabled}
       />

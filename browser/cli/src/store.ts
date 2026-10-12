@@ -1,4 +1,5 @@
 import { Agent, Store, type OptionalClass, type Resource } from '@tomic/lib';
+import { loadOrCreateLocalAgent } from '@tomic/lib/node';
 import { atomicConfig } from './config.js';
 
 const stripTrailingSlash = (url: string): string => url.replace(/\/$/, '');
@@ -54,12 +55,24 @@ const getAgent = async (): Promise<Agent | undefined> => {
     secret = atomicConfig.agentSecret;
   }
 
-  if (!secret) return undefined;
+  if (secret) {
+    return Agent.fromSecret(secret, 'js');
+  }
 
-  return Agent.fromSecret(secret, 'js');
+  // A key from `ad-generate connect`, if this machine has one for the server.
+  if (serverUrl) {
+    return (
+      await loadOrCreateLocalAgent(KEY_TOOL, serverUrl, { create: false })
+    )?.agent;
+  }
+
+  return undefined;
 };
 
-const serverUrl = resolveServerUrl();
+/** Where `ad-generate connect` keeps this machine's key. */
+export const KEY_TOOL = 'atomic-cli';
+
+export const serverUrl = resolveServerUrl();
 
 export const store = new Store(serverUrl ? { serverUrl } : {});
 

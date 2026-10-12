@@ -859,6 +859,7 @@ async fn parse_json_ad_map_to_resource(
                 final_commit.subject = did_subject;
                 let opts = CommitOpts {
                     validate_schema: true,
+                    validate_constraints: true,
                     validate_signature: true,
                     validate_timestamp: false,
                     validate_rights: parse_opts.for_agent != ForAgent::Sudo,
@@ -911,6 +912,7 @@ async fn parse_json_ad_map_to_resource(
 
             let opts = CommitOpts {
                 validate_schema: true,
+                validate_constraints: true,
                 validate_signature: true,
                 validate_timestamp: false,
                 validate_rights: parse_opts.for_agent != ForAgent::Sudo,

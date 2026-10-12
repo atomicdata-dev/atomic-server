@@ -410,7 +410,7 @@ export function passkeyRpId(): string | undefined {
 export class PrfUnsupportedError extends Error {
   constructor(message = 'This device cannot protect a backup with a passkey.') {
     super(message);
-    this.name = 'PrfUnsupportedError';
+    this.name = /* @wc-ignore */ 'PrfUnsupportedError';
   }
 }
 
@@ -1071,40 +1071,114 @@ function addAssistedWrapperInBackground(
   dek: Uint8Array<ArrayBuffer>,
   replace = false,
 ): void {
+  if (hasAssistedWrapper(recovery) && !replace) return;
+
+  void appendAssistedWrapper(recovery, dek).catch(() => undefined);
+}
+
+/**
+ * Wrap `dek` with the account's assisted key and append it to the stored
+ * backup. Resolves the saved backup, or null when this account cannot have
+ * one: the service does not offer it, the signed-in account is not the one
+ * owning this backup, or its owner turned assisted recovery off.
+ */
+async function appendAssistedWrapper(
+  recovery: RecoverySecret,
+  dek: Uint8Array<ArrayBuffer>,
+): Promise<RecoverySecret | null> {
+  if (recovery.format_version !== 2) return null;
+
+  if (!(await isAssistedRecoveryAvailable())) return null;
+
+  // The wrapper is appended to the signed-in account's backup, so only
+  // when that account is the one owning this backup.
+  const account = await getManagedAccount().catch(() => null);
+
   if (
-    recovery.format_version !== 2 ||
-    (hasAssistedWrapper(recovery) && !replace)
+    !account ||
+    account.email !== recovery.owner_email ||
+    account.assisted_recovery_off
   )
-    return;
+    return null;
 
-  void (async () => {
-    if (!(await isAssistedRecoveryAvailable())) return;
-    // The wrapper is appended to the signed-in account's backup, so only
-    // when that account is the one owning this backup.
-    const account = await getManagedAccount().catch(() => null);
+  const wrapper = await wrapDekWithAssisted(dek, recovery.agent_subject);
+  const response = await managedFetch('/recovery-secret/wrappers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agent_subject: recovery.agent_subject,
+      encrypted_secret: recovery.encrypted_secret,
+      nonce: recovery.nonce,
+      wrapper,
+    }),
+  });
 
-    if (
-      !account ||
-      account.email !== recovery.owner_email ||
-      account.assisted_recovery_off
-    )
-      return;
+  if (!response.ok) return null;
 
-    const wrapper = await wrapDekWithAssisted(dek, recovery.agent_subject);
-    const response = await managedFetch('/recovery-secret/wrappers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        agent_subject: recovery.agent_subject,
-        encrypted_secret: recovery.encrypted_secret,
-        nonce: recovery.nonce,
-        wrapper,
-      }),
-    });
+  const saved = (await response.json()) as RecoverySecret;
+  cacheRecoverySecret(saved);
 
-    if (response.ok)
-      cacheRecoverySecret((await response.json()) as RecoverySecret);
-  })().catch(() => undefined);
+  return saved;
+}
+
+/**
+ * Turn on signing in as the way into an existing backup that predates
+ * assisted recovery. Only something that already opens it can: one passkey
+ * prompt, or the recovery code when there is no passkey. Throws when the
+ * backup could not be opened or the wrapper could not be stored.
+ */
+export async function enableAssistedForBackup(
+  recovery: RecoverySecret,
+  recoveryCode?: string,
+): Promise<RecoverySecret> {
+  let dek: Uint8Array<ArrayBuffer> | undefined;
+
+  const keep = (opened: Uint8Array<ArrayBuffer>) => {
+    dek = opened;
+  };
+
+  if (recoveryCode) {
+    const wrapper = recovery.wrappers.find(
+      w => w.wrapper_type === 'recovery-code',
+    );
+
+    if (!wrapper) throw new Error('This backup has no recovery code.');
+
+    const wrapKey = await deriveKeyFromRecoveryCode(
+      normalizeRecoveryCodeInput(recoveryCode),
+      base64ToBytes(wrapper.salt),
+      ['decrypt'],
+      wrapper.kdf_params,
+    );
+    await openWithDekKey(
+      recovery,
+      wrapper,
+      wrapKey,
+      'Wrong recovery code',
+      keep,
+    );
+  } else {
+    const { wrapper, key } = await unlockPasskeyWrapper(recovery);
+    await openWithDekKey(
+      recovery,
+      wrapper,
+      key,
+      'That passkey could not unlock this backup.',
+      keep,
+    );
+  }
+
+  if (!dek) throw new Error('Your backup could not be opened.');
+
+  const saved = await appendAssistedWrapper(recovery, dek);
+
+  if (!saved) {
+    throw new Error(
+      `Could not turn this on in your ${PRODUCT_NAME} account. Sign in to it and try again.`,
+    );
+  }
+
+  return saved;
 }
 
 /** Whether this backup can be unlocked by a passkey / by a typed code. */
@@ -1775,10 +1849,14 @@ const LEGACY_RECOVERY_CACHE_KEY = 'atomic.recovery.backup';
  */
 function cacheRecoverySecret(secret: RecoverySecret): void {
   try {
-    // Keyed by agent, so a shared machine accumulates one entry per account
-    // rather than each sign-in evicting the last.
+    // One entry per account, so a shared machine accumulates one per person
+    // rather than each sign-in evicting the last. An account holds one backup
+    // on the server, so a newer one for another agent replaces the old: kept,
+    // it showed the same address twice and only one of them opened.
     const others = readCachedBackups().filter(
-      entry => !sameAgent(entry.agent_subject, secret.agent_subject),
+      entry =>
+        !sameAgent(entry.agent_subject, secret.agent_subject) &&
+        entry.owner_email !== secret.owner_email,
     );
     localStorage.setItem(
       RECOVERY_CACHE_KEY,

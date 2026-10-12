@@ -106,3 +106,41 @@ it('matches a backup saved under the legacy did:ad: spelling of the agent', asyn
     backup,
   );
 });
+
+it('keeps one cached backup per account when its agent changes', async () => {
+  const items = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => items.set(key, value),
+    removeItem: (key: string) => items.delete(key),
+  });
+  const backup = (agent: string, owner: string) => ({
+    owner_email: owner,
+    agent_subject: agent,
+    wrappers: [],
+    created_at: 1,
+    updated_at: 1,
+  });
+  items.set(
+    'atomic.recovery.backups',
+    JSON.stringify([
+      backup('did:ad:agent:old', 'one@example.com'),
+      backup('did:ad:agent:other', 'two@example.com'),
+    ]),
+  );
+  vi.mocked(getManagedApiBase).mockReturnValue('https://cache.example/api');
+  vi.mocked(managedFetch).mockResolvedValue(
+    Response.json(backup('did:ad:agent:new', 'one@example.com')),
+  );
+
+  await getRecoverySecret();
+
+  const cached = JSON.parse(items.get('atomic.recovery.backups')!) as {
+    agent_subject: string;
+  }[];
+  expect(cached.map(entry => entry.agent_subject)).toEqual([
+    'did:ad:agent:other',
+    'did:ad:agent:new',
+  ]);
+  vi.unstubAllGlobals();
+});

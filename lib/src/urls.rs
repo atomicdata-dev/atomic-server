@@ -16,8 +16,11 @@ pub const FILE: &str = "https://atomicdata.dev/classes/File";
 pub const CHATROOM: &str = "https://atomicdata.dev/classes/ChatRoom";
 pub const FOLDER: &str = "https://atomicdata.dev/classes/Folder";
 pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
+pub const CHAT_LOG: &str = "https://atomicdata.dev/classes/ChatLog";
 pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
+pub const FOLLOW_EVENT: &str = "https://atomicdata.dev/classes/FollowEvent";
 pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
+pub const LENS: &str = "https://atomicdata.dev/classes/Lens";
 pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
 pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
 pub const DOCUMENT_V2: &str = "https://atomicdata.dev/classes/DocumentV2";
@@ -33,6 +36,14 @@ pub const TAG: &str = "https://atomicdata.dev/classes/Tag";
 pub const PEER: &str = "https://atomicdata.dev/classes/Peer";
 pub const PLAIN_TEXT: &str = "https://atomicdata.dev/classes/PlainText";
 pub const FORK: &str = "https://atomicdata.dev/classes/Fork";
+pub const FORM: &str = "https://atomicdata.dev/classes/Form";
+pub const FORM_PAGE: &str = "https://atomicdata.dev/classes/FormPage";
+pub const FORM_FIELD: &str = "https://atomicdata.dev/classes/FormField";
+pub const FORM_HEADING: &str = "https://atomicdata.dev/classes/FormHeading";
+pub const FORM_PARAGRAPH: &str = "https://atomicdata.dev/classes/FormParagraph";
+pub const FORM_INFO_BOX: &str = "https://atomicdata.dev/classes/FormInfoBox";
+pub const FORM_INVITE_CODE: &str = "https://atomicdata.dev/classes/FormInviteCode";
+pub const FORM_CONDITION: &str = "https://atomicdata.dev/classes/FormCondition";
 
 // Properties
 pub const ORIGINAL_SUBJECT: &str = "https://atomicdata.dev/properties/originalSubject";
@@ -60,8 +71,15 @@ pub const IS_LOCKED: &str = "https://atomicdata.dev/properties/isLocked";
 pub const DATATYPE_PROP: &str = "https://atomicdata.dev/properties/datatype";
 pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
 pub const ALLOWS_ONLY: &str = "https://atomicdata.dev/properties/allowsOnly";
+// ... for Tags
+pub const COLOR: &str = "https://atomicdata.dev/properties/color";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
+pub const CONSTRAINTS: &str = "https://atomicdata.dev/properties/constraints";
+// ... for Lenses
+pub const LENS_FROM: &str = "https://atomicdata.dev/properties/lensFrom";
+pub const LENS_TO: &str = "https://atomicdata.dev/properties/lensTo";
+pub const LENS_TRANSFORM: &str = "https://atomicdata.dev/properties/lensTransform";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
 // ... for Drives
 pub const DEFAULT_ONTOLOGY: &str =
@@ -101,6 +119,15 @@ pub const DRIVES: &str = "https://atomicdata.dev/properties/drives";
 pub const PRIVATE_DRIVE: &str = "https://atomicdata.dev/properties/personalDrive";
 /// Resources shared with this agent (e.g. accepted invites); clients show as "Shared with me".
 pub const SHARED_WITH_ME: &str = "https://atomicdata.dev/properties/sharedWithMe";
+/// End-to-end encrypted chats. See `lib/defaults/conversations.json` and
+/// [crate::conversation].
+pub const CONVERSATION: &str = "https://atomicdata.dev/classes/Conversation";
+pub const SEALED_MESSAGE: &str = "https://atomicdata.dev/classes/SealedMessage";
+pub const ENCRYPTION_KEY: &str = "https://atomicdata.dev/properties/encryptionKey";
+pub const CONVERSATION_KEYS: &str = "https://atomicdata.dev/properties/conversationKeys";
+pub const SEALED: &str = "https://atomicdata.dev/properties/sealed";
+/// On a private drive: the Conversations its owner is in.
+pub const CONVERSATIONS: &str = "https://atomicdata.dev/properties/conversations";
 pub const AVAILABLE_DOMAINS: &str = "https://atomicdata.dev/properties/availableDomains";
 /// Identifies a version in a resource's Loro history. See [crate::history].
 pub const VERSION_ID: &str = "https://atomicdata.dev/properties/versionId";
@@ -206,7 +233,10 @@ pub const IMAGE_HEIGHT: &str = "https://atomicdata.dev/properties/imageHeight";
 pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
 pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";
 pub const ABOUT: &str = "https://atomicdata.dev/properties/about";
+pub const REPLY_TO: &str = "https://atomicdata.dev/properties/replyTo";
 pub const COMMENTS_FOLDER: &str = "https://atomicdata.dev/properties/commentsFolder";
+pub const TRASH_FOLDER: &str = "https://atomicdata.dev/properties/trashFolder";
+pub const TRASHED_FROM: &str = "https://atomicdata.dev/properties/trashedFrom";
 pub const MEETINGS_FOLDER: &str = "https://atomicdata.dev/properties/meetingsFolder";
 pub const FOLLOW_SESSIONS_CHATROOM: &str =
     "https://atomicdata.dev/properties/followSessionsChatroom";
@@ -235,6 +265,36 @@ pub const JSON_SCHEMA: &str = "https://atomicdata.dev/properties/jsonSchema";
 pub const PLUGIN_AUTHOR: &str = "https://atomicdata.dev/properties/pluginAuthor";
 pub const PLUGIN_AGENT: &str = "https://atomicdata.dev/properties/pluginAgent";
 pub const PLUGIN_PERMISSIONS: &str = "https://atomicdata.dev/properties/pluginPermissions";
+// ... for Forms
+pub const FORM_OWNS_SCHEMA: &str = "https://atomicdata.dev/properties/form-owns-schema";
+pub const FORM_DATA_CLASS: &str = "https://atomicdata.dev/properties/form-data-class";
+pub const FORM_TARGET_TABLE: &str = "https://atomicdata.dev/properties/form-target-table";
+pub const FORM_PAGES: &str = "https://atomicdata.dev/properties/form-pages";
+pub const FORM_PUBLISHED_AT: &str = "https://atomicdata.dev/properties/form-published-at";
+pub const FORM_OPEN_AT: &str = "https://atomicdata.dev/properties/form-open-at";
+pub const FORM_CLOSE_AT: &str = "https://atomicdata.dev/properties/form-close-at";
+pub const FORM_SETTINGS: &str = "https://atomicdata.dev/properties/form-settings";
+pub const FORM_PUBLISH_ID: &str = "https://atomicdata.dev/properties/form-publish-id";
+pub const FORM_FIELDS: &str = "https://atomicdata.dev/properties/form-fields";
+pub const COVER_IMAGE: &str = "https://atomicdata.dev/properties/cover-image";
+pub const IMAGE_POSITION: &str = "https://atomicdata.dev/properties/image-position";
+pub const FORM_MAPS_TO: &str = "https://atomicdata.dev/properties/form-maps-to";
+pub const REQUIRED: &str = "https://atomicdata.dev/properties/required";
+pub const FORM_FIELD_TYPE: &str = "https://atomicdata.dev/properties/form-field-type";
+pub const FORM_FIELD_OPTIONS: &str = "https://atomicdata.dev/properties/form-field-options";
+pub const FORM_STYLING: &str = "https://atomicdata.dev/properties/form-styling";
+pub const FORM_CUSTOM_CSS: &str = "https://atomicdata.dev/properties/form-custom-css";
+pub const FORM_SUBMISSION_SUMMARY: &str =
+    "https://atomicdata.dev/properties/form-submission-summary";
+pub const FORM_ACCESS: &str = "https://atomicdata.dev/properties/form-access";
+pub const FORM_CODE: &str = "https://atomicdata.dev/properties/form-code";
+pub const USED_AT: &str = "https://atomicdata.dev/properties/used-at";
+pub const FORM_CONDITIONS: &str = "https://atomicdata.dev/properties/form-conditions";
+pub const FORM_CONDITION_FIELD: &str = "https://atomicdata.dev/properties/form-condition-field";
+pub const FORM_CONDITION_OPERATOR: &str =
+    "https://atomicdata.dev/properties/form-condition-operator";
+pub const FORM_CONDITION_VALUE: &str = "https://atomicdata.dev/properties/form-condition-value";
+pub const FORM_INFO_BOX_STYLE: &str = "https://atomicdata.dev/properties/form-info-box-style";
 // ... for Release / Installation / Listing
 pub const RUNTIME: &str = "https://atomicdata.dev/properties/runtime";
 pub const WORLD: &str = "https://atomicdata.dev/properties/world";
@@ -293,6 +353,7 @@ pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
 pub const PATH_QUERY: &str = "/query";
 pub const PATH_PRUNE_TESTS: &str = "/prunetests";
 pub const PATH_INVITE: &str = "/invites";
+pub const PATH_CONVERSATIONS: &str = "/conversations";
 
 pub const IMPORT_BASELINE: &str = "https://atomicdata.dev/properties/importBaseline";
 

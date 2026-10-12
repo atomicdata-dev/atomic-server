@@ -11,6 +11,7 @@ import {
 import { useOntologyContext } from '../OntologyContext';
 import { PropertyFormCommon } from './PropertyFormCommon';
 import { TargetableCard } from '../TargetableCard';
+import { isContentAddressed } from '../../../helpers/propertyIdentity';
 
 interface PropertyCardWriteProps {
   subject: string;
@@ -42,6 +43,8 @@ export function PropertyCardWrite({
             <FaHashtag />
             <InputSwitcher
               commit
+              // The shortname is part of a content-addressed property's ID.
+              disabled={!canEdit || isContentAddressed(subject)}
               resource={resource}
               property={shortnameProp}
             />

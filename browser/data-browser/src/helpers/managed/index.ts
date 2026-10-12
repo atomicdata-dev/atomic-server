@@ -2,6 +2,7 @@
 // original index.ts was not captured; re-exports the modules consumers use
 // (e.g. IdentityReconcileGate imports { evaluateIdentityReconciliation,
 // writeManagedAccountBinding } from '../helpers/managed').
+export * from './agentLink';
 export * from './api';
 export * from './binding';
 export * from './devices';

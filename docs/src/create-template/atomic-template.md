@@ -9,7 +9,7 @@ yarn create @tomic/template my-project --template <TEMPLATE> --server-url <SERVE
 
 `@tomic/template` is a tool that helps you kickstart a new project using AtomicServer using a variaty of pre build templates that you can further customize to your needs.
 
-`SERVER_URL` is the HTTP(S) API origin. `DRIVE_SUBJECT` is the `did:ad:`
+`SERVER_URL` is the HTTP(S) API origin. `DRIVE_SUBJECT` is the `atomic:`
 identity of the drive where the template data was installed.
 
 In order to use these templates you need the coresponding template data on your AtomicServer.

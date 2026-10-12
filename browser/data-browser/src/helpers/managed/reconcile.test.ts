@@ -20,6 +20,7 @@ function mockFetch(opts: {
   enrollments?: ManagedEnrollmentSummary[];
   recovery?: { agent_subject: string } | null;
 }) {
+  vi.stubEnv('VITE_MANAGED_API_BASE', 'https://portal.example/api');
   setManagedDeviceToken(null);
   globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
@@ -75,6 +76,7 @@ describe('evaluateServerReconciliation', () => {
 
   afterEach(() => {
     globalThis.fetch = realFetch;
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 

@@ -13,6 +13,7 @@ import {
   useTableEditorContext,
 } from './TableEditorContext';
 import { FaUpRightAndDownLeftFromCenter } from 'react-icons/fa6';
+import { isInMultiSelection } from './helpers/selectionBounds';
 import { IconButton } from '@components/IconButton/IconButton';
 import { KeyboardInteraction } from './helpers/keyboardHandlers';
 import { CSSVar } from '@helpers/CSSVar';
@@ -45,6 +46,8 @@ export interface CellProps {
 
 interface IndexCellProps extends CellProps {
   onExpand: (rowIndex: number) => void;
+  /** Rendered before the expand button, e.g. a row-select tick box. */
+  Extra?: React.ComponentType<{ index: number }>;
   /**
    * Rendered in the gutter at the start of the row, left of the row number —
    * where a row-scoped affordance belongs (the table view hangs its comment
@@ -86,12 +89,38 @@ export function Cell({
     registerEventListener,
     disabledKeyboardInteractions,
     setMouseDown,
+    openSelectionMenu,
   } = useTableEditorContext();
 
   const isActive = rowIndex === selectedRow && columnIndex === selectedColumn;
   const isActiveCorner =
     rowIndex === multiSelectCornerRow &&
     columnIndex === multiSelectCornerColumn;
+
+  const inMultiSelection = isInMultiSelection(
+    cursorMode,
+    selectedRow,
+    selectedColumn,
+    multiSelectCornerRow,
+    multiSelectCornerColumn,
+    rowIndex,
+    columnIndex,
+  );
+
+  // Right-clicking inside a multi-cell selection acts on all of it, so it
+  // opens the selection's own menu rather than the cell's.
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (inMultiSelection) {
+        openSelectionMenu(e);
+
+        return;
+      }
+
+      onContextMenu?.(e);
+    },
+    [inMultiSelection, openSelectionMenu, onContextMenu],
+  );
 
   const handleMouseUp = useCallback(() => {
     setMouseDown(false);
@@ -146,6 +175,12 @@ export function Cell({
         return;
       }
 
+      // A right-click inside the selection must not collapse it: the context
+      // menu that follows is for the whole selection.
+      if (e.button === 2 && inMultiSelection) {
+        return;
+      }
+
       setMouseDown(true);
 
       // Stop the browser starting its own text selection for this drag.
@@ -194,6 +229,7 @@ export function Cell({
       shouldEnterEditMode,
       cursorMode,
       isActive,
+      inMultiSelection,
       disabledKeyboardInteractions,
       setCursorMode,
       setMouseDown,
@@ -289,7 +325,7 @@ export function Cell({
       onMouseUp={handleMouseUp}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
-      onContextMenu={onContextMenu}
+      onContextMenu={handleContextMenu}
     >
       {children}
     </CellWrapper>
@@ -299,6 +335,7 @@ export function Cell({
 export function IndexCell({
   children,
   onExpand,
+  Extra,
   RowHeaderAddonComponent,
   ...props
 }: React.PropsWithChildren<IndexCellProps>): JSX.Element {
@@ -308,9 +345,12 @@ export function IndexCell({
 
   return (
     <StyledIndexCell role='rowheader' {...props} hasMarking={!!marking}>
-      {RowHeaderAddonComponent && (
+      {(Extra || RowHeaderAddonComponent) && (
         <AddonSlot>
-          <RowHeaderAddonComponent rowIndex={props.rowIndex} />
+          {Extra && <Extra index={props.rowIndex} />}
+          {RowHeaderAddonComponent && (
+            <RowHeaderAddonComponent rowIndex={props.rowIndex} />
+          )}
         </AddonSlot>
       )}
       <IconButton
@@ -335,11 +375,12 @@ const AddonSlot = styled.span`
   margin-inline-end: auto;
   display: flex;
   align-items: center;
+  gap: ${p => p.theme.size(1)};
 `;
 
-/* The `:not([data-row-affordance])` below spares the addon's buttons: those are
- * row-scoped and are revealed from the row itself (see TableRow), so they must
- * not also be shown and hidden by this cell's own hover rules. */
+/* The addon's buttons (`data-row-affordance`) are
+ * row-scoped and are revealed from the row itself (see TableRow); only the
+ * expand button is shown and hidden by this cell's own hover rules. */
 const StyledIndexCell = styled(Cell)<{ hasMarking: boolean }>`
   justify-content: flex-end !important;
   /* Tighter than a data cell: the gutter fits two controls side by side. */
@@ -347,17 +388,42 @@ const StyledIndexCell = styled(Cell)<{ hasMarking: boolean }>`
   gap: ${p => p.theme.size(1)};
   color: ${p => p.theme.colors.textLight};
 
-  & button:not([data-row-affordance]) {
+  /* The row-select tick box sits in the slot pinned left, so it doesn't move
+     when the number swaps for the expand button under a hovering or tapping
+     pointer. */
+  & [data-row-select] {
+    display: flex;
+    align-items: center;
+  }
+
+  & [data-row-select]:not([data-active='true']) {
     display: none;
   }
 
-  &:hover ${IndexNumber}, &:focus-within ${IndexNumber} {
+  /* No hover on touch: without this there'd be no way to start selecting. */
+  @media (hover: none) {
+    & [data-row-select] {
+      display: flex !important;
+    }
+  }
+
+  &:hover [data-row-select],
+  &:focus-within [data-row-select] {
+    display: flex;
+  }
+
+  /* Only the expand button: the tick box and the addon's buttons live in the
+     slot and are shown by their own rules. */
+  & > button {
     display: none;
   }
 
-  &:not([data-hasmarking='true']):hover button:not([data-row-affordance]),
-  &:not([data-hasmarking='true']):focus-within
-    button:not([data-row-affordance]) {
+  &:hover ${IndexNumber}, &:is(:focus, :has(> button:focus)) ${IndexNumber} {
+    display: none;
+  }
+
+  &:not([data-hasmarking='true']):hover > button,
+  &:not([data-hasmarking='true']):is(:focus, :has(> button:focus)) > button {
     display: ${p => (p.hasMarking ? 'none' : 'block')};
   }
 `;

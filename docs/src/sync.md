@@ -37,8 +37,8 @@ A browser tab is the odd one out: it cannot accept incoming connections, so it i
 It reaches other devices through an always-on device, or through the WebRTC room.
 A phone or desktop running `atomic_lib` *is* a peer: it can be dialed, and it can serve.
 
-Discovery, the step of finding an address for a Drive you only know by its `did:ad:` identifier, is separate from transport.
-A device can announce that it holds a Drive on the Mainline DHT, and a client can look that up; see [resolution](did.md#resolution).
+Discovery, the step of finding an address for a Drive you only know by its `atomic:` identifier, is separate from transport.
+A device announces that it holds a Drive through the pkarr relay network, and a client looks that up to find an Iroh node to dial; see [resolution](identifiers.md#resolution).
 A mesh transport over [Reticulum](https://reticulum.network/) is planned but not built.
 
 ## What crosses the link

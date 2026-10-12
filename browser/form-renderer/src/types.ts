@@ -1,0 +1,341 @@
+/**
+ * Mirrors `lib/src/forms.rs`'s `FormDefinition` / `FormBlock` — the
+ * denormalized JSON served by `GET /form/{id}/definition`. Keep field names
+ * and shapes in lockstep with the Rust side; there is no code generation
+ * between them.
+ */
+
+export type FieldType =
+  | 'short-text'
+  | 'long-text'
+  | 'email'
+  | 'number'
+  | 'date'
+  | 'datetime'
+  | 'checkbox'
+  | 'radio'
+  | 'multi-select'
+  | 'phone'
+  | 'country'
+  | 'url'
+  | 'currency'
+  | 'dropdown'
+  | 'dropdown-multi'
+  | 'likert'
+  | 'rating'
+  | 'picture-choice'
+  | 'choice-matrix'
+  | 'table-input'
+  | 'address';
+
+/** One column of a `table-input` question. */
+export interface TableColumn {
+  label: string;
+  type?: 'text' | 'number';
+}
+
+/** The question types whose options are Tag resources on the mapped
+ * Property's `allowsOnly`. Mirrors `CHOICE_FIELD_TYPES` in
+ * `server/src/forms.rs`. */
+export const CHOICE_FIELD_TYPES: FieldType[] = [
+  'radio',
+  'multi-select',
+  'dropdown',
+  'dropdown-multi',
+  'picture-choice',
+];
+
+export function isChoiceField(type: string): boolean {
+  return (CHOICE_FIELD_TYPES as string[]).includes(type);
+}
+
+/**
+ * One resolved choice option. Mirrors `FieldOption` in `server/src/forms.rs`,
+ * which resolves these from the Tags on the mapped Property's `allowsOnly` —
+ * a published form's visitor has no agent and could not fetch them itself.
+ *
+ * `value` is the Tag's subject: what the answer stores and what conditions
+ * compare against. Everything user-facing renders `label`.
+ */
+export interface FieldOption {
+  value: string;
+  label: string;
+  color?: string;
+  emoji?: string;
+  /** `picture-choice`: the Tag's cover image, already rewritten into a URL the
+   * visitor can fetch (`/form/{id}/image?file=…`). */
+  image?: string;
+}
+
+/** An option's display text. Matches `useTagData`, which prefixes the emoji. */
+export function optionText(option: FieldOption): string {
+  return option.emoji ? `${option.emoji} ${option.label}` : option.label;
+}
+
+/** Where a choice question's options come from, when they are not the Tags on
+ * its own mapped Property. Mirrors [OPTIONS_SOURCE_KEY] in
+ * `server/src/forms.rs` and `OptionsSource` in the builder
+ * (`chunks/FormBuilder/FieldOptions/optionsSource.ts`).
+ *
+ * `property` set → another column's Tags. Otherwise `table` alone → that
+ * table's rows, labelled by `labelProperty`. `table` is stored in both cases
+ * (the builder picks a table first) and ignored when `property` is set. */
+export interface OptionsSource {
+  table?: string;
+  property?: string;
+  labelProperty?: string;
+}
+
+/** The `form-field-options` bag. Every key is type-specific; a field only
+ * ever reads the keys its own type defines. Kept flat (rather than a
+ * discriminated union per type) because that is how the property is stored
+ * and how both validators read it. */
+export interface FieldOptions {
+  /** Resolved from an integer table column by the definition builder. */
+  integer?: boolean;
+  placeholder?: string;
+  /** rating: the number of steps. Not a limit. (On `number` / `currency`,
+   * `min` / `max` are the pre-JSON-Schema names of `minimum` / `maximum`; still
+   * read, never written.) */
+  min?: number;
+  max?: number;
+  /** The limits a submission has to satisfy, under the JSON Schema keyword
+   * names the class `constraints` use (`lib/src/class_constraints.rs`). The
+   * server narrows the class's constraint for the mapped column with the
+   * form's own options when it builds the definition, so these are the
+   * result. `minimum` / `maximum` / `exclusive*`: number and currency.
+   * `minLength` / `maxLength` / `pattern`: short and long text.
+   * `minItems` / `maxItems`: multi-select (picks) and table-input (rows). */
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  pattern?: string;
+  minItems?: number;
+  maxItems?: number;
+  /** Choice questions: the resolved options, in `allowsOnly` order. */
+  options?: FieldOption[];
+  /** Choice questions: where {@link FieldOptions.options} was resolved from,
+   * when it is not the question's own column. Mirrors `OPTIONS_SOURCE_KEY` in
+   * `server/src/forms.rs`. Builder-facing only — by the time a definition
+   * reaches the renderer the options are already resolved, whatever the
+   * source. */
+  optionsSource?: OptionsSource;
+  defaultValue?: boolean;
+  /** currency: ISO 4217-ish code, e.g. `EUR`. Rendered as a symbol when known. */
+  currency?: string;
+  /** phone: the country the input starts in (and formats national input as).
+   * country: pre-selected on first render. ISO 3166-1 alpha-2. */
+  defaultCountry?: string;
+  /** likert: number of points on the scale (answers are 1..scale). */
+  scale?: number;
+  /** likert: labels for the extremes of the scale. */
+  minLabel?: string;
+  maxLabel?: string;
+  /** rating: glyph to render. */
+  icon?: 'star' | 'heart' | string;
+  /** choice-matrix: statements (one per row) and the scale shared by them. */
+  rows?: string[];
+  columns?: string[] | TableColumn[];
+  /** @deprecated Old name of `minItems` / `maxItems` on `table-input`. */
+  minRows?: number;
+  maxRows?: number;
+  /** @deprecated Old name of `minItems` / `maxItems` on `multi-select` /
+   * `dropdown-multi`. */
+  minSelected?: number;
+  maxSelected?: number;
+  /** short-text / long-text: how long the answer may be, in characters. */
+  minLength?: number;
+  maxLength?: number;
+}
+
+/** The subfields an `address` answer is made of. All are optional strings;
+ * `required` on the field means line1 + city + country must be filled.
+ * `country` holds an ISO 3166-1 alpha-2 code (see `countries.ts`); the rest
+ * is free text. */
+export interface AddressValue {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  postalCode?: string;
+  state?: string;
+  country?: string;
+}
+
+/** Ordered `address` subfields — shared by the input and both validators so
+ * an unknown key can be rejected. */
+export const ADDRESS_FIELDS: {
+  key: keyof AddressValue;
+  label: string;
+  autoComplete: string;
+}[] = [
+  { key: 'line1', label: 'Address', autoComplete: 'address-line1' },
+  { key: 'line2', label: 'Address line 2', autoComplete: 'address-line2' },
+  { key: 'postalCode', label: 'Postal code', autoComplete: 'postal-code' },
+  { key: 'city', label: 'City', autoComplete: 'address-level2' },
+  { key: 'state', label: 'State / Province', autoComplete: 'address-level1' },
+  { key: 'country', label: 'Country', autoComplete: 'country-name' },
+];
+
+/** Address subfields that must be filled when the field is `required`. */
+export const ADDRESS_REQUIRED_FIELDS: (keyof AddressValue)[] = [
+  'line1',
+  'city',
+  'country',
+];
+
+export interface HeadingBlock {
+  kind: 'heading';
+  text: string;
+  conditions?: FormCondition[];
+}
+
+export interface ParagraphBlock {
+  kind: 'paragraph';
+  text: string;
+  conditions?: FormCondition[];
+}
+
+/** The visual variants a {@link InfoBoxBlock} may carry. Mirrors
+ * `INFO_BOX_STYLES` in `server/src/forms.rs`. */
+export const INFO_BOX_STYLES = [
+  'info',
+  'note',
+  'tip',
+  'success',
+  'warning',
+  'danger',
+] as const;
+
+export type InfoBoxStyle = (typeof INFO_BOX_STYLES)[number];
+
+export const DEFAULT_INFO_BOX_STYLE: InfoBoxStyle = 'info';
+
+/** `style` is a plain String at the store, so a definition can carry anything;
+ * everything reading one goes through here to land back on a known variant. */
+export function infoBoxStyle(style: string | undefined): InfoBoxStyle {
+  return (INFO_BOX_STYLES as readonly string[]).includes(style ?? '')
+    ? (style as InfoBoxStyle)
+    : DEFAULT_INFO_BOX_STYLE;
+}
+
+/** A callout: markdown `text` in a styled box, under an optional `title`. */
+export interface InfoBoxBlock {
+  kind: 'info-box';
+  title?: string | null;
+  text: string;
+  style: InfoBoxStyle | string;
+  conditions?: FormCondition[];
+}
+
+export interface FieldBlock {
+  kind: 'field';
+  mapsTo: string;
+  label: string;
+  description?: string | null;
+  type: FieldType;
+  required: boolean;
+  options: FieldOptions;
+  conditions?: FormCondition[];
+}
+
+export type FormBlock =
+  | HeadingBlock
+  | ParagraphBlock
+  | InfoBoxBlock
+  | FieldBlock;
+
+export type ConditionOperator =
+  | 'equals'
+  | 'not-equals'
+  | 'contains'
+  | 'greater-than'
+  | 'less-than';
+
+/** Denormalized visibility predicate. `field` is the referenced question's
+ * `mapsTo` (property subject), not the FormField resource URL. Empty list on
+ * a page/block means always visible; multiple entries are ANDed. */
+export interface FormCondition {
+  field: string;
+  operator: ConditionOperator | string;
+  value: unknown;
+}
+
+export interface FormPageDefinition {
+  name?: string | null;
+  coverImage?: string | null;
+  imagePosition?: string | null;
+  conditions?: FormCondition[];
+  blocks: FormBlock[];
+}
+
+export type ImagePosition = 'top' | 'left' | 'right' | 'behind' | 'full';
+
+export type Roundness = 'sharp' | 'rounded' | 'round';
+
+/** How much vertical space sits between the blocks of a page. */
+export type FieldSpacing = 'small' | 'large';
+
+/** Visual theming for the published form. All keys optional; unset keys keep
+ * the light/dark-adaptive defaults from `style.css`. `imageUrl` is filled by
+ * the server (`/form/{id}/image`) or, in the builder preview, with the File's
+ * own `downloadURL`. */
+export interface FormStyling {
+  imageUrl?: string;
+  imagePosition?: ImagePosition | string;
+  textColor?: string;
+  mainColor?: string;
+  backgroundColor?: string;
+  roundness?: Roundness | string;
+  /** Vertical space between blocks. Defaults to `small` (1.5rem) when unset;
+   * `large` (5rem) gives each question room of its own. */
+  fieldSpacing?: FieldSpacing | string;
+  /** Multi-page progress bar visibility. Defaults to shown when unset. */
+  showProgressBar?: boolean;
+  /** Keep half-filled answers in the visitor's `localStorage` so they can
+   * close the tab and come back. Defaults to on; only `false` opts out (for
+   * kiosks and other shared devices, where a stranger's answers must not be
+   * waiting for the next person). See `draft.ts`. */
+  saveDrafts?: boolean;
+  /** Animate Next/Back page changes (zoom out + slide out, slide in + zoom
+   * in). Off unless set to `true`. A visitor's `prefers-reduced-motion`
+   * always wins over `true`. */
+  animatePageTransitions?: boolean;
+  /** The form owner's own CSS, injected by `FormShell` into the
+   * `atomic-form-custom` cascade layer and scoped to the form's root element.
+   * Overrides anything in `base.css` without needing `!important` — see
+   * `wrapCustomCss`. Sanitized and minified server-side
+   * (`server/src/forms.rs::sanitize_custom_css`); a builder preview injects it
+   * unsanitized, since it is the owner's own CSS on the owner's own screen. */
+  customCss?: string;
+}
+
+/** Captcha client config, filled in by the server for published forms
+ * (`server/src/captcha.rs::client_config`). Absent in builder previews, so
+ * the preview never renders a live widget. */
+export interface FormCaptcha {
+  provider: 'altcha' | string;
+  challengeUrl: string;
+}
+
+/** The ride-along key under which FormRenderer passes the solved captcha
+ * payload to `onSubmit` — same pattern as the honeypot value. The host app
+ * lifts it out into the submit body's top-level `altcha` field. */
+export const CAPTCHA_VALUE_KEY = '__altcha';
+
+export interface FormDefinition {
+  version: number;
+  id: string;
+  name: string;
+  settings: Record<string, unknown>;
+  styling: FormStyling;
+  honeypotField: string;
+  captcha?: FormCaptcha;
+  pages: FormPageDefinition[];
+}
+
+/** A submitted value for one field, keyed by the field's `mapsTo` property subject. */
+export type FormValues = Record<string, unknown>;
+
+/** Field-level validation errors, keyed by `mapsTo`. */
+export type FormErrors = Record<string, string>;

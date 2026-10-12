@@ -8,7 +8,13 @@ import { transform } from 'oxc-transform-react';
 const looksLikeReactCode = /\b[A-Z]|\buse/;
 
 const includeRE = /\.[cm]?[jt]sx?(?:$|\?)/;
-const excludeRE = /\/node_modules\//;
+// Worker entrypoints are excluded along with node_modules: Fast Refresh
+// instrumentation calls `$RefreshReg$`, which only exists on `window`, so a
+// worker module that picks it up dies on load. `@tomic/lib`'s
+// `client-db.worker.js` is the one that bites — pnpm links it from
+// `browser/lib/dist`, outside any `node_modules/` path, and it is in
+// `optimizeDeps.exclude`, so it reaches this transform like first-party code.
+const excludeRE = /\/node_modules\/|\.worker\.[cm]?[jt]sx?(?:$|\?)/;
 
 /**
  * Matches the old `babel-plugin-styled-components` options: `displayName` so
@@ -39,7 +45,12 @@ export const styledComponentsOxcOptions = {
  */
 export function oxcReactCompiler({
   compile = true,
-}: { compile?: boolean } = {}): Plugin[] {
+  only,
+}: {
+  compile?: boolean;
+  /** Handle only files whose path matches; Vite transforms the rest. */
+  only?: RegExp;
+} = {}): Plugin[] {
   let sourcemap = true;
   let jsxDevelopment = false;
   let fastRefresh = false;
@@ -73,8 +84,12 @@ export function oxcReactCompiler({
       },
       async handler(code, id) {
         const isClient = this.environment?.config.consumer !== 'server';
-        const shouldCompile = isClient && looksLikeReactCode.test(code);
         const filename = id.split('?')[0]!;
+
+        // Leave every other file to Vite's own transform.
+        if (only && !only.test(filename)) return;
+
+        const shouldCompile = isClient && looksLikeReactCode.test(code);
 
         // Only this app's own source gets Fast Refresh instrumentation.
         //

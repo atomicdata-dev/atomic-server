@@ -1,0 +1,819 @@
+[
+  {
+    "constraint": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "value": "open",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "value": "closed",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "value": "done",
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "value": "",
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        1,
+        2.5,
+        3
+      ]
+    },
+    "value": 1,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        1,
+        2.5,
+        3
+      ]
+    },
+    "value": 2.5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        1,
+        2.5,
+        3
+      ]
+    },
+    "value": 3.0,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        1,
+        2.5,
+        3
+      ]
+    },
+    "value": 4,
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        1,
+        2.5,
+        3
+      ]
+    },
+    "value": "1",
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": "atomic:aaaa1111",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": "https://example.com/tags/open",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": "atomic:bbbb2222",
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "https://example.com/tags/open"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "atomic:bbbb2222"
+    ],
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "https://example.com/tags/open"
+      ]
+    },
+    "value": [],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "did:ad:aaaa1111"
+      ]
+    },
+    "value": "atomic:aaaa1111",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111"
+      ]
+    },
+    "value": "did:ad:aaaa1111",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "value": [
+      "open"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": []
+    },
+    "value": "x",
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "minimum": 0
+    },
+    "value": 0,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 0
+    },
+    "value": 5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 0
+    },
+    "value": -1,
+    "valid": false,
+    "rule": "minimum"
+  },
+  {
+    "constraint": {
+      "minimum": 0.5
+    },
+    "value": 0.25,
+    "valid": false,
+    "rule": "minimum"
+  },
+  {
+    "constraint": {
+      "minimum": 0.5
+    },
+    "value": 0.5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maximum": 10
+    },
+    "value": 10,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maximum": 10
+    },
+    "value": 10.5,
+    "valid": false,
+    "rule": "maximum"
+  },
+  {
+    "constraint": {
+      "maximum": 10
+    },
+    "value": -100,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "exclusiveMinimum": 0
+    },
+    "value": 0,
+    "valid": false,
+    "rule": "exclusiveMinimum"
+  },
+  {
+    "constraint": {
+      "exclusiveMinimum": 0
+    },
+    "value": 1,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "exclusiveMinimum": 0
+    },
+    "value": -1,
+    "valid": false,
+    "rule": "exclusiveMinimum"
+  },
+  {
+    "constraint": {
+      "exclusiveMaximum": 10
+    },
+    "value": 10,
+    "valid": false,
+    "rule": "exclusiveMaximum"
+  },
+  {
+    "constraint": {
+      "exclusiveMaximum": 10
+    },
+    "value": 9.99,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "exclusiveMaximum": 10
+    },
+    "value": 11,
+    "valid": false,
+    "rule": "exclusiveMaximum"
+  },
+  {
+    "constraint": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "value": 50,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "value": 101,
+    "valid": false,
+    "rule": "maximum"
+  },
+  {
+    "constraint": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "value": -1,
+    "valid": false,
+    "rule": "minimum"
+  },
+  {
+    "constraint": {
+      "minLength": 3
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minLength": 3
+    },
+    "value": "ab",
+    "valid": false,
+    "rule": "minLength"
+  },
+  {
+    "constraint": {
+      "minLength": 1
+    },
+    "value": "",
+    "valid": false,
+    "rule": "minLength"
+  },
+  {
+    "constraint": {
+      "maxLength": 3
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxLength": 3
+    },
+    "value": "abcd",
+    "valid": false,
+    "rule": "maxLength"
+  },
+  {
+    "constraint": {
+      "maxLength": 0
+    },
+    "value": "",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxLength": 2
+    },
+    "value": "éé",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxLength": 2
+    },
+    "value": "😀😀",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxLength": 2
+    },
+    "value": "😀😀😀",
+    "valid": false,
+    "rule": "maxLength"
+  },
+  {
+    "constraint": {
+      "minLength": 2
+    },
+    "value": "😀",
+    "valid": false,
+    "rule": "minLength"
+  },
+  {
+    "constraint": {
+      "minLength": 2
+    },
+    "value": "á",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minItems": 2
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "atomic:bbbb2222"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minItems": 2
+    },
+    "value": [
+      "atomic:aaaa1111"
+    ],
+    "valid": false,
+    "rule": "minItems"
+  },
+  {
+    "constraint": {
+      "minItems": 1
+    },
+    "value": [],
+    "valid": false,
+    "rule": "minItems"
+  },
+  {
+    "constraint": {
+      "maxItems": 1
+    },
+    "value": [
+      "atomic:aaaa1111"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxItems": 1
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "atomic:bbbb2222"
+    ],
+    "valid": false,
+    "rule": "maxItems"
+  },
+  {
+    "constraint": {
+      "maxItems": 0
+    },
+    "value": [],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "valid": false,
+    "rule": "maxItems"
+  },
+  {
+    "constraint": {
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "value": [
+      1,
+      2
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "atomic:bbbb2222"
+      ],
+      "maxItems": 1
+    },
+    "value": [
+      "atomic:aaaa1111"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "enum": [
+        "atomic:aaaa1111",
+        "atomic:bbbb2222"
+      ],
+      "maxItems": 1
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "atomic:bbbb2222"
+    ],
+    "valid": false,
+    "rule": "maxItems"
+  },
+  {
+    "constraint": {
+      "pattern": "^[a-z]+$"
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^[a-z]+$"
+    },
+    "value": "abc1",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "pattern": "abc"
+    },
+    "value": "xxabcxx",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "abc"
+    },
+    "value": "xxabxx",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "pattern": "^[0-9]{4}-[0-9]{2}$"
+    },
+    "value": "2026-10",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^[0-9]{4}-[0-9]{2}$"
+    },
+    "value": "2026-1",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "pattern": "^(red|green)$"
+    },
+    "value": "green",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^(red|green)$"
+    },
+    "value": "blue",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "pattern": "^.+@.+\\.[a-z]{2,}$"
+    },
+    "value": "a@b.nl",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^.+@.+\\.[a-z]{2,}$"
+    },
+    "value": "a@b",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "pattern": "^\\S+$"
+    },
+    "value": "no-spaces",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^\\S+$"
+    },
+    "value": "has space",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "class": "https://atomicdata.dev/classes/Agent"
+    },
+    "value": "atomic:aaaa1111",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "class": "https://atomicdata.dev/classes/Agent"
+    },
+    "value": [
+      "atomic:aaaa1111",
+      "atomic:bbbb2222"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "class": "https://atomicdata.dev/classes/Agent"
+    },
+    "value": "anything",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 5
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maximum": 5
+    },
+    "value": true,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 5
+    },
+    "value": [
+      1
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minLength": 5
+    },
+    "value": 3,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxLength": 1
+    },
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^a$"
+    },
+    "value": 5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minItems": 2
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maxItems": 1
+    },
+    "value": 7,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minItems": 2
+    },
+    "value": {
+      "a": 1
+    },
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minLength": 5
+    },
+    "value": true,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "pattern": "^a$"
+    },
+    "value": [
+      "b"
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {},
+    "value": "anything",
+    "valid": true
+  },
+  {
+    "constraint": {},
+    "value": [
+      1,
+      2
+    ],
+    "valid": true
+  },
+  {
+    "constraint": {},
+    "value": 5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 0,
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "value": 2,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": 0,
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "value": 5,
+    "valid": false,
+    "rule": "enum"
+  },
+  {
+    "constraint": {
+      "minLength": 2,
+      "maxLength": 4,
+      "pattern": "^[a-z]+$"
+    },
+    "value": "abc",
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minLength": 2,
+      "maxLength": 4,
+      "pattern": "^[a-z]+$"
+    },
+    "value": "ABC",
+    "valid": false,
+    "rule": "pattern"
+  },
+  {
+    "constraint": {
+      "minimum": 0
+    },
+    "value": 0.0,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "maximum": 1000.0
+    },
+    "value": 1000,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": -5
+    },
+    "value": -5,
+    "valid": true
+  },
+  {
+    "constraint": {
+      "minimum": -5
+    },
+    "value": -6,
+    "valid": false,
+    "rule": "minimum"
+  }
+]

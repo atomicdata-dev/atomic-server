@@ -15,8 +15,12 @@ interface LocalizedTextValueProps {
  * doubles as a completeness audit when switching the content language.
  */
 export function LocalizedTextValue({
-  value,
+  value: stored,
 }: LocalizedTextValueProps): JSX.Element {
+  // A cleared translation is stored as '' by older clients. It is not a
+  // deliberate empty translation: treat it as absent, so the fallback and the
+  // missing marker come back.
+  const value = withoutEmptyTranslations(stored);
   const { contentLanguage } = useSettings();
   const declared = useDeclaredLanguages();
 
@@ -59,3 +63,15 @@ const MissingFallback = styled.span`
     vertical-align: super;
   }
 `;
+
+function withoutEmptyTranslations(
+  value: LocalizedText | undefined,
+): LocalizedText | undefined {
+  if (!value) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, text]) => text !== ''),
+  );
+}

@@ -1,10 +1,18 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { ai, Client, useDrive } from '@tomic/react';
+import {
+  ai,
+  Client,
+  core,
+  dataBrowser,
+  useArray,
+  useDrive,
+  useString,
+} from '@tomic/react';
 import { DIVIDER, DropdownMenu, isItem, DropdownItem } from '../Dropdown';
 import { AutoOpenTrigger } from '../Dropdown/AutoOpenTrigger';
 import { DropdownTriggerComponent } from '../Dropdown/DropdownTrigger';
 import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
-import { FaEllipsisVertical, FaFlag } from 'react-icons/fa6';
+import { FaEllipsisVertical, FaFlag, FaWpforms } from 'react-icons/fa6';
 import {
   ConfirmationDialog,
   ConfirmationDialogTheme,
@@ -21,6 +29,14 @@ import { useCustomContextItemsContext } from './CustomContextItemsContext';
 import { CoverPickerDialog, EmojiPickerDialog } from '../ResourceDecorations';
 import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
+import { getDeleteDialog } from './deleteDialogRegistry';
+import { useAfterResourceDelete } from '../../hooks/useAfterResourceDelete';
+
+const CreateTableFormDialog = lazy(() =>
+  import('../../chunks/TablePage/CreateTableFormDialog').then(module => ({
+    default: module.CreateTableFormDialog,
+  })),
+);
 
 const RunPluginDialog = lazy(() =>
   import('@chunks/PluginRuns/RunPluginDialog').then(m => ({
@@ -49,6 +65,7 @@ export const ContextMenuOptions = {
   Share: 'share',
   Tags: 'tags',
   Delete: 'delete',
+  Restore: 'restore',
   History: 'history',
   Import: 'import',
   UseInCode: 'useInCode',
@@ -64,6 +81,7 @@ export const ContextMenuOptions = {
   OpenOriginal: 'openOriginal',
   SetEmoji: 'setEmoji',
   SetCover: 'setCover',
+  CreateTableForm: 'createTableForm',
   Reload: 'reload',
 } as const;
 
@@ -117,7 +135,9 @@ export function ResourceContextMenu({
   searchable = true,
 }: ResourceContextMenuProps) {
   const [confirmingAction, setConfirmingAction] = useState<ActionDefinition>();
+  const [showCustomDeleteDialog, setShowCustomDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
+  const [showCreateTableForm, setShowCreateTableForm] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [shiftHeld, setShiftHeld] = useState(false);
   const openCodeUsageDialog = useCallback(
@@ -143,7 +163,11 @@ export function ResourceContextMenu({
     openPluginRun,
     pluginClass,
   });
+  const [dataClassSubject] = useString(ctx.resource, core.properties.classtype);
+  const [resourceClasses] = useArray(ctx.resource, core.properties.isA);
   const { items: customItems } = useCustomContextItemsContext();
+  const CustomDeleteDialog = getDeleteDialog(ctx.resource.getClasses()[0]);
+  const afterDelete = useAfterResourceDelete(subject, onAfterDelete);
   const appMenu = useAppMenuItems();
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
 
@@ -208,10 +232,19 @@ export function ResourceContextMenu({
 
     previousSection = action.section;
 
+    // Classes with their own delete dialog (e.g. Forms, which can also delete
+    // a results table) must always go through it — shift-to-skip and the
+    // generic confirmation are only safe for the non-cascading delete.
+    const usesCustomDeleteDialog =
+      action.id === ContextMenuOptions.Delete && CustomDeleteDialog;
+
     items.push({
       id: action.id,
       label:
-        shiftHeld && action.danger && action.dangerLabel
+        shiftHeld &&
+        action.danger &&
+        action.dangerLabel &&
+        !usesCustomDeleteDialog
           ? action.dangerLabel(ctx)
           : action.label(ctx),
       helper: action.helper(ctx),
@@ -225,7 +258,9 @@ export function ResourceContextMenu({
           : action.searchOnly,
       onClick: () => {
         // Shift skips the confirmation dialog for danger actions.
-        if (action.danger && action.confirmation && !shiftHeld) {
+        if (usesCustomDeleteDialog) {
+          setShowCustomDeleteDialog(true);
+        } else if (action.danger && action.confirmation && !shiftHeld) {
           setConfirmingAction(action);
         } else {
           runAction(action, ctx);
@@ -253,6 +288,21 @@ export function ResourceContextMenu({
   const pageItems = subject === ctx.currentSubject ? [...customItems] : [];
   while (pageItems[0] === DIVIDER) pageItems.shift();
   while (pageItems.at(-1) === DIVIDER) pageItems.pop();
+
+  if (
+    ctx.canWrite &&
+    resourceClasses.includes(dataBrowser.classes.table) &&
+    dataClassSubject
+  ) {
+    items.push({
+      id: ContextMenuOptions.CreateTableForm,
+      label: 'Create form from this table',
+      icon: <FaWpforms />,
+      onClick: () => setShowCreateTableForm(true),
+    });
+  }
+
+  // Add custom items from context (if any) before filtering
   const allItems = [
     ...pageItems,
     ...addIf(pageItems.length > 0 && items.length > 0, DIVIDER),
@@ -314,6 +364,16 @@ export function ResourceContextMenu({
         bindActive={handleBindActive}
         anchorPoint={anchorPoint}
       />
+      {showCreateTableForm && dataClassSubject && (
+        <Suspense fallback={null}>
+          <CreateTableFormDialog
+            key={subject}
+            table={ctx.resource}
+            dataClassSubject={dataClassSubject}
+            onClose={() => setShowCreateTableForm(false)}
+          />
+        </Suspense>
+      )}
       <ConfirmationDialog
         title={confirmation?.title(ctx) ?? ''}
         show={confirmingAction !== undefined}
@@ -340,6 +400,14 @@ export function ResourceContextMenu({
           confirmation?.body(ctx)
         )}
       </ConfirmationDialog>
+      {CustomDeleteDialog && (
+        <CustomDeleteDialog
+          resource={ctx.resource}
+          show={showCustomDeleteDialog}
+          bindShow={setShowCustomDeleteDialog}
+          onDeleted={afterDelete}
+        />
+      )}
       {/* Use the menu's own subject, not the current page's — a right-click can
        * target a resource other than the one being viewed. */}
       <ResourceCodeUsageDialog

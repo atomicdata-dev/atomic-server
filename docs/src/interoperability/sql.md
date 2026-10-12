@@ -62,7 +62,7 @@ If you want to store arbitrary Atomic Data in a SQL database, you might be best 
 - SQL is far more common, many people will know how to use it.
 - SQL databases are battle-tested and has been powering countless of products for tens of years, whereas Atomic Server is at this moment in beta.
 - SQL databases have a more powerful and expressive query language, where you can define tables in your query and combine resources.
-- Atomic Data doesn't have a [mutli-node / distributed option](https://github.com/atomicdata-dev/atomic-server/issues/213)
+- Atomic Data doesn't have a [mutli-node / distributed option](https://github.com/ontola/atomic-server/issues/213)
 
 ## FAQ
 

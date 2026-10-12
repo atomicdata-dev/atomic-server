@@ -15,7 +15,7 @@ interface LogoProps {
 }
 
 /**
- * Atomic Place wordmark: normal o and gradient full stop. It links to
+ * atomic.place wordmark: normal o and gradient full stop. It links to
  * atomic.place, opened outside the app (a new tab, or the system browser in
  * the desktop and Android apps), so following it never loses the page the
  * user is on, such as a half-finished onboarding step.
@@ -23,7 +23,7 @@ interface LogoProps {
 export function Logo({
   style,
   className,
-  alt = 'Atomic Place',
+  alt = 'atomic.place',
   link = true,
 }: LogoProps): JSX.Element {
   if (!link) return <Wordmark style={style} className={className} alt={alt} />;
@@ -33,7 +33,7 @@ export function Logo({
       href={ATOMIC_PLACE_WEBSITE}
       target='_blank'
       rel='noreferrer'
-      aria-label={`${alt || 'Atomic Place'} website`}
+      aria-label={`${alt || 'atomic.place'} website`}
       style={style}
       className={className}
       onClick={event => {

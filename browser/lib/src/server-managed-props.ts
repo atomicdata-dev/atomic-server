@@ -1,5 +1,6 @@
 import { commits } from './ontologies/commits.js';
 import { core } from './ontologies/core.js';
+import { forms } from './ontologies/forms.js';
 import { server } from './ontologies/server.js';
 import { GENESIS } from './urls.js';
 
@@ -35,6 +36,10 @@ export const DERIVED_BY_SERVER: ReadonlySet<string> = new Set<string>([
   commits.properties.lastCommit,
   commits.properties.createdAt,
   server.properties.createdBy,
+  // Class-extender output: a summary only the server may compute. Letting it
+  // into the Loro doc would turn it into a local op that a later save signs
+  // into a commit, persisting a stale copy.
+  forms.properties.formSubmissionSummary,
 ]);
 
 /** True for a propval the server derives — see {@link DERIVED_BY_SERVER}. */

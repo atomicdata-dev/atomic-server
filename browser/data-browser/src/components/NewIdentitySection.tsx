@@ -7,6 +7,7 @@ import {
   agentPublicKey,
   agentSubject,
   core,
+  dataBrowser,
   useStore,
 } from '@tomic/react';
 import { fetchPrivateDriveSubject } from '../helpers/privateDrive';
@@ -27,6 +28,7 @@ import { styled } from 'styled-components';
 import { InputStyled, InputWrapper } from './forms/InputStyles';
 import Field from './forms/Field';
 import { PRODUCT_NAME } from '../helpers/managed';
+import { ProfileForm } from './ProfileForm';
 import {
   isPasskeySupported,
   PrfUnsupportedError,
@@ -206,14 +208,20 @@ export function NewIdentitySection({
 
   // ─── Step: Profile → private drive (automatic) ───────────────────────────
 
-  function handleProfileSave(name: string) {
+  function handleProfileSave({
+    name,
+    picture,
+  }: {
+    name: string;
+    picture?: File;
+  }) {
     const trimmed = name.trim();
     setIdentity(prev => (prev ? { ...prev, profileName: trimmed } : null));
-    void createPrivateDrive(trimmed);
+    void createPrivateDrive(trimmed, picture);
   }
 
   /** One private drive per user on this server; becomes default home / initialDrive. */
-  async function createPrivateDrive(username: string) {
+  async function createPrivateDrive(username: string, picture?: File) {
     if (!identity) return;
 
     setStep('creating-drive');
@@ -241,6 +249,28 @@ export function NewIdentitySection({
       }
 
       await agentResource.save();
+
+      // The agent exists on the server only from the save above, so the
+      // picture goes up after it. A failed upload must not cost the account:
+      // the picture can be added later in the profile.
+      if (picture) {
+        try {
+          const [uploaded] = await store.uploadFiles(
+            [picture],
+            identity.agentSubject,
+          );
+
+          if (uploaded) {
+            await agentResource.set(dataBrowser.properties.icon, uploaded);
+            await agentResource.save();
+          }
+        } catch (e) {
+          console.warn('Profile picture upload failed', e);
+          toast.error(
+            'Your profile picture could not be uploaded. You can add it later in your profile.',
+          );
+        }
+      }
 
       const driveName = username ? `${username}'s Drive` : 'Personal';
 
@@ -476,12 +506,14 @@ export function NewIdentitySection({
       )}
 
       {step === 'profile' && identity && (
-        <ProfileStep
+        <ProfileForm
           key='profile'
-          error={error}
-          loading={loading}
+          fieldId='profile-name'
+          autoFocus
+          error={error ? new Error(error) : undefined}
+          disabled={loading}
           onSave={handleProfileSave}
-          defaultName={defaultProfileName}
+          initialName={defaultProfileName}
         />
       )}
 
@@ -624,7 +656,11 @@ function downloadSecretBackupFile(secret: string): void {
   URL.revokeObjectURL(url);
 }
 
-function SecretStep({
+/**
+ * Hands over a new account's secret. Shared by account creation and by
+ * accepting an invite with a new account, so both say the same thing.
+ */
+export function SecretStep({
   secret,
   secretBackedUp,
   onCopy,
@@ -736,62 +772,6 @@ function VerifyStep({
           />
         </InputWrapper>
       </Field>
-    </Column>
-  );
-}
-
-function ProfileStep({
-  error,
-  loading,
-  onSave,
-  defaultName,
-}: {
-  error: string | undefined;
-  loading: boolean;
-  onSave: (name: string) => void;
-  defaultName?: string;
-}) {
-  const [name, setName] = useState(defaultName ?? '');
-
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    onSave(name.trim());
-  }
-
-  return (
-    <Column gap='1rem'>
-      <h3 key='title'>Set your profile name!</h3>
-      <p key='copy'>Others can read this. You can change this later.</p>
-      <form key='form' onSubmit={handleSave}>
-        <Column gap='1rem'>
-          <Field
-            key='field'
-            label='Profile Name'
-            fieldId='profile-name'
-            error={error ? new Error(error) : undefined}
-          >
-            <InputWrapper>
-              <InputStyled
-                id='profile-name'
-                value={name}
-                onChange={e => setName(e.target.value)}
-                type='text'
-                placeholder='Enter your name'
-                autoComplete='off'
-                autoFocus
-                disabled={loading}
-              />
-            </InputWrapper>
-          </Field>
-          <Row key='submit' gap='1rem' wrapItems>
-            <ContinueButton type='submit' disabled={loading || !name.trim()}>
-              {loading ? 'Creating drive…' : 'Save & continue'}
-            </ContinueButton>
-          </Row>
-        </Column>
-      </form>
     </Column>
   );
 }

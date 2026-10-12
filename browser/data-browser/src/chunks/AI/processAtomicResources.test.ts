@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Store } from '@tomic/react';
 import { processAtomicResources } from './processAtomicResources';
 
-vi.mock('./jsonAdCompact', () => ({
+vi.mock('@tomic/react', async importOriginal => ({
+  ...(await importOriginal<typeof import('@tomic/react')>()),
   buildClassContext: vi.fn().mockResolvedValue({}),
   describeClassCompact: vi.fn(),
   toCompact: vi.fn().mockResolvedValue({ name: 'Bread', price: 3 }),

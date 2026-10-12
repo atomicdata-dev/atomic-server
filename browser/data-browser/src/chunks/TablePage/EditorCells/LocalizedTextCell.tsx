@@ -33,7 +33,18 @@ function LocalizedTextCellEdit({
       autoFocus
       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
         setLocalValue(e.target.value);
-        onChange({ ...localized, [tag]: e.target.value });
+
+        // Clearing the text removes the language, so the cell goes back to
+        // showing the fallback with the missing-translation marker.
+        const next = { ...localized };
+
+        if (e.target.value === '') {
+          delete next[tag];
+        } else {
+          next[tag] = e.target.value;
+        }
+
+        onChange(next);
       }}
     />
   );

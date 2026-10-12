@@ -10,7 +10,9 @@ import {
   server,
   core,
   ai,
+  forms,
   notifications,
+  conversations,
   useArray,
 } from '@tomic/react';
 
@@ -26,8 +28,10 @@ import { FilePage } from './File/FilePage';
 import { ResourcePageDefault } from './ResourcePageDefault';
 import { Spinner } from '../components/Spinner';
 import { ChatRoomPage } from './ChatRoomPage';
+import { ConversationPage } from './Conversation/ConversationPage';
 import { InboxPage } from './InboxPage';
 import { MessagePage } from './MessagePage';
+import { ChatLogPage } from './ChatLogPage';
 import { BookmarkPage } from './BookmarkPage/BookmarkPage';
 import { ImporterPage } from './ImporterPage.jsx';
 import { FolderPage } from './FolderPage';
@@ -79,6 +83,10 @@ const ImportResolutionNotice = lazy(() =>
 
 const AppPage = lazy(() =>
   import('../chunks/AppPage').then(m => ({ default: m.AppPage })),
+);
+
+const FormBuilderPage = lazy(() =>
+  import('../chunks/FormBuilder').then(m => ({ default: m.FormBuilderPage })),
 );
 
 /** These properties are passed to every View at Page level */
@@ -159,10 +167,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
   if (resource.loading && !loadingExceeded && !hasLoadedThisSubject) {
     return (
       <Main subject={subject}>
-        <ContainerNarrow>
-          <p>Loading...</p>
-          <Spinner />
-        </ContainerNarrow>
+        <Spinner centered />
       </Main>
     );
   }
@@ -202,7 +207,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               {websiteExportClass ? (
                 <WebsiteExportPage resource={resource} />
               ) : (
@@ -229,7 +234,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <AppPage resource={resource} />
             </Suspense>
           </ErrorBoundary>
@@ -243,7 +248,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <AtomicPluginPage resource={resource} drive={drive!} />
             </Suspense>
           </ErrorBoundary>
@@ -257,7 +262,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <PluginView resource={resource} plugin={plugin} />
             </Suspense>
           </ErrorBoundary>
@@ -269,7 +274,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
   return (
     <Main subject={subject}>
       <ErrorBoundary>
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<Spinner centered />}>
           {/* A fork renders through its content class's own view, so the bar is
               the only thing telling you this is not the original. */}
           <ForkBar resource={resource} />
@@ -302,8 +307,12 @@ function selectComponent(klass: string | undefined) {
       return FilePage;
     case dataBrowser.classes.chatroom:
       return ChatRoomPage;
+    case conversations.classes.conversation:
+      return ConversationPage;
     case dataBrowser.classes.message:
       return MessagePage;
+    case dataBrowser.classes.chatLog:
+      return ChatLogPage;
     case dataBrowser.classes.bookmark:
       return BookmarkPage;
     case dataBrowser.classes.importer:
@@ -328,6 +337,8 @@ function selectComponent(klass: string | undefined) {
       return MeetingPage;
     case canvas.classes.canvas:
       return CanvasPage;
+    case forms.classes.form:
+      return FormBuilderPage;
     case notifications.classes.inbox:
       return InboxPage;
     case server.classes.installation:
