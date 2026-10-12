@@ -285,8 +285,10 @@ const ExpandToggleButton = styled.button`
   cursor: pointer;
   color: ${p => p.theme.colors.main};
 
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+    }
   }
 
   &:active {
@@ -408,7 +410,9 @@ const ActionWrapper = styled.div<{ isDragging?: boolean }>`
     }
   }
 
-  ${ExpandToggleButton}:hover ${CaretBadge} {
-    transform: scale(1.6);
+  @media (hover: hover) {
+    ${ExpandToggleButton}:hover ${CaretBadge} {
+      transform: scale(1.6);
+    }
   }
 `;
