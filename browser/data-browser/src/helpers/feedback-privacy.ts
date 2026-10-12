@@ -4,6 +4,10 @@ import type { Event } from '@sentry/react';
 /** Where a report was sent from. Anything else is reported as the sidebar. */
 const FEEDBACK_SOURCES = new Set(['sidebar', 'error', 'ai-chat']);
 
+/** Crumbs that say what the person did without carrying a URL. */
+const KEPT_BREADCRUMB_CATEGORIES = new Set(['console', 'ui.click']);
+const MAX_BREADCRUMBS = 30;
+
 /** Feedback must not inherit scope breadcrumbs, private URLs, or identifying user context. */
 export function sanitizeFeedbackEvent(event: Event): Event {
   if (event.type !== 'feedback') return event;
@@ -14,6 +18,13 @@ export function sanitizeFeedbackEvent(event: Event): Event {
   const userAgent = Object.entries(event.request?.headers ?? {}).find(
     ([name]) => name.toLowerCase() === 'user-agent',
   )?.[1];
+
+  // Navigation, fetch, xhr and history crumbs carry private subject URLs.
+  const breadcrumbs = (event.breadcrumbs ?? [])
+    .filter(
+      crumb => crumb.category && KEPT_BREADCRUMB_CATEGORIES.has(crumb.category),
+    )
+    .slice(-MAX_BREADCRUMBS);
 
   return {
     platform: event.platform,
@@ -27,6 +38,7 @@ export function sanitizeFeedbackEvent(event: Event): Event {
     ...(typeof event.user?.id === 'string' && event.user.id
       ? { user: { id: event.user.id } }
       : {}),
+    ...(breadcrumbs.length ? { breadcrumbs } : {}),
     event_id: event.event_id,
     timestamp: event.timestamp,
     release: event.release,

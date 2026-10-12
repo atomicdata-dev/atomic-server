@@ -99,3 +99,42 @@ it('sends no user when the agent is not identified', () => {
   });
   expect(report.user).toBeUndefined();
 });
+
+it('keeps console and click breadcrumbs, drops those that carry URLs, and caps at 30', () => {
+  const categories = [
+    'console',
+    'ui.click',
+    'navigation',
+    'fetch',
+    'xhr',
+    'history',
+  ];
+  const report = sanitizeFeedbackEvent({
+    type: 'feedback',
+    breadcrumbs: [
+      ...categories.map(category => ({
+        category,
+        message: `crumb ${category}`,
+        data: { url: 'SECRET_URL' },
+      })),
+      { message: 'no category' },
+    ],
+    contexts: { feedback: { message: 'Problem' } },
+  });
+  expect(report.breadcrumbs?.map(crumb => crumb.category)).toEqual([
+    'console',
+    'ui.click',
+  ]);
+
+  const many = sanitizeFeedbackEvent({
+    type: 'feedback',
+    breadcrumbs: Array.from({ length: 50 }, (_, i) => ({
+      category: 'console',
+      message: `log ${i}`,
+    })),
+    contexts: { feedback: { message: 'Problem' } },
+  });
+  expect(many.breadcrumbs).toHaveLength(30);
+  expect(many.breadcrumbs?.[0]?.message).toBe('log 20');
+  expect(many.breadcrumbs?.at(-1)?.message).toBe('log 49');
+});
