@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -46,14 +47,22 @@ export function FeedbackDiagnostics({
     () => recorder.active,
   );
   const [preview, setPreview] = useState<DiagnosticPreview | undefined>();
-  const [included, setIncluded] = useState(false);
+  // Attached by default; the person can opt out, and that holds across the
+  // recorder's updates for as long as this dialog stays open.
+  const [included, setIncluded] = useState(true);
+  const declined = useRef(false);
   const current = preview?.session === session ? preview : undefined;
 
   useEffect(() => {
     const refresh = () => {
-      setPreview(recorder.active ? previewDiagnostics(recorder) : undefined);
-      setIncluded(false);
-      onSelect(undefined);
+      const selected = recorder.active
+        ? previewDiagnostics(recorder)
+        : undefined;
+      const attach = !!selected && !declined.current;
+
+      setPreview(selected);
+      setIncluded(attach);
+      onSelect(attach ? selected : undefined);
     };
 
     refresh();
@@ -66,9 +75,10 @@ export function FeedbackDiagnostics({
       <Checkbox.Label htmlFor={includeId}>
         <Checkbox
           id={includeId}
-          checked={included}
+          checked={included && active}
           disabled={disabled || !active}
           onChange={value => {
+            declined.current = !value;
             setIncluded(value);
 
             if (!value) {

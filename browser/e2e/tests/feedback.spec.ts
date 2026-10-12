@@ -86,7 +86,7 @@ test('disabled feedback explains availability without claiming a failed send', a
   ).toBeDisabled();
 });
 
-test('local diagnostics require explicit inclusion and exclude private context', async ({
+test('local diagnostics are attached by default, can be declined, and exclude private context', async ({
   page,
 }, testInfo) => {
   const reports: string[] = [];
@@ -112,6 +112,7 @@ test('local diagnostics require explicit inclusion and exclude private context',
     name: 'Include diagnostic data',
   });
   await expect(include).toBeEnabled();
+  await expect(include).toBeChecked();
   await page.evaluate(async () => {
     const resource = await window.store.newResource({
       parent: window.store.getDrive(),
@@ -126,7 +127,6 @@ test('local diagnostics require explicit inclusion and exclude private context',
       `${window.location.pathname}${window.location.search}${window.location.search ? '&' : '?'}secret=PRIVATE_DIAGNOSTIC_URL`,
     );
   });
-  await include.check();
   await expect(include).toBeChecked();
   await dialog.getByText('Diagnostic data', { exact: true }).click();
   await expect(
