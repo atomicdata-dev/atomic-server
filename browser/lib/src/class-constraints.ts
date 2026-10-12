@@ -525,18 +525,45 @@ interface ConstraintResource {
   get(prop: string): unknown;
 }
 
+/** One value that breaks a constraint of one of its resource's classes. */
+export interface ConstraintViolation {
+  /** Subject of the class whose `constraints` map holds the broken rule. */
+  classSubject: string;
+  /** Shortname of that class, or its subject when it has none. */
+  className: string;
+  /** The constrained property, as written in the class's `constraints`. */
+  property: string;
+  /** Shortname of the property, or its subject when it has none. */
+  propertyName: string;
+  /** The keyword that failed. */
+  keyword: ConstraintError['keyword'];
+  /** JSON pointer inside the property's value; empty for the value itself. */
+  path: string;
+  detail: string;
+  /** `Value for <shortname> breaks <keyword> on class <class>[ at <path>]: <detail>` */
+  message: string;
+}
+
 /**
- * Checks every value of `resource` against the constraints of each of its
- * classes that is already in the local store. Classes that are not loaded are
- * skipped, never fetched; so is a class whose map does not parse (the server
- * rejects those when the class is written).
+ * Collects every violation of the constraints of each class of `resource`,
+ * across all classes and all constrained properties. Per property only the
+ * first failure is reported (a nested value is not walked for further failing
+ * leaves). Rust twin: `class_constraints::violations`.
  *
- * Throws `Value for <shortname> breaks <keyword> on class <class>: <detail>`.
+ * `getLocal` returns a resource from the local store, or `undefined`. A class
+ * it does not return, or whose `constraints` map does not parse (the server
+ * rejects those when the class is written), is skipped and yields no
+ * violations; classes are never fetched.
+ *
+ * Sync never runs these checks, so use this to find resources that arrived
+ * from peers and break their classes.
  */
-export function checkResourceConstraints(
-  resource: ConstraintResource,
+export function constraintViolations(
   getLocal: (subject: string) => ConstraintResource | undefined,
-): void {
+  resource: ConstraintResource,
+): ConstraintViolation[] {
+  const found: ConstraintViolation[] = [];
+
   for (const classSubject of resource.getClasses()) {
     const klass = getLocal(classSubject);
     const raw = klass?.get('https://atomicdata.dev/properties/constraints');
@@ -561,20 +588,45 @@ export function checkResourceConstraints(
       } catch (e) {
         if (!(e instanceof ConstraintError)) throw e;
 
-        const shortname = shortnameOf(prop, getLocal);
+        const propertyName = shortnameOf(prop, getLocal);
         const className = String(
           klass.get('https://atomicdata.dev/properties/shortname') ??
             classSubject,
         );
-
         const at = e.path ? ` at ${e.path}` : '';
 
-        throw new Error(
-          `Value for ${shortname} breaks ${e.keyword} on class ${className}${at}: ${e.detail}`,
-        );
+        found.push({
+          classSubject,
+          className,
+          property: prop,
+          propertyName,
+          keyword: e.keyword,
+          path: e.path,
+          detail: e.detail,
+          message: `Value for ${propertyName} breaks ${e.keyword} on class ${className}${at}: ${e.detail}`,
+        });
       }
     }
   }
+
+  return found;
+}
+
+/**
+ * Checks every value of `resource` against the constraints of each of its
+ * classes that is already in the local store, throwing the first violation of
+ * {@link constraintViolations}. Classes that are not loaded are skipped, never
+ * fetched; so is a class whose map does not parse.
+ *
+ * Throws `Value for <shortname> breaks <keyword> on class <class>: <detail>`.
+ */
+export function checkResourceConstraints(
+  resource: ConstraintResource,
+  getLocal: (subject: string) => ConstraintResource | undefined,
+): void {
+  const [first] = constraintViolations(getLocal, resource);
+
+  if (first) throw new Error(first.message);
 }
 
 function shortnameOf(
