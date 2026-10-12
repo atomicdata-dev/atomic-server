@@ -161,13 +161,28 @@ it.each([
       ).toBe(ledger.name);
 
       if (!queueRetained) {
+        // The outbox is persisted in the client database (localStorage only
+        // holds a queue that has no database), so lose it there.
         localStorage.removeItem(`atomic.outbox.${owner.subject}`);
+        const queued = await a.db.outboxEntries(owner.subject);
+        await a.db.outboxWrite(
+          {
+            agent: owner.subject,
+            puts: [],
+            deletes: queued.map(row => JSON.parse(row).subject as string),
+          },
+          true,
+        );
+        expect(await a.db.outboxEntries(owner.subject)).toEqual([]);
       }
 
       // Recreate all JS Store/resource/outbox state, retaining only the local
       // database and persisted outbox. This is not an OS/OPFS crash test.
       const restarted = await makeClient(owner, a.db);
       restarted.store.setDrive(drive.subject);
+      // The queue is loaded from the database asynchronously after the
+      // restart; reading it earlier would report an empty queue.
+      await restarted.store.outbox.whenHydrated();
       expect(restarted.store.outbox.hasPending(doc.subject)).toBe(
         queueRetained,
       );
