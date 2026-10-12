@@ -27,4 +27,19 @@ describe('orbitTrail', () => {
 
     expect(inline).toBe(orbitTrailMarkup());
   });
+
+  it('is the same trail brand/src/place-mark.svg draws, in white', () => {
+    const svg = readFileSync(
+      new URL('../../../../brand/src/place-mark.svg', import.meta.url),
+      'utf8',
+    );
+    const inline = svg
+      .split(/<!-- orbit-trail:start -->|<!-- orbit-trail:end -->/)[1]
+      ?.trim()
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n');
+
+    expect(inline).toBe(orbitTrailMarkup('#fff'));
+  });
 });

@@ -3,10 +3,11 @@
 // the end of the arc, so they stack. Opacity climbs from nothing at 3 o'clock
 // to solid at the top, where a small dot heads the trail.
 //
-// Spinner.tsx renders these. index.html carries the same markup inline (it
-// cannot import); orbitTrail.test.ts fails when the two differ. To
-// regenerate, replace the paths between the `orbit-trail` comments in
-// index.html with `orbitTrailMarkup()`.
+// Spinner.tsx renders these. index.html and brand/src/place-mark.svg carry
+// the same markup inline (they cannot import); orbitTrail.test.ts fails when
+// they differ. To regenerate, replace what sits between the `orbit-trail`
+// comments with `orbitTrailMarkup()` (`orbitTrailMarkup('#fff')` for the
+// brand mark, whose ink is white).
 
 const CENTER = 50;
 const RADIUS = 24;
@@ -82,15 +83,15 @@ export function trailBands(n = BAND_COUNT): TrailBand[] {
 }
 
 /** The trail as SVG markup, one element per line, for index.html. */
-export function orbitTrailMarkup(): string {
+export function orbitTrailMarkup(ink = 'currentColor'): string {
   const paths = trailBands().map(
     b =>
-      `<path d="${b.d}" stroke="currentColor" stroke-width="${TRAIL_STROKE_WIDTH}" stroke-linecap="${b.cap}" stroke-opacity="${b.opacity}"/>`,
+      `<path d="${b.d}" stroke="${ink}" stroke-width="${TRAIL_STROKE_WIDTH}" stroke-linecap="${b.cap}" stroke-opacity="${b.opacity}"/>`,
   );
   const { cx, cy, r } = TRAIL_HEAD;
 
   return [
     ...paths,
-    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="currentColor"/>`,
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ink}"/>`,
   ].join('\n');
 }
