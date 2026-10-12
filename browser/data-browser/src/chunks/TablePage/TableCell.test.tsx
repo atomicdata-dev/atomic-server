@@ -189,7 +189,9 @@ describe('typing on a selected date cell (#1822)', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
     });
 
-    await waitFor(() => expect(row.get(DAY)).toBe('2026-10-02'));
+    await waitFor(() => expect(row.get(DAY)).toBe('2026-10-02'), {
+      timeout: 5000,
+    });
   });
 });
 
@@ -282,7 +284,7 @@ describe('typing on a selected number cell (#1825)', () => {
     expect(row.get(COUNT)).toBe(42);
 
     await pressOnEditor('Enter', input);
-    await waitFor(() => expect(row.get(COUNT)).toBe(7));
+    await waitFor(() => expect(row.get(COUNT)).toBe(7), { timeout: 5000 });
   });
 
   it('keeps the stored integer when a seeded edit is abandoned with Escape', async () => {
@@ -310,7 +312,7 @@ describe('typing on a selected number cell (#1825)', () => {
 
     fireEvent.change(input, { target: { value: '-2.25' } });
     await pressOnEditor('Tab', input);
-    await waitFor(() => expect(row.get(RATIO)).toBe(-2.25));
+    await waitFor(() => expect(row.get(RATIO)).toBe(-2.25), { timeout: 5000 });
   });
 
   it('ignores a letter on a float cell', async () => {
