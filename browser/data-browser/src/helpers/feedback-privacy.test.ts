@@ -75,3 +75,27 @@ it('keeps a known report source and replaces anything else', () => {
   expect(source('error')).toBe('error');
   expect(source('SECRET_SOURCE')).toBe('sidebar');
 });
+
+it('keeps only the hashed user id, never email, IP or username', () => {
+  const report = sanitizeFeedbackEvent({
+    type: 'feedback',
+    user: {
+      id: 'a1b2c3d4e5f60718',
+      email: 'SECRET_EMAIL',
+      ip_address: 'SECRET_IP',
+      username: 'SECRET_USER',
+    },
+    contexts: { feedback: { message: 'Problem' } },
+  });
+  expect(report.user).toEqual({ id: 'a1b2c3d4e5f60718' });
+  expect(JSON.stringify(report)).not.toContain('SECRET');
+});
+
+it('sends no user when the agent is not identified', () => {
+  const report = sanitizeFeedbackEvent({
+    type: 'feedback',
+    user: { email: 'SECRET_EMAIL', ip_address: 'SECRET_IP' },
+    contexts: { feedback: { message: 'Problem' } },
+  });
+  expect(report.user).toBeUndefined();
+});

@@ -4,7 +4,7 @@ import type { Event } from '@sentry/react';
 /** Where a report was sent from. Anything else is reported as the sidebar. */
 const FEEDBACK_SOURCES = new Set(['sidebar', 'error', 'ai-chat']);
 
-/** Feedback must not inherit scope breadcrumbs, private URLs, or user context. */
+/** Feedback must not inherit scope breadcrumbs, private URLs, or identifying user context. */
 export function sanitizeFeedbackEvent(event: Event): Event {
   if (event.type !== 'feedback') return event;
   const feedback = event.contexts?.feedback;
@@ -22,6 +22,11 @@ export function sanitizeFeedbackEvent(event: Event): Event {
       ? { request: { headers: { 'User-Agent': userAgent } } }
       : {}),
     type: 'feedback',
+    // Only the hashed agent pseudonym (`identifyAgentInSentry`); never the
+    // email, IP address or username.
+    ...(typeof event.user?.id === 'string' && event.user.id
+      ? { user: { id: event.user.id } }
+      : {}),
     event_id: event.event_id,
     timestamp: event.timestamp,
     release: event.release,
