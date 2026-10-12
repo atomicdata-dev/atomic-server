@@ -41,7 +41,8 @@ pub const KEYWORDS: [&str; 18] = [
 /// constraint nested deeper is rejected when it is parsed.
 pub const MAX_DEPTH: usize = 16;
 
-const TYPES: [&str; 7] = [
+/// The JSON Schema `type` names a constraint accepts.
+pub const TYPES: [&str; 7] = [
     "string", "number", "integer", "boolean", "null", "object", "array",
 ];
 

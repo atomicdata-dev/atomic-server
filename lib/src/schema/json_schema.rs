@@ -24,7 +24,7 @@ use serde_json::{Map, Number, Value as Json};
 
 use crate::{
     agents::Agent,
-    class_constraints::{parse_constraint, parse_constraints, MAX_DEPTH},
+    class_constraints::{parse_constraint, parse_constraints, MAX_DEPTH, TYPES as SCHEMA_TYPES},
     commit::{Commit, CommitBuilder, CommitOpts},
     datatype::{match_datatype, DataType},
     errors::AtomicResult,
@@ -353,10 +353,6 @@ const NESTED_KEYWORDS: [&str; 5] = [
     "anyOf",
 ];
 
-const SCHEMA_TYPES: [&str; 7] = [
-    "string", "number", "integer", "boolean", "null", "object", "array",
-];
-
 /// Reads the nested keywords of `node` into `out`: `properties`, `required`,
 /// `additionalProperties`, `items` and `anyOf`, each validated by pointer.
 /// `depth` is the nesting level of `node` itself.
@@ -499,16 +495,6 @@ fn read_nested(schema: &Node, pointer: &str, depth: usize) -> AtomicResult<Json>
         return fail(pointer, e.to_string());
     }
     Ok(Json::Object(out))
-}
-
-/// The nested keywords of a property schema other than `items`, which the
-/// array branch reads itself.
-fn read_nested_keywords_except_items(
-    node: &Node,
-    pointer: &str,
-    out: &mut Map<String, Json>,
-) -> AtomicResult<()> {
-    read_nested_keywords(node, pointer, 0, false, out)
 }
 
 /// Whether the `items` schema of an array needs the nested reader instead of
@@ -890,7 +876,8 @@ fn read_property(schema: &Node, pointer: &str, ctx: &ImportContext) -> AtomicRes
         }
     }
     if !has_ref {
-        read_nested_keywords_except_items(s, pointer, &mut nested)?;
+        // `items` is left to the array branch, which reads it itself.
+        read_nested_keywords(s, pointer, 0, false, &mut nested)?;
     }
     if !nested.is_empty() || (type_is_array && (union || nullable)) {
         // The nested schema checks the type too, so keep it next to it.

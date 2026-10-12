@@ -35,7 +35,8 @@ export type ConstraintKeyword = (typeof CONSTRAINT_KEYWORDS)[number];
 /** How deep schemas may nest. A constraint nested deeper is rejected. */
 export const MAX_DEPTH = 16;
 
-const TYPES = [
+/** The JSON Schema `type` names a constraint accepts. */
+export const CONSTRAINT_TYPES = [
   'string',
   'number',
   'integer',
@@ -45,7 +46,9 @@ const TYPES = [
   'array',
 ] as const;
 
-export type ConstraintType = (typeof TYPES)[number];
+export type ConstraintType = (typeof CONSTRAINT_TYPES)[number];
+
+const TYPES: readonly string[] = CONSTRAINT_TYPES;
 
 /**
  * A constraint. Below the top level the same shape describes a nested JSON
@@ -356,7 +359,12 @@ const typeMatches = (name: ConstraintType, v: unknown): boolean => {
 const typeNameOf = (v: unknown): string =>
   v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
 
-/** Unwraps `{ '@id': subject }` list items so arrays of links compare as subjects. */
+/**
+ * Unwraps `{ '@id': subject }` list items so arrays of links compare as
+ * subjects. Only a bare link is unwrapped: an object with more keys is data (a
+ * nested resource, or JSON that happens to have an `@id` key) and is checked as
+ * an object, as `atomic_lib` does.
+ */
 const plain = (v: unknown): unknown =>
   isObject(v) && typeof v['@id'] === 'string' && Object.keys(v).length === 1
     ? v['@id']

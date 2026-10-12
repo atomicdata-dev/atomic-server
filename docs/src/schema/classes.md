@@ -189,6 +189,7 @@ That is JSON Schema, minus `$ref`, `oneOf`, `allOf`, `not`, `format` and the oth
   A Class commit is rejected when its own `constraints` map has an unknown keyword or a wrong type, at any level.
 - **Never on sync.** Reconciling drives and importing peer data does not run these checks, and neither do commits received over a peer connection. A replica keeps what another node already accepted.
 - **Unloaded classes are skipped in the client.** Before signing, `@tomic/lib` runs the same checks for classes already in the local store and throws the same message. It never fetches a class for this, so the server stays the authority.
+- **Older nodes.** A node from before nested constraints (v0.41.0-beta.8 and earlier) knows only the flat keywords. Its server refuses a commit that writes `type`, `const`, `properties`, `required`, `additionalProperties`, `items` or `anyOf` into a class's `constraints`, with "Unknown constraint keyword". When such a class reaches it anyway (by sync, or written elsewhere), it cannot parse the map and skips the whole class: none of that class's constraints are enforced there, the flat ones (`minimum`, `pattern`, ...) included. Other classes are unaffected.
 - **Legacy.** A Property's own `allowsOnly` and `max` keep working as before and are still not enforced.
 
 Both implementations (`atomic_lib` and `@tomic/lib`) run the same cases from `lib/tests/fixtures/class-constraints.json`.

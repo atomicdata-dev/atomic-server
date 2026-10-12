@@ -1,5 +1,6 @@
 import { Datatype } from './datatypes.js';
 import {
+  CONSTRAINT_TYPES,
   MAX_DEPTH,
   parseConstraint,
   parseConstraints,
@@ -135,15 +136,7 @@ const NESTED_KEYWORDS = [
   'anyOf',
 ];
 
-const SCHEMA_TYPES = [
-  'string',
-  'number',
-  'integer',
-  'boolean',
-  'null',
-  'object',
-  'array',
-];
+const SCHEMA_TYPES: readonly string[] = CONSTRAINT_TYPES;
 
 const REF_KEYS = new Set([
   '$ref',
