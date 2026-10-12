@@ -1,7 +1,7 @@
 // @wc-ignore-file
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import toast from 'react-hot-toast';
-import { handleZoneDrop, isZoneData } from './useSidebarDnd';
+import { handleZoneDrop, isZoneData, zoneDropKeyframes } from './useSidebarDnd';
 
 vi.mock('react-hot-toast', () => {
   const t = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() });
@@ -56,5 +56,13 @@ describe('sidebar drop zones', () => {
     d.moveToTrash.mockRejectedValue(new Error('nope'));
     await handleZoneDrop('trash', 'a', d);
     expect(toast.error).toHaveBeenCalledWith('nope');
+  });
+
+  it('shrinks and fades the overlay in place on a zone drop', () => {
+    const [from, to] = zoneDropKeyframes({ x: 12, y: -40 });
+
+    expect(from.transform).toBe('translate(12px, -40px) scale(1)');
+    expect(to.transform).toBe('translate(12px, -40px) scale(0.2)');
+    expect(to.opacity).toBe(0);
   });
 });

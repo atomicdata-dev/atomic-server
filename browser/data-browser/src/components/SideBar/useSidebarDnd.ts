@@ -12,7 +12,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { core, dataBrowser, useStore } from '@tomic/react';
-import { useCallback, useState, type MouseEvent } from 'react';
+import { useCallback, useRef, useState, type MouseEvent } from 'react';
 import toast from 'react-hot-toast';
 import { isContentAddressed } from '../../helpers/propertyIdentity';
 import {
@@ -123,6 +123,28 @@ export const handleZoneDrop = async (
   toast.success('Added to favorites');
 };
 
+/** How long the overlay takes to vanish into the Trash zone, in ms. */
+export const TRASH_DROP_MS = 150;
+
+/**
+ * Keyframes for the overlay disappearing into the zone it was dropped on: it
+ * shrinks and fades in place (the pointer is already over the zone's centre).
+ */
+export const zoneDropKeyframes = (transform: {
+  x: number;
+  y: number;
+}): Keyframe[] => {
+  /* @wc-ignore */
+  const at = `translate(${transform.x}px, ${transform.y}px)`;
+
+  return [
+    /* @wc-ignore */
+    { transform: `${at} scale(1)`, opacity: 0.9 },
+    /* @wc-ignore */
+    { transform: `${at} scale(0.2)`, opacity: 0 },
+  ];
+};
+
 export const useSidebarDnd = (
   onIsRearangingChange: (isRearanging: boolean) => void,
 ) => {
@@ -163,7 +185,11 @@ export const useSidebarDnd = (
   );
 
   const [draggingResource, setDraggingResource] = useState<string>();
-  const [waitForSavePromise, setWaitForSavePromise] = useState<Promise<void>>();
+  // Refs, not state: dnd-kit calls `animateDrop` right after `onDragEnd`, before
+  // a state update would have re-created the callback, so state set in
+  // `handleDragEnd` would be read stale (the previous drag's promise).
+  const waitForSaveRef = useRef<Promise<void>>(undefined);
+  const lastDropRef = useRef<{ zone: SideBarZoneKind } | undefined>(undefined);
   const [favorites, addFavorite] = useFavorites();
 
   const animateDrop: DropAnimationFunction = useCallback(
@@ -172,8 +198,23 @@ export const useSidebarDnd = (
         return;
       }
 
-      return new Promise(resolve => {
-        waitForSavePromise?.then(() => {
+      // The item leaves the tree on a Trash drop, but the `parent=` query can
+      // still list its row for a moment. Flying to that row would send the
+      // overlay back to where the item came from, so shrink into the zone.
+      if (lastDropRef.current?.zone === 'trash') {
+        return new Promise<void>(resolve => {
+          const animation = dragOverlay.node.animate(
+            zoneDropKeyframes(transform),
+            { duration: TRASH_DROP_MS, easing: 'ease-in', fill: 'forwards' },
+          );
+
+          animation.onfinish = () => resolve();
+        });
+      }
+
+      return new Promise<void>(resolve => {
+        // Favorites keeps the item in place, so flying back to its row is right.
+        (waitForSaveRef.current ?? Promise.resolve()).then(() => {
           const targetNode = document.querySelector(
             `[data-sidebar-id="${getTransitionName(
               SIDEBAR_TRANSITION_TAG,
@@ -218,10 +259,12 @@ export const useSidebarDnd = (
         });
       });
     },
-    [waitForSavePromise],
+    [],
   );
 
   const handleDragStart = (event: DragStartEvent) => {
+    lastDropRef.current = undefined;
+    waitForSaveRef.current = undefined;
     onIsRearangingChange(true);
     setDraggingResource(event.active.id as string);
   };
@@ -229,16 +272,22 @@ export const useSidebarDnd = (
   // Escape or a cancelled touch ends a drag without a drop: leave drag mode so
   // the panels come back.
   const handleDragCancel = () => {
+    lastDropRef.current = undefined;
     setDraggingResource(undefined);
     onIsRearangingChange(false);
-    setWaitForSavePromise(Promise.resolve());
+    waitForSaveRef.current = Promise.resolve();
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    // Set synchronously: `animateDrop` runs before any state update lands.
+    lastDropRef.current = isZoneData(event.over?.data.current)
+      ? { zone: event.over.data.current.zone }
+      : undefined;
+
     if (!event.over) {
       setDraggingResource(undefined);
       onIsRearangingChange(false);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -246,15 +295,14 @@ export const useSidebarDnd = (
     const subject = event.active.id as string;
 
     if (isZoneData(event.over.data.current)) {
-      // The drop animation waits on this, so the overlay only flies back once
-      // a trashed row has left the tree.
+      // The Favorites drop animation waits on this; Trash does not (see above).
       const promise = handleZoneDrop(event.over.data.current.zone, subject, {
         favorites,
         addFavorite,
         moveToTrash: s => moveToTrash(store, s, drive),
       });
 
-      setWaitForSavePromise(promise);
+      waitForSaveRef.current = promise;
       await promise;
       setDraggingResource(undefined);
       onIsRearangingChange(false);
@@ -276,7 +324,7 @@ export const useSidebarDnd = (
     if (subject === dropParent) {
       onIsRearangingChange(false);
       setDraggingResource(undefined);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -286,7 +334,7 @@ export const useSidebarDnd = (
       toast.error("A property can't be moved to another parent.");
       onIsRearangingChange(false);
       setDraggingResource(undefined);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -300,7 +348,7 @@ export const useSidebarDnd = (
     ) {
       setDraggingResource(undefined);
       onIsRearangingChange(false);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -328,7 +376,7 @@ export const useSidebarDnd = (
       await resource.save();
     })();
 
-    setWaitForSavePromise(promise);
+    waitForSaveRef.current = promise;
     await promise;
     setDraggingResource(undefined);
     onIsRearangingChange(false);
