@@ -1,6 +1,11 @@
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 import { styled } from 'styled-components';
 import { holdBootSplash } from '../helpers/bootSplash';
+import {
+  TRAIL_HEAD,
+  TRAIL_STROKE_WIDTH,
+  trailBands,
+} from '../helpers/orbitTrail';
 
 interface SpinnerProps {
   size?: string;
@@ -24,7 +29,6 @@ export const Spinner = ({
   // second loader at another size and position; the splash waits for it.
   useEffect(() => (centered ? holdBootSplash() : undefined), [centered]);
 
-  const maskId = `spinner-sweep-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const mark = (
     <Mark
       $size={size ?? (centered ? '4rem' : undefined)}
@@ -33,37 +37,19 @@ export const Spinner = ({
     >
       <System>
         <Sweep viewBox='0 0 100 100' fill='none'>
-          {/* The logo's sweep (brand/src/place-mark.svg): 270 degrees,
-              centred on the orb, and outlined like the logo: a 24-wide
-              stroke with a 14-wide one cut out of it, so the inside stays
-              see-through on any background. */}
-          <mask
-            id={maskId}
-            maskUnits='userSpaceOnUse'
-            x='0'
-            y='0'
-            width='100'
-            height='100'
-          >
+          {/* The fading trail from atomic.place's hero, headed by a dot
+              (see helpers/orbitTrail.ts). */}
+          {trailBands().map(band => (
             <path
-              d='M74 50 A 24 24 0 1 1 50 26'
-              stroke='white'
-              strokeWidth='24'
-              strokeLinecap='round'
+              key={band.d}
+              d={band.d}
+              stroke='currentColor'
+              strokeWidth={TRAIL_STROKE_WIDTH}
+              strokeLinecap={band.cap}
+              strokeOpacity={band.opacity}
             />
-            <path
-              d='M74 50 A 24 24 0 1 1 50 26'
-              stroke='black'
-              strokeWidth='14'
-              strokeLinecap='round'
-            />
-          </mask>
-          <rect
-            width='100'
-            height='100'
-            fill='currentColor'
-            mask={`url(#${maskId})`}
-          />
+          ))}
+          <circle {...TRAIL_HEAD} fill='currentColor' />
         </Sweep>
       </System>
       <Orb />
