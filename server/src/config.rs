@@ -37,6 +37,19 @@ pub struct Opts {
     #[clap(long, default_value = "latest", env = "ATOMIC_ENVELOPE_RETENTION")]
     pub envelope_retention: String,
 
+    /// How often the server deletes file blobs that no resource references any
+    /// more (for example after a File was destroyed). A duration such as `24h`,
+    /// `90m` or `7d`; a bare number is seconds. `0` or `off` disables the
+    /// background sweep; `atomic-server gc-blobs` still works by hand.
+    #[clap(long, default_value = "24h", env = "ATOMIC_BLOB_GC_INTERVAL")]
+    pub blob_gc_interval: String,
+
+    /// A blob written more recently than this is never garbage collected, so an
+    /// upload whose File resource has not been committed yet survives. Same
+    /// format as `--blob-gc-interval`; `0` removes the protection.
+    #[clap(long, default_value = "72h", env = "ATOMIC_BLOB_GC_GRACE")]
+    pub blob_gc_grace: String,
+
     /// Compact the store file at startup when it is at least
     /// `--auto-compact-min-mb` and at least `--auto-compact-min-reclaimable-percent`
     /// of it is dead space (pages freed by overwrites and deletes that redb
@@ -342,6 +355,21 @@ pub enum Command {
     /// redb takes an exclusive file lock and will fail otherwise.
     #[clap(name = "compact")]
     Compact,
+    /// Delete file blobs that no resource references any more and are older
+    /// than `--blob-gc-grace`. Frees disk or bucket space that destroying a
+    /// File does not. With `--dry-run` it only reports what it would delete.
+    /// With the local blob store the server MUST be stopped (redb takes an
+    /// exclusive file lock); the running server also does this on its own every
+    /// `--blob-gc-interval`.
+    #[clap(name = "gc-blobs")]
+    GcBlobs(GcBlobsOpts),
+}
+
+#[derive(Parser, Clone, Debug)]
+pub struct GcBlobsOpts {
+    /// Report the blobs and bytes that would be deleted; delete nothing.
+    #[clap(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

@@ -1779,7 +1779,32 @@ remote multipart upload/download and image renditions, asserting Tree::Blobs
 stays empty. Standalone local storage still runs through the original tests.
 
 Not covered here: live Hetzner rollout, arbitrary large-file memory limits,
-blob garbage collection, or encrypted Vault attachment recovery.
+or encrypted Vault attachment recovery.
+
+### Blob garbage collection
+
+`lib/src/db/blob_gc.rs` unit tests cover the mark phase (`blob`, `internalId`,
+every chunk, website assets and deployment manifests, plugin release packages;
+commit rows and unrelated `PluginMeta` rows are not scanned),
+the grace period, a re-put restarting it, a hash shared by two Files surviving
+until the last one is destroyed, an unreadable resource aborting the pass before
+any delete, a backend that cannot list never being swept, the dry run changing
+nothing (not even the first-seen stamp), legacy unstamped blobs getting a full
+grace period, `keep` hashes, and backend delete errors being skipped.
+`server/src/blob_storage.rs` runs the same sweep against an `object_store`
+in-memory and a local-filesystem store (foreign object names and the readiness
+probe untouched, deleting a missing object is fine) and parses the interval and
+grace settings. `server/tests/it/blob_gc.rs` uploads two Files over HTTP,
+removes one server-side (`store.remove_resource`), and checks the dry run, the grace period, and that
+`/download/files/<hash>` goes from 200 to 404 for the destroyed one only.
+
+Not covered: destroying an uploaded File through a signed WebSocket destroy
+commit (it failed with "not found in the store" in the test; cause not yet
+established), the background timer itself (`spawn_gc`; the pass it runs is),
+the `atomic-server gc-blobs` subcommand end to end, a sweep against real S3
+(`ObjectBlobBackend::list`/`delete` are only exercised on in-memory and local
+object stores), a very large blob count, and the narrow race where a re-upload
+lands between the pre-delete age check and the delete itself.
 
 `shared_files_count_once_per_drive_independently_of_other_owners` proves that
 one physical object shared by two owners counts once in each drive, repeated

@@ -13,7 +13,8 @@ future phases and is not an as-built specification.
 - [x] Tests for HTTP upload/download, image previews, peer frames, node replacement,
   migration verification, and storage failure without local writes.
 - [ ] Streaming/proxy range requests and direct presigned downloads.
-- [ ] Blob garbage collection and per-tenant buckets.
+- [x] Blob garbage collection (phase 1d, below).
+- [ ] Per-tenant buckets.
 - [ ] Encrypted Vault attachment backup/recovery (separate from hosted primary storage).
 
 Configuration: `ATOMIC_BLOB_BACKEND=redb|s3` (default redb), `ATOMIC_S3_BUCKET`,
@@ -208,6 +209,44 @@ The grace period protects against races: a client uploads a blob via `BLOB_RESPO
 
 This applies to the redb backend too — it's a pre-existing gap. Worth doing in Phase 1 as a cleanup pass that's not S3-specific. S3 then inherits it.
 
+### As built (phase 1d)
+
+`Db::gc_blobs` (`lib/src/db/blob_gc.rs`), run every `ATOMIC_BLOB_GC_INTERVAL`
+(default `24h`; `0`/`off` disables) by a background task in `serve`, and by hand
+with `atomic-server gc-blobs [--dry-run]`. `ATOMIC_BLOB_GC_GRACE` (default `72h`)
+is the minimum age. Both take `90m`, `24h`, `7d` or bare seconds.
+
+- **Mark** collects every 64-hex-digit token in `Tree::Resources` property values
+  (except commit rows: they name the File subject and outlive a destroy) and in
+  only the `Tree::PluginMeta` records that own blobs (`website/v1/` and
+  `plugin-release/v1/`; the rest, such as the pending-search queue keyed by
+  subject, is skipped), plus the tokens in each website deployment's
+  manifest blob. That covers `File.blob`, `internalId`, `chunks`, website
+  assets/files and plugin release packages without special-casing classes;
+  an unknown resource class that mentions a hash keeps the blob ("when unsure,
+  referenced"). A row that cannot be read or decoded aborts the pass before any
+  delete.
+- **Sweep** lists the backend (before marking), deletes unreferenced blobs older
+  than the grace period, re-reads each candidate's age right before deleting
+  it, and logs and skips backend errors. The listing and delete are new
+  `BlobBackend::list`/`delete`/`modified_ms`/`record_first_seen`; they default to
+  an error, so an out-of-tree backend is never swept by accident.
+- **Age.** S3 objects carry a last-modified time, and `put` replaces the object,
+  so a re-upload restarts the clock. The redb tree has no timestamps, so
+  `RedbBlobBackend` writes `blob-seen/v1/<hash>` -> big-endian ms into
+  `Tree::PluginMeta` in the same atomic batch as the bytes (no new table, no
+  data migration, blob values untouched). A blob with no such row (written
+  before this) is stamped by the first non-dry GC pass and deleted no earlier
+  than one grace period after it; a dry run stamps nothing. Same semantics on
+  both: age is time since the last `put`.
+- Image renditions (synthetic hash, never referenced) are collected like other
+  unreferenced blobs after the grace period and regenerated on demand. The S3
+  readiness probe object is excluded by hash.
+- Known gaps: a re-upload landing between the age check and the delete call can
+  still lose the object (S3 has no conditional delete); every `has_blob`-then-skip
+  caller should `put` instead if it must restart the grace period
+  (`store_package` does).
+
 ## Sync engine changes
 
 `lib/src/sync/engine.rs:506-525` checks `store.kv.contains_key(Tree::Blobs, ...)` synchronously inside a hot loop. With S3, every miss costs a network round trip (50–200ms typical, much worse cross-region). Three changes:
@@ -242,7 +281,7 @@ Browser clients are unaffected — they don't talk to S3, the server proxies on 
 | **1a** | Add `BlobBackend` trait, refactor existing redb code behind it. **No behavior change.** | All later phases. |
 | **1b** | `ObjectStoreBlobBackend` + env-var config for server-wide. `HybridBlobBackend` for migration. | Self-hosters with one S3 bucket — the 80% case. |
 | **1c** | Streaming downloads (`get_stream`), in-memory LRU cache. | Reduces server RAM and S3 read costs on hot paths. |
-| **1d** | Mark-and-sweep GC + admin command. | Reclaims storage. Not S3-specific but blocked-by-it in practice. |
+| **1d** (done) | Mark-and-sweep GC + admin command. | Reclaims storage. Not S3-specific but blocked-by-it in practice. |
 | **2a** | `Secret` resource class + property-level encryption with server-held key. | Per-tenant credentials without leaking via `/query`. |
 | **2b** | Per-drive backend properties + cache + creds-validation hook. | True multi-tenant blob isolation. |
 | **3** | Presigned-URL redirect downloads. CORS documentation. | Bandwidth offload for large files; lower egress costs. |

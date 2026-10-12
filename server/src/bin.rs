@@ -140,6 +140,46 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             );
             Ok(())
         }
+        Some(config::Command::GcBlobs(gc)) => {
+            let grace = blob_storage::parse_duration(&config.opts.blob_gc_grace)
+                .map_err(|e| format!("ATOMIC_BLOB_GC_GRACE: {e}"))?;
+            let appstate = appstate::AppState::init(config.clone()).await?;
+            let report = blob_storage::run_gc(&appstate.store, grace, gc.dry_run).await?;
+            let mib = |b: u64| b as f64 / (1024.0 * 1024.0);
+            println!(
+                "{} blobs ({:.1} MiB) in storage; {} referenced, {} younger than the grace period ({}s), {} without a recorded age.",
+                report.scanned,
+                mib(report.scanned_bytes),
+                report.referenced,
+                report.in_grace,
+                grace.as_secs(),
+                report.unstamped,
+            );
+            if gc.dry_run {
+                for blob in &report.candidates {
+                    println!("{}  {} bytes", hex::encode(&blob.key), blob.size);
+                }
+                println!(
+                    "Dry run: {} unreferenced blobs ({:.1} MiB) would be deleted. Nothing was changed.",
+                    report.candidates.len(),
+                    mib(report.candidate_bytes),
+                );
+            } else {
+                println!(
+                    "Deleted {} unreferenced blobs, freeing {:.1} MiB. {} failed.",
+                    report.deleted,
+                    mib(report.deleted_bytes),
+                    report.failed,
+                );
+                if report.unstamped > 0 {
+                    println!(
+                        "{} older blobs had no recorded age; their grace period starts now.",
+                        report.unstamped
+                    );
+                }
+            }
+            Ok(())
+        }
         Some(config::Command::Reset) => {
             if dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
             .with_prompt(

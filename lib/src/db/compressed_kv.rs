@@ -281,6 +281,24 @@ impl KvStore for CompressedKv {
         }
     }
 
+    fn range_value_sizes(
+        &self,
+        tree: Tree,
+        start: Vec<u8>,
+        end: Vec<u8>,
+        limit: usize,
+    ) -> AtomicResult<Vec<(Vec<u8>, u64)>> {
+        if is_compressed_tree(tree) {
+            // Stored length is not the logical length: decode.
+            return Ok(self
+                .range_page(tree, start, end, limit)?
+                .into_iter()
+                .map(|(key, value)| (key, value.len() as u64))
+                .collect());
+        }
+        self.inner.range_value_sizes(tree, start, end, limit)
+    }
+
     fn iter_tree(&self, tree: Tree) -> KvIter {
         self.decoded(tree, self.inner.iter_tree(tree))
     }
