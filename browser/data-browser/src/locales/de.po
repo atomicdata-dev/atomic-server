@@ -9354,20 +9354,20 @@ msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
-msgstr ""
-
-#: src/components/Notifications/MessageNotifier.tsx
-msgid "Someone"
 msgstr ""
 
 #: src/components/Notifications/NotificationList.tsx
@@ -10526,7 +10526,9 @@ msgid "{0}: {1} comments on {2}"
 msgstr ""
 
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr ""
 
@@ -12899,7 +12901,7 @@ msgstr ""
 msgid "Items you deleted from this drive"
 msgstr ""
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr ""
@@ -12911,4 +12913,19 @@ msgstr ""
 #. 0: serverName
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+msgstr ""
+
+#: src/views/NotificationPage.tsx
+msgid "Open conversation"
+msgstr ""
+
+#: src/views/NotificationPage.tsx
+msgid "All notifications"
+msgstr ""
+
+#: src/components/Notifications/MessageNotifier.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
+msgid "Someone"
 msgstr ""

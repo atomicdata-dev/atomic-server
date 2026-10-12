@@ -9367,21 +9367,21 @@ msgstr "{0} replied to you"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr "{0} commented on {1}"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
 msgstr "{0} in {1}"
-
-#: src/components/Notifications/MessageNotifier.tsx
-msgid "Someone"
-msgstr "Someone"
 
 #: src/components/Notifications/NotificationList.tsx
 msgid "Unread"
@@ -10539,7 +10539,9 @@ msgid "{0}: {1} comments on {2}"
 msgstr "{0}: {1} comments on {2}"
 
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr "{0} replied to you in {1}"
 
@@ -12912,7 +12914,7 @@ msgstr "Could not open Trash"
 msgid "Items you deleted from this drive"
 msgstr "Items you deleted from this drive"
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr "This server does not have “{0}”"
@@ -12925,3 +12927,18 @@ msgstr "This server does not have another workspace on this device"
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+
+#: src/views/NotificationPage.tsx
+msgid "Open conversation"
+msgstr "Open conversation"
+
+#: src/views/NotificationPage.tsx
+msgid "All notifications"
+msgstr "All notifications"
+
+#: src/components/Notifications/MessageNotifier.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
+msgid "Someone"
+msgstr "Someone"
