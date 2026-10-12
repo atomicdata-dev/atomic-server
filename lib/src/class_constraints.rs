@@ -901,8 +901,9 @@ impl std::fmt::Display for Violation {
 }
 
 /// Collects every violation of the constraints of each class in the
-/// resource's `isA`, across all classes and all constrained properties, in
-/// class order and then property order. Per property only the first failure
+/// resource's `isA`, across all classes and all constrained properties,
+/// grouped by class in `isA` order. The order of properties within a class is
+/// unspecified (Rust and TS may differ). Per property only the first failure
 /// is reported (a nested value is not walked for further failing leaves), so
 /// the result holds at most one [`Violation`] per class and property. The TS
 /// twin `constraintViolations` behaves the same.
