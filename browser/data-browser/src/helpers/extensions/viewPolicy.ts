@@ -1,5 +1,12 @@
 // @wc-ignore-file
-import { core, urls, type Resource, type Store } from '@tomic/react';
+import {
+  core,
+  urls,
+  type Resource,
+  type Store,
+  includesAgentSubject,
+  sameAgentSubject,
+} from '@tomic/react';
 
 /** Host-selected profiles, never accepted from iframe request arguments. */
 export type ViewPolicy =
@@ -45,7 +52,7 @@ export async function canViewAccess(
       if (
         policy.agent &&
         Array.isArray(writes) &&
-        writes.includes(policy.agent)
+        includesAgentSubject(writes, policy.agent)
       )
         return true;
 
@@ -56,7 +63,7 @@ export async function canViewAccess(
           reads.some(
             agent =>
               agent === urls.instances.publicAgent ||
-              (policy.agent && agent === policy.agent),
+              sameAgentSubject(agent, policy.agent),
           )
         )
           return true;

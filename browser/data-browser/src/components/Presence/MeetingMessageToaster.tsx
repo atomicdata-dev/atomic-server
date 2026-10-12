@@ -12,6 +12,7 @@ import {
   useStore,
   useString,
   useTitle,
+  sameAgentSubject,
 } from '@tomic/react';
 import { useFollow } from './FollowContext';
 import { AgentAvatar } from './AgentAvatar';
@@ -74,7 +75,11 @@ export function MeetingMessageToaster(): null {
         const logged = readLogEntry(store, subject)?.entry;
 
         // System lines ("Viewing …", "Started/ended") and my own messages.
-        if (isFollowEntry(logged) || logged?.a === agent?.subject) continue;
+        if (
+          isFollowEntry(logged) ||
+          sameAgentSubject(logged?.a, agent?.subject)
+        )
+          continue;
 
         toast.custom(
           t => (
@@ -102,7 +107,7 @@ export function MeetingMessageToaster(): null {
       // Skip my own messages — I know what I just said.
       const author = res.get(properties.createdBy) as string | undefined;
 
-      if (author && author === agent?.subject) {
+      if (sameAgentSubject(author, agent?.subject)) {
         continue;
       }
 

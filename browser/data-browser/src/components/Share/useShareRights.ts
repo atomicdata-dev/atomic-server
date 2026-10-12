@@ -1,4 +1,11 @@
-import { core, useArray, type Resource } from '@tomic/react';
+import {
+  core,
+  useArray,
+  type Resource,
+  agentKeyOf,
+  includesAgentSubject,
+  sameAgentSubject,
+} from '@tomic/react';
 import type { ShareRole } from './RoleSelect';
 
 export interface DirectRight {
@@ -23,16 +30,22 @@ export function useShareRights(
 
   const rights: DirectRight[] = [];
 
-  for (const agent of new Set([...writers, ...readers])) {
+  const listed = new Set<string>();
+
+  for (const agent of [...writers, ...readers]) {
+    // One row per agent, not per spelling of its subject.
+    if (listed.has(agentKeyOf(agent))) continue;
+
+    listed.add(agentKeyOf(agent));
     rights.push({
       agentSubject: agent,
-      role: writers.includes(agent) ? 'write' : 'read',
+      role: includesAgentSubject(writers, agent) ? 'write' : 'read',
     });
   }
 
   const setRole = async (agent: string, role: ShareRole | 'remove') => {
-    const nextWriters = writers.filter(a => a !== agent);
-    const nextReaders = readers.filter(a => a !== agent);
+    const nextWriters = writers.filter(a => !sameAgentSubject(a, agent));
+    const nextReaders = readers.filter(a => !sameAgentSubject(a, agent));
 
     if (role === 'write') {
       nextWriters.push(agent);

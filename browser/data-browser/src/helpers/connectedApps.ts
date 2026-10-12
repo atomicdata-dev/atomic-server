@@ -1,4 +1,4 @@
-import { dataBrowser, type Store } from '@tomic/react';
+import { dataBrowser, type Store, sameAgentSubject } from '@tomic/react';
 
 const APPS = dataBrowser.properties.resources;
 
@@ -36,7 +36,7 @@ export async function forgetConnectedApp(
   const apps = (drive.get(APPS) as string[] | undefined) ?? [];
   await drive.set(
     APPS,
-    apps.filter(subject => subject !== agent),
+    apps.filter(subject => !sameAgentSubject(subject, agent)),
   );
   await drive.save();
 }

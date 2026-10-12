@@ -1,3 +1,4 @@
+use atomic_lib::agents::same_agent;
 use atomic_lib::{db::trees::Tree, errors::AtomicResult, urls, Db, Resource, Storelike, Value};
 use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
@@ -83,7 +84,10 @@ impl InviteToken {
     /// link again: that grants nothing new, so it does not use a place.
     pub fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()> {
         if self.usages_left(store)? == Some(0)
-            && !self.accepted_by(store)?.iter().any(|a| a == agent)
+            && !self
+                .accepted_by(store)?
+                .iter()
+                .any(|a| same_agent(a, agent))
         {
             return Err(INVITE_EXHAUSTED.into());
         }
@@ -94,7 +98,7 @@ impl InviteToken {
     /// from before [`Self::check_usages`] until after this call.
     pub fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()> {
         let mut accepted = self.accepted_by(store)?;
-        if accepted.iter().any(|a| a == agent) {
+        if accepted.iter().any(|a| same_agent(a, agent)) {
             return Ok(());
         }
         accepted.push(agent.to_string());
@@ -525,6 +529,20 @@ mod test {
             .record_acceptance(&store, "did:ad:agent:first")
             .unwrap();
         assert_eq!(token.usages_left(&store).unwrap(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn reopening_with_the_other_agent_spelling_is_not_a_new_usage() {
+        let (store, token) = limited_setup("invite_limited_spelling", 1).await;
+        token
+            .record_acceptance(&store, "did:ad:agent:first")
+            .unwrap();
+        token.check_usages(&store, "atomic:agent:first").unwrap();
+        token
+            .record_acceptance(&store, "atomic:agent:first")
+            .unwrap();
+        assert_eq!(token.accepted_by(&store).unwrap().len(), 1);
+        assert!(token.check_usages(&store, "atomic:agent:second").is_err());
     }
 
     #[tokio::test]

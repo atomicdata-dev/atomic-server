@@ -287,7 +287,10 @@ async fn grant_read(db: &Db, mut resource: Resource, agent: &str) -> AtomicResul
         Ok(value) => value.to_subjects(None)?,
         Err(_) => Vec::new(),
     };
-    if readers.iter().any(|reader| reader == agent) {
+    if readers
+        .iter()
+        .any(|reader| atomic_lib::agents::same_agent(reader, agent))
+    {
         return Ok(());
     }
     readers.push(agent.to_string());

@@ -86,7 +86,7 @@ import { decodeB64, encodeB64Url } from './base64.js';
 import {
   canonicalizeScheme,
   isAgentSubject,
-  agentPublicKey,
+  agentKeyOf,
   isAtomicIdentifier,
   isBlobSubject,
   isLensSubject,
@@ -141,14 +141,6 @@ type LoroEphemeralCallback = (update: Uint8Array) => void;
 /** Callback for drive-scoped presence updates */
 type PresenceCallback = (update: Uint8Array) => void;
 type SubjectCallback = (subject: string) => void;
-
-/** The public key an agent subject names, whatever its spelling. */
-function agentKeyOf(subject: string): string {
-  return (agentPublicKey(subject) ?? subject)
-    .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-}
 
 /** Callback called when the stores agent changes */
 type AgentCallback = (agent: Agent | undefined) => void;

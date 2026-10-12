@@ -220,7 +220,7 @@ async fn invoke_consumed(
                 "call ID is permanently reserved by an archived action; use a new ID".into(),
             );
         }
-        if p.actor != host.for_agent.to_string()
+        if !same_actor(&p.actor, &host.for_agent.to_string())
             || p.action != call.action
             || p.arguments != call.arguments
             || p.origin != origin
@@ -440,7 +440,7 @@ async fn execute_approved<H: external::ExternalHost>(
     if p.archived.is_some() {
         return Err("archived actions cannot be approved".into());
     }
-    if p.actor != actor {
+    if !same_actor(&p.actor, actor) {
         return Err("proposal belongs to another actor".into());
     }
     if p.release != bound.release || p.config != bound.config {
@@ -580,7 +580,7 @@ fn put(host: &StoreHost, kind: &str, id: &str, value: Value) -> Result<(), Strin
 }
 fn owned(host: &StoreHost, id: &str) -> Result<Proposal, String> {
     let p = saved(host, id)?.ok_or("proposal not found")?;
-    if p.actor != host.for_agent.to_string() {
+    if !same_actor(&p.actor, &host.for_agent.to_string()) {
         return Err("proposal belongs to another actor".into());
     }
     Ok(p)
@@ -1113,6 +1113,11 @@ async fn check_reference(caller: &StoreHost, target: &str) -> Result<(), String>
     }
     Ok(())
 }
+/// Whether two actor strings are the same agent, whatever the subject spelling
+/// (`atomic:agent:X` or legacy `did:ad:agent:X`).
+fn same_actor(a: &str, b: &str) -> bool {
+    atomic_lib::agents::same_agent(a, b)
+}
 fn grant_id(caller: &str, action: &str, actor: &str) -> String {
     json!([caller, action, actor]).to_string()
 }
@@ -1215,7 +1220,7 @@ pub async fn grants(host: &StoreHost) -> Result<Vec<Grant>, String> {
             })
         })
         .filter_map(|g| match g {
-            Ok(Some(g)) if g.actor == host.for_agent.to_string() => Some(Ok(g)),
+            Ok(Some(g)) if same_actor(&g.actor, &host.for_agent.to_string()) => Some(Ok(g)),
             Ok(_) => None,
             Err(e) => Some(Err(e)),
         })

@@ -1,3 +1,4 @@
+import { sameAgentSubject } from '@tomic/react';
 /**
  * Whether the person opening an invite already has what it grants, so the
  * invite screen can step aside and open the shared resource instead.
@@ -61,7 +62,7 @@ export async function alreadyHasInviteAccess(
   timeoutMs = 4000,
 ): Promise<boolean> {
   if (!agent) return false;
-  if (grant.signer === agent) return true;
+  if (sameAgentSubject(grant.signer, agent)) return true;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<false>(resolve => {

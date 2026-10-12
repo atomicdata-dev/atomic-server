@@ -230,6 +230,59 @@ export function agentPublicKey(raw: string): string | undefined {
     : undefined;
 }
 
+/**
+ * The public key an agent subject names, in one canonical spelling: the same
+ * key appears padded or unpadded, as standard base64 or base64url. Subjects
+ * that are not agent identifiers are returned unchanged.
+ */
+export function agentKeyOf(subject: string): string {
+  const key = agentPublicKey(subject);
+
+  if (key === undefined) {
+    return subject;
+  }
+
+  return key.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+/**
+ * Whether two subjects name the same agent. `atomic:agent:{key}` and the
+ * legacy `did:ad:agent:{key}` are one identity; sign-in still derives the
+ * legacy spelling while stored data keeps whatever it was written with, so a
+ * plain `===` between an agent subject from the store and one from a resource
+ * (a member list, `createdBy`, a chat entry's author) is a bug. Use this for
+ * every `me`, author, member and signer check. Non-agent subjects fall back
+ * to {@link canonicalIdentifier} equality.
+ */
+export function sameAgentSubject(
+  a: string | undefined | null,
+  b: string | undefined | null,
+): boolean {
+  if (!a || !b) {
+    return false;
+  }
+
+  if (a === b) {
+    return true;
+  }
+
+  if (isAgentSubject(a) && isAgentSubject(b)) {
+    return agentKeyOf(a) === agentKeyOf(b);
+  }
+
+  return canonicalIdentifier(a) === canonicalIdentifier(b);
+}
+
+/** Whether `agent` is in `list`, comparing by identity (see {@link sameAgentSubject}). */
+export function includesAgentSubject(
+  list: readonly string[] | undefined | null,
+  agent: string | undefined | null,
+): boolean {
+  return (
+    !!list && !!agent && list.some(member => sameAgentSubject(member, agent))
+  );
+}
+
 export function commitSignature(raw: string): string | undefined {
   const body = identifierBody(raw);
 

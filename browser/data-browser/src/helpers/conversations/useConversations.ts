@@ -1,4 +1,9 @@
-import { conversations, useStore, type Store } from '@tomic/react';
+import {
+  conversations,
+  useStore,
+  type Store,
+  sameAgentSubject,
+} from '@tomic/react';
 import { useEffect, useState } from 'react';
 import { useSettings } from '../AppSettings';
 import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
@@ -99,7 +104,10 @@ export async function findOrStartConversation(
     throw new Error('Sign in to use messages.');
   }
 
-  const members = [agent.subject, ...others.filter(o => o !== agent.subject)];
+  const members = [
+    agent.subject,
+    ...others.filter(o => !sameAgentSubject(o, agent.subject)),
+  ];
   const privateDriveSubject = await fetchPrivateDriveSubject(store, agent);
   const privateDrive = privateDriveSubject
     ? await store.getResource(privateDriveSubject)

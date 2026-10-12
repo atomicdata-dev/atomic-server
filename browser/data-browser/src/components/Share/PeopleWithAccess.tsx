@@ -1,7 +1,13 @@
 import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
-import { urls, useResource, useTitle } from '@tomic/react';
+import {
+  urls,
+  useResource,
+  useTitle,
+  agentKeyOf,
+  sameAgentSubject,
+} from '@tomic/react';
 import { AgentAvatar } from '../Presence/AgentAvatar';
 import { RoleSelect, roleLabel, type ShareRole } from './RoleSelect';
 import type { DirectRight } from './useShareRights';
@@ -36,9 +42,12 @@ export function PeopleWithAccess({
   const people = rights.filter(
     r =>
       r.agentSubject !== urls.instances.publicAgent &&
-      r.agentSubject !== currentAgent,
+      !sameAgentSubject(r.agentSubject, currentAgent),
   );
-  const shown = new Set([...people.map(p => p.agentSubject), currentAgent]);
+  const shown = new Set([
+    ...people.map(p => agentKeyOf(p.agentSubject)),
+    currentAgent ? agentKeyOf(currentAgent) : undefined,
+  ]);
   const inheritedByParent = groupInherited(inheritedRights, shown);
 
   return (
@@ -197,14 +206,14 @@ function groupInherited(
   for (const right of inherited) {
     if (
       right.agentSubject === urls.instances.publicAgent ||
-      shown.has(right.agentSubject) ||
-      seen.has(right.agentSubject) ||
+      shown.has(agentKeyOf(right.agentSubject)) ||
+      seen.has(agentKeyOf(right.agentSubject)) ||
       !(right.read || right.write)
     ) {
       continue;
     }
 
-    seen.add(right.agentSubject);
+    seen.add(agentKeyOf(right.agentSubject));
     const group = groups.get(right.setIn) ?? [];
     group.push(right);
     groups.set(right.setIn, group);
@@ -222,11 +231,11 @@ export function effectiveRole(
   if (!agent) return undefined;
   if (canWrite) return 'write';
 
-  const direct = rights.find(r => r.agentSubject === agent);
+  const direct = rights.find(r => sameAgentSubject(r.agentSubject, agent));
 
   if (direct) return direct.role;
 
-  const parent = inherited.filter(r => r.agentSubject === agent);
+  const parent = inherited.filter(r => sameAgentSubject(r.agentSubject, agent));
 
   if (parent.some(r => r.write)) return 'write';
   if (parent.some(r => r.read)) return 'read';

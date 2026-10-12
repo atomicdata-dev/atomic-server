@@ -149,8 +149,7 @@ impl Default for Keyring {
 /// legacy `did:ad:agent:X` are one identity, so a keyring sealed with one
 /// spelling must open for a reader who signs in with the other.
 fn same_agent(a: &str, b: &str) -> bool {
-    a == b
-        || crate::identifiers::canonicalize_scheme(a) == crate::identifiers::canonicalize_scheme(b)
+    crate::agents::same_agent(a, b)
 }
 
 /// What the wrap key and the wrapper's associated data are bound to, so a
