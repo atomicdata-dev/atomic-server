@@ -12721,7 +12721,7 @@ msgstr "Move this resource out of the Trash, back to where it was."
 msgid "Delete permanently"
 msgstr "Delete permanently"
 
-#: src/components/SideBar/SidebarTrashLink.tsx
+#: src/components/SideBar/AccountMenu.tsx
 msgid "Trash"
 msgstr "Trash"
 
@@ -12903,6 +12903,14 @@ msgstr "Could not reach that address."
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
 msgstr "That address answers, but it is not an AtomicServer."
+
+#: src/components/SideBar/AccountMenu.tsx
+msgid "Could not open Trash"
+msgstr "Could not open Trash"
+
+#: src/components/SideBar/AccountMenu.tsx
+msgid "Items you deleted from this drive"
+msgstr "Items you deleted from this drive"
 
 #. 0: name
 #: src/helpers/syncProblem.ts

@@ -12708,7 +12708,7 @@ msgstr ""
 msgid "Delete permanently"
 msgstr ""
 
-#: src/components/SideBar/SidebarTrashLink.tsx
+#: src/components/SideBar/AccountMenu.tsx
 msgid "Trash"
 msgstr ""
 
@@ -12889,6 +12889,14 @@ msgstr ""
 
 #: src/components/ConnectDevice.tsx
 msgid "That address answers, but it is not an AtomicServer."
+msgstr ""
+
+#: src/components/SideBar/AccountMenu.tsx
+msgid "Could not open Trash"
+msgstr ""
+
+#: src/components/SideBar/AccountMenu.tsx
+msgid "Items you deleted from this drive"
 msgstr ""
 
 #. 0: name

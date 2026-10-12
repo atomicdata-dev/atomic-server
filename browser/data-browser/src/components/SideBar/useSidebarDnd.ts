@@ -8,12 +8,11 @@ import {
   KeyboardSensor,
   MouseSensor,
   pointerWithin,
-  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import { core, dataBrowser, useStore } from '@tomic/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type MouseEvent } from 'react';
 import toast from 'react-hot-toast';
 import { isContentAddressed } from '../../helpers/propertyIdentity';
 import {
@@ -23,6 +22,8 @@ import {
 import { useSettings } from '../../helpers/AppSettings';
 import { useFavorites } from '../../hooks/useFavorites';
 import { moveToTrash } from '../../helpers/trash';
+import { useResourceContextMenu } from '../ResourceContextMenu/ResourceContextMenuContext';
+import { HoldMoveTouchSensor } from './holdMoveTouchSensor';
 // Fractional-key math shared with table row insertion.
 import {
   computeSortOrder,
@@ -129,6 +130,20 @@ export const useSidebarDnd = (
   const { sidebarKeyboardDndEnabled, drive } = useSettings();
 
   const keyboardSensor = useSensor(KeyboardSensor);
+  const { openResourceMenu } = useResourceContextMenu();
+
+  const onHold = useCallback(
+    (subject: string, point: { x: number; y: number }) => {
+      // The menu only needs a position; there is no mouse event for a held touch.
+      openResourceMenu(subject, {
+        clientX: point.x,
+        clientY: point.y,
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      } as MouseEvent);
+    },
+    [openResourceMenu],
+  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -136,11 +151,13 @@ export const useSidebarDnd = (
         distance: 10,
       },
     }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
-      },
+    // Touch: a quick swipe scrolls, a tap navigates, holding still and
+    // lifting opens the context menu, holding and then moving drags.
+    useSensor(HoldMoveTouchSensor, {
+      holdDelay: 400,
+      scrollTolerance: 8,
+      dragThreshold: 8,
+      onHold,
     }),
     sidebarKeyboardDndEnabled ? keyboardSensor : undefined,
   );

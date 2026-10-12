@@ -637,10 +637,37 @@ export async function signIn(page: Page, secret?: string) {
  * Returns the agent secret so other pages/contexts can sign in as the same user.
  */
 export async function devDrive(page: Page): Promise<string> {
+  // The route sits on a splash until the drive exists; when it never does, the
+  // timeout alone says nothing, so keep what the page printed to say why.
+  const printed: string[] = [];
+
+  const remember = (m: ConsoleMessage) => {
+    if (['error', 'warning'].includes(m.type()))
+      printed.push(`${m.type()}: ${m.text()}`.slice(0, 300));
+  };
+
+  page.on('console', remember);
+  page.on('pageerror', e => printed.push(`pageerror: ${e}`.slice(0, 300)));
+
   await page.goto(`${FRONTEND_URL}/app/dev-drive`);
-  await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
-    timeout: 30000,
-  });
+
+  try {
+    await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
+      timeout: 30000,
+    });
+  } catch (e) {
+    const shown = await page
+      .evaluate(() => document.body.innerText.slice(0, 300))
+      .catch(() => '(page unreadable)');
+
+    throw new Error(
+      `devDrive never reached the drive: ${page.url()} shows ${JSON.stringify(shown)}; page printed ${JSON.stringify(printed.slice(-10))}`,
+      { cause: e },
+    );
+  } finally {
+    page.off('console', remember);
+  }
+
   await expect(currentDriveTitle(page)).toBeVisible({ timeout: 15000 });
 
   const secret = await page.evaluate(() =>
