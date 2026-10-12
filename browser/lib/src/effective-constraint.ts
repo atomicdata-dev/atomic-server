@@ -80,6 +80,15 @@ function tighten(a: Constraint, b: Constraint): Constraint {
   out.pattern ??= b.pattern;
   out.class ??= b.class;
 
+  // Nested schemas cannot be combined either: the first class wins.
+  if (out.const === undefined) out.const = b.const;
+  out.type ??= b.type;
+  out.properties ??= b.properties;
+  out.required ??= b.required;
+  out.additionalProperties ??= b.additionalProperties;
+  out.items ??= b.items;
+  out.anyOf ??= b.anyOf;
+
   return out;
 }
 
@@ -191,8 +200,18 @@ function definedOnly(c: Constraint | undefined): Constraint {
 export type ConstraintPatch = {
   [K in ConstraintKeyword]?: K extends 'pattern'
     ? string | RegExp | undefined
-    : Constraint[K] | undefined;
+    : K extends NestedKeyword
+      ? JSONValue | undefined
+      : Constraint[K] | undefined;
 };
+
+/** Keywords that hold a nested JSON Schema or its type, written as plain JSON. */
+type NestedKeyword =
+  | 'type'
+  | 'properties'
+  | 'additionalProperties'
+  | 'items'
+  | 'anyOf';
 
 const isObject = (v: unknown): v is JSONObject =>
   typeof v === 'object' && v !== null && !Array.isArray(v);

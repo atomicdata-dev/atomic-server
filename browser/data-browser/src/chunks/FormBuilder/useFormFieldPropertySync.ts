@@ -2,10 +2,10 @@ import {
   canonicalizeScheme,
   core,
   forms,
-  parseConstraints,
   Resource,
   setClassConstraint,
   Store,
+  type ConstraintPatch,
   useResource,
   useStore,
 } from '@tomic/react';
@@ -105,13 +105,20 @@ async function moveClassConstraint(
     return;
   }
 
-  const entry = parseConstraints(raw).get(canonicalizeScheme(from));
+  // Move the stored JSON, not a parsed constraint: nested schemas and
+  // patterns have to arrive exactly as they were written.
+  const map: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const key = canonicalizeScheme(from);
+  const entry =
+    typeof map === 'object' && map !== null
+      ? Object.entries(map).find(([k]) => canonicalizeScheme(k) === key)?.[1]
+      : undefined;
 
-  if (!entry) {
+  if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
     return;
   }
 
-  await setClassConstraint(dataClass, to, entry);
+  await setClassConstraint(dataClass, to, entry as ConstraintPatch);
   await setClassConstraint(dataClass, from, undefined);
 }
 

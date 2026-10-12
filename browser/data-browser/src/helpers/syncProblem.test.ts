@@ -140,4 +140,68 @@ describe('describeSyncProblem', () => {
       }),
     ).toBeNull();
   });
+
+  describe('a refused workspace', () => {
+    const OTHER = 'atomic:otherdrive';
+    const refused = (drive: string) =>
+      `Drive ${drive} is not enrolled for sync on this node`;
+    const blockedEntry = (message: string) => [
+      {
+        subject: 'atomic:somedoc',
+        blocked: true,
+        failures: 5,
+        lastAttemptError: message,
+      },
+    ];
+
+    it('keeps the plain wording for the workspace in view', () => {
+      const problem = describeSyncProblem({
+        ...base,
+        entries: blockedEntry(refused(DRIVE)),
+        driveOf: () => DRIVE,
+      });
+
+      expect(problem?.title).toBe('This server does not have this workspace');
+      expect(problem?.otherDrive).toBeUndefined();
+      expect(problem?.actions).toEqual(['connect-device', 'review-sync']);
+    });
+
+    it('names another workspace by its title, and is not offered the viewed switch', () => {
+      const problem = describeSyncProblem({
+        ...base,
+        entries: blockedEntry(refused('did:ad:otherdrive')),
+        driveTitle: () => 'Team notes',
+      });
+
+      expect(problem?.title).toBe('This server does not have “Team notes”');
+      expect(problem?.body).toContain('not the workspace you are viewing');
+      expect(problem?.otherDrive).toBe(OTHER);
+      expect(problem?.actions).toEqual(['connect-device']);
+      expect(problem?.detail).toContain('is not enrolled');
+    });
+
+    it('falls back to a neutral phrase when the title cannot be loaded', () => {
+      const problem = describeSyncProblem({
+        ...base,
+        entries: blockedEntry(refused(OTHER)),
+        driveTitle: () => undefined,
+      });
+
+      expect(problem?.title).toBe(
+        'This server does not have another workspace on this device',
+      );
+      expect(problem?.title).not.toContain(OTHER);
+    });
+
+    it('finds the workspace from the entry when the message names none', () => {
+      const problem = describeSyncProblem({
+        ...base,
+        entries: blockedEntry('Parent of atomic:x not found'),
+        driveOf: () => OTHER,
+        driveTitle: () => 'Team notes',
+      });
+
+      expect(problem?.otherDrive).toBe(OTHER);
+    });
+  });
 });
