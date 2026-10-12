@@ -1786,12 +1786,15 @@ or encrypted Vault attachment recovery.
 `lib/src/db/blob_gc.rs` unit tests cover the mark phase (`blob`, `internalId`,
 every chunk, website assets and deployment manifests, plugin release packages;
 commit rows and unrelated `PluginMeta` rows are not scanned),
-the grace period, a re-put restarting it, a hash shared by two Files surviving
+the grace period, a blob referenced between the first and the second mark
+surviving, a failing second mark deleting nothing, a re-put restarting it, a hash shared by two Files surviving
 until the last one is destroyed, an unreadable resource aborting the pass before
 any delete, a backend that cannot list never being swept, the dry run changing
 nothing (not even the first-seen stamp), legacy unstamped blobs getting a full
 grace period, `keep` hashes, and backend delete errors being skipped.
-`server/src/blob_storage.rs` runs the same sweep against an `object_store`
+`server/src/blob_storage.rs` also covers the `ATOMIC_BLOB_GC_S3_EXCLUSIVE`
+guard (an object store refuses a deleting pass without it, a dry run and the
+local store do not need it). It runs the same sweep against an `object_store`
 in-memory and a local-filesystem store (foreign object names and the readiness
 probe untouched, deleting a missing object is fine) and parses the interval and
 grace settings. `server/tests/it/blob_gc.rs` uploads two Files over HTTP,
@@ -1800,7 +1803,9 @@ removes one server-side (`store.remove_resource`), and checks the dry run, the g
 
 Not covered: destroying an uploaded File through a signed WebSocket destroy
 commit (it failed with "not found in the store" in the test; cause not yet
-established), the background timer itself (`spawn_gc`; the pass it runs is),
+established), destroy followed by undo (policy: the bytes are gone after the
+grace period, the File resource comes back without them) and hashes that live
+only in a rich-text body (not scanned by design), the background timer itself (`spawn_gc`; the pass it runs is),
 the `atomic-server gc-blobs` subcommand end to end, a sweep against real S3
 (`ObjectBlobBackend::list`/`delete` are only exercised on in-memory and local
 object stores), a very large blob count, and the narrow race where a re-upload

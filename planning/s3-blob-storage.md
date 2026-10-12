@@ -226,9 +226,17 @@ is the minimum age. Both take `90m`, `24h`, `7d` or bare seconds.
   an unknown resource class that mentions a hash keeps the blob ("when unsure,
   referenced"). A row that cannot be read or decoded aborts the pass before any
   delete.
+- **Second mark.** After the candidates are chosen, the mark phase runs again
+  right before the delete loop, and only candidates that are still unmarked are
+  deleted (`BlobGcReport::rereferenced` counts the ones a File started
+  referencing in the meantime: an undone destroy, a duplicate, a synced
+  resource, a client that skipped the upload). If the second mark fails,
+  nothing is deleted. The loop itself does no listing or scanning, so the
+  remaining window is its duration.
 - **Sweep** lists the backend (before marking), deletes unreferenced blobs older
   than the grace period, re-reads each candidate's age right before deleting
-  it, and logs and skips backend errors. The listing and delete are new
+  it, logs each deleted blob at `info` (hash, bytes, age) next to the totals
+  line, and logs and skips backend errors. The listing and delete are new
   `BlobBackend::list`/`delete`/`modified_ms`/`record_first_seen`; they default to
   an error, so an out-of-tree backend is never swept by accident.
 - **Age.** S3 objects carry a last-modified time, and `put` replaces the object,
@@ -242,6 +250,24 @@ is the minimum age. Both take `90m`, `24h`, `7d` or bare seconds.
 - Image renditions (synthetic hash, never referenced) are collected like other
   unreferenced blobs after the grace period and regenerated on demand. The S3
   readiness probe object is excluded by hash.
+- **History is not state (policy).** Commits, `Tree::LoroSnapshots` and
+  `Value::LoroDoc` payloads are not scanned: that would keep the bytes of every
+  destroyed File forever. So the bytes of a destroyed File are removed after the
+  grace period, and undoing a destroy later restores the File resource but not
+  its bytes. Checked in the code: a live resource's row (the projection) and its
+  snapshot are written in one transaction, so every property is in the row and
+  the snapshot is never the only holder. The one Loro-only content is a
+  Document's rich-text body (the `doc` map), whose image nodes carry a
+  download URL with the hash; a blob can only be uploaded for an existing
+  referencing File (`PUT /blob` admission), and that File is what keeps the
+  bytes, so such an embed only dangles when the File itself is destroyed.
+- **One node per bucket and prefix.** The mark only knows this node's database,
+  so two nodes sharing a bucket and prefix would delete each other's blobs. On
+  the object-store backend, deleting therefore needs
+  `ATOMIC_BLOB_GC_S3_EXCLUSIVE=true` (the operator asserts the bucket and prefix
+  are this node's alone). Without it the background sweep stays off with one
+  warning at startup, and `atomic-server gc-blobs` refuses unless `--dry-run`.
+  The local redb backend is unaffected.
 - Known gaps: a re-upload landing between the age check and the delete call can
   still lose the object (S3 has no conditional delete); every `has_blob`-then-skip
   caller should `put` instead if it must restart the grace period

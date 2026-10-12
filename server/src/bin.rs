@@ -144,7 +144,13 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             let grace = blob_storage::parse_duration(&config.opts.blob_gc_grace)
                 .map_err(|e| format!("ATOMIC_BLOB_GC_GRACE: {e}"))?;
             let appstate = appstate::AppState::init(config.clone()).await?;
-            let report = blob_storage::run_gc(&appstate.store, grace, gc.dry_run).await?;
+            let report = blob_storage::run_gc(
+                &appstate.store,
+                grace,
+                gc.dry_run,
+                config.opts.blob_gc_s3_exclusive,
+            )
+            .await?;
             let mib = |b: u64| b as f64 / (1024.0 * 1024.0);
             println!(
                 "{} blobs ({:.1} MiB) in storage; {} referenced, {} younger than the grace period ({}s), {} without a recorded age.",

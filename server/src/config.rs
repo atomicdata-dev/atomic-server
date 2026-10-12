@@ -41,6 +41,10 @@ pub struct Opts {
     /// more (for example after a File was destroyed). A duration such as `24h`,
     /// `90m` or `7d`; a bare number is seconds. `0` or `off` disables the
     /// background sweep; `atomic-server gc-blobs` still works by hand.
+    /// Only current state counts as a reference, not history: the bytes of a
+    /// destroyed File are removed after `--blob-gc-grace`, and undoing the
+    /// destroy later restores the File resource but not its bytes. On S3 the
+    /// sweep only runs with `--blob-gc-s3-exclusive`.
     #[clap(long, default_value = "24h", env = "ATOMIC_BLOB_GC_INTERVAL")]
     pub blob_gc_interval: String,
 
@@ -49,6 +53,21 @@ pub struct Opts {
     /// format as `--blob-gc-interval`; `0` removes the protection.
     #[clap(long, default_value = "72h", env = "ATOMIC_BLOB_GC_GRACE")]
     pub blob_gc_grace: String,
+
+    /// Allow blob garbage collection to delete from S3-compatible storage. Set
+    /// this to `true` only when the bucket and prefix belong to this node alone:
+    /// the sweep only knows this node's database, so a second node sharing the
+    /// bucket and prefix would have its files deleted. Without it the
+    /// background sweep stays off (a warning is logged once) and
+    /// `atomic-server gc-blobs` only accepts `--dry-run`. The local blob store
+    /// is not affected.
+    #[clap(
+        long,
+        default_value_t = false,
+        action = clap::ArgAction::Set,
+        env = "ATOMIC_BLOB_GC_S3_EXCLUSIVE"
+    )]
+    pub blob_gc_s3_exclusive: bool,
 
     /// Compact the store file at startup when it is at least
     /// `--auto-compact-min-mb` and at least `--auto-compact-min-reclaimable-percent`

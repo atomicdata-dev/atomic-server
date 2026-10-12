@@ -207,12 +207,33 @@ pub fn parse_gc_interval(raw: &str) -> AtomicResult<Option<std::time::Duration>>
     Ok((!interval.is_zero()).then_some(interval))
 }
 
+/// Why a real (deleting) pass is not allowed on this store, if so. An object
+/// store can be shared by several nodes; the mark phase only knows this node's
+/// database, so deleting there needs the operator's word that it is exclusive.
+pub fn gc_delete_refusal(store: &atomic_lib::Db, s3_exclusive: bool) -> Option<String> {
+    (store.blob_backend.is_some() && !s3_exclusive).then(|| {
+        "blob garbage collection will not delete from S3-compatible storage unless \
+         ATOMIC_BLOB_GC_S3_EXCLUSIVE=true asserts that this bucket and prefix belong to \
+         this node alone (another node sharing them would lose its files); \
+         `gc-blobs --dry-run` is always allowed"
+            .to_string()
+    })
+}
+
 /// One mark-and-sweep pass over the blob backend with this server's settings.
+/// `s3_exclusive` is `ATOMIC_BLOB_GC_S3_EXCLUSIVE`; a deleting pass on an
+/// object store is refused without it, a dry run never is.
 pub async fn run_gc(
     store: &atomic_lib::Db,
     grace: std::time::Duration,
     dry_run: bool,
+    s3_exclusive: bool,
 ) -> AtomicResult<atomic_lib::db::blob_gc::BlobGcReport> {
+    if !dry_run {
+        if let Some(refusal) = gc_delete_refusal(store, s3_exclusive) {
+            return Err(refusal.into());
+        }
+    }
     // The S3 readiness probe is an object no resource can reference.
     let options = atomic_lib::db::blob_gc::BlobGcOptions::new(grace)
         .dry_run(dry_run)
@@ -232,6 +253,11 @@ pub fn spawn_gc(appstate: crate::appstate::AppState) -> AtomicResult<()> {
         tracing::info!("Blob garbage collection is off (ATOMIC_BLOB_GC_INTERVAL)");
         return Ok(());
     };
+    let s3_exclusive = opts.blob_gc_s3_exclusive;
+    if let Some(refusal) = gc_delete_refusal(&appstate.store, s3_exclusive) {
+        tracing::warn!("Blob garbage collection is off: {refusal}");
+        return Ok(());
+    }
     tracing::info!(
         interval_secs = interval.as_secs(),
         grace_secs = grace.as_secs(),
@@ -242,7 +268,7 @@ pub fn spawn_gc(appstate: crate::appstate::AppState) -> AtomicResult<()> {
         actix_web::rt::time::sleep(interval.min(std::time::Duration::from_secs(300))).await;
         loop {
             let started = std::time::Instant::now();
-            match run_gc(&appstate.store, grace, false).await {
+            match run_gc(&appstate.store, grace, false, s3_exclusive).await {
                 Ok(report) => tracing::info!(
                     scanned = report.scanned,
                     referenced = report.referenced,
@@ -558,15 +584,27 @@ mod tests {
         db.remove_resource(&files[3]).await.unwrap();
 
         // Inside the grace period nothing is deleted.
-        let report = run_gc(&db, Duration::from_secs(3600), false).await.unwrap();
+        let report = run_gc(&db, Duration::from_secs(3600), false, true)
+            .await
+            .unwrap();
         assert_eq!((report.deleted, report.in_grace), (0, 1));
         // A dry run reports the orphan and deletes nothing.
-        let report = run_gc(&db, Duration::ZERO, true).await.unwrap();
+        let report = run_gc(&db, Duration::ZERO, true, false).await.unwrap();
         assert_eq!(report.candidates.len(), 1);
         assert_eq!(report.candidate_bytes, orphan.len() as u64);
         assert!(db.has_blob(blake3::hash(orphan).as_bytes()).await.unwrap());
 
-        let report = run_gc(&db, Duration::ZERO, false).await.unwrap();
+        // Deleting from an object store needs the operator's exclusivity flag.
+        let refused = run_gc(&db, Duration::ZERO, false, false)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(refused.contains("ATOMIC_BLOB_GC_S3_EXCLUSIVE"), "{refused}");
+        assert!(gc_delete_refusal(&db, false).is_some());
+        assert!(gc_delete_refusal(&db, true).is_none());
+        assert!(db.has_blob(blake3::hash(orphan).as_bytes()).await.unwrap());
+
+        let report = run_gc(&db, Duration::ZERO, false, true).await.unwrap();
         assert_eq!((report.deleted, report.failed), (1, 0));
         assert_eq!(report.deleted_bytes, orphan.len() as u64);
         assert!(!db.has_blob(blake3::hash(orphan).as_bytes()).await.unwrap());
@@ -588,7 +626,26 @@ mod tests {
 
         // The last file referencing the shared object goes: now it is swept too.
         db.remove_resource(&files[2]).await.unwrap();
-        assert_eq!(run_gc(&db, Duration::ZERO, false).await.unwrap().deleted, 1);
+        assert_eq!(
+            run_gc(&db, Duration::ZERO, false, true)
+                .await
+                .unwrap()
+                .deleted,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn local_blob_store_needs_no_exclusivity_flag() {
+        use std::time::Duration;
+        let db = Db::init_redb(None).await.unwrap();
+        let bytes = b"orphan in the local blob tree";
+        db.put_blob(blake3::hash(bytes).as_bytes(), bytes)
+            .await
+            .unwrap();
+        assert!(gc_delete_refusal(&db, false).is_none());
+        let report = run_gc(&db, Duration::ZERO, false, false).await.unwrap();
+        assert_eq!(report.deleted, 1);
     }
 
     #[tokio::test]

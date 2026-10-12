@@ -21,12 +21,43 @@
 //! keeps a blob, never the opposite. Anything that fails to read or decode
 //! aborts the whole pass before a single delete.
 //!
+//! **History is not state.** Only the current projection of each resource is
+//! read. Commits, `Tree::LoroSnapshots` and `Value::LoroDoc` payloads are not
+//! scanned, on purpose: scanning them would keep the bytes of every destroyed
+//! File forever and defeat the point of the pass. The consequences:
+//!
+//! * the bytes of a destroyed File are removed once the grace period has
+//!   passed; undoing a destroy later restores the File resource but not its
+//!   bytes;
+//! * a hash that lives only inside a rich-text body (the Loro `doc` map of a
+//!   Document, e.g. an image node's `src`) does not keep a blob. That is safe
+//!   for live content because a blob can only be uploaded for a File resource
+//!   (`PUT /blob` is admitted by an existing referencing File), and that File
+//!   is what keeps the bytes. Only deleting the File while the document still
+//!   embeds it leaves a dangling image, as deleting any File does.
+//!
+//! A resource's row (the projection) and its Loro snapshot are written in one
+//! transaction, so every property of a live resource is also in its row.
+//!
 //! **Sweep.** Every blob the backend lists that is not marked, not in
 //! [`BlobGcOptions::keep`], and was last written at least
 //! [`BlobGcOptions::grace`] ago is deleted. The grace period covers an upload
 //! whose `File` commit has not landed yet. Blobs are listed *before* the mark
 //! phase, and each candidate's age is re-read right before its delete, so a
 //! re-upload that races the pass restarts the clock instead of being swept.
+//!
+//! The mark phase runs a **second time** after the candidates are chosen and
+//! right before the delete loop, and only candidates that are still unmarked
+//! are deleted. That catches a File that started referencing an old orphan
+//! (an undone destroy, a duplicate, a synced resource, a client that skipped
+//! the upload because the server has the bytes) during the first, long scan or
+//! the listing. A failing second mark deletes nothing. What remains is the
+//! duration of the delete loop itself, which does no listing or scanning.
+//!
+//! **One owner per store.** The mark only knows this node's database, so a
+//! second node sharing the same bucket and prefix would have its blobs deleted.
+//! The server therefore refuses to delete from an object store unless the
+//! operator asserts exclusive ownership (`ATOMIC_BLOB_GC_S3_EXCLUSIVE`).
 //!
 //! Derived caches that nothing references (processed image renditions, keyed
 //! by a synthetic hash) are collected like any other unreferenced blob once
@@ -92,6 +123,9 @@ pub struct BlobGcReport {
     pub deleted_bytes: u64,
     /// Candidates whose age changed before the delete (re-uploaded meanwhile).
     pub revived: usize,
+    /// Candidates a resource started referencing between the first mark and
+    /// the second one, right before the delete loop. Kept.
+    pub rereferenced: usize,
     /// Deletes (or age lookups) the backend refused; logged and skipped.
     pub failed: usize,
 }
@@ -255,6 +289,21 @@ impl Db {
     /// deleted because the pass could not establish what is referenced (or
     /// could not list the backend).
     pub async fn gc_blobs(&self, opts: &BlobGcOptions) -> AtomicResult<BlobGcReport> {
+        self.gc_blobs_with(opts, || self.referenced_blob_hashes())
+            .await
+    }
+
+    /// [`Self::gc_blobs`] with the mark phase injected, so a test can change
+    /// the store between the first and the second mark.
+    async fn gc_blobs_with<M, F>(
+        &self,
+        opts: &BlobGcOptions,
+        mut mark: M,
+    ) -> AtomicResult<BlobGcReport>
+    where
+        M: FnMut() -> F,
+        F: std::future::Future<Output = AtomicResult<HashSet<BlobHash>>>,
+    {
         let backend = self.blob_store();
         let grace_ms = i64::try_from(opts.grace.as_millis()).unwrap_or(i64::MAX);
         let mut report = BlobGcReport {
@@ -266,7 +315,7 @@ impl Db {
         // its fresh age out of our snapshot, which is why the age is read
         // again before each delete.
         let listed = backend.list().await?;
-        let marked = self.referenced_blob_hashes().await?;
+        let marked = mark().await?;
         report.marked = marked.len();
 
         let now = crate::utils::now();
@@ -307,27 +356,54 @@ impl Db {
             }
         }
 
-        let candidates = report.candidates.clone();
+        // Second mark: the first one may be minutes old by now (a big store, a
+        // slow listing). Anything a resource started referencing meanwhile is
+        // dropped from the candidates. If this cannot be established, delete
+        // nothing.
+        let marked_again = mark().await?;
+        let mut candidates = Vec::with_capacity(report.candidates.len());
+        for info in &report.candidates {
+            let referenced = BlobHash::try_from(info.key.as_slice())
+                .map(|hash| marked_again.contains(&hash))
+                .unwrap_or(true);
+            if referenced {
+                report.rereferenced += 1;
+            } else {
+                candidates.push(info.clone());
+            }
+        }
+
+        // The delete loop: no listing, no scanning, one age read and one
+        // delete per blob.
         for (n, info) in candidates.iter().enumerate() {
             let name = hex::encode(&info.key);
-            match backend.modified_ms(&info.key).await {
+            let age_ms = match backend.modified_ms(&info.key).await {
                 // Gone already, or no age to judge by: leave it.
                 Ok(None) => continue,
-                Ok(Some(t)) if crate::utils::now().saturating_sub(t) < grace_ms => {
-                    report.revived += 1;
-                    continue;
+                Ok(Some(t)) => {
+                    let age = crate::utils::now().saturating_sub(t);
+                    if age < grace_ms {
+                        report.revived += 1;
+                        continue;
+                    }
+                    age
                 }
-                Ok(Some(_)) => {}
                 Err(e) => {
                     tracing::warn!(blob = name, "blob GC: could not read blob age: {e}");
                     report.failed += 1;
                     continue;
                 }
-            }
+            };
             match backend.delete(&info.key).await {
                 Ok(()) => {
                     report.deleted += 1;
                     report.deleted_bytes += info.size;
+                    tracing::info!(
+                        blob = name,
+                        bytes = info.size,
+                        age_secs = age_ms / 1000,
+                        "blob GC: deleted unreferenced blob"
+                    );
                 }
                 Err(e) => {
                     tracing::warn!(blob = name, "blob GC: could not delete blob: {e}");
@@ -517,6 +593,75 @@ mod tests {
             )
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn blob_referenced_between_the_two_marks_survives() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let (db, drive) = db_with_drive().await;
+        let bytes = b"old orphan that a restored File points at again".as_slice();
+        db.put_blob(&hash_of(bytes), bytes).await.unwrap();
+        backdate(&db, bytes, 100 * HOUR);
+
+        let marks = AtomicUsize::new(0);
+        let (db_ref, drive_ref) = (&db, &drive);
+        let report = db
+            .gc_blobs_with(&BlobGcOptions::new(HOUR), || {
+                let n = marks.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    // After the first mark and the choice of candidates: a File
+                    // starts referencing the old blob without re-putting it.
+                    if n == 1 {
+                        reference_file(db_ref, drive_ref, "restored", bytes).await;
+                    }
+                    db_ref.referenced_blob_hashes().await
+                }
+            })
+            .await
+            .unwrap();
+        assert_eq!(marks.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            report.candidates.len(),
+            1,
+            "it was an orphan at the first mark"
+        );
+        assert_eq!((report.rereferenced, report.deleted), (1, 0));
+        assert!(stored(&db, bytes).await);
+
+        // Control: without the late reference the same blob is deleted.
+        let orphan = b"stays an orphan".as_slice();
+        db.put_blob(&hash_of(orphan), orphan).await.unwrap();
+        backdate(&db, orphan, 100 * HOUR);
+        let report = db.gc_blobs(&BlobGcOptions::new(HOUR)).await.unwrap();
+        assert_eq!((report.rereferenced, report.deleted), (0, 1));
+        assert!(!stored(&db, orphan).await);
+        assert!(stored(&db, bytes).await);
+    }
+
+    #[tokio::test]
+    async fn failing_second_mark_deletes_nothing() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let (db, _) = db_with_drive().await;
+        let orphan = b"would be swept".as_slice();
+        db.put_blob(&hash_of(orphan), orphan).await.unwrap();
+        backdate(&db, orphan, 100 * HOUR);
+
+        let marks = AtomicUsize::new(0);
+        let db_ref = &db;
+        let err = db
+            .gc_blobs_with(&BlobGcOptions::new(HOUR), || {
+                let n = marks.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n == 1 {
+                        return Err("blob GC aborted: resource cannot be read".into());
+                    }
+                    db_ref.referenced_blob_hashes().await
+                }
+            })
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("cannot be read"), "{err}");
+        assert!(stored(&db, orphan).await);
     }
 
     #[tokio::test]
