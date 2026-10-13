@@ -7,6 +7,20 @@ import { LoroLoader } from './loro-loader.js';
 afterEach(() => vi.restoreAllMocks());
 
 describe('save receipts', () => {
+  it('does not retry an accepted genesis when receipt bookkeeping fails', async () => {
+    const { store, posted } = await testStore();
+    const doc = await store.newResource({ noParent: true });
+    vi.spyOn(doc.__internalObject, 'recordServerAcceptance').mockImplementation(
+      () => {
+        throw new Error('receipt encoding failed');
+      },
+    );
+    await doc.save();
+    expect(store.outbox.getEntry(doc.subject)?.signedGenesis).toBeUndefined();
+    await store.syncDirtyResources();
+    expect(posted.filter(commit => commit.isGenesis)).toHaveLength(1);
+    store.setServerConnected(false);
+  });
   it('names the acknowledged server and version without claiming a local copy', async () => {
     const { store, posted } = await testStore();
     const doc = await store.newResource({ noParent: true });

@@ -708,7 +708,7 @@ export class Resource<C extends OptionalClass = any> {
         // offline branch awaits `saveOffline` and only then calls
         // `markDirty`, so the count rising correctly implies the
         // edit is in clientDb.
-        if (!this._store.serverConnected) return;
+        if (!this._store.isServerConnectedFor(this.subject)) return;
         this._store.outbox.markDirty(this.subject);
       });
     }
@@ -863,7 +863,7 @@ export class Resource<C extends OptionalClass = any> {
     // place that has to resolve them.
     // The `store` getter throws when unset (a bare `new Resource()` in tests,
     // or a resource built before it's attached), so read the field directly.
-    const origin = this._store?.getServerUrl();
+    const origin = this._store?.getResourceOrigin(this.subject);
 
     if (json && typeof json === 'object') {
       for (const [key, value] of Object.entries(json)) {
@@ -2888,7 +2888,7 @@ export class Resource<C extends OptionalClass = any> {
     this.store.outbox.setDestroyCommit(this.subject, commit);
     this.store.removeResource(this.subject);
 
-    if (!this.store.serverConnected) {
+    if (!this.store.isServerConnectedFor(this.subject)) {
       // Queued; the reconnect drain POSTs it. Resolve once the queued
       // envelope is on disk, like an offline save.
       await this.store.outbox.flush();
@@ -3735,7 +3735,10 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('No agent has been set, you cannot save.');
     }
 
-    if (this.store.requireOnlineWrites && !this.store.serverConnected) {
+    if (
+      this.store.requireOnlineWrites &&
+      !this.store.isServerConnectedFor(this.subject)
+    ) {
       throw new Error(
         'The local node is not connected; this change was not saved.',
       );
@@ -3815,7 +3818,7 @@ export class Resource<C extends OptionalClass = any> {
         }
       }
 
-      if (!this.store.serverConnected) {
+      if (!this.store.isServerConnectedFor(this.subject)) {
         // Offline: the snapshot and the outbox entry are written together.
         await this.saveOffline(hasChanges, completion);
 

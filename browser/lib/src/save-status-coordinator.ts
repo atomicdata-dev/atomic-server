@@ -6,7 +6,7 @@ interface SaveStatusDependencies {
   getOutboxEntry: (
     subject: string,
   ) => Pick<OutboxEntry, 'blocked' | 'lastAttemptError'> | undefined;
-  isConnected: () => boolean;
+  isConnected: (subject: string) => boolean;
   changePending: (delta: number) => void;
   subscribeSync: (callback: () => void) => () => void;
   onError: (error: Error) => void;
@@ -66,7 +66,9 @@ export class SaveStatusCoordinator {
     else if (error) kind = 'error';
     else if (target.hasUnsavedChanges()) kind = 'dirty';
     else kind = 'idle';
-    const queuedReason = this.dependencies.isConnected() ? 'retry' : 'offline';
+    const queuedReason = this.dependencies.isConnected(target.subject)
+      ? 'retry'
+      : 'offline';
     const reason = kind === 'queued' ? queuedReason : undefined;
     const previous = this.saveSnapshots.get(target);
     if (

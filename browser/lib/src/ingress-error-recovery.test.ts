@@ -1,10 +1,53 @@
-import { beforeAll, expect, it } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { AtomicError, ErrorType } from './error.js';
 import { Store } from './store.js';
 import { Resource } from './resource.js';
 import { LoroLoader } from './loro-loader.js';
-import { core } from './index.js';
+import { core, server } from './index.js';
 beforeAll(() => LoroLoader.initializeLoro());
+it('recovers a class-less partial SUB with a full GET while retaining later local edits', async () => {
+  const store = new Store({ serverUrl: 'http://localhost', connect: false });
+  vi.spyOn(store, 'fetchResourceFromServer').mockImplementation(
+    () => new Promise(() => {}),
+  );
+  vi.spyOn(store, 'getProperty').mockRejectedValue(new Error('offline'));
+  const subject = 'atomic:partial-sub';
+  const remote = new LoroLoader.Loro.LoroDoc();
+  const props = remote.getMap('properties');
+  props.set(core.properties.isA, [server.classes.drive]);
+  props.set(core.properties.name, 'Private home');
+  remote.commit();
+  const base = remote.oplogVersion();
+  props.set(core.properties.description, 'Remote edit');
+  remote.commit();
+  expect(
+    store.applyIncoming({
+      subject,
+      source: 'ws-sub-push',
+      loroBytes: remote.export({ mode: 'update', from: base }),
+    }),
+  ).toBe('invalid');
+  expect(
+    store.applyIncoming({
+      subject,
+      source: 'ws-pending-get',
+      loroBytes: remote.export({ mode: 'snapshot' }),
+      replaceLoroDocsFromRemote: true,
+    }),
+  ).toBe('applied');
+  const resource = store.resources.get(subject)!;
+  expect(resource.hasClasses(server.classes.drive)).toBe(true);
+  expect(resource.get(core.properties.description)).toBe('Remote edit');
+  await resource.set(core.properties.name, 'Local edit');
+  store.applyIncoming({
+    subject,
+    source: 'ws-pending-get',
+    loroBytes: remote.export({ mode: 'snapshot' }),
+    replaceLoroDocsFromRemote: true,
+  });
+  expect(resource.get(core.properties.name)).toBe('Local edit');
+  expect(resource.hasClasses(server.classes.drive)).toBe(true);
+});
 it.each([false, true])(
   'a valid snapshot clears a stale read error (own echo: %s)',
   own => {

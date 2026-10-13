@@ -1,3 +1,4 @@
+import { parseDriveRoute, type DriveRoute } from './drive-routes.js';
 import { RequestCancelledError } from './error.js';
 /**
  * Single durable queue for "writes that haven't reached the server".
@@ -63,6 +64,7 @@ export function isOutboxDatabase(db: unknown): db is OutboxDatabase {
 }
 
 export interface OutboxEntry {
+  route?: DriveRoute;
   subject: string;
   /** When this subject first became dirty since the last successful drain.
    *  Used for ordering and stale-entry detection. */
@@ -475,6 +477,7 @@ function parseStoredEntries(raw: string | null): PersistedEntry[] {
 }
 
 interface PersistedEntry {
+  route?: DriveRoute;
   subject: string;
   enqueuedAt: number;
   signedGenesis?: unknown;
@@ -522,7 +525,10 @@ export class LocalOutbox {
    *  queue is incomplete until its database attaches too. */
   private databaseExpected = false;
 
-  constructor(onChange?: () => void) {
+  constructor(
+    onChange?: () => void,
+    private readonly routeFor?: (subject: string) => DriveRoute,
+  ) {
     if (onChange) this.onChange = onChange;
     // One-shot: split the old shared queue into per-agent namespaces before
     // hydrating, so a later `rebind` finds each agent's migrated entries.
@@ -714,6 +720,8 @@ export class LocalOutbox {
 
   /** Record a mutation of `subject`'s entry: persist it and tell the store. */
   private changed(subject: string): void {
+    const entry = this.entries.get(subject);
+    if (entry && !entry.route) entry.route = this.routeFor?.(subject);
     this.touchedWhileAttaching?.add(subject);
     this.schedulePersist();
     this.onChange();
@@ -743,6 +751,7 @@ export class LocalOutbox {
       ? {
           ...(existing ?? { subject, enqueuedAt: Date.now() }),
           baseVersion: existing?.baseVersion ?? opts.baseVersion,
+          route: existing?.route ?? this.routeFor?.(subject),
         }
       : undefined;
     const db = this.database;
@@ -992,14 +1001,16 @@ export class LocalOutbox {
    *  per-entry backoff. Returns 0 when something is due now, or undefined when
    *  the outbox is empty. `Store.scheduleOutboxDrain` uses this to wake at the
    *  right time instead of busy-retrying a failing entry. */
-  nextDueAt(): number | undefined {
+  nextDueAt(
+    canDrain: (entry: OutboxEntry) => boolean = () => true,
+  ): number | undefined {
     let soonest: number | undefined;
 
     for (const e of this.entries.values()) {
       // Blocked entries never become due on their own — they wait for a fresh
       // `markDirty`. Excluding them lets `nextDueAt` return undefined when
       // nothing is drainable, so the scheduler doesn't arm a no-op timer.
-      if (e.blocked) continue;
+      if (e.blocked || !canDrain(e)) continue;
 
       const due =
         e.failures && e.lastAttemptAt !== undefined
@@ -1396,6 +1407,7 @@ export class LocalOutbox {
 function toPersisted(e: OutboxEntry): PersistedEntry {
   return {
     subject: e.subject,
+    route: e.route,
     enqueuedAt: e.enqueuedAt,
     signedGenesis: e.signedGenesis
       ? commitToJsonADObject(e.signedGenesis)
@@ -1454,6 +1466,7 @@ function parseEntry(p: unknown): OutboxEntry | undefined {
 
   return {
     subject: obj.subject,
+    route: parseDriveRoute(obj.route),
     enqueuedAt,
     signedGenesis,
     signedDestroy,

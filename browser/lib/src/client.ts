@@ -1,3 +1,5 @@
+import { core } from './ontologies/core.js';
+import { server as serverOntology } from './ontologies/server.js';
 // Provides functionality to interact with an Atomic Server.
 // Send requests to the server and receive responses.
 
@@ -346,7 +348,27 @@ export class Client {
           if (opts.noNested) {
             resource = json;
           } else {
-            const resources = parser.parse(json, subject);
+            // A bound tenant root is an address for its canonical DID drive.
+            // Only this endpoint/shape may change identity; ordinary documents
+            // still reject a mismatched @id.
+            const canonical = response.headers
+              .get('Link')
+              ?.match(/<([^>]+)>;\s*rel="canonical"/)?.[1];
+            const canonicalAlias =
+              canonical &&
+              isAtomicIdentifier(canonical) &&
+              json?.['@id'] === subject;
+            if (canonicalAlias) json['@id'] = canonical;
+            const driveAlias =
+              Client.isBareHttpOrigin(subject) &&
+              typeof json?.['@id'] === 'string' &&
+              isAtomicIdentifier(json['@id']) &&
+              Array.isArray(json[core.properties.isA]) &&
+              json[core.properties.isA].includes(serverOntology.classes.drive);
+            const resources = parser.parse(
+              json,
+              canonicalAlias ? canonical : driveAlias ? undefined : subject,
+            );
 
             if (resources.length === 0) {
               throw new AtomicError(

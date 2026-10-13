@@ -302,7 +302,18 @@ export class Collection {
   private isDestroyed(subject: string): boolean {
     return this.store.isDestroyed(subject);
   }
-  private server: string;
+  private initialServer: string;
+  private followsRoute = false;
+  private get routingSubject(): string | undefined {
+    return this.params.property === core.properties.parent
+      ? this.params.value
+      : this.params.drive;
+  }
+  private get server(): string {
+    return this.followsRoute
+      ? this.store.getServerUrlForSubject(this.routingSubject)
+      : this.initialServer;
+  }
   private params: CollectionParams;
 
   private _totalMembers = 0;
@@ -339,7 +350,7 @@ export class Collection {
       identity: number;
       database: ReturnType<Store['getClientDb']>;
       server: string;
-      route: number;
+      route: string;
     }
   >();
 
@@ -347,8 +358,8 @@ export class Collection {
     return {
       identity: this.store.getIdentityGeneration(),
       database: this.store.getClientDb(),
-      server: this.store.getServerUrl(),
-      route: this.store.getRoutingGeneration(),
+      server: this.server,
+      route: this.store.captureRoute(this.routingSubject ?? this.server).key,
     };
   }
 
@@ -383,10 +394,15 @@ export class Collection {
     server: string,
     params: CollectionParams,
     noFetch = false,
-    options: { preferServer?: boolean; explicitDrive?: boolean } = {},
+    options: {
+      preferServer?: boolean;
+      explicitDrive?: boolean;
+      followsRoute?: boolean;
+    } = {},
   ) {
     this.store = store;
-    this.server = server;
+    this.initialServer = server;
+    this.followsRoute = !!options.followsRoute;
     this.params = params;
     this.preferServer = !!options.preferServer;
     this.explicitDrive = !!options.explicitDrive;
@@ -915,7 +931,7 @@ export class Collection {
       options.requireComplete &&
       this.completeness !== 'complete' &&
       this.identityGeneration === this.store.getIdentityGeneration() &&
-      this.store.serverConnected
+      this.store.isServerConnectedFor(this.routingSubject ?? this.server)
     ) {
       // A cached local page may be partial even if another Collection asked
       // this query earlier. A mutation needing every member must ask anew.
@@ -1037,8 +1053,11 @@ export class Collection {
     // connection; without one the local database answers as usual.
     if (
       this.preferServer &&
-      (this.store.serverConnected ||
-        (await this.store.waitForServerConnected(3000)))
+      (this.store.isServerConnectedFor(this.routingSubject ?? this.server) ||
+        (await this.store.waitForServerConnected(
+          3000,
+          this.routingSubject ?? this.server,
+        )))
     ) {
       try {
         await this.fetchPageFromServer(page);
@@ -1076,7 +1095,7 @@ export class Collection {
       // hid every later message from the host, on every reload. Asked once
       // per page per session, not on every mount.
       if (
-        this.store.serverConnected &&
+        this.store.isServerConnectedFor(this.routingSubject ?? this.server) &&
         !this.store.hasCompletedDriveSyncFor(
           this.params.drive ?? this.store.getDrive(),
         ) &&
@@ -1102,7 +1121,7 @@ export class Collection {
       return;
     }
 
-    if (this.store.serverConnected) {
+    if (this.store.isServerConnectedFor(this.routingSubject ?? this.server)) {
       await this.fetchPageFromServer(page).catch(() => undefined);
 
       return;
@@ -1118,9 +1137,12 @@ export class Collection {
     // flips after AUTH_OK — which is why the sidebar came up empty when signed
     // in and full when signed out. Being offline for real costs one bounded
     // wait. If neither source answers, the page remains unavailable.
-    await this.store.waitForServerConnected(3000);
+    await this.store.waitForServerConnected(
+      3000,
+      this.routingSubject ?? this.server,
+    );
 
-    if (this.store.serverConnected) {
+    if (this.store.isServerConnectedFor(this.routingSubject ?? this.server)) {
       await this.fetchPageFromServer(page).catch(() => undefined);
     }
   }
@@ -1269,7 +1291,10 @@ export class Collection {
       // instead. With no server to ask, this database is the only source this
       // query has, so it is worth every second it takes — an offline page that
       // asked nobody would render as if the drive were empty.
-      if (!clientDb.isReady && !this.store.serverConnected) {
+      if (
+        !clientDb.isReady &&
+        !this.store.isServerConnectedFor(this.routingSubject ?? this.server)
+      ) {
         await clientDb.waitForReady();
       }
     }
@@ -1312,7 +1337,7 @@ export class Collection {
     // server has them all, so let it answer instead of a partial list, and do
     // not queue a query behind the sync's writes first.
     if (
-      this.store.serverConnected &&
+      this.store.isServerConnectedFor(this.routingSubject ?? this.server) &&
       this.store.isDriveSyncPulling() &&
       !this.store.hasCompletedDriveSyncFor(drive)
     ) {
@@ -1341,7 +1366,7 @@ export class Collection {
     // deadline (a worker busy with a drive sync's writes) is no answer. A
     // local-only parent has no server to ask, so it waits as long as it takes.
     const result =
-      this.store.serverConnected &&
+      this.store.isServerConnectedFor(this.routingSubject ?? this.server) &&
       !(
         typeof this.params.value === 'string' &&
         this.store.isLocalOnlySubject(this.params.value)
@@ -1359,7 +1384,7 @@ export class Collection {
 
     // The sync may have started pulling while the query ran.
     if (
-      this.store.serverConnected &&
+      this.store.isServerConnectedFor(this.routingSubject ?? this.server) &&
       this.store.isDriveSyncPulling() &&
       !this.store.hasCompletedDriveSyncFor(drive)
     ) {
@@ -1734,6 +1759,14 @@ export class Collection {
     // GET-before-Loro-ready race that affected the drive resource. Ensure Loro
     // is loaded and force-materialize the doc before reading its props.
     await enableLoro();
+
+    if (
+      this.readScope().route !== scope.route ||
+      this.server !== scope.server
+    ) {
+      throw new Error('Collection destination changed while loading');
+    }
+
     resource.getLoroDoc();
 
     // Same leak as `fetchPageFromLocalDb`: the server's atom-by-atom index
@@ -1746,6 +1779,16 @@ export class Collection {
       (m): m is string => m !== undefined,
     );
     const filteredMembers = filterIndexLeakage(rawMembers);
+    // A query on a background drive can be the first sight of these DIDs.
+    // Carry its scope into later reads, but never migrate an explicit replica.
+    const owner =
+      this.routingSubject && this.store.driveOfSubject(this.routingSubject);
+
+    if (owner && this.store.getServerUrlForSubject(owner) === scope.server) {
+      for (const member of filteredMembers)
+        this.store.rememberResourceDrive(member, owner);
+    }
+
     const answeredTotal = resource.props.totalMembers;
 
     if (!isNumber(answeredTotal)) {

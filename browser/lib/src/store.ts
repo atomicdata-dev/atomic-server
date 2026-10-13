@@ -1,3 +1,8 @@
+import {
+  serverOrigin as normalizeServerOrigin,
+  parseDriveRoute,
+  type DriveRoute,
+} from './drive-routes.js';
 import type { ScheduledSave, ResourceSaveState } from './scheduled-save.js';
 import { SaveStatusCoordinator } from './save-status-coordinator.js';
 import { verifyLocalDriveCopy } from './local-drive-copy.js';
@@ -374,6 +379,7 @@ export enum StoreEvents {
   ServerURLChanged = 'server-url-changed',
   /** Event that gets called whenever the drive changes */
   DriveChanged = 'drive-changed',
+  DriveRouteChanged = 'drive-route-changed',
   /** Event that gets called whenever the websocket/server connection changes */
   ConnectionChanged = 'connection-changed',
   /** Event that gets called whenever sync/debug status changes */
@@ -470,6 +476,7 @@ type StoreEventHandlers = {
   [StoreEvents.AgentChanged]: AgentCallback;
   [StoreEvents.ServerURLChanged]: ServerURLCallback;
   [StoreEvents.DriveChanged]: DriveCallback;
+  [StoreEvents.DriveRouteChanged]: DriveCallback;
   [StoreEvents.ConnectionChanged]: ConnectionStateCallback;
   [StoreEvents.SyncStatusChanged]: SyncStatusCallback;
   [StoreEvents.CommitLogChanged]: CommitLogCallback;
@@ -807,10 +814,13 @@ export class Store {
    * Constructor callback re-emits `SyncStatusChanged` so subscribers
    * see queue-size changes without a manual `markDirtyForSync` call.
    */
-  public readonly outbox: LocalOutbox = new LocalOutbox(() => {
-    this.emitSyncStatus();
-    this.scheduleOutboxDrain();
-  });
+  public readonly outbox: LocalOutbox = new LocalOutbox(
+    () => {
+      this.emitSyncStatus();
+      this.scheduleOutboxDrain();
+    },
+    subject => this.pinSubjectRoute(subject),
+  );
   /** Only restored queues need legacy genesis baseline repair. Online saves
    * must remain independent of local database readiness. */
   private restoredOutboxEntries = new WeakSet<OutboxEntry>();
@@ -835,7 +845,11 @@ export class Store {
    * land instead of stranding until the next user keystroke.
    */
   private scheduleOutboxDrain(): void {
-    if (!this._serverConnected) return;
+    if (
+      ![...this.serverConnections.values()].some(s => s.connected) &&
+      !this._serverConnected
+    )
+      return;
     if (this.outbox.size === 0) return;
     if (!this.getAgent()) return;
     // Wake when the soonest entry is due (0 = due now), honoring per-entry
@@ -843,7 +857,9 @@ export class Store {
     // an existing timer: a fresh edit (due now) must not wait behind a failing
     // entry's backoff window, and a drain that skipped only-backing-off entries
     // must still re-arm so they retry when due.
-    const dueAt = this.outbox.nextDueAt();
+    const dueAt = this.outbox.nextDueAt(entry =>
+      this.isServerConnectedFor(entry.subject),
+    );
 
     // `undefined` means nothing is drainable (e.g. every entry is blocked on an
     // unrecoverable 401). Don't arm a timer — those wait for a fresh edit.
@@ -858,7 +874,11 @@ export class Store {
     if (this.outboxDrainTimer) clearTimeout(this.outboxDrainTimer);
     this.outboxDrainTimer = setTimeout(() => {
       this.outboxDrainTimer = undefined;
-      if (!this._serverConnected) return;
+      if (
+        ![...this.serverConnections.values()].some(s => s.connected) &&
+        !this._serverConnected
+      )
+        return;
       void this.syncDirtyResources().catch(() => undefined);
     }, delay);
   }
@@ -877,6 +897,7 @@ export class Store {
   private _serverConnectionError: string | undefined;
   private _driveSyncInProgress = false;
   private _driveSyncPulling = false;
+  private activeDriveSyncs = new Map<string, boolean>();
   /**
    * Saves that a UI layer has scheduled (e.g. `useValue`'s commit
    * debounce) but whose `save()` hasn't run yet. During that window the
@@ -1187,20 +1208,25 @@ export class Store {
    * resolved against the in-memory store.
    */
   private driveOf(subject: string): string {
-    let current = subject;
+    let current = this.resolveSubject(subject);
     const seen = new Set<string>();
 
     for (let i = 0; i < 64; i++) {
       if (seen.has(current)) break;
 
       seen.add(current);
-      const parent = this.resources.get(current)?.get(core.properties.parent);
+      const resource = this.resources.get(current);
+      if (resource?.hasClasses(server.classes.drive)) return current;
+      const declared = resource?.get('https://atomicdata.dev/properties/drive');
+      if (typeof declared === 'string' && declared)
+        return this.resolveSubject(declared);
+      const parent = resource?.get(core.properties.parent);
 
       if (typeof parent !== 'string' || !parent || parent === current) {
-        return current;
+        return this.resourceDrives.get(current) ?? current;
       }
 
-      current = parent;
+      current = this.resolveSubject(parent);
     }
 
     return current;
@@ -1230,6 +1256,332 @@ export class Store {
     }
 
     this.localOnlyDrives.add(normalized);
+  }
+
+  private driveServers = new Map<string, string>();
+  private routeRevisions = new Map<string, number>();
+  private resourceOrigins = new Map<string, string>();
+  private resourceDrives = new Map<string, string>();
+  private serverConnections = new Map<
+    string,
+    { connected: boolean; error?: string }
+  >();
+
+  private routeStorageKey(): string {
+    return `atomic.driveServers.${this.agent?.subject ?? '__anonymous__'}`;
+  }
+
+  private persistDriveServers(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(
+        this.routeStorageKey(),
+        JSON.stringify([...this.driveServers]),
+      );
+    }
+  }
+
+  private loadDriveServers(): void {
+    this.driveServers.clear();
+    this.routeRevisions.clear();
+    this.resourceOrigins.clear();
+    this.resourceDrives.clear();
+    this._syncedDrives.clear();
+    this.activeDriveSyncs.clear();
+    this.updateDriveSyncProgress();
+    if (typeof localStorage === 'undefined') return;
+
+    try {
+      const entries: unknown = JSON.parse(
+        localStorage.getItem(this.routeStorageKey()) ?? '[]',
+      );
+      if (!Array.isArray(entries)) return;
+
+      for (const entry of entries) {
+        if (!Array.isArray(entry)) continue;
+        const route = parseDriveRoute({ drive: entry[0], server: entry[1] });
+        if (route)
+          this.driveServers.set(
+            this.normalizeSubject(route.drive),
+            route.server,
+          );
+      }
+    } catch {
+      /* A corrupt preference does not prevent local recovery. */
+    }
+  }
+
+  /** Explicit placement, including a migration. Changing the default server
+   * never moves a drive. The full origin is retained for vanity subdomains. */
+  public setDriveServer(
+    drive: string,
+    url: string,
+    { connect = true } = {},
+  ): void {
+    const key = this.resolveSubject(drive);
+    const origin = normalizeServerOrigin(url);
+    const previous = this.driveServers.get(key);
+
+    if (previous !== origin) {
+      this.driveServers.set(key, origin);
+      this.routeRevisions.set(key, (this.routeRevisions.get(key) ?? 0) + 1);
+      this.routingGeneration++;
+      this._syncedDrives.delete(key);
+      this.activeDriveSyncs.delete(key);
+      this.updateDriveSyncProgress();
+      this.collectionPagesAnsweredByServer.clear();
+
+      // A receipt from the old destination cannot certify a migrated copy.
+      if (previous) {
+        for (const resource of this.resources.values()) {
+          if (this.driveOf(resource.subject) === key) {
+            this.rememberResourceOrigin(resource.subject, origin);
+            resource.clearLoroSaveCursor();
+          }
+        }
+      }
+
+      this.persistDriveServers();
+
+      // Old frames have no placement revision on the wire. Cancel that socket
+      // at a migration boundary; other drives reconnect to their own origin.
+      if (previous && this.webSockets.has(previous)) {
+        this.webSockets.get(previous)!.close();
+        this.webSockets.delete(previous);
+
+        if (
+          [...this.driveServers.values()].includes(previous) ||
+          previous === this.serverUrl
+        ) {
+          this.openWebSocket(previous);
+        }
+      }
+
+      this.eventManager.emit(StoreEvents.DriveRouteChanged, key);
+    }
+
+    if (
+      connect &&
+      supportsWebSockets() &&
+      (typeof localStorage === 'undefined' ||
+        localStorage.getItem('ws-disconnected') !== '1')
+    ) {
+      this.openWebSocket(origin);
+    }
+
+    this.emitSyncStatus();
+    this.scheduleOutboxDrain();
+  }
+
+  /** An unset route uses the bootstrap server once, then keeps that choice.
+   * Outbox entries carry it too, so a cold delete needs no surviving resource. */
+  public routeForSubject(subject: string): DriveRoute {
+    let key = this.resolveSubject(subject);
+
+    if (/^https?:/.test(subject)) {
+      const url = new URL(subject);
+      const drive = url.searchParams.get('drive');
+      if (drive) key = this.resolveSubject(drive);
+    }
+
+    const queued = this.outbox.getEntry(key)?.route;
+
+    // Parentless Agent profiles are shared identities, not drive-owned rows.
+    // Publish a fresh edit to the selected node; an already queued edit keeps
+    // its captured destination. Access-key profiles with a parent stay scoped.
+    if (
+      isAgentSubject(key) &&
+      !this.resources.get(key)?.get(core.properties.parent)
+    ) {
+      return {
+        drive: key,
+        server:
+          queued?.server ??
+          this.driveServers.get(
+            this.normalizeSubject(this.getDrive() ?? this.serverUrl),
+          ) ??
+          this.serverUrl,
+      };
+    }
+
+    const drive = this.normalizeSubject(queued?.drive ?? this.driveOf(key));
+    const fallback = /^https?:/.test(subject)
+      ? normalizeServerOrigin(subject)
+      : this.serverUrl;
+    // Query endpoints explicitly name their server. Their drive still supplies
+    // the revision fence, including when a caller deliberately queries a replica.
+    if (/^https?:/.test(subject) && new URL(subject).search)
+      return { drive, server: fallback };
+
+    return {
+      drive,
+      server:
+        this.driveServers.get(drive) ??
+        queued?.server ??
+        this.resourceOrigins.get(key) ??
+        fallback,
+    };
+  }
+
+  public getServerUrlForSubject(subject?: string): string {
+    return subject ? this.routeForSubject(subject).server : this.serverUrl;
+  }
+
+  /** Pure lookup used during Loro materialization, which cannot walk propvals
+   * while those same propvals are being rebuilt. */
+  public getResourceOrigin(subject: string): string | undefined {
+    const key = this.normalizeSubject(subject);
+
+    return (
+      this.resourceOrigins.get(key) ??
+      this.driveServers.get(key) ??
+      (/^https?:/.test(subject)
+        ? normalizeServerOrigin(subject)
+        : this.serverUrl)
+    );
+  }
+
+  public rememberResourceOrigin(subject: string, origin: string): void {
+    this.resourceOrigins.set(
+      this.normalizeSubject(subject),
+      normalizeServerOrigin(origin),
+    );
+  }
+
+  /** A scoped query establishes ownership even before a member is loaded. */
+  public rememberResourceDrive(subject: string, drive: string): void {
+    this.resourceDrives.set(
+      this.resolveSubject(subject),
+      this.resolveSubject(drive),
+    );
+  }
+
+  public learnServerResource(
+    resource: Resource,
+    origin: string,
+    alias?: string,
+  ): void {
+    if (resource.error) return;
+    const subject = this.normalizeSubject(resource.subject);
+    this.rememberResourceOrigin(subject, origin);
+    if (alias && this.normalizeSubject(alias) !== subject)
+      this.aliases.set(this.normalizeSubject(alias), subject);
+    const declared = resource.get('https://atomicdata.dev/properties/drive');
+    const drive = resource.hasClasses(server.classes.drive)
+      ? subject
+      : typeof declared === 'string'
+        ? this.normalizeSubject(declared)
+        : undefined;
+
+    if (!resource.error && drive && !this.driveServers.has(drive)) {
+      this.driveServers.set(drive, origin);
+      this.persistDriveServers();
+    }
+  }
+
+  public acceptsServerResource(
+    subject: string,
+    origin: string,
+    bytes?: Uint8Array,
+  ): boolean {
+    let drive = this.driveOf(subject);
+    let expected = this.driveServers.get(drive);
+
+    if (!expected && bytes && LoroLoader.isLoaded()) {
+      const doc = new LoroLoader.Loro.LoroDoc();
+
+      try {
+        doc.import(bytes);
+        const declared = doc
+          .getMap('properties')
+          .get('https://atomicdata.dev/properties/drive');
+
+        if (typeof declared === 'string') {
+          drive = this.normalizeSubject(declared);
+          expected = this.driveServers.get(drive);
+        }
+      } catch {
+        /* A delta may need the cached document; normal ingress handles it. */
+      } finally {
+        doc.free();
+      }
+    }
+
+    return !expected || expected === origin;
+  }
+
+  private pinSubjectRoute(subject: string): DriveRoute {
+    const route = this.routeForSubject(subject);
+
+    if (
+      route.server &&
+      !isAgentSubject(subject) &&
+      !this.driveServers.has(route.drive)
+    ) {
+      this.driveServers.set(route.drive, route.server);
+      this.persistDriveServers();
+    }
+
+    return route;
+  }
+
+  /** A continuation is owned by an identity and a placement revision, never by
+   * whichever workspace happens to be selected when its response arrives. */
+  public captureRoute(
+    subject: string,
+  ): DriveRoute & { current: () => boolean; key: string } {
+    const route = this.routeForSubject(subject);
+    const identity = this.identityGeneration;
+    const revision = this.routeRevisions.get(route.drive) ?? 0;
+
+    return {
+      ...route,
+      key: JSON.stringify([identity, route.drive, route.server, revision]),
+      current: () =>
+        identity === this.identityGeneration &&
+        revision === (this.routeRevisions.get(route.drive) ?? 0) &&
+        route.server === this.getServerUrlForSubject(subject),
+    };
+  }
+
+  public isServerConnectedFor(subject?: string): boolean {
+    const origin = this.getServerUrlForSubject(subject);
+
+    return (
+      this.serverConnections.get(origin)?.connected ??
+      (origin === this.serverUrl && this._serverConnected)
+    );
+  }
+
+  /** Report every origin independently. One failed tenant must not pause the
+   * outbox or overwrite the status of another tenant. */
+  public reportServerConnection(
+    origin: string,
+    connected: boolean,
+    error?: string,
+  ): void {
+    this.serverConnections.set(origin, { connected, error });
+
+    if (origin === this.serverUrl) this.setServerConnected(connected, error);
+    else {
+      this.eventManager.emit(
+        StoreEvents.ConnectionChanged,
+        this.serverConnected,
+      );
+      this.emitSyncStatus();
+    }
+
+    if (!connected) {
+      for (const [drive, host] of this.driveServers) {
+        if (host === origin) {
+          this._syncedDrives.delete(this.normalizeSubject(drive));
+          this.activeDriveSyncs.delete(drive);
+        }
+      }
+    }
+
+    this.updateDriveSyncProgress();
+    this.emitSyncStatus();
+    if (connected) this.scheduleOutboxDrain();
   }
 
   /** The drive a subject belongs to, for naming it to the person. */
@@ -1304,7 +1656,7 @@ export class Store {
 
     if (this.isDriveRefusedByServer(drive)) {
       this.registerLocalOnlyDrive(drive);
-      this.getDefaultWebSocket()?.unsubscribeFromDrive(drive);
+      this.getWebSocketForSubject(drive)?.unsubscribeFromDrive(drive);
 
       for (const entry of this.outbox.pending()) {
         const subject = this.normalizeSubject(entry.subject);
@@ -1327,7 +1679,7 @@ export class Store {
       return;
     }
 
-    const serverUrl = this.serverUrl;
+    const route = this.captureRoute(drive);
     // Sockets are registered under whatever string opened them, which is not
     // always `serverUrl`, so fall back to the drive's origin exactly as
     // `promoteLocalDrive` does. An open one, at that: the inventory below is a
@@ -1335,9 +1687,7 @@ export class Store {
     // with "WebSocket is not open", which is not something a user can act on.
     const open = (candidate: WSClient | undefined) =>
       candidate?.readyState === WebSocket.OPEN ? candidate : undefined;
-    const ws =
-      open(this.getDefaultWebSocket()) ??
-      open(this.getWebSocketForSubject(normalized));
+    const ws = open(this.getWebSocketForSubject(normalized));
 
     if (!ws)
       throw new AtomicError(
@@ -1351,7 +1701,7 @@ export class Store {
         this.getClientDb() !== db ||
         this.getAgent() !== agent ||
         this.getIdentityGeneration() !== generation ||
-        this.serverUrl !== serverUrl ||
+        !route.current() ||
         (status.syncInProgress &&
           !(allowDriveSync && this._driveSyncInProgress)) ||
         status.pendingDirtyCount ||
@@ -1368,9 +1718,29 @@ export class Store {
     const deadline = Date.now() + 15_000;
 
     const settled = async () => {
-      while (this._driveSyncInProgress && Date.now() < deadline) {
+      if (this._driveSyncInProgress) {
         current(true);
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise<void>((resolve, reject) => {
+          let unsubscribe = () => {};
+
+          const finish = () => {
+            clearTimeout(timer);
+            unsubscribe();
+
+            try {
+              current();
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          };
+
+          const timer = setTimeout(finish, Math.max(0, deadline - Date.now()));
+          unsubscribe = this.on(StoreEvents.SyncStatusChanged, () => {
+            if (!this._driveSyncInProgress || !route.current()) finish();
+          });
+          if (!this._driveSyncInProgress) finish();
+        });
       }
 
       current();
@@ -1395,33 +1765,43 @@ export class Store {
     );
     const local = await db.getVersionVectorsForDrive(drive);
 
-    for (const item of inventory) {
+    const missing = inventory.filter(item => {
       const vv = local[item.subject];
-      if (
-        vv &&
-        Object.entries(item.vv).every(
+
+      return (
+        !vv ||
+        !Object.entries(item.vv).every(
           ([peer, counter]) => (vv[peer] ?? 0) >= counter,
         )
-      )
-        continue;
-      await settled();
-      const resource = await this.fetchResourceFromServer(item.subject, {
-        noWebSocket: true,
-      });
-      if (resource.error) throw resource.error;
-      await settled();
-      const jsonAd = resource.toClientDbJsonAd();
-      const snapshot = resource.getLoroDoc()?.export({ mode: 'snapshot' });
+      );
+    });
 
-      if (!jsonAd || !snapshot?.length) {
-        throw new Error(
-          'A resource is missing its local history. Keep the server connected.',
-        );
-      }
+    // Bound pressure on HTTP and the local worker without serializing an
+    // entire large workspace. Every continuation still checks its owner.
+    for (let offset = 0; offset < missing.length; offset += 8) {
+      await Promise.all(
+        missing.slice(offset, offset + 8).map(async item => {
+          await settled();
+          const resource = await this.fetchResourceFromServer(item.subject, {
+            noWebSocket: true,
+            drive,
+          });
+          if (resource.error) throw resource.error;
+          await settled();
+          const jsonAd = resource.toClientDbJsonAd();
+          const snapshot = resource.getLoroDoc()?.export({ mode: 'snapshot' });
 
-      await this.persistState(db, resource.subject, jsonAd, snapshot, {
-        exact: true,
-      });
+          if (!jsonAd || !snapshot?.length) {
+            throw new Error(
+              'A resource is missing its local history. Keep the server connected.',
+            );
+          }
+
+          await this.persistState(db, resource.subject, jsonAd, snapshot, {
+            exact: true,
+          });
+        }),
+      );
     }
 
     await verifyLocalDriveCopy(db, drive, inventory);
@@ -1479,7 +1859,10 @@ export class Store {
   public isLiveSyncedDrive(drive: string): boolean {
     if (!drive || this.isLocalOnlyDrive(drive)) return false;
 
-    return !this.isForeignOriginSubject(drive);
+    return (
+      !this.isForeignOriginSubject(drive) ||
+      this.driveServers.has(this.driveOf(drive))
+    );
   }
 
   /**
@@ -1502,7 +1885,7 @@ export class Store {
 
     if (!this.isLocalOnlyDrive(normalized)) return;
 
-    if (!this._serverConnected) {
+    if (!this.isServerConnectedFor(normalized)) {
       throw new AtomicError(
         'Connect to a server before syncing this workspace.',
         ErrorType.Server,
@@ -1514,8 +1897,7 @@ export class Store {
     this.unregisterLocalOnlyDrive(normalized);
     this.subscribeWebSocket(normalized);
 
-    const ws =
-      this.getDefaultWebSocket() ?? this.getWebSocketForSubject(normalized);
+    const ws = this.getWebSocketForSubject(normalized);
     await ws?.resyncDrive(normalized);
   }
 
@@ -1533,11 +1915,18 @@ export class Store {
     timeoutMs = 60_000,
   ): Promise<void> {
     const normalized = this.normalizeSubject(drive);
+    const route = this.captureRoute(drive);
+
+    const assertCurrent = () => {
+      if (!route.current())
+        throw new RequestCancelledError(
+          'Workspace destination changed during verification',
+        );
+    };
+
     const open = (candidate: WSClient | undefined) =>
       candidate?.readyState === WebSocket.OPEN ? candidate : undefined;
-    const ws =
-      open(this.getDefaultWebSocket()) ??
-      open(this.getWebSocketForSubject(normalized));
+    const ws = open(this.getWebSocketForSubject(normalized));
     const db = this.getClientDb();
 
     if (!ws || !db) {
@@ -1554,6 +1943,7 @@ export class Store {
     let lastProblem = 'The server has not received this workspace yet.';
 
     while (Date.now() < deadline) {
+      assertCurrent();
       await ws.resyncDrive(normalized);
       await db.flush();
 
@@ -1580,11 +1970,13 @@ export class Store {
             );
           });
 
+          assertCurrent();
           if (missing.length === 0) return;
 
           lastProblem = `The server is still missing ${missing.length} item(s).`;
         }
       } catch (e) {
+        assertCurrent();
         lastProblem = e instanceof Error ? e.message : String(e);
       }
 
@@ -1755,11 +2147,11 @@ export class Store {
               subject: entry.subject,
               error,
               failures: entry.failures ?? 0,
-              server: this.getServerUrl(),
-              drive: this.getDrive(),
+              server: this.getServerUrlForSubject(entry.subject),
+              drive: this.driveOfSubject(entry.subject),
               ageMs: Math.max(0, Date.now() - entry.enqueuedAt),
               outboxSize: this.outbox.size,
-              connected: this._serverConnected,
+              connected: this.isServerConnectedFor(entry.subject),
               isGenesis: entry.signedGenesis !== undefined,
               rearmedAfterResync: entry.rearmedAfterResync === true,
             });
@@ -1961,7 +2353,51 @@ export class Store {
       return;
     }
 
-    const endpoint = new URL('/commit', this.serverUrl).toString();
+    // Queues from before per-drive routing have no captured route. Recover
+    // their ownership from local metadata before choosing a connection, without
+    // fetching a deleted resource or sending anything to the bootstrap server.
+    if (!entry.route && this.clientDb) {
+      const identity = this.identityGeneration;
+      let ancestor = this.normalizeSubject(subject);
+      const seen = new Set<string>();
+
+      for (let depth = 0; depth < 64 && !seen.has(ancestor); depth++) {
+        seen.add(ancestor);
+
+        if (this.driveServers.has(ancestor)) {
+          this.rememberResourceDrive(subject, ancestor);
+          break;
+        }
+
+        const row = await this.clientDb.getResourceWithSnapshot(ancestor);
+        if (
+          identity !== this.identityGeneration ||
+          this.outbox.getEntry(subject) !== entry
+        )
+          throw new RequestCancelledError('Outbox identity changed');
+        if (!row.jsonAd) break;
+        const values = JSON.parse(row.jsonAd);
+        const parent =
+          values['https://atomicdata.dev/properties/drive'] ??
+          values[core.properties.parent];
+        if (typeof parent !== 'string') break;
+        ancestor = this.normalizeSubject(parent);
+      }
+    }
+
+    if (!this.isServerConnectedFor(subject)) return;
+    const route = this.captureRoute(subject);
+    const owner = entry;
+
+    const assertCurrent = () => {
+      if (!route.current() || this.outbox.getEntry(subject) !== owner) {
+        throw new RequestCancelledError(
+          'Commit destination or identity changed',
+        );
+      }
+    };
+
+    const endpoint = new URL('/commit', route.server).toString();
 
     // Step 0: a queued destroy supersedes everything else for this subject.
     // Handled BEFORE the cold-drain `getResource` below, which would refetch
@@ -1969,6 +2405,7 @@ export class Store {
     if (entry.signedDestroy) {
       await this.drainDestroy(subject, entry.signedDestroy, endpoint, {
         neverSynced: !!entry.signedGenesis,
+        assertCurrent,
       });
 
       return;
@@ -2017,18 +2454,26 @@ export class Store {
           ?.appliedCommitSignatures.add(genesis.signature);
       }
 
+      assertCurrent();
       const created = await this.postCommit(genesis, endpoint);
-      this.resources
-        .get(subject)
-        ?.recordServerAcceptance(
-          endpoint,
-          created,
-          LoroLoader.Loro.decodeImportBlobMeta(genesis.loroUpdate!, false)
-            .partialEndVersionVector,
-        );
-      // Publish the acknowledgement before ResourceSaved listeners decide
-      // whether this new resource can be subscribed on the server.
+      assertCurrent();
+      // Acceptance owns queue cleanup. Receipt bookkeeping must never turn
+      // a successful POST into a retry of the accepted genesis.
       this.outbox.clearGenesis(subject);
+
+      try {
+        this.resources
+          .get(subject)
+          ?.recordServerAcceptance(
+            endpoint,
+            created,
+            LoroLoader.Loro.decodeImportBlobMeta(genesis.loroUpdate!, false)
+              .partialEndVersionVector,
+          );
+      } catch (error) {
+        console.warn('Could not record the accepted genesis receipt', error);
+      }
+
       const commitId = commitIdOf(created);
       const resource = this.resources.get(subject);
 
@@ -2241,7 +2686,9 @@ export class Store {
     const { bytes: delta, versionAfterExport } = exported;
     const builder = new CommitBuilder(subject);
     builder.setLoroUpdate(delta);
+    assertCurrent();
     const commit = await builder.sign(agent);
+    assertCurrent();
 
     // Registered before the POST, not after the ack: the server echoes the
     // commit to this connection too, and under load that echo lands before
@@ -2255,6 +2702,7 @@ export class Store {
 
     try {
       created = await this.postCommit(commit, endpoint);
+      assertCurrent();
     } catch (e) {
       // Pending-deps rejection: the delta we just sent starts past ops the
       // server never received (an earlier commit was lost after the save
@@ -2342,7 +2790,7 @@ export class Store {
     subject: string,
     destroy: Commit,
     endpoint: string,
-    opts: { neverSynced: boolean },
+    opts: { neverSynced: boolean; assertCurrent: () => void },
   ): Promise<void> {
     if (!opts.neverSynced) {
       // Registered before the POST like every own commit: should the server
@@ -2370,6 +2818,7 @@ export class Store {
     // syncing. Then make sure the resource is gone locally too — `destroy()`
     // already removed it optimistically, but a cold drain after a reload
     // (or a fetch that raced the delete) may have brought it back.
+    opts.assertCurrent();
     this.outbox.clearDestroy(subject);
     this.removeResource(subject);
     this.emitSyncStatus();
@@ -2711,7 +3160,10 @@ export class Store {
         // every `waitForSynced` / offline-sync flow strands. (sync:219.)
         if (url.search) return false;
 
-        return url.origin === new URL(this.serverUrl).origin;
+        return (
+          url.origin === new URL(this.serverUrl).origin ||
+          [...this.driveServers.values()].includes(url.origin)
+        );
       } catch {
         return false;
       }
@@ -2970,7 +3422,6 @@ export class Store {
         const url = new URL(change.subject);
         queryProjection =
           url.pathname === '/query' &&
-          url.origin === new URL(this.serverUrl).origin &&
           change.resource.subject === change.subject;
       }
 
@@ -3204,9 +3655,18 @@ export class Store {
     // don't overwrite it with the server's version. The local changes
     // need to be synced first.
     if (storeResource) {
-      storeResource.merge(resource.__internalObject, {
-        replaceLoroDocs: replaceLoroDocsFromRemote,
-      });
+      try {
+        storeResource.merge(resource.__internalObject, {
+          replaceLoroDocs: replaceLoroDocsFromRemote,
+        });
+      } catch (error) {
+        // Preserve the existing history, but surface failed ingress even for
+        // fire-and-forget callers. They must not silently replace local edits.
+        this.notifyError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        throw error;
+      }
     } else {
       this.resources.set(subject, resource.__internalObject);
     }
@@ -3931,6 +4391,7 @@ export class Store {
     for (const subject of subjects) {
       const resource = await this.fetchResourceFromServer(subject, {
         noWebSocket: true,
+        drive,
       });
       if (resource.error) throw resource.error;
       const actualParent = resource.get(core.properties.parent);
@@ -3968,7 +4429,8 @@ export class Store {
     // Local hits come from the durable KV index in ClientDb (title,
     // description, Loro body, 1-edit prefix fuzzy, PropValSub filters).
     const clientDb = this.clientDb;
-    const offline = !this._serverConnected && !opts.serverOnly;
+    const offline =
+      !this.isServerConnectedFor(parentScope ?? this.drive) && !opts.serverOnly;
     const limit = opts.limit ?? 30;
 
     // The local OPFS search can take a while on a large drive, so it must not
@@ -4015,7 +4477,11 @@ export class Store {
 
     // Merge with hosted `/search` (same KV engine) so OPFS lag still
     // picks up hits the server already indexed.
-    const searchSubject = buildSearchSubject(this.serverUrl, query, opts);
+    const searchSubject = buildSearchSubject(
+      this.getServerUrlForSubject(parentScope ?? this.drive),
+      query,
+      opts,
+    );
     searchDebug('[search] server search →', searchSubject);
     // Search URLs are dynamic query resources without commit identities. Keeping
     // one in the normal resource cache makes a later retry merge against the
@@ -4055,8 +4521,9 @@ export class Store {
     query: string,
     opts: SemanticSearchOpts = {},
   ): Promise<{ subject: string; chunk: string }[]> {
+    const parent = Array.isArray(opts.parents) ? opts.parents[0] : opts.parents;
     const vectorSearchSubject = buildSemanticSearchSubject(
-      this.serverUrl,
+      this.getServerUrlForSubject(parent ?? this.drive),
       query,
       opts,
     );
@@ -4090,7 +4557,7 @@ export class Store {
 
     try {
       const signInfo = this.agent
-        ? { agent: this.agent, serverURL: this.getServerUrl() }
+        ? { agent: this.agent, serverURL: this.getServerUrlForSubject(subject) }
         : undefined;
 
       const { createdResources } = await this.client.fetchResourceHTTP(
@@ -4579,7 +5046,7 @@ export class Store {
     // as no database: the server is asked instead of the page sitting on a
     // placeholder. Offline, the local database is the only source, so it is
     // awaited as long as it takes.
-    let local = this._serverConnected
+    let local = this.isServerConnectedFor(subject)
       ? await withDeadline<boolean | undefined>(
           this.hydrateFromLocalDb(subject),
           this.localReadDeadlineMs(),
@@ -4653,7 +5120,7 @@ export class Store {
       // fall back to an HTTP 404 in the meantime. A store that never opened a
       // socket (a Node client, a unit test) fetches over HTTP right away.
       if (
-        !this._serverConnected &&
+        !this.isServerConnectedFor(subject) &&
         (isAtomicIdentifier(subject) || this.getWebSocketForSubject(subject))
       ) {
         // Offline — use whatever local data we found. If there IS no local
@@ -4665,7 +5132,7 @@ export class Store {
           // that handshake flashes an ErrorPage before the real load (the
           // user-visible "error state" flicker). Wait briefly for the WS; if it
           // connects, fetch from the server. Only fail if it stays down.
-          const connected = await this.waitForServerConnected(5000);
+          const connected = await this.waitForServerConnected(5000, subject);
 
           if (connected) {
             await this.fetchResourceFromServer(subject, opts);
@@ -4840,10 +5307,17 @@ export class Store {
     subject: string,
   ): Promise<Readonly<ReturnType<Resource['getPropVals']>>> {
     const agent = this.getAgent();
+    const route = this.captureRoute(subject);
     const { resource } = await this.client.fetchResourceHTTP(subject, {
-      signInfo: agent ? { agent, serverURL: this.getServerUrl() } : undefined,
-      serverURL: this.getServerUrl(),
+      signInfo: agent
+        ? { agent, serverURL: this.getServerUrlForSubject(subject) }
+        : undefined,
+      serverURL: this.getServerUrlForSubject(subject),
     });
+    if (!route.current())
+      throw new RequestCancelledError(
+        'Server destination changed while reading',
+      );
     if (resource.error) throw resource.error;
 
     return resource.getPropVals();
@@ -4853,6 +5327,8 @@ export class Store {
     /** The resource URL to be fetched */
     subject: string,
     opts: {
+      /** Ownership hint for a cold DID outside the selected drive. */
+      drive?: string;
       /**
        * Fetch it from the `/path` endpoint of your server URL. This effectively
        * is a proxy / cache.
@@ -4870,6 +5346,12 @@ export class Store {
       forceOverride?: boolean;
     } = {},
   ): Promise<Resource<C>> {
+    if (opts.drive)
+      this.resourceDrives.set(
+        this.resolveSubject(subject),
+        this.resolveSubject(opts.drive),
+      );
+
     // Embedded pilot vocabulary must resolve through the installed host, not
     // depend on a public catalog deployment being available.
     if (isEmbeddedVocabulary(subject)) {
@@ -4905,8 +5387,11 @@ export class Store {
       !normalizedSubject.startsWith('_new:') &&
       !normalizedSubject.startsWith('_local:');
 
+    const route = this.captureRoute(subject);
+    const fetchKey = `${normalizedSubject}:${route.key}`;
+
     if (canDedup) {
-      const inflight = this._inFlightFetches.get(normalizedSubject);
+      const inflight = this._inFlightFetches.get(fetchKey);
       if (inflight) return inflight as Promise<Resource<C>>;
     }
 
@@ -4917,11 +5402,11 @@ export class Store {
         // Only clear if we're still the owner of the slot — a
         // re-entrant fetch that took the slot after us shouldn't be
         // wiped by our completion.
-        if (this._inFlightFetches.get(normalizedSubject) === tracked) {
-          this._inFlightFetches.delete(normalizedSubject);
+        if (this._inFlightFetches.get(fetchKey) === tracked) {
+          this._inFlightFetches.delete(fetchKey);
         }
       });
-      this._inFlightFetches.set(normalizedSubject, tracked);
+      this._inFlightFetches.set(fetchKey, tracked);
 
       return tracked as Promise<Resource<C>>;
     }
@@ -4943,6 +5428,13 @@ export class Store {
     },
   ): Promise<Resource<C>> {
     const normalizedSubject = this.normalizeSubject(subject);
+    const route = this.captureRoute(subject);
+
+    const assertCurrent = () => {
+      if (!route.current())
+        throw new RequestCancelledError(`Resource route changed: ${subject}`);
+    };
+
     const isTemporarySubject =
       normalizedSubject.startsWith('_new:') ||
       normalizedSubject.startsWith('_local:');
@@ -4971,10 +5463,12 @@ export class Store {
       this.addResource(newR, { skipCommitCompare: true });
     }
 
-    const fetchSubject =
-      subject.startsWith('http') || isAtomicIdentifier(subject)
+    const resolvedSubject = this.resolveSubject(subject);
+    const fetchSubject = isAtomicIdentifier(resolvedSubject)
+      ? resolvedSubject
+      : subject.startsWith('http') || isAtomicIdentifier(subject)
         ? subject
-        : new URL(subject, this.serverUrl).toString();
+        : new URL(subject, route.server).toString();
 
     const ws = this.getWebSocketForSubject(fetchSubject);
 
@@ -4987,6 +5481,7 @@ export class Store {
       try {
         await ws.fetch(fetchSubject);
       } catch (error) {
+        assertCurrent();
         // A hook may already have installed a loading placeholder. Settle it
         // so concurrent getResource callers receive the failure, not a timeout.
         const pending = this.getResolved(subject);
@@ -5004,16 +5499,24 @@ export class Store {
       }
     } else {
       const signInfo = this.agent
-        ? { agent: this.agent, serverURL: this.getServerUrl() }
+        ? {
+            agent: this.agent,
+            serverURL: this.driveServers.has(route.drive)
+              ? route.server
+              : this.serverUrl,
+          }
         : undefined;
 
       const fetchVia = (fromProxy: boolean) =>
         this.client.fetchResourceHTTP(fetchSubject, {
-          from: fromProxy ? this.getServerUrl() : undefined,
+          from: fromProxy ? this.serverUrl : undefined,
           method: opts.method,
           body: opts.body,
-          signInfo,
-          serverURL: this.getServerUrl(),
+          signInfo:
+            fromProxy && this.agent
+              ? { agent: this.agent, serverURL: this.serverUrl }
+              : signInfo,
+          serverURL: fromProxy ? this.serverUrl : route.server,
         });
 
       // Only plain documents, the shape of a vocabulary term. A query or
@@ -5052,6 +5555,7 @@ export class Store {
         }
       }
 
+      assertCurrent();
       const { resource, createdResources, cancelled } = result;
 
       if (cancelled) {
@@ -5086,6 +5590,8 @@ export class Store {
       // The `subject` arg becomes the alias if it differs from the
       // resolved subject (e.g. POST endpoint that returns the
       // canonical resource).
+      if (!resource.error)
+        this.rememberResourceOrigin(resource.subject, route.server);
       this.applyIncoming({
         subject,
         resource,
@@ -5093,9 +5599,11 @@ export class Store {
         replaceLoroDocsFromRemote: !!opts.forceOverride,
       });
 
+      this.learnServerResource(resource, route.server, subject);
       const primarySubject = this.normalizeSubject(resource.subject);
       createdResources.forEach(r => {
         if (this.normalizeSubject(r.subject) !== primarySubject) {
+          if (!r.error) this.rememberResourceOrigin(r.subject, route.server);
           this.applyIncoming({
             subject: r.subject,
             resource: r,
@@ -5153,16 +5661,18 @@ export class Store {
   /** Opens a Websocket for some subject URL, or returns the existing one. */
   public getWebSocketForSubject(subject: string): WSClient | undefined {
     try {
-      // DIDs are hosted on the current server, so use server URL for WebSocket
-      let origin: string;
+      const origin = this.getServerUrlForSubject(subject);
 
-      if (isAtomicIdentifier(subject)) {
-        origin = new URL(this.serverUrl).origin;
-      } else if (subject.startsWith('http')) {
-        origin = new URL(subject).origin;
-      } else {
-        // Relative path - use server URL
-        origin = new URL(this.serverUrl).origin;
+      if (
+        !this.webSockets.has(origin) &&
+        this.driveServers.has(this.driveOf(subject)) &&
+        !this.isLocalOnlySubject(subject) &&
+        origin !== this.serverUrlWithoutSocket &&
+        supportsWebSockets() &&
+        (typeof localStorage === 'undefined' ||
+          localStorage.getItem('ws-disconnected') !== '1')
+      ) {
+        this.openWebSocket(origin);
       }
 
       const ws = this.webSockets.get(origin);
@@ -5229,7 +5739,10 @@ export class Store {
     if (!this.serverUrl) return null;
 
     try {
-      const url = new URL('/history-attribution', this.serverUrl);
+      const url = new URL(
+        '/history-attribution',
+        this.getServerUrlForSubject(subject),
+      );
       url.searchParams.set('subject', subject);
       const agent = this.getAgent();
       // Sign the URL being fetched: the server rebuilds the signed message
@@ -5419,7 +5932,7 @@ export class Store {
       }
 
       const inflight = this._inFlightFetches.get(
-        this.normalizeSubject(subject),
+        `${this.normalizeSubject(subject)}:${this.captureRoute(subject).key}`,
       );
 
       if (inflight) {
@@ -5475,10 +5988,13 @@ export class Store {
         const batch = ws.fetchMany(chunk);
 
         chunk.forEach((subject, index) => {
-          const normalized = this.normalizeSubject(subject);
+          const route = this.captureRoute(subject);
+          const normalized = `${this.normalizeSubject(subject)}:${route.key}`;
           const one = batch.then(entries => {
             const entry = entries[index];
 
+            if (!route.current() || entry instanceof RequestCancelledError)
+              throw new RequestCancelledError('Batch resource route changed');
             if (!(entry instanceof Error)) return entry as Resource<C>;
 
             // Same shape as a failed single fetch: the placeholder (created
@@ -5521,7 +6037,13 @@ export class Store {
    */
   public async getResource<C extends OptionalClass = UnknownClass>(
     subjectRaw: string,
+    opts: { drive?: string } = {},
   ): Promise<Resource<C>> {
+    if (opts.drive)
+      this.resourceDrives.set(
+        this.resolveSubject(subjectRaw),
+        this.resolveSubject(opts.drive),
+      );
     const normalized = this.normalizeSubject(subjectRaw);
     const resolved = this.resolveSubject(subjectRaw);
     let found = this.resources.get(resolved) as Resource<C> | undefined;
@@ -5818,12 +6340,13 @@ export class Store {
    * Use this to decide whether to attempt server operations or store locally.
    */
   public get serverConnected(): boolean {
-    return this._serverConnected;
+    return this.isServerConnectedFor(this.drive);
   }
 
   /** Called by WebSocket client when connection state changes. */
   public setServerConnected(connected: boolean, error?: string): void {
     const nextError = connected ? undefined : error;
+    this.serverConnections.set(this.serverUrl, { connected, error: nextError });
 
     if (
       this._serverConnected === connected &&
@@ -5931,7 +6454,7 @@ export class Store {
 
   private saveStatus = new SaveStatusCoordinator({
     getOutboxEntry: subject => this.outbox.getEntry(subject),
-    isConnected: () => this._serverConnected,
+    isConnected: subject => this.isServerConnectedFor(subject),
     changePending: delta => {
       this._scheduledSaves += delta;
       this.emitSyncStatus();
@@ -5963,8 +6486,14 @@ export class Store {
     return this.saveStatus.subscribe(resource, callback);
   }
 
-  public startDriveSync(): void {
-    this._driveSyncInProgress = true;
+  private updateDriveSyncProgress(): void {
+    this._driveSyncInProgress = this.activeDriveSyncs.size > 0;
+    this._driveSyncPulling = [...this.activeDriveSyncs.values()].some(Boolean);
+  }
+
+  public startDriveSync(drive = this.drive ?? ''): void {
+    this.activeDriveSyncs.set(drive ? this.normalizeSubject(drive) : '', false);
+    this.updateDriveSyncProgress();
     this.emitSyncStatus();
   }
 
@@ -5992,12 +6521,13 @@ export class Store {
     count: number,
     timestamp: number,
   ): void {
-    this._driveSyncInProgress = false;
-    this._driveSyncPulling = false;
+    this.activeDriveSyncs.delete(this.normalizeSubject(drive));
+    this.activeDriveSyncs.delete('');
+    this.updateDriveSyncProgress();
     this._lastDriveSync = { drive, count, timestamp };
 
     if (drive) {
-      this._syncedDrives.add(drive);
+      this._syncedDrives.add(this.normalizeSubject(drive));
 
       if (this._lastDriveSyncError?.drive === drive) {
         this._lastDriveSyncError = undefined;
@@ -6030,12 +6560,13 @@ export class Store {
    * refused" instead of a green check.
    */
   public failDriveSync(drive: string, message: string): void {
-    this._driveSyncInProgress = false;
-    this._driveSyncPulling = false;
+    this.activeDriveSyncs.delete(this.normalizeSubject(drive));
+    this.activeDriveSyncs.delete('');
+    this.updateDriveSyncProgress();
     this._lastDriveSyncError = { drive, message, timestamp: Date.now() };
 
     if (drive) {
-      this._syncedDrives.delete(drive);
+      this._syncedDrives.delete(this.normalizeSubject(drive));
     }
 
     this.emitSyncStatus();
@@ -6074,14 +6605,15 @@ export class Store {
   }
 
   /** The server started sending resources for a drive sync. */
-  public startDriveSyncPull(): void {
-    this._driveSyncPulling = true;
+  public startDriveSyncPull(drive = this.drive ?? ''): void {
+    this.activeDriveSyncs.set(drive ? this.normalizeSubject(drive) : '', true);
+    this.updateDriveSyncProgress();
   }
 
   public hasCompletedDriveSyncFor(drive: string | undefined): boolean {
     if (!drive) return false;
 
-    return this._syncedDrives.has(drive);
+    return this._syncedDrives.has(this.normalizeSubject(drive));
   }
 
   public getSyncStatus(): StoreSyncStatus {
@@ -6098,8 +6630,10 @@ export class Store {
     }
 
     return {
-      serverConnected: this._serverConnected,
-      serverConnectionError: this._serverConnectionError,
+      serverConnected: this.serverConnected,
+      serverConnectionError: this.serverConnections.get(
+        this.getServerUrlForSubject(this.drive),
+      )?.error,
       syncInProgress:
         this._driveSyncInProgress ||
         this.outbox.isDraining ||
@@ -6114,7 +6648,7 @@ export class Store {
         inFlightSaves +
         this._scheduledSaves,
       blockedCount: this.outbox.blockedCount,
-      serverUrl: this.serverUrl,
+      serverUrl: this.getServerUrlForSubject(this.drive),
       drive: this.drive,
       clientDbReady: this.clientDb?.isReady ?? false,
       clientDbAttached: !!this.clientDb,
@@ -6355,25 +6889,49 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    const identityChanged = this.agent?.subject !== agent?.subject;
     if (this.agent !== agent) this.identityGeneration++;
 
     if (this.agent?.subject !== agent?.subject) {
       this.localReadsAwaitingAttach.clear();
       this.collectionPagesAnsweredByServer.clear();
-      this.liveSubscriptionGeneration++;
-      const subjects = [...this.liveSubjects.keys()];
-      this.liveSubjects.clear();
 
-      for (const subject of subjects) {
-        this.getWebSocketForSubject(subject)?.unsubscribeResource(subject);
+      // Anonymous holders are public views; keep them through first login.
+      // An existing account's holders must be reacquired by the new owner.
+      if (this.agent) {
+        this.liveSubscriptionGeneration++;
+        const subjects = [...this.liveSubjects.keys()];
+        this.liveSubjects.clear();
+
+        for (const subject of subjects) {
+          this.getWebSocketForSubject(subject)?.unsubscribeResource(subject);
+        }
       }
     }
 
     // The current drive is an account context, not a server preference. Clear
     // it before reauthenticating, so the next identity never subscribes or
     // reconciles the previous identity's private workspace.
-    if (this.agent && this.agent.subject !== agent?.subject) this.setDrive('');
+    const replaceConnections = !!this.agent && identityChanged;
+
+    if (replaceConnections) {
+      this.setDrive('');
+      for (const socket of this.webSockets.values()) socket.close();
+      this.webSockets.clear();
+    }
+
     this.agent = agent;
+    if (identityChanged) this.loadDriveServers();
+
+    if (
+      replaceConnections &&
+      this.serverUrl !== this.serverUrlWithoutSocket &&
+      supportsWebSockets() &&
+      (typeof localStorage === 'undefined' ||
+        localStorage.getItem('ws-disconnected') !== '1')
+    ) {
+      this.openWebSocket(this.serverUrl);
+    }
 
     // The outbox is identity-scoped: rebind to this agent's own queue so a new
     // identity never drains a previous agent's commits (whose `did:ad:<sig>`
@@ -6720,11 +7278,7 @@ export class Store {
    * `connect: false` keeps the socket closed — see `StoreOpts.connect`.
    */
   public setServerUrl(url: string, { connect = true } = {}): void {
-    Client.tryValidSubject(url);
-
-    if (url.substring(-1) === '/') {
-      throw Error('baseUrl should not have a trailing slash');
-    }
+    url = normalizeServerOrigin(url);
 
     const previous = this.serverUrl;
 
@@ -6735,20 +7289,9 @@ export class Store {
 
     this.serverUrl = url;
 
-    // Switching servers: tear down the old socket and reset the connection
-    // status. `serverConnected` / `serverConnectionError` describe *the current
-    // server*, so a leftover socket is not just waste — it keeps retrying and
-    // overwriting them, which surfaces the previous server's error on the new
-    // server's card.
     if (previous && previous !== url) {
-      const stale = this.webSockets.get(previous);
-
-      if (stale) {
-        stale.close();
-        this.webSockets.delete(previous);
-      }
-
-      this.setServerConnected(false);
+      const state = this.serverConnections.get(url);
+      this.setServerConnected(state?.connected ?? false, state?.error);
     }
 
     this.eventManager.emit(StoreEvents.ServerURLChanged, url);
@@ -6790,6 +7333,9 @@ export class Store {
    *  so AppSettings-style UI mirrors stay in sync.
    */
   public setDrive(drive: string): void {
+    const resolved = drive ? this.resolveSubject(drive) : drive;
+    if (Client.isBareHttpOrigin(drive) && isAtomicIdentifier(resolved))
+      drive = resolved;
     if ((this.drive ?? '') !== drive) this.routingGeneration++;
 
     if (!drive) {
@@ -6798,6 +7344,16 @@ export class Store {
       this.setServerUrl(new URL(drive).origin);
     } else {
       this.drive = drive;
+      if (!this.isForeignOriginSubject(drive)) this.pinSubjectRoute(drive);
+      const origin = this.getServerUrlForSubject(drive);
+      if (
+        this.isLiveSyncedDrive(drive) &&
+        supportsWebSockets() &&
+        (typeof localStorage === 'undefined' ||
+          localStorage.getItem('ws-disconnected') !== '1') &&
+        origin !== this.serverUrlWithoutSocket
+      )
+        this.openWebSocket(origin);
     }
 
     if (typeof window !== 'undefined') {
@@ -6809,6 +7365,8 @@ export class Store {
 
   /** Opens a WebSocket for this Atomic Server URL */
   public openWebSocket(url: string) {
+    url = normalizeServerOrigin(url);
+
     // Check if we're running in a webbrowser
     if (supportsWebSockets()) {
       if (this.webSockets.has(url)) {
@@ -6833,8 +7391,8 @@ export class Store {
    * global `StoreEvents.Error` toast) instead of polling sync status to
    * detect the failure themselves.
    */
-  public reconnect(timeoutMs = 15000): Promise<void> {
-    const url = this.serverUrl;
+  public reconnect(timeoutMs = 15000, subject = this.drive): Promise<void> {
+    const url = this.getServerUrlForSubject(subject);
 
     if (!url) return Promise.resolve();
 
@@ -6849,17 +7407,19 @@ export class Store {
         );
       }, timeoutMs);
 
-      unsub = this.on(StoreEvents.ConnectionChanged, connected => {
-        if (connected) {
+      unsub = this.on(StoreEvents.ConnectionChanged, () => {
+        const state = this.serverConnections.get(url);
+
+        if (state?.connected) {
           clearTimeout(timer);
           unsub?.();
           resolve();
-        } else if (this._serverConnectionError) {
+        } else if (state?.error) {
           // A disconnect without an error message is the synchronous
           // teardown step below — keep waiting for the real outcome.
           clearTimeout(timer);
           unsub?.();
-          reject(new Error(this._serverConnectionError));
+          reject(new Error(state.error));
         }
       });
 
@@ -6877,19 +7437,15 @@ export class Store {
         localStorage.removeItem('ws-disconnected');
       }
 
-      this.setServerConnected(false);
+      this.reportServerConnection(url, false);
       this.openWebSocket(url);
     });
   }
 
   /** Close the WebSocket connection. Persists across refresh until reconnect(). */
   public disconnect(): void {
-    const existing = this.webSockets.get(this.serverUrl);
-
-    if (existing) {
-      existing.close();
-      this.webSockets.delete(this.serverUrl);
-    }
+    for (const socket of this.webSockets.values()) socket.close();
+    this.webSockets.clear();
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('ws-disconnected', '1');
@@ -6958,7 +7514,7 @@ export class Store {
   /** Drive resources use drive-wide fan-out. Mounted agent profiles also need
    * a targeted subscription: another user's profile is outside our drive. */
   public subscribeWebSocket(subject: string): void {
-    if (!this._serverConnected) return;
+    if (!this.isServerConnectedFor(subject)) return;
     const normalized = this.normalizeSubject(subject);
 
     if (
@@ -7033,8 +7589,7 @@ export class Store {
     const unsubEvent = this.on(StoreEvents.Indexing, driveSubject, callback);
 
     try {
-      const ws =
-        this.getDefaultWebSocket() ?? this.getWebSocketForSubject(driveSubject);
+      const ws = this.getWebSocketForSubject(driveSubject);
       ws?.subscribeIndexStatus(driveSubject);
     } catch (e) {
       console.error(e);
@@ -7044,9 +7599,7 @@ export class Store {
       unsubEvent();
 
       try {
-        const ws =
-          this.getDefaultWebSocket() ??
-          this.getWebSocketForSubject(driveSubject);
+        const ws = this.getWebSocketForSubject(driveSubject);
         ws?.unsubscribeIndexStatus(driveSubject);
       } catch (e) {
         console.error(e);
@@ -7080,12 +7633,18 @@ export class Store {
       subject,
       callback,
       () => {
-        if (this._serverConnected && !this.isLocalOnlySubject(subject)) {
+        if (
+          this.isServerConnectedFor(subject) &&
+          !this.isLocalOnlySubject(subject)
+        ) {
           this.getWebSocketForSubject(subject)?.subscribeLoroSync(subject);
         }
       },
       () => {
-        if (this._serverConnected && !this.isLocalOnlySubject(subject)) {
+        if (
+          this.isServerConnectedFor(subject) &&
+          !this.isLocalOnlySubject(subject)
+        ) {
           this.getWebSocketForSubject(subject)?.unsubscribeLoroSync(subject);
         }
       },
@@ -7096,7 +7655,7 @@ export class Store {
    *  Non-persistent real-time; persistence is via commits. */
   public broadcastLoroSyncUpdate(subject: string, update: Uint8Array): void {
     this.publishPeerEphemeral(subject, update, PeerEphemeralKind.DOC);
-    if (!this._serverConnected) return;
+    if (!this.isServerConnectedFor(subject)) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroSyncUpdate(subject, update);
   }
@@ -7119,7 +7678,7 @@ export class Store {
     update: Uint8Array,
   ): void {
     this.publishPeerEphemeral(subject, update, PeerEphemeralKind.LORO);
-    if (!this._serverConnected) return;
+    if (!this.isServerConnectedFor(subject)) return;
     if (this.isLocalOnlySubject(subject)) return;
     this.getWebSocketForSubject(subject)?.sendLoroEphemeralUpdate(
       subject,
@@ -7189,12 +7748,12 @@ export class Store {
       drive,
       callback,
       () => {
-        if (this._serverConnected && this.isLiveSyncedDrive(drive)) {
+        if (this.isServerConnectedFor(drive) && this.isLiveSyncedDrive(drive)) {
           this.presenceWebSocket(drive)?.subscribePresence(drive);
         }
       },
       () => {
-        if (this._serverConnected && this.isLiveSyncedDrive(drive)) {
+        if (this.isServerConnectedFor(drive) && this.isLiveSyncedDrive(drive)) {
           this.presenceWebSocket(drive)?.unsubscribePresence(drive);
         }
       },
@@ -7205,7 +7764,7 @@ export class Store {
    *  drive's presence subscribers. */
   public broadcastPresenceUpdate(drive: string, update: Uint8Array): void {
     this.publishPeerEphemeral(drive, update, PeerEphemeralKind.PRESENCE);
-    if (!this._serverConnected) return;
+    if (!this.isServerConnectedFor(drive)) return;
     // Local-only drives and foreign-origin HTTP drives have no live
     // peers on the home websocket.
     if (!this.isLiveSyncedDrive(drive)) return;
@@ -7213,7 +7772,7 @@ export class Store {
   }
 
   private presenceWebSocket(drive: string): WSClient | undefined {
-    return this.getDefaultWebSocket() ?? this.getWebSocketForSubject(drive);
+    return this.getWebSocketForSubject(drive);
   }
 
   public getPresenceSubjects(): string[] {
@@ -7643,7 +8202,7 @@ export class Store {
     // that depend on the blob (Plugin install reading the zip) then fail
     // server-side. Use the durable HTTP path; awaiting completion serializes
     // it with downstream commits.
-    const url = `${this.getServerUrl()}/blob/${hashHex}`;
+    const url = `${this.getServerUrlForSubject(resource.subject)}/blob/${hashHex}`;
     // Honor `injectFetch` like every other network call on this class
     // (see `Client.fetch`'s identical fallback) — a bare global `fetch()`
     // here meant tests/embedders overriding the store's fetch couldn't
@@ -7683,7 +8242,7 @@ export class Store {
     if (!this.clientDb) {
       const resources = await this.client.uploadFiles(
         files,
-        this.getServerUrl(),
+        this.getServerUrlForSubject(parent),
         agent,
         parent,
       );
@@ -7755,7 +8314,7 @@ export class Store {
       await resource.set(BLOB, blobSubject(hash), false);
       await resource.set(
         server.properties.downloadUrl,
-        `${this.getServerUrl()}/download/files/${hash}`,
+        `${this.getServerUrlForSubject(parent)}/download/files/${hash}`,
         false,
       );
 
@@ -7827,6 +8386,7 @@ export class Store {
    * commits still work; they just always reach every subscriber.
    */
   private async sendCommit(commit: Commit, endpoint: string): Promise<Commit> {
+    const route = this.captureRoute(commit.subject);
     const ws = this.getWebSocketForEndpoint(endpoint);
 
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -7852,6 +8412,9 @@ export class Store {
         console.warn('[Store.postCommit] WS path failed, using HTTP:', e);
       }
     }
+
+    if (!route.current())
+      throw new RequestCancelledError('Commit destination changed');
 
     return this.client.postCommit(commit, endpoint);
   }
@@ -7968,7 +8531,10 @@ export class Store {
     jsonADString: string,
     options: ImportJsonADOptions,
   ): Promise<void> {
-    const url = new URL(endpoints.import, this.serverUrl);
+    const url = new URL(
+      endpoints.import,
+      this.getServerUrlForSubject(options.parent),
+    );
     url.searchParams.set('parent', options.parent);
     url.searchParams.set(
       'overwrite-outside',
@@ -8201,8 +8767,11 @@ export class Store {
    * exist four times over (here, in `Collection`, and in two data-browser
    * helpers), each with its own timeout and return shape.
    */
-  public waitForServerConnected(timeoutMs: number): Promise<boolean> {
-    if (this._serverConnected) return Promise.resolve(true);
+  public waitForServerConnected(
+    timeoutMs: number,
+    subject = this.drive,
+  ): Promise<boolean> {
+    if (this.isServerConnectedFor(subject)) return Promise.resolve(true);
 
     return new Promise<boolean>(resolve => {
       let unsub: (() => void) | undefined;
@@ -8211,8 +8780,8 @@ export class Store {
         resolve(false);
       }, timeoutMs);
 
-      unsub = this.on(StoreEvents.ConnectionChanged, connected => {
-        if (connected) {
+      unsub = this.on(StoreEvents.ConnectionChanged, () => {
+        if (this.isServerConnectedFor(subject)) {
           clearTimeout(timer);
           unsub?.();
           resolve(true);

@@ -574,7 +574,7 @@ describe('WSClient legacy scheme sync', () => {
   });
 
   it('uses legacy nested subjects in the full sync', async () => {
-    const { client, socket } = await connectedClient();
+    const { client, socket, store } = await connectedClient();
     const internal = client as unknown as {
       _pendingSyncState: Map<string, unknown>;
       sendFullSyncState: (drive: string) => void;
@@ -588,6 +588,7 @@ describe('WSClient legacy scheme sync', () => {
       },
       current: () => true,
     });
+    store.setDrive('atomic:other-drive');
     internal.sendFullSyncState('did:ad:drive');
     const frame = framesWithTag(socket, Tag.SYNC).at(-1)!;
     const dl = (frame[1] << 8) | frame[2];
@@ -1218,6 +1219,8 @@ describe('WSClient SYNC_DIFF and the outbox', () => {
       (subject: string) =>
         ({
           getLoroDoc: () => ({ subject }),
+          get: () => undefined,
+          hasClasses: () => false,
         }) as unknown as ReturnType<typeof store.resources.get>,
     );
     vi.spyOn(Resource, 'exportLoroBytesForSync').mockImplementation(

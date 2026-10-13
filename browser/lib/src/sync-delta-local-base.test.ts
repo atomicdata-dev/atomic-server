@@ -136,6 +136,7 @@ describe('a sync delta for a resource with no local Loro history', () => {
       source: 'peer-sync',
     });
     const existing = store.resources.get(SUBJECT)!;
+    const notifyError = vi.spyOn(store, 'notifyError');
     const version = existing.getLoroDoc()!.oplogVersion().encode();
     const remote = new Resource(SUBJECT);
     remote.setStore(store);
@@ -154,6 +155,9 @@ describe('a sync delta for a resource with no local Loro history', () => {
           source: 'http-fetch',
         }),
       ).toThrow('unsupported snapshot version');
+      expect(notifyError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'unsupported snapshot version' }),
+      );
       expect(existing.getLoroDoc()!.oplogVersion().encode()).toEqual(version);
       expect(existing.get(RENDERS)).toEqual([OWN, TXN]);
     } finally {

@@ -286,6 +286,7 @@ export class WSClient {
   private _retryDelay = 1000;
   private _retryTimer: ReturnType<typeof setTimeout> | undefined;
   private _onlineListener: (() => void) | undefined;
+  private _routeUnsub: (() => void) | undefined;
   private _driveUnsub: (() => void) | undefined;
   private _savedDriveUnsub: (() => void) | undefined;
   private _liveUpdatedUnsub: (() => void) | undefined;
@@ -328,6 +329,7 @@ export class WSClient {
     number,
     {
       subject: string;
+      current: () => boolean;
       resolve: (r: Resource) => void;
       reject: (e: Error) => void;
       timer: ReturnType<typeof setTimeout>;
@@ -339,6 +341,7 @@ export class WSClient {
     number,
     {
       subjects: string[];
+      current: Array<() => boolean>;
       resolve: (results: Array<Resource | Error>) => void;
       reject: (e: Error) => void;
       timer: ReturnType<typeof setTimeout>;
@@ -448,8 +451,14 @@ export class WSClient {
     // session adopting a drive once the resource resolves — so subscribing
     // only inside the connect handshake misses it. Idempotent server-side.
     this._driveUnsub = store.on(StoreEvents.DriveChanged, () => {
-      this._pendingSyncState.clear();
+      // Explicit holders can still reconcile a background drive. Each
+      // pending probe has its own route/identity fence.
       this.subscribeToDrive();
+      void this.reconcileSubscribedDrive();
+    });
+
+    this._routeUnsub = store.on(StoreEvents.DriveRouteChanged, () => {
+      this.reSubscribeAll();
       void this.reconcileSubscribedDrive();
     });
 
@@ -660,6 +669,8 @@ export class WSClient {
       clearTimeout(this._retryTimer);
     }
 
+    this._routeUnsub?.();
+    this._routeUnsub = undefined;
     this._driveUnsub?.();
     this._driveUnsub = undefined;
     this._savedDriveUnsub?.();
@@ -969,6 +980,7 @@ export class WSClient {
 
   /** Sends a GET message for some resource over websockets. */
   public async fetch(subject: string): Promise<Resource> {
+    const route = this.store.captureRoute(subject);
     // Ensure auth has been kicked off before sending the GET. `authPromise`
     // starts as a resolved promise (not undefined), so `await this.authPromise`
     // alone is a no-op when nobody has called `authenticate()` yet — that
@@ -1005,8 +1017,16 @@ export class WSClient {
         );
       }, REQUEST_TIMEOUT);
 
+      if (!route.current()) {
+        reject(new RequestCancelledError('Resource destination changed'));
+        clearTimeout(timer);
+
+        return;
+      }
+
       this.pendingGets.set(requestId, {
         subject,
+        current: route.current,
         resolve: (r: Resource) => {
           close('ok');
           resolve(r);
@@ -1034,6 +1054,7 @@ export class WSClient {
    */
   public async fetchMany(subjects: string[]): Promise<Array<Resource | Error>> {
     if (subjects.length === 0) return [];
+    const routes = subjects.map(subject => this.store.captureRoute(subject));
     await this.authenticate();
 
     if (this.readyState !== WebSocket.OPEN) {
@@ -1073,6 +1094,7 @@ export class WSClient {
 
       this.pendingGetManys.set(requestId, {
         subjects,
+        current: routes.map(route => route.current),
         resolve: results => {
           close('ok');
           resolve(results);
@@ -1223,21 +1245,11 @@ export class WSClient {
    * writes are then lost on restart.
    */
   private reportConnected(connected: boolean, error?: string): void {
-    let isPrimary = false;
-
-    try {
-      isPrimary =
-        new URL(this.store.getServerUrl()).origin === this.serverOrigin;
-    } catch {
-      isPrimary = false;
-    }
-
-    if (!isPrimary) return;
-
-    this.store.setServerConnected(connected, error);
+    this.store.reportServerConnection(this.serverOrigin, connected, error);
   }
 
   private handleMessage(ev: MessageEvent) {
+    if (this._closed) return;
     // Any inbound frame proves the socket is alive.
     this._lastFrameAt = Date.now();
     this._probeSentAt = undefined;
@@ -1381,7 +1393,7 @@ export class WSClient {
         // Live collaboration, relayed by the server without inspection:
         // each kind fans out to its own subscriber map on the store.
         const msg = decodeEphemeral(payload);
-        if (!msg) break;
+        if (!msg || !this.owns(msg.subject)) break;
 
         switch (msg.kind) {
           case EphemeralKind.DOC:
@@ -1414,6 +1426,24 @@ export class WSClient {
           ? this.takePending(msg.requestId)
           : undefined;
 
+        if (msg.requestId && !pending) break;
+
+        if (
+          (pending && !pending.current()) ||
+          !this.store.acceptsServerResource(
+            msg.subject,
+            this.serverOrigin,
+            msg.loroBytes,
+          )
+        ) {
+          pending?.reject(
+            new RequestCancelledError('Resource destination changed'),
+          );
+          break;
+        }
+
+        this.store.rememberResourceOrigin(msg.subject, this.serverOrigin);
+
         if (pending) {
           this.store.applyIncoming({
             subject: msg.subject,
@@ -1424,7 +1454,16 @@ export class WSClient {
           // The resource we just hydrated is what the GET caller is
           // waiting for — read it back from the store map.
           const resource = this.hydratedResource(msg.subject);
-          if (resource) pending.resolve(resource);
+
+          if (resource) {
+            this.store.learnServerResource(
+              resource,
+              this.serverOrigin,
+              pending.subject,
+            );
+            pending.resolve(resource);
+          }
+
           break;
         }
 
@@ -1444,7 +1483,11 @@ export class WSClient {
         });
 
         const resource = this.hydratedResource(msg.subject);
-        if (resource) this.checkForMissingBlobs(resource);
+
+        if (resource) {
+          this.store.learnServerResource(resource, this.serverOrigin);
+          this.checkForMissingBlobs(resource);
+        }
 
         break;
       }
@@ -1470,6 +1513,9 @@ export class WSClient {
             );
           }
 
+          if (!pending.current[index]())
+            return new RequestCancelledError('Resource destination changed');
+          this.store.rememberResourceOrigin(subject, this.serverOrigin);
           const inner = frame.subarray(1);
 
           if (frame[0] === Tag.UPDATE) {
@@ -1513,7 +1559,7 @@ export class WSClient {
       case Tag.DESTROY: {
         const subject = decodeSubject(payload.subarray(2));
 
-        if (subject) {
+        if (subject && this.owns(subject)) {
           this.store.removeResource(subject);
         }
 
@@ -1523,7 +1569,7 @@ export class WSClient {
       case Tag.SYNC_OK: {
         const msg = decodeSyncOk(payload);
 
-        if (msg) {
+        if (msg && this.owns(msg.drive)) {
           this.store.finishDriveSync(
             canonicalizeScheme(msg.drive),
             0,
@@ -1551,8 +1597,9 @@ export class WSClient {
       case Tag.SYNC_PUSH: {
         const msg = decodeSyncPush(payload);
 
-        if (msg) {
-          if (msg.entries.length > 0) this.store.startDriveSyncPull();
+        if (msg && this.owns(msg.drive)) {
+          const current = this.connectionGuard(msg.drive);
+          if (msg.entries.length > 0) this.store.startDriveSyncPull(msg.drive);
 
           // Per-entry `getResourceLoading + importLoroUpdate +
           // setSource + addResources({skipCommitCompare:true})`
@@ -1566,6 +1613,8 @@ export class WSClient {
           // that is waiting on one still gets it.
           const workerDb = this.store.getClientDb();
           let entries = msg.entries;
+          for (const entry of entries)
+            this.store.rememberResourceOrigin(entry.subject, this.serverOrigin);
 
           // Only for a real pull. A handful of resources arriving is a live
           // change that mounted views are waiting on, so it takes the path
@@ -1627,6 +1676,7 @@ export class WSClient {
             const count = msg.entries.length;
 
             const finish = () => {
+              if (!current()) return;
               this.store.finishDriveSync(drive, count, Date.now());
 
               if (this.pulledInBulk) {
@@ -1745,7 +1795,10 @@ export class WSClient {
     // Switching drives: stop the old drive's fan-out first. Until 2026-09
     // the old subscription stayed registered for the life of the socket, so
     // every drive ever opened in a session kept pushing its commits here.
-    if (this._subscribedDrive && this._subscribedDrive !== drive) {
+    if (
+      this._subscribedDrive &&
+      (this._subscribedDrive !== drive || !this.owns(drive))
+    ) {
       this.unsubscribeFromDrive(this._subscribedDrive);
       this._subscribedDrive = undefined;
     }
@@ -1763,7 +1816,7 @@ export class WSClient {
     if (isNotFound(knownError) || isUnauthorized(knownError)) return;
     if (drive && this.awaitingDriveGenesis(drive)) return;
 
-    if (drive && this.store.isLiveSyncedDrive(drive)) {
+    if (drive && this.owns(drive) && this.store.isLiveSyncedDrive(drive)) {
       this.sendBinary(encodeSub(this.wireSubject(drive)));
       this._subscribedDrive = drive;
     }
@@ -1821,7 +1874,7 @@ export class WSClient {
       this.authenticatedWith !== this.store.getAgent()?.subject
     )
       return;
-    if (!this.store.isLiveSyncedDrive(subject)) return;
+    if (!this.owns(subject) || !this.store.isLiveSyncedDrive(subject)) return;
     const resource = this.hydratedResource(subject);
     if (
       !resource ||
@@ -1894,11 +1947,11 @@ export class WSClient {
     }
 
     for (const subject of this.store.getLoroSyncSubjects()) {
-      this.subscribeLoroSync(subject);
+      if (this.owns(subject)) this.subscribeLoroSync(subject);
     }
 
     for (const drive of this.store.getPresenceSubjects()) {
-      this.subscribePresence(drive);
+      if (this.owns(drive)) this.subscribePresence(drive);
     }
 
     // The fresh connection's server-side presence cache is empty; announce
@@ -1992,7 +2045,7 @@ export class WSClient {
       )
         return;
 
-      if (drive && this.store.isLiveSyncedDrive(drive)) {
+      if (drive && this.owns(drive) && this.store.isLiveSyncedDrive(drive)) {
         await this.startVVSync(drive);
       }
     };
@@ -2057,6 +2110,7 @@ export class WSClient {
     const error = this.hydratedResource(drive)?.error;
 
     return (
+      this.owns(drive) &&
       this.store.isLiveSyncedDrive(drive) &&
       !isNotFound(error) &&
       !isUnauthorized(error)
@@ -2166,7 +2220,7 @@ export class WSClient {
     // reconcile, and computing it would only fail, once per call.
     if (this.store.getClientDb()?.initError) return;
 
-    const current = this.connectionGuard();
+    const current = this.connectionGuard(drive);
 
     // Reading every version vector of a large drive keeps the local database
     // worker busy for a second or more, and everything the screen is waiting
@@ -2227,7 +2281,7 @@ export class WSClient {
       });
       if (!current() || (!explicit && !this.canAutomaticallySyncDrive(drive)))
         return;
-      this.store.startDriveSync();
+      this.store.startDriveSync(drive);
       this._pendingSyncState.set(drive, { state: syncState, current });
       this.sendBinary(
         encodeSync(
@@ -2253,7 +2307,7 @@ export class WSClient {
    *  reconcile SYNC_PUSHes the drive's resources up (the server has none).
    *  No-op if the socket isn't open. */
   public async resyncDrive(drive: string): Promise<void> {
-    if (this.readyState !== WebSocket.OPEN) return;
+    if (this.readyState !== WebSocket.OPEN || !this.owns(drive)) return;
 
     await this.startVVSync(drive, true);
   }
@@ -2350,7 +2404,7 @@ export class WSClient {
     pullFrom?: Record<string, Record<string, number>>;
     removeCommits?: Record<string, string>;
   }) {
-    const current = this.connectionGuard();
+    const current = this.connectionGuard(diff.drive);
     if (!current()) return;
     const clientDb = this.store.getClientDb();
 
@@ -2468,17 +2522,23 @@ export class WSClient {
   /** A continuation belongs to one socket and identity, including reconnects
    * to the same server/account. A later OPEN socket cannot revive old work.
    */
-  private connectionGuard(): () => boolean {
+  private owns(subject: string | undefined): boolean {
+    if (!subject) return false;
+
+    return this.store.getServerUrlForSubject(subject) === this.serverOrigin;
+  }
+
+  private connectionGuard(subject = this.store.getDrive()): () => boolean {
     const { signal } = this.connection;
     const agent = this.store.getAgent()?.subject;
-    const drive = this.store.getDrive();
+    const route = subject ? this.store.captureRoute(subject) : undefined;
     const authenticatedWith = this.authenticatedWith;
 
     return () =>
       !signal.aborted &&
       this.readyState === WebSocket.OPEN &&
       this.store.getAgent()?.subject === agent &&
-      this.store.getDrive() === drive &&
+      (!route || (route.current() && this.owns(subject))) &&
       this.authenticatedWith === authenticatedWith;
   }
 

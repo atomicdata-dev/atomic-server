@@ -29,6 +29,7 @@ describe('live subscription ownership', () => {
 
   it('revokes the old account and fences its delayed release', () => {
     const { store, socket } = setup();
+    store.setAgent({ subject: 'atomic:agent:previous' } as Agent);
     const releaseOld = store.subscribeLive(subject);
     store.setAgent({ subject: 'atomic:agent:next' } as Agent);
     expect(store.liveSubjects.size).toBe(0);
@@ -39,6 +40,16 @@ describe('live subscription ownership', () => {
     expect(socket.unsubscribeResource).not.toHaveBeenCalled();
     expect(store.liveSubjects.get(subject)).toBe(1);
     releaseNew();
+    expect(socket.unsubscribeResource).toHaveBeenCalledExactlyOnceWith(subject);
+  });
+
+  it('retains anonymous live holders through first login', () => {
+    const { store, socket } = setup();
+    const release = store.subscribeLive(subject);
+    store.setAgent({ subject: 'atomic:agent:first' } as Agent);
+    expect(store.liveSubjects.get(subject)).toBe(1);
+    expect(socket.unsubscribeResource).not.toHaveBeenCalled();
+    release();
     expect(socket.unsubscribeResource).toHaveBeenCalledExactlyOnceWith(subject);
   });
 });

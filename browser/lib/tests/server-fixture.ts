@@ -48,8 +48,10 @@ async function waitForReady(url: string, timeoutMs: number): Promise<void> {
 
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { method: 'GET' });
-      if (res.ok || res.status === 401 || res.status === 404) return;
+      const res = await fetch(new URL('/server', url), {
+        headers: { Accept: 'application/ad+json' },
+      });
+      if (res.status === 200) return;
     } catch (e) {
       lastErr = e;
     }
@@ -94,7 +96,9 @@ function parseConfigToml(text: string): MinimalConfigToml {
   return out;
 }
 
-export async function startServer(): Promise<ServerHandle> {
+export async function startServer(
+  options: { servedDomainSuffix?: string } = {},
+): Promise<ServerHandle> {
   // Respect Cargo's configured target directory, just like e2e-server.sh.
   // CI may provide only a prebuilt binary, without Cargo installed.
   let targetDir =
@@ -140,6 +144,9 @@ export async function startServer(): Promise<ServerHandle> {
     // server instance so parallel test files don't collide.
     ATOMIC_CACHE_DIR: path.join(tmpDir, 'cache'),
     ATOMIC_DOMAIN: 'localhost',
+    ...(options.servedDomainSuffix
+      ? { ATOMIC_SERVED_DOMAIN_SUFFIX: options.servedDomainSuffix }
+      : {}),
     ATOMIC_INITIALIZE: 'true',
     RUST_LOG: process.env.RUST_LOG ?? 'warn',
   };

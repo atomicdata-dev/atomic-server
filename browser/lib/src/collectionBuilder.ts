@@ -171,9 +171,32 @@ export class CollectionBuilder {
       params.drive = params.value;
     }
 
+    if (
+      !this.explicitDrive &&
+      params.property === core.properties.parent &&
+      params.value
+    ) {
+      const owner = this.store.driveOfSubject(params.value);
+      if (
+        (owner !== this.store.normalizeSubject(params.value) ||
+          this.store.resources
+            .get(params.value)
+            ?.hasClasses(serverOntology.classes.drive)) &&
+        (!params.drive || this.store.normalizeSubject(params.drive) !== owner)
+      )
+        params.drive = owner;
+    }
+
     const driveOrigin = httpOrigin(params.drive);
     const server =
-      this.server ?? parentOrigin ?? driveOrigin ?? this.store.getServerUrl();
+      this.server ??
+      parentOrigin ??
+      driveOrigin ??
+      this.store.getServerUrlForSubject(
+        params.property === core.properties.parent
+          ? params.value
+          : params.drive,
+      );
 
     // A deep link can be opened while the local personal drive is selected.
     // Do not send that unrelated default scope to the remote parent server.
@@ -189,6 +212,7 @@ export class CollectionBuilder {
     return new Collection(this.store, server, params, false, {
       preferServer: this.preferServer,
       explicitDrive: this.explicitDrive,
+      followsRoute: this.server === undefined,
     });
   }
 

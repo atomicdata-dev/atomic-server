@@ -28,7 +28,7 @@ describe('Local-only drives', () => {
         .mockResolvedValue({}),
       driveInventory: vi.fn(async () => [{ subject: drive, vv: { peer: 1 } }]),
     };
-    vi.spyOn(store, 'getDefaultWebSocket').mockReturnValue(ws as never);
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(ws as never);
     vi.spyOn(store, 'getClientDb').mockReturnValue({
       flush: vi.fn(async () => {}),
       getVersionVectorsForDrive: vi.fn(async () => ({ [drive]: { peer: 1 } })),

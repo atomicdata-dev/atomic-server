@@ -66,14 +66,17 @@ describe('makeDriveLocal preconditions', () => {
         }),
         unsubscribeFromDrive: vi.fn(),
       };
-      vi.spyOn(store, 'getDefaultWebSocket').mockReturnValue(ws as never);
+      vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(ws as never);
       const fetch = vi
         .spyOn(store, 'fetchResourceFromServer')
         .mockResolvedValue(resource);
 
       await store.makeDriveLocal(DRIVE);
 
-      assert(fetch).toHaveBeenCalledWith(DRIVE, { noWebSocket: true });
+      assert(fetch).toHaveBeenCalledWith(DRIVE, {
+        noWebSocket: true,
+        drive: DRIVE,
+      });
       assert(db.putResourceWithSnapshot).toHaveBeenCalled();
       assert(store.isLocalOnlyDrive(DRIVE)).toBe(true);
       assert(ws.unsubscribeFromDrive).toHaveBeenCalledWith(DRIVE);

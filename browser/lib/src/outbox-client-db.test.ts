@@ -144,6 +144,66 @@ async function newAgent(): Promise<Agent> {
 }
 
 describe('the outbox in the client database', () => {
+  it.each(['genesis', 'edit', 'destroy', 'legacy-edit'] as const)(
+    'replays a cold %s to its original drive server after the default changes',
+    async operation => {
+      const agent = await newAgent();
+      const db = new FakeClientDb();
+      const first = await tab(agent, db, true);
+      const destination = 'https://tenant.example.com:8443';
+      const drive = await first.store.newResource({
+        isA: server.classes.drive,
+        noParent: true,
+      });
+      first.store.setDriveServer(drive.subject, destination);
+      first.store.reportServerConnection(destination, true);
+      await drive.save();
+      const resource = await first.store.newResource({ parent: drive.subject });
+      if (operation !== 'genesis') await resource.save();
+      first.store.reportServerConnection(destination, false);
+
+      if (operation === 'destroy') await resource.destroy();
+      else {
+        await resource.set(core.properties.name, 'Queued on the tenant', false);
+        await resource.save();
+      }
+
+      await first.store.outbox.flush();
+      expect(db.queued(agent.subject!)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            subject: resource.subject,
+            route: { drive: drive.subject, server: destination },
+          }),
+        ]),
+      );
+      first.store.setServerConnected(false);
+
+      if (operation === 'legacy-edit') {
+        for (const [subject, value] of db.outbox.get(agent.subject!)!) {
+          const entry = JSON.parse(value);
+          delete entry.route;
+          db.outbox.get(agent.subject!)!.set(subject, JSON.stringify(entry));
+        }
+
+        localStorage.removeItem(`atomic.outbox.${agent.subject}`);
+      }
+
+      const reload = await tab(agent, db, false);
+      reload.store.setServerUrl('https://another.example.com');
+      reload.store.reportServerConnection(destination, true);
+      await reload.store.syncDirtyResources();
+      expect(reload.postCommitSpy).toHaveBeenCalled();
+      expect(
+        reload.postCommitSpy.mock.calls.every(
+          ([, endpoint]) => endpoint === `${destination}/commit`,
+        ),
+      ).toBe(true);
+      expect(reload.store.outbox.hasPending(resource.subject)).toBe(false);
+      reload.store.reportServerConnection(destination, false);
+    },
+  );
+
   it('keeps the existing home title when creating another drive after reload', async () => {
     const agent = await newAgent();
     const db = new FakeClientDb();
