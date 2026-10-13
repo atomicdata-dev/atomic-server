@@ -10,6 +10,10 @@ import {
 import { serializeDeterministically as serializePeerCommit } from './commit.js';
 import { taskSchema } from './task-schema.js';
 import {
+  sharedVocabularyOntologies,
+  sharedVocabularyProperties,
+} from './shared-vocabularies.js';
+import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
   type HistoryAttribution,
@@ -550,13 +554,15 @@ function isProxyWorthyError(error?: Error): boolean {
 export function isEmbeddedVocabulary(subject: string): boolean {
   return (
     embeddedVocabulary.has(subject) ||
-    subject === 'https://atomicdata.dev/task/v1'
+    subject === 'https://atomicdata.dev/task/v1' ||
+    (sharedVocabularyOntologies as readonly string[]).includes(subject)
   );
 }
 
 const embeddedVocabulary = new Set<string>([
   ...Object.values(taskSchema.properties),
   ...Object.values(taskSchema.tags),
+  ...sharedVocabularyProperties,
   // These classes ship in lib/defaults/plugins.json on every host. Their
   // public atomicdata.dev URLs are not published on the catalog yet.
   server.classes.plugin,

@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Table templates (#2243): the Time tracker, Expenses, Deals, Job applications and Guest list templates bind their generic columns (start/end/project/person/billable, amount, stage, company, email) to shared, embedded `work/v1`, `money/v1`, `pipeline/v1` and `contact/v1` vocabularies, so the same template yields the same property IDs on every drive. Row classes stay in the drive's ontology. Existing tables are not migrated. New exports: `workSchema`, `moneySchema`, `pipelineSchema`, `contactSchema`; `timeTrackingSchema` is deprecated. The Deals value column is now called Amount.
+
 ## [v0.41.0-beta.8] - 2026-10-10
 
 - Phones: the chat view no longer scrolls sideways by a few pixels, the "more" menu no longer opens the on-screen keyboard, and the Back button closes an open dropdown menu.
