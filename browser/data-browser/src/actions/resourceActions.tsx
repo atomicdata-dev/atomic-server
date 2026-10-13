@@ -38,6 +38,7 @@ import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
 import { isInTrash, restoreFromTrash } from '../helpers/trash';
+import { removeRecentResource } from '../helpers/recentResources';
 import { openSearchOverlay } from '../components/overlayState';
 import { openShareDialog } from '../components/Share/shareDialogState';
 
@@ -432,6 +433,11 @@ export const resourceActions: ActionDefinition[] = [
 
       try {
         await ctx.resource.destroy();
+
+        if (ctx.drive) {
+          removeRecentResource(ctx.drive, ctx.subject);
+        }
+
         ctx.onAfterDelete?.();
 
         if (ctx.currentSubject === ctx.subject) {

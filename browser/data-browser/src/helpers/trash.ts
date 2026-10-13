@@ -1,5 +1,6 @@
 import { core, dataBrowser, type Resource, type Store } from '@tomic/react';
 import { isContentAddressed } from './propertyIdentity';
+import { removeRecentResource } from './recentResources';
 import { getOrCreateTrashFolder } from './standardLocations';
 
 /** The drive's Trash folder, if one was ever created. */
@@ -51,6 +52,7 @@ export async function moveToTrash(
 
   await resource.set(core.properties.parent, trash);
   await resource.save();
+  removeRecentResource(drive, subject);
 
   return true;
 }

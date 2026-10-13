@@ -62,7 +62,11 @@ import {
   pendingSearchOverlayScope,
   type OverlayType,
 } from './overlayState';
-import { getRecentResources } from '../helpers/recentResources';
+import {
+  getRecentResources,
+  removeRecentResource,
+} from '../helpers/recentResources';
+import { withoutUnavailable } from '../helpers/unavailableResources';
 import { useDocumentText } from '../hooks/useDocumentText';
 import { getSearchResultHint } from '../helpers/searchResultHint';
 
@@ -418,11 +422,29 @@ function SearchOverlay(): JSX.Element {
   // Nothing typed yet: offer what was opened recently, most recent first,
   // minus the page already open.
   const showRecent = !query.trim() && filterIsEmpty && !scope;
-  const listed = showRecent
-    ? getRecentResources(drive)
-        .filter(subject => subject !== currentSubject)
-        .slice(0, 8)
+  const candidates = showRecent
+    ? getRecentResources(drive).filter(subject => subject !== currentSubject)
     : results;
+  // Deleted or trashed resources (possibly from an earlier session or another
+  // device) are hidden, and forgotten when they were only a recent.
+  const available = withoutUnavailable(
+    store,
+    drive,
+    candidates,
+    useResources(candidates),
+  );
+  const listed = showRecent ? available.slice(0, 8) : available;
+  const goneRecents = showRecent
+    ? candidates.filter(subject => !available.includes(subject)).join('\n')
+    : '';
+
+  useEffect(() => {
+    if (goneRecents) {
+      goneRecents
+        .split('\n')
+        .forEach(subject => removeRecentResource(drive, subject));
+    }
+  }, [drive, goneRecents]);
 
   const actionHits = currentSubject
     ? matchActionsForPalette(query, resourceActions, actionCtx)

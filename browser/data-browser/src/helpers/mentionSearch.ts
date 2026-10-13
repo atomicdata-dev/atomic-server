@@ -1,5 +1,6 @@
 import { core, type Resource, type Store } from '@tomic/react';
 import { getRecentResources } from './recentResources';
+import { isUnavailableResource } from './unavailableResources';
 
 export const MAX_MENTION_SUGGESTIONS = 10;
 
@@ -36,9 +37,22 @@ const getSubjectsWithoutQuery = async (
   // Recents can point at resources that were deleted or are no longer
   // readable since they were opened.
   return resources
-    .filter(r => !r.error && r.title)
+    .filter(r => !r.error && r.title && !isUnavailableResource(store, drive, r))
     .slice(0, MAX_MENTION_SUGGESTIONS)
     .map(r => r.subject);
+};
+
+/** Search hits that are not deleted or trashed since they were indexed. */
+const withoutUnavailableHits = async (
+  store: Store,
+  drive: string,
+  subjects: string[],
+): Promise<string[]> => {
+  const resources = await Promise.all(subjects.map(s => store.getResource(s)));
+
+  return subjects.filter(
+    (_, i) => !isUnavailableResource(store, drive, resources[i]),
+  );
 };
 
 /** Subjects to offer for an `@` mention in `drive`: a search for `query`, or
@@ -51,12 +65,16 @@ export const findMentionSubjects = async (
   exclude?: string,
 ): Promise<string[]> =>
   query.trim()
-    ? store.search(query.toLowerCase(), {
-        limit: MAX_MENTION_SUGGESTIONS,
-        // Including the results could lead to weird behavior when the document itself is returned from the server.
-        include: false,
-        parents: [drive],
-      })
+    ? withoutUnavailableHits(
+        store,
+        drive,
+        await store.search(query.toLowerCase(), {
+          limit: MAX_MENTION_SUGGESTIONS,
+          // Including the results could lead to weird behavior when the document itself is returned from the server.
+          include: false,
+          parents: [drive],
+        }),
+      )
     : getSubjectsWithoutQuery(store, drive, exclude);
 
 /** Whether an agent matches a (lowercased, trimmed) typed query by subject,
