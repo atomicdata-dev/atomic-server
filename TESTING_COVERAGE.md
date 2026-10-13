@@ -2887,13 +2887,11 @@ node lookup from replacing an explicitly local-only agent profile.
 `sync-delta-local-base.test.ts` verifies that a complete server sync snapshot
 after a JSON-only collection read is persisted, so reload keeps the edit.
 
-Remaining gaps: automatic background Vault pull is not implemented, so explicit
-restore is the stale-device acceptance boundary. Newly attached bytes in a
-workspace that has only used Vault stay local: G1 establishes recovery of blobs
-already uploaded to S3, not Vault-only blob upload. Native lifecycle, large
-restore budgets, arbitrary missing segments, notification read-state convergence,
-Cloud Server revoke/regrant and full invitation revocation parity still need
-coverage. Native deletion tests include checkpoint retention and stale lanes;
+The 2026-10-14 follow-up below adds automatic background Vault pull, Vault-only
+blob recovery and notification read-state convergence. G1 still tests the
+separate Cloud Server blob path. Remaining gaps include native lifecycle, large restore budgets, arbitrary
+missing segments, Cloud Server revoke/regrant and full invitation revocation
+parity. Native deletion tests include checkpoint retention and stale lanes;
 browser compaction, pruning and Discard history races remain untested.
 
 
@@ -2928,7 +2926,53 @@ browser compaction, pruning and Discard history races remain untested.
   Automatic recovery checks authoritative absence before needing a local database.
   The managed billing E2E again asserts unpaid 402 and separate hosting consent.
 
-Limits: these checks do not establish automatic Vault pull, blob-only fresh-device
-upload/recovery, arbitrary orphan ID discovery, profile fan-out, multi-process
-control-plane leadership, native runtime parity or complete production incident
-coverage. Validation counts and unresolved runs belong in the active PR evidence.
+Limits of the 2026-10-13 checks: automatic Vault pull and Vault-only attachment
+recovery are covered by the later follow-up below. Arbitrary orphan ID discovery,
+profile fan-out, multi-process control-plane leadership, native runtime parity
+and complete production incident coverage remain unproven. Validation counts and unresolved runs belong in the active PR evidence.
+
+
+### Vault durability and notification convergence (2026-10-14)
+
+- `lib/src/vault/blobs.rs` verifies separate encrypted chunks, exact byte/hash
+  recovery, empty files, corruption and immutable paths across key epochs.
+  `vault::sync` tests cold recovery after dropping the source store, missing
+  dependencies, refusal to back up absent local bytes, and missing expected
+  lane tails/checkpoints even when the listing contains none of them.
+- `wasm/tests/vault.rs` exercises real JS byte representations for both graph
+  and blob objects. `nodeVault.test.ts` checks the native IPC adapter. A native
+  compile and shared Rust tests do not establish packaged-app lifecycle parity.
+- `vault.test.ts` injects failure at every reserve/upload/confirm boundary for
+  blobs and graph packs. No failed pass advances the cursor; retry completes.
+  Key epoch validation refuses malformed records instead of assuming epoch 1.
+- `vaultAutoBackup.test.ts` tests automatic pull on changed remote state,
+  serialized retries, account isolation and partial recovery. Library
+  `vault-refresh.test.ts` verifies open resource identity, retained local edits
+  and cancellation of a restore read completed after identity changes.
+- Notification tests use a logical source-event identity and a per-event Loro
+  read/unread ledger on the personal drive. Independent writes converge across
+  three replicas; late duplicate resources cannot reset a read receipt.
+  The browser journey closes the receiving page, sends a message, reopens it,
+  then signs in with a separate profile and marks it read across both profiles.
+- `inbox.test.ts` and `standardLocations.test.ts` cancel delayed notification
+  read/unread decisions and folder creation after an account switch. WebSocket
+  tests reject delayed blob requests after disconnect, account or database
+  changes, and close an unopened connection without authenticating it.
+- `row-dialog.spec.ts` opens an inline draft before collection membership catches
+  up. Expansion follows the same row source as the visible grid. Pairing-dialog
+  tests drain their proxy handlers before closing the page.
+- Paired acceptance C1 now requires automatic reconnect catch-up in both modes.
+  H1 creates a multi-chunk file in a Vault-only workspace, closes its source,
+  blocks Cloud Server blob access, restores on a cold device and verifies exact
+  bytes through the visible Download action. E1 still verifies incomplete
+  recovery and retained readable data for missing/corrupt objects on desktop
+  and narrow viewports. Recovery tests block peers to isolate durability only.
+
+Remaining limits: notification delivery while every app stays closed still
+requires a push/background service. This change catches up when an app returns;
+OS notification activation in a packaged native app is not covered. Large-Vault
+memory budgets, arbitrary seeded process/network schedules, multi-process
+control-plane leadership and rollback of all independent recovery evidence
+remain separate work. The upload campaign is deterministic boundary coverage,
+not an exhaustive distributed fault simulation. Native lifecycle, browser
+compaction/pruning races and cross-device invitation revocation remain gaps.

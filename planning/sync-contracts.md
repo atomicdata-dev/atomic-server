@@ -1,6 +1,6 @@
 # Sync contracts
 
-Status: third slice and Critic fixes locally verified, 2026-10-13. Based on the latest recovery
+Status: durability follow-up in full-suite validation, 2026-10-14. Based on the latest recovery
 work in #2242; CI maintenance remains separate. Preserve peer multiplayer and
 independent Vault / hosted capabilities.
 
@@ -60,6 +60,29 @@ Current acceptance evidence is in
 
 ## Remaining architecture work
 
+### Durability follow-up (2026-10-14)
+
+Work on `codex/sync-durability-20261014`, stacked on the reviewed sync-contract
+pair. TrekMeester retains ownership of that pair's integration. Preserve live
+peer multiplayer and keep attachment ciphertext in separate object storage.
+
+- [x] Add encrypted blob dependencies to the Vault format; upload dependencies
+  before confirming graph backup; verify cold recovery and missing/corrupt bytes.
+- [x] Carry key/epoch handles through adapters and validate expected recovery
+  inventory, including omitted lane tails and incomplete checkpoints.
+- [x] Pull Vault changes on reconnect/resume without replacing pending edits or
+  accepting stale account/session completions.
+- [x] Define stable notification identity and read-state convergence; test
+  offline catch-up and distinguish closed-app delivery capabilities.
+- [x] Add deterministic upload interruption coverage, rendered multiplayer
+  journeys and native IPC adapter contract checks.
+- [ ] Complete full-suite validation and publish the stacked PR pair.
+- [ ] Validate packaged native lifecycle and seeded process/network schedules;
+  native compilation and shared-core tests do not establish these guarantees.
+
+Open adjacent work inspected: #2205 changes encrypted conversation attachments;
+#2226 changes notification presentation. These changes stay below those views.
+
 ### Complexity Critic follow-up (merge remains on hold)
 
 - [x] Reproduce accepted-genesis receipt failure and anonymous login subscription loss; fix both.
@@ -87,13 +110,14 @@ so the save/ingress, recovery, routing and managed-policy changes remain reviewa
 - [x] Verify two live servers and vanity hosts, reconnect/account switches,
   relevant suites and full lint; update coverage and PR evidence.
 
-- [ ] Carry a drive key and its epoch as one handle through every adapter; add a
+- [x] Carry a drive key and its epoch as one handle through every adapter; add a
   manifest proving expected lane tails and resource/blob dependencies. Readable
   metadata and contiguous listed segments alone do not prove complete recovery.
-- [ ] Vault-only encrypted blob upload and fresh-device recovery through separate
+- [x] Vault-only encrypted blob upload and fresh-device recovery through separate
   blob storage, with an explicit format and key lifecycle.
-- [ ] Stable notification event IDs, read/unread conflict semantics, and closed-app
-  delivery. Pagination/scope fix live inbox gaps without establishing those contracts.
+- [x] Logical notification event IDs, convergent read/unread receipts, and
+  catch-up after a closed browser returns. Push delivery while all apps stay
+  closed remains separate work.
 - [ ] Native runtime parity and seeded network/process fault campaigns across
   capability combinations. Sharing a result type and compiling adapters is narrower.
 
