@@ -82,4 +82,16 @@ describe('a non-empty local result for a drive this client never synced', () => 
     expect(requests).toEqual([]);
     expect(collection.totalMembers).toBe(1);
   });
+
+  it('asks again after the connection dropped and came back', async () => {
+    const { store, requests } = setup();
+    await messagesIn(store, HOST_DRIVE);
+    const asked = requests.length;
+
+    store.setServerConnected(false);
+    store.setServerConnected(true);
+    await messagesIn(store, HOST_DRIVE);
+
+    expect(requests.length).toBeGreaterThan(asked);
+  });
 });
