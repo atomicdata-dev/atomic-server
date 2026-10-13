@@ -21,6 +21,7 @@ function setup(local = true) {
     isLocalOnlyDrive: vi.fn((subject: string) => local && subject === drive),
     getAgent: vi.fn(() => ({ subject: agentSubject })),
     setServerUrl: vi.fn(),
+    setDriveServer: vi.fn(),
     getResource: vi.fn(async () => ({})),
     reconnect: vi.fn(async () => {}),
     promoteLocalDrive: vi.fn(async () => {}),

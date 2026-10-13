@@ -123,14 +123,14 @@ describe('shouldAutoEnroll', () => {
     expect(shouldAutoEnroll(base)).toBe(true);
   });
 
-  it('enrolls a paid drive that is not enrolled yet', () => {
+  it('requires a hosting choice even when a paid plan is active', () => {
     expect(
       shouldAutoEnroll({
         ...base,
         accountEnrolled: false,
         paidPlanActive: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(shouldAutoEnroll({ ...base, accountEnrolled: false })).toBe(false);
     expect(shouldAutoEnroll({ ...base, accountEnrolled: null })).toBe(false);
   });

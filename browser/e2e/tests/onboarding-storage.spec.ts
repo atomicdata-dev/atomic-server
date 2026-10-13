@@ -3,6 +3,47 @@ import { before, FRONTEND_URL } from './test-utils';
 
 test.beforeEach(before);
 
+test('an emailed invite cannot change the signing server before origin confirmation', async ({
+  page,
+}) => {
+  const original = await page.evaluate(() => window.store!.getServerUrl());
+  const requests: string[] = [];
+  const foreign = 'http://untrusted.localhost:19099';
+  await page.route(`${foreign}/**`, async route => {
+    requests.push(route.request().url());
+    await route.fulfill({ status: 403, body: 'Test server: no access' });
+  });
+  const token = Buffer.from('{}').toString('base64');
+  await page.goto(
+    `${FRONTEND_URL}/app/invite?${new URLSearchParams({ token, server: foreign, accept: 'true' })}`,
+  );
+  await expect(
+    page.getByRole('heading', {
+      name: 'Open an invitation from another server?',
+    }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.store!.getServerUrl())).toBe(
+    original,
+  );
+  expect(
+    await page.evaluate(() => window.store!.getAgent()?.subject),
+  ).toBeTruthy();
+  expect(requests).toEqual([]);
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Continue to invitation' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.store!.getServerUrl())).toBe(
+    original,
+  );
+  expect(requests).toEqual([]);
+  await expect(page.locator('#boot-splash')).toBeHidden({ timeout: 15_000 });
+  await page
+    .getByRole('heading', { name: 'Open an invitation from another server?' })
+    .locator('..')
+    .screenshot({ path: '/tmp/critic-invite-origin.png' });
+});
+
 test('onboarding checks storage before showing account controls and keeps feedback available', async ({
   page,
 }) => {

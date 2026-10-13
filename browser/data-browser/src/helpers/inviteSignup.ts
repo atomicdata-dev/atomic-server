@@ -36,6 +36,9 @@ export function resumeInviteUrl(invitation: string): string {
     ) {
       params.set('token', token);
       params.set('server', url.origin);
+      // The destination is untrusted input. The invite route confirms an
+      // unfamiliar server, then the user reviews and accepts the invitation.
+      params.delete('accept');
     }
   } catch {
     // Older links contain only the opaque signed token.

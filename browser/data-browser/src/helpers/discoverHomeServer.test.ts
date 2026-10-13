@@ -21,6 +21,7 @@ function setup(overrides: Partial<DiscoveryDeps> = {}) {
   const store = {
     getServerUrl: vi.fn(() => 'https://app.example'),
     setServerUrl: vi.fn(),
+    setDriveServer: vi.fn(),
     unregisterLocalOnlyDrive: vi.fn(),
     waitForServerConnected: vi.fn(async () => true),
   };
@@ -215,6 +216,7 @@ describe('discoverHomeServerForApp', () => {
     const store = {
       getServerUrl: () => 'https://app.example',
       setServerUrl: vi.fn(),
+      setDriveServer: vi.fn(),
       unregisterLocalOnlyDrive: vi.fn(),
       waitForServerConnected: vi.fn(async () => true),
     };

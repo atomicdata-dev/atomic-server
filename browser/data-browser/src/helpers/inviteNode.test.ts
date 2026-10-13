@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { inviteNodeCandidates, pickInviteNode } from './inviteNode';
+import {
+  inviteNodeCandidates,
+  pickInviteNode,
+  serverFromEntryUrl,
+} from './inviteNode';
 import { rememberOriginWithoutNode } from './originNode';
 
 describe('inviteNodeCandidates', () => {
@@ -54,5 +58,30 @@ describe('inviteNodeCandidates', () => {
       ]),
     ).toBe('https://node1.atomicserver.eu');
     expect(pickInviteNode(['https://app.atomic.place'])).toBeUndefined();
+  });
+});
+
+describe('entry URL signing destination', () => {
+  it.each([
+    '/app/invite',
+    '/APP/INVITE/',
+    '/app/%69nvite',
+    '/app/show?token=x',
+  ])('never adopts an invitation origin at %s', path => {
+    const url = new URL(path, 'https://app.example');
+    url.searchParams.set('server', 'https://untrusted.example');
+    expect(serverFromEntryUrl(url.href)).toBeUndefined();
+  });
+  it('keeps ordinary server deep links and rejects credentials', () => {
+    expect(
+      serverFromEntryUrl(
+        'https://app.example/app/show?server=https://node.example',
+      ),
+    ).toBe('https://node.example');
+    expect(
+      serverFromEntryUrl(
+        'https://app.example/app/show?server=https://user:pass@node.example',
+      ),
+    ).toBeUndefined();
   });
 });

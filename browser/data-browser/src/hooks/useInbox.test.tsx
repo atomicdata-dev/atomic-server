@@ -101,6 +101,36 @@ describe('inbox live sync outside the active workspace', () => {
     unmount();
   });
 
+  it('settles an offline partial inbox instead of showing an endless loader', async () => {
+    const store = new Store({
+      serverUrl: 'https://example.com',
+      connect: false,
+    });
+    privateDrive = 'atomic:offline-personal';
+    store.hydrateResourceFromJsonAd(
+      privateDrive,
+      JSON.stringify({
+        '@id': privateDrive,
+        [core.properties.isA]: [server.classes.drive],
+      }),
+    );
+    store.setClientDb({
+      isReady: true,
+      query: async () => ({ subjects: [], resources: [], count: 0 }),
+      flush: async () => undefined,
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoreContext.Provider, { value: store }, children);
+    const { result, unmount } = renderHook(() => useInbox(), { wrapper });
+    await waitFor(() => expect(result.current.ready).toBe(true), {
+      timeout: 5000,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.items).toEqual([]);
+    expect(store.hasCompletedDriveSyncFor(privateDrive)).toBe(false);
+    unmount();
+  });
+
   it('counts every page and replaces the inbox when the personal drive changes', async () => {
     const store = new Store({
       serverUrl: 'https://example.com',

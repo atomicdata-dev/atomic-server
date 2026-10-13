@@ -208,8 +208,9 @@ async function resolveHostedDriveOrigin(
 export async function connectHostedDrive(
   store: {
     setServerUrl(url: string): void;
+    setDriveServer(drive: string, url: string): void;
     unregisterLocalOnlyDrive(drive: string): void;
-    waitForServerConnected(timeoutMs: number): Promise<boolean>;
+    waitForServerConnected(timeoutMs: number, drive?: string): Promise<boolean>;
     getIdentityGeneration(): number;
     getRoutingGeneration(): number;
   },
@@ -232,11 +233,12 @@ export async function connectHostedDrive(
   if (!origin || !isCurrent()) return false;
 
   store.unregisterLocalOnlyDrive(drive);
+  store.setDriveServer(drive, origin);
   store.setServerUrl(origin);
   route = store.getRoutingGeneration();
   persistServer(origin);
   // Let the first resource/query use WS; HTTP remains available if WS cannot connect.
-  await store.waitForServerConnected(3_000);
+  await store.waitForServerConnected(3_000, drive);
 
   return isCurrent();
 }

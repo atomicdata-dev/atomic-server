@@ -24,7 +24,7 @@ export function useInbox(): {
   items: Resource[];
   unread: number;
   ready: boolean;
-  /** True until the list is known: the query ran and every member loaded. */
+  /** True while loading available rows and their members, including offline. */
   loading: boolean;
   privateDrive: string | undefined;
 } {
@@ -78,7 +78,9 @@ export function useInbox(): {
     if (!ready || !privateDrive) return;
     let cancelled = false;
     void collection
-      .getAllMembers({ requireComplete: store.serverConnected })
+      .getAllMembers({
+        requireComplete: store.isServerConnectedFor(privateDrive),
+      })
       .then(subjects => {
         if (!cancelled)
           setAllMembers({ collection, drive: privateDrive, subjects });
@@ -115,10 +117,7 @@ export function useInbox(): {
     items,
     unread: items.filter(isUnread).length,
     ready: isReady,
-    loading:
-      !membersReady ||
-      collection.completeness !== 'complete' ||
-      [...resources.values()].some(r => r.loading),
+    loading: !membersReady || [...resources.values()].some(r => r.loading),
     privateDrive,
   };
 }

@@ -45,7 +45,7 @@ it('carries the invitation node through email and another-browser recovery', () 
   expect(resumed.pathname).toBe('/app/invite');
   expect(resumed.searchParams.get('token')).toBe('a+b/=');
   expect(resumed.searchParams.get('server')).toBe('https://team.example');
-  expect(resumed.searchParams.get('accept')).toBe('true');
+  expect(resumed.searchParams.has('accept')).toBe(false);
 });
 it('reads only the invitation token and node, ignoring redirect fields', () => {
   const resumed = new URL(

@@ -2,6 +2,7 @@
 // @wc-ignore-file
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -79,8 +80,10 @@ it.each([
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByTestId('vault-restore'));
-    await waitFor(() => expect(vault.restore).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('vault-restore'));
+    });
+    expect(vault.restore).toHaveBeenCalled();
     expect(onRestored).not.toHaveBeenCalled();
   },
 );

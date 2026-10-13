@@ -12929,3 +12929,15 @@ msgstr ""
 #: src/helpers/managed/vault.ts
 msgid "Restore incomplete: {0} backup objects were unreadable, {1} were missing. Recovered data was kept. Retry with a complete backup and its current key."
 msgstr "Restauration incomplète : {0} objets de sauvegarde étaient illisibles et {1} manquaient. Les données récupérées ont été conservées. Réessayez avec une sauvegarde complète et sa clé actuelle."
+
+#: src/components/InviteOriginGate.tsx
+msgid "Open an invitation from another server?"
+msgstr "Ouvrir une invitation provenant d’un autre serveur ?"
+
+#: src/components/InviteOriginGate.tsx
+msgid "This invitation connects to <0/>. Continuing shares your public identity with this server. Only continue if you trust the person who sent it."
+msgstr "Cette invitation vous connecte à <0/>. En continuant, vous partagez votre identité publique avec ce serveur. Continuez uniquement si vous faites confiance à la personne qui vous l’a envoyée."
+
+#: src/components/InviteOriginGate.tsx
+msgid "Continue to invitation"
+msgstr "Continuer vers l’invitation"

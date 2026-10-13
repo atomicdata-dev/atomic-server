@@ -576,12 +576,6 @@ export async function restoreFromVault(
       return { status: 'unavailable', reason: 'no account session' };
     }
 
-    const db = await check(() => deps.db(store));
-    database = store.getClientDb();
-    databaseCaptured = true;
-
-    if (!db) return { status: 'unavailable', reason: 'no local database' };
-
     const enrollment = (await check(() => deps.listVaultDrives())).find(
       e =>
         e.drive_subject === driveSubject &&
@@ -601,6 +595,12 @@ export async function restoreFromVault(
     if (state.confirmed_objects === 0) {
       return absent('the vault is empty');
     }
+
+    // Local storage is needed to restore data, not to establish absence.
+    const db = await check(() => deps.db(store));
+    database = store.getClientDb();
+    databaseCaptured = true;
+    if (!db) return { status: 'unavailable', reason: 'no local database' };
 
     // This device's lane. A restore records which other lanes it imported, so a
     // checkpoint published from here later can claim coverage for them — the

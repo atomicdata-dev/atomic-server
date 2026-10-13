@@ -110,9 +110,10 @@ test.describe('notifications', () => {
       .getByRole('radio', { name: 'Write' })
       .check();
     await page.getByRole('button', { name: 'Copy invite link' }).click();
-    const inviteUrl = await page
-      .locator('[data-invite-link]')
-      .getAttribute('data-invite-link');
+    await expect(
+      page.getByText('Invite link copied', { exact: true }),
+    ).toBeVisible();
+    const inviteUrl = await page.evaluate(() => navigator.clipboard.readText());
     expect(inviteUrl).toBeTruthy();
     await page.keyboard.press('Escape');
     await waitForSynced(page);
@@ -273,9 +274,10 @@ test.describe('notifications', () => {
       .getByRole('radio', { name: 'Write' })
       .check();
     await page.getByRole('button', { name: 'Copy invite link' }).click();
-    const inviteUrl = await page
-      .locator('[data-invite-link]')
-      .getAttribute('data-invite-link');
+    await expect(
+      page.getByText('Invite link copied', { exact: true }),
+    ).toBeVisible();
+    const inviteUrl = await page.evaluate(() => navigator.clipboard.readText());
     expect(inviteUrl).toBeTruthy();
     await page.keyboard.press('Escape');
     await waitForSynced(page);

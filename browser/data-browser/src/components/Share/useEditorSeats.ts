@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { server, useStore, type Resource } from '@tomic/react';
+import { getManagedAccount } from '../../helpers/managed/session';
 import { managedFetch } from '../../helpers/managed/api';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
 
@@ -26,12 +27,17 @@ export function useEditorSeats(target: Resource): EditorSeats | undefined {
     setSeats(undefined);
     if (!isSaas || !drive) return;
     const controller = new AbortController();
-    void managedFetch(
-      `/billing/subscription?${new URLSearchParams({ drive })}`,
-      { signal: controller.signal },
-    )
+    void getManagedAccount()
+      .then(account => {
+        if (!account || controller.signal.aborted) return undefined;
+
+        return managedFetch(
+          `/billing/subscription?${new URLSearchParams({ drive })}`,
+          { signal: controller.signal },
+        );
+      })
       .then(async response => {
-        if (!response.ok || response.status === 204) return;
+        if (!response?.ok || response.status === 204) return;
         const subscription = await response.json();
         if (
           controller.signal.aborted ||

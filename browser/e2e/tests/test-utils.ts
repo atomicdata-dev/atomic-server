@@ -94,6 +94,16 @@ export function spaUrl(url: string): string {
   try {
     const parsed = new URL(url, FRONTEND_URL);
     const frontend = new URL(FRONTEND_URL);
+
+    // Moving the invite screen must retain the node that issued the link.
+    if (
+      parsed.pathname === '/app/invite' &&
+      parsed.origin !== frontend.origin &&
+      !parsed.searchParams.has('server')
+    ) {
+      parsed.searchParams.set('server', parsed.origin);
+    }
+
     parsed.protocol = frontend.protocol;
     parsed.host = frontend.host;
 

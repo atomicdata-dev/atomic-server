@@ -292,12 +292,14 @@ export function IdentityReconcileGate({
       // goes stale. See reconcile.ts for why this can't be derived from the
       // drive's `did:` subject directly.
       const serverResult = await evaluateServerReconciliation(
-        store.getServerUrl(),
+        store.getServerUrlForSubject(store.getDrive()),
         store.getDrive(),
       );
       if (!isCurrent()) return;
 
       if (!serverResult.ok) {
+        const drive = store.getDrive();
+        if (drive) store.setDriveServer(drive, serverResult.expectedOrigin);
         setServer(serverResult.expectedOrigin);
       }
 

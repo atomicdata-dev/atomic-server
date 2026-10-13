@@ -1378,7 +1378,7 @@ function SyncPage() {
   /**
    * Enroll this drive with Cloud Server and point this device at it.
    *
-   * `auto` is the run nobody clicked: a paid plan, or an enrollment this
+   * `auto` resumes an existing enrollment this
    * device has not caught up with. It must not open a sign-in window or leave
    * for checkout on its own, so those cases become an error on the row.
    */
@@ -1549,16 +1549,15 @@ function SyncPage() {
       paidPlanActive: planActive && subscriptionSource === 'stripe',
     });
   /**
-   * The one case that still asks: a plan that was not bought, such as Cloud
-   * Server added by hand by an operator. Hosting stores the drive readable on
-   * our servers, so it waits for the owner's word.
+   * A plan grants capacity. Hosting a readable copy still needs the owner's
+   * explicit choice, whether the plan was paid or granted by an operator.
    */
   const needsHostingConsent =
     !managedServer &&
     !hostedCopyOrigin &&
     !cloudServerBlocked &&
     cloudEnrolled === false &&
-    (serverAccessGranted || (planActive && subscriptionSource !== 'stripe'));
+    (serverAccessGranted || planActive);
 
   useEffect(() => {
     const drive = status.drive;
@@ -1581,6 +1580,8 @@ function SyncPage() {
     }
 
     try {
+      const drive = store.getDrive();
+      if (drive) store.setDriveServer(drive, server);
       setServer(server);
     } catch (e) {
       store.notifyError(e as Error);

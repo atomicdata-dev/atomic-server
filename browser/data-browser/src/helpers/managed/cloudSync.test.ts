@@ -127,6 +127,7 @@ describe('enableCloudSyncForDrive', () => {
       getAgent: vi.fn(() => ({ subject: agentSubject })),
       getResource: vi.fn(async () => ({ get: () => undefined })),
       setServerUrl: vi.fn(),
+      setDriveServer: vi.fn(),
       reconnect: vi.fn(async () => undefined),
       promoteLocalDrive: vi.fn(async () => {
         throw new Error('Standalone agent is not enrolled');

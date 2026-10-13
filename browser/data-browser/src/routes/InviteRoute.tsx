@@ -18,6 +18,7 @@ import {
 import InvitePage from '../views/InvitePage';
 import { appRoute } from './RootRoutes';
 import { pathNames } from './paths';
+import { InviteOriginGate } from '../components/InviteOriginGate';
 
 /**
  * /app/invite?token=... route.
@@ -31,6 +32,7 @@ export const InviteRoute = createRoute({
 });
 
 function InviteRouteComponent() {
+  const store = useStore();
   const token = new URLSearchParams(window.location.search).get('token');
 
   if (!token) {
@@ -51,13 +53,18 @@ function InviteRouteComponent() {
   if (invalid) return <p>Invalid invitation.</p>;
 
   return (
-    <OpenIfAlreadyShared token={token}>
-      {browserInvite ? (
-        <PeerInvitePage token={token} />
-      ) : (
-        <NodeInvite token={token} />
-      )}
-    </OpenIfAlreadyShared>
+    <InviteOriginGate
+      origin={new URLSearchParams(window.location.search).get('server')}
+      trustedOrigins={[window.location.origin, store.getServerUrl()]}
+    >
+      <OpenIfAlreadyShared token={token}>
+        {browserInvite ? (
+          <PeerInvitePage token={token} />
+        ) : (
+          <NodeInvite token={token} />
+        )}
+      </OpenIfAlreadyShared>
+    </InviteOriginGate>
   );
 }
 

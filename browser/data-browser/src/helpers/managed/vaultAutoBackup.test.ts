@@ -66,6 +66,18 @@ async function signedInStore(): Promise<Store> {
   return store;
 }
 
+it('can establish no backup without local database support', async () => {
+  const store = await signedInStore();
+  const deps = fakeDeps({
+    db: vi.fn(async () => null),
+    listVaultDrives: vi.fn(async () => []),
+  });
+  expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+    status: 'no-backup',
+  });
+  expect(deps.db).not.toHaveBeenCalled();
+});
+
 function fakeDeps(overrides: Partial<VaultAutoBackupDeps> = {}) {
   const deps: VaultAutoBackupDeps = {
     hasAccount: vi.fn(async () => true),

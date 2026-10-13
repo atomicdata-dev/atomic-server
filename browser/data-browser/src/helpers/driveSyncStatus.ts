@@ -107,7 +107,7 @@ export function driveHostedByNode(input: {
  * until then "not managed" is just the default, and acting on it would
  * re-enroll and reconnect a drive that is already hosted here (a spurious
  * "working offline" toast and a "Connected to Cloud Server" toast on every
- * visit). A paid-but-unenrolled drive has to be enrolled either way.
+ * visit). A paid plan alone does not authorize hosting.
  */
 export function shouldAutoEnroll(input: {
   accountEnrolled: boolean | null;
@@ -119,5 +119,5 @@ export function shouldAutoEnroll(input: {
     return input.nodeInfoLoaded && !input.currentServerManaged;
   }
 
-  return input.accountEnrolled === false && input.paidPlanActive;
+  return false;
 }

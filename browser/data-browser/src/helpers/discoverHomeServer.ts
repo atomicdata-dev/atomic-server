@@ -76,8 +76,9 @@ export async function serverServesGenesis(
 type DiscoveryStore = {
   getServerUrl(): string | undefined;
   setServerUrl(url: string): void;
+  setDriveServer(drive: string, url: string): void;
   unregisterLocalOnlyDrive(drive: string): void;
-  waitForServerConnected(timeoutMs: number): Promise<boolean>;
+  waitForServerConnected(timeoutMs: number, drive?: string): Promise<boolean>;
 };
 
 /** The parts that touch the network or the device, replaceable in a test. */
@@ -174,9 +175,10 @@ export async function discoverHomeServer(
     if (!origin || expired || deps.wasExplicitlyChosen()) return false;
 
     store.unregisterLocalOnlyDrive(drive);
+    store.setDriveServer(drive, origin);
     store.setServerUrl(origin);
     persistServer(origin);
-    await store.waitForServerConnected(3_000);
+    await store.waitForServerConnected(3_000, drive);
 
     return true;
   } catch {

@@ -1,3 +1,4 @@
+import { serverFromEntryUrl } from './helpers/inviteNode';
 import { StoreContext, Store, enableLoro, Client } from '@tomic/react';
 
 import { isDev, isE2E } from './config';
@@ -53,21 +54,7 @@ const defaultServerUrl = isRunningInTauri()
 // (further down this file) fetches against the Store's `serverUrl`
 // immediately and runs before any async reconciliation
 // (`IdentityReconcileGate`) would get a chance to fix it.
-const searchServerUrl = (() => {
-  const raw = new URLSearchParams(window.location.search).get('server');
-
-  if (!raw) return undefined;
-
-  try {
-    const url = new URL(raw);
-
-    return url.protocol === 'http:' || url.protocol === 'https:'
-      ? url.origin
-      : undefined;
-  } catch {
-    return undefined;
-  }
-})();
+const searchServerUrl = serverFromEntryUrl(window.location.href);
 
 if (searchServerUrl) {
   // Following a `?server=` link is choosing that server.

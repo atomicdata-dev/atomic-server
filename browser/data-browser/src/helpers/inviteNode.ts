@@ -1,12 +1,16 @@
 import { isOriginWithoutNode } from './originNode';
 
-function originOf(url: string | null | undefined): string | undefined {
+export function inviteOrigin(
+  url: string | null | undefined,
+): string | undefined {
   if (!url) return undefined;
 
   try {
     const parsed = new URL(url);
 
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    return !parsed.username &&
+      !parsed.password &&
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:')
       ? parsed.origin
       : undefined;
   } catch {
@@ -41,9 +45,9 @@ export function inviteNodeCandidates({
   dev = false,
 }: InviteNodeInput): string[] {
   const ordered = [
-    originOf(serverParam),
-    dev ? undefined : originOf(locationOrigin),
-    originOf(storedServer),
+    inviteOrigin(serverParam),
+    dev ? undefined : inviteOrigin(locationOrigin),
+    inviteOrigin(storedServer),
   ];
 
   return ordered.filter(
@@ -55,4 +59,20 @@ export function inviteNodeCandidates({
 /** The first candidate that is not known to be an origin without a node. */
 export function pickInviteNode(candidates: string[]): string | undefined {
   return candidates.find(origin => !isOriginWithoutNode(origin));
+}
+
+/** Resolve ordinary deep-link routing without trusting an invitation sender. */
+export function serverFromEntryUrl(href: string): string | undefined {
+  try {
+    const url = new URL(href);
+    const path = decodeURIComponent(url.pathname)
+      .replace(/\/+$/, '')
+      .toLowerCase();
+    if (url.searchParams.has('token') || path === '/app/invite')
+      return undefined;
+
+    return inviteOrigin(url.searchParams.get('server'));
+  } catch {
+    return undefined;
+  }
 }

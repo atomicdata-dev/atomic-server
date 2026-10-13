@@ -91,6 +91,7 @@ describe('evaluateServerReconciliation', () => {
       getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn().mockResolvedValue(true),
       setServerUrl: (url: string) => events.push(url),
+      setDriveServer: vi.fn(),
       unregisterLocalOnlyDrive: (drive: string) => events.push(drive),
     };
     const persist = vi.fn();
@@ -122,6 +123,7 @@ describe('evaluateServerReconciliation', () => {
         getIdentityGeneration: vi.fn(() => 0),
         getRoutingGeneration: vi.fn(() => 0),
         setServerUrl: vi.fn(),
+        setDriveServer: vi.fn(),
         unregisterLocalOnlyDrive: vi.fn(),
         waitForServerConnected: vi.fn().mockResolvedValue(true),
       };
@@ -152,6 +154,7 @@ describe('evaluateServerReconciliation', () => {
         getRoutingGeneration: vi.fn(() => 0),
         waitForServerConnected: vi.fn().mockResolvedValue(true),
         setServerUrl: vi.fn(),
+        setDriveServer: vi.fn(),
         unregisterLocalOnlyDrive: vi.fn(),
       };
       expect(await connectHostedDrive(store, 'did:ad:drive1', vi.fn())).toBe(
@@ -171,6 +174,7 @@ describe('evaluateServerReconciliation', () => {
       getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn(),
       setServerUrl: vi.fn(),
+      setDriveServer: vi.fn(),
       unregisterLocalOnlyDrive: vi.fn(),
     };
     expect(await connectHostedDrive(store, 'did:ad:other', vi.fn())).toBe(
@@ -193,6 +197,7 @@ describe('evaluateServerReconciliation', () => {
       getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn(),
       setServerUrl: vi.fn(),
+      setDriveServer: vi.fn(),
       unregisterLocalOnlyDrive: vi.fn(),
     };
     expect(await connectHostedDrive(store, 'did:ad:drive1', vi.fn(), 1)).toBe(

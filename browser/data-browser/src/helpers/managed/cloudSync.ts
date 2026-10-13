@@ -270,6 +270,7 @@ export async function enableCloudSyncForDrive(params: {
 
   // React's setting update is asynchronous. Reset the store connection now,
   // or the wait below may see the old server as connected and push there.
+  store.setDriveServer(drive, httpOrigin, { connect: false });
   store.setServerUrl(httpOrigin, { connect: false });
   setServer(httpOrigin);
 
@@ -277,7 +278,7 @@ export async function enableCloudSyncForDrive(params: {
   // disconnected by hand (a flag that survives reloads), and reuses a socket
   // left over from an earlier attempt at the same node. Either way the wait
   // used to run out its 20 seconds with nothing to say why.
-  await store.reconnect(20_000).catch((error: unknown) => {
+  await store.reconnect(20_000, drive).catch((error: unknown) => {
     throw new Error(
       `Could not connect to the Cloud Server node: ${
         error instanceof Error ? error.message : String(error)

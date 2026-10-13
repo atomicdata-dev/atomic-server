@@ -1,6 +1,8 @@
 import { useStore, useCurrentAgent, server, type Resource } from '@tomic/react';
 import { generateInviteToken } from '@tomic/lib';
 import { prepareDriveSharing } from '../../helpers/managed/prepareDriveSharing';
+import { getManagedAccount } from '../../helpers/managed/session';
+import { fetchManagedInfo } from '../../helpers/managedServer';
 import { managedFetch } from '../../helpers/managed/api';
 import {
   automaticPeerRoom,
@@ -39,7 +41,18 @@ export function useCreateInviteLink(
     const isDrive = target.hasClasses(server.classes.drive);
     let browserPeer = isDrive && store.isLocalOnlyDrive(target.subject);
 
-    if (isDrive && isSaas && !browserPeer) {
+    const serverUrl = store.getServerUrlForSubject(target.subject);
+
+    if (
+      isDrive &&
+      isSaas &&
+      !browserPeer &&
+      (await fetchManagedInfo(serverUrl)).managed
+    ) {
+      if (!(await getManagedAccount()))
+        throw new Error(
+          'Sign in to your portal account to check this drive before sharing.',
+        );
       const response = await managedFetch('/sync-enrollments', {});
 
       if (!response.ok || response.status === 204)
@@ -85,8 +98,6 @@ export function useCreateInviteLink(
       });
       resumePeerLinks(store);
     }
-
-    const serverUrl = store.getServerUrl();
 
     if (browserPeer) {
       return `${window.location.origin}/app/invite?token=${encodeURIComponent(tokenBase64)}`;

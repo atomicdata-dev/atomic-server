@@ -27,6 +27,8 @@ const state = vi.hoisted(() => ({
 const store = {
   getAgent: () => ({ ...state.agent, privateDrive: 'did:ad:home' }),
   getServerUrl: () => 'https://node.example',
+  getServerUrlForSubject: () => 'https://node.example',
+  setDriveServer: vi.fn(),
   getDrive: () => 'did:ad:drive',
   // A demo guest's own subject is registered as local-only.
   isLocalOnlyDrive: (subject: string) =>
