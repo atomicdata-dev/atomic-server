@@ -475,6 +475,9 @@ where
         crate::plugins::replicate::reconcile_replication_targets(&replication_store).await;
     });
 
+    // Deletes file blobs nothing references any more, in the background.
+    crate::blob_storage::spawn_gc(appstate.clone())?;
+
     // Runs plugins nobody is watching. Sleeps on a server with no schedules.
     #[cfg(feature = "wasm-plugins")]
     crate::plugins::scheduler::spawn(appstate.clone());

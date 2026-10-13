@@ -82,9 +82,10 @@ fn package_hash(package: &str) -> AtomicResult<Vec<u8>> {
 /// Stores zip bytes content-addressed and returns their blake3 hex.
 pub async fn store_package(db: &Db, bytes: &[u8]) -> AtomicResult<String> {
     let hash = blake3::hash(bytes);
-    if !db.has_blob(hash.as_bytes()).await? {
-        db.put_blob(hash.as_bytes(), bytes).await?;
-    }
+    // Always written, even when present: that restarts the blob's garbage
+    // collection grace period, so a package left over from a deleted release
+    // is not swept between this call and the release that references it.
+    db.put_blob(hash.as_bytes(), bytes).await?;
     Ok(hash.to_hex().to_string())
 }
 

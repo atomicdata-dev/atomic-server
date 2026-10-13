@@ -1,4 +1,4 @@
-import { ai, core, dataBrowser, type Store } from '@tomic/react';
+import { ai, core, dataBrowser, type Resource, type Store } from '@tomic/react';
 import {
   aiChatsFolderCert,
   decodeB64,
@@ -25,16 +25,38 @@ export async function getOrCreateDriveLocation(
   pointerProperty: string,
   create: { isA: string; name: string },
 ): Promise<string> {
-  const drive = await store.getResource(driveSubject);
-  const existing = drive.get(pointerProperty) as string | undefined;
+  // A local-only drive has no server to ask and no other device.
+  const isLocalOnly = store.isLocalOnlySubject(driveSubject);
+  const askServer = store.serverConnected && !isLocalOnly;
+  let drive = await store.getResource(driveSubject);
+  let existing = drive.get(pointerProperty) as string | undefined;
+
+  // The pointer may have been set by another device after this one loaded the
+  // drive, and a drive that is not the open one is not pushed here. Creating
+  // now would add a second location and move the pointer to it, so ask the
+  // server before concluding there is none.
+  if (!existing && askServer) {
+    drive = await refetched(store, driveSubject, drive);
+    existing = drive.get(pointerProperty) as string | undefined;
+  }
 
   if (existing) {
-    // A pointer to a deleted/broken resource should not be returned —
-    // recreate instead (the stale pointer gets overwritten below).
-    const target = await store.getResource(existing);
+    let target = await store.getResource(existing);
+
+    if (target.error && askServer) {
+      target = await refetched(store, existing, target);
+    }
 
     if (!target.error) {
       return existing;
+    }
+
+    // Only a target the server does not have is a stale pointer, to be
+    // overwritten below. A read that failed for another reason (offline,
+    // unauthorized, not synced yet) says nothing about it: creating a new
+    // location then would orphan the real one and what is in it.
+    if (!isNotFound(target.error) || (!askServer && !isLocalOnly)) {
+      throw target.error;
     }
   }
 
@@ -50,6 +72,19 @@ export async function getOrCreateDriveLocation(
   await drive.save();
 
   return resource.subject;
+}
+
+/** The server's copy of a resource, or `fallback` when it cannot be asked. */
+async function refetched<T extends Resource>(
+  store: Store,
+  subject: string,
+  fallback: T,
+): Promise<T> {
+  try {
+    return (await store.fetchResourceFromServer(subject)) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 /** The Drive's Comments folder: default parent (= rights anchor) for comment Messages. */

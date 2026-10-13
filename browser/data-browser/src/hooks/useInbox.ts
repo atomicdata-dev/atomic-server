@@ -7,6 +7,7 @@ import {
   type Resource,
 } from '@tomic/react';
 import { usePrivateDrive } from './usePrivateDrive';
+import { usePrivateDriveSync } from './usePrivateDriveSync';
 import { dedupeBySource, isUnread } from '../helpers/notifications/inbox';
 
 const PAGE_SIZE = 100;
@@ -25,7 +26,7 @@ export function useInbox(): {
   privateDrive: string | undefined;
 } {
   const { privateDrive } = usePrivateDrive();
-  const { collection, ready } = useCollection(
+  const { collection, ready, invalidateCollection } = useCollection(
     {
       property: core.properties.isA,
       value: notifications.classes.notification,
@@ -35,6 +36,9 @@ export function useInbox(): {
     },
     { pageSize: PAGE_SIZE },
   );
+
+  usePrivateDriveSync(privateDrive, invalidateCollection);
+
   const members = useCollectionPage(collection, 0);
   const resources = useResources(privateDrive ? members : []);
 
