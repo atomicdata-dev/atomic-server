@@ -65,6 +65,7 @@ export const ContextMenuOptions = {
   Share: 'share',
   Tags: 'tags',
   Delete: 'delete',
+  Restore: 'restore',
   History: 'history',
   Import: 'import',
   UseInCode: 'useInCode',

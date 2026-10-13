@@ -96,5 +96,19 @@ export function useDriveVault(driveSubject: string | null): UseVaultBackup {
     return outcome;
   }, [importFromVault, driveSubject, store]);
 
-  return { ...vault, restore };
+  const { restoreFromFile: importFromFile } = vault;
+  const restoreFromFile = useCallback(
+    async (file: File) => {
+      const outcome = await importFromFile(file);
+
+      if (outcome && driveSubject) {
+        await reopenRestoredDrive(store, driveSubject);
+      }
+
+      return outcome;
+    },
+    [importFromFile, driveSubject, store],
+  );
+
+  return { ...vault, restore, restoreFromFile };
 }

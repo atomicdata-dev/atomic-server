@@ -81,13 +81,15 @@ Set `serverUrl` to the origin of the Atomic Server that hosts those ontologies (
 
 If you do paste an `https://your-server/atomic:…` or `https://your-server/did:ad:…` URL, the CLI treats it as an alias of the identifier and takes the server origin from the URL.
 
-Now we will generate the ontology files. We do this by running the `ad-generate ontologies` command. If your ontologies don't have public read rights you will have to add an agent secret to the command that has access to these resources.
+Now we will generate the ontology files. We do this by running the `ad-generate ontologies` command. If your ontologies don't have public read rights, connect this machine first:
 
 ```
-ad-generate ontologies --agent <AGENT_SECRET>
+ad-generate connect
 ```
 
-> Agent secret can also be preconfigured in the config **but be careful** when using version control as you can easily leak your secret this way.
+It makes a key on your machine (stored in `~/.config/atomic-cli/`) and opens a link in your Atomic app, where you pick which drives it may read and click Allow. You can revoke it under Connected apps in your account settings. Your own secret is never needed.
+
+You can still pass an agent secret instead (`ad-generate ontologies --agent <AGENT_SECRET>`, or `agentSecret` in the config), **but be careful** when using version control, as you can easily leak your secret this way.
 
 After running the command the files will have been generated in the specified output folder along with an `index.ts` file. The only thing left to do is to register our ontologies with @tomic/lib. This should be done as soon in your apps runtime lifecycle as possible, for example in your App.tsx when using React or root index.ts in most cases.
 

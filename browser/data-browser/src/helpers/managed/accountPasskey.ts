@@ -1,6 +1,6 @@
 // @wc-ignore-file
 import { hasManagedApi, managedFetch } from './api';
-import { getManagedAccount } from './session';
+import { getManagedAccount, noteManagedSessionChanged } from './session';
 
 function decode(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c =>
@@ -177,6 +177,8 @@ export async function signInWithAccountPasskey(email = ''): Promise<boolean> {
       'That passkey is not linked to an account. Use Google or an email link instead.',
     );
   }
+
+  noteManagedSessionChanged();
 
   return true;
 }

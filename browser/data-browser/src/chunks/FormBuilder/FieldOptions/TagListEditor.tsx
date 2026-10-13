@@ -3,7 +3,6 @@ import {
   dataBrowser,
   isAtomicIdentifier,
   Resource,
-  useArray,
   useResource,
   useStore,
   useString,
@@ -32,9 +31,11 @@ import { useDraftString } from '@helpers/useDraftString';
 import { tagColours } from '@components/Tag/tagColours';
 import { ReorderableList } from '../ReorderableList';
 import { AddButton } from './StringListEditor';
+import { useColumnOptions } from '../formDataClass';
 
 interface TagListEditorProps {
-  /** The SelectProperty whose `allowsOnly` holds the option Tags. */
+  /** The SelectProperty whose options (the `enum` the form's data class sets
+   * for it) are the option Tags. */
   property: Resource;
   label: string;
   addLabel: string;
@@ -54,8 +55,9 @@ interface TagListEditorProps {
  * beside each, an add button below — the same shape as {@link StringListEditor}
  * (matrix rows, table columns), which is what these options used to be.
  *
- * The difference is underneath. Each option is a **Tag** on the mapped
- * SelectProperty's `allowsOnly`, not a string in the field's options bag, so
+ * The difference is underneath. Each option is a **Tag** in the `enum` of the
+ * form's data class for the mapped column, not a string in the field's options
+ * bag, so
  * editing a label rewrites it everywhere it has already been submitted instead
  * of stranding old answers with a copy of the old text.
  *
@@ -75,49 +77,45 @@ export function TagListEditor({
 }: TagListEditorProps): JSX.Element {
   const store = useStore();
 
-  const [allowsOnly, setAllowsOnly] = useArray(
-    property,
-    core.properties.allowsOnly,
-    { commit: true },
-  );
+  const [tags, setTags] = useColumnOptions(property.subject);
 
   // The option whose input should take focus once it renders: the one just
   // added, so a run of options can be typed without reaching for the mouse.
   const [focusSubject, setFocusSubject] = useState<string>();
 
   const addOption = useCallback(
-    async (index = allowsOnly.length) => {
+    async (index = tags.length) => {
       const subject = await createOptionTag(
         store,
         property.subject,
-        `Option ${allowsOnly.length + 1}`,
+        `Option ${tags.length + 1}`,
       );
-      const next = [...allowsOnly];
+      const next = [...tags];
       next.splice(index, 0, subject);
       // Before the list update that mounts the row, so it is already marked
       // for focus by the time it first renders.
       setFocusSubject(subject);
-      await setAllowsOnly(next);
+      await setTags(next);
     },
-    [store, property.subject, allowsOnly, setAllowsOnly],
+    [store, property.subject, tags, setTags],
   );
 
   const removeOption = useCallback(
     async (subject: string) => {
       // Answers already referencing this tag keep the reference; the results
       // view folds them into "Other" rather than silently relabelling them.
-      await setAllowsOnly(allowsOnly.filter(s => s !== subject));
+      await setTags(tags.filter(s => s !== subject));
       await store.getResourceLoading(subject).destroy();
     },
-    [store, allowsOnly, setAllowsOnly],
+    [store, tags, setTags],
   );
 
   return (
     <Field label={label} labelAction={labelAction}>
       <Column gap='0.4rem'>
         <ReorderableList
-          subjects={allowsOnly}
-          onReorder={setAllowsOnly}
+          subjects={tags}
+          onReorder={setTags}
           gap='0.4rem'
           align='start'
           renderItem={(subject, index) => (

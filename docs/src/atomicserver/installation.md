@@ -159,7 +159,22 @@ It's the easiest way to get your server to run on the web, yet still have full c
 
 - Create an account on some tunneling service, such as [tunnelto.dev](https://tunnelto.dev/) (which we will use here). Make sure to reserve a subdomain, you want it to remain stable.
 - `tunnelto --port 9883 --subdomain joepio --key YOUR_API_KEY`
-- `atomic-server --domain joepio.tunnelto.dev --custom-server-url 'https://joepio.tunnelto.dev' --initialize`
+- `atomic-server --domain joepio.tunnelto.dev --server-url 'https://joepio.tunnelto.dev' --initialize`
+
+## Behind a reverse proxy (nginx, Caddy, Traefik, Ferron, Cloudflare Tunnel)
+
+`--https` means that atomic-server terminates TLS itself. Behind a proxy that does it for you, leave it off, and tell the server its public URL instead:
+
+```ini
+ATOMIC_PORT=80
+ATOMIC_HTTPS=false
+ATOMIC_DOMAIN=atomic.example.com
+ATOMIC_SERVER_URL=https://atomic.example.com
+```
+
+Without `ATOMIC_SERVER_URL` (or `--server-url`) the server builds its own address from `--https` and `--domain`, so it calls itself `http://atomic.example.com`. Resources it names itself, such as `/query` and everything delivered over the WebSocket, then reach your `https://` page as `http://` links, which the browser blocks as mixed content. Child resources of a Drive fail to load and real-time sync stops. The server logs a warning at boot when it sees a public-looking `ATOMIC_DOMAIN` with `ATOMIC_HTTPS` off and no server URL.
+
+For requests that arrive through the proxy the server also honours `X-Forwarded-Proto` and `X-Forwarded-Host`, for hosts it is configured to serve, so make your proxy send them. `ATOMIC_SERVER_URL` is what applies where there is no request, and is the fallback when the headers are missing.
 
 ## HTTPS Setup on a VPS (static IP required)
 
@@ -264,6 +279,9 @@ still `localhost`. As far as the process can tell, it is a private machine.
 
 If your server is reachable from the internet by any route, set
 `ATOMIC_OWNER_AGENT`. Nothing else infers it for you.
+
+Also set `ATOMIC_SERVER_URL` to the public address, see
+[Behind a reverse proxy](#behind-a-reverse-proxy-nginx-caddy-traefik-ferron-cloudflare-tunnel).
 
 ### Running an open server on purpose
 

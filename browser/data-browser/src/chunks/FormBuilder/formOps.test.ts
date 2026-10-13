@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { core, dataBrowser, forms, Datatype } from '@tomic/react';
+import { core, forms, Datatype, getEffectiveConstraint } from '@tomic/react';
+import { optionSubjects } from '@helpers/withConstraint';
 import { buildFormFromSpec } from './createFormFromSpec';
 import { formTestFixture } from './formTestFixture';
 import {
@@ -39,9 +40,16 @@ async function fixture() {
   const property = f.resources.get(
     role.get(forms.properties.formMapsTo) as string,
   )!;
+  const dataClass = f.resources.get(result.class)!;
   f.saved.length = 0;
 
-  return { ...f, result, form, page, email, role, property };
+  // The option Tags of a column: the `enum` in the data class's constraints.
+  const tagsOf = (column: { subject: string }) =>
+    optionSubjects(
+      getEffectiveConstraint(f.store, [dataClass.subject], column.subject),
+    );
+
+  return { ...f, result, form, page, email, role, property, dataClass, tagsOf };
 }
 
 describe('form inspection and configuration', () => {
@@ -58,7 +66,7 @@ describe('form inspection and configuration', () => {
       required: false,
     });
     expect(result.pages[0].fields[1].choices.map(c => c.subject)).toEqual(
-      f.property.getSubjects(core.properties.allowsOnly),
+      f.tagsOf(f.property),
     );
     expect(result.pages[1].fields[0]).toMatchObject({
       type: 'paragraph',
@@ -152,9 +160,7 @@ describe('form inspection and configuration', () => {
 
   it('renames/reorders choice Tags by identity, adds choices and retains removed Tags', async () => {
     const f = await fixture();
-    const [engineer, designer] = f.property.getSubjects(
-      core.properties.allowsOnly,
-    );
+    const [engineer, designer] = f.tagsOf(f.property);
     await configureFormField(f.store, {
       form: f.form.subject,
       page: 'Start',
@@ -164,7 +170,7 @@ describe('form inspection and configuration', () => {
         { label: 'Other' },
       ],
     });
-    const tags = f.property.getSubjects(core.properties.allowsOnly);
+    const tags = f.tagsOf(f.property);
     expect(tags[0]).toBe(designer);
     expect(f.resources.get(designer)!.get(core.properties.name)).toBe(
       'Product Designer',
@@ -411,17 +417,20 @@ describe('form inspection and configuration', () => {
       choices: [{ label: 'Email' }, { label: 'Phone' }],
     });
     const property = f.resources.get(added.property!)!;
-    expect(property.get(dataBrowser.properties.max)).toBe(1);
     expect(
-      property
-        .getSubjects(core.properties.allowsOnly)
+      getEffectiveConstraint(f.store, [f.dataClass.subject], property.subject)
+        .maxItems,
+    ).toBe(1);
+    expect(
+      f
+        .tagsOf(property)
         .map(s => f.resources.get(s)!.get(core.properties.name)),
     ).toEqual(['Email', 'Phone']);
   });
 
   it('rejects duplicate or foreign choice subjects and leaves all Tags untouched', async () => {
     const f = await fixture();
-    const tag = f.property.getSubjects(core.properties.allowsOnly)[0];
+    const tag = f.tagsOf(f.property)[0];
     await expect(
       configureFormField(f.store, {
         form: f.form.subject,

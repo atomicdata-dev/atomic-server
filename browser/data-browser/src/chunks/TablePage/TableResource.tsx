@@ -1302,6 +1302,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
       aggregateOutcomes,
       // The rows on screen: under the quick filter, the ones that match.
       rowCount: rowCollection.totalMembers,
+      rowsLoading: !ready,
       setColumnAggregate,
       removeAggregateRow,
       canWriteTable: canWrite,
@@ -1337,6 +1338,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
       viewAggregates,
       aggregateOutcomes,
       rowCollection.totalMembers,
+      ready,
       setColumnAggregate,
       removeAggregateRow,
       canWrite,
@@ -1644,6 +1646,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
               )}
               <FancyTable
                 readOnly={!canWrite}
+                busy={!ready}
                 columns={gridColumns}
                 columnSizes={gridColumnSizes}
                 // The session's empty entry row is local state: it needs

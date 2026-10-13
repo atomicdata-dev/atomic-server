@@ -67,9 +67,50 @@ export function selectionBounds(options: FieldOptions): {
   max?: number;
 } {
   return {
-    min: countBound(options.minSelected),
-    max: countBound(options.maxSelected),
+    min: countBound(options.minItems ?? options.minSelected),
+    max: countBound(options.maxItems ?? options.maxSelected),
   };
+}
+
+/** The row count limits of a `table-input`: `minItems` / `maxItems`, or the
+ * names older forms stored them under. */
+export function rowBounds(options: FieldOptions): {
+  min?: number;
+  max?: number;
+} {
+  return {
+    min: options.minItems ?? options.minRows,
+    max: options.maxItems ?? options.maxRows,
+  };
+}
+
+/** The value limits of a `number` / `currency` question: JSON Schema's
+ * `minimum` / `maximum`, or the `min` / `max` older forms stored. */
+export function valueBounds(options: FieldOptions): {
+  min?: number;
+  max?: number;
+  exclusiveMin?: number;
+  exclusiveMax?: number;
+} {
+  return {
+    min: options.minimum ?? options.min,
+    max: options.maximum ?? options.max,
+    exclusiveMin: options.exclusiveMinimum,
+    exclusiveMax: options.exclusiveMaximum,
+  };
+}
+
+/** Whether `value` matches the question's `pattern`. A pattern that does not
+ * compile as a JavaScript regular expression is ignored: the server has the
+ * last word (it uses Rust's regex syntax). */
+function matchesPattern(value: string, options: FieldOptions): boolean {
+  if (!options.pattern) return true;
+
+  try {
+    return new RegExp(options.pattern).test(value);
+  } catch {
+    return true;
+  }
 }
 
 function countBound(raw: unknown): number | undefined {
@@ -173,12 +214,22 @@ function validateInStep(
 }
 
 function validateBounds(n: number, options: FieldOptions): string | null {
-  if (options.min !== undefined && n < options.min) {
-    return `Must be at least ${options.min}`;
+  const { min, max, exclusiveMin, exclusiveMax } = valueBounds(options);
+
+  if (min !== undefined && n < min) {
+    return `Must be at least ${min}`;
   }
 
-  if (options.max !== undefined && n > options.max) {
-    return `Must be at most ${options.max}`;
+  if (max !== undefined && n > max) {
+    return `Must be at most ${max}`;
+  }
+
+  if (exclusiveMin !== undefined && n <= exclusiveMin) {
+    return `Must be more than ${exclusiveMin}`;
+  }
+
+  if (exclusiveMax !== undefined && n >= exclusiveMax) {
+    return `Must be less than ${exclusiveMax}`;
   }
 
   return null;
@@ -249,6 +300,10 @@ export function validateFieldValue(
         return `At most ${max} ${plural(max, 'character')} allowed`;
       }
 
+      if (!matchesPattern(raw, field.options)) {
+        return 'Does not match the required format';
+      }
+
       return null;
     }
 
@@ -265,15 +320,7 @@ export function validateFieldValue(
       if (field.options.integer && !Number.isSafeInteger(n))
         return 'Expected a whole number';
 
-      if (field.options.min !== undefined && n < field.options.min) {
-        return `Must be at least ${field.options.min}`;
-      }
-
-      if (field.options.max !== undefined && n > field.options.max) {
-        return `Must be at most ${field.options.max}`;
-      }
-
-      return null;
+      return validateBounds(n, field.options);
     }
 
     case 'date':
@@ -419,18 +466,14 @@ export function validateFieldValue(
 
       const filled = raw.filter(row => !isEmpty(row)).length;
 
-      if (
-        field.options.minRows !== undefined &&
-        filled < field.options.minRows
-      ) {
-        return `Please fill in at least ${field.options.minRows} row(s)`;
+      const rowLimits = rowBounds(field.options);
+
+      if (rowLimits.min !== undefined && filled < rowLimits.min) {
+        return `Please fill in at least ${rowLimits.min} row(s)`;
       }
 
-      if (
-        field.options.maxRows !== undefined &&
-        filled > field.options.maxRows
-      ) {
-        return `At most ${field.options.maxRows} row(s) allowed`;
+      if (rowLimits.max !== undefined && filled > rowLimits.max) {
+        return `At most ${rowLimits.max} row(s) allowed`;
       }
 
       return null;

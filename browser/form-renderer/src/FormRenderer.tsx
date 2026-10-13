@@ -20,6 +20,7 @@ import {
   staggerSpanStyle,
   staggerStyle,
   transitionClass,
+  PAGE_FRAME_WAIT_MS,
   useReducedMotion,
   type PageTransition,
   type TransitionDirection,
@@ -181,9 +182,20 @@ export function FormRenderer({
   useEffect(() => {
     if (!transition) return;
 
-    const timer = setTimeout(endPhase, phaseDeadlineMs(transition, slots));
+    const deadline = phaseDeadlineMs(transition, slots);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // The clock starts once the browser has painted the phase's first frame;
+    // see `PAGE_FRAME_WAIT_MS` for why, and for the fallback.
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(endPhase, deadline);
+    });
+    const unpainted = setTimeout(endPhase, deadline + PAGE_FRAME_WAIT_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      clearTimeout(unpainted);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transition]);
 

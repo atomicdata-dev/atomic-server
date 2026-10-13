@@ -91,15 +91,35 @@ export interface DeclaredAccept {
 }
 
 /**
+ * One table a destination declares: created beneath the plugin, with a default
+ * table view of `columns`.
+ */
+export interface DeclaredDestinationTable {
+  name: string;
+  /** Shortname of a class in the destination's `schema`. */
+  rowClass: string;
+  /** Property shortnames shown by the default view, in order. */
+  columns: string[];
+}
+
+/**
  * Where an importer writes, declared so the host can create it before the
  * first run instead of a plugin-specific setup screen.
  *
- * The host ensures `schema` in the drive's ontology, creates one table (and a
- * default table view of `table.columns`) beneath the plugin, and stores
- * `{ table, rowClass, properties }` as the plugin's config (under
- * `config.key` when the manifest declares one): the table subject, the
- * subject of the `table.rowClass` class, and every property's subject by
- * shortname. Repeating setup resumes the same resources.
+ * The host ensures `schema` in the drive's ontology and creates every declared
+ * table (each with a default table view of its `columns`) beneath the plugin.
+ * It then stores the plugin's config (under `config.key` when the manifest
+ * declares one):
+ *
+ * - `table` → `{ table, rowClass }`: the table subject and the subject of its
+ *   row class, flat, as before `tables` existed;
+ * - `tables` → `{ tables: { [key]: { table, rowClass } } }`, one entry per key,
+ *   for a plugin that writes more than one kind of record;
+ * - always `properties`: every property's subject by shortname.
+ *
+ * Declare `table`, `tables` or both; each table needs its own row class.
+ * Repeating setup resumes the same resources, so adding a table to `tables` in
+ * a later release only creates the new one.
  */
 export interface DeclaredDestination {
   schema: {
@@ -117,13 +137,13 @@ export interface DeclaredDestination {
       recommends?: string[];
     }[];
   };
-  table: {
-    name: string;
-    /** Shortname of a class in `schema`. */
-    rowClass: string;
-    /** Property shortnames shown by the default view, in order. */
-    columns: string[];
-  };
+  /** The single table, stored flat as `{ table, rowClass }`. */
+  table?: DeclaredDestinationTable;
+  /**
+   * More tables, each under a key the plugin chooses (`statements`,
+   * `closingBalances`) and reads back as `config.tables.<key>`.
+   */
+  tables?: Record<string, DeclaredDestinationTable>;
 }
 
 export type ManifestRuntime = 'atomic-js/1' | 'wasip2/1';
@@ -818,6 +838,18 @@ export function validateManifest(raw: unknown): PluginManifest {
 }
 
 const SHORTNAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** A `destination.tables` key: what the plugin reads as `config.tables.<key>`. */
+const TABLE_KEY = /^[a-z][A-Za-z0-9]{0,63}$/;
+/** Keys that would shadow `Object.prototype` members when read as `config.tables[key]`. */
+const RESERVED_KEYS = [
+  'constructor',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toString',
+  'valueOf',
+];
 
 /** Checks a destination declaration; see {@link DeclaredDestination}. */
 function validateDestination(
@@ -856,7 +888,7 @@ function validateDestination(
     });
   };
 
-  object(entry, ['schema', 'table']);
+  object(entry, ['schema', 'table', 'tables']);
   const schema = object(entry.schema, ['properties', 'classes']);
   if (!Array.isArray(schema.properties) || !Array.isArray(schema.classes))
     fail('schema needs properties and classes lists');
@@ -912,16 +944,49 @@ function validateDestination(
     new Set(classes.map(c => c.shortname)).size !== classes.length
   )
     fail('declare one to eight uniquely named classes');
-  const table = object(entry.table, ['name', 'rowClass', 'columns']);
-  const rowClass = text(table.rowClass, 'table rowClass');
-  if (!classes.some(c => c.shortname === rowClass))
-    fail('table rowClass must name a class in schema');
-  const columns = shortnames(table.columns, 'table columns');
-  if (columns.some(name => !known.has(name)))
-    fail('table columns must name properties in schema');
+
+  const table = (raw: unknown): DeclaredDestinationTable => {
+    const declared = object(raw, ['name', 'rowClass', 'columns']);
+    const rowClass = text(declared.rowClass, 'table rowClass');
+    if (!classes.some(c => c.shortname === rowClass))
+      fail('table rowClass must name a class in schema');
+    const columns = shortnames(declared.columns, 'table columns');
+    if (columns.some(name => !known.has(name)))
+      fail('table columns must name properties in schema');
+
+    return { name: text(declared.name, 'table name'), rowClass, columns };
+  };
+
+  if (entry.table === undefined && entry.tables === undefined)
+    fail('declare `table` or `tables`');
+  const primary = entry.table === undefined ? undefined : table(entry.table);
+  let keyed: Record<string, DeclaredDestinationTable> | undefined;
+
+  if (entry.tables !== undefined) {
+    const declared = object(entry.tables, Object.keys(entry.tables ?? {}));
+    const keys = Object.keys(declared);
+    if (keys.length === 0) fail('tables must not be empty');
+    keyed = {};
+
+    for (const key of keys) {
+      if (!TABLE_KEY.test(key) || RESERVED_KEYS.includes(key))
+        fail(
+          'table keys must be identifiers of letters and digits starting with a lower-case letter, at most 64',
+        );
+      keyed[key] = table(declared[key]);
+    }
+  }
+
+  const rowClasses = [
+    ...(primary ? [primary.rowClass] : []),
+    ...Object.values(keyed ?? {}).map(t => t.rowClass),
+  ];
+  if (new Set(rowClasses).size !== rowClasses.length)
+    fail('each table needs its own rowClass');
 
   return {
     schema: { properties, classes },
-    table: { name: text(table.name, 'table name'), rowClass, columns },
+    ...(primary ? { table: primary } : {}),
+    ...(keyed ? { tables: keyed } : {}),
   };
 }

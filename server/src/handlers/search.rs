@@ -62,7 +62,7 @@ pub async fn search_query(
     }
 
     let q = params.q.as_deref().unwrap_or("");
-    let hits = atomic_lib::search::query(store, q, &opts)?;
+    let (hits, timings) = atomic_lib::search::query_timed(store, q, &opts)?;
     timer.add("execute_query");
     crate::metrics::search_performed();
 
@@ -86,7 +86,7 @@ pub async fn search_query(
         .await?;
     results_resource.set_subject(subject.to_string());
 
-    timer.add("get_resources");
+    timer.add("build_endpoint");
     let resources = get_resources(
         req,
         &appstate,
@@ -95,6 +95,7 @@ pub async fn search_query(
         limit,
     )
     .await?;
+    timer.add("get_resources");
     tracing::info!(
         "search_query: after auth filter -> {} resources (was {} subjects)",
         resources.len(),
@@ -123,7 +124,18 @@ pub async fn search_query(
     result_vec.push(results_resource);
 
     let mut builder = HttpResponse::Ok();
-    builder.append_header(("Server-Timing", timer.header_value()));
+    let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+    // Sub-steps of `execute_query`, plus how many documents were considered.
+    let server_timing = format!(
+        "{}, score;dur={:.1}, scope;dur={:.1}, rank;dur={:.1}, candidates;desc=\"{} in scope of {}\"",
+        timer.header_value(),
+        ms(timings.score),
+        ms(timings.scope),
+        ms(timings.rank),
+        timings.in_scope,
+        timings.candidates,
+    );
+    builder.append_header(("Server-Timing", server_timing));
     builder.content_type("application/ad+json");
 
     Ok(builder.body(Resource::vec_to_json_ad(&result_vec, Some(&origin))?))

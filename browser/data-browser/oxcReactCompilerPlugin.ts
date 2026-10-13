@@ -45,7 +45,12 @@ export const styledComponentsOxcOptions = {
  */
 export function oxcReactCompiler({
   compile = true,
-}: { compile?: boolean } = {}): Plugin[] {
+  only,
+}: {
+  compile?: boolean;
+  /** Handle only files whose path matches; Vite transforms the rest. */
+  only?: RegExp;
+} = {}): Plugin[] {
   let sourcemap = true;
   let jsxDevelopment = false;
   let fastRefresh = false;
@@ -79,8 +84,12 @@ export function oxcReactCompiler({
       },
       async handler(code, id) {
         const isClient = this.environment?.config.consumer !== 'server';
-        const shouldCompile = isClient && looksLikeReactCode.test(code);
         const filename = id.split('?')[0]!;
+
+        // Leave every other file to Vite's own transform.
+        if (only && !only.test(filename)) return;
+
+        const shouldCompile = isClient && looksLikeReactCode.test(code);
 
         // Only this app's own source gets Fast Refresh instrumentation.
         //

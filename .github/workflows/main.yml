@@ -147,9 +147,12 @@ jobs:
           if [ "$BRANCH" != "develop" ] && gh api "repos/ontola/atomic-saas/branches/$BRANCH" >/dev/null 2>&1; then
             # A failed lookup (e.g. a token without pull-request read access)
             # must not read as "no open PR": that silently builds main, whose
-            # lockfile cannot match a branch that adds dependencies. Pair with
-            # the namesake then, and say so.
-            if open=$(gh api "repos/ontola/atomic-saas/pulls?state=open&head=ontola:$BRANCH" -q length 2>"$RUNNER_TEMP/pulls.err"); then
+            # lockfile cannot match a branch that adds dependencies. Ask the
+            # commit's own PR list first, which a token that can read the
+            # branch may also read; only when both lookups fail, pair with the
+            # namesake and say so.
+            if open=$(gh api "repos/ontola/atomic-saas/pulls?state=open&head=ontola:$BRANCH" -q length 2>"$RUNNER_TEMP/pulls.err") \
+              || open=$(gh api "repos/ontola/atomic-saas/commits/$BRANCH/pulls" -q "[.[] | select(.state == \"open\" and .head.ref == \"$BRANCH\")] | length" 2>>"$RUNNER_TEMP/pulls.err"); then
               if [ "${open:-0}" -gt 0 ]; then
                 ref="$BRANCH"
                 source="paired branch '$BRANCH'"

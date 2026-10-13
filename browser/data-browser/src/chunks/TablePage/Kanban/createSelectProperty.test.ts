@@ -16,7 +16,7 @@ vi.mock('@components/Tag/tagColours', () => ({
   tagColours: ['blue', 'red', 'green'],
 }));
 
-const { createPropertyOnClass, createSelectPropertyOnClass } =
+const { createOptionTags, createPropertyOnClass, createSelectPropertyOnClass } =
   await import('./createSelectProperty');
 
 /**
@@ -62,7 +62,12 @@ function fakeStore() {
   }
 
   const store = {
+    getServerUrl: () => 'https://localhost',
     getResource: async (subject: string) => makeResource(subject),
+    getResourceLoading: (subject: string) =>
+      resources.has(subject)
+        ? { ...makeResource(subject), isReady: () => true }
+        : { isReady: () => false, get: () => undefined },
     newResource: async (opts: {
       subject?: string;
       parent?: string;
@@ -131,7 +136,8 @@ describe('table column creation dedupes ontology shortnames', () => {
     });
 
     expect(second.subject).toBe(first.subject);
-    expect(second.tags).toEqual(first.tags);
+    // Each table gets Tags of its own for the shared property.
+    expect(Object.keys(second.tags)).toEqual(Object.keys(first.tags));
 
     const refreshedOntology = await store.getResource(ontology.subject);
     const properties = (refreshedOntology.get(core.properties.properties) ??
@@ -178,7 +184,7 @@ describe('table column creation dedupes ontology shortnames', () => {
     expect(property.hasClasses(dataBrowser.classes.selectProperty)).toBe(true);
   });
 
-  it('mints its own when the existing select lacks a requested option', async () => {
+  it('shares the property but gives each class its own options', async () => {
     const store = fakeStore();
     const { rowClassA, rowClassB } = await twoTablesOnOneOntology(store);
 
@@ -187,18 +193,85 @@ describe('table column creation dedupes ontology shortnames', () => {
       tags: STATUS_TAGS,
     });
 
-    // A reading list's "Status" (Want to read / Reading) is a different
-    // property from a task's, so it gets its own shortname rather than
-    // failing or quietly growing the other one's options.
+    // A reading list's "Status" (Want to read / Reading) is the same property
+    // as a task's, but the options are the class's, not the property's.
     const second = await createSelectPropertyOnClass(store, rowClassB, {
       name: 'Status',
       tags: [{ name: 'Todo' }, { name: 'Blocked' }],
     });
 
-    expect(second.subject).not.toBe(first.subject);
-    const property = await store.getResource(second.subject);
-    expect(property.get(core.properties.shortname)).toBe('status-2');
+    expect(second.subject).toBe(first.subject);
     expect(Object.keys(second.tags).sort()).toEqual(['Blocked', 'Todo']);
+
+    const constraintsOf = (klass: Resource) =>
+      klass.get(core.properties.constraints) as Record<
+        string,
+        { enum: string[] }
+      >;
+
+    expect(constraintsOf(rowClassA)[first.subject].enum).toEqual(
+      Object.values(first.tags),
+    );
+    expect(constraintsOf(rowClassB)[first.subject].enum).toEqual(
+      Object.values(second.tags),
+    );
+  });
+
+  it('writes options and a single pick to the class, not the property', async () => {
+    const store = fakeStore();
+    const { rowClassA } = await twoTablesOnOneOntology(store);
+
+    const created = await createSelectPropertyOnClass(store, rowClassA, {
+      name: 'Priority',
+      tags: [{ name: 'Low' }, { name: 'High' }],
+      max: 1,
+    });
+    const property = await store.getResource(created.subject);
+
+    expect(property.get(core.properties.allowsOnly)).toEqual([]);
+    expect(property.get(dataBrowser.properties.max)).toBeUndefined();
+    expect(rowClassA.get(core.properties.constraints)).toEqual({
+      [created.subject]: {
+        enum: Object.values(created.tags),
+        maxItems: 1,
+      },
+    });
+  });
+
+  it('keeps options on the property for forms (constraintsOn: property)', async () => {
+    const store = fakeStore();
+    const { rowClassA } = await twoTablesOnOneOntology(store);
+
+    const created = await createSelectPropertyOnClass(store, rowClassA, {
+      name: 'Choice',
+      tags: [{ name: 'A' }, { name: 'B' }],
+      max: 1,
+      constraintsOn: 'property',
+    });
+    const property = await store.getResource(created.subject);
+
+    expect(property.get(core.properties.allowsOnly)).toEqual(
+      Object.values(created.tags),
+    );
+    expect(property.get(dataBrowser.properties.max)).toBe(1);
+    expect(rowClassA.get(core.properties.constraints)).toBeUndefined();
+  });
+
+  it('writes the linked class of a plain column to the class map', async () => {
+    const store = fakeStore();
+    const { rowClassA } = await twoTablesOnOneOntology(store);
+
+    const subject = await createPropertyOnClass(store, rowClassA, {
+      name: 'Customer',
+      datatype: Datatype.ATOMIC_URL,
+      classtype: 'https://example.com/Customer',
+    });
+    const property = await store.getResource(subject);
+
+    expect(property.get(core.properties.classtype)).toBeUndefined();
+    expect(rowClassA.get(core.properties.constraints)).toEqual({
+      [subject]: { class: 'https://example.com/Customer' },
+    });
   });
 
   it('does not dedupe when the row classes have no shared ontology', async () => {
@@ -224,5 +297,82 @@ describe('table column creation dedupes ontology shortnames', () => {
 
     // No shared ontology to collide on — each class gets its own property.
     expect(second).not.toBe(first);
+  });
+});
+
+describe('column properties are content-addressed', () => {
+  it('creates plain and select properties with contentAddressedProperty', async () => {
+    const store = fakeStore();
+    const spy = vi.spyOn(store, 'newResource');
+    const { rowClassA } = await twoTablesOnOneOntology(store);
+    spy.mockClear();
+
+    await createPropertyOnClass(store, rowClassA, {
+      name: 'Title',
+      datatype: Datatype.STRING,
+    });
+    await createSelectPropertyOnClass(store, rowClassA, {
+      name: 'Status',
+      tags: STATUS_TAGS,
+    });
+
+    const propertyCalls = spy.mock.calls.filter(([opts]) =>
+      [opts?.isA].flat().includes(core.classes.property),
+    );
+
+    expect(propertyCalls).toHaveLength(2);
+    expect(
+      propertyCalls.every(([opts]) => opts?.contentAddressedProperty === true),
+    ).toBe(true);
+  });
+
+  it('mints a new column under a disambiguated shortname when asked not to reuse', async () => {
+    const store = fakeStore();
+    const { rowClassA } = await twoTablesOnOneOntology(store);
+
+    const first = await createPropertyOnClass(store, rowClassA, {
+      name: 'Price',
+      datatype: Datatype.STRING,
+    });
+    const second = await createPropertyOnClass(store, rowClassA, {
+      name: 'Price',
+      datatype: Datatype.STRING,
+      reuse: false,
+    });
+
+    expect(second).not.toBe(first);
+    expect(
+      (await store.getResource(second)).get(core.properties.shortname),
+    ).toBe('price-2');
+  });
+});
+
+describe('option tags of a hosted property', () => {
+  it('are not parented to a property this server does not host', async () => {
+    const store = fakeStore();
+    const parents: (string | undefined)[] = [];
+    const subjects: (string | undefined)[] = [];
+    const original = store.newResource;
+    store.newResource = (async (opts: {
+      subject?: string;
+      parent?: string;
+    }) => {
+      parents.push(opts.parent);
+      subjects.push(opts.subject);
+
+      return original(opts as Parameters<typeof original>[0]);
+    }) as typeof original;
+
+    await createOptionTags(
+      store as unknown as Store,
+      'https://atomicdata.dev/task/v1/status',
+      [{ name: 'Todo' }],
+      'atomic:row-class',
+    );
+
+    // The server refuses a subject under a domain it does not own, and a child
+    // of a resource the agent cannot append to.
+    expect(parents).toEqual(['atomic:row-class']);
+    expect(subjects).toEqual([undefined]);
   });
 });

@@ -19,6 +19,8 @@ pub enum DidKind {
     Agent,
     Commit,
     Blob,
+    Property,
+    Lens,
     Node,
     Other,
 }
@@ -854,6 +856,8 @@ mod tests {
             ("did:ad:agent:key", DidKind::Agent),
             ("did:ad:commit:signature", DidKind::Commit),
             ("did:ad:blob:hash", DidKind::Blob),
+            ("did:ad:prop:hash", DidKind::Property),
+            ("did:ad:lens:hash", DidKind::Lens),
             ("did:ad:node:node-id", DidKind::Node),
             ("did:ad:future:value", DidKind::Other),
         ];

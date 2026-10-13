@@ -122,6 +122,38 @@ impl QueryFilter {
 /// Still used by the [Tree::PropValSub] / [Tree::ValPropSub] key layouts.
 pub const SEPARATION_BIT: u8 = 0xff;
 
+/// Every property of the core vocabulary starts with this.
+const PROPERTY_NAMESPACE: &str = "https://atomicdata.dev/properties/";
+
+/// Written in an index key instead of [`PROPERTY_NAMESPACE`]. No URL starts
+/// with it. Stores written before keep the full URL until the index rebuild of
+/// [`super::index_keys::migrate_if_needed`] has run; reads accept both.
+const PROPERTY_NAMESPACE_BYTE: u8 = 0x01;
+
+/// How an atom index key writes a property: the core vocabulary's namespace
+/// as one byte (34 bytes saved in every row), anything else as it is.
+pub(crate) fn property_key_part(property: &str) -> Vec<u8> {
+    match property.strip_prefix(PROPERTY_NAMESPACE) {
+        Some(rest) => [&[PROPERTY_NAMESPACE_BYTE][..], rest.as_bytes()].concat(),
+        None => property.as_bytes().to_vec(),
+    }
+}
+
+/// Reads a property back from an index key part, in either form.
+pub(crate) fn property_from_key_part(part: &[u8]) -> AtomicResult<String> {
+    let text = |bytes: &[u8]| {
+        std::str::from_utf8(bytes)
+            .map(str::to_string)
+            .map_err(|_| "Can't parse prop into string".into())
+    };
+    match part.split_first() {
+        Some((&PROPERTY_NAMESPACE_BYTE, rest)) => {
+            Ok(format!("{PROPERTY_NAMESPACE}{}", text(rest)?))
+        }
+        _ => text(part),
+    }
+}
+
 /// What the atom indexes write for an atom's sort value: nothing when it is
 /// the reference value (which every indexed atom's is), so a long URL or text
 /// is not in the key twice. Readers take an empty part to mean "the same".

@@ -247,7 +247,7 @@ mod vault_ipc {
     store::{MemoryVaultStore, VaultObjectStore},
     sync::{
       commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch, CheckpointPolicy,
-      SegmentKind,
+      HistoryKeep, SegmentKind,
     },
   };
   pub use base64::engine::general_purpose::STANDARD;
@@ -372,6 +372,7 @@ async fn vault_export(
   checkpoint_n: u64,
   drive_has_checkpoint: bool,
   observed_lanes: std::collections::BTreeMap<String, u32>,
+  current_state_only: Option<bool>,
   node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
 ) -> Result<Option<vault_ipc::VaultExportOut>, String> {
   let store = vault_ipc::store_of(&node)?;
@@ -396,7 +397,14 @@ async fn vault_export(
       checkpoint_n,
       drive_has_checkpoint,
       &observed_lanes,
-      vault_ipc::CheckpointPolicy::default(),
+      vault_ipc::CheckpointPolicy {
+        history: if current_state_only.unwrap_or(false) {
+          vault_ipc::HistoryKeep::CurrentStateOnly
+        } else {
+          vault_ipc::HistoryKeep::Full
+        },
+        ..vault_ipc::CheckpointPolicy::default()
+      },
     ))?
     .map_err(|e| format!("Could not seal this drive: {e}"))?;
 

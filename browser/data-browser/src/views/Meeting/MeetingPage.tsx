@@ -10,6 +10,7 @@ import type { ResourcePageProps } from '../ResourcePage';
 import { EditableTitle } from '../../components/EditableTitle';
 import { ResourceCoverImage } from '../../components/ResourceDecorations';
 import { Button } from '../../components/Button';
+import { Spinner } from '../../components/Spinner';
 import { Row, Column } from '../../components/Row';
 import { useFollow } from '../../components/Presence/FollowContext';
 import { useRightPanel } from '../../components/RightPanel/RightPanelContext';
@@ -82,7 +83,7 @@ export function MeetingPage({
         </MeetingHeader>
 
         {doc ? (
-          <Suspense fallback={<div>Loading meeting notes…</div>}>
+          <Suspense fallback={<Spinner centered />}>
             <CollaborativeEditor
               id='meeting-editor'
               resource={resource}
@@ -92,7 +93,7 @@ export function MeetingPage({
             />
           </Suspense>
         ) : (
-          <div>Loading meeting notes…</div>
+          <Spinner centered />
         )}
       </Page>
     </>

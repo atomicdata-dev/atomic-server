@@ -21,7 +21,7 @@ import { InlineFormattedResourceList } from '@components/InlineFormattedResource
 import { useResource } from '@tomic/react';
 import { MCP_TOOL_NAMES } from '../defaultMCPServers';
 import { core, Client } from '@tomic/lib';
-import { tryExpandRef } from '@helpers/subjectRefs';
+import { tryExpandRef } from '@tomic/react';
 
 interface ToolMessageProps {
   part: ToolUIPart | DynamicToolUIPart;
@@ -112,7 +112,7 @@ const getIcon = (toolName: string) => {
     case TOOL_NAMES.READ_SKILL_REFERENCE:
       return FaGraduationCap;
     case TOOL_NAMES.GET_SCHEMA:
-    case TOOL_NAMES.GET_USER_CLASSES:
+    case TOOL_NAMES.FIND_SCHEMA:
     case TOOL_NAMES.DESCRIBE_DASHBOARD:
       return FaBook;
     case TOOL_NAMES.EDIT_ATOMIC_RESOURCE:
@@ -121,6 +121,7 @@ const getIcon = (toolName: string) => {
       return FaPencil;
     case TOOL_NAMES.CREATE_RESOURCE:
     case TOOL_NAMES.CREATE_TABLE:
+    case TOOL_NAMES.ENSURE_ONTOLOGY:
     case TOOL_NAMES.CREATE_DASHBOARD:
       return FaPlus;
     default:
@@ -176,8 +177,12 @@ const ToolTitle = ({
     return <span>Reading schema</span>;
   }
 
-  if (toolName === TOOL_NAMES.GET_USER_CLASSES) {
-    return <span>Listing user classes</span>;
+  if (toolName === TOOL_NAMES.FIND_SCHEMA) {
+    return <span>Searching schemas</span>;
+  }
+
+  if (toolName === TOOL_NAMES.ENSURE_ONTOLOGY) {
+    return <span>Saving schema</span>;
   }
 
   if (toolName === TOOL_NAMES.CREATE_RESOURCE && isCreateResourceArgs(args)) {

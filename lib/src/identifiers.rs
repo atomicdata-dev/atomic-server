@@ -21,6 +21,12 @@ pub const ATOMIC_COMMIT_PREFIX: &str = "atomic:commit:";
 /// Prefix for Blob identifiers: `atomic:blob:`.
 pub const ATOMIC_BLOB_PREFIX: &str = "atomic:blob:";
 
+/// Prefix for Property identifiers: `atomic:prop:`.
+pub const ATOMIC_PROP_PREFIX: &str = "atomic:prop:";
+
+/// Prefix for Lens identifiers: `atomic:lens:`.
+pub const ATOMIC_LENS_PREFIX: &str = "atomic:lens:";
+
 /// Prefix for Node identifiers: `atomic:node:`.
 pub const ATOMIC_NODE_PREFIX: &str = "atomic:node:";
 
@@ -35,6 +41,9 @@ pub const DID_AD_COMMIT_PREFIX: &str = "did:ad:commit:";
 
 /// Legacy blob prefix. New code emits [`ATOMIC_BLOB_PREFIX`].
 pub const DID_AD_BLOB_PREFIX: &str = "did:ad:blob:";
+
+/// Legacy property prefix. New code emits [`ATOMIC_PROP_PREFIX`].
+pub const DID_AD_PROP_PREFIX: &str = "did:ad:prop:";
 
 /// Legacy node prefix. New code emits [`ATOMIC_NODE_PREFIX`].
 pub const DID_AD_NODE_PREFIX: &str = "did:ad:node:";
@@ -158,6 +167,20 @@ pub fn identifier_kind(raw: &str) -> Option<DidKind> {
             DidKind::Blob
         });
     }
+    if let Some(rest) = body.strip_prefix("prop:") {
+        return Some(if rest.is_empty() {
+            DidKind::Other
+        } else {
+            DidKind::Property
+        });
+    }
+    if let Some(rest) = body.strip_prefix("lens:") {
+        return Some(if rest.is_empty() {
+            DidKind::Other
+        } else {
+            DidKind::Lens
+        });
+    }
     if let Some(rest) = body.strip_prefix("node:") {
         return Some(if rest.is_empty() {
             DidKind::Other
@@ -182,6 +205,14 @@ pub fn is_commit_id(raw: &str) -> bool {
 
 pub fn is_blob_id(raw: &str) -> bool {
     identifier_kind(raw) == Some(DidKind::Blob)
+}
+
+pub fn is_prop_id(raw: &str) -> bool {
+    identifier_kind(raw) == Some(DidKind::Property)
+}
+
+pub fn is_lens_id(raw: &str) -> bool {
+    identifier_kind(raw) == Some(DidKind::Lens)
 }
 
 pub fn is_node_id(raw: &str) -> bool {
@@ -210,6 +241,20 @@ pub fn commit_signature(raw: &str) -> Option<&str> {
 pub fn blob_hash_hex(raw: &str) -> Option<&str> {
     identifier_body(raw)?
         .strip_prefix("blob:")
+        .filter(|s| !s.is_empty())
+}
+
+/// Hex BLAKE3 of an `atomic:prop:` / `did:ad:prop:` identifier.
+pub fn prop_hash_hex(raw: &str) -> Option<&str> {
+    identifier_body(raw)?
+        .strip_prefix("prop:")
+        .filter(|s| !s.is_empty())
+}
+
+/// Hex BLAKE3 of an `atomic:lens:` / `did:ad:lens:` identifier.
+pub fn lens_hash_hex(raw: &str) -> Option<&str> {
+    identifier_body(raw)?
+        .strip_prefix("lens:")
         .filter(|s| !s.is_empty())
 }
 
@@ -261,6 +306,14 @@ pub fn blob_subject(hash_hex: &str) -> String {
     format!("{ATOMIC_BLOB_PREFIX}{hash_hex}")
 }
 
+pub fn prop_subject(hash_hex: &str) -> String {
+    format!("{ATOMIC_PROP_PREFIX}{hash_hex}")
+}
+
+pub fn lens_subject(hash_hex: &str) -> String {
+    format!("{ATOMIC_LENS_PREFIX}{hash_hex}")
+}
+
 pub fn node_subject(node_id: &str) -> String {
     format!("{ATOMIC_NODE_PREFIX}{node_id}")
 }
@@ -293,6 +346,9 @@ mod tests {
             ("atomic:commit:sig", DidKind::Commit),
             ("atomic:blob:ab", DidKind::Blob),
             ("atomic:node:ff", DidKind::Node),
+            ("atomic:prop:ab", DidKind::Property),
+            ("did:ad:prop:ab", DidKind::Property),
+            ("atomic:prop:", DidKind::Other),
             ("atomic:future:x", DidKind::Other),
             ("did:ad:future:x", DidKind::Other),
         ] {
@@ -301,6 +357,17 @@ mod tests {
         assert_eq!(identifier_kind("https://example.com"), None);
         assert_eq!(identifier_kind("did:key:abc"), None);
         assert_eq!(identifier_kind("atomic://pair?v=1"), None);
+    }
+
+    #[test]
+    fn prop_identifier_helpers() {
+        assert!(is_prop_id("atomic:prop:ab"));
+        assert!(is_prop_id("did:ad:prop:ab"));
+        assert!(!is_prop_id("atomic:blob:ab"));
+        assert_eq!(prop_hash_hex("did:ad:prop:ab"), Some("ab"));
+        assert_eq!(prop_hash_hex("atomic:prop:"), None);
+        assert_eq!(prop_subject("ab"), "atomic:prop:ab");
+        assert_eq!(canonicalize_scheme("did:ad:prop:ab"), "atomic:prop:ab");
     }
 
     #[test]

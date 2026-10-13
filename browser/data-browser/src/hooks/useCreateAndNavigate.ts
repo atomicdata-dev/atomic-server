@@ -38,11 +38,6 @@ export function useCreateAndNavigate(): CreateAndNavigate {
       propVals,
       { parent, extraParams, onCreated, subject, noParent, skipNavigation },
     ): Promise<Resource> => {
-      const classTitle =
-        store
-          .getResourceLoading(isA)
-          ?.title?.replace(/^https?:\/\/[^/]+\/classes\//, '') ?? 'Resource';
-
       const resource = await store.newResource({
         subject,
         isA,
@@ -73,8 +68,6 @@ export function useCreateAndNavigate(): CreateAndNavigate {
             to: constructOpenURL(resource.subject, extraParams),
           });
         }
-
-        toast.success(`${classTitle} created`);
       } catch (e) {
         store.notifyError(e);
         toast.error('Failed to save new resource');

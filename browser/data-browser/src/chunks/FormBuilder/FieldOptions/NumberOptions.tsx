@@ -6,6 +6,7 @@ import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
 import { Divider } from './Divider';
+import { useFieldConstraint } from '../formDataClass';
 
 interface NumberOptionsProps {
   field: Resource;
@@ -13,6 +14,7 @@ interface NumberOptionsProps {
 
 export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
+  const constraint = useFieldConstraint(field);
 
   const placeholder = (options.placeholder as string | undefined) ?? '';
 
@@ -21,13 +23,17 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
       <FieldPair>
         <BoundField
           label='Min'
-          optionKey='min'
+          floor={constraint.minimum}
+          max={constraint.maximum}
+          optionKey='minimum'
           options={options}
           setOptions={setOptions}
         />
         <BoundField
           label='Max'
-          optionKey='max'
+          floor={constraint.minimum}
+          max={constraint.maximum}
+          optionKey='maximum'
           options={options}
           setOptions={setOptions}
         />

@@ -306,7 +306,8 @@ test.describe('Plugins', () => {
       await closeWith('Uninstall');
     });
 
-    await expect(page.getByText('Plugin uninstalled')).toBeVisible();
+    // The installation page is gone once the uninstall navigates away.
+    await expect(page.getByRole('button', { name: 'Uninstall' })).toBeHidden();
 
     // After uninstall the plugin resource is destroyed, so reloading on its
     // URL would 404. Navigate to the drive page first.

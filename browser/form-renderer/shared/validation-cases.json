@@ -1,0 +1,29 @@
+{
+  "_comment": "Answers whose verdict must be identical in the browser (src/validation.ts) and on the server (server/src/forms.rs). Both test suites read this file, so a rule changed on one side fails on the other. Only cases both sides agree on belong here: the renderer is deliberately stricter on half-typed international phone numbers.",
+  "cases": [
+    { "type": "email", "value": "a@b.co", "valid": true },
+    {
+      "type": "email",
+      "value": "first.last+tag@sub.example.org",
+      "valid": true
+    },
+    { "type": "email", "value": "no-at-sign.example.com", "valid": false },
+    { "type": "email", "value": "a@b", "valid": false },
+    { "type": "email", "value": "a b@c.de", "valid": false },
+    { "type": "email", "value": " a@b.co", "valid": false },
+    { "type": "url", "value": "https://example.com", "valid": true },
+    { "type": "url", "value": "HTTP://example.com/path?q=1#x", "valid": true },
+    { "type": "url", "value": " https://example.com ", "valid": true },
+    { "type": "url", "value": "ftp://example.com", "valid": false },
+    { "type": "url", "value": "example.com", "valid": false },
+    { "type": "url", "value": "https://exa mple.com", "valid": false },
+    { "type": "phone", "value": "+31612345678", "valid": true },
+    { "type": "phone", "value": "(020) 123-4567", "valid": true },
+    { "type": "phone", "value": "020 123 4567", "valid": true },
+    { "type": "phone", "value": "12ab", "valid": false },
+    { "type": "phone", "value": "abcdefgh", "valid": false },
+    { "type": "country", "value": "NL", "valid": true },
+    { "type": "country", "value": "nl", "valid": false },
+    { "type": "country", "value": "Netherlands", "valid": false }
+  ]
+}

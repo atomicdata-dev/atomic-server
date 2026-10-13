@@ -85,6 +85,42 @@
     "https://atomicdata.dev/properties/shortname": "recommends"
   },
   {
+    "@id": "https://atomicdata.dev/properties/constraints",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Per-property value constraints for instances of this Class: a JSON object keyed by property subject whose values use a subset of JSON Schema keywords (`enum`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `pattern`, `class`).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "constraints"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/lensFrom",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The property a Lens reads. Part of the Lens's content-addressed identity.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "lens-from"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/lensTo",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The property a Lens writes. The Lens belongs to the ontology that owns this property. Part of the Lens's content-addressed identity.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "lens-to"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/lensTransform",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "How a value under `lensFrom` becomes a value under `lensTo`: a JSON object with an `op` (`rename`, `wrap`, `head`, `map` or `convert`). Part of the Lens's content-addressed identity.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "lens-transform"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/requires",
     "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -122,7 +158,8 @@
     ],
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/recommends",
-      "https://atomicdata.dev/properties/requires"
+      "https://atomicdata.dev/properties/requires",
+      "https://atomicdata.dev/properties/constraints"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/shortname",
@@ -154,6 +191,22 @@
       "https://atomicdata.dev/properties/publicKey"
     ],
     "https://atomicdata.dev/properties/shortname": "agent"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Lens",
+    "https://atomicdata.dev/properties/description": "A Lens maps the values of one Property onto another, so data stored under an old Property shows up under its replacement. Its ID is the hash of `lensFrom`, `lensTo` and `lensTransform`, and it belongs to the ontology that owns `lensTo`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/lensFrom",
+      "https://atomicdata.dev/properties/lensTo",
+      "https://atomicdata.dev/properties/lensTransform"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "lens"
   },
   {
     "@id": "https://atomicdata.dev/classes/Importer",

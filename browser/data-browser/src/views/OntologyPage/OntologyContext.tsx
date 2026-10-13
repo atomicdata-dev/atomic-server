@@ -65,7 +65,7 @@ export function OntologyContextProvider({
   const addProperty = useCallback(
     async (subject: string) => {
       await setProperties(
-        await sortSubjectList(store, [...properties, subject]),
+        await sortSubjectList(store, [...new Set([...properties, subject])]),
       );
     },
     [properties, setProperties],

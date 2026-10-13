@@ -1,9 +1,7 @@
 import {
-  core,
   forms,
   Resource,
   server,
-  useArray,
   useResource,
   useString,
   useTitle,
@@ -26,6 +24,7 @@ import {
   type FieldOptions,
 } from '@tomic/form-renderer';
 import { Row } from '@components/Row';
+import { useColumnOptions } from './formDataClass';
 import { parseFieldOptions } from './FieldOptions/useFieldOptions';
 import { isChoiceFieldType, type FormFieldType } from './fieldTypes';
 
@@ -225,8 +224,9 @@ function CheckboxPreview({ label }: { label: string }): JSX.Element {
 
 /**
  * Radios, checkbox lists, dropdowns and picture cards, all fed by the same
- * source: the options of a choice question are Tags on the Property it maps
- * to (see `TagListEditor`), not values on the field.
+ * source: the options of a choice question are the Tags in the data class's
+ * constraint for the column it maps to (see `TagListEditor`), not values on the
+ * field.
  *
  * Empty for a question whose options come from a table's *rows* — that list
  * only exists server-side, at publish time.
@@ -239,8 +239,7 @@ function ChoicePreview({
   type: FormFieldType;
 }): JSX.Element {
   const [mapsTo] = useString(field, forms.properties.formMapsTo);
-  const property = useResource(mapsTo);
-  const [allowsOnly] = useArray(property, core.properties.allowsOnly);
+  const [allowsOnly] = useColumnOptions(mapsTo);
 
   if (allowsOnly.length === 0) {
     return <Empty>No options yet</Empty>;

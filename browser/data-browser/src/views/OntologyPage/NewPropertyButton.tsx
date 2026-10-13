@@ -20,6 +20,8 @@ import { stringToSlug } from '../../helpers/stringToSlug';
 import { Column } from '../../components/Row';
 import { newProperty } from './ontologyUtils';
 import { toAnchorId } from '../../helpers/toAnchorId';
+import { BasicSelect } from '../../components/forms/BasicSelect';
+import { datatypeOptions } from './PropertyDatatypePicker';
 import { DashedButton } from './DashedButton';
 import { useOntologyContext } from './OntologyContext';
 
@@ -33,12 +35,20 @@ export function NewPropertyButton({
   const store = useStore();
   const [inputValue, setInputValue] = useState('');
   const [isValid, setIsValid] = useState(false);
+  // Shortname and datatype are the property's identity: both are chosen
+  // here, before it is created.
+  const [datatype, setDatatype] = useState<string>(Datatype.STRING);
   const inputRef = useRef<HTMLInputElement>(null);
   const { addProperty } = useOntologyContext();
 
   const [dialogProps, show, hide, isOpen] = useDialog({
     onSuccess: async () => {
-      const createdProperty = await newProperty(inputValue, parent, store);
+      const createdProperty = await newProperty(
+        inputValue,
+        parent,
+        store,
+        datatype as Datatype,
+      );
       await addProperty(createdProperty);
       requestAnimationFrame(() => {
         const id = toAnchorId(createdProperty);
@@ -71,6 +81,7 @@ export function NewPropertyButton({
   const openAndReset = () => {
     setInputValue('');
     setIsValid(false);
+    setDatatype(Datatype.STRING);
     show();
 
     requestAnimationFrame(() => {
@@ -110,6 +121,17 @@ export function NewPropertyButton({
                     onKeyDown={handleKeyDown}
                   />
                 </InputWrapper>
+                <BasicSelect
+                  aria-label='Property datatype'
+                  value={datatype}
+                  onChange={e => setDatatype(e.target.value)}
+                >
+                  {datatypeOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </BasicSelect>
               </Column>
             </DialogContent>
             <DialogActions>

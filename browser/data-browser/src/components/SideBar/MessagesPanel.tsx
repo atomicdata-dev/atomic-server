@@ -14,6 +14,7 @@ import {
   SideBarMenuRowLabel,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
+import { Panel } from './usePanelList';
 
 interface MessagesPanelProps {
   onItemClick: () => void;
@@ -30,6 +31,7 @@ export function MessagesPanel({
     <>
       <SideBarPanel
         title='Messages'
+        panel={Panel.Messages}
         heightStorageKey='messagesPanelHeight'
         initialHeight={200}
         data-testid='messages-panel'

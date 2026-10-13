@@ -4,7 +4,10 @@ import { accountPasskey } from './accountPasskey';
 import { hasManagedApi, managedFetch } from './api';
 import { getManagedAccount } from './session';
 vi.mock('./api', () => ({ hasManagedApi: vi.fn(), managedFetch: vi.fn() }));
-vi.mock('./session', () => ({ getManagedAccount: vi.fn() }));
+vi.mock('./session', () => ({
+  getManagedAccount: vi.fn(),
+  noteManagedSessionChanged: vi.fn(),
+}));
 const create = vi.fn();
 const get = vi.fn();
 const salt = new Uint8Array(16).fill(9);

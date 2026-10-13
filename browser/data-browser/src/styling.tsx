@@ -225,6 +225,8 @@ export const buildTheme = (
       alert: '#cf5b5b',
       alertLight: '#e66f6f',
       warning: '#f5a623',
+      // Readable on bg in both modes; for confirmations and "done" states.
+      success: darkMode ? '#4cc27a' : '#237a42',
       diff: {
         addedBg: '#e4ffe4',
         addedFg: '#003500',
@@ -331,6 +333,8 @@ declare module 'styled-components' {
       alert: string;
       alertLight: string;
       warning: string;
+      /** Confirmation / done color */
+      success: string;
       diff: {
         addedBg: string;
         addedFg: string;
@@ -363,6 +367,13 @@ export const GlobalStyle = createGlobalStyle`
      (https://bugzilla.mozilla.org/show_bug.cgi?id=1962617). */
   html {
     height: 100%;
+  }
+
+  /* Mouse/touch focus on buttons and links must not leave a focus ring;
+     keyboard focus (:focus-visible) keeps its styling. Text inputs,
+     textareas, selects and contenteditable are deliberately not matched. */
+  :is(button, a, summary, [role='button'], [role='menuitem'], [role='tab'], [tabindex]):focus:not(:focus-visible) {
+    outline: none;
   }
 
   * {

@@ -9,6 +9,12 @@ export interface SearchOpts {
   include?: boolean;
   /** Max of how many results to return */
   limit?: number;
+  /**
+   * Called with the local-index hits as soon as they are available, while the
+   * hosted `/search` request may still be pending. The final result of
+   * `search()` includes these hits too. Not called when there are no local hits.
+   */
+  onPartial?: (subjects: string[]) => void;
   /** Subjects of resource to scope the search to. This should be a list of parents of the resources you're looking for. */
   parents?: string[] | string;
   /** Property-Value pair of set filters. */

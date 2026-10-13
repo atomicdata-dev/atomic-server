@@ -17,7 +17,7 @@ import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Checkbox, CheckboxLabel } from '@components/forms/Checkbox';
 import { useTableFormColumns } from '../FormBuilder/useTableFormColumns';
 import {
-  compatibleFieldTypes,
+  compatibleColumnTypes,
   columnLabel,
   createMappedField,
 } from '../FormBuilder/tableColumns';
@@ -76,7 +76,9 @@ export function CreateTableFormDialog({
       await form.save();
 
       for (const property of columns.filter(
-        p => !excluded.includes(p.subject) && compatibleFieldTypes(p).length,
+        p =>
+          !excluded.includes(p.subject) &&
+          compatibleColumnTypes(store, dataClass.subject, p).length,
       )) {
         const field = await createMappedField(store, page, dataClass, property);
         await page.set(forms.properties.formFields, [
@@ -121,7 +123,9 @@ export function CreateTableFormDialog({
               table.
             </p>
             {columns.map(property => {
-              const supported = compatibleFieldTypes(property).length > 0;
+              const supported =
+                compatibleColumnTypes(store, dataClass.subject, property)
+                  .length > 0;
 
               return (
                 <CheckboxLabel key={property.subject}>

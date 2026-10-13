@@ -2,7 +2,7 @@
 use crate::{
     agents::Agent,
     commit::sign_message,
-    errors::AtomicResult,
+    errors::{AtomicError, AtomicErrorType, AtomicResult},
     parse::{parse_json_ad_string, ParseOpts},
     storelike::ResourceResponse,
     Resource, Storelike, Subject,
@@ -516,11 +516,21 @@ async fn fetch_body_with_client(
             .map_err(|e| format!("Could not parse HTTP response for {}: {}", url, e))?,
     };
     if status != 200 {
-        return Err(format!(
+        let message = format!(
             "Could not fetch url '{}'. Status: {}. Body: {}",
             url, status, body
-        )
-        .into());
+        );
+        // 404 and 410 are the server's definitive answer, unlike a 5xx or a
+        // network error. Callers use the type to remember it.
+        return Err(if status == 404 || status == 410 {
+            AtomicError {
+                message,
+                error_type: AtomicErrorType::NotFoundError,
+                subject: Some(url.to_string()),
+            }
+        } else {
+            message.into()
+        });
     };
     crate::metrics::external_fetch();
     Ok(body)

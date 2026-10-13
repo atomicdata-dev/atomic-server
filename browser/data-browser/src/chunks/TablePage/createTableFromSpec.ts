@@ -13,8 +13,10 @@ import {
   commits,
   core,
   dataBrowser,
+  getEffectiveConstraint,
   perfSpan,
   server,
+  setClassConstraint,
   urls,
 } from '@tomic/react';
 import { ViewKind } from './tableViewKinds';
@@ -28,8 +30,10 @@ import { stringToSlug } from '@helpers/stringToSlug';
 import type { RowActionKind, RowActionSpec } from './rowActions';
 import {
   attachPropertiesToClass,
+  createOptionTags,
   createPropertyOnClass,
   createSelectPropertyOnClass,
+  selectConstraintPatch,
 } from './Kanban/createSelectProperty';
 
 /**
@@ -317,21 +321,47 @@ export async function createColumnOnClass(
         throw new Error(
           `Shared property ${column.name} is not a select property`,
         );
-      const options = property.get(core.properties.allowsOnly) as
-        | string[]
-        | undefined;
+      // A shared property may still carry legacy `allowsOnly` options. Take
+      // them over into this table's own class map, which is where options
+      // live now; otherwise this table gets fresh options from the spec.
+      const legacy = (
+        getEffectiveConstraint(store, [], property.subject).enum ?? []
+      ).filter((v): v is string => typeof v === 'string');
 
-      for (const subject of options ?? []) {
+      for (const subject of legacy) {
         const tag = await store.getResource(subject);
         tags[String(tag.get(core.properties.name))] = subject;
       }
 
-      for (const option of column.options ?? []) {
-        if (!tags[option])
-          throw new Error(
-            `Shared property ${column.name} has no option ${option}`,
-          );
+      if (legacy.length > 0) {
+        for (const option of column.options ?? []) {
+          if (!tags[option])
+            throw new Error(
+              `Shared property ${column.name} has no option ${option}`,
+            );
+        }
+
+        await setClassConstraint(tableClass, property.subject, {
+          enum: legacy,
+        });
+      } else {
+        const created = await createOptionTags(
+          store,
+          property.subject,
+          (column.options ?? []).map(name => ({ name })),
+          tableClass.subject,
+        );
+        Object.assign(tags, created.byName);
+        await setClassConstraint(
+          tableClass,
+          property.subject,
+          selectConstraintPatch(created.subjects),
+        );
       }
+    } else if (column.type === 'relation' && column.targetClass) {
+      await setClassConstraint(tableClass, property.subject, {
+        class: column.targetClass,
+      });
     }
 
     if (!deferAttach)

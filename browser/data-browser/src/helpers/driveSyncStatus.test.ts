@@ -6,6 +6,7 @@ import {
   currentDriveValue,
   driveHostedByNode,
   hasHostedDriveConnection,
+  shouldAutoEnroll,
 } from './driveSyncStatus';
 
 describe('drive-specific server status', () => {
@@ -97,5 +98,40 @@ describe('driveHostedByNode', () => {
       }),
     ).toBe(false);
     expect(driveHostedByNode({ ...hosted, resourceCount: 0 })).toBe(false);
+  });
+});
+
+describe('shouldAutoEnroll', () => {
+  const base = {
+    accountEnrolled: true,
+    nodeInfoLoaded: true,
+    currentServerManaged: false,
+    paidPlanActive: false,
+  };
+
+  it('does not re-enroll before the server said whether it is managed', () => {
+    expect(shouldAutoEnroll({ ...base, nodeInfoLoaded: false })).toBe(false);
+  });
+
+  it('does not re-enroll a drive already on a managed node', () => {
+    expect(shouldAutoEnroll({ ...base, currentServerManaged: true })).toBe(
+      false,
+    );
+  });
+
+  it('switches an enrolled drive that this device has not switched to', () => {
+    expect(shouldAutoEnroll(base)).toBe(true);
+  });
+
+  it('enrolls a paid drive that is not enrolled yet', () => {
+    expect(
+      shouldAutoEnroll({
+        ...base,
+        accountEnrolled: false,
+        paidPlanActive: true,
+      }),
+    ).toBe(true);
+    expect(shouldAutoEnroll({ ...base, accountEnrolled: false })).toBe(false);
+    expect(shouldAutoEnroll({ ...base, accountEnrolled: null })).toBe(false);
   });
 });

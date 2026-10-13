@@ -300,6 +300,13 @@ export function formatAggregateValue(
   /** The computed column the number came from, when it wasn't a property. */
   derived?: DerivedColumnSpec,
 ): string {
+  // An answered count over no rows is zero: it is how an empty queue reads. The
+  // store reports it as `null`, "no resource had a value", which for a count is
+  // the same thing.
+  if (fn === 'count' && value === null) {
+    return '0';
+  }
+
   if (value === null || value === undefined) {
     // Nothing to compute is not zero, and must not read as zero.
     return '—';

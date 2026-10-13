@@ -100,7 +100,6 @@ export function PluginSecrets({
       }
 
       setStored((result.body as SecretsView).secrets);
-      toast.success(`Stored ${secret.name}`);
 
       return true;
     },

@@ -5,12 +5,16 @@ import {
   useArray,
   Property,
   Datatype,
+  core,
+  getEffectiveConstraint,
+  useValue,
 } from '@tomic/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { reorderArray } from '@chunks/TableEditor';
 import { useDeclaredLanguages } from '../../hooks/useDeclaredLanguages';
 import type { DerivedColumnSpec } from './derivedColumns';
 import type { RowActionSpec } from './rowActions';
+import { withConstraint } from './useColumnConstraint';
 
 /**
  * A column the view renders itself rather than reading off a Property —
@@ -99,6 +103,11 @@ export function useTableColumns(
     valueOpts,
   );
 
+  // Option lists, linked classes and limits live in the class's `constraints`
+  // map. Reload the columns when it changes so they pick the new values up.
+  const [classConstraints] = useValue(tableClass, core.properties.constraints);
+  const constraintsKey = JSON.stringify(classConstraints ?? null);
+
   const [allColumns, setAllColumns] = useState<Property[]>([]);
 
   useEffect(() => {
@@ -135,7 +144,16 @@ export function useTableColumns(
         setAllColumns(
           results
             .filter(result => result.status === 'fulfilled')
-            .map(result => result.value),
+            .map(result =>
+              withConstraint(
+                result.value,
+                getEffectiveConstraint(
+                  store,
+                  [tableClass.subject],
+                  result.value.subject,
+                ),
+              ),
+            ),
         );
       },
     );
@@ -143,7 +161,7 @@ export function useTableColumns(
     return () => {
       cancelled = true;
     };
-  }, [requiredProps, recommendedProps, store]);
+  }, [requiredProps, recommendedProps, store, tableClass, constraintsKey]);
 
   // Visible, ordered columns: the view's `view-columns` order filtered to
   // properties that still exist on the class. Empty config → all class

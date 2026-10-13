@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { styled, type DefaultTheme } from 'styled-components';
+import { css, styled, type DefaultTheme } from 'styled-components';
 import { FaCheck } from 'react-icons/fa6';
 import {
   ServiceBody,
@@ -36,6 +36,7 @@ export type ServiceTone = 'ok' | 'busy' | 'waiting' | 'error' | 'muted';
  * renames the service: "Cloud Vault" stays "Cloud Vault", and the status line
  * says whether it is backing up, waiting or failing.
  *
+ * `details` carries usage and the like, between the status and the actions.
  * Actions go primary first, then subtle ones, so the button you are most
  * likely to want is always in the same place.
  */
@@ -46,6 +47,7 @@ export function ServiceRow({
   tagline,
   points,
   status,
+  details,
   notice,
   actions,
   ...props
@@ -57,6 +59,9 @@ export function ServiceRow({
   /** What you get. Shown only while the service is not on. */
   points?: string[];
   status?: { tone: ServiceTone; text: ReactNode } | null;
+  /** What the service holds for this drive, such as its usage or its address.
+   *  Sits under the status line, so every row shows it in the same place. */
+  details?: ReactNode;
   /** Something to read before acting, such as what consent means. */
   notice?: ReactNode;
   actions?: ReactNode;
@@ -97,6 +102,7 @@ export function ServiceRow({
             <span>{status.text}</span>
           </StatusLine>
         )}
+        {details && <Details>{details}</Details>}
         {notice && <Notice>{notice}</Notice>}
         {actions && <Actions>{actions}</Actions>}
       </Body>
@@ -223,6 +229,31 @@ const StatusDot = styled.span<{ $tone: ServiceTone }>`
   background: ${p => TONE_COLOURS[p.$tone](p.theme)};
 `;
 
+/**
+ * One compact size for every button inside a service row (its actions and its
+ * details), whichever variant it is. Set here, once, so no call site picks its
+ * own size.
+ */
+export const compactButtons = css`
+  button {
+    min-height: 0;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    gap: 0.4ch;
+  }
+`;
+
+const Details = styled.div`
+  ${compactButtons}
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  margin-top: 0.15rem;
+`;
+
 const Notice = styled.p`
   margin: 0.2rem 0 0;
   padding: 0.6rem 0.75rem;
@@ -235,6 +266,7 @@ const Notice = styled.p`
 `;
 
 const Actions = styled.div`
+  ${compactButtons}
   display: flex;
   flex-wrap: wrap;
   align-items: center;

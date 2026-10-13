@@ -84,8 +84,18 @@ export function useServerSearch(
     const RETRY_DELAY_MS = 2000;
 
     const runSearch = () => {
+      // Show local hits right away; `loading` stays true until the server
+      // answered, so the UI can combine early results with a pending state.
+      const onPartial = (partial: string[]) => {
+        if (cancelled || partial.length === 0) {
+          return;
+        }
+
+        updateResults(partial, debouncedQuery, memoizedSearchOpts);
+      };
+
       store
-        .search(debouncedQuery, memoizedSearchOpts)
+        .search(debouncedQuery, { ...memoizedSearchOpts, onPartial })
         .then(r => {
           if (cancelled) {
             return;

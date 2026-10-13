@@ -13,12 +13,12 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
-import { shortenRefsDeep, shortenSubject } from '@helpers/subjectRefs';
+import { shortenRefsDeep, shortenSubject } from '@tomic/react';
 import {
   buildClassContext,
   describeClassCompact,
   toCompact,
-} from './jsonAdCompact';
+} from '@tomic/react';
 
 const ROW_SAMPLE_LIMIT = 20;
 

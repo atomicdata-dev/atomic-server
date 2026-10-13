@@ -16,8 +16,11 @@ pub const FILE: &str = "https://atomicdata.dev/classes/File";
 pub const CHATROOM: &str = "https://atomicdata.dev/classes/ChatRoom";
 pub const FOLDER: &str = "https://atomicdata.dev/classes/Folder";
 pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
+pub const CHAT_LOG: &str = "https://atomicdata.dev/classes/ChatLog";
 pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
+pub const FOLLOW_EVENT: &str = "https://atomicdata.dev/classes/FollowEvent";
 pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
+pub const LENS: &str = "https://atomicdata.dev/classes/Lens";
 pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
 pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
 pub const DOCUMENT_V2: &str = "https://atomicdata.dev/classes/DocumentV2";
@@ -72,6 +75,11 @@ pub const ALLOWS_ONLY: &str = "https://atomicdata.dev/properties/allowsOnly";
 pub const COLOR: &str = "https://atomicdata.dev/properties/color";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
+pub const CONSTRAINTS: &str = "https://atomicdata.dev/properties/constraints";
+// ... for Lenses
+pub const LENS_FROM: &str = "https://atomicdata.dev/properties/lensFrom";
+pub const LENS_TO: &str = "https://atomicdata.dev/properties/lensTo";
+pub const LENS_TRANSFORM: &str = "https://atomicdata.dev/properties/lensTransform";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
 // ... for Drives
 pub const DEFAULT_ONTOLOGY: &str =
@@ -225,7 +233,10 @@ pub const IMAGE_HEIGHT: &str = "https://atomicdata.dev/properties/imageHeight";
 pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
 pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";
 pub const ABOUT: &str = "https://atomicdata.dev/properties/about";
+pub const REPLY_TO: &str = "https://atomicdata.dev/properties/replyTo";
 pub const COMMENTS_FOLDER: &str = "https://atomicdata.dev/properties/commentsFolder";
+pub const TRASH_FOLDER: &str = "https://atomicdata.dev/properties/trashFolder";
+pub const TRASHED_FROM: &str = "https://atomicdata.dev/properties/trashedFrom";
 pub const MEETINGS_FOLDER: &str = "https://atomicdata.dev/properties/meetingsFolder";
 pub const FOLLOW_SESSIONS_CHATROOM: &str =
     "https://atomicdata.dev/properties/followSessionsChatroom";

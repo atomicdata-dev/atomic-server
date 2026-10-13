@@ -16,12 +16,16 @@ import {
 } from './helpers/originNode';
 
 import { useEffect, type JSX } from 'react';
-import { reportRepeatedCommitFailures } from './helpers/sentry';
+import {
+  identifyAgentInSentry,
+  reportRepeatedCommitFailures,
+} from './helpers/sentry';
 import { RouterProvider } from '@tanstack/react-router';
 import { ProxyConnectReturn } from './chunks/AppPage/ProxyConnectReturn';
 import { router } from './routes/Router';
 
 import { errorHandler } from './handlers/errorHandler';
+import { registerRefusedDriveHealing } from './helpers/managed/refusedDrive';
 import { PerformanceProfiler, attachStoreToProfiler } from './helpers/profiler';
 
 /**
@@ -245,6 +249,8 @@ window.store = store;
 // dump a snapshot.
 attachStoreToProfiler(store);
 reportRepeatedCommitFailures(store);
+identifyAgentInSentry(store);
+registerRefusedDriveHealing(store);
 
 if (isDev()) {
   const { attachDevtools } = await import('./helpers/devtools');

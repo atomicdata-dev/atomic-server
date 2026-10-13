@@ -1,13 +1,6 @@
-import {
-  Datatype,
-  Property,
-  Resource,
-  core,
-  useArray,
-  useResource,
-  useResources,
-} from '@tomic/react';
+import { Datatype, Property, Resource, useResources } from '@tomic/react';
 import { useMemo } from 'react';
+import { optionSubjects, useColumnConstraint } from '../useColumnConstraint';
 import { useKanbanGroupBy } from '../Kanban/useKanbanGroupBy';
 import {
   isClosedStatusTag,
@@ -53,8 +46,16 @@ export function useIssueStatus(
     canWrite && !booleanProp,
   );
 
-  const statusResource = useResource(booleanProp ? undefined : groupBy);
-  const [tagSubjects] = useArray(statusResource, core.properties.allowsOnly);
+  const constraint = useColumnConstraint(
+    booleanProp ? undefined : groupBy,
+    tableClass.subject,
+  );
+  // The constraint object is rebuilt every render, so key on its options.
+  const optionsKey = JSON.stringify(optionSubjects(constraint));
+  const tagSubjects = useMemo(
+    () => JSON.parse(optionsKey) as string[],
+    [optionsKey],
+  );
   const tagResources = useResources(tagSubjects);
 
   const model = useMemo<IssueStatusModel | undefined>(() => {

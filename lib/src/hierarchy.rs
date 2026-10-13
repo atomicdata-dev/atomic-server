@@ -273,6 +273,94 @@ pub async fn check_append(
     }
 }
 
+/// Whether `resource` is a [`urls::CHAT_LOG`] page.
+pub fn is_chat_log(resource: &Resource) -> bool {
+    resource
+        .get(urls::IS_A)
+        .ok()
+        .and_then(|v| v.to_subjects(None).ok())
+        .is_some_and(|classes| classes.iter().any(|c| c == urls::CHAT_LOG))
+}
+
+/// Properties the server stamps itself; a client doc may carry stale ops for
+/// them, and changing them gives a non-writer nothing.
+const SERVER_MANAGED: [&str; 2] = [urls::LAST_COMMIT, urls::CREATED_AT];
+
+/// Entries a commit adds or changes must not lie further ahead than
+/// [`crate::chat_log::MAX_FUTURE_MS`] of the server clock.
+pub fn check_chat_log_entry_times(
+    entry_changes: &[crate::chat_log::EntryChange],
+) -> AtomicResult<()> {
+    let now = crate::utils::now();
+    for change in entry_changes {
+        let Some(after) = &change.after else { continue };
+        let c = crate::chat_log::entry_created_at(after).ok_or_else(|| {
+            crate::errors::AtomicError::other_error(format!(
+                "Chat log entry {} has no numeric `c` (createdAt)",
+                change.key
+            ))
+        })?;
+        if c > now + crate::chat_log::MAX_FUTURE_MS {
+            return Err(format!(
+                "Chat log entry {} lies more than 10 minutes in the future (c = {c}, server time = {now}). Check your clock.",
+                change.key
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+/// The rule for a commit to a [`urls::CHAT_LOG`] page signed by someone who has
+/// no `write` on it (a member with `append`): the page's `properties` and
+/// `datatypes` stay as they are, and every entry the commit adds, changes or
+/// removes has the signer as its author, before and after. Throws if violated.
+pub fn check_chat_log_member_commit(
+    store: &impl Storelike,
+    for_agent: &ForAgent,
+    changed_property_keys: &[String],
+    datatypes_changed: bool,
+    entry_changes: &[crate::chat_log::EntryChange],
+) -> AtomicResult<()> {
+    let signer = normalized_agent(store, for_agent);
+    if let Some(key) = changed_property_keys
+        .iter()
+        .find(|k| !SERVER_MANAGED.contains(&k.as_str()))
+    {
+        return Err(crate::errors::AtomicError::unauthorized(format!(
+            "Without write rights on a chat log page you can only change its entries, not the property {key}"
+        )));
+    }
+    if datatypes_changed {
+        return Err(crate::errors::AtomicError::unauthorized(
+            "Without write rights on a chat log page you can only change its entries, not its datatypes".to_string(),
+        ));
+    }
+    for change in entry_changes {
+        for side in [&change.before, &change.after].into_iter().flatten() {
+            let ok = crate::chat_log::entry_author(side).is_some_and(|a| {
+                same_agent_key(
+                    store
+                        .normalize_subject(
+                            &crate::agents::migrate_legacy_agent_subject(a)
+                                .as_str()
+                                .into(),
+                        )
+                        .as_str(),
+                    &signer,
+                )
+            });
+            if !ok {
+                return Err(crate::errors::AtomicError::unauthorized(format!(
+                    "Chat log entry {} is not yours: only its author or a writer of the chat may change or remove it",
+                    change.key
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Whether `for_agent` may create the parentless, non-DID drive `subject`:
 /// the node's own agent, or Sudo.
 fn check_top_level_drive_creation(
@@ -292,7 +380,7 @@ fn check_top_level_drive_creation(
 }
 
 /// Same key as `a` and `b`, in whatever spelling either arrives in.
-fn same_agent_key(a: &str, b: &str) -> bool {
+pub(crate) fn same_agent_key(a: &str, b: &str) -> bool {
     let strip = |s: &str| crate::identifiers::agent_public_key(s).map(|k| k.to_string());
     match (strip(a), strip(b)) {
         (Some(ka), Some(kb)) => crate::authentication::public_keys_match(&ka, &kb),
@@ -778,6 +866,7 @@ mod test {
         let commit = commitbuilder.sign(&agent, &store, &resource).await.unwrap();
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: false,
             validate_timestamp: true,
             validate_rights: true,
@@ -802,6 +891,7 @@ mod test {
 
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: false,
             validate_timestamp: true,
             validate_rights: true,
@@ -861,6 +951,7 @@ mod test {
 
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: false,
             validate_timestamp: true,
             validate_rights: true,
@@ -967,6 +1058,7 @@ mod test {
 
         let opts = crate::commit::CommitOpts {
             validate_schema: false,
+            validate_constraints: false,
             validate_signature: false,
             validate_timestamp: true,
             validate_rights: true,

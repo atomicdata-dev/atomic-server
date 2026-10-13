@@ -17,6 +17,7 @@ pub mod drive_usage;
 pub mod export;
 pub mod forget_peer;
 pub mod form;
+pub mod genesis;
 pub mod get_resource;
 pub mod history_attribution;
 #[cfg(feature = "image")]

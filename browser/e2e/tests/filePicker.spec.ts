@@ -66,26 +66,34 @@ const createModel = async (page: Page) => {
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
 
+  // The datatype is part of a property's identity: changing it swaps in a new
+  // property on the class's line. The class a link points at is a constraint
+  // of the robot class, set from the property's dialog.
+  await page
+    .getByTestId('class-card-write-robot')
+    .getByLabel('Property datatype')
+    .selectOption('https://atomicdata.dev/datatypes/atomicURL');
+  // Wait for the replacement property's line before opening its dialog.
+  await expect(
+    page.getByTestId('class-card-write-robot').getByLabel('Property datatype'),
+  ).toHaveValue('https://atomicdata.dev/datatypes/atomicURL');
+
   await page.getByRole('button', { name: 'Configure programming' }).click();
 
   await inDialog(page, async (dialog, closeDialogWith) => {
-    await dialog
-      .getByLabel('Datatype')
-      .selectOption('https://atomicdata.dev/datatypes/atomicURL');
-
-    await expect(dialog.getByLabel('Classtype')).not.toBeDisabled();
+    await expect(dialog.getByLabel('Linked class')).not.toBeDisabled();
 
     await fillSearchBox(
       dialog,
       'Search for a class',
       'https://atomicdata.dev/classes/File',
       {
-        label: 'Classtype',
+        label: 'Linked class',
       },
     );
 
     await page.keyboard.press('Enter');
-    await expect(dialog.getByLabel('Classtype')).toHaveText('file');
+    await expect(dialog.getByLabel('Linked class')).toHaveText('file');
 
     await closeDialogWith(DIALOG_CLOSE_BUTTON);
   });

@@ -94,8 +94,25 @@ export interface FieldOptions {
   /** Resolved from an integer table column by the definition builder. */
   integer?: boolean;
   placeholder?: string;
+  /** rating: the number of steps. Not a limit. (On `number` / `currency`,
+   * `min` / `max` are the pre-JSON-Schema names of `minimum` / `maximum`; still
+   * read, never written.) */
   min?: number;
   max?: number;
+  /** The limits a submission has to satisfy, under the JSON Schema keyword
+   * names the class `constraints` use (`lib/src/class_constraints.rs`). The
+   * server narrows the class's constraint for the mapped column with the
+   * form's own options when it builds the definition, so these are the
+   * result. `minimum` / `maximum` / `exclusive*`: number and currency.
+   * `minLength` / `maxLength` / `pattern`: short and long text.
+   * `minItems` / `maxItems`: multi-select (picks) and table-input (rows). */
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  pattern?: string;
+  minItems?: number;
+  maxItems?: number;
   /** Choice questions: the resolved options, in `allowsOnly` order. */
   options?: FieldOption[];
   /** Choice questions: where {@link FieldOptions.options} was resolved from,
@@ -120,18 +137,14 @@ export interface FieldOptions {
   /** choice-matrix: statements (one per row) and the scale shared by them. */
   rows?: string[];
   columns?: string[] | TableColumn[];
-  /** table-input: row count bounds. */
+  /** @deprecated Old name of `minItems` / `maxItems` on `table-input`. */
   minRows?: number;
   maxRows?: number;
-  /** multi-select / dropdown-multi: how many options may be ticked. Kept
-   * apart from `min`/`max` (value bounds on `number`/`currency`, steps on
-   * `rating`) because these count picks, not magnitudes. */
+  /** @deprecated Old name of `minItems` / `maxItems` on `multi-select` /
+   * `dropdown-multi`. */
   minSelected?: number;
   maxSelected?: number;
-  /** short-text / long-text: how long the answer may be, in characters.
-   * Kept apart from `min`/`max` (value bounds on `number`/`currency`) for
-   * the same reason `minSelected` is: these count characters, not
-   * magnitudes. */
+  /** short-text / long-text: how long the answer may be, in characters. */
   minLength?: number;
   maxLength?: number;
 }

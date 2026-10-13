@@ -13,7 +13,7 @@ import { TabPanel, Tabs } from '../../../components/Tabs';
 import { Column, Row } from '../../../components/Row';
 import { LabelText } from '../LabelText';
 import InputResourceArray from '../../../components/forms/InputResourceArray';
-import { CreateTagRow, EditableTag } from '../../../components/Tag';
+import { CreateTagRow, EditableTag, Tag } from '../../../components/Tag';
 import { useEnumHandlers } from './useEnumHandlers';
 import { filterAllowsOnly } from './filterAllowsOnly';
 
@@ -88,14 +88,43 @@ const TagPanel: FC<TagPanelProps> = ({ resource, ontology }) => {
   }, [resource, allowsOnly, setAllowsOnly]);
 
   return (
-    <Column>
-      <p>Only allow its value to be selected from the following tags:</p>
-      <Row wrapItems>
-        {tags.map(tag => (
-          <EditableTag subject={tag} key={tag} onDelete={removeTag} />
-        ))}
-      </Row>
-      <CreateTagRow parent={ontology.subject} onNewTag={addTag} />
-    </Column>
+    <TagOptionsEditor
+      tags={tags}
+      parent={ontology.subject}
+      onAdd={addTag}
+      onRemove={removeTag}
+    />
   );
 };
+
+interface TagOptionsEditorProps {
+  tags: string[];
+  /** The resource new tags are created under. */
+  parent: string;
+  onAdd: (tag: Resource) => void;
+  onRemove: (subject: string) => void;
+  disabled?: boolean;
+}
+
+/** The tags a value may be picked from, with a row to add more. */
+export const TagOptionsEditor: FC<TagOptionsEditorProps> = ({
+  tags,
+  parent,
+  onAdd,
+  onRemove,
+  disabled,
+}) => (
+  <Column>
+    <p>Only allow its value to be selected from the following tags:</p>
+    <Row wrapItems>
+      {tags.map(tag =>
+        disabled ? (
+          <Tag subject={tag} key={tag} />
+        ) : (
+          <EditableTag subject={tag} key={tag} onDelete={onRemove} />
+        ),
+      )}
+    </Row>
+    {!disabled && <CreateTagRow parent={parent} onNewTag={onAdd} />}
+  </Column>
+);

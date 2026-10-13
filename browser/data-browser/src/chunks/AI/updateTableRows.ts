@@ -6,8 +6,8 @@ import {
   type Resource,
   type JSONValue,
 } from '@tomic/lib';
-import { expandSubject, shortenRefsDeep } from '@helpers/subjectRefs';
-import { buildClassContext, resolveKey, coerceValueIn } from './jsonAdCompact';
+import { expandSubject, shortenRefsDeep } from '@tomic/react';
+import { buildClassContext, resolveKey, coerceValueIn } from '@tomic/react';
 
 export async function updateTableRows(
   store: Store,

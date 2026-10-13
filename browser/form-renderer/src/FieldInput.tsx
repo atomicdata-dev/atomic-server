@@ -19,6 +19,8 @@ import {
   ratingMax,
   selectionBounds,
   selectionHint,
+  rowBounds,
+  valueBounds,
   tableColumns,
 } from './validation.js';
 
@@ -196,8 +198,8 @@ export function FieldInput({
           className='atomic-form-input'
           type='number'
           placeholder={placeholder}
-          min={field.options.min}
-          max={field.options.max}
+          min={valueBounds(field.options).min}
+          max={valueBounds(field.options).max}
           value={(value as number | string) ?? ''}
           onChange={e =>
             onChange(e.target.value === '' ? undefined : Number(e.target.value))
@@ -221,8 +223,8 @@ export function FieldInput({
             type='number'
             step='0.01'
             placeholder={placeholder}
-            min={field.options.min}
-            max={field.options.max}
+            min={valueBounds(field.options).min}
+            max={valueBounds(field.options).max}
             value={(value as number | string) ?? ''}
             onChange={e =>
               onChange(
@@ -499,7 +501,8 @@ export function FieldInput({
         : [];
       // Always show at least `minRows` (or one) editable rows, even before
       // the visitor has typed anything — an empty grid has nothing to click.
-      const minRows = Math.max(field.options.minRows ?? 1, 1);
+      const rowLimits = rowBounds(field.options);
+      const minRows = Math.max(rowLimits.min ?? 1, 1);
       const rows: Record<string, unknown>[] =
         stored.length >= minRows
           ? stored
@@ -511,8 +514,7 @@ export function FieldInput({
               ),
             ];
       const canAddRow =
-        field.options.maxRows === undefined ||
-        rows.length < field.options.maxRows;
+        rowLimits.max === undefined || rows.length < rowLimits.max;
 
       const update = (next: Record<string, unknown>[]) => onChange(next);
 

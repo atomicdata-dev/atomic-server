@@ -58,7 +58,7 @@ const ElementWrapper = styled.div<ElementViewProps>`
 
   ${ElementTextStyle}
 
-  &:focus {
+  &:focus-visible {
     ${ElementFocusStyle}
   }
 `;

@@ -9,7 +9,10 @@ import * as Sentry from '@sentry/react';
 import { isDev } from '../config';
 
 export function handleErrorBugsnag(e: Error): void {
-  if (!isDev()) {
+  // Only when `initBugsnag` ran (an API key is configured). Calling `notify`
+  // before `start` logs "Bugsnag.notify() was called before Bugsnag.start()"
+  // for every error, on installs that never use Bugsnag.
+  if (!isDev() && Bugsnag.isStarted()) {
     Bugsnag.notify(e);
   }
 }

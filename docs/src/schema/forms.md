@@ -113,20 +113,20 @@ of a submitted answer. Options not listed for a type are ignored.
 | `phone`           | String            | `placeholder`, `defaultCountry` | string; the renderer's country-select input submits E.164 (`+31612345678`), and the server also accepts digits with the usual separators and an optional `+` prefix |
 | `country`         | String            | `placeholder`, `defaultCountry` | ISO 3166-1 alpha-2 code (`"NL"`); the renderer shows the country's name in the visitor's own language |
 | `url`             | String            | `placeholder`        | string, must start with `http://` or `https://` |
-| `number`          | Float or Integer  | `placeholder`, `min`, `max` | number |
-| `currency`        | Float             | `currency` (ISO code), `placeholder`, `min`, `max` | number |
+| `number`          | Float or Integer  | `placeholder`, `minimum`, `maximum` | number |
+| `currency`        | Float             | `currency` (ISO code), `placeholder`, `minimum`, `maximum` | number |
 | `date`            | Date              | —                    | `"YYYY-MM-DD"` |
 | `datetime`        | Timestamp         | —                    | milliseconds since epoch |
 | `checkbox`        | Boolean           | `defaultValue`       | boolean |
 | `radio`           | String            | `options`            | one of `options` |
 | `dropdown`        | String            | `options`, `placeholder` | one of `options` |
-| `multi-select`    | JSON              | `options`, `minSelected`, `maxSelected` | array of `options` |
-| `dropdown-multi`  | JSON              | `options`, `minSelected`, `maxSelected` | array of `options` |
+| `multi-select`    | JSON              | `options`, `minItems`, `maxItems` | array of `options` |
+| `dropdown-multi`  | JSON              | `options`, `minItems`, `maxItems` | array of `options` |
 | `picture-choice`  | String            | `options`, `optionImages` | one of `options` |
 | `likert`          | Integer           | `scale` (2–11, default 5), `minLabel`, `maxLabel` | integer `1..scale` |
 | `rating`          | Integer           | `max` (2–10, default 5), `icon` (`star`/`heart`) | integer `1..max` |
 | `choice-matrix`   | JSON              | `rows`, `columns`    | object mapping a row to one of `columns` |
-| `table-input`     | JSON              | `columns` (`{label, type}`, type `text`/`number`), `minRows`, `maxRows` | array of row objects keyed by column label |
+| `table-input`     | JSON              | `columns` (`{label, type}`, type `text`/`number`), `minItems`, `maxItems` | array of row objects keyed by column label |
 | `address`         | JSON              | —                    | object with any of `line1`, `line2`, `postalCode`, `city`, `state`, `country`; `country` is an ISO 3166-1 alpha-2 code, the rest is free text |
 
 `defaultCountry` is an ISO 3166-1 alpha-2 code. On a `phone` field it decides
@@ -152,11 +152,26 @@ the minimum is checked on submit only. Like the bounds below, they only
 constrain an answer that was given — an untouched question stays
 "unanswered", which is what `required` is for.
 
-`minSelected` / `maxSelected` bound how many options a multi-pick question
-accepts. Past the maximum the remaining options are disabled rather than
+`minItems` / `maxItems` bound how many options a multi-pick question
+accepts (and, on `table-input`, how many rows). Past the maximum the remaining options are disabled rather than
 flagged; the minimum is checked on submit. Both only constrain an answer that
 was given — an untouched question stays "unanswered", which is what `required`
 is for.
+
+## Limits are class constraints
+
+A question's limits are JSON Schema keywords, the same ones a Class's
+`constraints` map uses: `minimum` / `maximum` on `number` and `currency`,
+`minLength` / `maxLength` on text, `minItems` / `maxItems` on multi-pick and
+`table-input`. The class that answers are stored as an instance of
+(`form-data-class`) says what the column accepts from anyone: the choice
+options of a select are the `enum` of its constraint for the column, a single
+pick is `maxItems: 1`, a link points at `class`. The question's own options may
+only tighten that. The definition (`GET /form/{id}/definition`) carries the
+narrowed result, and the server validates submissions with it. Forms stored
+with the older names (`min`, `max`, `minSelected`, `maxSelected`, `minRows`,
+`maxRows`) and options still on the Property (`allowsOnly`, `max`) keep
+working; the Property is only the fallback for a keyword the class does not set.
 
 For `required` fields, "answered" is per-subfield on the composite types: a
 `choice-matrix` needs every row answered, and an `address` needs at least

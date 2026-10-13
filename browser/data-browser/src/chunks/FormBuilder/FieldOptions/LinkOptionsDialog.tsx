@@ -29,6 +29,7 @@ import {
   sourceColumn,
   useOptionsSource,
 } from './optionsSource';
+import { useFormDataClass } from '../formDataClass';
 
 interface LinkOptionsDialogProps {
   /** The FormField whose `optionsSource` this writes. */
@@ -56,6 +57,7 @@ export function LinkOptionsDialog({
   close,
 }: LinkOptionsDialogProps): JSX.Element {
   const store = useStore();
+  const dataClass = useFormDataClass();
   const [source, setSource] = useOptionsSource(field);
 
   const [tableSubject, setTableSubject] = useState<string | undefined>(
@@ -98,7 +100,9 @@ export function LinkOptionsDialog({
     setSaving(true);
 
     try {
-      setSource(await applyOptionsSource(store, property, table, column));
+      setSource(
+        await applyOptionsSource(store, dataClass, property, table, column),
+      );
       close(true);
     } catch (e) {
       toast.error((e as Error).message);

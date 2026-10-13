@@ -36,7 +36,6 @@ export function ValueFormEdit({
       await resource.save();
       saved.current = true;
       onClose();
-      toast.success('Resource saved');
     } catch (e) {
       setErr(e);
       toast.error('Could not save resource...');

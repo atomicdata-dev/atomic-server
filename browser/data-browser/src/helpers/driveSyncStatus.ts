@@ -97,3 +97,27 @@ export function driveHostedByNode(input: {
     (input.resourceCount ?? 0) > 0
   );
 }
+
+/**
+ * Should the Sync page start Cloud Server for this drive by itself?
+ *
+ * An account that already enrolled the drive only needs a switch when this
+ * device still points at some other server. Whether the current server is a
+ * managed node is only known once `/server` has answered (`nodeInfoLoaded`);
+ * until then "not managed" is just the default, and acting on it would
+ * re-enroll and reconnect a drive that is already hosted here (a spurious
+ * "working offline" toast and a "Connected to Cloud Server" toast on every
+ * visit). A paid-but-unenrolled drive has to be enrolled either way.
+ */
+export function shouldAutoEnroll(input: {
+  accountEnrolled: boolean | null;
+  nodeInfoLoaded: boolean;
+  currentServerManaged: boolean;
+  paidPlanActive: boolean;
+}): boolean {
+  if (input.accountEnrolled === true) {
+    return input.nodeInfoLoaded && !input.currentServerManaged;
+  }
+
+  return input.accountEnrolled === false && input.paidPlanActive;
+}

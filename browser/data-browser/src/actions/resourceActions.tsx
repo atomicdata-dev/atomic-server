@@ -16,6 +16,7 @@ import {
   FaPlay,
   FaPlus,
   FaRotateRight,
+  FaTrashCanArrowUp,
   FaRegStar,
   FaShare,
   FaStar,
@@ -32,18 +33,22 @@ import {
   editURL,
   historyURL,
   importerURL,
-  shareURL,
 } from '../helpers/navigation';
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
+import { isInTrash, restoreFromTrash } from '../helpers/trash';
 import { openSearchOverlay } from '../components/overlayState';
+import { openShareDialog } from '../components/Share/shareDialogState';
 
 /** Asks the resource bar to open its tag picker for `detail` (a subject). */
 export const OPEN_TAGS_EVENT = 'atomic-open-tags';
 
 const getParent = (ctx: ActionContext): string | undefined =>
   ctx.resource.get(core.properties.parent) as string | undefined;
+
+const inTrash = (ctx: ActionContext): boolean =>
+  isInTrash(ctx.store, ctx.drive, ctx.resource);
 
 /**
  * All actions on a resource, in menu order. Ids keep the historical
@@ -205,7 +210,6 @@ export const resourceActions: ActionDefinition[] = [
       try {
         const forksFolder = await getOrCreateForksFolder(ctx.store, ctx.drive!);
         const fork = await ctx.resource.fork(forksFolder);
-        toast.success('Fork created');
         ctx.navigate(constructOpenURL(fork.subject));
       } catch (error) {
         toast.error((error as Error).message);
@@ -225,7 +229,6 @@ export const resourceActions: ActionDefinition[] = [
     run: async ctx => {
       try {
         const original = await ctx.resource.mergeIntoOriginal();
-        toast.success('Fork merged');
         ctx.navigate(constructOpenURL(original.subject));
       } catch (error) {
         toast.error((error as Error).message);
@@ -316,13 +319,13 @@ export const resourceActions: ActionDefinition[] = [
     id: 'share',
     scope: 'resource',
     section: 'action',
-    label: () => 'Permissions & Invites',
-    helper: () => 'Edit permissions and create invites.',
+    label: () => 'Share',
+    helper: () => 'Invite people and manage who has access.',
     keywords: ['share', 'access', 'rights', 'invite'],
     icon: () => <FaShare />,
     asTool: true,
     toolName: 'open_share_settings',
-    run: ctx => ctx.navigate(shareURL(ctx.subject)),
+    run: ctx => openShareDialog(ctx.subject),
   },
   {
     id: 'history',
@@ -388,10 +391,25 @@ export const resourceActions: ActionDefinition[] = [
     run: ctx => ctx.navigate(importerURL(ctx.subject)),
   },
   {
+    id: 'restore',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Restore',
+    helper: () => 'Move this resource out of the Trash, back to where it was.',
+    keywords: ['trash', 'undelete', 'recover'],
+    icon: () => <FaTrashCanArrowUp />,
+    available: ctx => ctx.canWrite && inTrash(ctx),
+    run: async ctx => {
+      if (ctx.drive) {
+        await restoreFromTrash(ctx.store, ctx.subject, ctx.drive);
+      }
+    },
+  },
+  {
     id: 'delete',
     scope: 'resource',
     section: 'action',
-    label: () => 'Delete',
+    label: ctx => (inTrash(ctx) ? 'Delete permanently' : 'Delete'),
     helper: () => 'Delete this resource.',
     keywords: ['remove', 'destroy', 'trash'],
     icon: () => <FaTrash />,
@@ -415,7 +433,6 @@ export const resourceActions: ActionDefinition[] = [
       try {
         await ctx.resource.destroy();
         ctx.onAfterDelete?.();
-        toast.success('Resource deleted!');
 
         if (ctx.currentSubject === ctx.subject) {
           ctx.navigate(parent ? constructOpenURL(parent) : '/');
@@ -462,7 +479,6 @@ export const resourceActions: ActionDefinition[] = [
         forceOverride: true,
         noWebSocket: true,
       });
-      toast.success('Resource reloaded');
     },
   },
 ];

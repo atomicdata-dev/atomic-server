@@ -165,6 +165,51 @@ describe('collection page assemble does not flash unsorted members', () => {
     }
   });
 
+  it('reads a bounded number of sort keys while a big list arrives', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '1000',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        sort_by: dataBrowser.properties.sortOrder,
+        sort_desc: false,
+      },
+      true,
+    );
+    const reads = vi.spyOn(Resource.prototype, 'get');
+    const n = 300;
+
+    for (let i = 0; i < n; i++) {
+      const subject = `https://example.com/row-${i}`;
+      const row = new Resource(subject);
+      row.applyHydratedValues([
+        [core.properties.parent, TABLE],
+        [core.properties.isA, [dataBrowser.classes.folder]],
+        [commits.properties.createdAt, 1000 + i],
+        [dataBrowser.properties.sortOrder, i],
+      ]);
+      row.loading = false;
+      store.addResource(row);
+      collection.applyResourceChange(subject, row);
+    }
+
+    const sortReads = reads.mock.calls.filter(
+      ([prop]) => prop === dataBrowser.properties.sortOrder,
+    ).length;
+
+    reads.mockRestore();
+
+    expect(pageMembers(collection)).toHaveLength(n);
+    // Each arrival compares against the last member, not the whole list.
+    expect(sortReads).toBeLessThan(n * 6);
+  });
+
   it('files a late-arriving member in its sortOrder place, not at the end', async ({
     expect,
   }) => {
@@ -359,6 +404,51 @@ describe('collection page assemble does not flash unsorted members', () => {
       assert(collection.totalMembers).toBe(2);
     },
   );
+
+  it('builds only the requested page of a big table whose rows have no sortOrder', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setDrive(DRIVE);
+    store.finishDriveSync(DRIVE, 2, Date.now());
+
+    const n = 300;
+    // Newest first, as an index that does not know the order may answer.
+    const subjects = Array.from(
+      { length: n },
+      (_, i) => `atomic:resource:row-${String(n - i).padStart(4, '0')}`,
+    );
+    store.setClientDb(
+      mockClientDb(async () => ({
+        subjects,
+        resources: subjects.map(s => jsonAd(s, 1000 + Number(s.slice(-4)))),
+        count: n,
+      })),
+    );
+
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        sort_by: dataBrowser.properties.sortOrder,
+        sort_desc: false,
+      },
+      true,
+    );
+    const hydrate = vi.spyOn(store, 'hydrateResourceFromJsonAd');
+
+    const page = await collection.getMembersOnPage(0);
+
+    // Oldest first, and only the 30 rows on the page were built.
+    expect(page[0]).toBe('atomic:resource:row-0001');
+    expect(page).toHaveLength(30);
+    expect(hydrate.mock.calls.length).toBeLessThanOrEqual(30);
+    hydrate.mockRestore();
+  });
 
   it('treats a missing sort key as missing, not the string "undefined"', async ({
     expect,

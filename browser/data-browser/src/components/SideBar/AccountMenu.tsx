@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { styled } from 'styled-components';
+import { SIDEBAR_BAR_HEIGHT, SIDEBAR_BAR_HEIGHT_TOUCH } from './SidebarCSSVars';
 import {
   FaBell,
   FaCirclePlus,
@@ -16,16 +17,24 @@ import {
   FaGear,
   FaInfo,
   FaPlug,
+  FaTrash,
   FaUser,
 } from 'react-icons/fa6';
 import { LuChevronsUpDown } from 'react-icons/lu';
 import {
   core,
+  dataBrowser,
   unknownSubject,
+  useCanWrite,
   useCurrentAgent,
   useResource,
+  useStore,
   useString,
 } from '@tomic/react';
+import { toast } from 'react-hot-toast';
+import { useSettings } from '../../helpers/AppSettings';
+import { constructOpenURL } from '../../helpers/navigation';
+import { getOrCreateTrashFolder } from '../../helpers/standardLocations';
 import { paths } from '../../routes/paths';
 import { shortcuts } from '../../actions/shortcuts';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -37,7 +46,12 @@ import { ResourceGlyph } from '../ResourceGlyph';
 import { useCombineRefs } from '../../hooks/useCombineRefs';
 import { useFeedbackDialog } from './FeedbackButton';
 import { OPEN_FEEDBACK_EVENT } from '../../actions/appMenuItems';
-import { getSyncIcon, getSyncLabel, useSyncStatus } from './syncStatus';
+import {
+  getSyncIcon,
+  getSyncLabel,
+  hasSyncWarning,
+  useSyncStatus,
+} from './syncStatus';
 import {
   SideBarMenuRow,
   SideBarMenuRowIcon,
@@ -98,6 +112,14 @@ function AccountMenuRow({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const feedback = useFeedbackDialog({ triggerRef });
   const [install, showInstallButton] = useInstallPrompt();
+  const store = useStore();
+  const { drive } = useSettings();
+  const driveResource = useResource(drive);
+  const [trashFolder] = useString(
+    driveResource,
+    dataBrowser.properties.trashFolder,
+  );
+  const agentCanWrite = useCanWrite(driveResource);
 
   // "Give feedback" in the More menu opens this menu's feedback dialog.
   // Error pages and dialogs have their own FeedbackButton and don't listen.
@@ -113,8 +135,34 @@ function AccountMenuRow({
     onItemClick();
   };
 
+  // The Trash folder is created on first use. Until then the item is offered
+  // to agents that can write the drive, and opening it creates the folder.
+  // Read-only agents only see it once a Trash folder exists.
+  const showTrash = !!trashFolder || agentCanWrite;
+
+  const goToTrash = async () => {
+    try {
+      const trash = trashFolder ?? (await getOrCreateTrashFolder(store, drive));
+
+      navigate(constructOpenURL(trash));
+      onItemClick();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not open Trash');
+    }
+  };
+
   const unreadLabel =
     unread > 0 ? `Notifications, ${unread} unread` : undefined;
+
+  // A warning icon leads to the banner that explains it.
+  const goToSync = () => {
+    if (hasSyncWarning(syncStatus)) {
+      void navigate({ to: paths.sync, hash: 'sync-problem' });
+      onItemClick();
+    } else {
+      goTo(paths.sync)();
+    }
+  };
 
   const items: DropdownItem[] = [
     agent
@@ -163,8 +211,19 @@ function AccountMenuRow({
       // item's accessible name "Sync".
       icon: <IconSlot aria-hidden>{getSyncIcon(syncStatus)}</IconSlot>,
       helper: getSyncLabel(syncStatus),
-      onClick: goTo(paths.sync),
+      onClick: goToSync,
     },
+    ...(showTrash
+      ? [
+          {
+            id: 'trash',
+            label: 'Trash',
+            icon: <FaTrash />,
+            helper: 'Items you deleted from this drive',
+            onClick: goToTrash,
+          },
+        ]
+      : []),
     {
       id: 'feedback',
       label: 'Feedback',
@@ -221,7 +280,7 @@ function AccountMenuRow({
           title={`Sync: ${getSyncLabel(syncStatus)}`}
           aria-label='Sync'
           data-testid='sidebar-sync-button'
-          onClick={goTo(paths.sync)}
+          onClick={goToSync}
         >
           {getSyncIcon(syncStatus)}
         </IconButton>
@@ -257,7 +316,9 @@ function AccountTrigger({
   // the 'User' it first rendered, before the profile had loaded or after a
   // rename.
   const [agentName] = useString(agentResource, core.properties.name);
-  const name = agent ? (agentName ?? 'User') : 'Login / New User';
+  const name = agent
+    ? (agentName ?? (agentResource.loading ? '' : 'Signed in'))
+    : 'Login / New User';
 
   return (
     <TriggerButton
@@ -329,6 +390,7 @@ function useInstallPrompt(): [install: () => void, available: boolean] {
 
 const Row = styled.div`
   display: flex;
+  min-height: ${SIDEBAR_BAR_HEIGHT};
   align-items: center;
   gap: 0.25rem;
   box-sizing: border-box;
@@ -359,6 +421,11 @@ const TriggerButton = styled(SideBarMenuRow)`
   cursor: pointer;
   gap: 0.25rem;
   padding-inline-end: 0.5rem;
+  min-height: ${SIDEBAR_BAR_HEIGHT};
+
+  @media (pointer: coarse) {
+    min-height: ${SIDEBAR_BAR_HEIGHT_TOUCH};
+  }
 
   &:focus-visible {
     outline: 2px solid ${p => p.theme.colors.main};

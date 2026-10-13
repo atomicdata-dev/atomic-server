@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   isOverLength,
@@ -152,8 +153,8 @@ describe('choice option membership', () => {
 describe('multi-select selection bounds', () => {
   const tag = (label: string) => `did:ad:tag:${label}`;
   const bounded = (bounds: {
-    minSelected?: number;
-    maxSelected?: number;
+    minItems?: number;
+    maxItems?: number;
   }): FieldBlock => ({
     ...field('multi-select', 'Pick'),
     options: {
@@ -164,7 +165,7 @@ describe('multi-select selection bounds', () => {
 
   it('accepts an answer inside the bounds', () => {
     expect(
-      validateFieldValue(bounded({ minSelected: 2, maxSelected: 3 }), [
+      validateFieldValue(bounded({ minItems: 2, maxItems: 3 }), [
         tag('A'),
         tag('B'),
       ]),
@@ -172,11 +173,11 @@ describe('multi-select selection bounds', () => {
   });
 
   it('rejects too few and too many', () => {
-    expect(validateFieldValue(bounded({ minSelected: 2 }), [tag('A')])).toBe(
+    expect(validateFieldValue(bounded({ minItems: 2 }), [tag('A')])).toBe(
       'Please select at least 2 option(s)',
     );
     expect(
-      validateFieldValue(bounded({ maxSelected: 2 }), [
+      validateFieldValue(bounded({ maxItems: 2 }), [
         tag('A'),
         tag('B'),
         tag('C'),
@@ -186,14 +187,14 @@ describe('multi-select selection bounds', () => {
 
   it('checks membership before counting', () => {
     expect(
-      validateFieldValue(bounded({ maxSelected: 1 }), [tag('A'), tag('X')]),
+      validateFieldValue(bounded({ maxItems: 1 }), [tag('A'), tag('X')]),
     ).toBe('Not one of the allowed options');
   });
 
   // A minimum bounds an answer; it does not make one mandatory. That is
   // `required`'s job, and the two produce different messages.
   it('leaves an empty answer unanswered rather than short', () => {
-    const min = bounded({ minSelected: 2 });
+    const min = bounded({ minItems: 2 });
     expect(validateFieldValue(min, [])).toBeNull();
 
     const page = (required: boolean) => ({
@@ -216,20 +217,20 @@ describe('multi-select selection bounds', () => {
 
   it('ignores bounds a hand-edited bag left unusable', () => {
     const junk = bounded({
-      minSelected: 'two' as unknown as number,
-      maxSelected: 0,
+      minItems: 'two' as unknown as number,
+      maxItems: 0,
     });
     expect(validateFieldValue(junk, [tag('A')])).toBeNull();
     expect(selectionHint(junk.options)).toBeUndefined();
   });
 
   it('describes the bounds in one line for the visitor', () => {
-    expect(selectionHint({ maxSelected: 3 })).toBe('Select up to 3 options');
-    expect(selectionHint({ minSelected: 1 })).toBe('Select at least 1 option');
-    expect(selectionHint({ minSelected: 2, maxSelected: 2 })).toBe(
+    expect(selectionHint({ maxItems: 3 })).toBe('Select up to 3 options');
+    expect(selectionHint({ minItems: 1 })).toBe('Select at least 1 option');
+    expect(selectionHint({ minItems: 2, maxItems: 2 })).toBe(
       'Select exactly 2 options',
     );
-    expect(selectionHint({ minSelected: 2, maxSelected: 4 })).toBe(
+    expect(selectionHint({ minItems: 2, maxItems: 4 })).toBe(
       'Select between 2 and 4 options',
     );
     expect(selectionHint({})).toBeUndefined();
@@ -360,5 +361,99 @@ describe('number fields backed by integer columns', () => {
     expect(validateFieldValue(integer, 36)).toBeNull();
     expect(validateFieldValue(integer, 3.6)).toBe('Expected a whole number');
     expect(validateFieldValue(field('number', 'Weight'), 3.6)).toBeNull();
+  });
+});
+
+/**
+ * The limits of a published question are JSON Schema keywords (the data
+ * class's constraint narrowed by the form). Mirrors
+ * `form_limits_are_json_schema_keywords` in `server/src/forms.rs`.
+ */
+describe('JSON Schema limits', () => {
+  const withOptions = (
+    type: FieldBlock['type'],
+    options: FieldBlock['options'],
+  ): FieldBlock => ({ ...field(type, 'Q'), options });
+
+  it('checks minimum, maximum and the exclusive variants', () => {
+    const number = withOptions('number', {
+      minimum: 1,
+      maximum: 9,
+      exclusiveMinimum: 1,
+      exclusiveMaximum: 9,
+    });
+    expect(validateFieldValue(number, 5)).toBeNull();
+    expect(validateFieldValue(number, 1)).toBe('Must be more than 1');
+    expect(validateFieldValue(number, 9)).toBe('Must be less than 9');
+    expect(validateFieldValue(number, 0)).toBe('Must be at least 1');
+    expect(validateFieldValue(number, 10)).toBe('Must be at most 9');
+    expect(validateFieldValue(withOptions('currency', { maximum: 5 }), 6)).toBe(
+      'Must be at most 5',
+    );
+  });
+
+  it('still reads the names older forms stored', () => {
+    expect(validateFieldValue(withOptions('number', { max: 3 }), 4)).toBe(
+      'Must be at most 3',
+    );
+    expect(
+      validateFieldValue(
+        withOptions('multi-select', {
+          maxSelected: 1,
+          options: [
+            { value: 'did:ad:tag:a', label: 'A' },
+            { value: 'did:ad:tag:b', label: 'B' },
+          ],
+        }),
+        ['did:ad:tag:a', 'did:ad:tag:b'],
+      ),
+    ).toBe('At most 1 option(s) allowed');
+    const rows = withOptions('table-input', {
+      columns: ['A'],
+      maxRows: 1,
+    });
+    expect(validateFieldValue(rows, [{ A: 'x' }, { A: 'y' }])).toBe(
+      'At most 1 row(s) allowed',
+    );
+  });
+
+  it('checks table-input row counts with minItems and maxItems', () => {
+    const rows = withOptions('table-input', {
+      columns: ['A'],
+      minItems: 2,
+      maxItems: 2,
+    });
+    expect(validateFieldValue(rows, [{ A: 'x' }])).toBe(
+      'Please fill in at least 2 row(s)',
+    );
+    expect(validateFieldValue(rows, [{ A: 'x' }, { A: 'y' }])).toBeNull();
+    expect(validateFieldValue(rows, [{ A: 'x' }, { A: 'y' }, { A: 'z' }])).toBe(
+      'At most 2 row(s) allowed',
+    );
+  });
+
+  it('checks a text pattern and ignores one it cannot compile', () => {
+    const code = withOptions('short-text', { pattern: '^[A-Z]{3}$' });
+    expect(validateFieldValue(code, 'ABC')).toBeNull();
+    expect(validateFieldValue(code, 'abc')).toBe(
+      'Does not match the required format',
+    );
+    expect(
+      validateFieldValue(withOptions('short-text', { pattern: '(' }), 'abc'),
+    ).toBeNull();
+  });
+});
+
+/** The same answers are checked against the server in `server/src/forms.rs`. */
+describe('verdicts shared with the server', () => {
+  const { cases } = JSON.parse(
+    readFileSync(
+      new URL('../shared/validation-cases.json', import.meta.url),
+      'utf8',
+    ),
+  ) as { cases: { type: FieldBlock['type']; value: string; valid: boolean }[] };
+
+  it.each(cases)('$type $value is valid: $valid', ({ type, value, valid }) => {
+    expect(validateFieldValue(field(type, type), value) === null).toBe(valid);
   });
 });

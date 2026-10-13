@@ -92,8 +92,9 @@ async function gotoSync(page: Page) {
   ).toBeVisible();
 }
 
+// Connect a device takes a pairing code or a server address in one box.
 const codeInput = (page: Page) =>
-  page.getByPlaceholder('Paste a pairing code or did:ad:node:…');
+  page.getByLabel('Pairing code or server address');
 
 async function pasteCode(page: Page, code: string) {
   await codeInput(page).fill(code);
@@ -107,12 +108,18 @@ async function pasteCode(page: Page, code: string) {
 test.describe('pairing by pasting a code', () => {
   test.beforeEach(before);
 
-  test('the paste form is offered on a device, not in a browser tab', async ({
+  test('a code is taken on a device, and answered in a browser tab', async ({
     page,
   }) => {
-    // Browser first: dialling needs a node, so the form must not be there.
+    // Browser first: dialling needs a node, so a pasted code must not dial
+    // anyone. The box stays, because it also takes a server address.
+    const calls = await stubIrohSync(page, { count: 1, peerName: 'Tablet' });
     await gotoSync(page);
-    await expect(codeInput(page)).toHaveCount(0);
+    await pasteCode(page, VALID_CODE);
+    await expect(page.getByTestId('connect-device-message')).toContainText(
+      'A browser tab can’t take one',
+    );
+    expect(calls.count).toBe(0);
 
     await pretendToBeTheApp(page);
     await gotoSync(page);

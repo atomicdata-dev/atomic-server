@@ -4,11 +4,18 @@ import {
   core,
   dataBrowser,
   forms,
+  getEffectiveConstraint,
   server,
   Store,
   type JSONValue,
 } from '@tomic/react';
 import { isChoiceField, infoBoxStyle } from '@tomic/form-renderer';
+import { optionSubjects } from '@helpers/withConstraint';
+import {
+  columnConstraint,
+  narrowFieldOptions,
+  normalizeFieldOptions,
+} from './formConstraints';
 import type {
   FieldOption,
   OptionsSource,
@@ -47,15 +54,18 @@ export async function buildFormDefinitionClientSide(
   const pageSubjects =
     (form.get(forms.properties.formPages) as string[] | undefined) ?? [];
 
-  const pages: FormPageDefinition[] = [];
-
-  for (const pageSubject of pageSubjects) {
-    pages.push(await buildPageDefinition(store, pageSubject));
-  }
-
   const dataClassSubject = form.get(forms.properties.formDataClass) as
     | string
     | undefined;
+  // Loaded up front: the constraint readers below look at it synchronously.
+  if (dataClassSubject) await store.getResource(dataClassSubject);
+
+  const pages: FormPageDefinition[] = [];
+
+  for (const pageSubject of pageSubjects) {
+    pages.push(await buildPageDefinition(store, pageSubject, dataClassSubject));
+  }
+
   const required = dataClassSubject
     ? (await store.getResource(dataClassSubject)).getSubjects(
         core.properties.requires,
@@ -131,6 +141,7 @@ async function buildStyling(
 async function buildPageDefinition(
   store: Store,
   pageSubject: string,
+  dataClassSubject: string | undefined,
 ): Promise<FormPageDefinition> {
   const page = await store.getResource(pageSubject);
 
@@ -149,7 +160,7 @@ async function buildPageDefinition(
 
   for (const fieldSubject of fieldSubjects) {
     const field = await store.getResource(fieldSubject);
-    blocks.push(await buildBlock(store, field));
+    blocks.push(await buildBlock(store, field, dataClassSubject));
   }
 
   const conditions = await buildConditions(store, page);
@@ -217,6 +228,7 @@ function parseConditionValue(raw: JSONValue | undefined): unknown {
 async function buildBlock(
   store: Store,
   field: Awaited<ReturnType<Store['getResource']>>,
+  dataClassSubject: string | undefined,
 ): Promise<FormBlock> {
   const conditions = await buildConditions(store, field);
 
@@ -256,29 +268,32 @@ async function buildBlock(
     (field.get(forms.properties.formFieldType) as FieldType | undefined) ??
     'short-text';
 
+  // The class decides what the column accepts and the question's own options
+  // may only tighten that (`narrow_options` on the server).
+  const property = await store.getResource(mapsTo);
+  const constraint = dataClassSubject
+    ? columnConstraint(store, dataClassSubject, mapsTo)
+    : {};
   const options = (await resolveChoiceOptions(
     store,
+    dataClassSubject,
     type,
     mapsTo,
-    parseFieldOptions(
-      field.get(forms.properties.formFieldOptions) as JSONValue | undefined,
+    narrowFieldOptions(
+      type,
+      normalizeFieldOptions(
+        type,
+        parseFieldOptions(
+          field.get(forms.properties.formFieldOptions) as JSONValue | undefined,
+        ),
+      ),
+      constraint,
     ),
   )) as FieldOptions;
 
-  const property = await store.getResource(mapsTo);
   if (type === 'number')
     options.integer =
       property.get(core.properties.datatype) === Datatype.INTEGER;
-  const max = property.get(dataBrowser.properties.max) as number | undefined;
-
-  if (
-    (type === 'multi-select' || type === 'dropdown-multi') &&
-    max !== undefined
-  ) {
-    options.maxSelected = Math.min(options.maxSelected ?? max, max);
-    if (options.minSelected !== undefined)
-      options.minSelected = Math.min(options.minSelected, max);
-  }
 
   return {
     kind: 'field',
@@ -295,8 +310,8 @@ async function buildBlock(
 /**
  * Mirrors `resolve_choice_options` (server/src/forms.rs): a choice question's
  * options resolved into inline option objects, from wherever its
- * `optionsSource` points — by default the Tags on its own mapped Property's
- * `allowsOnly`.
+ * `optionsSource` points — by default the Tags in the `enum` of the data
+ * class's constraint for its mapped column.
  *
  * One deliberate difference, the same split as the cover image in
  * `buildStyling`: a `picture-choice` option's image is a File subject, which
@@ -306,6 +321,7 @@ async function buildBlock(
  */
 async function resolveChoiceOptions(
   store: Store,
+  dataClassSubject: string | undefined,
   type: FieldType,
   mapsTo: string,
   options: Record<string, JSONValue>,
@@ -319,11 +335,19 @@ async function resolveChoiceOptions(
   let resolved: FieldOption[];
 
   if (source.property) {
-    resolved = await tagOptions(store, source.property);
+    // Another column's options live in the class of the table it belongs to.
+    const sourceClass = source.table
+      ? nonEmpty(
+          (await store.getResource(source.table)).get(
+            core.properties.classtype,
+          ),
+        )
+      : dataClassSubject;
+    resolved = await tagOptions(store, sourceClass, source.property);
   } else if (source.table) {
     resolved = await rowOptions(store, source.table, source.labelProperty);
   } else if (mapsTo) {
-    resolved = await tagOptions(store, mapsTo);
+    resolved = await tagOptions(store, dataClassSubject, mapsTo);
   } else {
     return options;
   }
@@ -337,11 +361,21 @@ const nonEmpty = (value: unknown) =>
 /** Mirrors `tag_options` (server/src/forms.rs). */
 async function tagOptions(
   store: Store,
+  classSubject: string | undefined,
   propertySubject: string,
 ): Promise<FieldOption[]> {
-  const property = await store.getResource(propertySubject);
-  const tagSubjects =
-    (property.get(core.properties.allowsOnly) as string[] | undefined) ?? [];
+  await store.getResource(propertySubject);
+  if (classSubject) await store.getResource(classSubject);
+
+  // The `enum` of the class's constraint for the column; the Property's legacy
+  // `allowsOnly` for columns that predate the class map.
+  const tagSubjects = optionSubjects(
+    getEffectiveConstraint(
+      store,
+      classSubject ? [classSubject] : [],
+      propertySubject,
+    ),
+  );
 
   return Promise.all(
     tagSubjects.map(async subject =>

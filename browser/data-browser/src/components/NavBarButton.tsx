@@ -11,8 +11,8 @@ import { transition } from '../helpers/transition';
 export const NAV_BUTTON_HEIGHT = '1.75rem';
 export const NAV_BUTTON_RADIUS = '6px';
 
-/** Touch screens get 44px targets; labels are dropped there (see below). */
-export const TOUCH_TARGET = '2.75rem';
+/** Touch screens get 40px targets; labels are dropped there (see below). */
+export const TOUCH_TARGET = '2.5rem';
 
 /**
  * Viewport-based (not container-based) "compact" test, so it is true from the
@@ -73,10 +73,17 @@ export const LabelButton = styled.button<{ $active?: boolean }>`
   }
 
   &:not([disabled]) {
-    &:hover,
     &:focus-visible {
       background: ${p => p.theme.colors.bg1};
       color: ${p => (p.$active ? p.theme.colors.main : p.theme.colors.text)};
+    }
+
+    /* Touch devices keep :hover after a tap, so only apply it with a real hover. */
+    @media (hover: hover) {
+      &:hover {
+        background: ${p => p.theme.colors.bg1};
+        color: ${p => (p.$active ? p.theme.colors.main : p.theme.colors.text)};
+      }
     }
 
     &:active {

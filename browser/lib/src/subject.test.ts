@@ -10,6 +10,10 @@ import {
   isIdentifierPathForm,
   isIdentifierResolutionPath,
   isValidSubject,
+  identifierKind,
+  isPropertySubject,
+  isResourceSubject,
+  canonicalIdentifier,
   isAtomicIdentifier,
   isLegacyAtomicLink,
   subjectsReferToSameResource,
@@ -218,5 +222,26 @@ describe('blobSubjectFromDownloadUrl', () => {
       undefined,
     );
     expect(blobSubjectFromDownloadUrl('')).toBeUndefined();
+  });
+});
+
+describe('property subjects', () => {
+  const hex = 'a'.repeat(64);
+
+  it('recognises atomic:prop: and legacy did:ad:prop:', () => {
+    expect(identifierKind(`atomic:prop:${hex}`)).toBe('property');
+    expect(identifierKind(`did:ad:prop:${hex}`)).toBe('property');
+    expect(identifierKind('atomic:prop:')).toBe('other');
+    expect(isPropertySubject(`did:ad:prop:${hex}`)).toBe(true);
+  });
+
+  it('is not a resource subject', () => {
+    expect(isResourceSubject(`atomic:prop:${hex}`)).toBe(false);
+  });
+
+  it('canonicalizes the legacy scheme', () => {
+    expect(canonicalIdentifier(`did:ad:prop:${hex}`)).toBe(
+      `atomic:prop:${hex}`,
+    );
   });
 });

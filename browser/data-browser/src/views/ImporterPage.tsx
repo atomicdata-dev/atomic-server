@@ -26,6 +26,7 @@ export function ImporterPage({ resource }: ImporterPageProps) {
   const [parent, setParent] = useCurrentSubject();
   const resourceByS = useResource(parent);
   const [isImporting, setIsImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   resource = resourceByS || resource;
 
@@ -35,12 +36,13 @@ export function ImporterPage({ resource }: ImporterPageProps) {
   const handleImport = useCallback(async () => {
     try {
       setIsImporting(true);
+      setImported(false);
       await store.importJsonAD(jsonAd, {
         overwriteOutside,
         parent: parent!,
       });
 
-      toast.success('Imported!');
+      setImported(true);
       setIsImporting(false);
     } catch (e) {
       toast.error(e.message);
@@ -111,6 +113,7 @@ export function ImporterPage({ resource }: ImporterPageProps) {
           >
             {isImporting ? 'Importing...' : 'Import'}
           </Button>
+          {imported && <p role='status'>Imported.</p>}
         </Column>
       </ContainerNarrow>
     </Main>

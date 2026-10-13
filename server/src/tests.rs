@@ -1699,7 +1699,7 @@ async fn form_submission_flow() {
         .unwrap();
     picture_prop.save_locally(store).await.unwrap();
 
-    // Options are Tags on the property's `allowsOnly`; a picture-choice
+    // Options are Tags in the data class's constraints; a picture-choice
     // option's image is the Tag's `cover-image`.
     // A real File in the form's drive: the definition only keeps images it
     // can see the form may show (`forms::FormScope`).
@@ -1755,15 +1755,26 @@ async fn form_submission_flow() {
         tag.save_locally(store).await.unwrap();
         tag_subjects.push(tag.get_subject().to_string());
     }
-    picture_prop
+    // The options are the `enum` of the data class's constraint for the
+    // column, and a single pick is `maxItems: 1`.
+    let mut data_class = store
+        .get_resource(&class.get_subject().to_string().into())
+        .await
+        .unwrap();
+    data_class
         .set(
-            urls::ALLOWS_ONLY.into(),
-            Value::ResourceArray(tag_subjects.iter().cloned().map(Into::into).collect()),
+            urls::CONSTRAINTS.into(),
+            Value::Json(serde_json::json!({
+                picture_prop.get_subject().to_string(): {
+                    "enum": tag_subjects,
+                    "maxItems": 1,
+                },
+            })),
             store,
         )
         .await
         .unwrap();
-    picture_prop.save_locally(store).await.unwrap();
+    data_class.save_locally(store).await.unwrap();
     let mut picture_field = Resource::new_instance(urls::FORM_FIELD, store)
         .await
         .unwrap();
@@ -2302,4 +2313,120 @@ async fn form_submission_flow() {
         foreign_rows.subjects.is_empty(),
         "no row lands in the other drive"
     );
+}
+
+/// `GET /genesis` hands out a drive's genesis certificate to anyone, and
+/// nothing else: a client that learned of this server from a public pkarr
+/// record uses it to check the server really holds the drive.
+#[actix_rt::test]
+async fn genesis_route_serves_only_the_certificate_of_a_drive() {
+    use clap::Parser;
+    let unique_string = atomic_lib::utils::random_string(10);
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
+    ]);
+    let mut config = config::build_config(opts).expect("failed init config");
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    config.vector_search_index_path =
+        format!("./.temp/{}/vector_search_index", unique_string).into();
+    let appstate = crate::appstate::AppState::init(config)
+        .await
+        .expect("failed init appstate");
+    atomic_lib::test_utils::setup_test_env(&appstate.store)
+        .await
+        .unwrap();
+    let store = &appstate.store;
+    let app = test::init_service(
+        App::new()
+            .app_data(Data::new(appstate.clone()))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+
+    // A private drive with content that must never leak.
+    let agent = store.get_default_agent().unwrap();
+    let mut builder = atomic_lib::commit::CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        atomic_lib::Value::ResourceArray(vec![urls::DRIVE.into()]),
+    );
+    builder.set(
+        urls::DESCRIPTION.into(),
+        atomic_lib::Value::Markdown("top secret plans".into()),
+    );
+    builder.set(
+        urls::READ.into(),
+        atomic_lib::Value::ResourceArray(vec![agent.subject.to_string().into()]),
+    );
+    let commit = atomic_lib::commit::Commit::create_did(builder, &agent, store)
+        .await
+        .unwrap();
+    let drive_did = commit.subject.clone();
+    let opts = atomic_lib::commit::CommitOpts {
+        validate_schema: false,
+        validate_constraints: false,
+        validate_signature: true,
+        validate_timestamp: false,
+        validate_rights: false,
+        validate_loro_causality: false,
+        update_index: true,
+        validate_for_agent: None,
+        source_id: None,
+    };
+    store.apply_commit(commit, &opts).await.unwrap();
+
+    // Anonymous: the drive itself is refused...
+    let path = format!("/did?subject={}", urlencoding::encode(drive_did.as_str()));
+    let req = test::TestRequest::with_uri(&path)
+        .insert_header(("Accept", "application/ad+json"))
+        .to_request();
+    assert_eq!(test::call_service(&app, req).await.status(), 401);
+
+    // ...but its certificate is served, and verifies against the identifier.
+    let path = format!(
+        "/genesis?subject={}",
+        urlencoding::encode(drive_did.as_str())
+    );
+    let req = test::TestRequest::with_uri(&path).to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body = get_body(resp);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let object = json.as_object().unwrap();
+    let mut keys: Vec<&String> = object.keys().collect();
+    keys.sort();
+    assert_eq!(keys, ["@id", urls::GENESIS], "only the certificate: {body}");
+    assert!(!body.contains("top secret"), "{body}");
+
+    let cert_b64 = object[urls::GENESIS].as_str().unwrap();
+    let cert_bytes = atomic_lib::agents::decode_base64(cert_b64).unwrap();
+    let cert = atomic_lib::genesis::GenesisCert::decode(&cert_bytes).unwrap();
+    let signature = atomic_lib::identifiers::identifier_body(drive_did.as_str()).unwrap();
+    cert.verify_signed_bytes(&cert_bytes, signature)
+        .expect("the served certificate must verify against the drive's identifier");
+
+    // Anything that is not a drive held here is a plain 404.
+    let agent = store.get_default_agent().unwrap().subject.to_string();
+    let fake_drive = format!("did:ad:{}", atomic_lib::agents::encode_base64(&[9u8; 64]));
+    for subject in [
+        "https://example.com/drive",
+        "did:ad:agent:abc",
+        "did:ad:tooshort",
+        agent.as_str(),
+        fake_drive.as_str(),
+        "",
+    ] {
+        let path = format!("/genesis?subject={}", urlencoding::encode(subject));
+        let req = test::TestRequest::with_uri(&path).to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            404,
+            "{subject:?}"
+        );
+    }
 }

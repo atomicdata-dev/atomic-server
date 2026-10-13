@@ -30,6 +30,15 @@ type ConversationWasmModule = {
     conversation: string,
     sealed: string[],
   ) => (string | null)[];
+  conversationSealFile: (
+    conversation: string,
+    plaintext: Uint8Array,
+  ) => { key: string; ciphertext: Uint8Array };
+  conversationOpenFile: (
+    conversation: string,
+    key: string,
+    ciphertext: Uint8Array,
+  ) => Uint8Array;
 };
 
 let modulePromise: Promise<ConversationWasmModule> | null = null;
@@ -148,6 +157,44 @@ export async function openPayloads(
   );
 
   return opened.map(text => (text === null ? null : parsePayload(text)));
+}
+
+/** An attachment after encryption on this device. */
+export interface SealedFile {
+  /** The random key of this file, base64url. It belongs inside the sealed
+   *  message that references the file and nowhere else. */
+  key: string;
+  /** What gets uploaded: version, nonce, ciphertext and tag. */
+  ciphertext: Uint8Array;
+}
+
+/**
+ * Encrypts an attachment for `conversation` under a fresh random key. The key
+ * is not derived from the conversation's epoch key, so a later membership
+ * change does not matter; the subject is bound in, so the ciphertext cannot be
+ * moved to another conversation.
+ */
+export async function sealFile(
+  conversation: string,
+  plaintext: Uint8Array,
+): Promise<SealedFile> {
+  const wasm = await loadWasm();
+
+  return wasm.conversationSealFile(conversation, plaintext);
+}
+
+/**
+ * Decrypts what {@link sealFile} produced. Throws when the key is wrong, the
+ * bytes were altered, or the file was sealed for another conversation.
+ */
+export async function openFile(
+  conversation: string,
+  key: string,
+  ciphertext: Uint8Array,
+): Promise<Uint8Array> {
+  const wasm = await loadWasm();
+
+  return wasm.conversationOpenFile(conversation, key, ciphertext);
 }
 
 /** What a SealedMessage carries inside `sealed`: what a Message would carry

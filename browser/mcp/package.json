@@ -1,0 +1,41 @@
+{
+  "name": "@tomic/mcp",
+  "version": "0.41.0-beta.7",
+  "author": "Joep Meindertsma",
+  "homepage": "https://docs.atomicdata.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atomicdata-dev/atomic-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/atomicdata-dev/atomic-server/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "description": "MCP server for Atomic Data: a stdio bridge to your node's own /mcp endpoint, so Claude Code, Cursor and others can read and edit your data",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "format-check": "oxfmt -c ../.oxfmtrc.json --check ./src",
+    "format": "oxfmt -c ../.oxfmtrc.json ./src",
+    "lint": "oxlint -c ../.oxlintrc.json . && pnpm format-check",
+    "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
+    "prepublishOnly": "pnpm run build && pnpm run lint",
+    "test": "vitest run",
+    "typecheck": "pnpm exec tsc --noEmit"
+  },
+  "bin": {
+    "atomic-mcp": "./bin/index.js"
+  },
+  "type": "module"
+}

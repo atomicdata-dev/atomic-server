@@ -37,6 +37,38 @@ pub struct Opts {
     #[clap(long, default_value = "latest", env = "ATOMIC_ENVELOPE_RETENTION")]
     pub envelope_retention: String,
 
+    /// How often the server deletes file blobs that no resource references any
+    /// more (for example after a File was destroyed). A duration such as `24h`,
+    /// `90m` or `7d`; a bare number is seconds. `0` or `off` disables the
+    /// background sweep; `atomic-server gc-blobs` still works by hand.
+    /// Only current state counts as a reference, not history: the bytes of a
+    /// destroyed File are removed after `--blob-gc-grace`, and undoing the
+    /// destroy later restores the File resource but not its bytes. On S3 the
+    /// sweep only runs with `--blob-gc-s3-exclusive`.
+    #[clap(long, default_value = "24h", env = "ATOMIC_BLOB_GC_INTERVAL")]
+    pub blob_gc_interval: String,
+
+    /// A blob written more recently than this is never garbage collected, so an
+    /// upload whose File resource has not been committed yet survives. Same
+    /// format as `--blob-gc-interval`; `0` removes the protection.
+    #[clap(long, default_value = "72h", env = "ATOMIC_BLOB_GC_GRACE")]
+    pub blob_gc_grace: String,
+
+    /// Allow blob garbage collection to delete from S3-compatible storage. Set
+    /// this to `true` only when the bucket and prefix belong to this node alone:
+    /// the sweep only knows this node's database, so a second node sharing the
+    /// bucket and prefix would have its files deleted. Without it the
+    /// background sweep stays off (a warning is logged once) and
+    /// `atomic-server gc-blobs` only accepts `--dry-run`. The local blob store
+    /// is not affected.
+    #[clap(
+        long,
+        default_value_t = false,
+        action = clap::ArgAction::Set,
+        env = "ATOMIC_BLOB_GC_S3_EXCLUSIVE"
+    )]
+    pub blob_gc_s3_exclusive: bool,
+
     /// Compact the store file at startup when it is at least
     /// `--auto-compact-min-mb` and at least `--auto-compact-min-reclaimable-percent`
     /// of it is dead space (pages freed by overwrites and deletes that redb
@@ -87,6 +119,11 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_WEBSITE_ORIGIN")]
     pub website_origin: Option<String>,
 
+    /// Where people approve MCP clients (the data-browser), when that is not this server.
+    /// A managed node whose app lives elsewhere sets it. Defaults to this server's own origin.
+    #[clap(long, env = "ATOMIC_APP_URL")]
+    pub app_url: Option<String>,
+
     // 9.883 is decimal for the `⚛` character.
     /// The port where the HTTP app is available. Set to 80 if you want this to be available on the network.
     #[clap(short, long, default_value = "9883", env = "ATOMIC_PORT")]
@@ -104,6 +141,15 @@ pub struct Opts {
     /// The IP address of the server. Set to :: if you want this to be available to other devices on your network.
     #[clap(long, default_value = "::", env = "ATOMIC_IP")]
     pub ip: IpAddr,
+
+    /// The public URL of this server, scheme included, e.g. `https://atomic.example.com`.
+    /// Set this when a reverse proxy or tunnel terminates TLS (or changes the
+    /// port) in front of atomic-server: `--https` only means that atomic-server
+    /// terminates TLS itself, so without this the server advertises itself as
+    /// `http://` and browsers block the resulting requests as mixed content.
+    /// If you leave this out, it is generated from `domain`, `port` and `https`.
+    #[clap(long, env = "ATOMIC_SERVER_URL")]
+    pub server_url: Option<String>,
 
     /// Use HTTPS instead of HTTP.
     /// Will get certificates from LetsEncrypt fully automated.
@@ -328,6 +374,21 @@ pub enum Command {
     /// redb takes an exclusive file lock and will fail otherwise.
     #[clap(name = "compact")]
     Compact,
+    /// Delete file blobs that no resource references any more and are older
+    /// than `--blob-gc-grace`. Frees disk or bucket space that destroying a
+    /// File does not. With `--dry-run` it only reports what it would delete.
+    /// With the local blob store the server MUST be stopped (redb takes an
+    /// exclusive file lock); the running server also does this on its own every
+    /// `--blob-gc-interval`.
+    #[clap(name = "gc-blobs")]
+    GcBlobs(GcBlobsOpts),
+}
+
+#[derive(Parser, Clone, Debug)]
+pub struct GcBlobsOpts {
+    /// Report the blobs and bytes that would be deleted; delete nothing.
+    #[clap(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -418,6 +479,12 @@ pub struct Config {
 impl Config {
     /// Returns the origin URL (scheme + domain + port) based on the configuration.
     pub fn get_origin(&self) -> String {
+        if let Some(url) = self.opts.server_url.as_deref().map(str::trim) {
+            if !url.is_empty() {
+                return url.trim_end_matches('/').to_string();
+            }
+        }
+
         let proto = if self.opts.https { "https" } else { "http" };
         let host = &self.opts.domain;
         let port = if self.opts.https {
@@ -570,6 +637,15 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
         );
     }
 
+    if let Some(url) = opts.server_url.as_deref().map(str::trim) {
+        if !url.is_empty() && !(url.starts_with("http://") || url.starts_with("https://")) {
+            return Err(format!(
+                "ATOMIC_SERVER_URL / --server-url must start with http:// or https://, got `{url}`."
+            )
+            .into());
+        }
+    }
+
     // Resolved before anything binds: Owner mode with an unusable owner must
     // fail here, not after the socket is open. Mirrors the `--https` without
     // `--email` refusal above.
@@ -679,6 +755,32 @@ mod tests {
         assert!(!config.compaction.enabled);
         assert_eq!(config.compaction.min_file_bytes, 64 * MIB);
         assert!((config.compaction.min_reclaimable_fraction - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_origin_is_built_from_the_flags_unless_a_server_url_is_given() {
+        let plain = config_from(&["--domain", "atomic.example.de", "--port", "80"]).unwrap();
+        assert_eq!(plain.get_origin(), "http://atomic.example.de");
+
+        // Behind a TLS-terminating proxy: the public scheme wins, and a
+        // trailing slash is not part of an origin.
+        let proxied = config_from(&[
+            "--domain",
+            "atomic.example.de",
+            "--port",
+            "80",
+            "--server-url",
+            "https://atomic.example.de/",
+        ])
+        .unwrap();
+        assert_eq!(proxied.get_origin(), "https://atomic.example.de");
+    }
+
+    #[test]
+    fn a_server_url_without_a_scheme_is_refused() {
+        let err = config_from(&["--server-url", "atomic.example.de"])
+            .expect_err("a bare host is not a URL");
+        assert!(err.to_string().contains("http:// or https://"), "{err}");
     }
 
     #[test]

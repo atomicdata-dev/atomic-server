@@ -4,13 +4,13 @@ import {
   notifications,
   useCollection,
   useResources,
-  useResource,
   useStore,
   type Resource,
   type Collection,
 } from '@tomic/react';
 import { useEffect, useState } from 'react';
 import { usePrivateDrive } from './usePrivateDrive';
+import { usePrivateDriveSync } from './usePrivateDriveSync';
 import { dedupeBySource, isUnread } from '../helpers/notifications/inbox';
 
 const PAGE_SIZE = 100;
@@ -30,15 +30,6 @@ export function useInbox(): {
 } {
   const { privateDrive } = usePrivateDrive();
   const store = useStore();
-  const home = useResource(privateDrive);
-  const homeReady = !home.loading && !home.error && !home.new;
-  // The active workspace's subscription does not cover the personal Inbox.
-  // Hold its drive even when another project is open, including new children.
-  useEffect(() => {
-    // A restored/new identity can resolve its home before that drive exists
-    // on this server. Wait for a successful read/save before subscribing.
-    if (privateDrive && homeReady) return store.subscribeLive(privateDrive);
-  }, [store, privateDrive, homeReady]);
   const { collection, ready, invalidateCollection } = useCollection(
     {
       property: core.properties.isA,
@@ -49,6 +40,8 @@ export function useInbox(): {
     },
     { pageSize: PAGE_SIZE },
   );
+  usePrivateDriveSync(privateDrive, invalidateCollection);
+
   useEffect(() => {
     if (!ready || !privateDrive) return;
     let cancelled = false;

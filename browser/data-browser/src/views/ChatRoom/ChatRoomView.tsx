@@ -11,6 +11,7 @@ import {
   useCanWrite,
   useCollection,
   useCreatedAt,
+  useCurrentAgent,
   useResource,
   useResourceSnapshot,
   useStore,
@@ -19,6 +20,25 @@ import {
   useTypingPresence,
 } from '@tomic/react';
 import { memo, useRef, useState, useEffect, useLayoutEffect } from 'react';
+import {
+  appendToChatLog,
+  deleteLogEntry,
+  editLogEntry,
+  hideMigrated,
+  isFollowEntry,
+  parseEntryId,
+  sendLogEntry,
+  scopeKey,
+  queryPages,
+  toEntryId,
+  windowChat,
+  type Timed,
+} from '../../helpers/chatLog';
+import {
+  useChatLogEntry,
+  useChatLogPages,
+  useChatLogRevision,
+} from '../../hooks/useChatLog';
 import toast from 'react-hot-toast';
 import {
   FaCopy,
@@ -26,6 +46,7 @@ import {
   FaLocationArrow,
   FaMessage,
   FaPencil,
+  FaTrash,
   FaReply,
   FaXmark,
 } from 'react-icons/fa6';
@@ -37,12 +58,17 @@ import { IconButton } from '../../components/IconButton/IconButton';
 import { ChatMessagesContainer } from '../../components/ChatMessagesContainer';
 import Markdown from '../../components/datatypes/Markdown';
 import { Detail } from '../../components/Detail';
-import { LoaderInline } from '../../components/Loader';
+import { Spinner } from '../../components/Spinner';
 import { editURL } from '../../helpers/navigation';
 import { formatCompactDateTime } from '../../helpers/dates/compactDateTime';
 import { ResourceInline } from '../ResourceInline';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { TypingIndicator } from '../../components/Presence/TypingIndicator';
+import { findMentionTrigger, insertMention } from '../../helpers/chatMention';
+import {
+  ChatMentionPicker,
+  type ChatMentionPickerHandle,
+} from './ChatMentionPicker';
 import {
   useSealedMessage,
   type SealedState,
@@ -93,6 +119,10 @@ export function ChatView({
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = inputRefProp ?? internalInputRef;
   const [scrollToBottomTrigger, setScrollToBottomTrigger] = useState(0);
+  const [caret, setCaret] = useState(0);
+  // Start index of an `@` token closed with Escape; reopens on a new `@`.
+  const [dismissedAt, setDismissedAt] = useState<number>();
+  const pickerRef = useRef<ChatMentionPickerHandle>(null);
 
   const { typers, notifyTyping, stopTyping } = useTypingPresence(threadSubject);
 
@@ -149,20 +179,66 @@ export function ChatView({
     }
 
     const messageBackup = newMessageVal;
+    const replyBackup = isReplyTo;
 
     try {
       setScrollToBottomTrigger(prev => prev + 1);
       setNewMessage('');
-      stopTyping();
-      await onSend(messageBackup, isReplyTo);
+      // The message shows up before the server has answered, so the reply
+      // state is cleared with the text: the next message is a plain one.
       setReplyTo(undefined);
+      stopTyping();
+      await onSend(messageBackup, replyBackup);
     } catch (err) {
       setNewMessage(messageBackup);
+      setReplyTo(replyBackup);
       toast.error(err.message);
     }
   };
 
+  const mentionTrigger = findMentionTrigger(newMessageVal, caret);
+  const openTrigger =
+    mentionTrigger && mentionTrigger.start !== dismissedAt
+      ? mentionTrigger
+      : undefined;
+
+  const handleSelectMention = (subject: string, label: string) => {
+    if (!openTrigger) return;
+    const result = insertMention(newMessageVal, openTrigger, subject, label);
+
+    setNewMessage(result.text);
+    setCaret(result.caret);
+    // Put the caret behind the inserted mention once React has rendered it.
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(result.caret, result.caret);
+    });
+    notifyTyping();
+  };
+
+  const syncCaret: React.ReactEventHandler<HTMLTextAreaElement> = e => {
+    setCaret(e.currentTarget.selectionStart);
+  };
+
   const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = e => {
+    if (openTrigger) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDismissedAt(openTrigger.start);
+
+        return;
+      }
+
+      if (
+        ['ArrowUp', 'ArrowDown', 'Enter', 'Tab'].includes(e.key) &&
+        pickerRef.current?.onKeyDown(e.key === 'Tab' ? 'Enter' : e.key)
+      ) {
+        e.preventDefault();
+
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -182,6 +258,7 @@ export function ChatView({
     HTMLTextAreaElement
   > = e => {
     setNewMessage(e.target.value);
+    setCaret(e.target.selectionStart);
 
     if (e.target.value === '') {
       stopTyping();
@@ -212,7 +289,7 @@ export function ChatView({
           fullView={noContainerPadding}
         >
           {messagesLoading ? (
-            <LoaderInline>Loading messages...</LoaderInline>
+            <Spinner centered />
           ) : messages.length === 0 ? (
             <EmptyChatState>
               <FaMessage />
@@ -248,27 +325,38 @@ export function ChatView({
         </Detail>
       )}
       <TypingIndicator typers={typers} />
-      <MessageForm onSubmit={sendMessage} $viewTransition={viewTransition}>
-        <MessageInput
-          aria-label='Chat input'
-          rows={1}
-          ref={inputRef}
-          autoFocus
-          value={newMessageVal}
-          onChange={handleChangeMessageText}
-          onKeyDown={handleKeyDown}
-          onBlur={stopTyping}
-          placeholder={'type a message'}
-        />
-        <SendButton
-          title='Send message [enter]'
-          disabled={disableSend}
-          clean
-          onClick={() => sendMessage()}
-        >
-          Send
-        </SendButton>
-      </MessageForm>
+      <ComposerWrapper>
+        {openTrigger && (
+          <ChatMentionPicker
+            trigger={openTrigger}
+            onSelect={handleSelectMention}
+            handleRef={pickerRef}
+          />
+        )}
+        <MessageForm onSubmit={sendMessage} $viewTransition={viewTransition}>
+          <MessageInput
+            aria-label='Chat input'
+            rows={1}
+            ref={inputRef}
+            autoFocus
+            value={newMessageVal}
+            onChange={handleChangeMessageText}
+            onKeyDown={handleKeyDown}
+            onKeyUp={syncCaret}
+            onClick={syncCaret}
+            onBlur={stopTyping}
+            placeholder={'type a message'}
+          />
+          <SendButton
+            title='Send message [enter]'
+            disabled={disableSend}
+            clean
+            onClick={() => sendMessage()}
+          >
+            Send
+          </SendButton>
+        </MessageForm>
+      </ComposerWrapper>
     </ViewWrapper>
   );
 }
@@ -293,14 +381,12 @@ export function ChatRoomView({
   viewTransition,
   noContainerPadding,
 }: ChatRoomViewProps) {
-  const store = useStore();
-  const { messages, loading, invalidate, olderCount, loadOlder } =
-    useChatMessages(resource.subject);
+  const { messages, loading, olderCount, loadOlder, send } = useChatMessages(
+    resource.subject,
+  );
 
-  const handleSend = async (text: string, replyTo?: string) => {
-    await sendChatMessage(store, { parent: resource.subject, text, replyTo });
-    invalidate();
-  };
+  const handleSend = (text: string, replyTo?: string) =>
+    send(text, { parent: resource.subject, replyTo });
 
   return (
     <ChatView
@@ -329,30 +415,24 @@ interface SendChatMessageOptions {
   extraClasses?: string[];
 }
 
-/** Creates and saves a Message resource. */
+/**
+ * Posts a message to a chat as an entry of its log (`planning/chat-log.md`);
+ * no `Message` resource is made. Follow events (`extraClasses` with
+ * FollowEvent) become entries of kind FollowEvent.
+ */
 export async function sendChatMessage(
   store: Store,
   { parent, text, about, replyTo, extraClasses }: SendChatMessageOptions,
 ) {
-  const msgResource = await store.newResource({
+  await sendLogEntry(store, {
     parent,
-    isA: [dataBrowser.classes.message, ...(extraClasses ?? [])],
-    propVals: {
-      [core.properties.description]: text,
-      // `createdAt` is NOT set here: it's derived from the genesis Loro
-      // change (timestamp) and materialized server-side. Authoring it
-      // explicitly is now rejected by the server.
-      ...(about && {
-        [dataBrowser.properties.about]: about,
-      }),
-      ...(replyTo && {
-        [dataBrowser.properties.replyTo]: replyTo,
-      }),
-    },
+    text,
+    about,
+    replyTo,
+    kind: extraClasses?.includes(dataBrowser.classes.followEvent)
+      ? dataBrowser.classes.followEvent
+      : undefined,
   });
-
-  await msgResource.save();
-  store.notifyResourceManuallyCreated(msgResource);
 }
 
 type SetReplyToType = (subject: string) => unknown;
@@ -379,8 +459,107 @@ interface MessageProps {
 /** How many characters are shown at max by default in a message */
 const MESSAGE_MAX_LEN = 500;
 
-/** Single message shown in a ChatRoom */
+/** Single message shown in a ChatRoom: an old Message resource or a log entry. */
 const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
+  return parseEntryId(subject) ? (
+    <LogMessage id={subject} setReplyTo={setReplyTo} />
+  ) : (
+    <ResourceMessage subject={subject} setReplyTo={setReplyTo} />
+  );
+});
+
+interface MessageViewProps {
+  /** Identifies the message in the page (RDFa `about`). */
+  about: string;
+  text: string;
+  createdAt: Date | undefined;
+  createdBy: string | undefined;
+  replyTo: string | undefined;
+  /** The key of a log entry, to scroll to a link to it. */
+  entryKey?: string;
+  edited?: boolean;
+  /** Replaces the text with an editor. Only for messages the viewer may change. */
+  editing?: React.ReactNode;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onReply: () => void;
+  onCopyUrl: () => void;
+}
+
+/** The look of one message: avatar, author and time, actions and the text. */
+function MessageView({
+  about,
+  text,
+  createdAt,
+  createdBy,
+  replyTo,
+  entryKey,
+  edited,
+  editing,
+  onEdit,
+  onDelete,
+  onReply,
+  onCopyUrl,
+}: MessageViewProps) {
+  function handleCopyText() {
+    navigator.clipboard.writeText(text || '');
+    toast.success('Copied message text to clipboard');
+  }
+
+  return (
+    <MessageComponent about={about} data-entry-key={entryKey}>
+      {createdBy ? (
+        <PresenceAvatarMenu
+          agentSubject={createdBy}
+          size='1.8rem'
+          chip={false}
+        />
+      ) : (
+        <AvatarSpacer />
+      )}
+      <MessageBody>
+        <MessageDetails>
+          <MessageMeta createdAt={createdAt} createdBy={createdBy} />
+          {edited && <span>(edited)</span>}
+          {replyTo && <MessageLine subject={replyTo} />}
+          <MessageActions>
+            {onEdit && (
+              <IconButton onClick={onEdit} title='Edit message'>
+                <FaPencil />
+              </IconButton>
+            )}
+            {onDelete && (
+              <IconButton onClick={onDelete} title='Delete message'>
+                <FaTrash />
+              </IconButton>
+            )}
+            <IconButton onClick={onReply} title='Reply to this message'>
+              <FaReply />
+            </IconButton>
+            <IconButton onClick={onCopyUrl} title='Copy link to this message'>
+              <FaLink />
+            </IconButton>
+            <IconButton onClick={handleCopyText} title='Copy message text'>
+              <FaCopy />
+            </IconButton>
+          </MessageActions>
+        </MessageDetails>
+        {/* markExternalLinks routes links through AtomicLink: subject links
+            navigate in-app instead of triggering a full page load. */}
+        {editing ?? (
+          <Markdown
+            text={text || ''}
+            maxLength={MESSAGE_MAX_LEN}
+            markExternalLinks
+          />
+        )}
+      </MessageBody>
+    </MessageComponent>
+  );
+}
+
+/** A message that is a resource of its own. */
+function ResourceMessage({ subject, setReplyTo }: MessageProps) {
   const resource = useResource(subject);
   const sealed = useSealedMessage(subject);
   const [plainDescription] = useString(resource, core.properties.description);
@@ -413,63 +592,123 @@ const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
     );
   }
 
-  function handleCopyText() {
-    navigator.clipboard.writeText(description || '');
-    toast.success('Copied message text to clipboard');
+  return (
+    <MessageView
+      about={subject}
+      text={description ?? ''}
+      createdAt={createdAt}
+      createdBy={createdBy}
+      replyTo={replyTo}
+      onEdit={canWrite ? () => navigate(editURL(subject)) : undefined}
+      onReply={() => setReplyTo(subject)}
+      onCopyUrl={handleCopyUrl}
+    />
+  );
+}
+
+/** A message that is an entry in a ChatLog page. */
+function LogMessage({
+  id,
+  setReplyTo,
+}: {
+  id: string;
+  setReplyTo: SetReplyToType;
+}) {
+  const store = useStore();
+  const [agent] = useCurrentAgent();
+  const { entry, key } = useChatLogEntry(id);
+  const [editingText, setEditingText] = useState<string>();
+
+  if (!entry || !key) {
+    return <MessageComponent about={id} />;
+  }
+
+  if (isFollowEntry(entry)) {
+    return (
+      <FollowEventMessage
+        description={entry.t}
+        createdAt={new Date(entry.c)}
+        createdBy={entry.a}
+      />
+    );
+  }
+
+  // The server only lets an author change their own entries; moderators can
+  // too, but own messages are what the buttons are for.
+  const isMine = !!agent && entry.a === agent.subject;
+
+  function handleCopyUrl() {
+    navigator.clipboard.writeText(id);
+    toast.success('Copied message URL to clipboard');
+  }
+
+  async function saveEdit() {
+    if (editingText === undefined) return;
+
+    try {
+      await editLogEntry(store, id, editingText);
+      setEditingText(undefined);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this message?')) return;
+
+    try {
+      await deleteLogEntry(store, id);
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   return (
-    <MessageComponent about={subject}>
-      {createdBy ? (
-        <PresenceAvatarMenu
-          agentSubject={createdBy}
-          size='1.8rem'
-          chip={false}
-        />
-      ) : (
-        <AvatarSpacer />
-      )}
-      <MessageBody>
-        <MessageDetails>
-          <MessageMeta createdAt={createdAt} createdBy={createdBy} />
-          {replyTo && <MessageLine subject={replyTo} />}
-          <MessageActions>
-            {canWrite && (
-              <IconButton
-                onClick={() => navigate(editURL(subject))}
-                title='Edit message'
-              >
-                <FaPencil />
-              </IconButton>
-            )}
-            <IconButton
-              onClick={() => setReplyTo(subject)}
-              title='Reply to this message'
-            >
-              <FaReply />
-            </IconButton>
-            <IconButton
-              onClick={handleCopyUrl}
-              title='Copy link to this message'
-            >
-              <FaLink />
-            </IconButton>
-            <IconButton onClick={handleCopyText} title='Copy message text'>
-              <FaCopy />
-            </IconButton>
-          </MessageActions>
-        </MessageDetails>
-        {/* markExternalLinks routes links through AtomicLink: subject links
-            navigate in-app instead of triggering a full page load. */}
-        <Markdown
-          text={description || ''}
-          maxLength={MESSAGE_MAX_LEN}
-          markExternalLinks
-        />
-      </MessageBody>
-    </MessageComponent>
+    <MessageView
+      about={id}
+      entryKey={key}
+      text={entry.t}
+      createdAt={new Date(entry.c)}
+      createdBy={entry.a}
+      replyTo={entry.r}
+      edited={entry.e !== undefined}
+      editing={
+        editingText === undefined ? undefined : (
+          <EditMessage
+            aria-label='Edit message text'
+            value={editingText}
+            autoFocus
+            onChange={e => setEditingText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void saveEdit();
+              } else if (e.key === 'Escape') {
+                setEditingText(undefined);
+              }
+            }}
+          />
+        )
+      }
+      onEdit={isMine ? () => setEditingText(entry.t) : undefined}
+      onDelete={isMine ? handleDelete : undefined}
+      onReply={() => setReplyTo(id)}
+      onCopyUrl={handleCopyUrl}
+    />
   );
-});
+}
+
+const EditMessage = styled.textarea`
+  width: 100%;
+  min-height: 3rem;
+  padding: ${p => p.theme.size(2)};
+  border: 1px solid ${p => p.theme.colors.bg2};
+  border-radius: ${p => p.theme.radius};
+  background: ${p => p.theme.colors.bg};
+  color: ${p => p.theme.colors.text};
+  font: inherit;
+  resize: vertical;
+`;
 
 /** Compact message header: the author (truncated when the name/DID is long,
  *  so it never shoves the date off-row) and a short human timestamp. */
@@ -599,6 +838,42 @@ const MESSAGE_LINE_MAX_LEN = 50;
 
 /** Small single line preview of a message, useful in replies */
 function MessageLine({ subject }: MessageLineProps) {
+  return parseEntryId(subject) ? (
+    <EntryMessageLine subject={subject} />
+  ) : (
+    <ResourceMessageLine subject={subject} />
+  );
+}
+
+function MessageLineView({
+  subject,
+  ready,
+  author,
+  text,
+}: {
+  subject: string;
+  ready: boolean;
+  author: string | undefined;
+  text: string | undefined;
+}) {
+  if (!ready) {
+    return <MessageLineStyled>loading...</MessageLineStyled>;
+  }
+
+  // truncate and add ellipsis
+  const truncated = text?.substring(0, MESSAGE_LINE_MAX_LEN);
+  const ellipsis = text && text.length > MESSAGE_LINE_MAX_LEN ? '...' : '';
+
+  return (
+    <MessageLineStyled>
+      <span>to </span>
+      {author && <ResourceInline subject={author} />}
+      <AtomicLink subject={subject}>{`: ${truncated}${ellipsis}`}</AtomicLink>
+    </MessageLineStyled>
+  );
+}
+
+function ResourceMessageLine({ subject }: MessageLineProps) {
   const { resource, ready } = useResourceSnapshot(subject);
   const sealed = useSealedMessage(subject);
   const [plainDescription] = useString(resource, core.properties.description);
@@ -607,21 +882,26 @@ function MessageLine({ subject }: MessageLineProps) {
   // fetch, so it survives a refresh.
   const author = useMessageSpeaker(resource);
 
-  if (!ready) {
-    return <MessageLineStyled>loading...</MessageLineStyled>;
-  }
+  return (
+    <MessageLineView
+      subject={subject}
+      ready={ready}
+      author={author}
+      text={description}
+    />
+  );
+}
 
-  // truncate and add ellipsis
-  const truncated = description?.substring(0, MESSAGE_LINE_MAX_LEN);
-  const ellipsis =
-    description && description.length > MESSAGE_LINE_MAX_LEN ? '...' : '';
+function EntryMessageLine({ subject: id }: MessageLineProps) {
+  const { entry } = useChatLogEntry(id);
 
   return (
-    <MessageLineStyled>
-      <span>to </span>
-      {author && <ResourceInline subject={author} />}
-      <AtomicLink subject={subject}>{`: ${truncated}${ellipsis}`}</AtomicLink>
-    </MessageLineStyled>
+    <MessageLineView
+      subject={id}
+      ready={!!entry}
+      author={entry?.a}
+      text={entry?.t}
+    />
   );
 }
 
@@ -732,6 +1012,9 @@ const MessageComponent = styled.div`
   /* Enough room that the avatar's hover ring never touches the body chip. */
   gap: 0.75rem;
   padding-block: 0.1rem;
+  /* Room for the body chip's negative right margin. Without it the row is
+   * 0.5rem wider than the scroll viewport and the chat scrolls sideways. */
+  padding-inline-end: 0.5rem;
 
   &:hover ${MessageBody} {
     background: ${p => p.theme.colors.bg1};
@@ -768,6 +1051,11 @@ const MessageInput = styled.textarea`
   min-height: 2rem;
   max-height: 50vh;
   font-family: ${p => p.theme.fontFamily};
+`;
+
+/** Anchors the mention picker to the composer. */
+const ComposerWrapper = styled.div`
+  position: relative;
 `;
 
 /** Wrapper for the new message form */
@@ -882,10 +1170,25 @@ function writeTail(key: string, tail: ChatTail) {
   }
 }
 
+/** What the message list shows: the newest messages and how many are older. */
+interface ChatWindow {
+  messages: string[];
+  olderCount: number;
+  /** Pages whose entries are in `messages`; watched for changes. */
+  loadedPages: string[];
+}
+
+const NO_PAGES: string[] = [];
+
 /**
- * Fetches messages linked to a subject using the Collection system, sorted by
- * createdAt ascending (oldest first) with pagination. ChatRooms link their
- * messages via `parent` (the default); comment threads via `about`.
+ * Fetches the messages of a chat or a comment thread, sorted by createdAt
+ * ascending (oldest first) with pagination. ChatRooms link their messages via
+ * `parent` (the default); comment threads via `about`.
+ *
+ * A message is either a `Message` resource (what older versions wrote, and
+ * follow events still are) or an entry in a ChatLog page (what new messages
+ * are). The list holds the subject of the first and the entry id
+ * (`<page subject>#<entry key>`) of the second, merged by time.
  */
 export function useChatMessages(
   subject: string,
@@ -893,19 +1196,23 @@ export function useChatMessages(
   /** A Conversation's messages are SealedMessages. */
   sealed = false,
 ) {
+  const store = useStore();
   // The newest messages seen last time this chat was open, so a reopened chat
   // fills at once from the local database while the real list (server sorted,
   // after the connection is up) is on its way.
   const tailKey = `chat-tail:${subject}:${property}`;
   const [remembered] = useState(() => readTail(tailKey));
-  const [messages, setMessages] = useState<string[]>(
-    remembered?.messages ?? [],
-  );
+  const [view, setView] = useState<ChatWindow>(() => ({
+    messages: remembered?.messages ?? [],
+    olderCount: remembered
+      ? Math.max(0, remembered.total - remembered.messages.length)
+      : 0,
+    loadedPages: NO_PAGES,
+  }));
   // How many of the NEWEST messages are listed. A busy chat can hold
   // thousands; listing (and rendering) them all made opening it a stall and
   // an unbounded DOM. Older ones load a page at a time on request.
   const [visible, setVisible] = useState(CHAT_PAGE_SIZE);
-  const [total, setTotal] = useState(remembered?.total ?? 0);
 
   // Scope the query to the drive the THREAD lives on, not the viewer's active
   // one. A guest opening a chatroom shared from another drive has their own
@@ -918,6 +1225,7 @@ export function useChatMessages(
   const threadDrive =
     thread.get(DRIVE_PROP) ??
     (thread.hasClasses(server.classes.drive) ? subject : undefined);
+  const drive = typeof threadDrive === 'string' ? threadDrive : undefined;
 
   const { collection, ready, invalidateCollection } = useCollection(
     {
@@ -926,12 +1234,19 @@ export function useChatMessages(
       filters: sealed ? ONLY_SEALED_MESSAGES : ONLY_MESSAGES,
       sort_by: commits.properties.createdAt,
       sort_desc: false,
-      drive: typeof threadDrive === 'string' ? threadDrive : undefined,
+      drive,
     },
     { pageSize: CHAT_PAGE_SIZE, preferServer: true },
   );
+  const logPages = useChatLogPages(property, subject, drive, !sealed);
+  // Entries are not properties: an entry from another tab or agent, or one
+  // added here, only shows up through this number changing.
+  const revision = useChatLogRevision(view.loadedPages);
+  const { pages, ready: pagesReady } = logPages;
 
   useEffect(() => {
+    let cancelled = false;
+
     const extractMembers = async () => {
       await collection.waitForReady();
       const count = collection.totalMembers;
@@ -956,30 +1271,132 @@ export function useChatMessages(
         return;
       }
 
-      setTotal(count);
-      setMessages(members);
+      let next: ChatWindow = {
+        messages: members,
+        olderCount: Math.max(0, count - members.length),
+        loadedPages: NO_PAGES,
+      };
+
+      if (pages.length > 0) {
+        const old: Timed[] = await Promise.all(
+          members.map(async id => ({
+            id,
+            at: (await store.getResource(id)).getCreatedAt() ?? 0,
+          })),
+        );
+        const entryKeys = new Set<string>();
+        const log: Timed[] = [];
+        const loadedPages: string[] = [];
+        let index = pages.length - 1;
+
+        // Newest pages first, as many as it takes to fill the window.
+        while (index >= 0 && log.length < visible) {
+          const current = pages[index];
+          index--;
+          const page = await store.getResource(current);
+
+          loadedPages.push(current);
+
+          if (page.error) continue;
+
+          for (const { key, entry } of page.listChatLogEntries()) {
+            // One key on two pages (two peers migrated the same message) is
+            // one message.
+            if (entryKeys.has(key)) continue;
+            entryKeys.add(key);
+            log.push({ id: toEntryId(current, key), at: entry.c });
+          }
+        }
+
+        // An old Message that already has its entry is a stale copy.
+        const { shown, hidden } = hideMigrated(old, entryKeys);
+
+        const merged = windowChat({
+          old: shown,
+          oldTotal: count - hidden,
+          log,
+          unloadedPages: index + 1,
+          visible,
+        });
+        next = {
+          messages: merged.ids,
+          olderCount: merged.olderCount,
+          loadedPages,
+        };
+      }
+
+      if (cancelled) return;
+
+      setView(previous =>
+        previous.messages.length === next.messages.length &&
+        previous.olderCount === next.olderCount &&
+        previous.messages.every((id, i) => id === next.messages[i]) &&
+        previous.loadedPages.length === next.loadedPages.length &&
+        previous.loadedPages.every((page, i) => page === next.loadedPages[i])
+          ? previous
+          : next,
+      );
 
       // An empty chat is remembered too, so reopening it does not flash the
       // loader every time while the server answers "no messages".
-      if (visible === CHAT_PAGE_SIZE) {
-        writeTail(tailKey, { total: count, messages: members });
+      if (visible === CHAT_PAGE_SIZE && pagesReady) {
+        writeTail(tailKey, {
+          total: next.messages.length + next.olderCount,
+          messages: next.messages,
+        });
       }
     };
 
-    extractMembers();
-  }, [collection, visible, tailKey]);
+    void extractMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collection, visible, tailKey, store, pages, pagesReady, revision]);
 
   // `useCollection` (used internally by this hook) routes
   // `ResourceManuallyCreated` through `applyResourceChange` for an
-  // optimistic append — sent messages appear instantly without a
+  // optimistic append — sent follow events appear instantly without a
   // server round-trip.
 
+  const send = async (
+    text: string,
+    {
+      parent,
+      replyTo,
+    }: {
+      /** Rights anchor of the log: the ChatRoom, or the drive's Comments folder. */
+      parent: string;
+      replyTo?: string;
+    },
+  ) => {
+    const known = pagesReady
+      ? pages
+      : await queryPages(store, property, subject, drive);
+
+    await appendToChatLog(store, {
+      parent,
+      about: property === dataBrowser.properties.about ? subject : undefined,
+      text,
+      replyTo,
+      pages: known,
+      scope: scopeKey(property, subject),
+    });
+    logPages.refresh();
+  };
+
   return {
-    messages,
-    loading: !ready && messages.length === 0 && !remembered,
-    invalidate: invalidateCollection,
+    messages: view.messages,
+    loading:
+      (!ready || !pagesReady) && view.messages.length === 0 && !remembered,
+    invalidate: async () => {
+      if (sealed) await invalidateCollection();
+      logPages.refresh();
+    },
     /** Messages that exist but are not listed yet (older than the window). */
-    olderCount: Math.max(0, total - messages.length),
+    olderCount: view.olderCount,
     loadOlder: () => setVisible(v => v + CHAT_PAGE_SIZE),
+    /** Appends a message to the chat's log: its newest page, or a new one. */
+    send,
   };
 }

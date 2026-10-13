@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { core, dataBrowser, Datatype, forms } from '@tomic/react';
+import {
+  core,
+  dataBrowser,
+  Datatype,
+  forms,
+  getEffectiveConstraint,
+} from '@tomic/react';
+import { optionSubjects } from '@helpers/withConstraint';
 import { formTestFixture as fixture } from './formTestFixture';
 import { buildFormFromSpec, type FormSpec } from './createFormFromSpec';
 
@@ -62,11 +69,20 @@ describe('create_form resource graph', () => {
     const choice = f.resources.get(
       result.pages[1].fields[0].property as string,
     )!;
-    expect(choice.get(dataBrowser.properties.max)).toBe(1);
+    // The options and the single pick are in the data class's constraints,
+    // not on the (immutable) Property.
+    const constraint = getEffectiveConstraint(
+      f.store,
+      [result.class],
+      choice.subject,
+    );
+    expect(constraint.maxItems).toBe(1);
+    expect(choice.get(dataBrowser.properties.max)).toBeUndefined();
+    expect(choice.get(core.properties.allowsOnly)).toEqual([]);
     expect(
-      choice
-        .getSubjects(core.properties.allowsOnly)
-        .map(s => f.resources.get(s)!.get(core.properties.name)),
+      optionSubjects(constraint).map(s =>
+        f.resources.get(s)!.get(core.properties.name),
+      ),
     ).toEqual(['Engineer', 'Designer']);
     expect(result.pages[0].fields[0].property).toBeUndefined();
   });

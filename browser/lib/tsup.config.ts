@@ -7,6 +7,8 @@ export default defineConfig(options => ({
   minify: !options.watch,
   entry: {
     index: 'src/index.ts',
+    // Node-only helpers (file system), so browsers never bundle them.
+    node: 'src/node.ts',
     // The DedicatedWorker that hosts the WASM ClientDb. Bundled as its own
     // entry so consumers can load it via `new Worker(new URL(...,
     // import.meta.url))`. Without this, the previous setup relied on a

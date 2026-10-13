@@ -195,12 +195,13 @@ Measured on a native release build (`lib/tests/vault_incremental_cost.rs`):
 
 | resources | full export | idle pass | one-resource edit |
 | --- | --- | --- | --- |
-| 100 | 137 KB / 19 ms | 0 B / 3 ms | 383 B / 4 ms |
-| 500 | 675 KB / 113 ms | 0 B / 21 ms | 380 B / 25 ms |
-| 2,000 | 2.69 MB / 508 ms | 0 B / 89 ms | 383 B / 93 ms |
+| 100 | 437 KB / 28 ms | 0 B / 6 ms | 3.3 KB / 6 ms |
+| 500 | 2.17 MB / 157 ms | 0 B / 33 ms | 3.3 KB / 41 ms |
+| 2,000 | 8.68 MB / 759 ms | 0 B / 125 ms | 3.3 KB / 154 ms |
 
-Bytes per pass are flat in drive size; wall clock is still linear in it, at
-roughly 45 µs per resource, because the walk visits every subject to read its
+(The anchor and one-edit figures now include signed envelopes, which the
+earlier numbers predate.) Bytes per pass are flat in drive size; wall clock is
+still linear in it, at roughly 60 µs per resource, because the walk visits every subject to read its
 version vector.
 
 Cursors are **local, never uploaded** — the metadata invariant is that no stored
@@ -208,6 +209,16 @@ object is O(resources). A device with no cursor (a fresh install, or one
 upgrading from a format-1 vault) exports everything, which is always safe
 because a full export is a superset of any delta. It is never safe to invent a
 cursor for history that was never recorded as shipped.
+
+Bytes per pass are also flat in the size of the edited document. Signed
+commits carry the Loro delta since the resource's previous state, not a full
+snapshot (`sign_at` in `lib/src/commit.rs`); before that, every envelope held
+the whole document, so under `all` retention a 40-edit run grew from 7.1 KB to
+32.1 KB per pass (`latest`: 4.2 KB to 16.3 KB). Now, over the same 40 edits of
+one note (`vault_envelope_growth`): `latest` stays at about 1.9 KB per pass and
+`all` at about 3.1 KB (first pass 4.8 KB, which includes the genesis). The
+extra ~1.2 KB under `all` is the previous pass's newest envelope, re-shipped
+because the envelope floor is `>=` (two commits can share a millisecond).
 
 ## Checkpoints
 
@@ -234,6 +245,40 @@ Checkpoint numbers are allocated by the client as `max(existing) + 1`. Two
 devices over an anchorless vault will pick the same one; the control plane
 rejects the second publication rather than letting two records claim different
 coverage over one set of stored bytes, and the loser retries at the next number.
+
+### Current-state checkpoints ("Discard history")
+
+`CheckpointPolicy.history` chooses what a checkpoint keeps of each resource's
+edit history. `Full` (the default, used by the automatic cadence and by
+"Compress now") ships the whole oplog plus the signed commit envelopes.
+`CurrentStateOnly` ("Discard history") ships a Loro **shallow snapshot** at the
+resource's current frontiers instead, and **no envelopes**: they attribute ops
+the pack no longer holds. The vault then holds current values only; delta packs
+written after it carry just the new ops, as always. Measured on one note
+(`vault_checkpoint_history_cost`): 10 edits 11.2 KB vs 4.5 KB, 100 edits 47.8 KB
+vs 11.8 KB, 400 edits 171 KB vs 34.6 KB. What remains grows with the number of
+distinct Loro peers (the browser edits under a fresh peer id per session).
+
+Properties, verified by tests in `vault/sync.rs`:
+
+- A vault holding only such a checkpoint restores values, children and
+  deletions; the restored docs accept edits.
+- No format change and no flag. The pack entry is still opaque Loro bytes and
+  `import_update` accepts a shallow snapshot, so an older client of this format
+  restores it unchanged (it needs a `loro` that knows shallow snapshots, 1.0+).
+- Sync with a device holding the full history works both ways without pending
+  ops: ops after the cut import on either side, and the full side's history
+  imports onto the shallow doc as a no-op for what it cut.
+- A peer behind the cut (version vector not covering the shallow start) cannot
+  be sent a delta. `AtomicLoroDoc::export_updates_since` answers it with a
+  shallow snapshot, which merges into any doc sharing the ancestry.
+- Past versions of a shallow doc cannot be read (`fork_at` is unsupported by
+  Loro on shallow docs); `at_version` returns an error, the History page lists
+  only what exists and does not throw.
+- Devices keep the history they hold. Because a device's local doc is still
+  full, a later *Full* checkpoint from that device would put the history back in
+  the vault; a lane that wants the vault to stay shallow must keep requesting
+  `CurrentStateOnly` (not yet sticky, see below).
 
 ## Restore
 
@@ -276,6 +321,9 @@ matters most.
   proves the object was sealed by someone holding the drive key. Signing
   objects with the agent key is a planned addition for provenance across
   multi-agent drives.
+- **A sticky "history discarded" preference.** After "Discard history" the
+  automatic cadence still takes `Full` checkpoints, which re-ship the history a
+  device holds locally. The lane does not remember the choice.
 - **Compression.** Per-drive trained zstd dictionaries are Phase 2 and will
   apply before encryption (compress-then-encrypt, pack-level).
 
@@ -297,6 +345,10 @@ be readable as claims about the format:
   and what it costs when a link is missing. The second is why coverage exists.
 - `the_newest_checkpoint_alone_restores_the_drive` — the self-sufficiency claim,
   moved from segments to checkpoints where Phase 2 put it.
+
+- `a_current_state_checkpoint_restores_state_without_history`,
+  `a_restored_shallow_doc_syncs_with_a_full_history_device` and
+  `deltas_continue_after_a_current_state_checkpoint` — Discard history.
 
 Run them with `cargo test --features db-redb vault::`. No server, bucket or
 network required — which is the point: a restore path that needs the vendor's

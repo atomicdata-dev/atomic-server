@@ -8,7 +8,8 @@ use atomic_lib::storelike::Storelike;
 use atomic_lib::vault::dek::DriveVaultKey;
 use atomic_lib::vault::store::{MemoryVaultStore, VaultObjectStore};
 use atomic_lib::vault::sync::{
-    commit_lane_state, drive_prefix, export_vault_segment, CheckpointPolicy, SegmentKind,
+    commit_lane_state, drive_prefix, export_vault_segment, CheckpointPolicy, HistoryKeep,
+    SegmentKind,
 };
 use atomic_lib::Subject;
 use std::collections::BTreeMap;
@@ -146,9 +147,11 @@ async fn vault_incremental_cost() {
 
 /// Delta cost of repeated edits to one document, per envelope retention.
 ///
-/// Delta packs ship only envelopes newer than the lane's cursor, so under
-/// `all` retention the bytes per pass stay flat instead of growing with the
-/// number of earlier edits. Run with
+/// Delta packs ship only envelopes newer than the lane's cursor, and each
+/// signed commit carries a Loro delta rather than a full snapshot, so the
+/// bytes per pass stay roughly flat (under `all` retention the previous pass's
+/// newest envelope is re-shipped, a constant overhead) instead of growing with
+/// the number of earlier edits or the size of the document. Run with
 /// `cargo test --features db-redb --release vault_envelope_growth -- --ignored --nocapture`.
 #[tokio::test]
 #[ignore]
@@ -179,6 +182,7 @@ async fn vault_envelope_growth() {
         let policy = CheckpointPolicy {
             max_segments: 1000,
             bytes_ratio: 1e9,
+            history: HistoryKeep::Full,
         };
         for i in 0..40usize {
             let mut resource = store.get_resource(&subject).await.unwrap();
@@ -215,5 +219,97 @@ async fn vault_envelope_growth() {
             sizes.iter().sum::<usize>(),
             sizes
         );
+        // Regression guard: a signed commit used to embed a full snapshot,
+        // so the last pass was 3-4x the first. The first pass under `all`
+        // also carries the genesis, hence the min with the second.
+        let baseline = sizes[0].min(sizes[1]);
+        assert!(
+            sizes[39] < baseline + 1500,
+            "{}: last delta ({}) grew past baseline ({}) + 1500 bytes",
+            retention.as_str(),
+            sizes[39],
+            baseline
+        );
+    }
+}
+
+/// What "Discard history" buys: the same doc, checkpointed whole and as a
+/// current-state-only (shallow) snapshot, after many edits. Run with
+/// `cargo test --features db-redb --release vault_checkpoint_history_cost -- --ignored --nocapture`.
+#[tokio::test]
+#[ignore]
+async fn vault_checkpoint_history_cost() {
+    let store = Db::init_temp("vault_checkpoint_history_cost")
+        .await
+        .unwrap();
+    let (_agent, drive) = store.setup("alice").await.unwrap();
+    let drive_subject = Subject::from_raw(&drive, store.get_base_domain().as_deref());
+    let note = store
+        .create_resource(FOLDER, &drive, "note", None)
+        .await
+        .unwrap();
+    let subject = Subject::from_raw(&note, store.get_base_domain().as_deref());
+    let key = DriveVaultKey::from_bytes([5u8; 32], 1);
+
+    let mut total = 0usize;
+    for edits in [10usize, 100, 400] {
+        let done = total;
+        total = edits;
+        for i in done..edits {
+            let mut resource = store.get_resource(&subject).await.unwrap();
+            resource
+                .set(
+                    atomic_lib::urls::NAME.into(),
+                    atomic_lib::Value::String(format!("edit-{i}")),
+                    &store,
+                )
+                .await
+                .unwrap();
+            resource.save_locally(&store).await.unwrap();
+        }
+        {
+            let d = store
+                .get_resource(&subject)
+                .await
+                .unwrap()
+                .build_state_doc()
+                .unwrap();
+            println!(
+                "note doc: full snapshot {} B, shallow {} B",
+                d.export_snapshot().len(),
+                d.export_shallow_snapshot().len()
+            );
+        }
+        let mut sizes = Vec::new();
+        for history in [HistoryKeep::Full, HistoryKeep::CurrentStateOnly] {
+            let vault = MemoryVaultStore::new();
+            let summary = export_vault_segment(
+                &store,
+                &drive_subject,
+                &key,
+                &vault,
+                PSEUDONYM,
+                DEVICE,
+                1,
+                1,
+                false,
+                &BTreeMap::new(),
+                CheckpointPolicy {
+                    history,
+                    ..CheckpointPolicy::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            sizes.push(summary.sealed_bytes);
+        }
+        println!(
+            "{edits} edits: full checkpoint {} B, current-state checkpoint {} B ({:.1}x smaller)",
+            sizes[0],
+            sizes[1],
+            sizes[0] as f64 / sizes[1] as f64
+        );
+        assert!(sizes[1] < sizes[0]);
     }
 }

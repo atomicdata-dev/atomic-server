@@ -1,4 +1,11 @@
-import { Resource, useResource, useTitle } from '@tomic/react';
+import {
+  core,
+  Resource,
+  useResource,
+  useStore,
+  useString,
+  useTitle,
+} from '@tomic/react';
 import { useEffect, type JSX, type ReactNode } from 'react';
 import { styled } from 'styled-components';
 import { FaLinkSlash } from 'react-icons/fa6';
@@ -13,6 +20,7 @@ import {
   syncMirroredTags,
   type OptionsSource,
 } from './optionsSource';
+import { useFormDataClass } from '../formDataClass';
 
 interface LinkedOptionsProps {
   /** The Property the field maps to — put back in charge of its own options
@@ -38,7 +46,10 @@ export function LinkedOptions({
   labelAction,
   onUnlink,
 }: LinkedOptionsProps): JSX.Element {
+  const store = useStore();
+  const dataClass = useFormDataClass();
   const table = useResource(source.table);
+  const [sourceClass] = useString(table, core.properties.classtype);
   const column = useResource(sourceColumn(source));
   const [tableTitle] = useTitle(table);
   const [columnTitle] = useTitle(column);
@@ -49,19 +60,27 @@ export function LinkedOptions({
   // carries a snapshot of it (see `applyOptionsSource`). Refresh it whenever
   // this panel opens, so a tag added over there shows up in the table too.
   useEffect(() => {
-    if (mode !== 'tags' || column.loading || property.loading) {
+    if (
+      mode !== 'tags' ||
+      !sourceClass ||
+      column.loading ||
+      property.loading ||
+      dataClass.loading
+    ) {
       return;
     }
 
-    syncMirroredTags(property, column).catch(() => {
-      // A read-only source column is a legitimate state; the published
-      // options still resolve from it.
-    });
-  }, [mode, property, column]);
+    syncMirroredTags(store, dataClass, property, sourceClass, column).catch(
+      () => {
+        // A read-only source column is a legitimate state; the published
+        // options still resolve from it.
+      },
+    );
+  }, [mode, store, dataClass, property, sourceClass, column]);
 
   const unlink = async () => {
     try {
-      await clearOptionsSource(property);
+      await clearOptionsSource(dataClass, property);
       onUnlink();
     } catch (e) {
       toast.error((e as Error).message);

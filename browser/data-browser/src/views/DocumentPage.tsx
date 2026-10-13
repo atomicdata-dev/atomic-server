@@ -50,9 +50,7 @@ export function DocumentPage({ resource }: ResourcePageProps): JSX.Element {
             </DocumentTitle>
           </Row>
           {canWrite && !failed ? (
-            <LoadingRow>
-              <Spinner size='2rem' />
-            </LoadingRow>
+            <Spinner centered size='2.5rem' />
           ) : (
             <div>
               {elements.map(subject => (
@@ -91,12 +89,6 @@ const FullPageWrapper = styled.div`
   flex-direction: column;
   min-height: ${p => p.theme.heights.fullPage};
   box-sizing: border-box;
-`;
-
-const LoadingRow = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: ${p => p.theme.size(4)};
 `;
 
 export default DocumentPage;

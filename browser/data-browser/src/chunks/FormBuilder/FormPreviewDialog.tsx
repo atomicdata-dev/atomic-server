@@ -22,23 +22,7 @@ interface FormPreviewButtonProps {
 export function FormPreviewButton({
   formSubject,
 }: FormPreviewButtonProps): JSX.Element {
-  const store = useStore();
   const [dialogProps, show, _close, isOpen] = useDialog();
-  const [definition, setDefinition] = useState<FormDefinition>();
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let cancelled = false;
-
-    buildFormDefinitionClientSide(store, formSubject).then(def => {
-      if (!cancelled) setDefinition(def);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, store, formSubject]);
 
   return (
     <>
@@ -52,21 +36,45 @@ export function FormPreviewButton({
               <h1>Preview</h1>
             </Dialog.Title>
             <Dialog.Content>
-              {definition ? (
-                <FormShell definition={definition}>
-                  <FormRenderer
-                    definition={definition}
-                    preview
-                    onSubmit={async () => ({ ok: true })}
-                  />
-                </FormShell>
-              ) : (
-                <p>Loading preview…</p>
-              )}
+              <PreviewForm formSubject={formSubject} />
             </Dialog.Content>
           </>
         )}
       </Dialog>
     </>
+  );
+}
+
+/** Mounted per opening, so each opening starts from "Loading preview…" and
+ * builds the definition from the form as it is now. Kept in the button instead,
+ * the last definition would outlive the dialog and be what the next opening
+ * rendered first: the form as it was before the edits made in between, until
+ * the rebuild landed. */
+function PreviewForm({ formSubject }: FormPreviewButtonProps): JSX.Element {
+  const store = useStore();
+  const [definition, setDefinition] = useState<FormDefinition>();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    buildFormDefinitionClientSide(store, formSubject).then(def => {
+      if (!cancelled) setDefinition(def);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store, formSubject]);
+
+  if (!definition) return <p>Loading preview…</p>;
+
+  return (
+    <FormShell definition={definition}>
+      <FormRenderer
+        definition={definition}
+        preview
+        onSubmit={async () => ({ ok: true })}
+      />
+    </FormShell>
   );
 }

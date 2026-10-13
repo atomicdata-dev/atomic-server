@@ -1,9 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import {
-  core,
-  dataBrowser,
-  ensureSchema,
   executeServerPlugin,
+  provisionDestination,
   pluginConfigFor,
   pluginConfigProblems,
   useStore,
@@ -13,7 +11,6 @@ import {
   type JSONObject,
   type PluginManifest,
   type Resource,
-  type SchemaSpec,
   type Store,
 } from '@tomic/react';
 import { Button } from '@components/Button';
@@ -33,7 +30,7 @@ import { RunPluginDialog } from './RunPluginDialog';
  * need `ctx.query`/`ctx.read` to recognise earlier imports), and nothing is
  * written until the proposal is approved in {@link RunPluginDialog}. A plugin
  * that also declares a `destination` gets a Set up step first, which creates
- * that table and stores it as the plugin's config.
+ * its tables and stores them as the plugin's config.
  */
 export function FileImport({
   resource,
@@ -140,7 +137,7 @@ export function FileImport({
     }
   };
 
-  const table = typeof config?.table === 'string' ? config.table : undefined;
+  const table = firstTable(config);
 
   if (config === undefined && !error) return <p>Loading importer…</p>;
 
@@ -149,10 +146,7 @@ export function FileImport({
       {missing.length > 0 ? (
         manifest.destination ? (
           <>
-            <p>
-              Set up creates a {manifest.destination.table.name} table for this
-              importer. Nothing is imported yet.
-            </p>
+            <SetupSummary destination={manifest.destination} />
             <Button disabled={busy !== undefined} onClick={setUp}>
               {busy === 'setup' ? 'Setting up…' : 'Set up'}
             </Button>
@@ -209,6 +203,56 @@ export function FileImport({
   );
 }
 
+/** What Set up is about to create, named the way the sidebar will show it. */
+function SetupSummary({
+  destination,
+}: {
+  destination: DeclaredDestination;
+}): React.JSX.Element {
+  const names = [
+    ...(destination.table ? [destination.table.name] : []),
+    ...Object.values(destination.tables ?? {}).map(table => table.name),
+  ];
+
+  if (names.length === 1)
+    return (
+      <p>
+        Set up creates a {names[0]} table for this importer. Nothing is imported
+        yet.
+      </p>
+    );
+
+  return (
+    <>
+      <p>
+        Set up creates {names.length} tables for this importer. Nothing is
+        imported yet.
+      </p>
+      <ul>
+        {names.map(name => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** Where "Open imported data" goes: the table a single-table importer writes, or its first. */
+function firstTable(config: JSONObject | undefined): string | undefined {
+  if (typeof config?.table === 'string') return config.table;
+  const tables = config?.tables;
+  if (!tables || typeof tables !== 'object' || Array.isArray(tables))
+    return undefined;
+  const first = Object.values(tables)[0];
+
+  return first &&
+    typeof first === 'object' &&
+    !Array.isArray(first) &&
+    typeof first.table === 'string'
+    ? first.table
+    : undefined;
+}
+
 function maxBytes(accepts: DeclaredAccept[]): number {
   return Math.max(
     0,
@@ -258,105 +302,4 @@ async function storedConfig(
     },
     manifest.config,
   );
-}
-
-async function ensureChild(
-  store: Store,
-  drive: string,
-  parent: string,
-  localId: string,
-  isA: string,
-  propVals: Record<string, unknown>,
-): Promise<Resource> {
-  const existing = await store.findByLocalId(drive, parent, localId);
-
-  if (!existing) {
-    // Created whole: a Table's genesis commit must already carry its
-    // required classtype.
-    const created = await store.newResource({
-      parent,
-      isA,
-      propVals: { ...propVals, [core.properties.localId]: localId } as never,
-    });
-    await created.save();
-
-    return created;
-  }
-
-  for (const [property, value] of Object.entries(propVals))
-    await existing.set(property, value as never);
-  await existing.save();
-
-  return existing;
-}
-
-/**
- * Creates what a `destination` declares and stores it as the plugin's config:
- * the schema in the drive's ontology, one table beneath the plugin with a
- * default table view, and `{ table, rowClass, properties }` under the
- * manifest's config key. Resumes the same resources when repeated, so a lost
- * response or a second click does not create a second table.
- */
-export async function provisionDestination(
-  store: Store,
-  drive: string,
-  plugin: string,
-  destination: DeclaredDestination,
-  key: string | undefined,
-): Promise<JSONObject> {
-  const terms = await ensureSchema(
-    store,
-    drive,
-    destination.schema as SchemaSpec,
-  );
-  const rowClass = terms.classes[destination.table.rowClass];
-  const table = await ensureChild(
-    store,
-    drive,
-    plugin,
-    'atomic:destination:table',
-    dataBrowser.classes.table,
-    {
-      [core.properties.name]: destination.table.name,
-      [core.properties.classtype]: rowClass,
-    },
-  );
-  const view = await ensureChild(
-    store,
-    drive,
-    table.subject,
-    'atomic:destination:default-view',
-    dataBrowser.classes.view,
-    {
-      [core.properties.name]: destination.table.name,
-      [dataBrowser.properties.viewKind]: 'table',
-      [dataBrowser.properties.viewColumns]: destination.table.columns.map(
-        column => terms.properties[column],
-      ),
-    },
-  );
-  await table.set(dataBrowser.properties.tableViews, [view.subject]);
-  await table.set(dataBrowser.properties.tableDefaultView, view.subject);
-  await table.save();
-
-  const config: JSONObject = {
-    table: table.subject,
-    rowClass,
-    properties: terms.properties,
-  };
-  const pluginTerms = await pluginClassesFor(store, drive);
-  const resource = await store.getResource(plugin);
-  const stored = resource.get(pluginTerms.properties['plugin-schemas']);
-  const current =
-    stored && typeof stored === 'object' && !Array.isArray(stored)
-      ? (stored as JSONObject)
-      : {};
-  await resource.set(
-    pluginTerms.properties['plugin-schemas'],
-    key ? { ...current, [key]: config } : { ...current, ...config },
-  );
-  await resource.set(pluginTerms.properties['plugin-workspace'], table.subject);
-  await resource.save();
-
-  return config;
 }

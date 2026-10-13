@@ -88,8 +88,9 @@ export function isLayoutType(type: AddableFieldType): type is FormLayoutType {
   return (FORM_LAYOUT_TYPES as string[]).includes(type);
 }
 
-/** The question types whose options are Tag resources on the mapped
- * Property's `allowsOnly`, making that Property a SelectProperty. Mirrors
+/** The question types whose options are Tag resources in the `enum` of the
+ * data class's constraint for the mapped column (the Property's legacy
+ * `allowsOnly` as the fallback), making that Property a SelectProperty. Mirrors
  * `CHOICE_FIELD_TYPES` in `server/src/forms.rs`. */
 export const CHOICE_FIELD_TYPES: FormFieldType[] = [
   'radio',
@@ -105,7 +106,7 @@ export function isChoiceFieldType(type: AddableFieldType): boolean {
 
 /** The choice types that accept exactly one option. The mapped Property is a
  * SelectProperty either way — always a `resourceArray`, as everywhere else in
- * the app — so single-pick is expressed as `max: 1`. */
+ * the app — so single-pick is expressed as `maxItems: 1` in the data class. */
 export const SINGLE_CHOICE_FIELD_TYPES: FormFieldType[] = [
   'radio',
   'dropdown',

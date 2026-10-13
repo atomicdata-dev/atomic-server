@@ -39,7 +39,6 @@ export function ConvertToDocumentButton({
         downloadUrl,
         mimeType,
       });
-      toast.success('Converted to document');
     } catch (error) {
       if (error instanceof DocumentConversionSaveError) {
         toast(

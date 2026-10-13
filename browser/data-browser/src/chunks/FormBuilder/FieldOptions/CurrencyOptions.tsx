@@ -6,6 +6,7 @@ import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
 import { Divider } from './Divider';
+import { useFieldConstraint } from '../formDataClass';
 
 /** Currencies the renderer knows a symbol for (`CURRENCY_SYMBOLS` in
  * `@tomic/form-renderer`'s FieldInput); anything else renders as its code. */
@@ -32,6 +33,7 @@ interface CurrencyOptionsProps {
 
 export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
+  const constraint = useFieldConstraint(field);
 
   const currency = (options.currency as string | undefined) ?? 'EUR';
 
@@ -53,13 +55,17 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
       <FieldPair>
         <BoundField
           label='Min'
-          optionKey='min'
+          floor={constraint.minimum}
+          max={constraint.maximum}
+          optionKey='minimum'
           options={options}
           setOptions={setOptions}
         />
         <BoundField
           label='Max'
-          optionKey='max'
+          floor={constraint.minimum}
+          max={constraint.maximum}
+          optionKey='maximum'
           options={options}
           setOptions={setOptions}
         />

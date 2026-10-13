@@ -36,6 +36,7 @@ import { MeetingCard } from './MeetingCard';
 import { HideInPrint } from '@components/HideInPrint';
 import { useOnValueChange } from '@helpers/useOnValueChange';
 import { FolderCard } from './FolderCard';
+import { Spinner } from '../../components/Spinner';
 
 interface ResourceCardProps extends CardViewPropsBase {
   /** The subject URL - the identifier of the resource. */
@@ -94,7 +95,7 @@ function ResourceCardInner(props: ResourceCardProps): JSX.Element {
   const [klass] = useString(resource, core.properties.isA);
 
   if (resource.loading) {
-    return <p>Loading...</p>;
+    return <Spinner size='1.5rem' />;
   }
 
   if (resource.error) {

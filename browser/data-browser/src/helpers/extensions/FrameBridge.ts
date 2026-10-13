@@ -1,4 +1,7 @@
 // @wc-ignore-file
+/** Whether the host is drawn light or dark. */
+export type ColorScheme = 'light' | 'dark';
+
 /** Transport and lifetime only. Adapters must authorize before reading or writing. */
 export interface FrameSession {
   isActive(): boolean;
@@ -26,9 +29,20 @@ export class FrameBridge {
     frame.addEventListener('load', this.loaded);
   }
 
-  setStyle(css: string): void {
+  private colorScheme: ColorScheme | undefined;
+
+  /**
+   * The host's theme: its stylesheet, and whether it is light or dark, so an
+   * app does not have to guess that from a background colour.
+   */
+  setStyle(css: string, colorScheme?: ColorScheme): void {
     this.css = css;
-    this.session().post({ type: '__atomic_style', css });
+    if (colorScheme) this.colorScheme = colorScheme;
+    this.session().post({
+      type: '__atomic_style',
+      css,
+      ...(this.colorScheme ? { colorScheme: this.colorScheme } : {}),
+    });
   }
 
   private session(): FrameSession {

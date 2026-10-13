@@ -6,7 +6,6 @@ import {
   core,
   dataBrowser,
   unknownSubject,
-  useArray,
   useResource,
   useResources,
   useStore,
@@ -43,6 +42,7 @@ import { computeSortOrder, readSortKey } from '@helpers/fractionalSortOrder';
 import { setRowDefault } from '../rowDefaults';
 import { useAllMembers } from '../helpers/useAllMembers';
 import { useCreateRow } from '../helpers/useCreateRow';
+import { optionSubjects, useColumnConstraint } from '../useColumnConstraint';
 
 interface KanbanViewProps {
   /** The Table resource; new cards are created as its children. */
@@ -135,8 +135,13 @@ export function KanbanView({
   const memberSubjects = useAllMembers(collection);
   const rows = useResources(memberSubjects);
 
-  const groupByResource = useResource(groupBy);
-  const [columnTags] = useArray(groupByResource, core.properties.allowsOnly);
+  const groupConstraint = useColumnConstraint(groupBy, tableClass.subject);
+  // The constraint object is rebuilt every render, so key on its options.
+  const optionsKey = JSON.stringify(optionSubjects(groupConstraint));
+  const columnTags = useMemo(
+    () => JSON.parse(optionsKey) as string[],
+    [optionsKey],
+  );
 
   // Bucket each row into its column by the first value of the group-by
   // property. Reactive: `useResources` re-snapshots when a card's status

@@ -1,5 +1,5 @@
 import { websiteVersionName } from '@chunks/Website/websiteVersionName';
-import { forwardRef, memo } from 'react';
+import { forwardRef, memo, useState } from 'react';
 import { styled, css, keyframes } from 'styled-components';
 import { SideBarItem } from '../SideBarItem';
 import { FloatingActions, floatingHoverStyles } from './FloatingActions';
@@ -35,6 +35,10 @@ interface SidebarItemTitleProps {
 const NavResourceLink = styled(StyledLink)`
   display: flex;
   align-self: stretch;
+  /* A held touch is ours (menu or drag): no native callout or selection. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 `;
 
 export const SidebarItemTitle = memo(
@@ -72,6 +76,11 @@ export const SidebarItemTitle = memo(
       const [storedTitle] = useTitle(resource);
       const title = websiteVersionName(storedTitle);
 
+      // The context menu is only visible on hover or focus, so it mounts then.
+      // Mounting one per row cost ~3 ms a render, on every row, every click.
+      const [actionsArmed, setActionsArmed] = useState(false);
+      const armActions = () => setActionsArmed(true);
+
       const expandLabel = expanded ? 'Collapse folder' : 'Expand folder';
 
       // An expandable row keeps its icon and wears the caret as a small
@@ -89,6 +98,8 @@ export const SidebarItemTitle = memo(
       return (
         <ActionWrapper
           isDragging={isDragging}
+          onPointerEnter={armActions}
+          onFocus={armActions}
           data-sidebar-id={getTransitionName(SIDEBAR_TRANSITION_TAG, subject)}
         >
           {sidebarKeyboardDndEnabled ? (
@@ -206,7 +217,7 @@ export const SidebarItemTitle = memo(
           )}
           {!hideActionButtons && (
             <FloatingActionsCell>
-              <FloatingActions subject={subject} />
+              <FloatingActions subject={subject} armed={actionsArmed} />
             </FloatingActionsCell>
           )}
         </ActionWrapper>
@@ -274,8 +285,10 @@ const ExpandToggleButton = styled.button`
   cursor: pointer;
   color: ${p => p.theme.colors.main};
 
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+    }
   }
 
   &:active {
@@ -397,7 +410,9 @@ const ActionWrapper = styled.div<{ isDragging?: boolean }>`
     }
   }
 
-  ${ExpandToggleButton}:hover ${CaretBadge} {
-    transform: scale(1.6);
+  @media (hover: hover) {
+    ${ExpandToggleButton}:hover ${CaretBadge} {
+      transform: scale(1.6);
+    }
   }
 `;

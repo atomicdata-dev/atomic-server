@@ -979,6 +979,13 @@ export class AtomicServer {
           this.source.directory('atomic-plugin'),
         )
         .withDirectory('/code/tools', this.source.directory('tools'))
+        // `server/src/forms.rs` pins its validation verdicts to the cases the
+        // browser form renderer shares (`include_str!`), so the Rust tests need
+        // this one file from `browser/`.
+        .withFile(
+          '/code/browser/form-renderer/shared/validation-cases.json',
+          this.source.file('browser/form-renderer/shared/validation-cases.json'),
+        )
         .withMountedCache('/code/target', this.targetCache('rust-slim-target-v3'))
         .with(touchWorkspaceSources)
         .withWorkdir('/code')
@@ -1100,6 +1107,10 @@ export class AtomicServer {
         browser.file('plugin/package.json'),
       )
       .withFile(
+        '/repo/browser/mcp/package.json',
+        browser.file('mcp/package.json'),
+      )
+      .withFile(
         '/repo/browser/e2e/package.json',
         browser.file('e2e/package.json'),
       )
@@ -1128,11 +1139,11 @@ export class AtomicServer {
       .withExec(['pnpm', 'install', '--frozen-lockfile']);
 
     // Drop in @tomic/lib source. Other packages are unused by the
-    // integration tests, so we don't bother mounting them.
-    const withSource = installed.withDirectory(
-      '/repo/browser/lib',
-      browser.directory('lib'),
-    );
+    // integration tests, except @tomic/mcp: hosted-mcp.integration.test.ts
+    // imports its bridge from `../../mcp/src`.
+    const withSource = installed
+      .withDirectory('/repo/browser/lib', browser.directory('lib'))
+      .withDirectory('/repo/browser/mcp', browser.directory('mcp'));
 
     return withSource
       .withFile('/repo/target/debug/atomic-server', binary, {
@@ -1402,6 +1413,13 @@ export class AtomicServer {
         this.source.directory('lib/test_files/loro-compat'),
       )
       .withFile('/Cargo.lock', this.source.file('Cargo.lock'))
+      // Fixtures shared by the Rust and TS twins (class constraints, lenses,
+      // JSON Schema interop, schema lockfiles), read by repository-root
+      // path. Same /lib collision: mount only that directory.
+      .withDirectory(
+        '/lib/tests/fixtures',
+        this.source.directory('lib/tests/fixtures'),
+      )
       // Tests read shared fixtures directly from the repository-root paths.
       // Include the manifest and planner corpus as well as pairing fixtures.
       .withDirectory('/testdata', this.source.directory('testdata'))
@@ -1499,6 +1517,12 @@ export class AtomicServer {
       )
       .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
       .withDirectory('/code/tools', source.directory('tools'))
+      // See the slim container above: the form validation cases are shared
+      // with the browser and `include_str!`d by the Rust tests.
+      .withFile(
+        '/code/browser/form-renderer/shared/validation-cases.json',
+        source.file('browser/form-renderer/shared/validation-cases.json'),
+      )
       .withMountedCache('/code/target', this.targetCache('rust-target-v3'))
       .with(touchWorkspaceSources)
       .withWorkdir('/code')
@@ -1728,6 +1752,13 @@ export class AtomicServer {
         .withFile(
           '/code/browser/lib/src/authentication_v2_vectors.json',
           source.file('browser/lib/src/authentication_v2_vectors.json'),
+        )
+        // server/src/forms.rs `include_str!`s the shared form validation
+        // cases (also read by the TypeScript form-renderer tests). Mount only
+        // that file, for the same reason as the plugin zip above.
+        .withFile(
+          '/code/browser/form-renderer/shared/validation-cases.json',
+          source.file('browser/form-renderer/shared/validation-cases.json'),
         )
         .withDirectory('/code/server', source.directory('server'))
         .withDirectory('/code/integrations', source.directory('integrations'))

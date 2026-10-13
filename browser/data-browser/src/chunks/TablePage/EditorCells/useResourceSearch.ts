@@ -9,6 +9,7 @@ import {
 } from '@tomic/react';
 import { useCallback, useMemo } from 'react';
 import { useSettings } from '@helpers/AppSettings';
+import { agentMatchesQuery } from '@helpers/mentionSearch';
 import { useSelectedIndex } from '@hooks/useSelectedIndex';
 
 /** A pasted subject the user means literally, so it needs no search hit. */
@@ -29,7 +30,7 @@ const stableEmpty: string[] = [];
  * data is not part of the drive, so search never finds them; the rights list
  * is the one place the drive names them, and each is fetched by subject.
  */
-function useDriveMembers(
+export function useDriveMembers(
   drive: string,
   classType: string | undefined,
   searchValue: string,
@@ -53,15 +54,7 @@ function useDriveMembers(
     if (!needle) return members;
 
     return members.filter(subject => {
-      const resource = loaded.get(subject);
-      const name = String(resource?.get(core.properties.name) ?? '');
-      const shortname = String(resource?.get(core.properties.shortname) ?? '');
-
-      return (
-        subject.toLowerCase().includes(needle) ||
-        name.toLowerCase().includes(needle) ||
-        shortname.toLowerCase().includes(needle)
-      );
+      return agentMatchesQuery(subject, loaded.get(subject), needle);
     });
   }, [members, loaded, needle]);
 }

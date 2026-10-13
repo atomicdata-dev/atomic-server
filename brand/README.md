@@ -18,7 +18,7 @@ repositories.
 | `src/atomic-mark-mono.svg` | single-ink contexts (Safari pinned tab). Ring and orb are separated by a real gap instead of the colour mark's white keyline, which carries no information once flattened |
 | `src/canvas-mark.svg` | Atomic Canvas — the open sweep. Same orb, same gradient, same family |
 
-Colours: the orb ramps `#01ECFF` (right) → `#2210FF` (left). The ring is black.
+Colours: the orb ramps `#01ECFF` (right) → `#2210FF` (left). The Atomic mark's ring is black; the Place mark's trail is white on a dark `#111111` tile.
 That gradient is the one brand constant — every mark shares it.
 
 ## Regenerating
@@ -125,7 +125,19 @@ Browser lockups, separate from the Atomic Place wordmark.
 
 `src/place-mark.svg` and `src/place-mark-mono.svg` supply the centred-orb
 icon for the data-browser web app, SaaS portal and marketing site. Native
-app and specification icons retain their existing sources for now. Regenerate
+app and specification icons retain their existing sources for now.
+
+The Place mark is the hero's orbit as a fading trail: 48 stacked arc bands
+whose opacity ramps from nothing at 3 o'clock to solid at the top, a dot at
+its head and the gradient orb in the middle, in white on a dark rounded tile
+with no keyline. The bands come from `orbitTrailMarkup('#fff')` in
+`browser/data-browser/src/helpers/orbitTrail.ts`, the same generator the app's
+loader uses, and are inlined in `place-mark.svg` between `orbit-trail`
+comments; `orbitTrail.test.ts` fails if they drift. To change the trail,
+regenerate that block and then run the generator. Because the tile is dark,
+the opaque variants (`flat`, `maskable`) fill with `#111111` instead of white
+(`TILE_BACKGROUND` in `generate.mjs`). `place-mark-mono.svg` stays a solid
+single-ink mark for Safari's pinned tab. Regenerate
 only the web surfaces with:
 
 ```sh

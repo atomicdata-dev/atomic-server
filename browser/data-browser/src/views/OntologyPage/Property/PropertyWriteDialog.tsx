@@ -9,6 +9,7 @@ import {
 import { styled } from 'styled-components';
 import InputSwitcher from '../../../components/forms/InputSwitcher';
 import { PropertyFormCommon } from './PropertyFormCommon';
+import { isContentAddressed } from '../../../helpers/propertyIdentity';
 
 import type { JSX } from 'react';
 
@@ -16,12 +17,15 @@ interface PropertyWriteDialogProps {
   resource: Resource;
   close: () => void;
   isOpen: boolean;
+  /** The class whose line opened the dialog: where a link's class is stored. */
+  classResource?: Resource;
 }
 
 export function PropertyWriteDialog({
   resource,
   close,
   isOpen,
+  classResource,
   ...dialogProps
 }: PropertyWriteDialogProps & InternalDialogProps): JSX.Element {
   const canEdit = useCanWrite(resource);
@@ -34,7 +38,8 @@ export function PropertyWriteDialog({
           <DialogTitle>
             <InputSwitcher
               commit
-              disabled={!canEdit}
+              // The shortname is part of a content-addressed property's ID.
+              disabled={!canEdit || isContentAddressed(resource.subject)}
               resource={resource}
               property={shortnameProp}
             />
@@ -45,6 +50,7 @@ export function PropertyWriteDialog({
             <PropertyFormCommon
               resource={resource}
               canEdit={canEdit}
+              classResource={classResource}
               onClassCreated={close}
             />
           </DialogContent>

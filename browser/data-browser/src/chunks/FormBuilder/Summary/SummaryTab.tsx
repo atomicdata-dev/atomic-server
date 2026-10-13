@@ -20,6 +20,8 @@ import {
 
 interface SummaryTabProps {
   formSubject: string;
+  /** This workspace has no server to host the form, so there is no summary. */
+  noServer?: boolean;
 }
 
 /**
@@ -56,7 +58,10 @@ async function fetchSummary(
   return parseFormSummary(jsonAd[forms.properties.formSubmissionSummary]);
 }
 
-export function SummaryTab({ formSubject }: SummaryTabProps): JSX.Element {
+export function SummaryTab({
+  formSubject,
+  noServer,
+}: SummaryTabProps): JSX.Element {
   const store = useStore();
   const [summary, setSummary] = useState<FormSummary | undefined>();
   const [fetching, setFetching] = useState(true);
@@ -95,12 +100,14 @@ export function SummaryTab({ formSubject }: SummaryTabProps): JSX.Element {
         ) : (
           <span />
         )}
-        <Button subtle onClick={refresh} disabled={fetching}>
-          <FaArrowsRotate />
-          Refresh
-        </Button>
+        {!noServer && (
+          <Button subtle onClick={refresh} disabled={fetching}>
+            <FaArrowsRotate />
+            Refresh
+          </Button>
+        )}
       </Row>
-      {renderBody(summary, fetching, fetchError)}
+      {renderBody(summary, fetching, fetchError, noServer)}
     </Wrapper>
   );
 }
@@ -109,7 +116,17 @@ function renderBody(
   summary: FormSummary | undefined,
   fetching: boolean,
   fetchError: Error | undefined,
+  noServer?: boolean,
 ): JSX.Element {
+  if (!summary && noServer) {
+    return (
+      <StatusMessage>
+        Summaries are made by a server, and this workspace has none. Host it on
+        a Cloud Server to collect answers and see them summarized here.
+      </StatusMessage>
+    );
+  }
+
   if (!summary) {
     if (fetching) {
       return <StatusMessage>Loading summary...</StatusMessage>;

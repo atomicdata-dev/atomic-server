@@ -25,6 +25,7 @@ import {
 import { ErrorLook } from '../components/ErrorLook';
 import { DrivesCard } from '../components/Drives/DrivesCard';
 import { AccountRecoveryCard } from '../components/AccountRecoveryCard';
+import { ConnectedAppsCard } from '../components/ConnectedAppsCard';
 import { AgentProfileHeader } from '../components/AgentProfileHeader';
 import { DeviceLockCard } from '../components/DeviceLockCard';
 import { NewInstanceButton } from '../components/NewInstanceButton';
@@ -53,7 +54,7 @@ const SettingsAgent: React.FunctionComponent = () => {
   const navigate = useNavigateWithTransition();
   const leavingAccount = useRef(false);
 
-  const { privateDrive } = usePrivateDrive();
+  const { privateDrive, loading: privateDriveLoading } = usePrivateDrive();
   const [savedDrives] = useSavedDrives();
   const [history, addToHistory, removeFromHistory] =
     useDriveHistory(savedDrives);
@@ -308,6 +309,18 @@ const SettingsAgent: React.FunctionComponent = () => {
               <AccountRecoveryCard agentSubject={effectiveAgent.subject} />
 
               <Margin />
+
+              {!privateDriveLoading && (privateDrive ?? drive) && (
+                <>
+                  <Row center gap='1ch'>
+                    <Heading as='h2'>Connected apps</Heading>
+                    <InfoHint title='Apps you let use your data, such as an AI assistant. Each has its own key; revoke one to cut it off.' />
+                  </Row>
+                  <ConnectedAppsCard home={(privateDrive ?? drive)!} />
+
+                  <Margin />
+                </>
+              )}
 
               <Row center gap='1ch'>
                 <Heading as='h2'>This device</Heading>

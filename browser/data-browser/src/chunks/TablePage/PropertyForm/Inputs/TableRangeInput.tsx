@@ -8,14 +8,12 @@ interface TableRangeInputProps {
   resource: Resource;
   minProp: string;
   maxProp: string;
-  constraintClass: string;
 }
 
 export function TableRangeInput({
   resource,
   minProp,
   maxProp,
-  constraintClass,
 }: TableRangeInputProps): JSX.Element {
   const [minLength, setMinLength] = useNumber(resource, minProp);
   const [maxLength, setMaxLength] = useNumber(resource, maxProp);
@@ -27,22 +25,11 @@ export function TableRangeInput({
       setMinLength(min);
       setMaxLength(max);
 
-      if (min !== undefined || max !== undefined) {
-        resource.addClasses(constraintClass);
-      } else {
-        resource.removeClasses(constraintClass);
-      }
-
-      const err = validateRange(min, max, true);
-      setError(err);
-
-      if (!err) {
-        resource.save().catch(e => {
-          console.error('Failed to save range constraint', e);
-        });
-      }
+      // Form state only: the range is written to the table class's
+      // constraints when the dialog is confirmed.
+      setError(validateRange(min, max, true));
     },
-    [setMinLength, setMaxLength, resource],
+    [setMinLength, setMaxLength, setError],
   );
 
   return (

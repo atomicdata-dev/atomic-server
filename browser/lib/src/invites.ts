@@ -10,6 +10,11 @@ import { properties } from './urls.js';
  * `description` is an optional free-text note the inviter adds (e.g. "come
  * review the Q3 plan"). Included in the signed payload so recipients see
  * exactly what the inviter wrote.
+ *
+ * `maxUsages` limits how many different agents may accept the invite. The
+ * server enforces it (it is part of the signed payload, so it cannot be
+ * raised afterwards). Omit it for an unlimited invite. Invites that never
+ * reach a server (`browserPeer`) cannot be limited.
  */
 export async function generateInviteToken(
   target: string,
@@ -18,7 +23,21 @@ export async function generateInviteToken(
   expiresAt?: number,
   description?: string,
   browserPeer = false,
+  maxUsages?: number,
 ): Promise<string> {
+  if (
+    maxUsages !== undefined &&
+    (!Number.isSafeInteger(maxUsages) || maxUsages < 1)
+  )
+    throw new Error(
+      'The usage limit of an invite must be a whole number of at least 1.',
+    );
+
+  if (maxUsages !== undefined && browserPeer)
+    throw new Error(
+      'Invites to a drive that syncs between browsers cannot have a usage limit.',
+    );
+
   const expires = expiresAt ?? Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days default
 
   const signable: Record<string, unknown> = {
@@ -33,6 +52,9 @@ export async function generateInviteToken(
   if (description && description.trim().length > 0) {
     signable[core.properties.description] = description.trim();
   }
+
+  if (maxUsages !== undefined)
+    signable[server.properties.usagesLeft] = maxUsages;
 
   if (browserPeer)
     signable['https://atomicdata.dev/properties/invite/transport'] = 'webrtc';

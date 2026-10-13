@@ -117,6 +117,7 @@ test.describe('AI Chat', () => {
       '/app/show?subject=' + encodeURIComponent(subject),
       page.url(),
     ).href;
+    // Messages are entries of the chat log pages under the chat.
     await expect
       .poll(
         async () =>
@@ -124,33 +125,29 @@ test.describe('AI Chat', () => {
             async ({ subject: subjectArg, partial: partialArg }) => {
               const store = window.store;
               const chat = await store.getResource(subjectArg);
-              const messages =
-                (chat.get(
-                  'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/property/messages',
-                ) as string[]) ?? [];
+              const children = await chat.getChildrenCollection();
+              await children.waitForReady();
+              let entries = 0;
+              let found = false;
 
-              if (messages.length !== 2) return false;
+              for (let i = 0; i < children.totalMembers; i++) {
+                const member = await children.getMemberWithIndex(i);
+                const child = member
+                  ? await store.getResource(member)
+                  : undefined;
 
-              for (const id of messages) {
-                const message = await store.getResource(id);
-                const parts =
-                  (message.get(
-                    'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/property/content',
-                  ) as string[]) ?? [];
+                if (
+                  !child?.hasClasses('https://atomicdata.dev/classes/ChatLog')
+                )
+                  continue;
 
-                for (const partId of parts) {
-                  const part = await store.getResource(partId);
-
-                  if (
-                    part.get(
-                      'https://atomicdata.dev/properties/description',
-                    ) === partialArg
-                  )
-                    return true;
+                for (const { entry } of child.listChatLogEntries()) {
+                  entries++;
+                  if (String(entry.parts).includes(partialArg)) found = true;
                 }
               }
 
-              return false;
+              return entries === 2 && found;
             },
             { subject, partial },
           ),
@@ -197,34 +194,31 @@ test.describe('AI Chat', () => {
                 return result.resource;
               };
 
-              const chat = await read(subjectArg);
-              const messages =
-                (chat.get(
-                  'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/property/messages',
-                ) as string[]) ?? [];
+              const chat = await store.getResource(subjectArg);
+              const children = await chat.getChildrenCollection();
+              await children.waitForReady();
+              let entries = 0;
+              let found = false;
 
-              if (messages.length !== 2) return false;
+              for (let i = 0; i < children.totalMembers; i++) {
+                const member = await children.getMemberWithIndex(i);
 
-              for (const id of messages) {
-                const message = await read(id);
-                const parts =
-                  (message.get(
-                    'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/property/content',
-                  ) as string[]) ?? [];
+                if (!member) continue;
 
-                for (const partId of parts) {
-                  const part = await read(partId);
+                const logPage = await read(member);
 
-                  if (
-                    part.get(
-                      'https://atomicdata.dev/properties/description',
-                    ) === partialArg
-                  )
-                    return true;
+                if (
+                  !logPage.hasClasses('https://atomicdata.dev/classes/ChatLog')
+                )
+                  continue;
+
+                for (const { entry } of logPage.listChatLogEntries()) {
+                  entries++;
+                  if (String(entry.parts).includes(partialArg)) found = true;
                 }
               }
 
-              return false;
+              return entries === 2 && found;
             },
             { subject, partial },
           ),

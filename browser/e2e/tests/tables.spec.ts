@@ -768,11 +768,22 @@ test.describe('tables', async () => {
     test.slow();
     await createBlankTable(page, 'View Order Test');
 
+    // The tab shows up as soon as the view is linked, but switching to it
+    // (`?view=`, a `replace` navigation) waits for the table's saves, seconds
+    // on a loaded machine. A menu opened before that lands loses its history
+    // entry to the replace and closes under the click, so each view is awaited
+    // until the URL has moved to it before the next menu is opened.
+    const viewParam = () => new URL(page.url()).searchParams.get('view');
+
     for (const kind of ['Kanban', 'Calendar']) {
+      const viewBefore = viewParam();
       await page.getByTitle('Add view').click();
       await page.getByRole('menuitem', { name: kind }).click();
       await expect(page.getByRole('tab', { name: kind })).toBeVisible();
+      await expect.poll(viewParam).not.toBe(viewBefore);
     }
+
+    await waitForSynced(page);
 
     // The table's own view comes first and has a name that has changed before;
     // only the order of the two views added here is under test.

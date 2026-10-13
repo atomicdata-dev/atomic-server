@@ -11,6 +11,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use atomic_wasm::{vault_generate_key, ClientDb};
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_node_experimental);
@@ -33,7 +34,18 @@ fn generated_keys_are_the_right_size_and_not_constant() {
 async fn a_bad_key_length_is_an_error_not_a_panic() {
     let db = ClientDb::new_in_memory(None).await.expect("in-memory db");
     let result = db
-        .vault_export("did:ad:whatever", &[0u8; 31], 1, PSEUDONYM, DEVICE, 1)
+        .vault_export(
+            "did:ad:whatever",
+            &[0u8; 31],
+            1,
+            PSEUDONYM,
+            DEVICE,
+            1,
+            1,
+            false,
+            JsValue::UNDEFINED,
+            None,
+        )
         .await;
     assert!(result.is_err(), "a 31-byte key must be rejected");
 }
@@ -45,7 +57,18 @@ async fn an_empty_drive_exports_nothing() {
     let db = ClientDb::new_in_memory(None).await.expect("in-memory db");
     let key = vault_generate_key();
     let out = db
-        .vault_export("did:ad:nonexistent", &key, 1, PSEUDONYM, DEVICE, 1)
+        .vault_export(
+            "did:ad:nonexistent",
+            &key,
+            1,
+            PSEUDONYM,
+            DEVICE,
+            1,
+            1,
+            false,
+            JsValue::UNDEFINED,
+            None,
+        )
         .await
         .expect("export should succeed, not throw");
     assert!(out.is_null(), "nothing to back up means null");
@@ -59,7 +82,7 @@ async fn importing_no_objects_is_a_no_op() {
     let key = vault_generate_key();
     let empty = serde_wasm_bindgen::to_value(&Vec::<u8>::new()).unwrap();
     let summary = db
-        .vault_import(&key, 1, PSEUDONYM, empty)
+        .vault_import(&key, 1, PSEUDONYM, DEVICE, empty)
         .await
         .expect("import of nothing should succeed");
     assert!(!summary.is_null());
@@ -167,7 +190,18 @@ async fn a_real_export_hands_js_binary_not_a_number_array() {
 
     let key = vault_generate_key();
     let out = db
-        .vault_export(drive, &key, 1, PSEUDONYM, DEVICE, 1)
+        .vault_export(
+            drive,
+            &key,
+            1,
+            PSEUDONYM,
+            DEVICE,
+            1,
+            1,
+            false,
+            JsValue::UNDEFINED,
+            None,
+        )
         .await
         .expect("export should succeed");
 
@@ -193,4 +227,77 @@ async fn a_real_export_hands_js_binary_not_a_number_array() {
         bytes[0], 1,
         "first byte is the envelope version, not '1' (49)"
     );
+}
+
+/// A current-state checkpoint crosses the boundary as binary and is smaller
+/// than the full one for a resource with edit history, and restores the
+/// current name into a fresh store.
+#[wasm_bindgen_test]
+async fn a_current_state_checkpoint_is_smaller_and_restores() {
+    use wasm_bindgen::JsCast;
+
+    let drive = "did:ad:vaultshallowtest";
+    let db = ClientDb::new_in_memory(None).await.expect("in-memory db");
+    for i in 0..20 {
+        db.put_resource(&format!(
+            r#"{{"@id":"{drive}","https://atomicdata.dev/properties/name":"edit {i}"}}"#
+        ))
+        .await
+        .expect("edit");
+    }
+    let key = vault_generate_key();
+
+    let mut sizes = Vec::new();
+    let mut sealed_current = None;
+    for current_state_only in [false, true] {
+        let out = db
+            .vault_export(
+                drive,
+                &key,
+                1,
+                PSEUDONYM,
+                DEVICE,
+                1,
+                1,
+                false,
+                JsValue::UNDEFINED,
+                Some(current_state_only),
+            )
+            .await
+            .expect("export");
+        let sealed = js_sys::Reflect::get(&out, &JsValue::from_str("sealed"))
+            .expect("sealed bytes")
+            .unchecked_into::<js_sys::Uint8Array>()
+            .to_vec();
+        sizes.push(sealed.len());
+        if current_state_only {
+            sealed_current = Some(sealed);
+        }
+    }
+    assert!(
+        sizes[1] < sizes[0],
+        "current-state checkpoint ({}) must be smaller than the full one ({})",
+        sizes[1],
+        sizes[0]
+    );
+
+    let fresh = ClientDb::new_in_memory(None).await.expect("in-memory db");
+    let object = js_sys::Object::new();
+    js_sys::Reflect::set(
+        &object,
+        &JsValue::from_str("objectKey"),
+        &JsValue::from_str(&format!("vault/{PSEUDONYM}/checkpoints/ckpt-000001.loro")),
+    )
+    .unwrap();
+    js_sys::Reflect::set(
+        &object,
+        &JsValue::from_str("sealed"),
+        &js_sys::Uint8Array::from(sealed_current.unwrap().as_slice()),
+    )
+    .unwrap();
+    let objects = js_sys::Array::of1(&object).into();
+    fresh
+        .vault_import(&key, 1, PSEUDONYM, DEVICE, objects)
+        .await
+        .expect("a shallow checkpoint restores");
 }

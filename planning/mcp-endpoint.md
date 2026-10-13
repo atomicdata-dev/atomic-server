@@ -1,6 +1,20 @@
 # Atomic as an MCP server
 
-> **Status:** Proposal (2026-09). Nothing in this file is implemented.
+> **Status:** One implementation. The node serves the tools at `POST /mcp`
+> (`server/src/mcp/`): OAuth 2.1 authorization server plus Streamable HTTP
+> resource server, reads and, if the person allowed editing, writes. A write is
+> a commit the node signs as the *issued agent* behind the token (its key is
+> derived again from the token's claims, never stored, never the person's), sent
+> through the normal commit pipeline, so the ACLs the person granted that agent
+> are the limit and Connected apps shows it by name and revokes it. The local
+> `@tomic/mcp` (`browser/mcp`) is only a stdio bridge to that endpoint with a
+> token from `atomic-mcp connect` (OAuth with a loopback redirect). The in-app
+> assistant keeps its own tool list (`useAtomicTools`, `assistant-tools.ts` in
+> `@tomic/lib`), which is the one place the verbs are still implemented twice;
+> `atomic-cli connect` and `ad-generate connect` still use a key of their own
+> (`/app/connect-agent`). Not done: `semantic_search` on `/mcp`, `format=compact`
+> short refs, refresh-token rotation, a per-process-independent one-time code
+> store.
 > Companion to [`actions.md`](./actions.md) (one verb list, many surfaces),
 > [`json-ad-compact.md`](./json-ad-compact.md) (the wire dialect),
 > [`atomic-lib-runtime.md`](./atomic-lib-runtime.md) (`AtomicNode`),
@@ -123,6 +137,17 @@ In MCP:
   builders that already go through compact. Same compact JSON-AD as the
   assistant (`toCompact` / `fromCompact`). Short `#xxxxxxxx` refs at the
   tool boundary.
+- **Schema tools** (hosted, built) — `find_schema({query, limit?})` and, on
+  write connections only, `ensure_ontology({drive, schema, shortname?})`,
+  twins of the assistant's tools (`schemaTools.ts`). Both run on the Rust
+  JSON Schema import/export (`lib/src/schema/json_schema.rs`, shared fixture
+  with `@tomic/lib`). `ensure_ontology` signs every commit as the issued
+  agent and sends it through the commit pipeline (`CommitSink` in
+  `EnsureTarget`), so rights apply as for `create_resource`.
+  `get_user_classes` stays as a deprecated alias of `find_schema` with an empty
+  query; `get_schema` stays. The descriptions tell the model to search first,
+  reuse classes, put constraints in the schema, and that renaming a shortname
+  or changing a type makes a new property.
 - **Resources** — `atomic://{subject}` (or the subject URL itself).
   `resources/read` is GET; `resources/list` is a drive/query listing.
   This mapping is almost free and is how clients that prefer resources
@@ -143,23 +168,61 @@ module. Long-term the graph verbs belong on `AtomicNode`; UI verbs do not.
 
 ## Sequencing
 
-1. **Extract headless tools** from `useAtomicTools.ts` (and
+1. [x] **Extract headless tools** from `useAtomicTools.ts` (and
    `jsonAdCompact.ts`) so they take a `Store`, not a hook. Assistant keeps
    working; this is the shared library MCP will call. Cheap, unblocks
    everything, and is the
    [`actions.md`](./actions.md) "fifth enumeration" fix even if MCP slips.
-2. **Local stdio MCP.** Node script or small binary. Agent secret from
-   env / config (same family as `/app/token`). Read + write. This is the
+2. [x] **Local stdio MCP.** Node script or small binary. Its own key,
+   approved in the app (the agent secret still works for scripts). Read +
+   write. This is the
    Cursor/Claude Desktop config people actually add. Highest ROI; no AS.
-3. **Server `format=compact`.** json-ad-compact phase 4. Needed before a
+3. [ ] **Server `format=compact`.** json-ad-compact phase 4. Needed before a
    Rust remote handler is worth writing.
-4. **Remote Streamable HTTP, read-only.** RFC 9728 metadata, OAuth 2.1
+4. [x] **Remote Streamable HTTP, read-only.** RFC 9728 metadata, OAuth 2.1
    against Atomic-as-AS (#1275 reopened) *or* the operator IdP if #1310
    has already advertised one. Writes return a clear "use local MCP /
    issued agent not yet" error, not a silent server-side save.
-5. **Remote writes as issued agent.** Same key-on-node pattern as plugin
+5. [ ] **Remote writes as issued agent.** Same key-on-node pattern as plugin
    unattended runs. Consent scopes: at least drive + read/write. `signer`
    is the issued DID. The user's root never touches the commit.
+
+## Hosted endpoint (step 4, built)
+
+`server/src/mcp/`. No state to store: client ids, authorization codes and
+tokens are signed with a key derived from the node key for this purpose
+(`Db::derive_node_key`), so nothing here can open a stored secret.
+
+```text
+POST /mcp                  401 + WWW-Authenticate: resource_metadata=…
+GET  /.well-known/oauth-protected-resource      (RFC 9728) names this node
+GET  /.well-known/oauth-authorization-server    (RFC 8414)
+POST /oauth/register       dynamic client registration; client_id = signed registration
+GET  /oauth/authorize      validates client + redirect_uri, redirects to <app>/app/authorize-mcp
+POST /oauth/agent          (signed by the person) a fresh issued agent for this client
+     …the app grants that agent `read` on the drives picked, as the person…
+POST /oauth/approve        (signed by the person) returns the redirect_url carrying the code
+POST /oauth/token          code + PKCE verifier -> access (1 h) + refresh (90 d) tokens
+```
+
+- **The issued agent** is an Ed25519 identity derived from the node key, the
+  approving person, the client and a nonce. Reads need no private key, so
+  nobody holds it; the node can re-derive it if hosted writes (step 5) come,
+  without storing a key. The node names its Agent resource after the client,
+  so Connected apps shows a name rather than a key.
+- **Rights are the ACLs**, as for the local MCP. A token is only "who am I":
+  what it can read is what the agent is listed on. Revoking (Connected apps)
+  removes the agent from the drives; the token keeps working and sees nothing.
+- **Nothing signs as the person.** `/oauth/agent` and `/oauth/approve` are
+  ordinary signed requests (version 2, method and body covered). A bearer
+  token is accepted on `/mcp` only, never on `/commit` or the WebSocket.
+- **Redirects** are exact-match against the registered URIs (https, http on
+  localhost, or an app scheme), and an unregistered one is answered, never
+  redirected to.
+- Known limits: codes are single-use per process (a restart forgets spent
+  codes, which are valid for two minutes and PKCE-bound); refresh tokens are
+  not rotated server-side; the compact `#ref` form is not in the hosted tool
+  list yet (step 3 makes it cheap).
 
 ## Allowed and forbidden
 
