@@ -74,6 +74,28 @@ it('a failed import cannot return a success result to the panel reload callback'
   expect(result.current.restoreProgress).toBeNull();
 });
 
+it('keeps the incomplete signal visible when a partial restore returns', async () => {
+  vi.mocked(recoverDriveKey).mockResolvedValue({
+    driveKey: new Uint8Array(32),
+    keyEpoch: 1,
+  });
+  const incomplete = 'Restore incomplete: 1 backup objects were unreadable.';
+  vi.mocked(restoreDrive).mockResolvedValue({
+    packsRead: 1,
+    resourcesRestored: 3,
+    tombstonesApplied: 0,
+    objectsSkipped: 0,
+    objectsUnreadable: 1,
+    incomplete,
+  });
+  const { result } = renderHook(() => useVaultBackup(inputs));
+  await waitFor(() => expect(result.current.status.state).toBe('on'));
+  await act(async () => {
+    expect((await result.current.restore())?.incomplete).toBe(incomplete);
+  });
+  expect(result.current.error).toBe(incomplete);
+});
+
 it('refreshes the key when another device re-keys an already-open panel', async () => {
   const oldKey = new Uint8Array(32).fill(4);
   const newKey = new Uint8Array(32).fill(5);

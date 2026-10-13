@@ -708,6 +708,11 @@ export function GettingStartedFlow({
 
         if (restored.status === 'restored') {
           hasData = await canRead(target, false);
+
+          // Readable data was kept; say that the restore was partial.
+          if (restored.outcome.incomplete) {
+            vaultReason = restored.outcome.incomplete;
+          }
         } else if (restored.status === 'no-backup') {
           vaultReason = restored.reason;
           vaultRecoveryFailed = restored.reason === 'timed out';

@@ -582,6 +582,10 @@ export async function restoreFromVault(
     });
     notifyVaultChanged(driveSubject);
 
+    if (outcome.incomplete) {
+      console.warn('[cloud-vault]', outcome.incomplete);
+    }
+
     return { status: 'restored', outcome };
   } catch (error) {
     // A discarded document cancels its own in-flight requests, and they land

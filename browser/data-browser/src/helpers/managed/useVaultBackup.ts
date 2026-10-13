@@ -399,6 +399,13 @@ export function useVaultBackup({
     ],
   );
 
+  /** A partial restore keeps its data but must still show the error. */
+  const surfaceIncomplete = useCallback((outcome: RestoreOutcome) => {
+    if (outcome.incomplete) setError(outcome.incomplete);
+
+    return outcome;
+  }, []);
+
   const restore = useCallback(async () => {
     if (status.state !== 'on') return null;
 
@@ -408,24 +415,26 @@ export function useVaultBackup({
       setRestoreProgress(0);
 
       try {
-        return await restoreDrive({
-          db: db!,
-          drivePseudonym: status.enrollment.drive_pseudonym,
-          // This device's lane, so the import can record which *other* lanes it
-          // now provably holds. That is what lets a checkpoint published from
-          // here later claim coverage for them — the only way a lane belonging
-          // to a device that is gone ever becomes prunable.
-          devicePubkey: devicePubkey!,
-          driveKey: key.driveKey,
-          keyEpoch: key.keyEpoch,
-          onProgress: (done, total) =>
-            setRestoreProgress(total === 0 ? 1 : done / total),
-        });
+        return surfaceIncomplete(
+          await restoreDrive({
+            db: db!,
+            drivePseudonym: status.enrollment.drive_pseudonym,
+            // This device's lane, so the import can record which *other* lanes it
+            // now provably holds. That is what lets a checkpoint published from
+            // here later claim coverage for them — the only way a lane belonging
+            // to a device that is gone ever becomes prunable.
+            devicePubkey: devicePubkey!,
+            driveKey: key.driveKey,
+            keyEpoch: key.keyEpoch,
+            onProgress: (done, total) =>
+              setRestoreProgress(total === 0 ? 1 : done / total),
+          }),
+        );
       } finally {
         setRestoreProgress(null);
       }
     });
-  }, [run, status, refreshKey, db, devicePubkey]);
+  }, [run, status, refreshKey, db, devicePubkey, surfaceIncomplete]);
 
   const downloadBackup = useCallback(async () => {
     if (status.state !== 'on') return null;
@@ -477,22 +486,24 @@ export function useVaultBackup({
         setRestoreProgress(0);
 
         try {
-          return await restoreDriveFromFile({
-            file,
-            db: db!,
-            drivePseudonym,
-            devicePubkey: devicePubkey!,
-            driveKey: key.driveKey,
-            keyEpoch: key.keyEpoch,
-            onProgress: (done, total) =>
-              setRestoreProgress(total === 0 ? 1 : done / total),
-          });
+          return surfaceIncomplete(
+            await restoreDriveFromFile({
+              file,
+              db: db!,
+              drivePseudonym,
+              devicePubkey: devicePubkey!,
+              driveKey: key.driveKey,
+              keyEpoch: key.keyEpoch,
+              onProgress: (done, total) =>
+                setRestoreProgress(total === 0 ? 1 : done / total),
+            }),
+          );
         } finally {
           setRestoreProgress(null);
         }
       });
     },
-    [run, status, ensureKey, db, devicePubkey],
+    [run, status, ensureKey, db, devicePubkey, surfaceIncomplete],
   );
 
   return {

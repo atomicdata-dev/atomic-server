@@ -28,6 +28,12 @@ fn gc_unsupported<T>() -> AtomicResult<T> {
 #[async_trait]
 pub trait BlobBackend: Send + Sync {
     async fn get(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>>;
+    /// Read an object whose key is NOT the BLAKE3 hash of its bytes, such as a
+    /// derived rendition stored under a synthetic cache key. `get` may verify
+    /// that the bytes hash to the key; this read must not. Defaults to `get`.
+    async fn get_unverified(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
+        self.get(key).await
+    }
     async fn put(&self, key: &[u8], bytes: &[u8]) -> AtomicResult<()>;
     /// Metadata only: usage accounting must not download every file.
     async fn size(&self, key: &[u8]) -> AtomicResult<Option<u64>>;
@@ -211,6 +217,15 @@ impl Db {
     pub async fn get_blob(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
         match &self.blob_backend {
             Some(backend) => backend.get(key).await,
+            None => self.kv.get(Tree::Blobs, key),
+        }
+    }
+
+    /// Like `get_blob`, for derived objects (renditions) stored under a
+    /// synthetic key that is not the hash of their bytes.
+    pub async fn get_derived_blob(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
+        match &self.blob_backend {
+            Some(backend) => backend.get_unverified(key).await,
             None => self.kv.get(Tree::Blobs, key),
         }
     }

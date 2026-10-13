@@ -290,7 +290,9 @@ async fn serve_processed_image(
     let format = get_format(params)?;
     let cache_key = processed_cache_key(source_hash, &format, params);
 
-    if let Some(cached) = appstate.store.get_blob(&cache_key).await? {
+    // Renditions live under a synthetic key, not their content hash, so the
+    // hash-verifying `get_blob` would reject them on the object backend.
+    if let Some(cached) = appstate.store.get_derived_blob(&cache_key).await? {
         return Ok(user_blob_response(mimetype_for(&format), cached));
     }
 

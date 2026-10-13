@@ -28,14 +28,18 @@ impl ObjectBlobBackend {
 #[async_trait]
 impl BlobBackend for ObjectBlobBackend {
     async fn get(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
-        match self.store.get(&self.path(key)).await {
-            Ok(object) => {
-                let bytes = object.bytes().await.map_err(|e| e.to_string())?.to_vec();
-                if blake3::hash(&bytes).as_bytes().as_slice() != key {
-                    return Err("Blob storage hash mismatch".into());
-                }
-                Ok(Some(bytes))
+        match self.get_unverified(key).await? {
+            Some(bytes) if blake3::hash(&bytes).as_bytes().as_slice() != key => {
+                Err("Blob storage hash mismatch".into())
             }
+            found => Ok(found),
+        }
+    }
+    async fn get_unverified(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
+        match self.store.get(&self.path(key)).await {
+            Ok(object) => Ok(Some(
+                object.bytes().await.map_err(|e| e.to_string())?.to_vec(),
+            )),
             Err(object_store::Error::NotFound { .. }) => Ok(None),
             Err(error) => Err(error.to_string().into()),
         }

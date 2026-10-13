@@ -772,7 +772,7 @@ export class Store {
   /** Whether one is on its way — see {@link expectClientDb}. */
   private clientDbExpected = false;
   /** Callbacks parked in {@link waitForClientDb} until the attach happens. */
-  private clientDbWaiters = new Set<() => void>();
+  private clientDbWaiters = new Set<(attached: boolean) => void>();
   /** Reads whose attachment grace expired; retry against the eventual database. */
   private localReadsAwaitingAttach = new Map<string, Resource>();
   /**
@@ -1082,10 +1082,10 @@ export class Store {
     if (!this.clientDbExpected) return Promise.resolve(false);
 
     return new Promise<boolean>(resolve => {
-      const done = () => {
+      const done = (attached: boolean) => {
         clearTimeout(timer);
         this.clientDbWaiters.delete(done);
-        resolve(true);
+        resolve(attached);
       };
 
       const timer = setTimeout(() => {
@@ -1095,6 +1095,19 @@ export class Store {
 
       this.clientDbWaiters.add(done);
     });
+  }
+
+  /**
+   * The local database announced with {@link expectClientDb} will not come
+   * (its init failed). Stop treating a missing resource as possibly stored
+   * locally: reads waiting for an attach are released and a real 404 no longer
+   * waits out the attach grace period.
+   */
+  public clientDbUnavailable(): void {
+    this.clientDbExpected = false;
+    this.localReadsAwaitingAttach.clear();
+
+    for (const waiter of [...this.clientDbWaiters]) waiter(false);
   }
 
   public setClientDb(clientDb: ClientDbWorker | undefined): void {
@@ -1110,7 +1123,7 @@ export class Store {
     // Release fetches that started before the attach and would otherwise be
     // about to fail a resource this database can answer for.
     if (clientDb) {
-      for (const waiter of [...this.clientDbWaiters]) waiter();
+      for (const waiter of [...this.clientDbWaiters]) waiter(true);
       void this.bindOutboxDatabase();
     }
 

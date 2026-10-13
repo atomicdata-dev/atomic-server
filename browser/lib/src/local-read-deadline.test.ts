@@ -198,3 +198,23 @@ it('merges a restored profile snapshot while retaining an unsynced local edit', 
   expect(profile.hasUnsavedChanges()).toBe(true);
   expect(profile.loading).toBe(false);
 });
+
+it('stops waiting for a local database once its init has failed', async () => {
+  vi.useFakeTimers();
+  const store = new Store({
+    serverUrl: 'https://app.example.com',
+    connect: false,
+  });
+  store.setServerConnected(true);
+  store.expectClientDb();
+  store.clientDbUnavailable();
+  store.injectFetch(
+    async () => new Response('Resource not found', { status: 404 }),
+  );
+
+  const loading = store.getResource('atomic:missing-after-failed-init');
+  await vi.advanceTimersByTimeAsync(1000);
+  const resource = await Promise.race([loading, Promise.resolve(undefined)]);
+
+  expect(resource?.error).toBeDefined();
+});

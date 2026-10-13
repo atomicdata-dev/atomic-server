@@ -602,7 +602,7 @@ describe('restoreDrive', () => {
     ]);
   });
 
-  it('rejects incomplete recovery even when some resources were imported', async () => {
+  it('returns a flagged outcome when some objects are unreadable but data was restored', async () => {
     const db = {
       vaultExport: vi.fn(),
       vaultCommitSegment: vi.fn(),
@@ -612,6 +612,32 @@ describe('restoreDrive', () => {
         tombstonesApplied: 0,
         objectsSkipped: 0,
         objectsUnreadable: 1,
+      }),
+    };
+
+    const outcome = await restoreDrive({
+      db,
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+      source: async () => [{ objectKey: 'pack', sealed: new Uint8Array([1]) }],
+    });
+
+    expect(outcome.resourcesRestored).toBe(5);
+    expect(outcome.incomplete).toMatch(/Restore incomplete:.*1.*unreadable/);
+    expect(outcome.incomplete).toContain('Recovered data was kept.');
+  });
+
+  it('still throws when every object is unreadable', async () => {
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 0,
+        resourcesRestored: 0,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 2,
       }),
     };
 
@@ -625,8 +651,7 @@ describe('restoreDrive', () => {
           { objectKey: 'pack', sealed: new Uint8Array([1]) },
         ],
       }),
-    ).rejects.toThrow(/incomplete.*1.*unreadable/i);
-    expect(db.vaultImport).toHaveBeenCalledOnce();
+    ).rejects.toThrow(/incomplete.*2.*unreadable/i);
   });
 
   it('downloads concurrently with a bound and preserves listing order', async () => {

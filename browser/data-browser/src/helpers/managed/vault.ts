@@ -207,6 +207,12 @@ export type RestoreOutcome = {
    * without mentioning this would be a lie.
    */
   objectsUnreadable: number;
+  /**
+   * Set when some objects would not open but readable data was still
+   * restored. Holds the user-facing "Restore incomplete" message. Callers
+   * must show it instead of treating the restore as clean.
+   */
+  incomplete?: string;
 };
 
 /** What a `VaultCheckpointRecord` looks like on the wire. */
@@ -1110,9 +1116,16 @@ export async function restoreDrive({
   // an incomplete restore instead of reloading into an apparently complete
   // drive. This applies equally to automatic, manual and file restores.
   if (outcome.objectsUnreadable > 0) {
-    throw new Error(
-      `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key.`,
-    );
+    const message = `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key.`;
+
+    // Nothing opened: the wrong key or a foreign vault, not a partial drive.
+    if (outcome.resourcesRestored === 0) throw new Error(message);
+
+    // After a re-key, old-epoch objects stay unreadable forever. Throwing
+    // here would make every restore fail again although the readable data was
+    // imported, so the drive could never be recovered. Return the outcome
+    // flagged instead; callers surface `incomplete`.
+    return { ...outcome, incomplete: message };
   }
 
   return outcome;

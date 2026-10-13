@@ -925,7 +925,14 @@ pub async fn import_vault_batch(
                 deletions.retain(|deleted_in| {
                     let Some((deleted_lane, deleted_segment)) = parse_segment_key(deleted_in)
                     else {
-                        return true;
+                        // A checkpoint's own tombstone. A segment the anchor
+                        // never observed was written after it, so a resource
+                        // recreated there is intentional and supersedes it.
+                        let postdates_anchor = anchor_key.as_deref() == Some(deleted_in.as_str())
+                            && parse_segment_key(object_key).is_some_and(|(lane, segment)| {
+                                !observed.get(&lane).is_some_and(|&seen| segment <= seen)
+                            });
+                        return !postdates_anchor;
                     };
                     let later_in_lane =
                         parse_segment_key(object_key).is_some_and(|(lane, segment)| {
@@ -1837,6 +1844,57 @@ mod tests {
                 .unwrap()
                 .to_string(),
             "restored"
+        );
+    }
+
+    #[tokio::test]
+    async fn recreation_after_a_checkpoint_supersedes_the_checkpoint_tombstone() {
+        let a = Db::init_temp("vault_ckpt_recreated_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let subject = a
+            .create_resource(FOLDER, &drive, "recreated", None)
+            .await
+            .unwrap();
+        let subject = Subject::from_raw(&subject, None);
+        let saved = a.get_resource(&subject).await.unwrap();
+        let drive = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        a.remove_resource(&subject).await.unwrap();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        let checkpoint = backup_with(
+            &a,
+            &drive,
+            &key,
+            &vault,
+            DEVICE,
+            CheckpointPolicy {
+                max_segments: 0,
+                ..Default::default()
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(checkpoint.kind, SegmentKind::Checkpoint);
+        assert_eq!(checkpoint.tombstones, 1);
+        a.add_resource_opts(&saved, false, true, true)
+            .await
+            .unwrap();
+        crate::sync::tombstones::clear_tombstone(&a, &subject.to_string());
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        let b = Db::init_temp("vault_ckpt_recreated_b").await.unwrap();
+        restore(&b, &key, &vault).await;
+        assert_eq!(
+            b.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(crate::urls::NAME)
+                .unwrap()
+                .to_string(),
+            "recreated",
+            "a recreation after the checkpoint was dropped by its tombstone"
         );
     }
 

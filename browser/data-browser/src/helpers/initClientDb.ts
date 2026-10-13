@@ -95,6 +95,8 @@ function scheduleStart(store: Store, agentSubject: string | undefined): void {
     .then(() => startForIdentity(store, agentSubject))
     .catch(err => {
       console.warn('[ClientDb] Failed to (re)start for identity:', err);
+      // No database is coming: reads must stop waiting for one to attach.
+      if (!store.getClientDb()) store.clientDbUnavailable();
     });
 }
 

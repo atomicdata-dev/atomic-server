@@ -53,7 +53,8 @@ export function VaultPanel({
   async function handleRestore() {
     const outcome = await vault.restore();
 
-    if (outcome) onRestored?.();
+    // An incomplete restore keeps its error on screen instead of reloading.
+    if (outcome && !outcome.incomplete) onRestored?.();
   }
 
   async function handleDownload() {
@@ -71,7 +72,8 @@ export function VaultPanel({
     setNotice(null);
     const outcome = await vault.restoreFromFile(file);
 
-    if (outcome) onRestored?.();
+    // An incomplete restore keeps its error on screen instead of reloading.
+    if (outcome && !outcome.incomplete) onRestored?.();
   }
 
   // Still settling, or cannot say. Neither is "off": an enable button when we
