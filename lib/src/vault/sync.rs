@@ -88,6 +88,10 @@ pub struct LaneState {
     /// has only seen listed.
     #[serde(default)]
     pub imported_lanes: BTreeMap<String, u32>,
+    /// Older builds advanced imports across unreadable gaps. Those cursors
+    /// cannot authorize pruning until a complete prefix is imported again.
+    #[serde(default)]
+    pub imported_coverage_checked: bool,
     /// Deletions already shipped or imported. Checkpoints must retain them
     /// after their delta segments are pruned. Local recreation clears the
     /// tombstone and removes the subject from this set on the next export.
@@ -105,7 +109,11 @@ impl LaneState {
     /// history we never recorded, which would silently skip ops that were never
     /// backed up.
     fn decode(bytes: &[u8]) -> Self {
-        if let Ok(state) = serde_json::from_slice::<LaneState>(bytes) {
+        if let Ok(mut state) = serde_json::from_slice::<LaneState>(bytes) {
+            if !state.imported_coverage_checked {
+                state.imported_lanes.clear();
+                state.imported_coverage_checked = true;
+            }
             return state;
         }
         if let Ok(subjects) = serde_json::from_slice::<Vec<String>>(bytes) {
@@ -214,6 +222,7 @@ pub fn record_imported_lane(
     segment: u32,
 ) {
     let mut state = read_lane_state(store, drive_pseudonym, device_pubkey);
+    state.imported_coverage_checked = true;
     let slot = state.imported_lanes.entry(lane.to_string()).or_insert(0);
     if segment <= *slot {
         return;
@@ -373,7 +382,19 @@ pub struct BackupSummary {
 }
 
 /// Outcome of one restore pass.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RestoreCompleteness {
+    #[default]
+    Empty,
+    Complete,
+    Partial,
+}
+
+/// Metadata coverage only. Attachment bytes live in the separate blob store
+/// and need their own availability check before claiming full drive recovery.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RestoreSummary {
     pub packs_read: usize,
     pub resources_restored: usize,
@@ -385,6 +406,56 @@ pub struct RestoreSummary {
     /// corrupt or was written by something else — the rest was still restored,
     /// and a caller that reports "restored" without reporting this is lying.
     pub objects_unreadable: usize,
+    /// Gaps proved by a later segment or a checkpoint's observed lane heads.
+    /// Cannot detect a missing tail that no available object ever mentions.
+    pub objects_missing: usize,
+    pub completeness: RestoreCompleteness,
+}
+
+/// Count absent segments above verified checkpoint coverage. Listing an
+/// object is not proof that it imported, but a later segment proves that an
+/// earlier one is needed unless a checkpoint explicitly covers it.
+fn missing_segments(
+    keys: &[String],
+    coverage: &BTreeMap<String, u32>,
+    observed: &BTreeMap<String, u32>,
+) -> usize {
+    let mut heads = observed.clone();
+    let mut listed: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
+    for (lane, segment) in keys.iter().filter_map(|key| parse_segment_key(key)) {
+        heads
+            .entry(lane.clone())
+            .and_modify(|h| *h = (*h).max(segment))
+            .or_insert(segment);
+        listed.entry(lane).or_default().insert(segment);
+    }
+    heads.into_iter().fold(0usize, |missing, (lane, head)| {
+        let floor = coverage.get(&lane).copied().unwrap_or(0);
+        let present = listed.get(&lane).map_or(0, |segments| {
+            segments.iter().filter(|&&n| n > floor && n <= head).count()
+        });
+        missing.saturating_add((head.saturating_sub(floor) as usize).saturating_sub(present))
+    })
+}
+
+fn contiguous_imports(
+    coverage: &BTreeMap<String, u32>,
+    imported: &BTreeMap<String, BTreeSet<u32>>,
+) -> BTreeMap<String, u32> {
+    let mut result = coverage.clone();
+    for (lane, segments) in imported {
+        let through = result.entry(lane.clone()).or_insert(0);
+        for &segment in segments {
+            if segment <= *through {
+                continue;
+            }
+            if through.checked_add(1) != Some(segment) {
+                break;
+            }
+            *through = segment;
+        }
+    }
+    result
 }
 
 /// The agents named in a drive's `read` and `write` rights.
@@ -887,6 +958,9 @@ pub async fn import_vault_batch(
 
     let plan = plan_restore(&keys, anchor_key.as_deref(), &coverage, &observed);
     summary.objects_skipped = plan.skipped.len();
+    let mut verified_coverage = BTreeMap::new();
+    let mut verified_observed = BTreeMap::new();
+    let mut imported: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
 
     // Deletion wins over stale entries across lanes. A listing's `observed`
     // mark is not proof of import: its checkpoint can still contain a subject
@@ -911,10 +985,24 @@ pub async fn import_vault_batch(
             continue;
         };
         if !matches!(header.kind, ObjectKind::Pack | ObjectKind::Checkpoint) {
+            summary.objects_unreadable += 1;
             continue;
         }
         let pack = Pack::decode(&plaintext)?;
         summary.packs_read += 1;
+        // An older checkpoint can cover a lane the newest anchor never
+        // imported. Every checkpoint actually restored may supply proof.
+        if header.kind == ObjectKind::Checkpoint {
+            for (target, source) in [
+                (&mut verified_coverage, &pack.coverage),
+                (&mut verified_observed, &pack.observed),
+            ] {
+                for (lane, &segment) in source {
+                    let through = target.entry(lane.clone()).or_insert(0u32);
+                    *through = (*through).max(segment);
+                }
+            }
+        }
 
         for entry in pack.entries {
             // A later segment from the deleting device is an intentional
@@ -995,13 +1083,10 @@ pub async fn import_vault_batch(
                 .insert(object_key.clone());
         }
 
-        // Now this device provably holds that lane's ops up to here, so a
-        // checkpoint it publishes later may cover them — which is what lets a
-        // restored device clean up lanes belonging to a phone that is gone.
-        if let (Some((pseudonym, device)), Some((lane, segment))) =
-            (drive_pseudonym, parse_segment_key(object_key))
-        {
-            record_imported_lane(store, pseudonym, device, &lane, segment);
+        // Importing segment N proves only N, not every earlier segment.
+        // Advance pruning coverage after the batch, across contiguous reads.
+        if let Some((lane, segment)) = parse_segment_key(object_key) {
+            imported.entry(lane).or_default().insert(segment);
         }
     }
 
@@ -1035,6 +1120,19 @@ pub async fn import_vault_batch(
         .into());
     }
 
+    if let Some((pseudonym, device)) = drive_pseudonym {
+        for (lane, segment) in contiguous_imports(&verified_coverage, &imported) {
+            record_imported_lane(store, pseudonym, device, &lane, segment);
+        }
+    }
+    summary.objects_missing = missing_segments(&keys, &verified_coverage, &verified_observed);
+    summary.completeness = if summary.objects_missing > 0 || summary.objects_unreadable > 0 {
+        RestoreCompleteness::Partial
+    } else if summary.packs_read == 0 {
+        RestoreCompleteness::Empty
+    } else {
+        RestoreCompleteness::Complete
+    };
     Ok(summary)
 }
 
@@ -1045,6 +1143,134 @@ mod tests {
 
     const PSEUDONYM: &str = "testpseudonym";
     const DEVICE: &str = "testdevice";
+
+    #[tokio::test]
+    async fn missing_or_corrupt_segments_never_certify_prunable_coverage() {
+        for corrupt in [false, true] {
+            let store = Db::init_temp("vault_gap").await.unwrap();
+            let key = key();
+            let vault = MemoryVaultStore::new();
+            let bytes = envelope::seal(
+                &key,
+                ObjectKind::Pack,
+                &Pack::new(vec![], vec![]).encode().unwrap(),
+            )
+            .unwrap();
+            vault
+                .put(&segment_key(PSEUDONYM, DEVICE, 1), &bytes)
+                .unwrap();
+            vault
+                .put(&segment_key(PSEUDONYM, DEVICE, 3), &bytes)
+                .unwrap();
+            if corrupt {
+                vault
+                    .put(&segment_key(PSEUDONYM, DEVICE, 2), b"broken")
+                    .unwrap();
+            }
+            let summary = import_vault_batch(
+                &store,
+                &key,
+                &vault,
+                &drive_prefix(PSEUDONYM),
+                Some((PSEUDONYM, "reader")),
+            )
+            .await
+            .unwrap();
+            assert_eq!(summary.completeness, RestoreCompleteness::Partial);
+            assert_eq!(summary.objects_missing, usize::from(!corrupt));
+            assert_eq!(summary.objects_unreadable, usize::from(corrupt));
+            assert_eq!(
+                read_lane_state(&store, PSEUDONYM, "reader")
+                    .imported_lanes
+                    .get(DEVICE),
+                Some(&1)
+            );
+            vault
+                .put(&segment_key(PSEUDONYM, DEVICE, 2), &bytes)
+                .unwrap();
+            let retry = import_vault_batch(
+                &store,
+                &key,
+                &vault,
+                &drive_prefix(PSEUDONYM),
+                Some((PSEUDONYM, "reader")),
+            )
+            .await
+            .unwrap();
+            assert_eq!(retry.completeness, RestoreCompleteness::Complete);
+            assert_eq!(
+                read_lane_state(&store, PSEUDONYM, "reader")
+                    .imported_lanes
+                    .get(DEVICE),
+                Some(&3)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn older_restored_checkpoints_also_prove_coverage() {
+        let store = Db::init_temp("vault_older_coverage").await.unwrap();
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        let covered = BTreeMap::from([(DEVICE.to_string(), 2)]);
+        for (number, coverage) in [(1, covered), (2, BTreeMap::new())] {
+            let pack = Pack::checkpoint(vec![], vec![], coverage, BTreeMap::new());
+            let sealed =
+                envelope::seal(&key, ObjectKind::Checkpoint, &pack.encode().unwrap()).unwrap();
+            vault
+                .put(&checkpoint_key(PSEUDONYM, number), &sealed)
+                .unwrap();
+        }
+        let pack = Pack::new(vec![], vec![]);
+        let sealed = envelope::seal(&key, ObjectKind::Pack, &pack.encode().unwrap()).unwrap();
+        vault
+            .put(&segment_key(PSEUDONYM, DEVICE, 3), &sealed)
+            .unwrap();
+        let summary = import_vault_batch(
+            &store,
+            &key,
+            &vault,
+            &drive_prefix(PSEUDONYM),
+            Some((PSEUDONYM, "reader")),
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary.completeness, RestoreCompleteness::Complete);
+        assert_eq!(summary.objects_missing, 0);
+        assert_eq!(
+            read_lane_state(&store, PSEUDONYM, "reader")
+                .imported_lanes
+                .get(DEVICE),
+            Some(&3)
+        );
+    }
+
+    #[test]
+    fn old_import_cursors_cannot_authorize_pruning() {
+        let legacy = br#"{"imported_lanes":{"device":99},"cursors":{"resource":{"1":2}}}"#;
+        let state = LaneState::decode(legacy);
+        assert!(state.imported_lanes.is_empty());
+        assert!(state.imported_coverage_checked);
+        assert!(state.cursors.contains_key("resource"));
+    }
+
+    #[test]
+    fn only_coverage_can_excuse_a_missing_segment() {
+        let keys = vec![segment_key(PSEUDONYM, DEVICE, 3)];
+        let observed = BTreeMap::from([(DEVICE.to_string(), 5)]);
+        assert_eq!(missing_segments(&keys, &BTreeMap::new(), &observed), 4);
+        let coverage = BTreeMap::from([(DEVICE.to_string(), 2)]);
+        assert_eq!(missing_segments(&keys, &coverage, &observed), 2);
+        assert_eq!(missing_segments(&keys, &coverage, &BTreeMap::new()), 0);
+        assert_eq!(
+            contiguous_imports(
+                &coverage,
+                &BTreeMap::from([(DEVICE.to_string(), BTreeSet::from([3]))])
+            )
+            .get(DEVICE),
+            Some(&3)
+        );
+    }
 
     fn key() -> DriveVaultKey {
         DriveVaultKey::from_bytes([5u8; 32], 1)

@@ -207,6 +207,9 @@ export type RestoreOutcome = {
    * without mentioning this would be a lie.
    */
   objectsUnreadable: number;
+  /** Optional while older native/WASM adapters remain supported. */
+  objectsMissing?: number;
+  completeness?: 'empty' | 'complete' | 'partial';
   /**
    * Set when some objects would not open but readable data was still
    * restored. Holds the user-facing "Restore incomplete" message. Callers
@@ -1115,8 +1118,12 @@ export async function restoreDrive({
   // The importer keeps everything it can recover. Callers must still surface
   // an incomplete restore instead of reloading into an apparently complete
   // drive. This applies equally to automatic, manual and file restores.
-  if (outcome.objectsUnreadable > 0) {
-    const message = `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key.`;
+  if (
+    outcome.completeness === 'partial' ||
+    outcome.objectsUnreadable > 0 ||
+    (outcome.objectsMissing ?? 0) > 0
+  ) {
+    const message = `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable, ${outcome.objectsMissing ?? 0} were missing. Recovered data was kept. Retry with a complete backup and its current key.`;
 
     // Nothing opened: the wrong key or a foreign vault, not a partial drive.
     if (outcome.resourcesRestored === 0) throw new Error(message);

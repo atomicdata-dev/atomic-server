@@ -210,11 +210,18 @@ export async function connectHostedDrive(
     setServerUrl(url: string): void;
     unregisterLocalOnlyDrive(drive: string): void;
     waitForServerConnected(timeoutMs: number): Promise<boolean>;
+    getIdentityGeneration(): number;
+    getRoutingGeneration(): number;
   },
   drive: string,
   persistServer: (url: string) => void,
   lookupTimeoutMs = 8_000,
 ): Promise<boolean> {
+  const identity = store.getIdentityGeneration();
+  let route = store.getRoutingGeneration();
+  const isCurrent = () =>
+    identity === store.getIdentityGeneration() &&
+    route === store.getRoutingGeneration();
   // Only race the read: a late lookup must never switch an already restored session.
   const origin = await withDeadline(
     resolveHostedDriveOrigin(drive),
@@ -222,15 +229,16 @@ export async function connectHostedDrive(
     undefined,
   );
 
-  if (!origin) return false;
+  if (!origin || !isCurrent()) return false;
 
   store.unregisterLocalOnlyDrive(drive);
   store.setServerUrl(origin);
+  route = store.getRoutingGeneration();
   persistServer(origin);
   // Let the first resource/query use WS; HTTP remains available if WS cannot connect.
   await store.waitForServerConnected(3_000);
 
-  return true;
+  return isCurrent();
 }
 
 export async function evaluateServerReconciliation(

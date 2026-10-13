@@ -778,6 +778,13 @@ export class Store {
   /** Current Agent, used for signing commits. Is required for posting things. */
   private agent?: Agent;
   private identityGeneration = 0;
+  private liveSubscriptionGeneration = 0;
+  private routingGeneration = 0;
+
+  /** Fences delayed route discovery, including drive/server A → B → A. */
+  public getRoutingGeneration(): number {
+    return this.routingGeneration;
+  }
 
   /** Local session revision. Fences delayed work, including agent A → B → A. */
   public getIdentityGeneration(): number {
@@ -1144,6 +1151,8 @@ export class Store {
     // first call introduces a new worker; the others just want
     // `emitSyncStatus`.
     const attached = !!clientDb && clientDb !== this.clientDb;
+    if (clientDb !== this.clientDb)
+      this.collectionPagesAnsweredByServer.clear();
     this.clientDb = clientDb;
 
     if (isOutboxDatabase(clientDb)) this.outbox.expectDatabase();
@@ -6350,6 +6359,14 @@ export class Store {
 
     if (this.agent?.subject !== agent?.subject) {
       this.localReadsAwaitingAttach.clear();
+      this.collectionPagesAnsweredByServer.clear();
+      this.liveSubscriptionGeneration++;
+      const subjects = [...this.liveSubjects.keys()];
+      this.liveSubjects.clear();
+
+      for (const subject of subjects) {
+        this.getWebSocketForSubject(subject)?.unsubscribeResource(subject);
+      }
     }
 
     // The current drive is an account context, not a server preference. Clear
@@ -6711,6 +6728,11 @@ export class Store {
 
     const previous = this.serverUrl;
 
+    if (previous !== url) {
+      this.routingGeneration++;
+      this.collectionPagesAnsweredByServer.clear();
+    }
+
     this.serverUrl = url;
 
     // Switching servers: tear down the old socket and reset the connection
@@ -6768,6 +6790,8 @@ export class Store {
    *  so AppSettings-style UI mirrors stay in sync.
    */
   public setDrive(drive: string): void {
+    if ((this.drive ?? '') !== drive) this.routingGeneration++;
+
     if (!drive) {
       this.drive = undefined;
     } else if (Client.isBareHttpOrigin(drive)) {
@@ -6906,6 +6930,8 @@ export class Store {
    */
   public subscribeLive(subject: string): () => void {
     const normalized = this.normalizeSubject(subject);
+    const generation = this.liveSubscriptionGeneration;
+    let released = false;
     const count = this.liveSubjects.get(normalized) ?? 0;
     this.liveSubjects.set(normalized, count + 1);
 
@@ -6914,6 +6940,8 @@ export class Store {
     }
 
     return () => {
+      if (released || generation !== this.liveSubscriptionGeneration) return;
+      released = true;
       const left = (this.liveSubjects.get(normalized) ?? 1) - 1;
 
       if (left > 0) {

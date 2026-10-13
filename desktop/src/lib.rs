@@ -288,18 +288,7 @@ mod vault_ipc {
     }
   }
 
-  #[derive(serde::Serialize)]
-  #[serde(rename_all = "camelCase")]
-  pub struct VaultImportOut {
-    pub packs_read: usize,
-    pub resources_restored: usize,
-    pub tombstones_applied: usize,
-    /// Objects the newest checkpoint already subsumed, so they were never read.
-    pub objects_skipped: usize,
-    /// Objects that would not open. Non-zero means part of the vault is corrupt
-    /// or foreign; everything else still restored.
-    pub objects_unreadable: usize,
-  }
+  pub type VaultImportOut = atomic_lib::vault::sync::RestoreSummary;
 
   pub fn decode_key(key_b64: &str, epoch: u32) -> Result<DriveVaultKey, String> {
     let raw = STANDARD
@@ -491,13 +480,7 @@ async fn vault_import(
     ))?
     .map_err(|e| format!("Could not restore from the vault: {e}"))?;
 
-    Ok(vault_ipc::VaultImportOut {
-      packs_read: summary.packs_read,
-      resources_restored: summary.resources_restored,
-      tombstones_applied: summary.tombstones_applied,
-      objects_skipped: summary.objects_skipped,
-      objects_unreadable: summary.objects_unreadable,
-    })
+    Ok(summary)
   })
   .await
 }

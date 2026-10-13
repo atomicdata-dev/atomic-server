@@ -93,9 +93,35 @@ app's invitation screen. It extracts the token and server from the invitation;
 an arbitrary redirect field is never followed. Legacy token-only links remain
 readable, but do not themselves identify a node.
 
-## Further guarantees
+## Subscription and query ownership
 
-These contracts do not yet provide per-drive routing ownership, proof of all
-backup dependencies, Vault-only blob upload, or complete query/notification
-coverage. See the repository's `TESTING_COVERAGE.md` and active
-`planning/sync-contracts.md` for those remaining boundaries.
+A `Store.subscribeLive()` holder releases its interest at most once. Switching
+accounts invalidates old holders, so their later cleanup cannot unsubscribe a
+new account. `getRoutingGeneration()` fences delayed routing decisions, including
+a switch away and back to the same route. It does not provide simultaneous
+per-drive server routing.
+
+`Collection.completeness` is `complete`, `partial`, or `unavailable`. A complete
+query was answered by its authority or by a reconciled/local-only index for its
+scope. It does not assert that offline peers have no newer edits. Call
+`getAllMembers({ requireComplete: true })` for operations that need all members;
+an unavailable index must not authorize a claim that the result is empty.
+Account, database or routing changes invalidate previous completeness evidence.
+
+## Vault metadata coverage
+
+WASM and desktop serialize the core `RestoreSummary`, including `completeness`,
+`objectsMissing` and `objectsUnreadable`. A later segment or a checkpoint's
+observed heads can prove an earlier segment is missing. Only checkpoint coverage
+can excuse that gap. Imported lane coverage advances through contiguous recovered
+segments, so a partial restore cannot authorize pruning the missing history.
+Old import cursors that did not establish this guarantee are discarded on upgrade;
+resource and backup cursors remain intact.
+
+`complete` here describes metadata coverage that the available objects establish.
+It does not prove that an unmentioned tail or entire lane was present, or that
+attachment bytes are available in the separate blob store. Those guarantees need
+a manifest and dependency verification. Keys and epochs still need a shared
+handle across adapters. Notification event identity, read/unread conflicts and
+closed-app delivery also remain open; see `TESTING_COVERAGE.md` and
+`planning/sync-contracts.md`.

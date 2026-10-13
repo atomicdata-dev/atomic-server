@@ -628,6 +628,31 @@ describe('restoreDrive', () => {
     expect(outcome.incomplete).toContain('Recovered data was kept.');
   });
 
+  it('surfaces a missing segment even when every downloaded object decrypted', async () => {
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 2,
+        resourcesRestored: 5,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 0,
+        objectsMissing: 1,
+        completeness: 'partial',
+      }),
+    };
+    const outcome = await restoreDrive({
+      db,
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+      source: async () => [{ objectKey: 'pack', sealed: new Uint8Array([1]) }],
+    });
+    expect(outcome.resourcesRestored).toBe(5);
+    expect(outcome.incomplete).toMatch(/Restore incomplete:.*1 were missing/);
+  });
+
   it('still throws when every object is unreadable', async () => {
     const db = {
       vaultExport: vi.fn(),

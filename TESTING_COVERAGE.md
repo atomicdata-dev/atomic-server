@@ -2801,9 +2801,27 @@ partition.
   saves require a server receipt for an attempted write, rather than treating a
   local-only `persisted` result as remote acceptance.
 
-Per-drive route ownership, general query coverage, native receipt parity and a
-shared complete/partial Rust Vault outcome remain open in
-`planning/sync-contracts.md`.
+### Subscription, query and restore coverage
+
+- `store-live-ownership.test.ts` reproduces duplicate releases cancelling another
+  holder and a stale account's release cancelling the new account's subscription.
+  `websockets.test.ts` also covers held subscriptions, resource readiness and overlap
+  between active-drive and explicit live subscriptions (reused from #2238).
+- `collection-completeness.test.ts` distinguishes unavailable, partial cached and
+  authoritative empty reads; identity/database replacement invalidates completeness.
+  `collection-explicit-drive.test.ts` scopes both the local index and optimistic
+  incoming members. The Inbox hook tests include 101 notifications, account changes
+  and server-only reconnect read-state refresh (focused work reused from #2130).
+- Hosted-route lookup tests fence account/routing A → B → A changes before mutation.
+- Rust Vault tests cover missing/corrupt segments followed by successful retry,
+  observed versus covered segments, and migration of unsafe legacy import cursors.
+  Pruning coverage advances only through a contiguous recovered prefix. WASM and
+  desktop serialize the same `RestoreSummary`; the browser surfaces its partial result.
+
+Still open: simultaneous per-drive routing, authoritative expected lane tails,
+resource/blob dependency coverage, key/epoch handles, notification event identity
+and read/unread merge semantics, closed-app delivery, native runtime and seeded
+network/process fault campaigns. See `planning/sync-contracts.md`.
 
 Run shared persistence journeys for both Vault and Server. UI-only interactions
 still run once. Passing a Server journey does not establish Vault recovery:

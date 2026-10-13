@@ -1253,20 +1253,6 @@ struct VaultObjectInput {
     sealed: Vec<u8>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct VaultImportResult {
-    packs_read: usize,
-    resources_restored: usize,
-    tombstones_applied: usize,
-    /// Objects the newest checkpoint already subsumed, so they were not read.
-    objects_skipped: usize,
-    /// Objects that would not open. Non-zero means part of the vault is corrupt
-    /// or foreign; the rest still restored, and the UI must say so rather than
-    /// report a clean restore.
-    objects_unreadable: usize,
-}
-
 /// The message an agent signs to derive its vault key-encryption key.
 ///
 /// Callers sign these exact bytes and pass the signature to `vaultWrapKey` /
@@ -1630,13 +1616,6 @@ impl ClientDb {
         .await
         .map_err(to_js_err)?;
 
-        serde_wasm_bindgen::to_value(&VaultImportResult {
-            packs_read: summary.packs_read,
-            resources_restored: summary.resources_restored,
-            tombstones_applied: summary.tombstones_applied,
-            objects_skipped: summary.objects_skipped,
-            objects_unreadable: summary.objects_unreadable,
-        })
-        .map_err(to_js_err)
+        serde_wasm_bindgen::to_value(&summary).map_err(to_js_err)
     }
 }

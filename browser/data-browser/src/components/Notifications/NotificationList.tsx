@@ -58,7 +58,7 @@ export function NotificationList(): React.JSX.Element {
       <Row center justify='space-between' wrapItems>
         <h1>Notifications</h1>
         {unread > 0 && (
-          <Button subtle onClick={markAllRead}>
+          <Button subtle onClick={markAllRead} disabled={loading}>
             Mark all as read
           </Button>
         )}

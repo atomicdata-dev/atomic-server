@@ -331,6 +331,51 @@ export class Collection {
   private static legacyQueryServers = new WeakMap<Store, Set<string>>();
   private legacyQuery = false;
   private readonly preferServer: boolean;
+  private readonly explicitDrive: boolean;
+  private readonly identityGeneration: number;
+  private completePages = new Map<
+    number,
+    {
+      identity: number;
+      database: ReturnType<Store['getClientDb']>;
+      server: string;
+      route: number;
+    }
+  >();
+
+  private readScope() {
+    return {
+      identity: this.store.getIdentityGeneration(),
+      database: this.store.getClientDb(),
+      server: this.store.getServerUrl(),
+      route: this.store.getRoutingGeneration(),
+    };
+  }
+
+  /** Completeness at the last query/reconcile boundary, not a claim that
+   * disconnected peers have no newer edits. Cached rows remain usable when
+   * partial; operations claiming to cover all members must require complete. */
+  public get completeness(): 'complete' | 'partial' | 'unavailable' {
+    const current = this.readScope();
+    const pages = Math.max(1, Math.ceil(this.totalMembers / this.pageSize));
+
+    for (let page = 0; page < pages; page++) {
+      const scope = this.completePages.get(page);
+
+      if (
+        !scope ||
+        this.identityGeneration !== current.identity ||
+        scope.identity !== current.identity ||
+        scope.database !== current.database ||
+        scope.server !== current.server ||
+        scope.route !== current.route
+      ) {
+        return this.pages.size ? 'partial' : 'unavailable';
+      }
+    }
+
+    return 'complete';
+  }
   private legacyMembers?: Promise<string[]>;
 
   public constructor(
@@ -338,12 +383,14 @@ export class Collection {
     server: string,
     params: CollectionParams,
     noFetch = false,
-    options: { preferServer?: boolean } = {},
+    options: { preferServer?: boolean; explicitDrive?: boolean } = {},
   ) {
     this.store = store;
     this.server = server;
     this.params = params;
     this.preferServer = !!options.preferServer;
+    this.explicitDrive = !!options.explicitDrive;
+    this.identityGeneration = store.getIdentityGeneration();
 
     if (!noFetch) {
       store.registerBulkRefreshable(this);
@@ -462,6 +509,7 @@ export class Collection {
   }
 
   public clearPages(): void {
+    this.completePages.clear();
     this.pages = new Map();
     this.legacyMembers = undefined;
     this._memberIndex.clear();
@@ -663,6 +711,13 @@ export class Collection {
       // matches the filter.
       !this.isDestroyed(subject) &&
       constraintMatches(resource, fp, fv) &&
+      // Genesis resources carry their owning drive. A live push from another
+      // account must respect the same explicit scope as the indexed query.
+      (!this.explicitDrive ||
+        !resource.get('https://atomicdata.dev/properties/drive') ||
+        this.store.normalizeSubject(
+          resource.get('https://atomicdata.dev/properties/drive') as string,
+        ) === this.store.normalizeSubject(this.params.drive ?? '')) &&
       // Every extra AND constraint must also hold (multi-property filtering).
       (this.params.filters ?? []).every(
         f =>
@@ -815,9 +870,19 @@ export class Collection {
   }
 
   public clone() {
-    const collection = new Collection(this.store, this.server, this.params);
+    const collection = new Collection(
+      this.store,
+      this.server,
+      this.params,
+      true,
+      {
+        preferServer: this.preferServer,
+        explicitDrive: this.explicitDrive,
+      },
+    );
     collection._totalMembers = this._totalMembers;
     collection._waitForReady = this._waitForReady;
+    collection.completePages = this.completePages;
     collection.pages = this.pages;
     // Share the index too — both clones look at the same `pages` Map,
     // so they should observe the same membership.
@@ -841,11 +906,41 @@ export class Collection {
     }
   }
 
-  public async getAllMembers(): Promise<string[]> {
+  public async getAllMembers(
+    options: { requireComplete?: boolean } = {},
+  ): Promise<string[]> {
+    await this.waitForReady();
+
+    if (
+      options.requireComplete &&
+      this.completeness !== 'complete' &&
+      this.identityGeneration === this.store.getIdentityGeneration() &&
+      this.store.serverConnected
+    ) {
+      // A cached local page may be partial even if another Collection asked
+      // this query earlier. A mutation needing every member must ask anew.
+      for (
+        let page = 0;
+        page < Math.max(1, Math.ceil(this.totalMembers / this.pageSize));
+        page++
+      ) {
+        await this.fetchPageFromServer(page);
+      }
+    }
+
     const members: string[] = [];
 
     for await (const member of this) {
       members.push(member);
+    }
+
+    if (
+      options.requireComplete &&
+      (this.completeness !== 'complete' || members.length !== this.totalMembers)
+    ) {
+      throw new Error(
+        'Collection is incomplete; retry after its index is available and reconciled',
+      );
     }
 
     return members;
@@ -996,7 +1091,8 @@ export class Collection {
     // Local-only parents (e.g. the demo drive's folders/tables) have no
     // server-side members by definition — a `/query` can only return
     // empty while leaking local subjects. The local DB result above is
-    // authoritative; when it couldn't answer, empty is the truth.
+    // authoritative when it answers. If unavailable, keep the presentation
+    // empty but do not certify this page as a complete result.
     if (
       typeof this.params.value === 'string' &&
       this.store.isLocalOnlySubject(this.params.value)
@@ -1021,7 +1117,7 @@ export class Collection {
     // signed-in session loses this race by design — `serverConnected` only
     // flips after AUTH_OK — which is why the sidebar came up empty when signed
     // in and full when signed out. Being offline for real costs one bounded
-    // wait, and the page still ends up empty, which is the truth then.
+    // wait. If neither source answers, the page remains unavailable.
     await this.store.waitForServerConnected(3000);
 
     if (this.store.serverConnected) {
@@ -1152,7 +1248,8 @@ export class Collection {
     // for so long: see {@link LOCAL_DB_READY_GRACE_MS}. Running out is not an
     // error, it just means this query is answered by the server, which the
     // `'no-db'` below already arranges.
-    const clientDb = this.store.getClientDb();
+    const scope = this.readScope();
+    const clientDb = scope.database;
 
     if (clientDb && !clientDb.isReady) {
       let ranOut: ReturnType<typeof setTimeout> | undefined;
@@ -1206,7 +1303,7 @@ export class Collection {
     // "Indexed queries require a drive scope", so don't ask — fall back to
     // the server `/query` instead of burning a worker round-trip on a
     // guaranteed error.
-    if (hasExtraFilters && !drive) {
+    if ((hasExtraFilters || this.explicitDrive) && !drive) {
       return 'no-db';
     }
 
@@ -1226,11 +1323,9 @@ export class Collection {
       property: this.params.property,
       value: this.params.value,
       filters: this.params.filters,
-      // Single property/value queries use the basic path and intentionally
-      // omit `drive` (see the sort note above). We still don't pass
-      // `sort_by`, so the indexed query stays drive-scoped without the
-      // DID-sort issue.
-      drive: hasExtraFilters ? drive : undefined,
+      // Explicit scopes apply even to a single class/property constraint.
+      // Leave the legacy unscoped basic query available for other callers.
+      drive: hasExtraFilters || this.explicitDrive ? drive : undefined,
       includeResources: true,
       // Aggregated in WASM over the whole matching set, exactly as the server
       // would — the local DB is not a lesser source here.
@@ -1277,7 +1372,20 @@ export class Collection {
     this._assemblingPage = true;
 
     try {
-      return this.finishLocalDbPage(page, result, drive);
+      const outcome = this.finishLocalDbPage(page, result, drive);
+
+      if (
+        outcome === 'ok' &&
+        (((hasExtraFilters || this.explicitDrive) &&
+          (this.store.hasCompletedDriveSyncFor(drive) ||
+            (drive && this.store.isLocalOnlySubject(drive)))) ||
+          (this.params.property === core.properties.parent &&
+            this.store.isLocalOnlySubject(this.params.value)))
+      ) {
+        this.completePages.set(page, scope);
+      }
+
+      return outcome;
     } finally {
       this._assemblingPage = false;
     }
@@ -1307,7 +1415,11 @@ export class Collection {
       // Per-drive on purpose. Asking whether *any* sync had finished meant a
       // synced personal drive vouched for every other drive too, so browsing
       // a drive that was never synced locally showed nothing at all.
-      if (this.store.hasCompletedDriveSyncFor(drive)) {
+      if (
+        this.store.hasCompletedDriveSyncFor(drive) ||
+        (drive && this.store.isLocalOnlySubject(drive)) ||
+        (this.params.value && this.store.isLocalOnlySubject(this.params.value))
+      ) {
         // `fetchPage` races us against `/query`. If the server already
         // populated the page with non-empty data, leave it — server is
         // authoritative for the instant of the query.
@@ -1572,12 +1684,19 @@ export class Collection {
   }
 
   private async fetchPageFromServer(page: number): Promise<void> {
+    const scope = this.readScope();
+
     if (
       this.legacyQuery ||
       (/^https?:\/\//.test(this.params.drive ?? '') &&
         Collection.legacyQueryServers.get(this.store)?.has(this.server))
-    )
-      return this.fetchLegacyPage(page);
+    ) {
+      await this.fetchLegacyPage(page);
+      this.completePages.set(page, scope);
+
+      return;
+    }
+
     const subject = this.buildSubject(page);
     const resource =
       await this.store.fetchResourceFromServer<Collections.Collection>(subject);
@@ -1656,6 +1775,7 @@ export class Collection {
 
     this._totalMembers = totalMembers;
     this._aggregates = readAggregates(resource);
+    this.completePages.set(page, scope);
   }
 }
 

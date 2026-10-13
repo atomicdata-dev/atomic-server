@@ -1334,6 +1334,8 @@ export class ClientDbWorker {
     tombstonesApplied: number;
     objectsSkipped: number;
     objectsUnreadable: number;
+    objectsMissing?: number;
+    completeness?: 'empty' | 'complete' | 'partial';
   }> {
     const r = await this.send({
       type: 'vaultImport',
@@ -1350,6 +1352,8 @@ export class ClientDbWorker {
       tombstonesApplied: number;
       objectsSkipped: number;
       objectsUnreadable: number;
+      objectsMissing?: number;
+      completeness?: 'empty' | 'complete' | 'partial';
     };
   }
 

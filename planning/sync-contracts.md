@@ -1,6 +1,6 @@
 # Sync contracts
 
-Status: first slice implemented and locally verified, 2026-10-13. Based on the latest recovery
+Status: second slice implemented; validation in progress, 2026-10-13. Based on the latest recovery
 work in #2242; CI maintenance remains separate. Preserve peer multiplayer and
 independent Vault / hosted capabilities.
 
@@ -24,13 +24,34 @@ independent Vault / hosted capabilities.
 - [x] Run browser peer sync between explicit drive members and through an invitation.
 - [x] Diagnose failures, fix regressions and record exact results and exclusions.
 
-## Following architecture slices
+## Second implementation
 
-- [ ] Per-drive route/subscription ownership and versioned managed policy changes.
-- [ ] Shared complete/partial restore outcomes, key handles and dependency coverage.
-- [ ] Vault-only blob upload and fresh-device recovery through separate blob storage.
-- [ ] Query completeness and notification event/read-state contracts.
-- [ ] Native adapter parity and seeded fault campaigns across capability combinations.
+- [x] Reuse #2238 live private-drive subscriptions and the scoped query/pagination
+  changes from #2130 (`8b54bd0c0`), preserving current recovery changes.
+- [x] Make subscription releases idempotent and invalidate old account owners;
+  fence late hosted-route discovery with identity and routing generations.
+- [x] Expose query completeness and require it for operations claiming all members;
+  include drive and query options in React query identity and read every Inbox page.
+- [x] Share the Rust restore result between WASM and desktop. Detect provable lane
+  gaps, keep imported coverage contiguous, and discard old unverified import cursors.
+- [x] Pair this with ordered admission snapshots and installation receipts in the
+  private managed adapter. Reject stale policy and refuse bootstrap before policy loads.
+- [ ] Verify package suites, changed browser journeys, formats, types and full lint.
+
+## Remaining architecture work
+
+- [ ] Replace the global server route with per-drive ownership throughout fetch,
+  commit, subscriptions, reconciliation and migration. Generations fence races;
+  they do not implement simultaneous multi-origin routing.
+- [ ] Carry a drive key and its epoch as one handle through every adapter; add a
+  manifest proving expected lane tails and resource/blob dependencies. Readable
+  metadata and contiguous listed segments alone do not prove complete recovery.
+- [ ] Vault-only encrypted blob upload and fresh-device recovery through separate
+  blob storage, with an explicit format and key lifecycle.
+- [ ] Stable notification event IDs, read/unread conflict semantics, and closed-app
+  delivery. Pagination/scope fix live inbox gaps without establishing those contracts.
+- [ ] Native runtime parity and seeded network/process fault campaigns across
+  capability combinations. Sharing a result type and compiling adapters is narrower.
 
 The private cross-repository review is maintained in
 `atomic-saas/planning/SYNC_CONTRACT_REVIEW.md`. This plan and public documentation

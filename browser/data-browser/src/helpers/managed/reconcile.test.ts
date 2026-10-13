@@ -87,6 +87,8 @@ describe('evaluateServerReconciliation', () => {
     });
     const events: string[] = [];
     const store = {
+      getIdentityGeneration: vi.fn(() => 0),
+      getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn().mockResolvedValue(true),
       setServerUrl: (url: string) => events.push(url),
       unregisterLocalOnlyDrive: (drive: string) => events.push(drive),
@@ -99,6 +101,45 @@ describe('evaluateServerReconciliation', () => {
     expect(persist).toHaveBeenCalledWith('https://node1.atomicserver.eu');
   });
 
+  it.each(['identity', 'route'])(
+    'discards hosted discovery after a %s round trip',
+    async changed => {
+      mockFetch({
+        account: { email: 'a@example.com' },
+        enrollments: [enrollment({})],
+      });
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      const fetch = globalThis.fetch;
+      globalThis.fetch = vi.fn(async (...args: Parameters<typeof fetch>) => {
+        await gate;
+
+        return fetch(...args);
+      });
+      const store = {
+        getIdentityGeneration: vi.fn(() => 0),
+        getRoutingGeneration: vi.fn(() => 0),
+        setServerUrl: vi.fn(),
+        unregisterLocalOnlyDrive: vi.fn(),
+        waitForServerConnected: vi.fn().mockResolvedValue(true),
+      };
+      const persist = vi.fn();
+      const pending = connectHostedDrive(store, 'did:ad:drive1', persist);
+      // A → B → A has identical subjects but a different generation.
+      (changed === 'identity'
+        ? store.getIdentityGeneration
+        : store.getRoutingGeneration
+      ).mockReturnValue(2);
+      release();
+      expect(await pending).toBe(false);
+      expect(store.setServerUrl).not.toHaveBeenCalled();
+      expect(store.unregisterLocalOnlyDrive).not.toHaveBeenCalled();
+      expect(persist).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['Pending', 'Disabled', 'Suspended'])(
     'does not connect a %s placement',
     async status => {
@@ -107,6 +148,8 @@ describe('evaluateServerReconciliation', () => {
         enrollments: [enrollment({ status })],
       });
       const store = {
+        getIdentityGeneration: vi.fn(() => 0),
+        getRoutingGeneration: vi.fn(() => 0),
         waitForServerConnected: vi.fn().mockResolvedValue(true),
         setServerUrl: vi.fn(),
         unregisterLocalOnlyDrive: vi.fn(),
@@ -124,6 +167,8 @@ describe('evaluateServerReconciliation', () => {
       enrollments: [enrollment({})],
     });
     const store = {
+      getIdentityGeneration: vi.fn(() => 0),
+      getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn(),
       setServerUrl: vi.fn(),
       unregisterLocalOnlyDrive: vi.fn(),
@@ -144,6 +189,8 @@ describe('evaluateServerReconciliation', () => {
         }),
     );
     const store = {
+      getIdentityGeneration: vi.fn(() => 0),
+      getRoutingGeneration: vi.fn(() => 0),
       waitForServerConnected: vi.fn(),
       setServerUrl: vi.fn(),
       unregisterLocalOnlyDrive: vi.fn(),
@@ -413,7 +460,11 @@ describe('localAgentIsDisposable', () => {
   });
 
   it('keeps an agent when the local node cannot be read', async () => {
-    const store = { getResource: () => Promise.reject(new Error('down')) };
+    const store = {
+      getIdentityGeneration: vi.fn(() => 0),
+      getRoutingGeneration: vi.fn(() => 0),
+      getResource: () => Promise.reject(new Error('down')),
+    };
 
     expect(await localAgentIsDisposable(store, 'did:ad:agent:a')).toBe(false);
   });
