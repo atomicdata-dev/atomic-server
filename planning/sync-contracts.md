@@ -1,6 +1,6 @@
 # Sync contracts
 
-Status: second slice implemented; validation in progress, 2026-10-13. Based on the latest recovery
+Status: second slice implemented and locally verified, 2026-10-13. Based on the latest recovery
 work in #2242; CI maintenance remains separate. Preserve peer multiplayer and
 independent Vault / hosted capabilities.
 
@@ -36,7 +36,27 @@ independent Vault / hosted capabilities.
   gaps, keep imported coverage contiguous, and discard old unverified import cursors.
 - [x] Pair this with ordered admission snapshots and installation receipts in the
   private managed adapter. Reject stale policy and refuse bootstrap before policy loads.
-- [ ] Verify package suites, changed browser journeys, formats, types and full lint.
+- [x] Verify package suites, changed browser journeys, formats, types and full lint.
+
+## Second-slice validation
+
+- Library: 1,699 passed / 1 skipped; real-server integrations: 4 passed.
+- Full data-browser after the final fix: 2,132 passed plus 2 stdio checks.
+- Rust Vault core: 41 passed. WASM built; desktop compiled (no native runtime claim).
+- Notifications: 2 browser journeys passed; Inbox screenshot reviewed.
+- Vault-only / Cloud Server acceptance: 9 passed, no retries/skips, including a
+  real managed-node restart. First run: 8 passed / 1 failed. It caught a partial
+  restore whose translated warning was empty, letting the UI reload as success.
+  Reproduced in three panel tests, then fixed using structured status, fallback
+  copy and settled catalogs. Manual and onboarding recovery now share the guard.
+- Full browser lint/types, Rust format/Clippy and paired portal lint/types passed.
+- Paired API: 611 passed / 3 ignored, then the final receipt-reset handler regression
+  passed. Managed policy: 15 passed.
+
+The earlier unfiltered browser/portal runs were not repeated in full for this
+slice. The PR descriptions retain their initial failure counts and focused reruns.
+Current acceptance evidence is in
+`/tmp/sync-contracts-contracts-20261013/acceptance-contracts-final-report/summary.md`.
 
 ## Remaining architecture work
 
