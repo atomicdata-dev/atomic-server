@@ -35,6 +35,16 @@ the envelope that produced the current state (`--envelope-retention latest`,
 the default) or every envelope (`all`), which turns the Loro history into a
 signed audit log.
 
+A resource can ask for the audit log itself. Set its `retention` property to
+`audit` (the default is `compact`) and the node keeps every envelope of that
+resource and of everything below it. The setting is inherited down the parent
+chain and only ever raises what a node keeps: `compact` on a child does not
+lower an `audit` above it, and a node running `--envelope-retention all` audits
+everything. Setting `audit` later protects history from that moment on; the
+envelopes a node already dropped are not recovered. Each node applies the
+setting to the resources it holds, so a device that is short on space can still
+keep less than a server does.
+
 Each commit's Loro change carries a token in its message, and the envelope
 that introduced that change carries the same token inside its `loroUpdate`.
 That is how a version in History maps to its signer.

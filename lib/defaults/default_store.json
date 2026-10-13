@@ -647,6 +647,16 @@
     "https://atomicdata.dev/properties/shortname": "overwrite-outside"
   },
   {
+    "@id": "https://atomicdata.dev/properties/retention",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How much signed history this Resource and everything below it keeps: `compact` (the default: the current state and the latest signed change) or `audit` (every signed change, so History can prove who changed what and when). Inherited down the parent chain; `audit` on a parent cannot be lowered by a child.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "retention"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/localId",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
     "https://atomicdata.dev/properties/description": "A `localId` is used to derive the Subject (`@id`, the URL) of an imported Resource. This is useful when some data owner has Atomic Data but does not have the technology to host all Resources at their respective URLs. [See docs](https://docs.atomicdata.dev/create-json-ad.html#preventing-duplication-with-localid).",

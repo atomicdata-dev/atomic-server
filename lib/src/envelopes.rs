@@ -46,8 +46,8 @@ pub enum EnvelopeRetention {
 impl EnvelopeRetention {
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
-            "latest" => Some(Self::Latest),
-            "all" | "full" => Some(Self::All),
+            "latest" | "compact" => Some(Self::Latest),
+            "all" | "full" | "audit" => Some(Self::All),
             _ => None,
         }
     }
@@ -122,6 +122,57 @@ fn decode(key: &[u8], value: Vec<u8>) -> Option<StoredEnvelope> {
     })
 }
 
+/// Most ancestors [`effective_retention`] looks at. A parent chain is a few
+/// levels deep; the bound only keeps a corrupt cycle from looping.
+const MAX_PARENT_DEPTH: usize = 32;
+
+/// The retention that applies to a resource: the node's setting, raised to
+/// `All` by a `retention: audit` on the resource itself or any ancestor.
+///
+/// Audit only ever wins. A node running `all` audits everything, and a
+/// `compact` on a child cannot lower an `audit` above it, so a setting made
+/// on a folder holds for everything the folder contains. Lowering audit means
+/// editing the resource that set it.
+///
+/// `resource` is the state the commit produced (or the last state, for a
+/// destroy); `None` falls back to the node's setting. Ancestors are read
+/// propvals-only, one shallow read per level.
+pub fn effective_retention(store: &Db, resource: Option<&crate::Resource>) -> EnvelopeRetention {
+    let node = store.envelope_retention();
+    if node == EnvelopeRetention::All {
+        return node;
+    }
+    let Some(start) = resource else { return node };
+    if is_audit(start) {
+        return EnvelopeRetention::All;
+    }
+    let mut parent = parent_of(start);
+    for _ in 0..MAX_PARENT_DEPTH {
+        let Some(subject) = parent else { break };
+        let Ok(ancestor) = store.get_resource_shallow(&subject) else {
+            break;
+        };
+        if is_audit(&ancestor) {
+            return EnvelopeRetention::All;
+        }
+        parent = parent_of(&ancestor);
+    }
+    node
+}
+
+fn is_audit(resource: &crate::Resource) -> bool {
+    resource
+        .get(crate::urls::RETENTION)
+        .ok()
+        .and_then(|value| EnvelopeRetention::parse(&value.to_string()))
+        == Some(EnvelopeRetention::All)
+}
+
+fn parent_of(resource: &crate::Resource) -> Option<crate::Subject> {
+    let parent = resource.get(crate::urls::PARENT).ok()?.to_string();
+    (!parent.is_empty()).then(|| crate::Subject::from(parent.as_str()))
+}
+
 /// Queue the writes that keep this commit's envelope, honouring the store's
 /// retention. Appended to the apply transaction so the envelope lands with
 /// the state it signs, or not at all. Unsigned commits (internal writes)
@@ -141,9 +192,16 @@ pub fn record_ops(
     if genesis_is_kept_as_row(response) {
         return Ok(());
     }
+    let retention = effective_retention(
+        store,
+        response
+            .resource_new
+            .as_ref()
+            .or(response.resource_old.as_ref()),
+    );
     // Later commits: under `All` the genesis envelope is history that has to
     // stay, so write it out before something newer sits beside it.
-    if store.envelope_retention() == EnvelopeRetention::All {
+    if retention == EnvelopeRetention::All {
         let nothing_stored = store
             .kv
             .scan_prefix(Tree::Envelopes, &prefix(subject))
@@ -161,7 +219,7 @@ pub fn record_ops(
         }
     }
 
-    if store.envelope_retention() == EnvelopeRetention::Latest {
+    if retention == EnvelopeRetention::Latest {
         for existing in store.kv.scan_prefix(Tree::Envelopes, &prefix(subject)) {
             let (old_key, _) = existing?;
             if old_key != new_key {
@@ -292,7 +350,8 @@ pub async fn import_envelope(store: &Db, expected_subject: &str, json: &str) -> 
     }
 
     let mut ops = Vec::new();
-    if store.envelope_retention() == EnvelopeRetention::Latest {
+    let local = store.get_resource_shallow(&commit.subject).ok();
+    if effective_retention(store, local.as_ref()) == EnvelopeRetention::Latest {
         let existing = envelopes(store, commit.subject.as_str());
         if existing.iter().any(|e| e.created_at > commit.created_at) {
             // A newer envelope is already the latest; the incoming one is
@@ -356,8 +415,9 @@ pub struct Attribution {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct HistoryAttribution {
     pub subject: String,
-    /// Retention this node runs; tells a reader whether missing attributions
-    /// are a gap or a policy.
+    /// Retention that applies to this resource (the node's setting, raised
+    /// by a `retention: audit` on it or an ancestor); tells a reader whether
+    /// missing attributions are a gap or a policy.
     pub retention: &'static str,
     /// Oldest first.
     pub attributions: Vec<Attribution>,
@@ -376,7 +436,14 @@ pub struct HistoryAttribution {
 /// in the stored oplog is claimed by a verified envelope. Anything not
 /// covered is unattributed, never a guessed signer.
 pub async fn attribute_history(store: &Db, subject: &str) -> AtomicResult<HistoryAttribution> {
-    let retention = store.envelope_retention().as_str();
+    let retention = effective_retention(
+        store,
+        store
+            .get_resource_shallow(&crate::Subject::from(subject))
+            .ok()
+            .as_ref(),
+    )
+    .as_str();
     let mut attributions: Vec<Attribution> = Vec::new();
     let pure = crate::Subject::from_raw(subject, None).pure_id();
     // The stored doc is where an update's changes can be read back with
@@ -493,6 +560,112 @@ mod tests {
             .await
             .unwrap();
         crate::Subject::from_raw(&subject, None)
+    }
+
+    /// Sets the resource's `retention` through a signed commit.
+    async fn set_retention(db: &Db, subject: &crate::Subject, value: &str) {
+        let mut resource = db.get_resource(subject).await.unwrap();
+        resource
+            .set(urls::RETENTION.into(), Value::String(value.into()), db)
+            .await
+            .unwrap();
+        resource.save_locally(db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_audited_resource_keeps_every_envelope_beside_a_compact_sibling() {
+        let db = Db::init_temp("envelopes_per_resource").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let audited = child(&db, &drive).await;
+        let plain = child(&db, &drive).await;
+        set_retention(&db, &audited, "audit").await;
+        for name in ["one", "two", "three"] {
+            signed_edit(&db, &audited, name).await;
+            signed_edit(&db, &plain, name).await;
+        }
+        assert_eq!(
+            envelopes(&db, audited.as_str()).len(),
+            5,
+            "genesis, the retention commit and three edits"
+        );
+        assert_eq!(
+            envelopes(&db, plain.as_str()).len(),
+            1,
+            "the node default still keeps one"
+        );
+        let report = attribute_history(&db, audited.as_str()).await.unwrap();
+        assert_eq!(report.retention, "all");
+        let report = attribute_history(&db, plain.as_str()).await.unwrap();
+        assert_eq!(report.retention, "latest");
+    }
+
+    #[tokio::test]
+    async fn audit_on_a_folder_holds_below_it_and_a_child_cannot_lower_it() {
+        let db = Db::init_temp("envelopes_inherited").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let folder = child(&db, &drive).await;
+        set_retention(&db, &folder, "audit").await;
+        let kid = child(&db, folder.as_str()).await;
+        set_retention(&db, &kid, "compact").await;
+        for name in ["one", "two"] {
+            signed_edit(&db, &kid, name).await;
+        }
+        assert_eq!(
+            envelopes(&db, kid.as_str()).len(),
+            4,
+            "genesis, the compact setting and two edits all stay"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_node_running_all_is_not_lowered_by_a_compact_resource() {
+        let db = Db::init_temp("envelopes_node_all").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        set_retention(&db, &subject, "compact").await;
+        signed_edit(&db, &subject, "one").await;
+        assert_eq!(envelopes(&db, subject.as_str()).len(), 3);
+    }
+
+    /// Taking `audit` off the resource that set it returns it to the node's
+    /// setting: from the next commit on, only the newest envelope stays.
+    #[tokio::test]
+    async fn removing_audit_returns_the_resource_to_the_node_setting() {
+        let db = Db::init_temp("envelopes_lowered").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        set_retention(&db, &subject, "audit").await;
+        signed_edit(&db, &subject, "one").await;
+        assert_eq!(envelopes(&db, subject.as_str()).len(), 3);
+        set_retention(&db, &subject, "compact").await;
+        assert_eq!(envelopes(&db, subject.as_str()).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn import_envelope_keeps_every_envelope_of_a_resource_marked_audit() {
+        let source = Db::init_temp("envelopes_import_audit_source")
+            .await
+            .unwrap();
+        let (_alice, drive) = source.setup("Alice").await.unwrap();
+        let subject = child(&source, &drive).await;
+        set_retention(&source, &subject, "audit").await;
+        signed_edit(&source, &subject, "one").await;
+        signed_edit(&source, &subject, "two").await;
+        let all = envelopes(&source, subject.as_str());
+        assert_eq!(all.len(), 4);
+
+        // The receiver holds the resource, with its setting, before the
+        // envelopes arrive, as in a bulk push.
+        let sink = Db::init_temp("envelopes_import_audit_sink").await.unwrap();
+        let resource = source.get_resource(&subject).await.unwrap();
+        sink.add_resource(&resource).await.unwrap();
+        for e in &all {
+            import_envelope(&sink, subject.as_str(), &e.json)
+                .await
+                .unwrap();
+        }
+        assert_eq!(envelopes(&sink, subject.as_str()).len(), 4);
     }
 
     #[tokio::test]
