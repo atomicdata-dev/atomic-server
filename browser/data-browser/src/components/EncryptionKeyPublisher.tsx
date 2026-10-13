@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useStore } from '@tomic/react';
+import { RequestCancelledError, useStore } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
 import { ensureEncryptionKey } from '../helpers/conversations/conversations';
 
@@ -20,9 +20,11 @@ export function EncryptionKeyPublisher() {
     // Not on the boot path: the first screen needs the network more.
     const timer = setTimeout(() => {
       if (cancelled) return;
-      ensureEncryptionKey(store, agent).catch(error =>
-        console.warn('Could not publish the encryption key:', error),
-      );
+      ensureEncryptionKey(store, agent).catch(error => {
+        // Switching identities or destinations cancels the old publication.
+        if (!cancelled && !(error instanceof RequestCancelledError))
+          console.warn('Could not publish the encryption key:', error);
+      });
     }, 2000);
 
     return () => {

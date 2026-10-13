@@ -1,16 +1,22 @@
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import {
   core,
   dataBrowser,
   notifications,
   Store,
-  type Resource,
+  Resource,
+  enableLoro,
 } from '@tomic/react';
 import {
   dedupeBySource,
   groupNotifications,
   isUnread,
   markReadAbout,
+  markRead,
+  markUnread,
+  readReceipts,
 } from './inbox';
 
 const fake = (
@@ -138,3 +144,96 @@ it('reads every page of a conversation while preserving newer arrivals', async (
     true,
   );
 });
+
+it('three replicas share read receipts despite duplicate events and offline edits', async () => {
+  const wasm = await readFile(
+    createRequire(import.meta.url).resolve('loro-crdt/web/loro_wasm_bg.wasm'),
+  );
+  const web = (await import('loro-crdt/web')) as unknown as {
+    default: (options: { module_or_path: Uint8Array }) => Promise<unknown>;
+  };
+  await web.default({ module_or_path: wasm });
+  await enableLoro();
+  const replicas = await Promise.all(
+    ['a', 'b', 'c'].map(async id => {
+      const home = new Resource('atomic:personal');
+      const item = new Resource(`atomic:copy-${id}`);
+      await item.set(
+        notifications.properties.notificationSource,
+        'atomic:page#entry',
+        false,
+      );
+      vi.spyOn(home, 'save').mockResolvedValue('persisted');
+      vi.spyOn(item, 'save').mockResolvedValue('persisted');
+      const store = {
+        getAgent: () => ({ subject: 'atomic:agent:me' }),
+        getIdentityGeneration: () => 1,
+        privateDriveSubject: async () => home.subject,
+        getResource: async (subject: string) =>
+          subject === home.subject ? home : item,
+      } as unknown as Store;
+
+      return { home, item, store };
+    }),
+  );
+  const [a, b, c] = replicas;
+  const merge = (from: typeof a, to: typeof a) =>
+    to.home.importLoroUpdate(
+      from.home.getLoroDoc()!.export({ mode: 'snapshot' }),
+    );
+  await markRead(b.store, [b.item.subject]);
+  merge(b, a);
+  merge(b, c);
+  expect(replicas.every(r => !isUnread(r.item, readReceipts(r.home)))).toBe(
+    true,
+  );
+  await markUnread(c.store, [c.item.subject]);
+  merge(c, a);
+  merge(a, b);
+  // B's old physical resource remains read, but the newer shared receipt wins.
+  expect(isUnread(b.item)).toBe(false);
+  expect(replicas.every(r => isUnread(r.item, readReceipts(r.home)))).toBe(
+    true,
+  );
+  // Concurrent read/unread decisions converge in either merge order.
+  await markRead(a.store, [a.item.subject]);
+  await markUnread(b.store, [b.item.subject]);
+  merge(a, c);
+  merge(b, c);
+  merge(c, a);
+  merge(c, b);
+  expect(readReceipts(a.home)).toEqual(readReceipts(b.home));
+  expect(readReceipts(b.home)).toEqual(readReceipts(c.home));
+});
+
+it.each([markRead, markUnread])(
+  'does not carry a delayed read decision into another identity',
+  async action => {
+    let generation = 1;
+    let resolve!: (resource: Resource) => void;
+    const pending = new Promise<Resource>(done => {
+      resolve = done;
+    });
+    const home = new Resource('atomic:home-of-next-user');
+    const save = vi.spyOn(home, 'save').mockResolvedValue('persisted');
+    const store = {
+      getIdentityGeneration: () => generation,
+      getAgent: () => ({ subject: 'atomic:agent:next' }),
+      getResource: (subject: string) =>
+        subject === 'atomic:notification' ? pending : Promise.resolve(home),
+      privateDriveSubject: async () => home.subject,
+    } as unknown as Store;
+    const operation = action(store, ['atomic:notification']);
+    const rejected = expect(operation).rejects.toThrow(/session changed/i);
+    generation++;
+    const item = new Resource('atomic:notification');
+    await item.set(
+      notifications.properties.notificationSource,
+      'atomic:old-user-message',
+      false,
+    );
+    resolve(item);
+    await rejected;
+    expect(save).not.toHaveBeenCalled();
+  },
+);

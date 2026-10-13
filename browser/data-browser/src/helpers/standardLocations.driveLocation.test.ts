@@ -32,6 +32,7 @@ function device(opts: {
   }));
   const driveSet = vi.fn();
   const store = {
+    getIdentityGeneration: () => 0,
     serverConnected: opts.connected ?? true,
     isLocalOnlySubject: () => false,
     getResource: vi.fn(async (subject: string) => {

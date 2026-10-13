@@ -11,7 +11,12 @@ import {
 import { useEffect, useState } from 'react';
 import { usePrivateDrive } from './usePrivateDrive';
 import { usePrivateDriveSync } from './usePrivateDriveSync';
-import { dedupeBySource, isUnread } from '../helpers/notifications/inbox';
+import {
+  dedupeBySource,
+  isUnread,
+  readReceipts,
+  type NotificationReceipts,
+} from '../helpers/notifications/inbox';
 
 const PAGE_SIZE = 100;
 
@@ -22,6 +27,7 @@ const PAGE_SIZE = 100;
  */
 export function useInbox(): {
   items: Resource[];
+  receipts: NotificationReceipts;
   unread: number;
   ready: boolean;
   /** True while loading available rows and their members, including offline. */
@@ -78,18 +84,15 @@ export function useInbox(): {
     if (!ready || !privateDrive) return;
     let cancelled = false;
     void collection
-      .getAllMembers({
-        requireComplete: store.isServerConnectedFor(privateDrive),
-      })
+      // Rendering can use partial rows while the private drive reconciles.
+      // Positive delivery/read receipts remain safe while more rows arrive.
+      .getAllMembers()
       .then(subjects => {
         if (!cancelled)
           setAllMembers({ collection, drive: privateDrive, subjects });
       })
-      .catch(async error => {
-        console.error('Could not read complete notifications:', error);
-        const subjects = await collection.getAllMembers();
-        if (!cancelled)
-          setAllMembers({ collection, drive: privateDrive, subjects });
+      .catch(error => {
+        if (!cancelled) console.error('Could not read notifications:', error);
       });
 
     return () => {
@@ -110,12 +113,15 @@ export function useInbox(): {
       !r.error &&
       r.hasClasses(notifications.classes.notification),
   );
-  const items = dedupeBySource(loaded);
+  const homes = useResources(privateDrive ? [privateDrive] : []);
+  const receipts = readReceipts([...homes.values()][0]);
+  const items = dedupeBySource(loaded, receipts);
   const isReady = ready && !!privateDrive;
 
   return {
     items,
-    unread: items.filter(isUnread).length,
+    receipts,
+    unread: items.filter(item => isUnread(item, receipts)).length,
     ready: isReady,
     loading: !membersReady || [...resources.values()].some(r => r.loading),
     privateDrive,

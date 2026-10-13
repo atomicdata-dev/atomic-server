@@ -4,6 +4,7 @@ import {
   decodeB64,
   isNotFound,
   isNotAvailableLocally,
+  RequestCancelledError,
 } from '@tomic/lib';
 
 /**
@@ -25,6 +26,13 @@ export async function getOrCreateDriveLocation(
   pointerProperty: string,
   create: { isA: string; name: string },
 ): Promise<string> {
+  const generation = store.getIdentityGeneration();
+
+  const checkSession = () => {
+    if (store.getIdentityGeneration() !== generation)
+      throw new RequestCancelledError('Drive location session changed');
+  };
+
   // A local-only drive has no server to ask and no other device.
   const isLocalOnly = store.isLocalOnlySubject(driveSubject);
   const askServer = store.serverConnected && !isLocalOnly;
@@ -60,15 +68,19 @@ export async function getOrCreateDriveLocation(
     }
   }
 
+  checkSession();
   const resource = await store.newResource({
     parent: driveSubject,
     isA: create.isA,
     propVals: { [core.properties.name]: create.name },
   });
+  checkSession();
   await resource.save();
+  checkSession();
   store.notifyResourceManuallyCreated(resource);
 
   await drive.set(pointerProperty, resource.subject);
+  checkSession();
   await drive.save();
 
   return resource.subject;

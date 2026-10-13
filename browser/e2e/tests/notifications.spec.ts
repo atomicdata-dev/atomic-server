@@ -14,6 +14,8 @@
 import { test, expect, type Page } from './fixtures';
 import {
   before,
+  getDevDriveSecret,
+  signIn,
   clickAccountMenuItem,
   currentDriveTitle,
   openAccountMenu,
@@ -52,6 +54,7 @@ test.describe('notifications', () => {
     context,
   }) => {
     test.slow();
+    const ownerSecret = await getDevDriveSecret(page);
 
     // Stub the OS side and let the test decide when the window has focus.
     await page.addInitScript(() => {
@@ -209,6 +212,38 @@ test.describe('notifications', () => {
     await expect(
       page.getByRole('heading', { name: 'Notify Chat' }),
     ).toBeVisible({ timeout: 15_000 });
+
+    // Both copies of the receiving app are closed when this message arrives.
+    // A later boot must catch it up quietly, then share its read receipt with
+    // another independent browser profile signed in as the same person.
+    await page.getByTestId('sidebar-settings-button').click();
+    await page.close();
+    const whileClosed = `Sent while closed ${timestamp()}`;
+    await send(guest, whileClosed);
+    const returned = await context.newPage();
+    await returned.goto(`${FRONTEND_URL}/app/settings`);
+    await clickAccountMenuItem(returned, 'Notifications');
+    const recovered = returned.getByRole('button', {
+      name: new RegExp(whileClosed),
+    });
+    await expect(recovered).toBeVisible({ timeout: 30_000 });
+    await expect(recovered.getByLabel('Unread')).toBeVisible();
+    const sameUserContext = await browser.newContext();
+    const sameUser = await sameUserContext.newPage();
+    await sameUser.goto(`${FRONTEND_URL}/app/agent`);
+    await signIn(sameUser, ownerSecret);
+    await clickAccountMenuItem(sameUser, 'Notifications');
+    const mirrored = sameUser.getByRole('button', {
+      name: new RegExp(whileClosed),
+    });
+    await expect(mirrored).toHaveCount(1, { timeout: 30_000 });
+    await sameUser.getByRole('button', { name: 'Mark all as read' }).click();
+    await expect(mirrored.getByLabel('Unread')).toHaveCount(0);
+    await expect(recovered.getByLabel('Unread')).toHaveCount(0, {
+      timeout: 20_000,
+    });
+    await sameUserContext.close();
+    await returned.close();
 
     await guestContext.close();
   });

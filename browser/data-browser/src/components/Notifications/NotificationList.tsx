@@ -30,7 +30,7 @@ import { LoaderBlock } from '../Loader';
  */
 export function NotificationList(): React.JSX.Element {
   const store = useStore();
-  const { items, unread, loading } = useInbox();
+  const { items, unread, loading, receipts } = useInbox();
   const navigate = useNavigateWithTransition();
   const { setPanelOpen } = useRightPanel();
 
@@ -50,7 +50,7 @@ export function NotificationList(): React.JSX.Element {
   const markAllRead = () =>
     void markRead(
       store,
-      items.filter(isUnread).map(n => n.subject),
+      items.filter(item => isUnread(item, receipts)).map(n => n.subject),
     );
 
   return (
@@ -71,7 +71,7 @@ export function NotificationList(): React.JSX.Element {
         </Empty>
       )}
       <List aria-label='Notifications'>
-        {groupNotifications(items).map(group => {
+        {groupNotifications(items, receipts).map(group => {
           const latest = group.items[0];
 
           return (

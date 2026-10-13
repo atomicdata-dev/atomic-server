@@ -9,7 +9,32 @@ import {
   dataBrowser,
   type Store,
 } from '@tomic/lib';
-import { getOrCreateAiChatsFolder } from './standardLocations';
+import {
+  getOrCreateAiChatsFolder,
+  getOrCreateDriveLocation,
+} from './standardLocations';
+
+it('does not create a standard location after its owning identity changes', async () => {
+  let generation = 1;
+  const newResource = vi.fn();
+  const store = {
+    getIdentityGeneration: () => generation,
+    isLocalOnlySubject: () => true,
+    getResource: async () => {
+      generation++;
+
+      return { get: () => undefined };
+    },
+    newResource,
+  } as unknown as Store;
+  await expect(
+    getOrCreateDriveLocation(store, 'atomic:old-home', 'atomic:inbox', {
+      isA: 'atomic:inbox-class',
+      name: 'Inbox',
+    }),
+  ).rejects.toThrow(/session changed/i);
+  expect(newResource).not.toHaveBeenCalled();
+});
 
 const secret = Agent.buildSecret(
   btoa('test-only-ai-folder-seed'.padEnd(32, '.')),

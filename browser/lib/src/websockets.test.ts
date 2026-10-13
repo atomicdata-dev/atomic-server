@@ -36,6 +36,7 @@ import { serializeDeterministically } from './commit.js';
  */
 class FakeWebSocket {
   public static readonly OPEN = 1;
+  public static readonly CONNECTING = 0;
   public url: string;
   public protocol = 'atomicdata-ws.v2';
   public binaryType = 'arraybuffer';
@@ -128,6 +129,56 @@ describe('WSClient handshake', () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
+
+  it('cancels immediately but closes a connecting socket only after it opens', async () => {
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    const { store } = await testStore();
+    const client = new WSClient('wss://example.com/ws', store);
+    const socket = socketOf(client);
+    const close = vi.spyOn(socket, 'close');
+    client.close();
+    assert(close).not.toHaveBeenCalled();
+    socket.open();
+    await Promise.resolve();
+    assert(close).toHaveBeenCalledOnce();
+    assert(socket.sent).toEqual([]);
+  });
+
+  it.each(['disconnect', 'identity', 'database', 'current'])(
+    'fences a pending blob read against %s changes',
+    async mode => {
+      const { client, socket, store } = await connectedClient();
+      let finish!: (value: Uint8Array | null) => void;
+      const db = {
+        getBlob: () =>
+          new Promise<Uint8Array | null>(resolve => {
+            finish = resolve;
+          }),
+      };
+      const database = vi
+        .spyOn(store, 'getClientDb')
+        .mockReturnValue(db as never);
+      const resource = new Resource('did:ad:file');
+      vi.spyOn(resource, 'get').mockReturnValue(
+        `did:ad:blob:${'ab'.repeat(32)}`,
+      );
+      const read = (
+        client as unknown as {
+          checkForMissingBlobs(r: Resource): Promise<void>;
+        }
+      ).checkForMissingBlobs(resource);
+      if (mode === 'disconnect') client.close();
+      if (mode === 'identity')
+        vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      if (mode === 'database') database.mockReturnValue({} as never);
+      finish(null);
+      await read;
+      assert(framesWithTag(socket, Tag.BLOB_REQUEST)).toHaveLength(
+        mode === 'current' ? 1 : 0,
+      );
+      client.close();
+    },
+  );
 
   it.each([
     'atomic:workspace',

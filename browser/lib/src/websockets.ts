@@ -597,6 +597,13 @@ export class WSClient {
       this.openPromise = new Promise((resolve, reject) => {
         rejectOpen = reject;
         ws.addEventListener('open', () => {
+          if (this._closed) {
+            ws.close();
+            reject(new RequestCancelledError('WebSocket closed by client'));
+
+            return;
+          }
+
           opened = true;
           this._retryDelay = 1000;
           resolve();
@@ -701,7 +708,9 @@ export class WSClient {
     this.rejectAllPending('WebSocket closed by client', true);
     this.stopLiveness();
 
-    this.ws.close();
+    // A close during CONNECTING is reported as a network failure by browsers.
+    // Reject our work now; let the transport open only to close it quietly.
+    if (this.ws.readyState !== WebSocket.CONNECTING) this.ws.close();
   }
 
   // ---- Authentication ----
@@ -2564,10 +2573,11 @@ export class WSClient {
     const clientDb = this.store.getClientDb();
 
     if (clientDb) {
+      const current = this.connectionGuard(resource.subject);
       const hash = hexToBytes(hashStr);
       const exists = await clientDb.getBlob(hash);
 
-      if (!exists) {
+      if (current() && this.store.getClientDb() === clientDb && !exists) {
         this.sendBinary(encodeBlobRequest(hash));
       }
     }
