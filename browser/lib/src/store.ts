@@ -40,6 +40,7 @@ import {
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
   NOT_AVAILABLE_LOCALLY_MESSAGE,
+  NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
 } from './error.js';
 import { EventManager } from './EventManager.js';
 import { hasBrowserAPI } from './hasBrowserAPI.js';
@@ -2513,6 +2514,33 @@ export class Store {
     return this.resources.get(this.resolveSubject(subject));
   }
 
+  /**
+   * One HTTP GET for a subject whose socket is down. `answered`: the server
+   * replied (with the resource or a real error such as 404/401, which stays on
+   * the resource). `unreachable`: the request failed in transport. `skipped`:
+   * it was cancelled or threw, so nothing is known about the server.
+   */
+  private async fetchOverHttpOnce(
+    subject: string,
+    opts: FetchOpts,
+  ): Promise<'answered' | 'unreachable' | 'skipped'> {
+    try {
+      await this.fetchResourceFromServer(subject, {
+        ...opts,
+        noWebSocket: true,
+      });
+    } catch (e) {
+      return isTransportError(e) ? 'unreachable' : 'skipped';
+    }
+
+    const got = this.getResolved(subject);
+
+    if (!got || got.loading) return 'skipped';
+    if (!got.error) return 'answered';
+
+    return isTransportError(got.error) ? 'unreachable' : 'answered';
+  }
+
   /** Mark a resource as errored + not-loading + notify. No-op if
    *  the subject isn't in the store. */
   private failResource(subject: string, error: Error): void {
@@ -4439,13 +4467,22 @@ export class Store {
             if (hasLocalData) return;
 
             if (!alreadyResolved) {
-              this.failResource(
-                subject,
-                new AtomicError(
-                  NOT_AVAILABLE_LOCALLY_MESSAGE,
-                  ErrorType.Transport,
-                ),
-              );
+              // The socket is down, the server may not be: ask once over
+              // plain HTTP before giving up. A hard failure of that request
+              // is the only thing that may be reported as "unreachable".
+              const reason = await this.fetchOverHttpOnce(subject, opts);
+
+              if (reason !== 'answered') {
+                this.failResource(
+                  subject,
+                  new AtomicError(
+                    reason === 'unreachable'
+                      ? NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE
+                      : NOT_AVAILABLE_LOCALLY_MESSAGE,
+                    ErrorType.Transport,
+                  ),
+                );
+              }
             }
           }
         }
