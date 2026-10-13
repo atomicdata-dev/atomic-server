@@ -236,13 +236,16 @@ pub fn record_ops(
     // state before it asked for the full log, so its envelope joins it and
     // the history written so far is kept. Only the commits after it prune,
     // and each of those drops just the envelope it supersedes.
+    // A state whose ancestor chain cannot be read might be audited, so it
+    // counts as audited too: nothing is dropped on a guess.
     let audited = store.envelope_retention() == EnvelopeRetention::All
         || [
             response.resource_new.as_ref(),
             response.resource_old.as_ref(),
         ]
         .into_iter()
-        .any(|state| resolve_retention(store, state) == Resolved::Audit);
+        .flatten()
+        .any(|state| resolve_retention(store, Some(state)) != Resolved::Compact);
     // Later commits: under audit the genesis envelope is history that has to
     // stay, so write it out before something newer sits beside it.
     if audited {
@@ -685,7 +688,8 @@ mod tests {
 
     /// Taking `audit` off never deletes the audit era: the lowering commit
     /// is kept beside the earlier rows, and only later commits prune the
-    /// newest superseded envelope.
+    /// newest superseded envelope (which, after one edit, is the lowering
+    /// commit itself).
     #[tokio::test]
     async fn lowering_audit_keeps_the_audit_era() {
         let db = Db::init_temp("envelopes_lowered").await.unwrap();
@@ -700,12 +704,61 @@ mod tests {
             4,
             "the lowering commit is kept beside the audit era"
         );
-        signed_edit(&db, &subject, "two").await;
-        assert_eq!(
-            envelopes(&db, subject.as_str()).len(),
-            4,
-            "later commits replace only the newest row"
-        );
+        let audit_era: Vec<String> = envelopes(&db, subject.as_str())
+            .iter()
+            .take(3)
+            .map(|e| e.signature.clone())
+            .collect();
+        for name in ["two", "three", "four"] {
+            signed_edit(&db, &subject, name).await;
+        }
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 4, "later commits replace only the newest row");
+        let kept_sigs: Vec<String> = kept.iter().take(3).map(|e| e.signature.clone()).collect();
+        assert_eq!(kept_sigs, audit_era, "the audit era stays untouched");
+    }
+
+    #[tokio::test]
+    async fn resolve_retention_reads_compact_and_audit() {
+        let db = Db::init_temp("envelopes_resolve").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let plain = child(&db, &drive).await;
+        let audited = child(&db, &drive).await;
+        set_retention(&db, &audited, "audit").await;
+        let kid = child(&db, audited.as_str()).await;
+        let explicit = child(&db, &drive).await;
+        set_retention(&db, &explicit, "compact").await;
+        for (subject, want) in [
+            (&plain, Resolved::Compact),
+            (&audited, Resolved::Audit),
+            (&kid, Resolved::Audit),
+            (&explicit, Resolved::Compact),
+        ] {
+            let resource = db.get_resource(subject).await.unwrap();
+            assert_eq!(resolve_retention(&db, Some(&resource)), want);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_local_write_under_an_unreadable_ancestor_prunes_nothing() {
+        let db = Db::init_temp("envelopes_unknown_local").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let mut resource = db.get_resource(&subject).await.unwrap();
+        resource
+            .set(
+                urls::PARENT.into(),
+                Value::AtomicUrl(crate::Subject::from_raw(
+                    "https://example.com/not-held",
+                    None,
+                )),
+                &db,
+            )
+            .await
+            .unwrap();
+        resource.save_locally(&db).await.unwrap();
+        signed_edit(&db, &subject, "one").await;
+        assert!(envelopes(&db, subject.as_str()).len() >= 2);
     }
 
     #[tokio::test]

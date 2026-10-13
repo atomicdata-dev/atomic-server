@@ -45,7 +45,10 @@ Setting `audit` later protects history from that moment on; the envelopes a
 node already dropped are not recovered. Taking `audit` off, or moving the
 resource out of an audited folder, never deletes what was kept: the commit that
 does it is stored beside the audit-era envelopes, and later commits replace only
-the newest one. A node that has not yet received an ancestor of a resource keeps
+the newest one. That newest one is the lowering commit itself, so after one more
+edit the signed record of who lowered `audit` is gone while the audit era stays.
+A receiver that already holds a newer envelope for a compact resource still
+drops an older incoming one, audit-era or not. A node that has not yet received an ancestor of a resource keeps
 every envelope it is sent until it can read the whole chain. Each node applies the
 setting to the resources it holds, so a device that is short on space can still
 keep less than a server does.
