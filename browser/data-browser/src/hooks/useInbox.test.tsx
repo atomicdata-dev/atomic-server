@@ -65,6 +65,7 @@ async function device({
   store.setClientDb({
     isReady: true,
     waitForReady: async () => true,
+    waitForInit: async () => undefined,
     query: vi.fn(async () => ({ subjects: [], count: 0 })),
   } as unknown as ClientDbWorker);
 

@@ -288,6 +288,9 @@ export class WSClient {
   private _onlineListener: (() => void) | undefined;
   private _driveUnsub: (() => void) | undefined;
   private _savedDriveUnsub: (() => void) | undefined;
+  private _liveUpdatedUnsub: (() => void) | undefined;
+  /** Subjects whose SUB went out on this socket (cleared when it closes). */
+  private _liveSent = new Set<string>();
   /** Drive-sync state computed for a hash-first probe, kept until the server
    *  either accepts it (`SYNC_OK`) or asks for the full state (`SYNC_RESEND`),
    *  with the guard of the connection and identity that computed it. */
@@ -455,6 +458,10 @@ export class WSClient {
         this.subscribeToDrive();
         void this.reconcileSubscribedDrive();
       }
+    });
+
+    this._liveUpdatedUnsub = store.on(StoreEvents.ResourceUpdated, resource => {
+      this.retryLiveSubscription(store.normalizeSubject(resource.subject));
     });
 
     const wsURL = new URL(url);
@@ -647,6 +654,8 @@ export class WSClient {
     this._driveUnsub = undefined;
     this._savedDriveUnsub?.();
     this._savedDriveUnsub = undefined;
+    this._liveUpdatedUnsub?.();
+    this._liveUpdatedUnsub = undefined;
 
     if (
       this._onlineListener &&
@@ -1776,7 +1785,11 @@ export class WSClient {
     this.sendBinary(encodeSub(this.wireSubject(subject)));
   }
 
-  /** A `SUB` for one resource, held via {@link Store.subscribeLive}. */
+  /** A `SUB` for one resource, held via {@link Store.subscribeLive}.
+   *  The server refuses a SUB for what the reader cannot read yet (a drive not
+   *  created, or whose genesis it has not acknowledged), and that refusal is
+   *  logged as a warning. So the SUB waits until the resource is known to be
+   *  readable; {@link retryLiveSubscription} sends it then. */
   public subscribeResource(subject: string): void {
     if (this.readyState !== WebSocket.OPEN) return;
     if (this.store.isLocalOnlySubject(subject)) return;
@@ -1785,10 +1798,35 @@ export class WSClient {
       this.authenticatedWith !== this.store.getAgent()?.subject
     )
       return;
+    if (!this.store.isLiveSyncedDrive(subject)) return;
+    const resource = this.hydratedResource(subject);
+    if (
+      !resource ||
+      resource.loading ||
+      resource.new ||
+      isNotFound(resource.error) ||
+      isUnauthorized(resource.error) ||
+      this.awaitingDriveGenesis(subject)
+    )
+      return;
+    if (this._liveSent.has(subject)) return;
+    this._liveSent.add(subject);
     this.sendBinary(encodeSub(this.wireSubject(subject)));
   }
 
+  /** Called when a resource changes: sends the held SUB that was waiting for it. */
+  private retryLiveSubscription(subject: string): void {
+    if (
+      this.store.liveSubjects.has(subject) &&
+      !this._liveSent.has(subject) &&
+      this.store.getWebSocketForSubject(subject) === this
+    ) {
+      this.subscribeResource(subject);
+    }
+  }
+
   public unsubscribeResource(subject: string): void {
+    this._liveSent.delete(subject);
     if (this.readyState !== WebSocket.OPEN) return;
     this.sendBinary(encodeUnsub(this.wireSubject(subject)));
   }
@@ -1808,6 +1846,8 @@ export class WSClient {
         this.subscribeAgentProfile(subject);
       }
     }
+
+    this._liveSent.clear();
 
     for (const subject of this.store.liveSubjects.keys()) {
       if (this.store.getWebSocketForSubject(subject) === this) {

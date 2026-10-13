@@ -847,6 +847,68 @@ describe('WSClient drive subscription', () => {
     client.close();
   });
 
+  describe('a held subscription on a resource the reader cannot read yet', () => {
+    const PRIVATE = 'did:ad:private-home';
+
+    async function liveClient() {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+      const resource = new Resource(PRIVATE);
+      store.resources.set(store.normalizeSubject(PRIVATE), resource);
+
+      return { client, socket, store, resource };
+    }
+
+    it.each([ErrorType.NotFound, ErrorType.Unauthorized])(
+      'sends no SUB while the resource is known to be %s',
+      async errorType => {
+        const { client, socket, store, resource } = await liveClient();
+        resource.setError(new AtomicError('Not readable', errorType));
+        store.subscribeLive(PRIVATE);
+        assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+        client.close();
+      },
+    );
+
+    it('sends no SUB for an unsaved resource or one awaiting its genesis', async () => {
+      const { client, socket, store, resource } = await liveClient();
+      resource.new = true;
+      store.outbox.setGenesisCommit(PRIVATE, signedCommit());
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      client.close();
+    });
+
+    it('sends no SUB for a resource that is not in the store yet, and sends it once it loads', async () => {
+      const { client, socket, store } = await liveClient();
+      store.resources.delete(store.normalizeSubject(PRIVATE));
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      const loaded = new Resource(PRIVATE);
+      loaded.new = false;
+      store.resources.set(store.normalizeSubject(PRIVATE), loaded);
+      store.notifyResourceUpdated(loaded);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      // Further updates do not repeat it.
+      store.notifyResourceUpdated(loaded);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+
+    it('sends the SUB once an errored resource loads without error', async () => {
+      const { client, socket, store, resource } = await liveClient();
+      resource.setError(new AtomicError('Not found', ErrorType.NotFound));
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      resource.setError(undefined as never);
+      resource.new = false;
+      store.notifyResourceUpdated(resource);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+  });
+
   it.each([ErrorType.NotFound, ErrorType.Unauthorized])(
     'does not automatically sync an unreadable drive under its legacy alias (%s)',
     async errorType => {
