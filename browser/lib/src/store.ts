@@ -657,6 +657,9 @@ async function readDriveVersionVectors(
   return all;
 }
 
+/** How long `makeDriveLocal` waits for running syncs and saves to settle. */
+const MAKE_LOCAL_SETTLE_MS = 15_000;
+
 export class Store {
   /** A list of all functions that need to be called when a certain resource is updated */
   public subscribers: Map<string, ResourceCallback[]>;
@@ -1267,6 +1270,13 @@ export class Store {
       return;
     }
 
+    // A drive reconcile or a save in flight is a moment, not a verdict: the
+    // boot-time round for the drive is still running when a person (or the
+    // template flow) goes straight to making a drive local, and refusing it
+    // outright made that click fail for nothing. Give it a bounded time to
+    // settle; `current()` below still refuses what does not.
+    await this.waitForSyncSettled(MAKE_LOCAL_SETTLE_MS);
+
     const serverUrl = this.serverUrl;
     // Sockets are registered under whatever string opened them, which is not
     // always `serverUrl`, so fall back to the drive's origin exactly as
@@ -1314,6 +1324,36 @@ export class Store {
     this.registerLocalOnlyDrive(drive);
     ws.unsubscribeFromDrive(drive);
     this.emitSyncStatus();
+  }
+
+  /** Resolves once no drive sync is running and nothing is waiting to save,
+   *  or after `timeoutMs`, whichever comes first. Never rejects: callers
+   *  re-check the status themselves. Blocked outbox entries are not waited
+   *  for, they only clear when someone acts. */
+  private waitForSyncSettled(timeoutMs: number): Promise<void> {
+    const settled = () => {
+      const status = this.getSyncStatus();
+
+      return !status.syncInProgress && !status.pendingDirtyCount;
+    };
+
+    if (settled()) return Promise.resolve();
+
+    return new Promise(resolve => {
+      const deadline = Date.now() + timeoutMs;
+
+      const poll = () => {
+        if (settled() || Date.now() >= deadline) {
+          resolve();
+
+          return;
+        }
+
+        setTimeout(poll, 100);
+      };
+
+      setTimeout(poll, 100);
+    });
   }
 
   /** Forget a local-only drive (e.g. after deleting a demo workspace),

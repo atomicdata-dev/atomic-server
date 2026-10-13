@@ -1,4 +1,4 @@
-import type { Store } from '@tomic/lib';
+import { isUnauthorized, type Store } from '@tomic/lib';
 import { isOriginWithoutNode } from './originNode';
 
 /**
@@ -68,7 +68,17 @@ export async function deviceHasDriveData(
       return !store.getResourceLoading(drive).error;
     }
 
-    const resource = await store.getResource(drive);
+    let resource = await store.getResource(drive);
+
+    // A private drive read before this identity signed in is cached as
+    // "Unauthorized", and the store only retries it once the socket has
+    // authenticated. That is not "this device has no data": the answer was
+    // given to the public agent. Ask again as the signed-in agent, otherwise a
+    // second device concludes the drive is missing and goes looking for its
+    // server through pkarr.
+    if (isUnauthorized(resource.error) && store.getAgent()) {
+      resource = await store.fetchResourceFromServer(drive);
+    }
 
     return !resource.error;
   } catch {
