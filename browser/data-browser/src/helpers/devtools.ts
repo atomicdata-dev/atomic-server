@@ -9,7 +9,12 @@
  * the result to a variable for further inspection.
  */
 import type { Store, CommitLogEntry, Resource } from '@tomic/react';
-import { ATOMIC_PREFIX } from '@tomic/lib';
+import {
+  ATOMIC_PREFIX,
+  canonicalizeScheme,
+  constraintViolations,
+  type ConstraintViolation,
+} from '@tomic/lib';
 
 type InspectResult = {
   subject: string;
@@ -37,6 +42,8 @@ type InspectResult = {
     jsonAd?: unknown;
     error?: string;
   };
+  /** Values breaking their classes' constraints (loaded classes only). */
+  violations: ConstraintViolation[];
 };
 
 function summarizeResource(r: Resource | undefined): InspectResult['jsStore'] {
@@ -157,7 +164,21 @@ export async function inspect(
     inspectWasm(store, subject),
     fetchFromServer(store, subject),
   ]);
-  const result: InspectResult = { subject, jsStore, wasm, server };
+
+  const local = store.resources.get(subject);
+
+  const lookup = (s: string) => {
+    const r =
+      store.resources.get(s) ?? store.resources.get(canonicalizeScheme(s));
+
+    return r?.isReady() ? r : undefined;
+  };
+
+  const violations = local?.isReady()
+    ? constraintViolations(lookup, local)
+    : [];
+
+  const result: InspectResult = { subject, jsStore, wasm, server, violations };
   const serverSummary = !server.connected
     ? 'offline'
     : server.error
@@ -167,7 +188,8 @@ export async function inspect(
     `[devtools.inspect] ${subject.slice(0, 60)}
   jsStore: present=${jsStore.present} loading=${jsStore.loading ?? '-'} new=${jsStore.new ?? '-'} props=${jsStore.propCount ?? 0} error=${jsStore.error ?? '-'}
   wasm:    clientDb=${wasm.hasClientDb} ready=${wasm.ready ?? '-'} jsonAd=${wasm.jsonAdChars ?? 0}ch snapshot=${wasm.hasLoroSnapshot ?? '-'}${wasm.threw ? ' threw=' + wasm.threw : ''}
-  server:  ${serverSummary}`,
+  server:  ${serverSummary}
+  violations: ${violations.length}${violations.map(v => '\n    ' + v.message).join('')}`,
     result,
   );
 

@@ -866,14 +866,56 @@ pub fn check_value(c: &Constraint, value: &Value) -> Result<(), ConstraintError>
     }
 }
 
-/// Checks every value of `resource` against the constraints of each class in
-/// its `isA`. Classes this store does not have are skipped, and so is a class
-/// whose map does not parse (it is rejected when the class is written).
+/// One value that breaks a constraint of one of its resource's classes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Violation {
+    /// Subject of the class whose `constraints` map holds the broken rule.
+    pub class: String,
+    /// Shortname of that class, or its subject when it has none.
+    pub class_name: String,
+    /// Canonical subject of the constrained property.
+    pub property: String,
+    /// Shortname of the property, or its subject when it has none.
+    pub property_name: String,
+    /// The JSON Schema keyword that failed.
+    pub keyword: &'static str,
+    /// JSON pointer to the failing value inside the property's value. Empty
+    /// for the value itself.
+    pub path: String,
+    pub detail: String,
+}
+
+impl std::fmt::Display for Violation {
+    /// `Value for <shortname> breaks <keyword> on class <class>[ at <path>]: <detail>`
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Value for {} breaks {} on class {}",
+            self.property_name, self.keyword, self.class_name
+        )?;
+        if !self.path.is_empty() {
+            write!(f, " at {}", self.path)?;
+        }
+        write!(f, ": {}", self.detail)
+    }
+}
+
+/// Collects every violation of the constraints of each class in the
+/// resource's `isA`, across all classes and all constrained properties,
+/// grouped by class in `isA` order. The order of properties within a class is
+/// unspecified (Rust and TS may differ). Per property only the first failure
+/// is reported (a nested value is not walked for further failing leaves), so
+/// the result holds at most one [`Violation`] per class and property. The TS
+/// twin `constraintViolations` behaves the same.
 ///
-/// Error text: `Value for <shortname> breaks <keyword> on class <class>: <detail>`.
-pub async fn check_resource(store: &impl Storelike, resource: &Resource) -> AtomicResult<()> {
+/// A class this store does not have, or whose `constraints` map does not
+/// parse, is skipped and yields no violations.
+///
+/// Use this to find resources that arrived by sync, which is never checked.
+pub async fn violations(store: &impl Storelike, resource: &Resource) -> Vec<Violation> {
+    let mut found = Vec::new();
     let Ok(classes) = resource.get(urls::IS_A).and_then(|v| v.to_subjects(None)) else {
-        return Ok(());
+        return found;
     };
 
     for class_subject in classes {
@@ -898,26 +940,36 @@ pub async fn check_resource(store: &impl Storelike, resource: &Resource) -> Atom
                 continue;
             };
             if let Err(e) = check_value(constraint, value) {
-                let shortname = shortname_of(store, prop).await;
-                let class_name = class
-                    .get(urls::SHORTNAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or(class_subject.clone());
-                let at = if e.path.is_empty() {
-                    String::new()
-                } else {
-                    format!(" at {}", e.path)
-                };
-                return Err(format!(
-                    "Value for {shortname} breaks {} on class {class_name}{at}: {}",
-                    e.keyword, e.detail
-                )
-                .into());
+                found.push(Violation {
+                    class: class_subject.clone(),
+                    class_name: class
+                        .get(urls::SHORTNAME)
+                        .map(|v| v.to_string())
+                        .unwrap_or(class_subject.clone()),
+                    property: prop.clone(),
+                    property_name: shortname_of(store, prop).await,
+                    keyword: e.keyword,
+                    path: e.path,
+                    detail: e.detail,
+                });
             }
         }
     }
 
-    Ok(())
+    found
+}
+
+/// Checks every value of `resource` against the constraints of each class in
+/// its `isA`, failing with the first [`Violation`] of [`violations`]. Classes
+/// this store does not have are skipped, and so is a class whose map does not
+/// parse (it is rejected when the class is written).
+///
+/// Error text: `Value for <shortname> breaks <keyword> on class <class>: <detail>`.
+pub async fn check_resource(store: &impl Storelike, resource: &Resource) -> AtomicResult<()> {
+    match violations(store, resource).await.into_iter().next() {
+        Some(v) => Err(v.to_string().into()),
+        None => Ok(()),
+    }
 }
 
 async fn shortname_of(store: &impl Storelike, prop: &str) -> String {
@@ -1057,6 +1109,86 @@ mod test {
             err.starts_with("Value for name breaks maxLength on class task:"),
             "{err}"
         );
+    }
+
+    #[tokio::test]
+    async fn violations_collects_every_failing_property() {
+        let store = crate::Db::init_temp("class_constraints_violations")
+            .await
+            .unwrap();
+        store.populate().await.unwrap();
+
+        let mut class = Resource::new_instance(urls::CLASS, &store).await.unwrap();
+        class.set_subject("https://example.com/Task".into());
+        class
+            .set_string(urls::SHORTNAME.into(), "task", &store)
+            .await
+            .unwrap();
+        class
+            .set_string(urls::DESCRIPTION.into(), "A task", &store)
+            .await
+            .unwrap();
+        class
+            .set_unsafe(
+                urls::CONSTRAINTS.into(),
+                Value::Json(json!({
+                    urls::NAME: { "maxLength": 3 },
+                    urls::DESCRIPTION: { "maxLength": 5 },
+                })),
+            )
+            .unwrap();
+        class.save_locally(&store).await.unwrap();
+
+        let mut task = Resource::new("https://example.com/task1".into());
+        task.set_unsafe(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![SubResource::Subject(
+                "https://example.com/Task".into(),
+            )]),
+        )
+        .unwrap();
+        task.set_string(urls::NAME.into(), "abc", &store)
+            .await
+            .unwrap();
+        task.set_string(urls::DESCRIPTION.into(), "short", &store)
+            .await
+            .unwrap();
+        assert!(violations(&store, &task).await.is_empty());
+
+        task.set_string(urls::NAME.into(), "abcd", &store)
+            .await
+            .unwrap();
+        task.set_string(urls::DESCRIPTION.into(), "too long", &store)
+            .await
+            .unwrap();
+        let found = violations(&store, &task).await;
+        assert_eq!(found.len(), 2, "{found:?}");
+        let names: Vec<_> = found.iter().map(|v| v.property_name.as_str()).collect();
+        assert!(names.contains(&"name") && names.contains(&"description"));
+        assert!(found
+            .iter()
+            .all(|v| v.class == "https://example.com/Task" && v.keyword == "maxLength"));
+        let err = check_resource(&store, &task).await.unwrap_err().to_string();
+        assert_eq!(err, found[0].to_string());
+        assert!(
+            err.starts_with("Value for ") && err.contains(" breaks maxLength on class task: "),
+            "{err}"
+        );
+
+        let mut orphan = Resource::new("https://example.com/task2".into());
+        orphan
+            .set_unsafe(
+                urls::IS_A.into(),
+                Value::ResourceArray(vec![SubResource::Subject(
+                    "https://example.com/Missing".into(),
+                )]),
+            )
+            .unwrap();
+        orphan
+            .set_string(urls::NAME.into(), "abcdefgh", &store)
+            .await
+            .unwrap();
+        assert!(violations(&store, &orphan).await.is_empty());
     }
 
     #[tokio::test]
