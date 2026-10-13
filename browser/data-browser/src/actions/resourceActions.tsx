@@ -37,7 +37,7 @@ import {
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
-import { isInTrash, restoreFromTrash } from '../helpers/trash';
+import { isInTrash, moveToTrash, restoreFromTrash } from '../helpers/trash';
 import { openSearchOverlay } from '../components/overlayState';
 import { openShareDialog } from '../components/Share/shareDialogState';
 
@@ -406,14 +406,46 @@ export const resourceActions: ActionDefinition[] = [
     },
   },
   {
+    id: 'trash',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Move to Trash',
+    helper: () => 'Move this resource to the Trash. You can restore it later.',
+    keywords: ['delete', 'remove', 'trash'],
+    icon: () => <FaTrash />,
+    available: ctx => ctx.canWrite && !!ctx.drive && !inTrash(ctx),
+    asTool: true,
+    toolName: 'move_to_trash',
+    run: async ctx => {
+      const parent = getParent(ctx);
+
+      try {
+        if (ctx.drive) {
+          await moveToTrash(ctx.store, ctx.subject, ctx.drive);
+        }
+
+        ctx.onAfterDelete?.();
+        toast.success('Moved to Trash');
+
+        if (ctx.currentSubject === ctx.subject) {
+          ctx.navigate(parent ? constructOpenURL(parent) : '/');
+        }
+      } catch (error) {
+        toast.error(
+          `Could not move to Trash: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
+    },
+  },
+  {
     id: 'delete',
     scope: 'resource',
     section: 'action',
-    label: ctx => (inTrash(ctx) ? 'Delete permanently' : 'Delete'),
+    label: () => 'Delete permanently',
     helper: () => 'Delete this resource.',
     keywords: ['remove', 'destroy', 'trash'],
     icon: () => <FaTrash />,
-    available: ctx => ctx.canWrite,
+    available: ctx => ctx.canWrite && (inTrash(ctx) || !ctx.drive),
     asTool: true,
     toolName: 'delete_resource',
     danger: true,
