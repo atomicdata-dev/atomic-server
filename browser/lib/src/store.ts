@@ -860,6 +860,12 @@ export class Store {
    * Driven by WebSocket open/close events. When false, commits are stored
    * locally and synced when the connection is restored.
    */
+  /** Pages of unsynced drives' collections the server has answered. Its
+   * members were written to the local DB as they loaded and live updates keep
+   * it current while connected, so the local answer is whole from then on.
+   * Cleared on reconnect, as what happened during a drop never arrived. Lives
+   * here so `collection.ts` needs no runtime import of the store. */
+  readonly collectionPagesAnsweredByServer = new Set<string>();
   private _serverConnected = false;
   private _serverConnectionError: string | undefined;
   private _driveSyncInProgress = false;
@@ -5819,6 +5825,10 @@ export class Store {
 
     this._serverConnected = connected;
     this._serverConnectionError = nextError;
+
+    if (connected) {
+      this.collectionPagesAnsweredByServer.clear();
+    }
 
     if (!connected) {
       this._driveSyncInProgress = false;
