@@ -53,6 +53,42 @@ describe('refreshing drive availability', () => {
     expect(store.fetchResourceFromServer).toHaveBeenCalledWith('did:ad:drive');
   });
 
+  it('does not refetch a cached 401 when no agent is set', async () => {
+    const unauthorized = new AtomicError(
+      'Unauthorized.',
+      ErrorType.Unauthorized,
+    );
+    const store = {
+      getAgent: () => undefined,
+      getResource: vi.fn().mockResolvedValue({ error: unauthorized }),
+      fetchResourceFromServer: vi.fn(),
+    };
+
+    expect(
+      await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
+    ).toBe(false);
+    expect(store.fetchResourceFromServer).not.toHaveBeenCalled();
+  });
+
+  it('reports unavailable when the signed-in refetch is still a 401', async () => {
+    const unauthorized = new AtomicError(
+      'Unauthorized.',
+      ErrorType.Unauthorized,
+    );
+    const store = {
+      getAgent: () => ({ subject: 'did:ad:agent:me' }),
+      getResource: vi.fn().mockResolvedValue({ error: unauthorized }),
+      fetchResourceFromServer: vi
+        .fn()
+        .mockResolvedValue({ error: unauthorized }),
+    };
+
+    expect(
+      await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
+    ).toBe(false);
+    expect(store.fetchResourceFromServer).toHaveBeenCalledTimes(1);
+  });
+
   it('does not report availability when local storage rejects the read', async () => {
     const store = {
       getResource: vi.fn().mockRejectedValue(new Error('Storage unavailable')),

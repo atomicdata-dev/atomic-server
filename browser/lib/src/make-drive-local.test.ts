@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { afterEach, describe, it, vi } from 'vitest';
 import type { ClientDbWorker } from './client-db.js';
 import { Resource } from './resource.js';
 import { testStore } from './test-store.js';
@@ -139,5 +139,86 @@ describe('local-only drive registration', () => {
     store.addResource(child);
 
     expect(store.isLocalOnlySubject('did:ad:legacy-child')).toBe(true);
+  });
+});
+
+type Settler = { waitForSyncSettled(ms: number): Promise<void> };
+
+describe('waitForSyncSettled', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const setup = async (initiallySettled: boolean) => {
+    const { store } = await testStore();
+    let settled = initiallySettled;
+    const base = store.getSyncStatus();
+
+    vi.spyOn(store, 'getSyncStatus').mockImplementation(() => ({
+      ...base,
+      syncInProgress: !settled,
+      pendingDirtyCount: 0,
+    }));
+    const unsubscribe = vi.fn();
+    const on = vi.spyOn(store, 'on').mockImplementation(((
+      _event: unknown,
+      cb: () => void,
+    ) => {
+      listener = cb;
+
+      return unsubscribe;
+    }) as never);
+    let listener: (() => void) | undefined;
+
+    return {
+      store,
+      on,
+      unsubscribe,
+      wait: (ms: number) =>
+        (store as unknown as Settler).waitForSyncSettled(ms),
+      settle: () => {
+        settled = true;
+        listener?.();
+      },
+      notify: () => listener?.(),
+    };
+  };
+
+  it('resolves immediately when already settled', async ({ expect }) => {
+    const t = await setup(true);
+
+    await expect(t.wait(5000)).resolves.toBeUndefined();
+    expect(t.on).not.toHaveBeenCalled();
+  });
+
+  it('resolves when the event reports settled, and unsubscribes', async ({
+    expect,
+  }) => {
+    vi.useFakeTimers();
+    const t = await setup(false);
+    const p = t.wait(5000);
+
+    t.notify();
+    expect(t.unsubscribe).not.toHaveBeenCalled();
+    t.settle();
+
+    await expect(p).resolves.toBeUndefined();
+    expect(t.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects with an explicit error on timeout, and unsubscribes', async ({
+    expect,
+  }) => {
+    vi.useFakeTimers();
+    const t = await setup(false);
+    const p = t.wait(5000);
+    const assertion = expect(p).rejects.toThrow(
+      'Drive is still syncing, try again in a moment.',
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await assertion;
+    expect(t.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

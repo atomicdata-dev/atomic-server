@@ -658,7 +658,7 @@ async function readDriveVersionVectors(
 }
 
 /** How long `makeDriveLocal` waits for running syncs and saves to settle. */
-const MAKE_LOCAL_SETTLE_MS = 15_000;
+const MAKE_LOCAL_SETTLE_MS = 5_000;
 
 export class Store {
   /** A list of all functions that need to be called when a certain resource is updated */
@@ -1326,9 +1326,10 @@ export class Store {
     this.emitSyncStatus();
   }
 
-  /** Resolves once no drive sync is running and nothing is waiting to save,
-   *  or after `timeoutMs`, whichever comes first. Never rejects: callers
-   *  re-check the status themselves. Blocked outbox entries are not waited
+  /** Resolves once no drive sync is running and nothing is waiting to save.
+   *  Rejects with a user-readable error after `timeoutMs`, so a stuck sync
+   *  surfaces fast instead of waiting silently. Driven by
+   *  `SyncStatusChanged`, not polling. Blocked outbox entries are not waited
    *  for, they only clear when someone acts. */
   private waitForSyncSettled(timeoutMs: number): Promise<void> {
     const settled = () => {
@@ -1339,20 +1340,23 @@ export class Store {
 
     if (settled()) return Promise.resolve();
 
-    return new Promise(resolve => {
-      const deadline = Date.now() + timeoutMs;
-
-      const poll = () => {
-        if (settled() || Date.now() >= deadline) {
-          resolve();
-
-          return;
-        }
-
-        setTimeout(poll, 100);
+    return new Promise<void>((resolve, reject) => {
+      const finish = () => {
+        clearTimeout(timer);
+        unsubscribe();
       };
 
-      setTimeout(poll, 100);
+      const unsubscribe = this.on(StoreEvents.SyncStatusChanged, () => {
+        if (!settled()) return;
+
+        finish();
+        resolve();
+      });
+
+      const timer = setTimeout(() => {
+        finish();
+        reject(new Error('Drive is still syncing, try again in a moment.'));
+      }, timeoutMs);
     });
   }
 
