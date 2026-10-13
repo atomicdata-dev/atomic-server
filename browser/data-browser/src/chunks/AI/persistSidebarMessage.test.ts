@@ -4,6 +4,7 @@ import type { PersistSidebarMessageArgs } from './persistSidebarMessage';
 
 const saved: string[] = [];
 const serverPersisted: string[] = [];
+const queues = new WeakMap<object, Promise<unknown>>();
 
 vi.mock('./chatConversionUtils', () => ({
   addMessageToChatResource: vi.fn(async (added, chat, _store, opts) => {
@@ -16,11 +17,15 @@ vi.mock('./chatConversionUtils', () => ({
       serverPersisted.push(resource.subject);
     },
   ),
-  // The real one serializes this work against the chat's message writes.
-  // There are none to serialize against here, so running it is the whole job.
-  queueChatWrite: vi.fn(async (_chat: unknown, work: () => Promise<unknown>) =>
-    work(),
-  ),
+  // Same contract as the real one: work for one chat runs strictly in order.
+  queueChatWrite: vi.fn((chat: object, work: () => Promise<unknown>) => {
+    const next = (queues.get(chat) ?? Promise.resolve())
+      .catch(() => {})
+      .then(work);
+    queues.set(chat, next);
+
+    return next;
+  }),
 }));
 
 const { persistSidebarMessage } = await import('./persistSidebarMessage');
@@ -188,12 +193,14 @@ describe('persistSidebarMessage', () => {
     // server has not seen, and whoever opens it in that window gets
     // "Resource not found" where the reply should be. The name still lands on
     // the resource; the finalization's own save carries it.
+    // No question in the conversation: still the empty draft, which only the
+    // user's first message turns into a chat.
     const chat = fakeChat();
 
     await persistSidebarMessage({
       ...args(chat, { isChatSavedRef: { current: false } }),
       message: message('assistant'),
-      newMessages: [message('user'), message('assistant')],
+      newMessages: [message('assistant'), message('assistant')],
     });
 
     expect(chat.get(NAME)).toBe('A good title');
@@ -225,5 +232,49 @@ describe('persistSidebarMessage', () => {
     });
 
     expect(chat.get(NAME)).toBe('Untitled Chat');
+  });
+
+  it('finalizes on the reply when saving the question failed', async () => {
+    // A save can fail once (a dropped connection, a save that is only queued
+    // in the outbox). The chat then stays a draft, and every reply after it
+    // used to be built local-only: only another question swept it up, so a
+    // chat whose last turn was an answer lived on one device alone.
+    const chat = fakeChat();
+    const isChatSavedRef = { current: false };
+    const failOnce = vi.fn(async () => {
+      throw new Error('network');
+    });
+    const save = chat.save;
+
+    chat.save = failOnce;
+    const user = message('user');
+    const base = args(chat, { isChatSavedRef, shouldGenerateTitles: false });
+    const pending = new Map();
+
+    await expect(
+      persistSidebarMessage({
+        ...base,
+        messageToResourceMapRef: { current: pending },
+        message: user,
+        newMessages: [user],
+      }),
+    ).rejects.toThrow('network');
+    expect(isChatSavedRef.current).toBe(false);
+
+    chat.save = save;
+    pending.set(user, { subject: 'message-user', props: { parts: [] } });
+    serverPersisted.length = 0;
+    const reply = message('assistant');
+
+    await persistSidebarMessage({
+      ...base,
+      messageToResourceMapRef: { current: pending },
+      message: reply,
+      newMessages: [user, reply],
+    });
+
+    expect(isChatSavedRef.current).toBe(true);
+    expect(serverPersisted).toContain('message-user');
+    expect(saved).toContain('chat-1');
   });
 });
