@@ -120,7 +120,8 @@ enum Commands {
         Examples: \n\n\
         $ atomic-cli schema push shop.schema.json --parent <drive subject>\n\
         $ atomic-cli schema lock shop.schema.json --ontology <ontology subject>\n\
-        $ atomic-cli schema check shop.schema.json \n\n\
+        $ atomic-cli schema check shop.schema.json \n\
+        $ atomic-cli schema diff shop.schema.json \n\n\
         The lockfile is written next to the schema file as <file>.lock.json. \
     ")]
     Schema {
@@ -177,6 +178,25 @@ enum SchemaCommands {
         /// Push even if the lockfile no longer matches the schema (new properties are made)
         #[arg(long)]
         accept_changes: bool,
+        /// Push even if the schema has breaking changes (see `schema diff`)
+        #[arg(long)]
+        allow_breaking: bool,
+    },
+    /// Show how a schema file differs from the ontology on the server (or from
+    /// an older schema file): compatible, tightening or breaking. Fails on breaking changes
+    Diff {
+        /// A JSON Schema or an ontology JSON file
+        #[arg(required = true)]
+        file: PathBuf,
+        /// Compare with this older schema file instead of the server (offline)
+        #[arg(long)]
+        against: Option<PathBuf>,
+        /// The ontology's shortname. Defaults to the one in the file.
+        #[arg(long)]
+        shortname: Option<String>,
+        /// Lockfile path. Defaults to <file>.lock.json
+        #[arg(long)]
+        lockfile: Option<PathBuf>,
     },
     /// Offline: write the lockfile for an ontology whose subject you already know
     Lock {
@@ -374,8 +394,26 @@ async fn exec_command(context: &mut Context) -> AtomicResult<()> {
                 shortname,
                 lockfile,
                 accept_changes,
+                allow_breaking,
             } => {
-                schema::push(context, &file, parent, shortname, lockfile, accept_changes).await?;
+                schema::push(
+                    context,
+                    &file,
+                    parent,
+                    shortname,
+                    lockfile,
+                    accept_changes,
+                    allow_breaking,
+                )
+                .await?;
+            }
+            SchemaCommands::Diff {
+                file,
+                against,
+                shortname,
+                lockfile,
+            } => {
+                schema::diff(context, &file, against, shortname, lockfile).await?;
             }
             SchemaCommands::Lock {
                 file,

@@ -20,6 +20,7 @@ interface Fixture {
     classes: Record<string, string>;
     plan?: OntologyInput;
     jsonSchema?: unknown;
+    fingerprint: string;
     lockfile: string;
   }>;
 }
@@ -45,6 +46,7 @@ describe('schema lockfile', () => {
     it(`writes the same bytes as Rust: ${c.name}`, () => {
       const lock = lockfileFromInput(inputOf(c), c.ontology, c.classes);
 
+      expect(lock.fingerprint).toBe(c.fingerprint);
       expect(serializeLockfile(lock)).toBe(c.lockfile);
       expect(parseLockfile(c.lockfile)).toEqual(lock);
       expect(checkLockfile(lock, inputOf(c))).toEqual([]);
@@ -55,7 +57,7 @@ describe('schema lockfile', () => {
     const { store } = makeSchemaStore();
     const input = inputOf(fixture.cases[0]);
     const ensured = await ensureOntology(store, TEST_DRIVE, input);
-    const lock = lockfileFromEnsured(ensured);
+    const lock = lockfileFromEnsured(ensured, input);
 
     expect(lock).toEqual(
       lockfileFromInput(input, ensured.ontology, ensured.classes),
@@ -90,6 +92,34 @@ describe('schema lockfile', () => {
 
     expect(problems).toContain('not in the lockfile');
     expect(problems).toContain("class 'gone' is in the lockfile");
+  });
+
+  it('reports a changed contract, and ignores cosmetic edits and order', () => {
+    const input = inputOf(fixture.cases[0]);
+    const lock = lockfileFromInput(input, fixture.cases[0].ontology);
+    const cosmetic: OntologyInput = structuredClone(input);
+
+    cosmetic.name = 'Renamed';
+    cosmetic.classes[0].description = 'Reworded';
+    cosmetic.classes.reverse();
+    cosmetic.classes[0].properties!.reverse();
+
+    expect(checkLockfile(lock, cosmetic)).toEqual([]);
+
+    const tighter: OntologyInput = structuredClone(input);
+
+    tighter.classes[0].requires!.push('email');
+
+    expect(checkLockfile(lock, tighter).join('\n')).toContain(
+      'changed since it was locked',
+    );
+  });
+
+  it('reads and writes a lockfile without a fingerprint unchanged', () => {
+    const text =
+      '{\n  "classes": {},\n  "ontology": "x",\n  "properties": {}\n}\n';
+
+    expect(serializeLockfile(parseLockfile(text))).toBe(text);
   });
 
   it('rejects unknown fields', () => {

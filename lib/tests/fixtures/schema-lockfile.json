@@ -30,7 +30,8 @@
           }
         ]
       },
-      "lockfile": "{\n  \"classes\": {\n    \"customer\": \"did:ad:customerGenesis\",\n    \"invoice\": \"did:ad:invoiceGenesis\"\n  },\n  \"ontology\": \"did:ad:shopOntologyGenesis\",\n  \"properties\": {\n    \"email\": \"atomic:prop:b4152651d32b39d8d89901323c9673775d2e43bb2ea452db01c8ad5d52432bc1\",\n    \"name\": \"atomic:prop:f04459be53adc3c4904126504db01a55e68a0932d3fd054fa8a5eb4b5bdd5d16\",\n    \"paid\": \"atomic:prop:c936055d9d82b752e65d0500f62f3318913a50c80f8db4002b6214a98f46a715\",\n    \"total\": \"atomic:prop:2d6898145b0e560b6d9cf4f71899d5b85cb2925700a9e339fe3aea8e98fb7539\"\n  }\n}\n"
+      "fingerprint": "b3-57e73e03bc27bf401f96ad12f1c4ffa600d846a7b3eba7b0fc48c4d3fbb1159b",
+      "lockfile": "{\n  \"classes\": {\n    \"customer\": \"did:ad:customerGenesis\",\n    \"invoice\": \"did:ad:invoiceGenesis\"\n  },\n  \"fingerprint\": \"b3-57e73e03bc27bf401f96ad12f1c4ffa600d846a7b3eba7b0fc48c4d3fbb1159b\",\n  \"ontology\": \"did:ad:shopOntologyGenesis\",\n  \"properties\": {\n    \"email\": \"atomic:prop:b4152651d32b39d8d89901323c9673775d2e43bb2ea452db01c8ad5d52432bc1\",\n    \"name\": \"atomic:prop:f04459be53adc3c4904126504db01a55e68a0932d3fd054fa8a5eb4b5bdd5d16\",\n    \"paid\": \"atomic:prop:c936055d9d82b752e65d0500f62f3318913a50c80f8db4002b6214a98f46a715\",\n    \"total\": \"atomic:prop:2d6898145b0e560b6d9cf4f71899d5b85cb2925700a9e339fe3aea8e98fb7539\"\n  }\n}\n"
     },
     {
       "name": "JSON Schema, offline (no class subjects yet)",
@@ -52,7 +53,40 @@
           }
         }
       },
-      "lockfile": "{\n  \"classes\": {},\n  \"ontology\": \"did:ad:notesOntologyGenesis\",\n  \"properties\": {\n    \"created\": \"atomic:prop:6de0c46d519d5bd92a2a67df62c5ed9aa33eef354d075efed6298838682208c4\",\n    \"pinned\": \"atomic:prop:d8f839a78c8dc003208dcc22b370e567051429bdb8c02fd48b2cc0c00d7f94c1\",\n    \"title\": \"atomic:prop:7daee85bf9d203e3315d321352da339f1890fdb91fc0ab199570eb6f15b8f280\"\n  }\n}\n"
+      "fingerprint": "b3-cdf6ef5ec790f8d4f66fab820d3e0532953442ba711cf99a09fbba167f4c0787",
+      "lockfile": "{\n  \"classes\": {},\n  \"fingerprint\": \"b3-cdf6ef5ec790f8d4f66fab820d3e0532953442ba711cf99a09fbba167f4c0787\",\n  \"ontology\": \"did:ad:notesOntologyGenesis\",\n  \"properties\": {\n    \"created\": \"atomic:prop:6de0c46d519d5bd92a2a67df62c5ed9aa33eef354d075efed6298838682208c4\",\n    \"pinned\": \"atomic:prop:d8f839a78c8dc003208dcc22b370e567051429bdb8c02fd48b2cc0c00d7f94c1\",\n    \"title\": \"atomic:prop:7daee85bf9d203e3315d321352da339f1890fdb91fc0ab199570eb6f15b8f280\"\n  }\n}\n"
+    },
+    {
+      "name": "plan with constraints, a classtype and a recommended property",
+      "ontology": "atomic:cafeOntologyGenesis",
+      "classes": {},
+      "plan": {
+        "shortname": "cafe",
+        "name": "Cafe",
+        "properties": [
+          { "shortname": "owner", "datatype": "https://atomicdata.dev/datatypes/atomicURL", "classtype": "https://atomicdata.dev/classes/Agent" }
+        ],
+        "classes": [
+          {
+            "shortname": "dish",
+            "description": "Cosmetic text stays out of the fingerprint",
+            "properties": [
+              { "shortname": "title", "datatype": "https://atomicdata.dev/datatypes/string" },
+              { "shortname": "price", "datatype": "https://atomicdata.dev/datatypes/integer" },
+              { "shortname": "tags", "datatype": "https://atomicdata.dev/datatypes/resourceArray" }
+            ],
+            "requires": ["title"],
+            "recommends": ["owner"],
+            "constraints": {
+              "price": { "type": "integer", "minimum": 0, "maximum": 10000 },
+              "title": { "minLength": 1, "pattern": "^[A-Z]" },
+              "tags": { "type": "array", "items": { "type": "string" }, "maxItems": 5 }
+            }
+          }
+        ]
+      },
+      "fingerprint": "b3-8706b0fb470dde2057bff0a03f39f07626a855feaca60fd6c2a788da274a52b3",
+      "lockfile": "{\n  \"classes\": {},\n  \"fingerprint\": \"b3-8706b0fb470dde2057bff0a03f39f07626a855feaca60fd6c2a788da274a52b3\",\n  \"ontology\": \"atomic:cafeOntologyGenesis\",\n  \"properties\": {\n    \"owner\": \"atomic:prop:2d1804cc3c9b9a3bbddc5950d15453d184c29ca628adfd4f7917269c56d2a797\",\n    \"price\": \"atomic:prop:affd49f9f0756d31a56f8614025bf97293e646f99d8b94e22b78a89031ff4cda\",\n    \"tags\": \"atomic:prop:08f95412119e4131b765a1b4994b8f66bfdcfc5de7d5962a14150c422a2e9096\",\n    \"title\": \"atomic:prop:d4a486fc85bb645d76009532a28ebac51e74b540af2d9c745e52a3b6bdca7156\"\n  }\n}\n"
     }
   ]
 }

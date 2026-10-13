@@ -162,6 +162,8 @@ Both command line tools do the same; the lockfile they write is byte for byte th
 atomic-cli schema push shop.schema.json --parent <drive subject>
 atomic-cli schema lock shop.schema.json --ontology <ontology subject>   # offline
 atomic-cli schema check shop.schema.json                                # offline
+atomic-cli schema diff shop.schema.json                                 # against the server
+atomic-cli schema diff shop.schema.json --against old.schema.json       # offline
 
 # @tomic/cli, uses atomic.config.json (serverUrl, agentSecret)
 npx ad-generate ontology push shop.schema.json --parent <drive subject> --types
@@ -171,8 +173,9 @@ npx ad-generate ontology check shop.schema.json
 
 - `push` runs `ensureOntology`: it creates the ontology under `--parent`, or finds it again, and brings classes in line. It then writes the lockfile. `atomic-cli` takes the parent from the config's initial drive when `--parent` is left out. `--types` (`@tomic/cli` only) adds the ontology to `atomic.config.json` and generates the TypeScript types.
 - `lock` needs no server. Property IDs follow from the ontology subject, the shortname and the datatype, so the lockfile can be made as soon as you know the ontology's subject. Class subjects are minted by the server, so they stay empty until a `push`. Locking again keeps the class subjects of an earlier push of the same ontology.
-- `check` fails when the lockfile no longer matches the schema. Changing a property's shortname or datatype makes a new property with a new ID, and `check` says so. Commit the lockfile and run `check` in CI.
-- `push` refuses to run when the existing lockfile fails `check`, so a changed datatype cannot quietly create a second property. `--accept-changes` pushes anyway.
+- `check` fails when the lockfile no longer matches the schema. Changing a property's shortname or datatype makes a new property with a new ID, and `check` says so. It also fails when the schema's [fingerprint](#changing-a-schema) differs from the one in the lockfile. Commit the lockfile and run `check` in CI.
+- `diff` (`atomic-cli` only) compares the schema file with the ontology on the server that the lockfile points to, or with an older schema file when you pass `--against`. It prints every change grouped by level and exits with an error when one is breaking.
+- `push` refuses to run when a property in the existing lockfile no longer matches the schema, so a changed datatype cannot quietly create a second property. `--accept-changes` pushes anyway. `atomic-cli` also runs `diff` against the server: it refuses breaking changes unless you pass `--allow-breaking`, and warns about tightening ones.
 - `--shortname` overrides the ontology's shortname, `--lockfile <path>` the lockfile's location.
 
 The lockfile is `<file>.lock.json` next to the schema file (`shop.schema.json.lock.json`). Its keys are sorted, it is indented with two spaces and ends with a newline:
@@ -182,6 +185,7 @@ The lockfile is `<file>.lock.json` next to the schema file (`shop.schema.json.lo
   "classes": {
     "customer": "did:ad:..."
   },
+  "fingerprint": "b3-57e73e03bc27bf401f96ad12f1c4ffa600d846a7b3eba7b0fc48c4d3fbb1159b",
   "ontology": "did:ad:...",
   "properties": {
     "email": "atomic:prop:b4152651d32b39d8d89901323c9673775d2e43bb2ea452db01c8ad5d52432bc1",
@@ -192,4 +196,23 @@ The lockfile is `<file>.lock.json` next to the schema file (`shop.schema.json.lo
 
 `atomic-cli` finds the ontology of a re-run through the `ontology` in the lockfile, because it cannot query the server for it. Keep the lockfile, or the next `push` makes a second ontology. `@tomic/cli` finds it by shortname under `--parent`.
 
-In code: `lockfileFromInput`, `serializeLockfile`, `checkLockfile` in `@tomic/lib`, and `Lockfile` in `atomic_lib::schema::lockfile`.
+## Changing a schema
+
+The workflow: edit the schema file, run `schema diff`, run `schema push`, regenerate types.
+`diff` sorts every change into one of three levels:
+
+| Level | Meaning | Examples |
+| --- | --- | --- |
+| compatible | Existing data stays valid and readers keep working. | A new optional property or class. A looser constraint: a lower `minimum`, a higher `maximum`, an `enum` value added, `additionalProperties: false` removed. Required to recommended. |
+| tightening | The property IDs are the same, but existing data may now fail the class constraints. | A new required property. Recommended to required. A higher `minimum` or lower `maximum` (also `exclusive*`, `minLength`, `maxLength`, `minItems`, `maxItems`). An `enum` value removed. A `const` or `pattern` added. `additionalProperties` set to false. |
+| breaking | Data written under the old schema is no longer read by the new one. | A property removed from a class, or a class removed. A property's datatype or shortname changed: that is a new property ID, and the old values stay under the old ID. A changed `classtype`. |
+
+A constraint that changed in a way that has no direction, such as a different `pattern` or `anyOf`, is reported as tightening and says the direction is unknown.
+Names and descriptions are cosmetic: editing them is not a change.
+
+The lockfile holds a `fingerprint`, `b3-` and a blake3 hash of the schema's contract: the ontology, the property IDs, and per class what it requires and recommends, the classtype of its properties and its constraints.
+Reordering classes or properties, or rewording a name or description, does not change it; any other edit does.
+`check` compares it, so CI notices a schema that changed without a new lock or push.
+`push` and `lock` write the new fingerprint. Lockfiles from before it existed have none and keep working.
+
+In code: `lockfileFromInput`, `schemaFingerprint`, `serializeLockfile`, `checkLockfile` in `@tomic/lib`, and `Lockfile` in `atomic_lib::schema::lockfile`, and `fingerprint` and `diff` in `atomic_lib::schema::compat`.

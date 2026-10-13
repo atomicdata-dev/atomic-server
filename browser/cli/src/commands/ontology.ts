@@ -173,10 +173,11 @@ const push = async (
   if (!parent) throw new Error('push needs --parent <subject>');
 
   // A pinned lockfile must still match, or the push would quietly make new
-  // properties next to the old ones.
+  // properties next to the old ones. The fingerprint is for `check`: a push
+  // is what gives a changed schema a new one.
   if (previous && !switches.has('--accept-changes')) {
     try {
-      assertLockfileMatches(previous, input);
+      assertLockfileMatches(previous, input, { fingerprint: false });
     } catch (error) {
       throw new Error(
         `${lockfilePath}: ${(error as Error).message}\nPass --accept-changes to push anyway`,
@@ -199,7 +200,7 @@ const push = async (
   }
 
   const ensured = await ensureOntology(store, parent, input);
-  const lock = lockfileFromEnsured(ensured);
+  const lock = lockfileFromEnsured(ensured, input);
 
   console.log(
     chalk.green('Ontology'),
