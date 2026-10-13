@@ -31,7 +31,8 @@ stale checkpoint races, checkpoint retention and deliberate later recreation.
 - [x] Make the SaaS acceptance job required; add peer multiplayer to that job.
 - [x] Review desktop and mobile recovery errors; keep technical causes out
       of the visible message. The focused missing/corrupt-object rerun passed.
-- [ ] Finish staged commit checks.
+- [x] Finish staged commit checks: recursive browser lint and workspace Clippy
+      passed with hooks enabled.
 - [ ] Publish paired Server PR and update SaaS #217, then inspect exact-head CI.
 
 CI's previous run is queued on Mancave; a queued run is not a pass. Initial
