@@ -5,7 +5,7 @@ import { Resource, normalizeLoroChangeTimestampMs } from './resource.js';
 import { decodeB64 } from './base64.js';
 import { decodeGenesisCert } from './genesis.js';
 import { GENESIS } from './urls.js';
-import { Store } from './store.js';
+import { Store, StoreEvents } from './store.js';
 import { commits } from './ontologies/commits.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import { isCommitSubject } from './commit.js';
@@ -1117,10 +1117,20 @@ export class Collection {
       return;
     }
 
-    const answered =
-      Collection.completedByServer.get(this.store) ?? new Set<string>();
+    let answered = Collection.completedByServer.get(this.store);
+
+    if (!answered) {
+      const known = new Set<string>();
+      answered = known;
+      Collection.completedByServer.set(this.store, known);
+      // Live updates keep the local answer whole only while connected. After
+      // a drop, what happened meanwhile never arrived, so ask again.
+      this.store.on(StoreEvents.ConnectionChanged, connected => {
+        if (connected) known.clear();
+      });
+    }
+
     answered.add(this.buildSubject(page));
-    Collection.completedByServer.set(this.store, answered);
 
     const fetched = this.pages.get(page);
 
