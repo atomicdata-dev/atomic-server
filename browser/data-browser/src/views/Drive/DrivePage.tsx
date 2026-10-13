@@ -77,7 +77,11 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
                     Set as current drive
                   </Button>
                 )}
-                <Button subtle onClick={showSettings}>
+                <Button
+                  subtle
+                  onClick={showSettings}
+                  data-testid='drive-settings-button'
+                >
                   <FaGear /> Drive settings
                 </Button>
               </Row>

@@ -2,10 +2,12 @@ import test, { expect } from './fixtures';
 import {
   before,
   SERVER_URL,
+  currentDialog,
   currentDriveTitle,
   fillSearchBox,
   inDialog,
   newResource,
+  openDriveSettings,
   setTitle,
   sidebarDriveButtonId,
   testFilePath,
@@ -38,13 +40,12 @@ test.describe('Plugins', () => {
     // browser never sees extender-modified propvals.
     await page.getByTestId(sidebarDriveButtonId).click();
 
-    // Drive page now renders Tags / Default Ontology / Plugins as collapsible
-    // sections. Expand the Plugins section so the Upload button is in the DOM.
-    await page.getByRole('main').getByText('Plugins', { exact: true }).click();
+    // Plugins live in the Drive settings dialog (its sections start open).
+    const settings = await openDriveSettings(page);
 
     // Upload a plugin
     const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.getByRole('main').getByText('Upload Plugin').click();
+    await settings.getByText('Upload Plugin').click();
     const fileChooser = await fileChooserPromise;
 
     await fileChooser.setFiles(testFilePath('test-plugin.zip'));
@@ -204,9 +205,10 @@ test.describe('Plugins', () => {
 
     // Navigate back to the plugin
     await currentDriveTitle(page).click();
-    // Plugins section state can collapse after reloads; expand it again.
-    await page.getByRole('main').getByText('Plugins', { exact: true }).click();
-    await page.getByRole('link', { name: 'ontola/test-plugin' }).click();
+    const pluginSettings = await openDriveSettings(page);
+    await pluginSettings
+      .getByRole('link', { name: 'ontola/test-plugin' })
+      .click();
 
     // Keep the mounted resource identity while changing metadata and saving
     // config. The server's Installation extender fills version, author and
@@ -313,43 +315,18 @@ test.describe('Plugins', () => {
     // URL would 404. Navigate to the drive page first.
     await page.getByTestId(sidebarDriveButtonId).click();
 
-    // Drive page nests children under a 'Resources' collapsible section
-    // (commit 32db1349). It usually starts collapsed on the drive view — but
-    // a bare click is a TOGGLE, and under load the section can have expanded
-    // itself (children landing after the first paint) so a blind click
-    // CLOSES it and the assertion below starves with everything looking
-    // idle. Same lesson as the menu helpers: drive the toggle by the
-    // outcome, retrying the click only while the folder is not visible.
-    //
     // The folder keeps its prefixed name after uninstall: with the
     // after_commit + host.commit model the rename was a real commit, so it
-    // persists.
-    const renamedFolder = page
-      .getByRole('main')
-      .getByRole('button', { name: 'My Problem' });
-    await expect(async () => {
-      if (!(await renamedFolder.isVisible().catch(() => false))) {
-        await page
-          .getByRole('main')
-          .getByText('Resources', { exact: true })
-          .click();
-      }
+    // persists. It is a tile in the drive page's Resources grid.
+    await expect(
+      page.getByRole('main').getByRole('link', { name: 'My Problem' }).first(),
+    ).toBeVisible({ timeout: 30000 });
 
-      await expect(renamedFolder).toBeVisible({ timeout: 3000 });
-    }).toPass({ timeout: 30000 });
-
-    // Same toggle discipline for the Plugins section.
-    const noPlugins = page.getByText('No plugins installed');
-    await expect(async () => {
-      if (!(await noPlugins.isVisible().catch(() => false))) {
-        await page
-          .getByRole('main')
-          .getByText('Plugins', { exact: true })
-          .click();
-      }
-
-      await expect(noPlugins).toBeVisible({ timeout: 3000 });
-    }).toPass({ timeout: 20000 });
+    // The Plugins setting no longer lists the plugin.
+    const settingsAfter = await openDriveSettings(page);
+    await expect(settingsAfter.getByText('No plugins installed')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(currentDialog(page)).toBeHidden();
 
     // Check if the custom view is gone.
     await page
