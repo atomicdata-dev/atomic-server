@@ -209,6 +209,11 @@ export function ConnectDeviceStep({
   }, [drive, agent?.subject, sessionAttempt]);
 
   const vault = useDriveVault(vaultDrive ?? null);
+  /** A restore that kept some data but not all of it. */
+  const [partialRestore, setPartialRestore] = useState<{
+    drive: string;
+    message: string;
+  }>();
   // Only offer this when there is something to restore. Backup being on with
   // nothing stored yet is a dead end, and an empty vault would return zero
   // resources and leave the screen looking like it failed.
@@ -232,11 +237,24 @@ export function ConnectDeviceStep({
   const needsSession = hasSession === false && !!portalUrl;
 
   async function restoreFromVault() {
+    setPartialRestore(undefined);
+
     const outcome = await vault.restore();
 
     // `restore` reports its own failure through `vault.error`, which is
     // rendered below; there is nothing to navigate to if it did not work.
-    if (outcome && vaultDrive) onConnected(vaultDrive);
+    if (!outcome || !vaultDrive) return;
+
+    // A partial restore kept what it recovered but is not a connected device:
+    // leaving now would hide the message. Stay, say so, and let the user
+    // retry or open what was recovered.
+    if (outcome.incomplete) {
+      setPartialRestore({ drive: vaultDrive, message: outcome.incomplete });
+
+      return;
+    }
+
+    onConnected(vaultDrive);
   }
 
   /** One look — for the "did connecting a server fix this?" check below. */
@@ -519,7 +537,11 @@ export function ConnectDeviceStep({
 
           {primary === 'restore' && (
             <VaultOffer data-testid='vault-restore-offer'>
-              {vault.error && <ErrorText role='alert'>{vault.error}</ErrorText>}
+              {(vault.error ?? partialRestore?.message) && (
+                <ErrorText role='alert'>
+                  {vault.error ?? partialRestore?.message}
+                </ErrorText>
+              )}
               {vault.restoreProgress !== null && (
                 <Explainer>
                   Restoring… {Math.round(vault.restoreProgress * 100)}%
@@ -533,6 +555,17 @@ export function ConnectDeviceStep({
               >
                 {vault.busy ? 'Restoring…' : 'Restore my workspace'}
               </Button>
+              {partialRestore && (
+                <Button
+                  type='button'
+                  subtle
+                  data-testid='vault-open-recovered'
+                  onClick={() => onConnected(partialRestore.drive)}
+                  disabled={vault.busy}
+                >
+                  Open recovered workspace
+                </Button>
+              )}
             </VaultOffer>
           )}
 

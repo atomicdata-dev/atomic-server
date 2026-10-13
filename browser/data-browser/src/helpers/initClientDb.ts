@@ -156,6 +156,10 @@ async function startForIdentity(
   if (store.getAgent()?.subject !== agentSubject) return;
   if (currentWorker && currentIdentity === agentSubject) return;
 
+  // An earlier start may have given up (no usable key) and told the store no
+  // database was coming. This one can still attach, so reads wait again.
+  store.expectClientDb();
+
   const isFirstStart = currentIdentity === null;
   currentIdentity = agentSubject;
 
@@ -194,7 +198,13 @@ async function startForIdentity(
     // No key we could use, and the database is not ours to replace. Leave
     // `currentWorker` unset so the next AgentChanged — the sign-in that
     // unwraps the key — comes back through here and starts it properly.
-    if (!resolved) return;
+    // Until then no database is coming, so reads must not wait out the attach
+    // grace for it; that start re-announces itself with `expectClientDb`.
+    if (!resolved) {
+      store.clientDbUnavailable();
+
+      return;
+    }
 
     dbKey = resolved;
     discardUndecryptable = !(await hasWrappedDbKey(agentSubject));

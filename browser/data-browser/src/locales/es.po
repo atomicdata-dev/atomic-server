@@ -12913,10 +12913,16 @@ msgstr ""
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr ""
 
-#~ msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore. {1}"
-#~ msgstr ""
-
 #. 0: errors.length
 #: src/helpers/managed/vault.ts
 msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore."
+msgstr ""
+
+#. 0: outcome.objectsUnreadable
+#: src/helpers/managed/vault.ts
+msgid "Restore incomplete: {0} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Open recovered workspace"
 msgstr ""

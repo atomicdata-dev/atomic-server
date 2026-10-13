@@ -218,3 +218,32 @@ it('stops waiting for a local database once its init has failed', async () => {
 
   expect(resource?.error).toBeDefined();
 });
+
+it('waits for a local database again when one is re-announced after being given up on', async () => {
+  vi.useFakeTimers();
+  const store = new Store({
+    serverUrl: 'https://app.example.com',
+    connect: false,
+  });
+  store.setServerConnected(true);
+  // `initClientDb` found no usable key and gave up, then a sign-in restarts it.
+  store.expectClientDb();
+  store.clientDbUnavailable();
+  store.expectClientDb();
+  store.injectFetch(
+    async () => new Response('Resource not found', { status: 404 }),
+  );
+
+  const loading = store.getResource('atomic:missing-after-rearm');
+  await vi.advanceTimersByTimeAsync(1000);
+
+  // Still waiting for the database that is about to attach.
+  expect(
+    await Promise.race([loading, Promise.resolve('waiting' as const)]),
+  ).toBe('waiting');
+
+  store.clientDbUnavailable();
+  await vi.advanceTimersByTimeAsync(1000);
+
+  expect((await loading).error).toBeDefined();
+});
