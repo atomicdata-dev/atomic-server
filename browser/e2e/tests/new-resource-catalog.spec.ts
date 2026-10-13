@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { before, waitForTableBuild } from './test-utils';
 test.beforeEach(before);
 
@@ -107,12 +107,12 @@ test('creation catalog searches templates and creates a selected table inside a 
 test('creation prompt opens the assistant and keeps the request while setting up a model', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const parent = await page.evaluate(() => window.store!.getDrive()!);
   await page.goto(
     new URL(`/app/new?parentSubject=${encodeURIComponent(parent)}`, page.url())
       .href,
   );
-  await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByRole('button', { name: 'Create with assistant' }),
   ).toBeDisabled();

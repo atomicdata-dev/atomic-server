@@ -17,7 +17,14 @@ independent Vault / hosted capabilities.
 - [x] Verify targeted regressions, package tests, type checks and full browser lint.
 - [x] Update the coverage map and public contract documentation.
 
-## Following slices
+## Full browser validation
+
+- [x] Run the unfiltered standalone E2E suite on the current PR build.
+- [x] Run both portal app profiles and the Vault / Cloud Server acceptance matrix.
+- [x] Run browser peer sync between explicit drive members and through an invitation.
+- [x] Diagnose failures, fix regressions and record exact results and exclusions.
+
+## Following architecture slices
 
 - [ ] Per-drive route/subscription ownership and versioned managed policy changes.
 - [ ] Shared complete/partial restore outcomes, key handles and dependency coverage.

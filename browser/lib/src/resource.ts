@@ -4016,13 +4016,23 @@ export class Resource<C extends OptionalClass = any> {
     // only the first offline baseline, so a run of offline edits all rebase
     // on the same synced version.
     //
-    // Skip when the only commit is an unposted genesis. `signChanges` already
-    // advanced the local cursor to that snapshot; treating it as a rewind
-    // baseline makes the post-genesis empty export look like "OPFS not ready"
-    // and the drain retries forever (`offline-create-then-online`).
-    const baseVersion = signedGenesis
-      ? undefined
-      : this.getEncodedSaveCursor() || undefined;
+    // An unposted genesis covers only the version captured when it was
+    // signed. Later offline edits still need a baseline across reloads.
+    // Derive it from that envelope: hydration may already have advanced the
+    // in-memory cursor past edits that the server has never received.
+    let baseVersion = this.getEncodedSaveCursor();
+
+    if (signedGenesis?.loroUpdate) {
+      const genesisVersion = LoroLoader.Loro.decodeImportBlobMeta(
+        signedGenesis.loroUpdate,
+        false,
+      ).partialEndVersionVector;
+      baseVersion =
+        this._loroDoc &&
+        !this.versionVectorsEqual(this._loroDoc.oplogVersion(), genesisVersion)
+          ? encodeB64(genesisVersion.encode())
+          : undefined;
+    }
 
     await this.store.outbox.recordOfflineSave(
       this.subject,

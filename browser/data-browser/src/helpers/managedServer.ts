@@ -1,6 +1,10 @@
 import { signRequest, type Agent } from '@tomic/react';
 import { serverProps, peerProps } from './serverOntology';
-import { rememberManagedPortalUrl, safePortalUrl } from './managed/api';
+import {
+  getRuntimeManagedPortalUrl,
+  rememberManagedPortalUrl,
+  safePortalUrl,
+} from './managed/api';
 import { isRunningInTauri } from './tauri';
 import { isOriginWithoutNode } from './originNode';
 
@@ -201,11 +205,14 @@ export type AccountCreationTarget =
 /**
  * The portal a build was compiled against, if any.
  *
- * Env-only, and separate from anything a server reports: it is the one source
+ * Deployment configuration, separate from anything a server reports: a source
  * that answers before a server has. Null in a source build, which keeps the
  * open core neutral.
  */
 export function managedPortalOverride(): string | null {
+  const runtime = getRuntimeManagedPortalUrl();
+  if (runtime) return runtime;
+
   const fromEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_MANAGED_PORTAL_URL as string | undefined)

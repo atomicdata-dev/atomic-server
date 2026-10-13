@@ -60,6 +60,15 @@ a forced refresh. Only a projection rebuilt from JSON, with no pending local
 edits, can be replaced by causal state. An incompatible import fails instead of
 resetting local history to the incoming resource.
 
+Computed query answers are an exception: each response replaces the previous
+projection so its member list and count stay consistent. Query answers have no
+shared edit history; the editable resources nested inside them still merge.
+
+Offline queue recovery merges the stored snapshot with the live document before
+exporting unsent changes. A cached snapshot cannot replace newer in-memory edits.
+Legacy queues recover their baseline from the signed genesis; normal online
+saves do not depend on the local database becoming ready.
+
 ## Recovery and identity
 
 Recovery distinguishes complete, partial, absent, unavailable, and cancelled
@@ -77,6 +86,12 @@ configured; they retain independent local/server operation.
 sign-out followed by sign-in as the same agent. It is local to that Store, is not
 persisted or a key epoch, and can fence delayed work. Recovery also checks the
 selected database and managed session before publishing results.
+
+Managed invitation handoffs carry both the signed token and its node origin
+through email and identity recovery. The resumed destination is always the
+app's invitation screen. It extracts the token and server from the invitation;
+an arbitrary redirect field is never followed. Legacy token-only links remain
+readable, but do not themselves identify a node.
 
 ## Further guarantees
 

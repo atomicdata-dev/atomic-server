@@ -13,7 +13,7 @@ import { canonicalizeScheme, isAtomicIdentifier } from './subject.js';
  * `pendingDirtyCount` stuck at 1, `hasSignedGenesis` false.
  */
 describe('offline create drain', () => {
-  it('does not capture a rewind baseline on an unposted genesis', async ({
+  it('captures a baseline only when edits follow the unposted genesis', async ({
     expect,
   }) => {
     const { store } = await testStore();
@@ -26,14 +26,13 @@ describe('offline create drain', () => {
     });
     expect(isAtomicIdentifier(extra.subject)).toBe(true);
 
-    const pending = store.outbox.pending();
-    expect(pending.length).toBeGreaterThan(0);
-
-    for (const entry of pending) {
-      if (entry.signedGenesis) {
-        expect(entry.baseVersion).toBeUndefined();
-      }
-    }
+    const ontology = extra.get(server.properties.defaultOntology) as string;
+    expect(store.outbox.getEntry(ontology)?.signedGenesis).toBeTruthy();
+    expect(store.outbox.getEntry(ontology)?.baseVersion).toBeUndefined();
+    // Linking the default ontology edits the drive after its genesis.
+    expect(store.outbox.getEntry(extra.subject)?.baseVersion).toBeTypeOf(
+      'string',
+    );
   });
 
   it('reconnect drain clears a genesis-only extra drive and its ontology', async ({

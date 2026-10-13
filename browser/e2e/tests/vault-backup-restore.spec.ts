@@ -294,6 +294,7 @@ test.describe('Cloud Vault backup and restore', () => {
   test('a device with no local data restores the workspace from the vault', async ({
     page,
     browser,
+    browserDiagnostics,
   }) => {
     test.slow();
 
@@ -344,6 +345,18 @@ test.describe('Cloud Vault backup and restore', () => {
     // The node is reachable here on purpose — signing in needs it — which is
     // precisely why the canary had to be kept away from it above.
     const wiped = await browser.newContext();
+    // This synthetic drive has no public discovery record. Keep recovery
+    // independent of the external relay and account for its one missing-record
+    // response without hiding failures from the Vault or node endpoints.
+    const discoveryUrl = /^https:\/\/dns\.iroh\.link\/pkarr\/[^/]+$/;
+    await wiped.route(discoveryUrl, route => route.fulfill({ status: 404 }));
+    browserDiagnostics.expect(
+      'error',
+      /^Failed to load resource: the server responded with a status of 404 \(Not Found\)$/,
+      'The synthetic workspace has no public discovery record',
+      1,
+      discoveryUrl,
+    );
 
     try {
       const fresh = await wiped.newPage();

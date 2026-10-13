@@ -27,6 +27,32 @@ describe('public node metadata', () => {
       credentials: 'omit',
     });
   });
+
+  it('keeps an explicit runtime portal when reading a local managed node', async () => {
+    vi.stubGlobal('window', {
+      location: { hostname: 'localhost' },
+      __ATOMIC_MANAGED__: { portalUrl: 'http://localhost:19897' },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              'https://atomicdata.dev/properties/server/managed': true,
+              'https://atomicdata.dev/properties/server/portalUrl':
+                'https://portal.example',
+            }),
+          ),
+      ),
+    );
+
+    const info = await fetchManagedInfo('http://localhost:19897');
+    expect(accountCreationTarget(info)).toEqual({
+      kind: 'portal',
+      url: 'http://localhost:19897/signin',
+    });
+  });
 });
 
 describe('accountCreationTarget', () => {

@@ -1,3 +1,4 @@
+import './helpers/validation';
 import { reactErrorHandler } from '@sentry/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

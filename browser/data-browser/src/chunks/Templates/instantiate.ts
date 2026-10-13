@@ -92,9 +92,10 @@ export async function startTemplateDemo(
   store: Store,
   plan: TemplatePlan,
 ): Promise<string> {
+  await store.waitForClientDb();
   const db = store.getClientDb();
-  if (!db) throw new Error('Enable local storage to preview this template.');
-  await db.waitForReady();
+  if (!db || !(await db.waitForReady()))
+    throw new Error('Enable local storage to preview this template.');
   const { cleanupDemoDrive, stopDemoDirector } =
     await import('../Demo/startDemo');
   stopDemoDirector();

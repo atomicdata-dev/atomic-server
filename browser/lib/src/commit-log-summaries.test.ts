@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { testStore } from './test-store.js';
 import { core } from './ontologies/core.js';
-import type { CommitLogEntry, Store } from './store.js';
+import { StoreEvents, type CommitLogEntry, type Store } from './store.js';
+import { LoroLoader } from './loro-loader.js';
 
 const outgoing = (store: Store, subject: string): CommitLogEntry[] =>
   store
@@ -16,6 +17,52 @@ const changed = (store: Store, entry: CommitLogEntry) =>
   ]);
 
 describe('commit log property summaries', () => {
+  it('waits for Loro without warning or caching an absent summary', async () => {
+    const { store } = await testStore();
+    const doc = await store.newResource({
+      noParent: true,
+      propVals: { [core.properties.name]: 'Saved title' },
+    });
+    await doc.save();
+    const [entry] = outgoing(store, doc.subject);
+    const loaded = vi.spyOn(LoroLoader, 'isLoaded').mockReturnValue(false);
+    const module = vi
+      .spyOn(LoroLoader, 'Loro', 'get')
+      .mockImplementation(() => {
+        throw new Error('Loro not initialized');
+      });
+    const warn = vi.spyOn(console, 'warn');
+    let ready: (() => void) | undefined;
+    const onReady = vi
+      .spyOn(LoroLoader, 'onReady')
+      .mockImplementation(callback => {
+        ready = callback;
+
+        return () => {};
+      });
+    const notify = vi.fn();
+    const unsubscribe = store.on(StoreEvents.CommitLogChanged, notify);
+
+    try {
+      expect(store.getCommitPropertySummaries(entry)).toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      loaded.mockRestore();
+      module.mockRestore();
+      warn.mockRestore();
+      onReady.mockRestore();
+    }
+
+    expect(ready).toBeDefined();
+    ready!();
+    expect(notify).toHaveBeenCalledWith(store.getCommitLog());
+    unsubscribe();
+    expect(changed(store, entry)).toContainEqual([
+      core.properties.name,
+      'changed',
+    ]);
+  });
+
   it('are computed on demand and show only what each commit changed', async () => {
     const { store } = await testStore();
     const drive = await store.createDrive('Home', { personal: true });

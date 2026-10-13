@@ -2,7 +2,7 @@ import { beforeAll, describe, expect as assert, it, vi } from 'vitest';
 import { Store, type IncomingChange } from './store.js';
 import { LoroLoader } from './loro-loader.js';
 import { Resource } from './resource.js';
-import { commits, core } from './index.js';
+import { commits, core, collections } from './index.js';
 
 /**
  * #1905. A local query hands back JSON-AD, not snapshots, so the resources it
@@ -97,6 +97,34 @@ function storeWith(json: string, local: Uint8Array) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
 describe('a sync delta for a resource with no local Loro history', () => {
+  it('replaces computed query results instead of merging their independent histories', async () => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const subject = 'https://example.com/query?drive=atomic:home';
+    let members = ['atomic:a', 'atomic:b'];
+    store.injectFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '@id': subject,
+            [collections.properties.members]: members,
+            [collections.properties.totalMembers]: members.length,
+          }),
+        ),
+    );
+    await store.fetchResourceFromServer(subject, {
+      noWebSocket: true,
+      forceOverride: true,
+    });
+    members = ['atomic:c'];
+    const fresh = await store.fetchResourceFromServer(subject, {
+      noWebSocket: true,
+      forceOverride: true,
+    });
+
+    assert(fresh.get(collections.properties.members)).toEqual(['atomic:c']);
+    assert(fresh.get(collections.properties.totalMembers)).toBe(1);
+  });
+
   it('preserves local history when an incoming snapshot cannot be merged', ({
     expect,
   }) => {
