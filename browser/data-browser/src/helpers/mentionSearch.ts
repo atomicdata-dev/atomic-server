@@ -3,6 +3,7 @@ import { getRecentResources } from './recentResources';
 import { isUnavailableResource } from './unavailableResources';
 
 export const MAX_MENTION_SUGGESTIONS = 10;
+const SEARCH_MARGIN = 5;
 
 /** With nothing typed yet, offer what the user opened recently in this drive,
  * topped up with the drive's own children so a fresh drive isn't empty. */
@@ -50,9 +51,9 @@ const withoutUnavailableHits = async (
 ): Promise<string[]> => {
   const resources = await Promise.all(subjects.map(s => store.getResource(s)));
 
-  return subjects.filter(
-    (_, i) => !isUnavailableResource(store, drive, resources[i]),
-  );
+  return subjects
+    .filter((_, i) => !isUnavailableResource(store, drive, resources[i]))
+    .slice(0, MAX_MENTION_SUGGESTIONS);
 };
 
 /** Subjects to offer for an `@` mention in `drive`: a search for `query`, or
@@ -69,7 +70,8 @@ export const findMentionSubjects = async (
         store,
         drive,
         await store.search(query.toLowerCase(), {
-          limit: MAX_MENTION_SUGGESTIONS,
+          // A few extra hits, so dropping stale ones doesn't shrink the list.
+          limit: MAX_MENTION_SUGGESTIONS + SEARCH_MARGIN,
           // Including the results could lead to weird behavior when the document itself is returned from the server.
           include: false,
           parents: [drive],

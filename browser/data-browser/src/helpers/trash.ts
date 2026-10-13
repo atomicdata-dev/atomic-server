@@ -7,11 +7,17 @@ import { getOrCreateTrashFolder } from './standardLocations';
 export const readTrashFolder = (drive: Resource): string | undefined =>
   drive.get(dataBrowser.properties.trashFolder) as string | undefined;
 
-/** Whether `resource` sits directly in the drive's Trash folder. */
+/**
+ * Whether `resource` sits directly in the drive's Trash folder. With `deep`,
+ * also when any ancestor does (a file inside a trashed folder). The deep walk
+ * only reads ancestors that are already loaded (`getResourceLoading`), so an
+ * unloaded ancestor ends it with `false`. A visited set ends parent cycles.
+ */
 export const isInTrash = (
   store: Store,
   drive: string | undefined,
   resource: Resource,
+  deep = false,
 ): boolean => {
   if (!drive) {
     return false;
@@ -19,7 +25,29 @@ export const isInTrash = (
 
   const trash = readTrashFolder(store.getResourceLoading(drive));
 
-  return !!trash && resource.get(core.properties.parent) === trash;
+  if (!trash) {
+    return false;
+  }
+
+  const visited = new Set<string>([resource.subject]);
+  let parent = resource.get(core.properties.parent) as string | undefined;
+
+  while (parent && !visited.has(parent)) {
+    if (parent === trash) {
+      return true;
+    }
+
+    if (!deep) {
+      return false;
+    }
+
+    visited.add(parent);
+    parent = store.getResourceLoading(parent).get(core.properties.parent) as
+      | string
+      | undefined;
+  }
+
+  return false;
 };
 
 /**

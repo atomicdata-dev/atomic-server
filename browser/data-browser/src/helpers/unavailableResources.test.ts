@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AtomicError,
   core,
@@ -10,6 +10,7 @@ import {
 } from '@tomic/react';
 import {
   isUnavailableResource,
+  unavailableReason,
   withoutUnavailable,
 } from './unavailableResources';
 
@@ -33,12 +34,13 @@ const setup = (
       error: all[subject]?.error,
       get: (prop: string) => all[subject]?.props?.[prop],
     }) as unknown as Resource;
+  const lookup = vi.fn(toResource);
   const store = {
     isDestroyed: (subject: string) => destroyed.includes(subject),
-    getResourceLoading: toResource,
+    getResourceLoading: lookup,
   } as unknown as Store;
 
-  return { store, resource: toResource };
+  return { store, resource: toResource, lookup };
 };
 
 describe('isUnavailableResource', () => {
@@ -77,7 +79,7 @@ describe('isUnavailableResource', () => {
     expect(isUnavailableResource(store, DRIVE, resource('a'))).toBe(false);
   });
 
-  it('hides resources that are gone, but not ones that merely failed', () => {
+  it('hides resources that are gone or uncached, but not ones that failed', () => {
     const { store, resource } = setup({
       missing: { error: new AtomicError('nope', ErrorType.NotFound) },
       offline: {
@@ -92,15 +94,25 @@ describe('isUnavailableResource', () => {
     expect(isUnavailableResource(store, DRIVE, resource('missing'))).toBe(true);
     expect(isUnavailableResource(store, DRIVE, resource('offline'))).toBe(true);
     expect(isUnavailableResource(store, DRIVE, resource('broken'))).toBe(false);
+    expect(unavailableReason(store, DRIVE, resource('missing'))).toBe('gone');
+    expect(unavailableReason(store, DRIVE, resource('offline'))).toBe(
+      'uncached',
+    );
+    expect(unavailableReason(store, DRIVE, resource('broken'))).toBeUndefined();
   });
 
-  it('terminates on a parent cycle', () => {
-    const { store, resource } = setup({
+  it('stops on a parent cycle by visiting each node once', () => {
+    const { store, resource, lookup } = setup({
       a: { props: { [core.properties.parent]: 'b' } },
-      b: { props: { [core.properties.parent]: 'a' } },
+      b: { props: { [core.properties.parent]: 'c' } },
+      c: { props: { [core.properties.parent]: 'a' } },
     });
 
+    lookup.mockClear();
+
     expect(isUnavailableResource(store, DRIVE, resource('a'))).toBe(false);
+    // The drive, then b and c once each; reaching a again ends the walk.
+    expect(lookup).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -117,6 +129,23 @@ describe('withoutUnavailable', () => {
 
     expect(
       withoutUnavailable(store, DRIVE, ['a', 'b', 'c'], resources),
-    ).toEqual(['b', 'c']);
+    ).toEqual({ available: ['b', 'c'], gone: ['a'] });
+  });
+
+  it('hides uncached subjects without reporting them as gone', () => {
+    const { store, resource } = setup({
+      off: {
+        error: new AtomicError(
+          NOT_AVAILABLE_LOCALLY_MESSAGE,
+          ErrorType.Transport,
+        ),
+      },
+    });
+    const resources = new Map([['off', resource('off')]]);
+
+    expect(withoutUnavailable(store, DRIVE, ['off'], resources)).toEqual({
+      available: [],
+      gone: [],
+    });
   });
 });

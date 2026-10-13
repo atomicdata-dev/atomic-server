@@ -427,24 +427,24 @@ function SearchOverlay(): JSX.Element {
     : results;
   // Deleted or trashed resources (possibly from an earlier session or another
   // device) are hidden, and forgotten when they were only a recent.
-  const available = withoutUnavailable(
+  const { available, gone } = withoutUnavailable(
     store,
     drive,
     candidates,
     useResources(candidates),
   );
   const listed = showRecent ? available.slice(0, 8) : available;
-  const goneRecents = showRecent
-    ? candidates.filter(subject => !available.includes(subject)).join('\n')
-    : '';
+  // `gone` is a new array every render; this key keeps the effect from
+  // re-running until the set of gone recents actually changes.
+  const goneKey = showRecent ? gone.join('\n') : '';
 
   useEffect(() => {
-    if (goneRecents) {
-      goneRecents
+    if (goneKey) {
+      goneKey
         .split('\n')
         .forEach(subject => removeRecentResource(drive, subject));
     }
-  }, [drive, goneRecents]);
+  }, [drive, goneKey]);
 
   const actionHits = currentSubject
     ? matchActionsForPalette(query, resourceActions, actionCtx)
