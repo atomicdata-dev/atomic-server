@@ -1,16 +1,13 @@
-import { useEffect } from 'react';
 import {
   core,
   notifications,
-  StoreEvents,
   useCollection,
   useCollectionPage,
-  useDrive,
   useResources,
-  useStore,
   type Resource,
 } from '@tomic/react';
 import { usePrivateDrive } from './usePrivateDrive';
+import { usePrivateDriveSync } from './usePrivateDriveSync';
 import { dedupeBySource, isUnread } from '../helpers/notifications/inbox';
 
 const PAGE_SIZE = 100;
@@ -28,9 +25,7 @@ export function useInbox(): {
   loading: boolean;
   privateDrive: string | undefined;
 } {
-  const store = useStore();
   const { privateDrive } = usePrivateDrive();
-  const [activeDrive] = useDrive();
   const { collection, ready, invalidateCollection } = useCollection(
     {
       property: core.properties.isA,
@@ -42,25 +37,7 @@ export function useInbox(): {
     { pageSize: PAGE_SIZE },
   );
 
-  // The socket only pushes the open drive. When that is a team drive, the
-  // private drive's commits (a Notification another device recorded) never
-  // reach this one, and the list would stay as it was at first load.
-  useEffect(() => {
-    if (!privateDrive || privateDrive === activeDrive) return;
-
-    return store.subscribeLive(privateDrive);
-  }, [store, privateDrive, activeDrive]);
-
-  // A collection waits only briefly for the connection and then settles on
-  // what it has: nothing, on a device that holds none of the private drive.
-  // Ask again once connected, and after a reconnect for what was missed.
-  useEffect(
-    () =>
-      store.on(StoreEvents.ConnectionChanged, connected => {
-        if (connected) void invalidateCollection();
-      }),
-    [store, invalidateCollection],
-  );
+  usePrivateDriveSync(privateDrive, invalidateCollection);
 
   const members = useCollectionPage(collection, 0);
   const resources = useResources(privateDrive ? members : []);
