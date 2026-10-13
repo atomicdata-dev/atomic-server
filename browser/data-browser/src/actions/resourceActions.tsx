@@ -37,7 +37,12 @@ import {
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
-import { isInTrash, moveToTrash, restoreFromTrash } from '../helpers/trash';
+import {
+  isInTrash,
+  moveToTrash,
+  readTrashFolder,
+  restoreFromTrash,
+} from '../helpers/trash';
 import { openSearchOverlay } from '../components/overlayState';
 import { openShareDialog } from '../components/Share/shareDialogState';
 
@@ -47,8 +52,21 @@ export const OPEN_TAGS_EVENT = 'atomic-open-tags';
 const getParent = (ctx: ActionContext): string | undefined =>
   ctx.resource.get(core.properties.parent) as string | undefined;
 
+// Trash membership is the direct parent only: items nested deeper in a trashed
+// folder travel with it, so only the folder itself shows Restore.
 const inTrash = (ctx: ActionContext): boolean =>
   isInTrash(ctx.store, ctx.drive, ctx.resource);
+
+/** The drive itself and its Trash folder cannot be moved to the Trash. */
+const isTrashable = (ctx: ActionContext): boolean => {
+  if (!ctx.drive || ctx.subject === ctx.drive || inTrash(ctx)) {
+    return false;
+  }
+
+  const trash = readTrashFolder(ctx.store.getResourceLoading(ctx.drive));
+
+  return ctx.subject !== trash;
+};
 
 /**
  * All actions on a resource, in menu order. Ids keep the historical
@@ -413,15 +431,18 @@ export const resourceActions: ActionDefinition[] = [
     helper: () => 'Move this resource to the Trash. You can restore it later.',
     keywords: ['delete', 'remove', 'trash'],
     icon: () => <FaTrash />,
-    available: ctx => ctx.canWrite && !!ctx.drive && !inTrash(ctx),
+    available: ctx => ctx.canWrite && isTrashable(ctx),
     asTool: true,
     toolName: 'move_to_trash',
     run: async ctx => {
       const parent = getParent(ctx);
 
       try {
-        if (ctx.drive) {
-          await moveToTrash(ctx.store, ctx.subject, ctx.drive);
+        if (
+          !ctx.drive ||
+          !(await moveToTrash(ctx.store, ctx.subject, ctx.drive))
+        ) {
+          return;
         }
 
         ctx.onAfterDelete?.();
@@ -442,17 +463,17 @@ export const resourceActions: ActionDefinition[] = [
     scope: 'resource',
     section: 'action',
     label: () => 'Delete permanently',
-    helper: () => 'Delete this resource.',
-    keywords: ['remove', 'destroy', 'trash'],
+    helper: () => 'Delete this resource permanently. This cannot be undone.',
+    keywords: ['remove', 'destroy'],
     icon: () => <FaTrash />,
-    available: ctx => ctx.canWrite && (inTrash(ctx) || !ctx.drive),
+    available: ctx => ctx.canWrite && !isTrashable(ctx),
     asTool: true,
     toolName: 'delete_resource',
     danger: true,
     dangerLabel: () => 'Confirm Delete',
     confirmation: {
       title: () => 'Delete resource',
-      confirmLabel: () => 'Delete',
+      confirmLabel: () => 'Delete permanently',
       body: ctx => (
         <p>
           Are you sure you want to delete {ctx.resource.title || ctx.subject}?

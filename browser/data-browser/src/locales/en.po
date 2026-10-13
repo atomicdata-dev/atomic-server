@@ -1912,10 +1912,6 @@ msgstr "Import Atomic Data to this resource"
 msgid "Confirm Delete"
 msgstr "Confirm Delete"
 
-#: src/actions/resourceActions.tsx
-msgid "Delete this resource."
-msgstr "Delete this resource."
-
 #. 0: ctx.resource.title
 #: src/components/ResourceContextMenu/index.tsx
 msgid "Open {0} menu"
@@ -12718,6 +12714,7 @@ msgid "Move this resource out of the Trash, back to where it was."
 msgstr "Move this resource out of the Trash, back to where it was."
 
 #: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
 msgid "Delete permanently"
 msgstr "Delete permanently"
 
@@ -12936,3 +12933,7 @@ msgstr "Move this resource to the Trash. You can restore it later."
 #: src/actions/resourceActions.tsx
 msgid "Could not move to Trash: {0}"
 msgstr "Could not move to Trash: {0}"
+
+#: src/actions/resourceActions.tsx
+msgid "Delete this resource permanently. This cannot be undone."
+msgstr "Delete this resource permanently. This cannot be undone."
