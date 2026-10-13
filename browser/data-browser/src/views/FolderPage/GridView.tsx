@@ -52,7 +52,7 @@ const NewCard = styled(GridCard)`
     font-size 0.1s ease-out,
     box-shadow 0.1s ease-in-out;
   ${GridItemWrapper}:hover &,
-  ${GridItemWrapper}:focus & {
+  ${GridItemWrapper}:focus-visible & {
     color: ${p => p.theme.colors.main};
     font-size: 3.8rem;
   }
