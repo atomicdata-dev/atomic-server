@@ -104,6 +104,7 @@ it('seeds a resource that has Loro history with its snapshot, not rebuilt from p
   });
   const store = {
     expectClientDb() {},
+    clientDbUnavailable() {},
     getAgent: () => undefined,
     on: () => () => {},
     getServerUrl: () => 'http://localhost',

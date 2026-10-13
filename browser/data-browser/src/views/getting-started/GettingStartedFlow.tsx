@@ -697,6 +697,9 @@ export function GettingStartedFlow({
       // "your data is on another device" hides which one this is.
       let vaultReason: string | undefined;
       let vaultRecoveryFailed = false;
+      // Set when a restore kept only part of the drive. The app opens on what
+      // was readable, but this must not vanish and must not be backed up.
+      let partialRestore: string | undefined;
 
       if (!hasData && target && !returnToAgent) {
         setWorkspaceStage('backup');
@@ -712,6 +715,7 @@ export function GettingStartedFlow({
           // Readable data was kept; say that the restore was partial.
           if (restored.outcome.incomplete) {
             vaultReason = restored.outcome.incomplete;
+            partialRestore = restored.outcome.incomplete;
           }
         } else if (restored.status === 'no-backup') {
           vaultReason = restored.reason;
@@ -770,11 +774,16 @@ export function GettingStartedFlow({
         // here: this is the one moment an existing account is known to be on
         // a device that holds its data. Not awaited — the first pass seals
         // the whole drive, and sign-in should not wait on an upload.
-        void ensureVaultBackup(store, target!);
+        //
+        // Not after a partial restore: a backup or checkpoint of a drive that
+        // is missing resources could record them as gone.
+        if (!partialRestore) void ensureVaultBackup(store, target!);
 
         navigate(
           returnToAgent ? paths.agentSettings : constructOpenURL(target!),
         );
+
+        if (partialRestore) toast.error(partialRestore, { duration: 20_000 });
       } else if (returnToAgent) {
         // Passkey management needs the key, not a downloaded copy of the drive.
         navigate(paths.agentSettings);

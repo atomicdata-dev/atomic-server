@@ -90,7 +90,13 @@ function scheduleStart(store: Store, agentSubject: string | undefined): void {
   // Detach synchronously on identity change: a caller can save immediately
   // after setAgent(), before the serialized restart has derived the new key.
   // It must not write to the previous identity's worker (or its destroyed RPC).
-  if (currentIdentity !== agentSubject) store.setClientDb(undefined);
+  if (currentIdentity !== agentSubject || !currentWorker) {
+    store.setClientDb(undefined);
+    // An earlier unresolved start told the store no database is coming. Reads
+    // triggered by this sign-in run before the queued start does, so re-arm
+    // now, or they fail at once with "Offline: resource not available".
+    store.expectClientDb();
+  }
   restartChain = restartChain
     .then(() => startForIdentity(store, agentSubject))
     .catch(err => {
