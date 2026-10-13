@@ -432,6 +432,29 @@ describe('WSClient drive sync probe', () => {
     client.close();
   });
 
+  it('does not import or index in the background in server-only mode', async ({
+    expect,
+  }) => {
+    const { client, store } = await connectedClient();
+    const indexPendingSearch = vi.fn();
+    const importEnvelopes = vi.fn();
+    vi.spyOn(store, 'getClientDb').mockReturnValue({
+      initError: new Error('no Web Locks'),
+      indexPendingSearch,
+      importEnvelopes,
+    } as never);
+    const internals = client as unknown as {
+      pendingEnvelopes: Array<{ subject: string; json: string }>;
+      drainBackground: () => Promise<void>;
+    };
+    internals.pendingEnvelopes = [{ subject: 'did:ad:x', json: '{}' }];
+    await internals.drainBackground();
+    expect(indexPendingSearch).not.toHaveBeenCalled();
+    expect(importEnvelopes).not.toHaveBeenCalled();
+    expect(internals.pendingEnvelopes).toHaveLength(0);
+    client.close();
+  });
+
   it('does not send a sync probe after the socket closes during computation', async ({
     expect,
   }) => {
