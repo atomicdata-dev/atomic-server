@@ -295,7 +295,9 @@ test('keyboard resize keeps the final sentence visible without a spacer above th
     (await composer.boundingBox())!.y - finalText.y - finalText.height,
   ).toBeLessThanOrEqual(16);
   await page.screenshot({ path: 'test-results/ai-mobile-long-keyboard.png' });
+  // A reader scrolls by hand: the list only detaches after real input.
   await viewport.evaluate(element => {
+    element.dispatchEvent(new WheelEvent('wheel', { bubbles: true }));
     element.scrollTop = 100;
   });
   await expect
@@ -355,7 +357,9 @@ test('scrolling up right after the keyboard resize keeps the reading position', 
       return text.y + text.height - bounds.y - bounds.height;
     })
     .toBeLessThanOrEqual(0);
+  // A reader scrolls by hand: the list only detaches after real input.
   await viewport.evaluate(element => {
+    element.dispatchEvent(new WheelEvent('wheel', { bubbles: true }));
     element.scrollTop = 100;
   });
   await expect

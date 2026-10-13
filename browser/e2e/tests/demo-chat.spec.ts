@@ -25,6 +25,19 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
   page,
 }) => {
   test.setTimeout(180000);
+
+  // Chat bubbles (toasts) seen from the start: the demo must not announce its
+  // seeded team chat as new messages while it is being built or before the
+  // scenario has begun.
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __bubbles: string[] }).__bubbles = seen;
+    setInterval(() => {
+      document
+        .querySelectorAll('div[style*="z-index: 9999"] button')
+        .forEach(el => seen.push((el as HTMLElement).innerText));
+    }, 100);
+  });
   await page.goto(`${FRONTEND_URL}/app/demo`);
 
   // The first resource is the meeting, with its chat open beside it.
@@ -37,6 +50,26 @@ test('the demo opens in the onboarding meeting, greets the visitor, then moves t
   await expect(
     page.locator('[data-entry-key]').filter({ hasText: 'say hi' }),
   ).toBeVisible({ timeout: 60000 });
+
+  // Nothing popped up on the way in, and the chat is showing its newest line.
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __bubbles: string[] }).__bubbles,
+    ),
+  ).toEqual([]);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const list = [
+          ...document.querySelectorAll('[data-radix-scroll-area-viewport]'),
+        ].find(el => el.querySelector('[data-entry-key]'));
+
+        return list
+          ? list.scrollHeight - list.scrollTop - list.clientHeight
+          : -1;
+      }),
+    )
+    .toBeLessThan(8);
 
   // Still in the meeting: nothing moves them until they have said hi.
   const meetingUrl = page.url();
