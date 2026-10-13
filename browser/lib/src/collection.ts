@@ -5,7 +5,7 @@ import { Resource, normalizeLoroChangeTimestampMs } from './resource.js';
 import { decodeB64 } from './base64.js';
 import { decodeGenesisCert } from './genesis.js';
 import { GENESIS } from './urls.js';
-import { Store, StoreEvents } from './store.js';
+import type { Store } from './store.js';
 import { commits } from './ontologies/commits.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import { isCommitSubject } from './commit.js';
@@ -329,10 +329,6 @@ export class Collection {
    */
   private _assemblingPage = false;
   private static legacyQueryServers = new WeakMap<Store, Set<string>>();
-  /** Pages of unsynced drives the server has answered this session. Its
-   * members were written to the local DB as they loaded and live updates keep
-   * it current, so the local answer is whole from then on. */
-  private static completedByServer = new WeakMap<Store, Set<string>>();
   private legacyQuery = false;
   private readonly preferServer: boolean;
   private legacyMembers?: Promise<string[]>;
@@ -989,9 +985,7 @@ export class Collection {
         !this.store.hasCompletedDriveSyncFor(
           this.params.drive ?? this.store.getDrive(),
         ) &&
-        !Collection.completedByServer
-          .get(this.store)
-          ?.has(this.buildSubject(page))
+        !this.store.collectionPagesAnsweredByServer.has(this.buildSubject(page))
       ) {
         await this.completeFromServer(page);
       }
@@ -1117,20 +1111,7 @@ export class Collection {
       return;
     }
 
-    let answered = Collection.completedByServer.get(this.store);
-
-    if (!answered) {
-      const known = new Set<string>();
-      answered = known;
-      Collection.completedByServer.set(this.store, known);
-      // Live updates keep the local answer whole only while connected. After
-      // a drop, what happened meanwhile never arrived, so ask again.
-      this.store.on(StoreEvents.ConnectionChanged, connected => {
-        if (connected) known.clear();
-      });
-    }
-
-    answered.add(this.buildSubject(page));
+    this.store.collectionPagesAnsweredByServer.add(this.buildSubject(page));
 
     const fetched = this.pages.get(page);
 
