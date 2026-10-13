@@ -436,6 +436,36 @@ describe('ensureVaultBackup', () => {
 });
 
 describe('restoreFromVault', () => {
+  it('uses the recovered key epoch after a drive has been re-keyed', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      recoverDriveKey: vi.fn(async () => ({ driveKey: KEY, keyEpoch: 3 })),
+    });
+
+    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
+      'restored',
+    );
+    expect(deps.restoreDrive).toHaveBeenCalledWith(
+      expect.objectContaining({ driveKey: KEY, keyEpoch: 3 }),
+    );
+  });
+
+  it('recovers a suspended backup without enabling uploads', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      listVaultDrives: vi.fn(async () => [
+        { ...enrollment, status: 'suspended' },
+      ]),
+    });
+
+    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
+      'restored',
+    );
+    expect(deps.restoreDrive).toHaveBeenCalledOnce();
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+  });
+
   it('restores a drive with a confirmed backup', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();

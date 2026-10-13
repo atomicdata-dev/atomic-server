@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
   vaultCommitSegment: vi.fn(),
+  vaultImport: vi.fn(),
   flush: vi.fn(),
 }));
 vi.mock('./client-db-open.js', () => ({
@@ -16,9 +17,14 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-it.each([false, true])(
-  'acknowledges a vault cursor only after durable flush (failure=%s)',
-  async fail => {
+it.each([
+  ['vaultCommitSegment', false],
+  ['vaultCommitSegment', true],
+  ['vaultImport', false],
+  ['vaultImport', true],
+] as const)(
+  'acknowledges %s only after durable flush (failure=%s)',
+  async (type, fail) => {
     vi.useFakeTimers();
     const worker = {
       onmessage: null as unknown as (event: unknown) => void,
@@ -46,19 +52,43 @@ it.each([false, true])(
     });
     const order: string[] = [];
     db.vaultCommitSegment.mockImplementation(() => order.push('commit'));
+    const summary = { resourcesRestored: 3, objectsUnreadable: 0 };
+    db.vaultImport.mockImplementation(async () => {
+      order.push('import');
+
+      return summary;
+    });
     db.flush.mockImplementation(() => {
       order.push('flush');
       if (fail) throw new Error('disk unavailable');
     });
     // No timer advances: a reload can kill the worker before its periodic tick.
     const response = await send({
-      type: 'vaultCommitSegment',
+      type,
       drivePseudonym: 'drive',
       devicePubkey: 'device',
       segment: 1,
     });
-    expect(order).toEqual(['commit', 'flush']);
+    expect(order).toEqual([
+      type === 'vaultImport' ? 'import' : 'commit',
+      'flush',
+    ]);
     expect(response.type).toBe(fail ? 'error' : 'ok');
-    if (fail) expect(response.message).toBe('disk unavailable');
+
+    if (fail) {
+      expect(response.message).toBe('disk unavailable');
+      // The failed acknowledgement must leave the worker usable for retry.
+      db.flush.mockImplementation(() => order.push('retry flush'));
+      const retry = await send({
+        type,
+        drivePseudonym: 'drive',
+        devicePubkey: 'device',
+        segment: 1,
+      });
+      expect(retry.type).toBe('ok');
+      expect(order.at(-1)).toBe('retry flush');
+    } else if (type === 'vaultImport') {
+      expect(response.data).toEqual(summary);
+    }
   },
 );

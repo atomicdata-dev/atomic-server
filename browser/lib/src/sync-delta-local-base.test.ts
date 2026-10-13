@@ -49,6 +49,7 @@ function history() {
 
   return {
     local,
+    full: doc.export({ mode: 'snapshot' }) as Uint8Array,
     delta: doc.export({ mode: 'update', from: synced } as never) as Uint8Array,
     json: JSON.stringify({
       '@id': SUBJECT,
@@ -172,6 +173,27 @@ describe('a sync delta for a resource with no local Loro history', () => {
     expect([
       ...(written.oplogVersion().toJSON() as Map<string, number>).keys(),
     ]).toEqual(['1']);
+  });
+
+  it('persists a complete sync snapshot after a JSON-only collection lookup', async ({
+    expect,
+  }) => {
+    const { json, local, full } = history();
+    const { store, writes } = storeWith(json, local);
+    store.hydrateResourceFromJsonAd(SUBJECT, json);
+    store.applyIncoming({
+      subject: SUBJECT,
+      loroBytes: full,
+      source: 'ws-sync-push',
+    });
+    await settle();
+    expect(store.resources.get(SUBJECT)!.get(core.properties.name)).toBe(
+      'New app',
+    );
+    expect(writes).toHaveLength(1);
+    const written = new LoroLoader.Loro.LoroDoc();
+    written.import(writes[0]);
+    expect(written.getMap('properties').get(RENDERS)).toEqual([OWN, TXN]);
   });
 
   it('does not warn about, or bring back, a resource deleted during the repair', async ({

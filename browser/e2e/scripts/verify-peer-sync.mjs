@@ -19,7 +19,11 @@ const vite = await createServer({
   root,
   cacheDir: join(root, 'browser/node_modules/.vite/peer-acceptance'),
   optimizeDeps: { entries: ['browser/e2e/scripts/peer-sync-harness.ts'] },
-  server: { host: 'localhost', port: 6772, strictPort: true },
+  server: {
+    host: 'localhost',
+    port: Number(process.env.ATOMIC_PEER_APP_PORT ?? 0),
+    strictPort: true,
+  },
 });
 vite.middlewares.use((req, res, next) => {
   if (req.url !== '/') return next();
@@ -27,6 +31,10 @@ vite.middlewares.use((req, res, next) => {
   res.end('<!doctype html><title>Peer sync acceptance</title>');
 });
 await vite.listen();
+const address = vite.httpServer.address();
+if (!address || typeof address === 'string')
+  throw new Error('peer fixture has no HTTP port');
+const appUrl = `http://localhost:${address.port}/`;
 const browser = await chromium.launch();
 const deadline = setTimeout(() => browser.close(), 90000);
 
@@ -54,7 +62,7 @@ try {
           errors.push(msg.text());
       }
     });
-    await page.goto('http://localhost:6772/');
+    await page.goto(appUrl);
   }
 
   const init = async (page, secret) =>

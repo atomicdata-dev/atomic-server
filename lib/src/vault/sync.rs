@@ -21,7 +21,7 @@
 //!
 //! What Loro does *not* make order-independent is a delete racing a create for
 //! the same subject, because a tombstone is applied by this code and not by the
-//! CRDT. [`plan_restore`] is where that ordering is decided.
+//! CRDT. Within a restore batch deletion wins over stale entries from any lane.
 
 use super::dek::DriveVaultKey;
 use super::envelope::{self, ObjectKind};
@@ -34,7 +34,7 @@ use crate::resources::Resource;
 use crate::storelike::Storelike;
 use crate::Subject;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A resource's Loro oplog version vector, as peer-id string → counter.
 ///
@@ -88,6 +88,11 @@ pub struct LaneState {
     /// has only seen listed.
     #[serde(default)]
     pub imported_lanes: BTreeMap<String, u32>,
+    /// Deletions already shipped or imported. Checkpoints must retain them
+    /// after their delta segments are pruned. Local recreation clears the
+    /// tombstone and removes the subject from this set on the next export.
+    #[serde(default)]
+    pub deleted_subjects: BTreeSet<String>,
 }
 
 impl LaneState {
@@ -616,14 +621,17 @@ pub async fn export_vault_segment(
     // vanished from the walk could be a transient read failure or an
     // authorization change, and a tombstone we invent would *delete real data*
     // on restore — far worse than carrying a stale resource for another cycle.
-    let mut tombstones = Vec::new();
+    state
+        .deleted_subjects
+        .retain(|subject| crate::sync::tombstones::is_tombstoned(store, subject));
+    let mut tombstones = BTreeSet::new();
     let mut carried = Vec::new();
     for subject in state.known_subjects() {
         if cursors.contains_key(subject) {
             continue;
         }
         if crate::sync::tombstones::is_tombstoned(store, subject) {
-            tombstones.push(subject.clone());
+            tombstones.insert(subject.clone());
         } else {
             // Gone from the walk with no tombstone to explain it. Keep the
             // cursor rather than forgetting the subject: forgetting it means
@@ -640,6 +648,12 @@ pub async fn export_vault_segment(
             cursors.insert(subject, cursor.clone());
         }
     }
+
+    state.deleted_subjects.extend(tombstones.iter().cloned());
+    if full {
+        tombstones.extend(state.deleted_subjects.iter().cloned());
+    }
+    let tombstones = tombstones.into_iter().collect();
 
     let (pack, kind, object_key, coverage) = if full {
         // Coverage is a claim the control plane acts on by deleting, so it
@@ -874,6 +888,12 @@ pub async fn import_vault_batch(
     let plan = plan_restore(&keys, anchor_key.as_deref(), &coverage, &observed);
     summary.objects_skipped = plan.skipped.len();
 
+    // Deletion wins over stale entries across lanes. A listing's `observed`
+    // mark is not proof of import: its checkpoint can still contain a subject
+    // another lane deleted. Apply all selected deletions after merging entries.
+    // A deliberate restore of an older backup with no such deletion still
+    // clears a local tombstone, as before.
+    let mut tombstones: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for object_key in &plan.order {
         let sealed = vault.get(object_key)?;
 
@@ -897,6 +917,27 @@ pub async fn import_vault_batch(
         summary.packs_read += 1;
 
         for entry in pack.entries {
+            // A later segment from the deleting device is an intentional
+            // recreation. A different lane's stale copy has no such ordering
+            // proof. Checkpoint coverage also proves the earlier deletion was
+            // imported; merely observing a segment in the listing does not.
+            if let Some(deletions) = tombstones.get_mut(&entry.subject) {
+                deletions.retain(|deleted_in| {
+                    let Some((deleted_lane, deleted_segment)) = parse_segment_key(deleted_in)
+                    else {
+                        return true;
+                    };
+                    let later_in_lane =
+                        parse_segment_key(object_key).is_some_and(|(lane, segment)| {
+                            lane == deleted_lane && segment > deleted_segment
+                        });
+                    !later_in_lane
+                        && !pack
+                            .coverage
+                            .get(&deleted_lane)
+                            .is_some_and(|&segment| segment >= deleted_segment)
+                });
+            }
             let subject = Subject::from_raw(&entry.subject, None);
 
             // Merge into whatever is already here rather than replacing it.
@@ -935,27 +976,16 @@ pub async fn import_vault_batch(
             // suppressing it from every future bulk sync, so the restored
             // resource would exist locally and never reach another replica —
             // the same stale-invariant bug `clear_tombstone` exists for (F11).
-            // Objects replay in plan order, so a later tombstone still wins.
+            // Deletions in this batch are applied after all entries and still win.
             crate::sync::tombstones::clear_tombstone(store, &entry.subject);
             summary.resources_restored += 1;
         }
 
-        for subject_str in pack.tombstones {
-            // `remove_resource` rather than a bare `record_tombstone`: the
-            // marker alone leaves the resource's data and index entries in
-            // place, so an earlier segment's oplog would restore a deleted
-            // resource and the tombstone would only stop it propagating. A
-            // delete must actually delete. `remove_resource` recurses into
-            // children and records tombstones for everything it removes.
-            let subject = Subject::from_raw(&subject_str, None);
-            match store.remove_resource(&subject).await {
-                Ok(()) => {}
-                // Already absent is the normal case when restoring into an
-                // empty store: the tombstone still has to be recorded so a
-                // later bulk sync does not pull the resource back from a peer.
-                Err(_) => crate::sync::tombstones::record_tombstone(store, &subject_str),
-            }
-            summary.tombstones_applied += 1;
+        for subject in pack.tombstones {
+            tombstones
+                .entry(subject)
+                .or_default()
+                .insert(object_key.clone());
         }
 
         // Now this device provably holds that lane's ops up to here, so a
@@ -966,6 +996,25 @@ pub async fn import_vault_batch(
         {
             record_imported_lane(store, pseudonym, device, &lane, segment);
         }
+    }
+
+    let tombstones: BTreeSet<_> = tombstones
+        .into_iter()
+        .filter_map(|(subject, deletions)| (!deletions.is_empty()).then_some(subject))
+        .collect();
+    for subject_str in &tombstones {
+        let subject = Subject::from_raw(subject_str, None);
+        // Remove data and index entries as well as recording the marker. On
+        // an empty store, record it even when there is nothing to remove.
+        if store.remove_resource(&subject).await.is_err() {
+            crate::sync::tombstones::record_tombstone(store, subject_str);
+        }
+        summary.tombstones_applied += 1;
+    }
+    if let Some((pseudonym, device)) = drive_pseudonym {
+        let mut state = read_lane_state(store, pseudonym, device);
+        state.deleted_subjects.extend(tombstones);
+        write_lane_state(store, pseudonym, device, &state);
     }
 
     // Nothing opened, but there was something to open: the key is wrong. Say so
@@ -1608,6 +1657,289 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(partial.packs_read, 1);
+    }
+
+    /// Separate databases must merge independent edits, not merely replay two
+    /// lanes exported from the same already-converged database.
+    #[tokio::test]
+    async fn independent_devices_converge_and_a_stale_device_catches_up() {
+        let a = Db::init_temp("vault_device_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let shared = a
+            .create_resource(FOLDER, &drive, "shared", None)
+            .await
+            .unwrap();
+        let doomed = a
+            .create_resource(FOLDER, &drive, "delete me", None)
+            .await
+            .unwrap();
+        let drive_subject = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        let lane_b = "bb".repeat(32);
+        backup(&a, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+
+        let b = Db::init_temp("vault_device_b").await.unwrap();
+        restore(&b, &key, &vault).await;
+        backup(&b, &drive_subject, &key, &vault, &lane_b)
+            .await
+            .unwrap();
+
+        // B is now offline with an older copy. Both devices edit the same
+        // resource, on separate properties, without reading the other's work.
+        rename(&a, &shared, "Alice's title").await;
+        let shared_subject = Subject::from_raw(&shared, None);
+        let mut resource = b.get_resource(&shared_subject).await.unwrap();
+        let doc = resource.build_state_doc().unwrap();
+        doc.set_property(
+            crate::urls::DESCRIPTION,
+            &crate::Value::String("Bob's text".into()),
+        )
+        .unwrap();
+        resource.apply_state_doc(doc).unwrap();
+        b.add_resource_opts(&resource, false, true, true)
+            .await
+            .unwrap();
+        a.remove_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .unwrap();
+        // Cross the first collection page as well as the CRDT boundary.
+        for i in 0..105 {
+            a.create_resource(FOLDER, &drive, &format!("child-{i}"), None)
+                .await
+                .unwrap();
+        }
+        backup(&a, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        backup(&b, &drive_subject, &key, &vault, &lane_b)
+            .await
+            .unwrap();
+
+        let fresh = Db::init_temp("vault_device_c").await.unwrap();
+        let summary = restore(&fresh, &key, &vault).await;
+        assert_eq!(summary.objects_unreadable, 0);
+        let merged = fresh.get_resource(&shared_subject).await.unwrap();
+        assert_eq!(
+            merged.get(crate::urls::NAME).unwrap().to_string(),
+            "Alice's title"
+        );
+        assert_eq!(
+            merged.get(crate::urls::DESCRIPTION).unwrap().to_string(),
+            "Bob's text"
+        );
+        assert!(fresh
+            .get_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .is_err());
+        assert!(drive_contents(&fresh, &drive_subject).await.len() >= 107);
+
+        // Explicit restore is also the catch-up operation for an existing
+        // device. It must keep B's edit and remove the stale deleted resource.
+        restore(&b, &key, &vault).await;
+        assert_eq!(
+            drive_contents(&b, &drive_subject).await,
+            drive_contents(&fresh, &drive_subject).await
+        );
+        rename(&b, &shared, "B after catch-up").await;
+        backup(&b, &drive_subject, &key, &vault, &lane_b)
+            .await
+            .unwrap();
+        restore(&a, &key, &vault).await;
+        restore(&fresh, &key, &vault).await;
+        assert_eq!(
+            drive_contents(&a, &drive_subject).await,
+            drive_contents(&b, &drive_subject).await
+        );
+        assert_eq!(
+            drive_contents(&fresh, &drive_subject).await,
+            drive_contents(&b, &drive_subject).await
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_stale_checkpoint_cannot_resurrect_a_deleted_resource() {
+        let a = Db::init_temp("vault_concurrent_delete_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let doomed = a
+            .create_resource(FOLDER, &drive, "deleted by A", None)
+            .await
+            .unwrap();
+        let drive = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        let lane_b = "bb".repeat(32);
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        let b = Db::init_temp("vault_concurrent_delete_b").await.unwrap();
+        restore(&b, &key, &vault).await;
+        backup(&b, &drive, &key, &vault, &lane_b).await.unwrap();
+        a.remove_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .unwrap();
+        let deletion = backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        assert_eq!(deletion.tombstones, 1);
+        // B has seen A's new segment in the listing but never imported it.
+        let checkpoint = backup_with(
+            &b,
+            &drive,
+            &key,
+            &vault,
+            &lane_b,
+            CheckpointPolicy {
+                max_segments: 0,
+                ..Default::default()
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(checkpoint.kind, SegmentKind::Checkpoint);
+        let c = Db::init_temp("vault_concurrent_delete_c").await.unwrap();
+        restore(&c, &key, &vault).await;
+        assert!(
+            c.get_resource(&Subject::from_raw(&doomed, None))
+                .await
+                .is_err(),
+            "a stale checkpoint resurrected a deletion from an uncovered lane"
+        );
+    }
+
+    #[tokio::test]
+    async fn later_same_lane_recreation_supersedes_its_deletion() {
+        let a = Db::init_temp("vault_recreated_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let subject = a
+            .create_resource(FOLDER, &drive, "restored", None)
+            .await
+            .unwrap();
+        let subject = Subject::from_raw(&subject, None);
+        let saved = a.get_resource(&subject).await.unwrap();
+        let drive = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        a.remove_resource(&subject).await.unwrap();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        a.add_resource_opts(&saved, false, true, true)
+            .await
+            .unwrap();
+        crate::sync::tombstones::clear_tombstone(&a, &subject.to_string());
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        let b = Db::init_temp("vault_recreated_b").await.unwrap();
+        restore(&b, &key, &vault).await;
+        assert_eq!(
+            b.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(crate::urls::NAME)
+                .unwrap()
+                .to_string(),
+            "restored"
+        );
+    }
+
+    #[tokio::test]
+    async fn checkpoint_keeps_deletions_after_their_delta_was_confirmed() {
+        let a = Db::init_temp("vault_checkpoint_delete_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let doomed = a
+            .create_resource(FOLDER, &drive, "deleted", None)
+            .await
+            .unwrap();
+        let drive = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        a.remove_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .unwrap();
+        assert_eq!(
+            backup(&a, &drive, &key, &vault, DEVICE)
+                .await
+                .unwrap()
+                .tombstones,
+            1
+        );
+        let checkpoint = backup_with(
+            &a,
+            &drive,
+            &key,
+            &vault,
+            DEVICE,
+            CheckpointPolicy {
+                max_segments: 0,
+                ..Default::default()
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            checkpoint.tombstones, 1,
+            "pruning the covered deletion delta must not erase the tombstone"
+        );
+    }
+
+    #[tokio::test]
+    async fn imported_deletions_survive_a_new_devices_checkpoint_and_prune() {
+        let a = Db::init_temp("vault_imported_delete_a").await.unwrap();
+        let (_, drive) = a.setup("alice").await.unwrap();
+        let doomed = a
+            .create_resource(FOLDER, &drive, "deleted", None)
+            .await
+            .unwrap();
+        let drive = Subject::from_raw(&drive, None);
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        a.remove_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .unwrap();
+        backup(&a, &drive, &key, &vault, DEVICE).await.unwrap();
+        let b = Db::init_temp("vault_imported_delete_b").await.unwrap();
+        let lane_b = "bb".repeat(32);
+        import_vault_batch(
+            &b,
+            &key,
+            &vault,
+            &drive_prefix(PSEUDONYM),
+            Some((PSEUDONYM, &lane_b)),
+        )
+        .await
+        .unwrap();
+        let checkpoint = backup_with(
+            &b,
+            &drive,
+            &key,
+            &vault,
+            &lane_b,
+            CheckpointPolicy {
+                max_segments: 0,
+                ..Default::default()
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(checkpoint.tombstones, 1);
+        // Keep only B's checkpoint, just as compaction may remove the
+        // covered source lane. A fresh device must still learn the deletion.
+        let compacted = MemoryVaultStore::new();
+        compacted
+            .put(
+                &checkpoint.object_key,
+                &vault.get(&checkpoint.object_key).unwrap(),
+            )
+            .unwrap();
+        let c = Db::init_temp("vault_imported_delete_c").await.unwrap();
+        restore(&c, &key, &compacted).await;
+        assert!(crate::sync::tombstones::is_tombstoned(&c, &doomed));
+        assert!(c
+            .get_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .is_err());
     }
 
     /// A restore carries the signed envelopes with the history, so the

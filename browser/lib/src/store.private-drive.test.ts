@@ -36,6 +36,21 @@ describe('deterministic personal drive', () => {
     expect(profile.get(core.properties.name)).toBe('Local person');
   });
 
+  it('keeps a local-only agent profile when an unrelated node is reachable', async ({
+    expect,
+  }) => {
+    const { store, agentDID } = await testStore();
+    store.registerLocalOnlyDrive(agentDID);
+    const profile = store.getResourceLoading(agentDID, { newResource: true });
+    await profile.set(core.properties.name, 'Local person', false);
+    const fetch = vi.spyOn(store, 'fetchResourceFromServer');
+    await store.createDrive('Home', { personal: true });
+    expect(fetch.mock.calls.some(([subject]) => subject === agentDID)).toBe(
+      false,
+    );
+    expect(profile.get(core.properties.name)).toBe('Local person');
+  });
+
   it('createDrive({ personal: true }) uses the derived DID and cert', async ({
     expect,
   }) => {

@@ -238,13 +238,23 @@ async fn a_current_state_checkpoint_is_smaller_and_restores() {
 
     let drive = "did:ad:vaultshallowtest";
     let db = ClientDb::new_in_memory(None).await.expect("in-memory db");
-    for i in 0..20 {
-        db.put_resource(&format!(
-            r#"{{"@id":"{drive}","https://atomicdata.dev/properties/name":"edit {i}"}}"#
-        ))
-        .await
-        .expect("edit");
+    // putResource alone materializes a new document; it does not accumulate
+    // edit history. Seed the same snapshot a real browser resource supplies.
+    let doc = atomic_lib::loro::AtomicLoroDoc::new();
+    for i in 0..100 {
+        doc.set_property(
+            atomic_lib::urls::NAME,
+            &atomic_lib::Value::String(format!("edit {i}")),
+        )
+        .unwrap();
+        doc.commit_with_message(&format!("edit {i}"));
     }
+    db.put_resource_with_snapshot(
+        &format!(r#"{{"@id":"{drive}","https://atomicdata.dev/properties/name":"edit 99"}}"#),
+        doc.export_snapshot(),
+    )
+    .await
+    .expect("persist real history");
     let key = vault_generate_key();
 
     let mut sizes = Vec::new();
@@ -300,4 +310,14 @@ async fn a_current_state_checkpoint_is_smaller_and_restores() {
         .vault_import(&key, 1, PSEUDONYM, DEVICE, objects)
         .await
         .expect("a shallow checkpoint restores");
+    let restored: serde_json::Value = serde_json::from_str(
+        &fresh
+            .get_resource(drive)
+            .await
+            .expect("read restored resource")
+            .as_string()
+            .expect("JSON-AD"),
+    )
+    .unwrap();
+    assert_eq!(restored[atomic_lib::urls::NAME], "edit 99");
 }

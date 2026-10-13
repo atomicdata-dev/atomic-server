@@ -358,6 +358,22 @@ it('opens its own home without requiring another device', async () => {
   expect(screen.queryByText('Connect device')).toBeNull();
 });
 
+it('does not create a new home over a backup whose restore failed', async () => {
+  state.hasData = false;
+  state.restoreVault.mockResolvedValue({
+    status: 'failed',
+    error: new Error('Backup download failed'),
+  });
+  await show('?step=signin');
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+  expect(state.store.ensurePrivateDrive).not.toHaveBeenCalled();
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
 const pasteOtherAgentsSecret = async () => {
   state.account = { email: 'joep@ontola.io' };
   state.recovery.mockResolvedValue({

@@ -586,10 +586,10 @@ interface LocalHydrationRequest {
 /**
  * How long resource fallback and collection reads wait for the app's
  * expected local database to attach. It is a boot-time event — `initClientDb` derives a
- * database name and unwraps a key first — so it either happens within seconds
- * of the page loading or not at all. Waiting avoids premature resource
- * failures and redundant server queries, and happens only when a database
- * was actually announced (see `Store.expectClientDb`).
+ * database name and unwraps a key first. Waiting avoids premature failures
+ * and redundant server queries without blocking forever. Reads that time out
+ * are reconsidered on attachment. Only announced databases are awaited (see
+ * `Store.expectClientDb`).
  */
 const CLIENT_DB_ATTACH_GRACE = 5000;
 
@@ -773,6 +773,8 @@ export class Store {
   private clientDbExpected = false;
   /** Callbacks parked in {@link waitForClientDb} until the attach happens. */
   private clientDbWaiters = new Set<() => void>();
+  /** Reads whose attachment grace expired; retry against the eventual database. */
+  private localReadsAwaitingAttach = new Map<string, Resource>();
   /**
    * Single durable queue replacing the old `dirtyForSync` Set +
    * `atomic.dirtyForSync` + `atomic.offline.<subject>` quartet.
@@ -1114,7 +1116,18 @@ export class Store {
 
     // Everything the server delivered while nothing was attached is in memory
     // only; this is the first moment it can be written.
-    if (attached) this.flushPendingClientDbWrites();
+    if (attached) {
+      this.flushPendingClientDbWrites();
+      const waiting = this.localReadsAwaitingAttach;
+      this.localReadsAwaitingAttach = new Map();
+
+      for (const [subject, resource] of waiting) {
+        if (this.resources.get(subject) !== resource) continue;
+        void this.hydrateFromLocalDb(subject).catch(error =>
+          this.notifyError(error),
+        );
+      }
+    }
 
     this.emitSyncStatus();
   }
@@ -2890,8 +2903,11 @@ export class Store {
       !this.outbox.mayHavePending(subject);
     const { complete } = resource.importLoroUpdate(change.loroBytes, replace);
 
-    // Full state: the doc holds the real history now, merged or replaced.
-    if (change.replaceLoroDocsFromRemote && complete) {
+    // A complete import supplies real causal history, including a SYNC_PUSH
+    // snapshot which has no GET-response replacement flag. Keeping a resource
+    // marked JSON-only here makes writeToClientDb skip the received edit:
+    // mounted views show the new value, while reload still reads the old one.
+    if (complete) {
       this._withoutLoroHistory.delete(subject);
     }
 
@@ -3479,7 +3495,10 @@ export class Store {
       ? prior
       : undefined;
 
-    if (this.serverUrlWithoutSocket !== this.serverUrl) {
+    if (
+      this.serverUrlWithoutSocket !== this.serverUrl &&
+      !this.isLocalOnlySubject(agentSubject)
+    ) {
       try {
         agentResource = await this.fetchResourceFromServer(agentSubject, {
           noWebSocket: true,
@@ -4290,6 +4309,8 @@ export class Store {
     subject: string,
     opts: FetchOpts = {},
   ): Promise<void> {
+    const readAgent = this.agent?.subject;
+
     // Foreign HTTP identities are served by their own authority. A local
     // database attachment/lock must not delay that read (in particular the
     // bounded legacy-account lookup during sign-in). Keep OPFS as an offline
@@ -4372,7 +4393,22 @@ export class Store {
      */
     const askOnceAttached = async (): Promise<void> => {
       if (hasLocalData || local !== undefined) return;
-      if (!(await this.waitForClientDb(CLIENT_DB_ATTACH_GRACE))) return;
+
+      if (!(await this.waitForClientDb(CLIENT_DB_ATTACH_GRACE))) {
+        // A timeout bounds the loading state; it does not prove the local
+        // copy is absent. Revisit this read when a slow attachment completes.
+        const resource = this.resources.get(subject);
+
+        if (
+          this.clientDbExpected &&
+          resource &&
+          this.agent?.subject === readAgent
+        ) {
+          this.localReadsAwaitingAttach.set(subject, resource);
+        }
+
+        return;
+      }
 
       local = await this.hydrateFromLocalDb(subject);
       hasLocalData = local === true;
@@ -4477,6 +4513,14 @@ export class Store {
         // Online, no local data — server is our only source.
         await this.fetchResourceFromServer(subject, opts);
       }
+
+      // HTTP and WebSocket reads can resolve to an errored Resource rather
+      // than reject. A server miss does not settle a local read which had no
+      // database yet (or hit its deadline). Otherwise opening a Vault-only
+      // child directly at boot leaves a permanent 404 over its OPFS copy.
+      if (!hasLocalData && this.resources.get(subject)?.error) {
+        await askOnceAttached();
+      }
     } catch (e) {
       // A cancelled fetch (the page is leaving) settles nothing: the caller
       // awaiting it must see the cancellation, a fire-and-forget one ignores it.
@@ -4542,23 +4586,17 @@ export class Store {
       return true;
     }
 
-    // Don't clobber an in-memory resource that has unsaved local edits
-    // — `hydrateOfflineReplay` would overwrite the in-flight Loro state
-    // with the (older) clientDb snapshot. The signal is in-memory only:
-    // `hasUnsavedChanges()` (`_dirty` between a `set()` and the next
-    // drain).
-    //
-    // We deliberately do NOT gate on `hasPendingCommits` (the outbox
-    // genesis/dirty bit): that survives a reload, so on
-    // a cold load a freshly-created placeholder for an offline-saved
-    // resource has `hasPendingCommits === true` but NO in-memory state
-    // to protect. Gating on it skipped `hydrateOfflineReplay`, leaving
-    // the placeholder stuck `loading: true` forever (offline file
-    // upload never rendered; the snapshot import populated the doc but
-    // `loading` never cleared). clientDb already holds the offline
-    // state, so hydrating from it RESTORES the edit — it doesn't clobber
-    // it.
-    if (existing?.hasUnsavedChanges()) {
+    // A JSON-only cache has no causal history, so do not turn it into fresh
+    // competing operations over an unsynced edit. A stored Loro snapshot does
+    // have history: merge it through hydrateOfflineReplay without replacing
+    // the local document. This matters after Vault import, when an automatic
+    // profile edit may already be queued in memory. Skipping the snapshot then
+    // lets that partial profile overwrite the restored name on the next save.
+    if (
+      existing?.hasUnsavedChanges() &&
+      !snapshot?.length &&
+      !parsed[commits.properties.loroUpdate]
+    ) {
       return true;
     }
 
@@ -6099,6 +6137,10 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    if (this.agent?.subject !== agent?.subject) {
+      this.localReadsAwaitingAttach.clear();
+    }
+
     // The current drive is an account context, not a server preference. Clear
     // it before reauthenticating, so the next identity never subscribes or
     // reconciles the previous identity's private workspace.

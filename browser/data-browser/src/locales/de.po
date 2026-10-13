@@ -12899,7 +12899,7 @@ msgstr ""
 msgid "Items you deleted from this drive"
 msgstr ""
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr ""
@@ -12911,4 +12911,12 @@ msgstr ""
 #. 0: serverName
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+msgstr ""
+
+#~ msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore. {1}"
+#~ msgstr ""
+
+#. 0: errors.length
+#: src/helpers/managed/vault.ts
+msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore."
 msgstr ""

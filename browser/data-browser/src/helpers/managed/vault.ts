@@ -923,6 +923,7 @@ export async function downloadVaultObjects<T>(
   objects: VaultObject[],
   read: (response: Response) => Promise<T>,
   onProgress?: (done: number, total: number) => void,
+  onError?: (error: unknown, object: VaultObject) => T,
 ): Promise<T[]> {
   if (objects.length === 0) return [];
 
@@ -974,8 +975,14 @@ export async function downloadVaultObjects<T>(
           completed++;
           if (!failed) onProgress?.(completed, objects.length);
         } catch (error) {
-          failed = true;
-          throw error;
+          if (!onError) {
+            failed = true;
+            throw error;
+          }
+
+          fetched[index] = onError(error, object);
+          completed++;
+          onProgress?.(completed, objects.length);
         }
       }
     }),
@@ -984,22 +991,46 @@ export async function downloadVaultObjects<T>(
   return fetched;
 }
 
+// Keep translation in a plain function: the extractor treats capitalized
+// class scopes as React components and would inject a hook into the constructor.
+function incompleteDownloadMessage(errors: string[]): string {
+  return `Restore incomplete: ${errors.length} backup objects could not be downloaded. Recovered data was kept. Retry the restore.`;
+}
+
+class IncompleteVaultDownload extends Error {
+  constructor(
+    readonly readable: SealedObject[],
+    errors: string[],
+  ) {
+    super(incompleteDownloadMessage(errors), { cause: errors[0] });
+  }
+}
+
 /** The cloud vault as a {@link RestoreSource}. */
 export function cloudRestoreSource(drivePseudonym: string): RestoreSource {
   return async onProgress => {
     const objects = await listVaultObjects(drivePseudonym);
 
-    const bodies = await downloadVaultObjects(
+    const errors: string[] = [];
+    const bodies = await downloadVaultObjects<Uint8Array | null>(
       drivePseudonym,
       objects,
       async response => new Uint8Array(await response.arrayBuffer()),
       onProgress,
-    );
+      error => {
+        errors.push(String(error));
 
-    return objects.map((object, i) => ({
-      objectKey: object.object_key,
-      sealed: bodies[i],
-    }));
+        return null;
+      },
+    );
+    const readable = objects.flatMap((object, i) => {
+      const sealed = bodies[i];
+
+      return sealed === null ? [] : [{ objectKey: object.object_key, sealed }];
+    });
+    if (errors.length) throw new IncompleteVaultDownload(readable, errors);
+
+    return readable;
   };
 }
 
@@ -1034,9 +1065,20 @@ export async function restoreDrive({
   onProgress?: (downloaded: number, total: number) => void;
   source?: RestoreSource;
 }): Promise<RestoreOutcome> {
-  const fetched = await source(onProgress);
+  let fetched: SealedObject[];
+  let incomplete: IncompleteVaultDownload | undefined;
+
+  try {
+    fetched = await source(onProgress);
+  } catch (error) {
+    if (!(error instanceof IncompleteVaultDownload)) throw error;
+    incomplete = error;
+    fetched = error.readable;
+  }
 
   if (fetched.length === 0) {
+    if (incomplete) throw incomplete;
+
     return {
       packsRead: 0,
       resourcesRestored: 0,
@@ -1054,13 +1096,26 @@ export async function restoreDrive({
   // observed maps to decide what to replay and when — see `plan_restore` in
   // `lib/src/vault/sync.rs`. Passing everything and letting it choose is what
   // keeps that decision in one place rather than duplicated here in JS.
-  return db.vaultImport(
+  const outcome = await db.vaultImport(
     driveKey,
     keyEpoch,
     drivePseudonym,
     devicePubkey,
     fetched,
   );
+
+  if (incomplete) throw incomplete;
+
+  // The importer keeps everything it can recover. Callers must still surface
+  // an incomplete restore instead of reloading into an apparently complete
+  // drive. This applies equally to automatic, manual and file restores.
+  if (outcome.objectsUnreadable > 0) {
+    throw new Error(
+      `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key.`,
+    );
+  }
+
+  return outcome;
 }
 
 /**

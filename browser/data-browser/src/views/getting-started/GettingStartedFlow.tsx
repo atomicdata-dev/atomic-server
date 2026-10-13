@@ -696,6 +696,7 @@ export function GettingStartedFlow({
       // different situations answer `no-backup`; a screen that says only
       // "your data is on another device" hides which one this is.
       let vaultReason: string | undefined;
+      let vaultRecoveryFailed = false;
 
       if (!hasData && target && !returnToAgent) {
         setWorkspaceStage('backup');
@@ -709,7 +710,9 @@ export function GettingStartedFlow({
           hasData = await canRead(target, false);
         } else if (restored.status === 'no-backup') {
           vaultReason = restored.reason;
+          vaultRecoveryFailed = restored.reason === 'timed out';
         } else {
+          vaultRecoveryFailed = true;
           vaultReason = restored.error.message;
         }
       }
@@ -731,7 +734,7 @@ export function GettingStartedFlow({
       // Recover first, but connecting a device is optional for the identity's
       // own home. A foreign requested workspace must never be synthesized.
       const home =
-        !hasData && target && !returnToAgent
+        !hasData && !vaultRecoveryFailed && target && !returnToAgent
           ? await openPrivateHome(store, target, true)
           : undefined;
 

@@ -12912,7 +12912,7 @@ msgstr "Could not open Trash"
 msgid "Items you deleted from this drive"
 msgstr "Items you deleted from this drive"
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr "This server does not have “{0}”"
@@ -12925,3 +12925,11 @@ msgstr "This server does not have another workspace on this device"
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+
+#~ msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore. {1}"
+#~ msgstr "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore. {1}"
+
+#. 0: errors.length
+#: src/helpers/managed/vault.ts
+msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore."
+msgstr "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore."

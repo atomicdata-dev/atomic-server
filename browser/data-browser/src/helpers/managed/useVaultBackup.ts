@@ -403,7 +403,8 @@ export function useVaultBackup({
     if (status.state !== 'on') return null;
 
     return run(async () => {
-      const key = await ensureKey(status.enrollment.drive_pseudonym);
+      // Another device may have re-keyed the vault since this panel opened.
+      const key = await refreshKey(status.enrollment.drive_pseudonym);
       setRestoreProgress(0);
 
       try {
@@ -416,6 +417,7 @@ export function useVaultBackup({
           // to a device that is gone ever becomes prunable.
           devicePubkey: devicePubkey!,
           driveKey: key.driveKey,
+          keyEpoch: key.keyEpoch,
           onProgress: (done, total) =>
             setRestoreProgress(total === 0 ? 1 : done / total),
         });
@@ -423,7 +425,7 @@ export function useVaultBackup({
         setRestoreProgress(null);
       }
     });
-  }, [run, status, ensureKey, db, devicePubkey]);
+  }, [run, status, refreshKey, db, devicePubkey]);
 
   const downloadBackup = useCallback(async () => {
     if (status.state !== 'on') return null;
