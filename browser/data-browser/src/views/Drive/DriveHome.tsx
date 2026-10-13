@@ -1,12 +1,21 @@
 import {
   dataBrowser,
+  isNotFound,
+  isUnauthorized,
   useDrivePresence,
   useResource,
   useTitle,
   useValue,
   type Resource,
 } from '@tomic/react';
-import { memo, useMemo, useState, type JSX } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type JSX,
+} from 'react';
 import {
   FaComment,
   FaFileLines,
@@ -174,9 +183,18 @@ function ResourceTile({ subject }: { subject: string }): JSX.Element {
 export function ActivityFeed({ drive }: { drive: Resource }): JSX.Element {
   const [stored] = useValue(drive, dataBrowser.properties.activityLog);
   const key = JSON.stringify(stored ?? null);
+  // Subjects the viewer cannot read; rows report them so no title leaks.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const hide = useCallback(
+    (subject: string) => setHidden(prev => new Set(prev).add(subject)),
+    [],
+  );
   const groups = useMemo(
-    () => groupActivity(parseActivityLog(JSON.parse(key))),
-    [key],
+    () =>
+      groupActivity(
+        parseActivityLog(JSON.parse(key)).filter(e => !hidden.has(e.subject)),
+      ),
+    [key, hidden],
   );
   const [showAll, setShowAll] = useState(false);
   const total = groups.reduce((n, g) => n + g.entries.length, 0);
@@ -199,6 +217,7 @@ export function ActivityFeed({ drive }: { drive: Resource }): JSX.Element {
                   <ActivityRow
                     key={`${entry.subject}:${entry.agent}:${entry.at}`}
                     entry={entry}
+                    onUnreadable={hide}
                   />
                 ))}
               </ActivityList>
@@ -247,13 +266,23 @@ function GroupLabel({ label }: { label: ActivityGroup['label'] }): JSX.Element {
 
 const ActivityRow = memo(function ActivityRow({
   entry,
+  onUnreadable,
 }: {
   entry: ActivityEntry;
-}): JSX.Element {
+  onUnreadable: (subject: string) => void;
+}): JSX.Element | null {
   const agent = useResource(entry.agent);
   const [name] = useTitle(agent);
   const resource = useResource(entry.subject, { allowIncomplete: true });
   const [title] = useTitle(resource);
+  const unreadable =
+    isUnauthorized(resource.error) || isNotFound(resource.error);
+
+  useEffect(() => {
+    if (unreadable) onUnreadable(entry.subject);
+  }, [unreadable, onUnreadable, entry.subject]);
+
+  if (unreadable) return null;
 
   return (
     <ActivityItem>

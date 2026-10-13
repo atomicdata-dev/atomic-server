@@ -76,3 +76,12 @@ describe('groupActivity', () => {
     expect(groups.map(g => g.label)).toEqual(['Today', 'This week', 'Earlier']);
   });
 });
+
+describe('activity log persistence shape', () => {
+  it('round-trips through the json datatype tag', async () => {
+    const { datatypeTag, Datatype } = await import('@tomic/react');
+    const log = [e('x', T)];
+    expect(datatypeTag(Datatype.JSON, log)).toBe('json');
+    expect(parseActivityLog(JSON.parse(JSON.stringify(log)))).toEqual(log);
+  });
+});

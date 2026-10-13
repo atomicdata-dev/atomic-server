@@ -3,7 +3,6 @@ import {
   StoreEvents,
   core,
   dataBrowser,
-  isAtomicIdentifier,
   type Resource,
   type Store,
 } from '@tomic/react';
@@ -23,6 +22,8 @@ const FRESH_MS = 30_000;
 /** Hard cap on queued subjects between flushes. */
 const MAX_PENDING = 100;
 const MAX_DEPTH = 12;
+/** Failed drive writes before the queued entries are dropped. */
+const MAX_FAILURES = 3;
 
 /**
  * Classes that are high-frequency or schema plumbing (a table creates a class
@@ -57,6 +58,9 @@ export function startDriveActivityRecorder(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let burstStart = 0;
   let flushing: Promise<void> | undefined;
+  /** Entries that are resolved but not yet written (a failed save retries them). */
+  let unsent: ActivityEntry[] = [];
+  let failures = 0;
   let disposed = false;
 
   const onSaved = (resource: Resource) => {
@@ -133,24 +137,15 @@ export function startDriveActivityRecorder(
   async function write(): Promise<void> {
     const agent = store.getAgent()?.subject;
 
-    if (!agent || pending.size === 0) {
+    if (!agent) {
       pending.clear();
+      unsent = [];
 
       return;
     }
 
     const batch = Array.from(pending.values());
     pending.clear();
-
-    const driveResource = await store.getResource(drive);
-
-    // Only try when the agent may write the drive; DID drives are
-    // self-sovereign (same fallback as `useCanWrite`).
-    const [allowed] = await driveResource.canWrite(agent);
-
-    if (!allowed && !(isAtomicIdentifier(drive) && isAtomicIdentifier(agent))) {
-      return;
-    }
 
     const entries: ActivityEntry[] = [];
 
@@ -165,21 +160,55 @@ export function startDriveActivityRecorder(
       }
     }
 
-    if (entries.length === 0) return;
+    unsent = mergeActivity(unsent, entries);
 
-    const current = parseActivityLog(
-      driveResource.get(dataBrowser.properties.activityLog),
-    );
-    const merged = mergeActivity(current, entries);
+    if (unsent.length === 0) return;
 
-    if (merged === current) return;
+    try {
+      // Read the drive fresh: another writer may have changed the log since
+      // we last saw it, and we must never overwrite from a stale local copy.
+      await store.reloadResource(drive).catch(() => undefined);
 
-    // Edit on top of the existing drive state; one commit for the burst.
-    await driveResource.set(
-      dataBrowser.properties.activityLog,
-      merged as unknown as never,
-    );
-    await driveResource.save();
+      const driveResource = await store.getResource(drive);
+
+      // No write right means no attempt. Unlike `useCanWrite` there is no
+      // DID fallback: a DID drive owned by someone else would only reject us.
+      const [allowed] = await driveResource.canWrite(agent);
+
+      if (!allowed) {
+        unsent = [];
+
+        return;
+      }
+
+      // The datatype tag (`json`) is only written for properties in the store.
+      await store.getResource(dataBrowser.properties.activityLog);
+
+      const current = parseActivityLog(
+        driveResource.get(dataBrowser.properties.activityLog),
+      );
+      const merged = mergeActivity(current, unsent);
+
+      // After a failed save the local drive already holds the value; resend it.
+      if (merged !== current || failures > 0) {
+        await driveResource.set(
+          dataBrowser.properties.activityLog,
+          merged as unknown as never,
+        );
+        await driveResource.save();
+      }
+
+      unsent = [];
+      failures = 0;
+    } catch {
+      // Keep the entries for the next flush, but give up after a few tries.
+      if (++failures >= MAX_FAILURES) {
+        unsent = [];
+        failures = 0;
+      } else {
+        schedule();
+      }
+    }
   }
 
   function flush(): Promise<void> {
@@ -201,7 +230,9 @@ export function startDriveActivityRecorder(
     return flushing;
   }
 
-  const onHide = () => {
+  const onHide = () => void flush();
+
+  const onVisibility = () => {
     if (document.visibilityState === 'hidden') void flush();
   };
 
@@ -210,7 +241,7 @@ export function startDriveActivityRecorder(
 
   if (hasWindow) {
     window.addEventListener('pagehide', onHide);
-    document.addEventListener('visibilitychange', onHide);
+    document.addEventListener('visibilitychange', onVisibility);
   }
 
   return () => {
@@ -218,10 +249,10 @@ export function startDriveActivityRecorder(
 
     if (hasWindow) {
       window.removeEventListener('pagehide', onHide);
-      document.removeEventListener('visibilitychange', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
     }
 
-    void flush();
     disposed = true;
+    void flush();
   };
 }
