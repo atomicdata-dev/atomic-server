@@ -97,6 +97,7 @@ function scheduleStart(store: Store, agentSubject: string | undefined): void {
     // now, or they fail at once with "Offline: resource not available".
     store.expectClientDb();
   }
+
   restartChain = restartChain
     .then(() => startForIdentity(store, agentSubject))
     .catch(err => {

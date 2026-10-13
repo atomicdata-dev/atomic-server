@@ -1,4 +1,5 @@
 import { driveDisplayMetadata } from './driveDisplayMetadata';
+import { hasManagedApi } from './api';
 import {
   StoreEvents,
   isNotFound,
@@ -55,14 +56,14 @@ import { reopenRestoredDrive } from '../driveData';
  * - {@link restoreFromVault}: pull the backup down on a device that has none of
  *   the data, without a click.
  *
- * All of it is best-effort. The vault needs a control-plane session, the wasm
- * bundle, and a device id; missing any of those makes every call here a quiet
- * no-op rather than an error the user has to read. A workspace with backup
- * switched off is a working workspace; onboarding and sign-in must never block
- * on this.
+ * Automatic backup is best-effort and does not block editing. Recovery returns
+ * an explicit outcome: unavailable dependencies do not prove an absent backup,
+ * and callers must not create defaults over data that has not arrived yet.
  */
 
 export type VaultAutoBackupDeps = {
+  /** A standalone install has no managed backup authority to query. */
+  isConfigured?: () => boolean;
   /** Whether a control-plane session exists. Nothing here works without one. */
   hasAccount: () => Promise<boolean>;
   canEnroll?: typeof canEnrollVault;
@@ -132,13 +133,13 @@ export function isVaultOptedOut(driveSubject: string): boolean {
 }
 
 const defaultDeps: VaultAutoBackupDeps = {
+  isConfigured: hasManagedApi,
   canEnroll: canEnrollVault,
   identityMatches: async subject =>
     (await evaluateIdentityReconciliation(subject)).ok,
-  // A self-hosted server answers `/api/me` with whatever it likes; that is
-  // "no account", not a failure worth logging.
-  hasAccount: async () =>
-    (await getManagedAccount().catch(() => null)) !== null,
+  // The account helper returns null when the service/session is absent.
+  // Transport failures must remain errors, especially during recovery.
+  hasAccount: async () => (await getManagedAccount()) !== null,
   loadKeys: loadVaultKeyOps,
   laneId: async () => {
     const deviceId = getOrCreateDeviceId();
@@ -465,16 +466,37 @@ export const AUTO_BACKUP_RETRY_MS = 60_000;
 
 export type VaultRestoreOutcome =
   | { status: 'restored'; outcome: RestoreOutcome }
-  | { status: 'no-backup'; reason: string }
+  | { status: 'partial'; outcome: RestoreOutcome; reason: string }
+  | {
+      status: 'no-backup';
+      reason: 'drive is not backed up' | 'the vault is empty';
+      driveSubject: string;
+      agentSubject: string;
+      identityGeneration: number;
+    }
+  | {
+      status: 'not-configured';
+      reason: 'no backup service configured';
+      driveSubject: string;
+      agentSubject: string;
+      identityGeneration: number;
+    }
+  | {
+      status: 'unavailable';
+      reason:
+        | 'not signed in'
+        | 'no account session'
+        | 'no local database'
+        | 'this device has no identity yet'
+        | 'timed out';
+    }
+  | { status: 'cancelled'; reason: string }
   | { status: 'failed'; error: Error };
 
 /**
- * Bring `driveSubject` back from its vault, if there is one to bring.
- *
- * `no-backup` covers every case where restoring is not possible rather than
- * broken — no session, no enrollment, an enrollment with nothing confirmed in
- * it — so a caller can fall through to its other routes without showing an
- * error for a device that simply has nothing to restore.
+ * Recover an existing drive. Only a successful enrollment/state lookup can
+ * establish `no-backup`; a missing dependency cannot authorize creation.
+ * Absence is scoped to the drive and identity session that was checked.
  */
 export async function restoreFromVault(
   store: Store,
@@ -483,71 +505,130 @@ export async function restoreFromVault(
 ): Promise<VaultRestoreOutcome> {
   const agent = store.getAgent();
 
-  if (!agent?.subject) return { status: 'no-backup', reason: 'not signed in' };
+  if (!agent?.subject)
+    return { status: 'unavailable', reason: 'not signed in' };
 
   // Taken before the first request, so its pagehide listener is registered
   // while this document is still the live one. The catch reads it.
   const pageSignal = pageRequestSignal();
+  const identityGeneration = store.getIdentityGeneration();
+  let sessionChanged = false;
+  let databaseCaptured = false;
+  let database: ReturnType<Store['getClientDb']>;
+  const unsubscribeSession = onManagedSessionChanged(() => {
+    sessionChanged = true;
+  });
+  const unsubscribeLogout = onManagedLogout(() => {
+    sessionChanged = true;
+  });
+  const isCurrent = () =>
+    !sessionChanged &&
+    !pageSignal?.aborted &&
+    store.getAgent() === agent &&
+    store.getIdentityGeneration() === identityGeneration &&
+    (!databaseCaptured || store.getClientDb() === database);
+
+  const check = async <T>(operation: () => Promise<T>): Promise<T> => {
+    if (!isCurrent()) throw new VaultSessionEndedError();
+    const value = await operation();
+    if (!isCurrent()) throw new VaultSessionEndedError();
+
+    return value;
+  };
+
+  const absent = (
+    reason: 'drive is not backed up' | 'the vault is empty',
+  ): VaultRestoreOutcome => ({
+    status: 'no-backup',
+    reason,
+    driveSubject,
+    agentSubject: agent.subject!,
+    identityGeneration,
+  });
 
   const absentFromNode = isNotFound(
     store.resources.get(store.normalizeSubject(driveSubject))?.error,
   );
 
   try {
+    // Standalone operation does not depend on a managed account. This is a
+    // configuration decision, distinct from an unavailable configured service.
+    if (deps.isConfigured?.() === false) {
+      return {
+        status: 'not-configured',
+        reason: 'no backup service configured',
+        driveSubject,
+        agentSubject: agent.subject,
+        identityGeneration,
+      };
+    }
+
     // Session first: one quick request, against a database wait of up to
     // `CLIENT_DB_WAIT_MS`. Sign-in calls this on every device that holds no
     // data, and a browser that never signed in to the account — the common
     // case for a fresh one — should not sit on "Restoring…" for twenty seconds
     // to be told there was nothing to ask.
-    if (!(await deps.hasAccount())) {
-      return { status: 'no-backup', reason: 'no account session' };
+    if (!(await check(() => deps.hasAccount()))) {
+      return { status: 'unavailable', reason: 'no account session' };
     }
 
-    const db = await deps.db(store);
+    const db = await check(() => deps.db(store));
+    database = store.getClientDb();
+    databaseCaptured = true;
 
-    if (!db) return { status: 'no-backup', reason: 'no local database' };
+    if (!db) return { status: 'unavailable', reason: 'no local database' };
 
-    const enrollment = (await deps.listVaultDrives()).find(
+    const enrollment = (await check(() => deps.listVaultDrives())).find(
       e =>
         e.drive_subject === driveSubject &&
         (e.status === 'active' || e.status === 'suspended'),
     );
 
     if (!enrollment) {
-      return { status: 'no-backup', reason: 'drive is not backed up' };
+      return absent('drive is not backed up');
     }
 
-    const state = await deps.getVaultState(enrollment.drive_pseudonym);
+    const state = await check(() =>
+      deps.getVaultState(enrollment.drive_pseudonym),
+    );
 
     // An empty vault restores zero resources, which on screen is
     // indistinguishable from a failed restore.
     if (state.confirmed_objects === 0) {
-      return { status: 'no-backup', reason: 'the vault is empty' };
+      return absent('the vault is empty');
     }
 
     // This device's lane. A restore records which other lanes it imported, so a
     // checkpoint published from here later can claim coverage for them — the
     // only route by which a lane belonging to a device that is gone for good
     // ever becomes prunable.
-    const lane = await deps.laneId();
+    const lane = await check(() => deps.laneId());
 
     if (!lane) {
-      return { status: 'no-backup', reason: 'this device has no identity yet' };
+      return {
+        status: 'unavailable',
+        reason: 'this device has no identity yet',
+      };
     }
 
-    const keys = await deps.loadKeys();
-    const { driveKey, keyEpoch } = await deps.recoverDriveKey({
-      keys,
-      drivePseudonym: enrollment.drive_pseudonym,
-      agentSecret: await agentVaultProof(agent, keys.proofMessage),
-    });
-    const outcome = await deps.restoreDrive({
-      db,
-      drivePseudonym: enrollment.drive_pseudonym,
-      devicePubkey: lane,
-      driveKey,
-      keyEpoch,
-    });
+    const keys = await check(() => deps.loadKeys());
+    const proof = await check(() => agentVaultProof(agent, keys.proofMessage));
+    const { driveKey, keyEpoch } = await check(() =>
+      deps.recoverDriveKey({
+        keys,
+        drivePseudonym: enrollment.drive_pseudonym,
+        agentSecret: proof,
+      }),
+    );
+    const outcome = await check(() =>
+      deps.restoreDrive({
+        db,
+        drivePseudonym: enrollment.drive_pseudonym,
+        devicePubkey: lane,
+        driveKey,
+        keyEpoch,
+      }),
+    );
 
     // Restoring a vault copy does not upload it to the node. Preserve a
     // confirmed node absence so saves and subscriptions stay on this device.
@@ -564,8 +645,9 @@ export async function restoreFromVault(
     // sidebar shows the drive's bare subject instead of its name.
     if (outcome.resourcesRestored > 0 && deps.reopenDrive) {
       try {
-        await deps.reopenDrive(store, driveSubject);
+        await check(() => deps.reopenDrive!(store, driveSubject));
       } catch (error) {
+        if (!isCurrent()) throw error;
         console.warn(
           '[cloud-vault] reopening the restored drive failed',
           error,
@@ -584,10 +666,16 @@ export async function restoreFromVault(
 
     if (outcome.incomplete) {
       console.warn('[cloud-vault]', outcome.incomplete);
+
+      return { status: 'partial', outcome, reason: outcome.incomplete };
     }
 
     return { status: 'restored', outcome };
   } catch (error) {
+    if (!isCurrent() || error instanceof VaultSessionEndedError) {
+      return { status: 'cancelled', reason: 'recovery session changed' };
+    }
+
     // A discarded document cancels its own in-flight requests, and they land
     // here as `TypeError: Failed to fetch`, indistinguishable by type from a
     // control plane that is really unreachable. The page is already gone, so
@@ -603,6 +691,9 @@ export async function restoreFromVault(
       status: 'failed',
       error: error instanceof Error ? error : new Error(String(error)),
     };
+  } finally {
+    unsubscribeSession();
+    unsubscribeLogout();
   }
 }
 

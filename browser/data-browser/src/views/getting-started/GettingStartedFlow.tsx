@@ -48,6 +48,7 @@ import {
 import {
   ensureVaultBackup,
   restoreFromVault,
+  type VaultRestoreOutcome,
 } from '../../helpers/managed/vaultAutoBackup';
 import { isOriginWithoutNode } from '../../helpers/originNode';
 import { isRunningInTauri } from '../../helpers/tauri';
@@ -692,24 +693,26 @@ export function GettingStartedFlow({
       // moment it can happen. Anything short of a restore (no session, no
       // backup, an empty one, a failure) falls through to the connect-device
       // step, which still offers the same restore by hand.
-      // Why the vault had nothing, for the connect-device step to show. Five
-      // different situations answer `no-backup`; a screen that says only
-      // "your data is on another device" hides which one this is.
+      // Carry the outcome through creation; merely attempting recovery does
+      // not establish that a home is safe to create.
       let vaultReason: string | undefined;
-      let vaultRecoveryFailed = false;
+      let vaultRecovery: VaultRestoreOutcome | undefined;
       // Set when a restore kept only part of the drive. The app opens on what
       // was readable, but this must not vanish and must not be backed up.
       let partialRestore: string | undefined;
 
       if (!hasData && target && !returnToAgent) {
         setWorkspaceStage('backup');
-        const restored = await withDeadline(
+        const restored = await withDeadline<VaultRestoreOutcome>(
           restoreFromVault(store, target),
           VAULT_RESTORE_TIMEOUT_MS,
-          { status: 'no-backup' as const, reason: 'timed out' },
+          { status: 'unavailable', reason: 'timed out' },
         );
 
-        if (restored.status === 'restored') {
+        vaultRecovery = restored;
+        if (restored.status === 'cancelled') return;
+
+        if (restored.status === 'restored' || restored.status === 'partial') {
           hasData = await canRead(target, false);
 
           // Readable data was kept; say that the restore was partial.
@@ -717,12 +720,10 @@ export function GettingStartedFlow({
             vaultReason = restored.outcome.incomplete;
             partialRestore = restored.outcome.incomplete;
           }
-        } else if (restored.status === 'no-backup') {
-          vaultReason = restored.reason;
-          vaultRecoveryFailed = restored.reason === 'timed out';
-        } else {
-          vaultRecoveryFailed = true;
+        } else if (restored.status === 'failed') {
           vaultReason = restored.error.message;
+        } else {
+          vaultReason = restored.reason;
         }
       }
 
@@ -743,8 +744,8 @@ export function GettingStartedFlow({
       // Recover first, but connecting a device is optional for the identity's
       // own home. A foreign requested workspace must never be synthesized.
       const home =
-        !hasData && !vaultRecoveryFailed && target && !returnToAgent
-          ? await openPrivateHome(store, target, true)
+        !hasData && target && !returnToAgent
+          ? await openPrivateHome(store, target, vaultRecovery)
           : undefined;
 
       if (home) {

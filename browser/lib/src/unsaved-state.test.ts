@@ -15,11 +15,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { core } from './ontologies/core.js';
 import { Resource, ResourceEvents } from './resource.js';
 import { testStore } from './test-store.js';
+import type { Store } from './store.js';
 
 const FOLDER = 'https://atomicdata.dev/classes/Folder';
 const DRIVE = 'https://atomicdata.dev/classes/Drive';
 
 afterEach(() => vi.restoreAllMocks());
+
+/** A local database that accepts writes: an offline save is only safe, and
+ *  only reported as `'offline'`, once it is stored on this device. */
+function localDatabase(store: Store): void {
+  vi.spyOn(store, 'getClientDb').mockReturnValue({
+    unsupportedEnvironment: false,
+    putResourceWithSnapshot: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NonNullable<ReturnType<Store['getClientDb']>>);
+}
 
 async function savedFolder(name = 'Saved') {
   const ctx = await testStore();
@@ -72,10 +82,11 @@ describe('unsaved state', () => {
     expect(resource.hasUnsavedChanges()).toBe(true);
     expect(resource.hasOpsPastSaveCursor()).toBe(true);
     expect(resource.commitError).toBe(refusal);
-    // The outbox entry outranks the flag in the status.
+    // The entry stays queued for retry, but the refusal outranks it in the
+    // status: the change is not on its way until the error is resolved.
     expect(store.outbox.hasPending(resource.subject)).toBe(true);
     expect(store.getSaveState(resource)).toMatchObject({
-      kind: 'queued',
+      kind: 'error',
       error: refusal.message,
     });
     store.setServerConnected(false);
@@ -83,6 +94,7 @@ describe('unsaved state', () => {
 
   it('offline: the edit stays unsaved and is shown as queued', async () => {
     const { store, resource } = await savedFolder();
+    localDatabase(store);
     store.setServerConnected(false);
     await resource.set(core.properties.name, 'Offline edit', false);
 

@@ -1,6 +1,6 @@
 import { describe, it, vi, expect as assert } from 'vitest';
 import { server } from './ontologies/server.js';
-import { testStore } from './test-store.js';
+import { testStore, attachTestDb } from './test-store.js';
 import type { ClientDbWorker } from './client-db.js';
 import { canonicalizeScheme, isAtomicIdentifier } from './subject.js';
 
@@ -17,6 +17,7 @@ describe('offline create drain', () => {
     expect,
   }) => {
     const { store } = await testStore();
+    attachTestDb(store);
     await store.createDrive('Home', { personal: true });
     store.setServerConnected(false);
 
@@ -39,6 +40,7 @@ describe('offline create drain', () => {
     expect,
   }) => {
     const { store } = await testStore();
+    attachTestDb(store);
     await store.createDrive('Home', { personal: true });
     store.setServerConnected(false);
 
@@ -60,6 +62,7 @@ describe('offline create drain', () => {
     expect,
   }) => {
     const { store } = await testStore();
+    attachTestDb(store);
     await store.createDrive('Home', { personal: true });
     store.setServerConnected(false);
 
@@ -95,6 +98,7 @@ describe('offline create drain', () => {
       // The test agent is configured with the legacy `did:ad:agent:` spelling;
       // the store keys its resources by the canonical `atomic:agent:` one.
       const agentDID = canonicalizeScheme(legacyAgentDID);
+      attachTestDb(store);
       await store.createDrive('Home', { personal: true });
       const agent = store.resources.get(agentDID)!;
       agent.setLastCommitValue('did:ad:commit:previous');

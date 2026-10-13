@@ -4,6 +4,30 @@ import { Agent } from './agent.js';
 import { JSCryptoProvider } from './CryptoProvider.js';
 import type { Commit } from './commit.js';
 
+/** Explicit in-memory persistence double for offline protocol unit tests.
+ * Real crash durability is covered by the browser/worker integration tests. */
+export function attachTestDb(store: Store) {
+  const records = new Map<string, { jsonAd: string; snapshot?: Uint8Array }>();
+  const putResourceWithSnapshot = vi.fn(
+    async (subject: string, jsonAd: string, snapshot?: Uint8Array) => {
+      records.set(subject, { jsonAd, snapshot: snapshot?.slice() });
+    },
+  );
+  store.setClientDb({
+    isReady: true,
+    waitForInit: async () => {},
+    putResourceWithSnapshot,
+    getResource: async (subject: string) => records.get(subject)?.jsonAd,
+    removeResource: async (subject: string) => {
+      records.delete(subject);
+    },
+    getResourceWithSnapshot: async (subject: string) =>
+      records.get(subject) ?? { jsonAd: null, snapshot: null },
+  } as unknown as NonNullable<ReturnType<Store['getClientDb']>>);
+
+  return { records, putResourceWithSnapshot };
+}
+
 export interface TestStore {
   store: Store;
   agentDID: string;

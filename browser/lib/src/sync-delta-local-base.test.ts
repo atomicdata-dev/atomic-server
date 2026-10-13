@@ -1,6 +1,7 @@
-import { beforeAll, describe, it, vi } from 'vitest';
-import { Store } from './store.js';
+import { beforeAll, describe, expect as assert, it, vi } from 'vitest';
+import { Store, type IncomingChange } from './store.js';
 import { LoroLoader } from './loro-loader.js';
+import { Resource } from './resource.js';
 import { commits, core } from './index.js';
 
 /**
@@ -96,6 +97,103 @@ function storeWith(json: string, local: Uint8Array) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
 describe('a sync delta for a resource with no local Loro history', () => {
+  it('preserves local history when an incoming snapshot cannot be merged', ({
+    expect,
+  }) => {
+    const { json, local, full } = history();
+    const { store } = storeWith(json, local);
+    store.applyIncoming({
+      subject: SUBJECT,
+      loroBytes: full,
+      source: 'peer-sync',
+    });
+    const existing = store.resources.get(SUBJECT)!;
+    const version = existing.getLoroDoc()!.oplogVersion().encode();
+    const remote = new Resource(SUBJECT);
+    remote.setStore(store);
+    remote.importLoroUpdate(local);
+    const importBytes = vi
+      .spyOn(existing.getLoroDoc()!, 'import')
+      .mockImplementation(() => {
+        throw new Error('unsupported snapshot version');
+      });
+
+    try {
+      expect(() =>
+        store.applyIncoming({
+          subject: SUBJECT,
+          resource: remote,
+          source: 'http-fetch',
+        }),
+      ).toThrow('unsupported snapshot version');
+      expect(existing.getLoroDoc()!.oplogVersion().encode()).toEqual(version);
+      expect(existing.get(RENDERS)).toEqual([OWN, TXN]);
+    } finally {
+      importBytes.mockRestore();
+    }
+  });
+
+  it('rejects ambiguous and missing payloads at the public ingress boundary', ({
+    expect,
+  }) => {
+    const store = new Store({
+      serverUrl: 'https://example.com',
+      connect: false,
+    });
+    const { full, json } = history();
+    const resource = store.hydrateResourceFromJsonAd(SUBJECT, json)!;
+    // @ts-expect-error Exactly one payload is required, including for JS callers.
+    const both: IncomingChange = {
+      subject: SUBJECT,
+      resource,
+      loroBytes: full,
+      source: 'peer-sync',
+    };
+    // @ts-expect-error A source label is not itself a payload.
+    const neither: IncomingChange = { subject: SUBJECT, source: 'peer-sync' };
+    expect(store.applyIncoming(both)).toBe('invalid');
+    expect(store.applyIncoming(neither)).toBe('invalid');
+  });
+
+  it.each(['websocket', 'http'])(
+    'preserves causal edits when a stale %s snapshot arrives after peer sync',
+    async transport => {
+      const { json, local, full } = history();
+      const { store, writes } = storeWith(json, local);
+      store.applyIncoming({
+        subject: SUBJECT,
+        loroBytes: full,
+        source: 'peer-sync',
+      });
+      assert(store.resources.get(SUBJECT)!.hasUnsavedChanges()).toBe(false);
+
+      if (transport === 'http') {
+        const remote = new Resource(SUBJECT);
+        remote.setStore(store);
+        remote.importLoroUpdate(local);
+        store.applyIncoming({
+          subject: SUBJECT,
+          resource: remote,
+          source: 'http-fetch',
+          replaceLoroDocsFromRemote: true,
+        });
+      } else {
+        store.applyIncoming({
+          subject: SUBJECT,
+          loroBytes: local,
+          source: 'ws-pending-get',
+          replaceLoroDocsFromRemote: true,
+        });
+      }
+
+      await settle();
+      assert(store.resources.get(SUBJECT)!.get(RENDERS)).toEqual([OWN, TXN]);
+      const reloaded = new LoroLoader.Loro.LoroDoc();
+      reloaded.import(writes.at(-1)!);
+      assert(reloaded.getMap('properties').get(RENDERS)).toEqual([OWN, TXN]);
+    },
+  );
+
   it('does not write a doc rebuilt from JSON-AD back to the local database', async ({
     expect,
   }) => {

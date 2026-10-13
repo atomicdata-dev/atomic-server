@@ -57,11 +57,11 @@ export class SaveStatusCoordinator {
     const target = resource.__internalObject;
     const scheduledCount = this.scheduledByResource.get(target) ?? 0;
     const entry = this.dependencies.getOutboxEntry(target.subject);
-    const error = entry?.lastAttemptError ?? target.commitError?.message;
+    const error = target.commitError?.message ?? entry?.lastAttemptError;
     let kind: ResourceSaveState['kind'];
     if (target.isSaving) kind = 'saving';
     else if (scheduledCount) kind = 'scheduled';
-    else if (entry?.blocked) kind = 'error';
+    else if (entry?.blocked || target.commitError) kind = 'error';
     else if (entry) kind = 'queued';
     else if (error) kind = 'error';
     else if (target.hasUnsavedChanges()) kind = 'dirty';

@@ -498,19 +498,32 @@ export type ChangeSource =
   | 'offline-replay'
   | 'peer-sync';
 
-/** One authoritative-or-local resource update. Either `loroBytes`
- * (WS paths) or `resource` (HTTP/local/offline) must be set. */
-export interface IncomingChange {
+interface IncomingChangeContext {
   subject: string;
-  loroBytes?: Uint8Array;
-  resource?: Resource;
   /** `did:ad:commit:<sig>` — used for echo dedup on the loroBytes path. */
   commitId?: string;
   source: ChangeSource;
   receivedAt?: number;
   forceNotify?: boolean;
-  replaceLoroDocsFromRemote?: boolean;
 }
+
+/** Exactly one representation. Bytes carry their own snapshot/update format;
+ * transports cannot choose to discard an existing causal document. */
+export type IncomingChange = IncomingChangeContext &
+  (
+    | {
+        resource: Resource;
+        loroBytes?: never;
+        /** @deprecated Ingress derives replacement from local causal state. */
+        replaceLoroDocsFromRemote?: boolean;
+      }
+    | {
+        loroBytes: Uint8Array;
+        resource?: never;
+        /** @deprecated Binary ingress derives replacement from local causal state. */
+        replaceLoroDocsFromRemote?: boolean;
+      }
+  );
 
 /** Returns True if the client has WebSocket support */
 const supportsWebSockets = () => typeof WebSocket !== 'undefined';
@@ -764,6 +777,12 @@ export class Store {
 
   /** Current Agent, used for signing commits. Is required for posting things. */
   private agent?: Agent;
+  private identityGeneration = 0;
+
+  /** Local session revision. Fences delayed work, including agent A → B → A. */
+  public getIdentityGeneration(): number {
+    return this.identityGeneration;
+  }
   /** Mapped from origin to websocket */
   private webSockets: Map<string, WSClient>;
 
@@ -1898,6 +1917,14 @@ export class Store {
       }
 
       const created = await this.postCommit(genesis, endpoint);
+      this.resources
+        .get(subject)
+        ?.recordServerAcceptance(
+          endpoint,
+          created,
+          LoroLoader.Loro.decodeImportBlobMeta(genesis.loroUpdate!, false)
+            .partialEndVersionVector,
+        );
       // Publish the acknowledgement before ResourceSaved listeners decide
       // whether this new resource can be subscribed on the server.
       this.outbox.clearGenesis(subject);
@@ -2151,6 +2178,7 @@ export class Store {
     // `await postCommit` round-trip are post-commit and must remain
     // dirty until the next drain pass.
     resource.markLoroSavedAt(versionAfterExport);
+    resource.recordServerAcceptance(endpoint, created, versionAfterExport);
 
     // The offline baseline (if any) has now been exported and acked — the
     // cursor sits at or past it, so drop it. Any still-dirty ops past the
@@ -2789,13 +2817,14 @@ export class Store {
   }
 
   /**
-   * Single ingress for resource state from any source: subject
-   * normalisation, commit-id dedup, Loro hydration, atomic OPFS
-   * persist, one `notify` — in that order.
+   * Materialize an incoming revision and notify observers. `applied` describes
+   * the in-memory view; its asynchronous local mirror is not a durability receipt.
    */
   public applyIncoming(
     change: IncomingChange,
   ): 'applied' | 'deduped' | 'invalid' {
+    // JavaScript callers do not have the TypeScript union's protection.
+    if (!!change.resource === !!change.loroBytes) return 'invalid';
     // A destroyed resource must not come back. Before the drain POSTs the
     // envelope the server still holds it, and after the ack an answer that
     // was computed before the destroy landed can still be in flight, so a SUB
@@ -2824,6 +2853,18 @@ export class Store {
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
 
+      // Only a JSON projection can be replaced. The caller's force-refresh
+      // preference cannot discard history that arrived through another route.
+      const existing = this.resources.get(
+        this.normalizeSubject(change.subject),
+      );
+      const replaceProjection =
+        change.source === 'http-fetch' &&
+        existing !== change.resource.__internalObject &&
+        this._withoutLoroHistory.has(this.normalizeSubject(change.subject)) &&
+        !existing?.hasUnsavedChanges() &&
+        !this.outbox.mayHavePending(change.subject);
+
       // The server's copy brings the real history with it.
       if (change.source === 'http-fetch') {
         this._withoutLoroHistory.delete(this.normalizeSubject(change.subject));
@@ -2832,7 +2873,7 @@ export class Store {
       this.addResource(change.resource, {
         skipCommitCompare: true,
         alias,
-        replaceLoroDocsFromRemote: change.replaceLoroDocsFromRemote,
+        replaceLoroDocsFromRemote: replaceProjection,
       });
 
       return 'applied';
@@ -2889,28 +2930,27 @@ export class Store {
         ? this.getResourceLoading(subject, { newResource: false })
         : new Resource(subject));
     resource.setStore(this);
-    // A GET response carrying the SNAPSHOT flag is authoritative full state
-    // (`replaceLoroDocsFromRemote`). REPLACE rather than merge it — merging a
-    // full snapshot into a doc the client already seeded with partial state (a
-    // SUB push that delivered only some props) can surface only the seed's
-    // props, leaving the resource class-less (the "deeply broken drive"). Don't
-    // replace a commit-detail delta, and don't clobber unsaved local edits.
-    //
-    // `hasUnsavedChanges()` is in-memory only, so it's blind on a cold
-    // reload: a WS reconnect can deliver the server's stale (pre-offline-
-    // edit) snapshot for a subject whose offline edit only exists in
-    // clientDb + the outbox's durable dirty bit —
-    // nothing has called `set()` on THIS freshly-created Resource object
-    // yet. Without also checking `outbox.hasPending`, `replace: true`
-    // wipes the doc via `resetLoroState()` before the OPFS-based local
-    // hydration (`fetchResourceWithLocalFallback`) gets a chance to merge
-    // the offline edit back in — silently dropping it. See
-    // `hydrateResourceFromJson`'s sibling comment for why that path
-    // deliberately does NOT gate the OPPOSITE decision (whether to
-    // hydrate at all) on this same durable bit — this is a different,
-    // narrower gate: only whether a destructive replace is safe.
+    // Preserve pending edits in memory and on disk. A cold local outbox can
+    // contain edits that this Resource has not hydrated yet.
+    // A full snapshot is not permission to discard another replica's history.
+    // Only a projection rebuilt from JSON lacks a causal base worth merging.
+    // Inspect the payload here so every transport applies the same policy.
+    let snapshot = false;
+
+    if (this._withoutLoroHistory.has(subject)) {
+      try {
+        snapshot = LoroLoader.Loro.decodeImportBlobMeta(
+          change.loroBytes,
+          false,
+        ).mode.includes('snapshot');
+      } catch {
+        return 'invalid';
+      }
+    }
+
     const replace =
-      !!change.replaceLoroDocsFromRemote &&
+      snapshot &&
+      this._withoutLoroHistory.has(subject) &&
       !isCommitSubject(subject) &&
       !resource.hasUnsavedChanges() &&
       !this.outbox.mayHavePending(subject);
@@ -6150,6 +6190,8 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    if (this.agent !== agent) this.identityGeneration++;
+
     if (this.agent?.subject !== agent?.subject) {
       this.localReadsAwaitingAttach.clear();
     }

@@ -2751,6 +2751,34 @@ partition.
 
 ## Vault recovery contracts (2026-10-13)
 
+### Save, ingress and recovery boundaries
+
+- `save-acknowledgement.test.ts` requires a local database for offline/local-only
+  success, retains signed local work across flush failure, and distinguishes a
+  child queued behind its parent. These regressions and their explicit database
+  fixtures are shared with the durability work in #1531.
+- `save-receipt.test.ts` checks the actual acknowledged endpoint/version, local
+  snapshot versions, absence of a peer/backup guarantee, and a newer edit made
+  while a server acknowledgement is pending. Local completion is rejected after
+  identity or database replacement. These are protocol unit tests;
+  actual flush/crash coverage remains in the worker and acceptance suites.
+- `sync-delta-local-base.test.ts` verifies that stale HTTP and WebSocket snapshots
+  cannot discard already-received peer history, including the persisted snapshot.
+  Import failure must preserve local history and reject. Ambiguous/missing ingress
+  representations are rejected at both TypeScript and JavaScript boundaries.
+- `vaultAutoBackup.test.ts` distinguishes unavailable database/device/account
+  dependencies from confirmed absence and standalone configuration. It fences
+  recovery after an identity A → signed-out → A transition.
+- `openPrivateHome.test.ts` rejects unavailable recovery and absence evidence from
+  another drive, agent or identity generation. `GettingStartedFlow.test.tsx`
+  renders complete/partial recovery and default-home decisions. Website release
+  saves require a server receipt for an attempted write, rather than treating a
+  local-only `persisted` result as remote acceptance.
+
+Per-drive route ownership, general query coverage, native receipt parity and a
+shared complete/partial Rust Vault outcome remain open in
+`planning/sync-contracts.md`.
+
 Run shared persistence journeys for both Vault and Server. UI-only interactions
 still run once. Passing a Server journey does not establish Vault recovery:
 Vault exports encrypted graph state and resolves file bytes through a separate

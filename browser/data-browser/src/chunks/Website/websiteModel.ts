@@ -317,8 +317,8 @@ export async function findWebsiteSchema(
 
 /** Local/outbox writes are not confirmation that a release is durable. */
 export async function saveWebsiteResource(resource: Resource) {
-  const result = await resource.save();
-  if (result === 'offline')
+  const receipt = await resource.saveWithReceipt();
+  if (receipt.status !== 'noop' && !receipt.server)
     throw new Error(
       `Changes remain pending locally for ${resource.subject}. Reconnect and save this resource before creating another release.`,
     );

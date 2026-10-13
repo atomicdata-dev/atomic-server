@@ -1,7 +1,10 @@
 import { core, type Store } from '@tomic/lib';
 import { deviceHasDriveData } from './driveData';
 import { isOriginWithoutNode } from './originNode';
-import { restoreFromVault } from './managed/vaultAutoBackup';
+import {
+  restoreFromVault,
+  type VaultRestoreOutcome,
+} from './managed/vaultAutoBackup';
 import { withDeadline } from './withDeadline';
 
 const pending = new WeakMap<
@@ -13,7 +16,7 @@ const pending = new WeakMap<
 export function openPrivateHome(
   store: Store,
   subject: string,
-  recoveryAttempted = false,
+  recovery?: VaultRestoreOutcome,
 ): Promise<'existing' | 'created' | undefined> {
   let homes = pending.get(store);
 
@@ -22,10 +25,10 @@ export function openPrivateHome(
     pending.set(store, homes);
   }
 
-  const key = `${store.getAgent()?.subject}:${subject}`;
+  const key = `${store.getIdentityGeneration()}:${store.getAgent()?.subject}:${subject}`;
   const existing = homes.get(key);
   if (existing) return existing;
-  const opening = prepare(store, subject, recoveryAttempted).finally(() =>
+  const opening = prepare(store, subject, recovery).finally(() =>
     homes.delete(key),
   );
   homes.set(key, opening);
@@ -36,23 +39,36 @@ export function openPrivateHome(
 async function prepare(
   store: Store,
   subject: string,
-  recoveryAttempted: boolean,
+  recovery: VaultRestoreOutcome | undefined,
 ): Promise<'existing' | 'created' | undefined> {
   const agent = store.getAgent();
+  const generation = store.getIdentityGeneration();
   if (!agent || (await store.privateDriveSubject()) !== subject) return;
   if (await deviceHasDriveData(store, subject)) return 'existing';
 
-  if (!recoveryAttempted) {
-    const restored = await withDeadline(
+  const restored =
+    recovery ??
+    (await withDeadline(
       restoreFromVault(store, subject),
       8_000,
       undefined,
-    ).catch(() => undefined);
-    if (await deviceHasDriveData(store, subject)) return 'existing';
-    // An unavailable backup is not an empty drive. Defaults written now can
-    // win against the recovered Loro state and replace the original title.
-    if (!restored || restored.status === 'failed') return;
-  }
+    ).catch(() => undefined));
+  if (
+    store.getAgent() !== agent ||
+    store.getIdentityGeneration() !== generation
+  )
+    return;
+  if (await deviceHasDriveData(store, subject)) return 'existing';
+  // Managed recovery needs authoritative absence. Standalone installs can
+  // create their own home without an account or managed backup dependency.
+  if (
+    !restored ||
+    (restored.status !== 'no-backup' && restored.status !== 'not-configured') ||
+    restored.driveSubject !== subject ||
+    restored.agentSubject !== agent.subject ||
+    restored.identityGeneration !== generation
+  )
+    return;
 
   const name = agent.subject
     ? await ownerName(store, agent.subject)
@@ -60,7 +76,11 @@ async function prepare(
 
   // A sign-out or another sign-in during recovery must not create that
   // identity's home on behalf of the new session.
-  if (store.getAgent() !== agent) return;
+  if (
+    store.getAgent() !== agent ||
+    store.getIdentityGeneration() !== generation
+  )
+    return;
   // No literal for the unnamed case: `ensurePrivateDrive` already defaults it,
   // inside the library. `undefined` is how a default parameter is asked for, so
   // the title stays one call. `InvitePage` leaves the name out too.

@@ -1,5 +1,6 @@
 import { describe, it, beforeEach } from 'vitest';
 import { Agent, Store, core, commits, JSCryptoProvider } from './index.js';
+import { attachTestDb } from './test-store.js';
 import { bootstrapCoreVocab } from './test-vocab.js';
 
 /** Creates a fresh Store with the given agent.
@@ -16,6 +17,7 @@ async function freshStore(agent: Agent): Promise<Store> {
   });
   await bootstrapCoreVocab(store);
   store.setAgent(agent);
+  attachTestDb(store);
 
   return store;
 }

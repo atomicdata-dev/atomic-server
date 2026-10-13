@@ -103,6 +103,7 @@
   - [Authentication](authentication.md)
   - [Invitations and sharing](invitations.md)
   - [Atomic Sync](sync.md)
+    - [Completion and recovery contracts](sync-contracts.md)
     - [Wire protocol: WebSocket and Iroh](websockets.md)
     - [Browser peer sync (WebRTC)](browser-peer-sync.md)
   - [Commits (signed writes)](commits/intro.md)

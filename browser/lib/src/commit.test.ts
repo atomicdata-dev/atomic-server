@@ -102,7 +102,7 @@ describe('Resource save flow', () => {
     await child.set(core.properties.name, 'Child', false);
 
     // The parent does not exist yet, so the child waits for it.
-    expect(await child.save()).toBe('offline');
+    expect(await child.save()).toBe('queued');
     expect(postCommitSpy).not.toHaveBeenCalled();
 
     await form.set(core.properties.name, 'Form', false);
