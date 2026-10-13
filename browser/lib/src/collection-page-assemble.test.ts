@@ -594,3 +594,82 @@ describe('deferred collection membership', () => {
     unsubscribe();
   });
 });
+
+it('preserves causal history when hydrating a persisted query member', async () => {
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
+  store.setDrive(DRIVE);
+  store.finishDriveSync(DRIVE, 1, Date.now());
+  const resource = new Resource(ALICE);
+  const doc = resource.getLoroDoc()!;
+  const props = doc.getMap('properties');
+  props.set(core.properties.parent, TABLE);
+  props.set(core.properties.name, 'before');
+  doc.commit();
+  props.set(core.properties.name, 'acknowledged offline');
+  const snapshot = doc.export({ mode: 'snapshot' });
+  const version = doc.oplogVersion().toJSON();
+  store.setClientDb(
+    mockClientDb(async () => ({
+      subjects: [ALICE],
+      resources: [
+        JSON.stringify({
+          '@id': ALICE,
+          [core.properties.parent]: TABLE,
+          [core.properties.name]: 'acknowledged offline',
+        }),
+      ],
+      snapshots: [snapshot],
+      count: 1,
+    })),
+  );
+  const collection = new Collection(
+    store,
+    'https://example.com',
+    {
+      page_size: '30',
+      include_nested: false,
+      property: core.properties.parent,
+      value: TABLE,
+      drive: DRIVE,
+    },
+    true,
+  );
+  await collection.refresh();
+  assert(
+    store.resources.get(ALICE)?.getLoroDoc()?.oplogVersion().toJSON(),
+  ).toEqual(version);
+  assert(store.resources.get(ALICE)?.get(core.properties.name)).toBe(
+    'acknowledged offline',
+  );
+});
+
+it('recovers a filtered table from its persisted drive when session drive state was lost', async () => {
+  const store = new Store({ serverUrl: 'https://example.com' });
+  const table = new Resource(TABLE);
+  table.setStore(store);
+  await table.set('https://atomicdata.dev/properties/drive', DRIVE, false);
+  store.resources.set(TABLE, table);
+  const query = vi.fn(async () => ({
+    subjects: [ALICE],
+    count: 1,
+    resources: [jsonAd(ALICE, 1000)],
+  }));
+  store.setClientDb(mockClientDb(query));
+  const collection = new Collection(
+    store,
+    'https://example.com',
+    {
+      property: core.properties.parent,
+      value: TABLE,
+      filters: [
+        { property: core.properties.isA, value: dataBrowser.classes.folder },
+      ],
+      page_size: '30',
+      include_nested: false,
+    },
+    true,
+  );
+  await collection.refresh();
+  assert(query).toHaveBeenCalledWith(assert.objectContaining({ drive: DRIVE }));
+  assert(pageMembers(collection)).toEqual([ALICE]);
+});

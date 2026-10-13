@@ -1,3 +1,9 @@
+import { useStore } from '@tomic/react';
+import { FeedbackDiagnostics } from './FeedbackDiagnostics';
+import {
+  currentDiagnosticText,
+  type DiagnosticPreview,
+} from '../../helpers/diagnostic-report';
 import { useId, useRef, useState, type RefObject } from 'react';
 import { FaComment } from 'react-icons/fa6';
 import * as Sentry from '@sentry/react';
@@ -14,8 +20,13 @@ import {
   TextAreaStyled,
 } from '../forms/InputStyles';
 import { Button } from '../Button';
+import Field from '../forms/Field';
 import { Column } from '../Row';
-import { errorFeedbackMessage, submitFeedback } from '../../helpers/feedback';
+import {
+  errorFeedbackMessage,
+  FEEDBACK_MESSAGE_MAX_LENGTH,
+  submitFeedback,
+} from '../../helpers/feedback';
 
 interface UseFeedbackDialogOptions {
   /** Prefills the message with details of this error. */
@@ -33,6 +44,9 @@ export function useFeedbackDialog({
   reportError,
   triggerRef,
 }: UseFeedbackDialogOptions = {}) {
+  const store = useStore();
+  const [diagnosticPreview, setDiagnosticPreview] =
+    useState<DiagnosticPreview>();
   const feedbackTitle = reportError ? 'Report this error' : 'Send feedback';
   const messageId = useId();
   const emailId = useId();
@@ -53,14 +67,20 @@ export function useFeedbackDialog({
     setFailed(false);
 
     try {
-      await submitFeedback(message, email, reportError ? 'error' : 'sidebar');
+      await submitFeedback(
+        message,
+        email,
+        reportError ? 'error' : 'sidebar',
+        currentDiagnosticText(store.diagnostics, diagnosticPreview),
+      );
+      setDiagnosticPreview(undefined);
       setSent(true);
       setMessage('');
     } catch {
       setFailed(true);
-    } finally {
-      setBusy(false);
     }
+
+    setBusy(false);
   }
 
   function open() {
@@ -84,33 +104,42 @@ export function useFeedbackDialog({
               email go to the Atomic team through Sentry. Please leave out
               private workspace content.
             </p>
-            <label htmlFor={messageId}>
-              Feedback
+            <Field label='Feedback' fieldId={messageId} disabled={busy}>
               <InputWrapper>
                 <TextAreaStyled
                   id={messageId}
                   rows={5}
-                  maxLength={10000}
+                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={message}
                   onChange={event => setMessage(event.target.value)}
                   disabled={busy}
                   style={{ width: '100%', boxSizing: 'border-box' }}
                 />
               </InputWrapper>
-            </label>
-            <label htmlFor={emailId}>
-              Email for a reply (optional)
-              <InputWrapper>
-                <InputStyled
-                  id={emailId}
-                  type='email'
-                  ref={emailRef}
-                  value={email}
-                  onChange={event => setEmail(event.target.value)}
+            </Field>
+            {dialogProps.show && (
+              <FeedbackDiagnostics
+                onSelect={setDiagnosticPreview}
+                disabled={busy}
+              >
+                <Field
+                  label='Email for a reply (optional)'
+                  fieldId={emailId}
                   disabled={busy}
-                />
-              </InputWrapper>
-            </label>
+                >
+                  <InputWrapper>
+                    <InputStyled
+                      id={emailId}
+                      type='email'
+                      ref={emailRef}
+                      value={email}
+                      onChange={event => setEmail(event.target.value)}
+                      disabled={busy}
+                    />
+                  </InputWrapper>
+                </Field>
+              </FeedbackDiagnostics>
+            )}
             {!enabled && (
               <p role='status'>
                 Feedback reporting is unavailable on this installation. Email{' '}

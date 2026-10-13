@@ -4,6 +4,10 @@ AI chat in the log (`planning/chat-log.md`, "Step 3: AI chat"): `lib/src/db/ai_c
 
 Date-only values (#1795, 2026-09-25): `browser/data-browser/src/helpers/dates/calendarDate.test.tsx` renders a `date` value through `ValueComp` (row dialog, resource page), the table cell, a min/max aggregate, day and month group headings and the history diff, in Europe/Amsterdam and America/New_York. Each must show the same civil day with no time. The tests set `process.env.TZ` themselves, so they fail on the bug in any CI zone.
 Row dialog fields (#1796, 2026-09-25): `browser/data-browser/src/components/PropVal.test.tsx` checks that the row dialog labels a value with its property's name (or a readable shortname when it has none), with the shortname in the tooltip. The label must not be a link, the property opens in a new tab, and the edited checkbox gets its accessible name from the label. Resource pages keep the linked shortname. `browser/e2e/tests/row-dialog.spec.ts` covers the same in a real Grocery list and runs axe (`label`, `link-name`) on the open dialog. It also covers the `ValueFormEdit` key warning through the browser-diagnostics fixture: that warning only shows with the wuchale transform, which vitest does not run.
+Server-only collection hydration: a library regression keeps query members while
+their resource bodies are loading, while still removing a completed re-parent.
+The existing local-db-off-server-only E2Es verify visible children after disabling
+OPFS and reloading both dev and UI-created drives.
 
 Server descriptor budget (2026-09-22): `server/src/serve.rs` tests the HTTP
 connection budget at small, staging-sized, and effectively unlimited process
@@ -298,6 +302,104 @@ worth more than a forgotten one. When you fix a bug, ask which row would have
 caught it, and if the answer is "none", that is the row to add.
 
 ---
+
+## Local diagnostic recorder with explicit sharing
+
+Schema 2 adds operation boundary and completeness evidence. `diagnostics.test.ts`
+checks overlapping operations, retention loss, and public save paths with injected
+local-write and transport failures. `diagnostic-report.test.ts` checks exhaustive
+embedded event meanings and export completeness. See `browser/DIAGNOSTICS.md`
+for interpretation limits and the blind agent evaluation rubric. The initial
+GPT-5.6 Luna synthetic triage pilot is recorded in
+`browser/diagnostic-evaluations/2026-09-15/README.md`; it does not validate repair success.
+
+
+`browser/lib/src/diagnostics.test.ts` covers disabled defaults, content-free events,
+500-event bounds, rolling retention/expiry, slow saves and unchanged online queues,
+late results after clear, actual save rejection, account reset and failing UI
+listeners. `diagnostic-report.test.ts`, `feedback.test.ts`, and
+`feedback-privacy.test.ts` cover frozen previews, expired-session refusal, explicit
+inclusion, complete per-submission JSON attachments (including reports over 4096
+characters), message length boundaries, build identity and stripping inherited
+private Sentry context while retaining browser/OS name and version, User-Agent,
+platform and severity. `feedback-envelope.test.ts` verifies the real SDK envelope
+and attachment isolation.
+`feedback.spec.ts` checks preview/checkbox controls, intercepted report delivery,
+private text/URL exclusion, schema-3 export, recording/history surviving reload,
+and disabling/clearing across tabs in real IndexedDB.
+`persistent-diagnostics.test.ts` covers default recording, reload session separation,
+origin-wide bounds, age pruning, continuous recording, persisted disabling, stale
+writer fencing, account reset races, frozen previews, storage/clear failures and
+allowlisted reads, unavailable cross-tab messaging and preserving a remotely
+disabled preference during an account change.
+
+Not covered: actual browser/OS crash durability of the last batch, cross-process correlation,
+production Sentry retention/access policies, and platform-specific background timer
+behavior. Slow/stalled events are heuristic warnings, not data-loss assertions.
+
+## Save failure boundaries and recovery
+
+- `browser/lib/tests/interrupted-sync.integration.test.ts` uses two accounts,
+  independent WASM databases and a real server. It checks disjoint offline field
+  edits and child creation, interrupts a sent SYNC probe, then recreates one Store
+  with an acknowledged pending edit. Both local databases and a fresh server
+  reader must match a predefined ledger; pending and blocked queues must clear.
+  Failure output includes acknowledgement results and diagnostic windows.
+  It runs with and without retained localStorage queue metadata. This is JS
+  client-state recreation with retained in-memory storage; it does not reproduce
+  every browser ingress ordering.
+- `interrupted-sync-crash.spec.ts` uses two dedicated Chromium processes and OPFS,
+  interrupts a SYNC probe, SIGKILLs one client immediately after an offline save,
+  verifies recovery with remote data blocked, observes A’s edit through an
+  independent server reader after a fresh sync-complete status and before B
+  reconnects, then checks both replicas and server. This read does not retry.
+  It found a cold-ingress overwrite when the outbox entry did not survive the kill,
+  and query hydration replacing original causal history with newly invented ops.
+- `cold-ingress-recovery.test.ts` covers that overwrite at the library boundary,
+  complete-snapshot merging, storage read failures, database/connection replacement
+  or deletion during a read, and simultaneous arrivals. Remote ingress must preserve durable
+  local history even when there is no outbox entry.
+- `collection-page-assemble.test.ts` verifies persisted query members retain
+  their original version vector; `client-db.worker.test.ts` checks query payloads
+  include aligned causal snapshots in the same worker operation.
+- `websockets.test.ts` verifies reconciliation includes acknowledged OPFS
+  operations even when an already-mounted resource contains older state. It also
+  covers per-chunk acknowledgements, bidirectional completion, earlier incoming
+  chunks delayed on persistence, failure/invalid imports, disconnect, rejection
+  with a DID drive, and coalesced overlapping probes. `cold-ingress-recovery.test.ts`
+  checks that ingestion awaits the actual persistence promise and propagates failure.
+- `client-db.node.test.ts` pauses the JSON half of a composed snapshot write and
+  verifies a concurrent read cannot observe its temporary reconstructed history.
+  `collection-page-assemble.test.ts` checks filtered table recovery when OPFS
+  survives but session drive selection is lost; `crash-durability.spec.ts` checks
+  visible row membership after SIGKILL. These cases do not cover power loss,
+  other browsers/native platforms, conflicting edits or seeded schedules.
+- `cancelled-lifecycle.test.ts` checks a cancelled reconnect fetch preserves
+  locally edited content; `websockets.test.ts` checks selecting the current
+  drive again does not invalidate an active reconciliation.
+
+- `server/src/handlers/commit/durability_tests.rs` injects a real redb flush failure,
+  verifies no acknowledgement, retries the identical signed commit, and checks
+  duplicate delivery adds no history.
+- `browser/lib/tests/lost-ack.integration.test.ts` loses an HTTP response after a
+  real server accepts genesis, adds a client edit before retry, and independently
+  reads the final value from the server. Local persistence is a test double here.
+- `client-db-durable-put.test.ts` checks snapshot and blob acknowledgements only
+  follow successful flushes, with a periodic retry after failure.
+- `crash-durability.spec.ts` includes file bytes in its independent ledger and
+  checks SHA-256 after Chromium SIGKILL/reopen with remote data access blocked.
+- `toolchain.node.mjs` verifies nested pnpm selection despite an older PATH binary
+  and rejects mismatched Playwright versions. The runner uses a frozen CI install.
+- `server/examples/vault_restore_drill.rs` is a standalone release acceptance probe:
+  metadata restores into an empty store, then restored file references and bytes
+  are checked through the production S3 adapter and a retained scratch bucket.
+  `scripts/verify-vault-s3-restore.py` requires healthy recovery to succeed and
+  missing/corrupt object controls to report incomplete recovery. Vault contains
+  metadata, not files. This does not cover the SaaS Vault API, HTTP download
+  authorization, deployed retention policies, or recovery after bucket loss.
+
+Cargo libtest defaults to serial execution because Iroh tests share process-global
+state. CI nextest isolates each test in its own process and keeps bounded parallelism.
 
 ## WASM database opening
 
@@ -1015,17 +1117,47 @@ native clients.
 
 ### Save durability and identity lifecycle regressions
 
+- `server/src/handlers/commit/durability_tests.rs` runs the shared HTTP/WS
+  commit handler against real redb in a child process, records acknowledgement
+  outside the database, exits without destructors, and reopens the store. Before
+  the handler awaited a flush, the acknowledged name edit reverted to the old
+  value. The test omits the periodic flush thread to deterministically exercise
+  the interval before its next tick. The child has a timeout and cleanup guard.
+  This covers the handler's persistence boundary, not socket delivery, browser
+  document/table UI, attachments, injected fsync failure, or power-loss behavior.
+
 - `save-acknowledgement.test.ts` exercises `Resource.save()` through the real
   outbox with a stubbed commit transport: server refusals (including terminal
   drops), backoff, blocked entries and cancellation cannot report persistence.
   It also covers offline transport failures, successful retries, unrelated
   subjects and edits arriving during an acknowledged save (#1388).
+  It also rejects missing/unsupported local storage, exposes storage failures
+  as errors, and retries a failed local-only snapshot without losing signed
+  genesis or edits. Children waiting on an unsaved parent return `queued`, not
+  the locally durable `offline` result. Offline protocol fixtures now explicitly
+  attach an in-memory storage double; those tests alone do not prove durability.
+
+- `crash-durability.spec.ts` edits a real document and table cell through the
+  compiled UI, awaits resource save completion without a test-only flush, sends
+  SIGKILL to its dedicated Chromium process, and reopens the same persistent
+  profile. HTTP data and WebSocket sync are blocked during recovery. Both edits
+  must remain readable. It runs in the full suite on POSIX, not smoke; this is
+  process-crash coverage, not power loss, storage eviction, or native acceptance.
+- `data-save-state.spec.ts` also disables local persistence, clicks save, checks
+  the visible error and Retry save button, re-enables storage, retries, and reloads
+  to verify the original edit. The error is handled rather than left as an
+  unhandled rejection. Connection-loss messages make no local-save promise.
+- `handlers::commit::benchmark::compare_acknowledgement_throughput` is an ignored,
+  manually run synthetic probe comparing periodic-flush and durable acknowledgements
+  for 1/4/16 concurrent writers. It is not a performance pass/fail release gate.
+
 - `destroy-via-outbox.test.ts` exercises `Resource.destroy()` through the same
   outbox: an online delete POSTs one destroy commit and removes the resource; a
   delete while disconnected queues the pre-signed envelope, survives a simulated
   reload (fresh `LocalOutbox` hydrating the same agent namespace) and is POSTed
   exactly once on reconnect; create + delete while offline POSTs neither
-  envelope; a never-saved `newResource` is dropped without a POST; a server
+  envelope; a never-saved `newResource` is dropped without a POST; the offline-create
+  fixture supplies an explicit in-memory persistence double; a server
   refusal rejects `destroy()` and keeps the entry queued; a transport failure
   resolves as queued and flips the store offline; "already gone" server answers
   (`already applied here`, `predates the resource's genesis`, `does not exist
@@ -1085,7 +1217,9 @@ native clients.
   cannot reuse the holes — and reopens it: the policy compacts, the file
   gives back most of the measured free space, every kept resource reads its
   last value, the record survives the next open, and a disabled policy leaves
-  the file byte-for-byte alone. Overwrites *alone* leave only ~20% dead
+  dead space uncompacted. The fixture disables periodic background flushes
+  so page-allocation measurements are deterministic; it flushes explicitly.
+  Overwrites *alone* leave only ~20% dead
   (freed blocks coalesce and get reused), which is why the test deletes.
   `server::config::tests` cover the `--auto-compact*` flags. Not covered:
   compaction of a store another process holds open (the open itself fails
@@ -1196,7 +1330,7 @@ This does not yet prove restoration of the user's private staging workspace.
 
 - `browser/e2e/tests/plugin.spec.ts`: private plugin assets load through signed parent requests; custom rendering and RPC still work.
 - The bootstrap test opens the shell directly and verifies its server-enforced opaque origin, independently of iframe attributes.
-- `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
+- `signout-signin-data.spec.ts` runs in the optional Linux WebKit project. macOS WebKit runs are rejected before browser launch: persistent profiles repeatedly prompt for the login Keychain, while ephemeral contexts reject OPFS. These remain browser tests, not native Tauri acceptance.
 
 - `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
 
@@ -1586,7 +1720,7 @@ This does not yet prove restoration of the user's private staging workspace.
 
 - `browser/e2e/tests/plugin.spec.ts`: private plugin assets load through signed parent requests; custom rendering and RPC still work. The compiled PluginPage flow checks client metadata updates without replacing its mounted resource, active draft preservation, valid/invalid config, Save completion and offline save/reconnect persistence.
 - The bootstrap test opens the shell directly and verifies its server-enforced opaque origin, independently of iframe attributes.
-- `signout-signin-data.spec.ts` uses fresh persistent profiles on macOS WebKit because ephemeral contexts reject OPFS; these remain browser tests, not native Tauri acceptance.
+- `signout-signin-data.spec.ts` runs in the optional Linux WebKit project. macOS WebKit runs are rejected before browser launch: persistent profiles repeatedly prompt for the login Keychain, while ephemeral contexts reject OPFS. These remain browser tests, not native Tauri acceptance.
 
 - `browser/lib/src/store.test.ts`: receiving an older resource preserves the merged value in both JSON and the persisted Loro snapshot; dashboard configuration reload exercises the real OPFS path.
 
@@ -2288,6 +2422,51 @@ subject-only) and direct reads, while the authorized agent can still read it.
 changed ports/schemes, malformed URLs and non-HTTP URLs; normalized same-origin
 and localhost requests remain eligible for DID-agent authentication.
 
+
+Reconciliation completion additionally checks server version-vector coverage
+(`websockets.test.ts`): skipped entries are selectively retried, two failed retries
+leave local resources intact, newer server versions are accepted, and later local
+edits/disconnects cannot change the frozen verification target. The skipped-entry
+variant of `interrupted-sync.integration.test.ts` forwards a valid chunk missing
+one update to the real server, requires its retry, then verifies the expected edit
+with a single independent HTTP read after reported completion.
+
+Iroh completion checks:
+- `peer::sync_completion_tests` uses real QUIC with a faulting responder:
+  an explicitly rejected push cannot stamp success; a chunk acknowledged without
+  import must be retried before a single receiver DB read succeeds.
+- `peer_verification::tests` covers multiple chunk ACKs, selective retry,
+  remote version dominance, bounded retry exhaustion, disconnect, and preservation
+  of interleaved live updates for the normal authenticated dispatcher.
+- `cross_process_sync` additionally disconnects after initial download, saves an
+  offline edit, reconnects, and triggers one independent receiver read only after
+  the sending process reports completion. This does not emulate power loss.
+
+- `iroh_e2e::accepting_peer_records_sync_only_after_matching_probe` checks that
+  becoming live leaves an unverified timestamp unchanged, while a later matching
+  probe advances it.
+
+
+Sync crash durability: `cross_process_sync::verified_sync_survives_receiver_kill`
+now kills the receiver immediately after the sender reports verified completion
+and reopens its redb, checking both resource content and Loro version coverage.
+The earlier single in-process receipt read is superseded by this crash boundary.
+Server `handlers::commit::durability_tests` exercises the shared WS sync handler
+without a periodic flush: chunk ACK plus GET coverage followed by unclean exit
+must survive reopening. Injected flush failures block both chunk ACKs and
+matching hash ACKs; exact retries retain the same CRDT version.
+
+Seeded shared-engine schedules:
+`handlers::commit::durability_tests::seeded_sync_tests::seeded_sync_failure_schedules`
+runs four fixed seeds against two redb replicas (288 scheduled operations).
+Every shuffled block includes disjoint field edits, delayed/dropped/duplicate
+delivery, storage reopen with identity restoration, failed disk flush, signed
+deletion and stale replay. Both content and parent-query membership are compared
+with an independent ledger after bounded reconciliation. Failures retain the
+seed, operation log, expected ledger and synthetic databases; set
+`ATOMIC_SYNC_SEED` to the reported decimal seed to replay. This is transport-level
+schedule simulation, not a browser/process-crash or arbitrary conflict-policy test.
+
 ## Drive root file drops
 
 `views/Drive/DrivePage.test.tsx` renders the drive page with its real dropzone
@@ -2295,6 +2474,13 @@ and upload hook, then delivers multiple files through the drop callback. It
 verifies the upload targets the displayed drive even when the current drive
 setting differs. Native drag events, overlay geometry and the refreshed child
 list are not covered by this component test.
+
+Develop integration (2026-09-16): selective retry tests in `websockets.test.ts`
+and `peer_verification::tests` also assert that signed history envelopes travel
+with retried snapshots. `client-db.node.test.ts` covers envelope reads/imports
+queued behind a combined JSON/snapshot write. Server acknowledgement crash tests
+and `cross_process_sync` use `test_utils::init_redb_file_without_periodic_flush`
+to keep the library's background durability tick from masking early success.
 
 ---
 
@@ -2615,6 +2801,11 @@ Recovery read fan-out: `recovery-fetch.test.ts` verifies concurrent reads share
 one in-flight request per API/account, settled responses are not cached, failures
 can be retried, and signed-out callers make no request. The SaaS legacy recovery
 upgrade journey passes with the production per-account request limit.
+
+Integration fixture binary discovery: `browser/lib/src/server-binary-fixture.test.ts`
+checks that CI's explicit prebuilt binary path does not invoke Cargo, while local
+builds honor Cargo's configured target directory.
+
 
 ## AI chat folder identity and discovery
 

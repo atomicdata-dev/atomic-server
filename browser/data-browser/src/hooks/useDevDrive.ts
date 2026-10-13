@@ -62,7 +62,10 @@ export function useDevDrive() {
       const newAgent = new Agent(agentProvider, agentDID);
 
       store.setAgent(newAgent);
-      await store.waitForClientDb(10_000);
+      const hasLocalStorage = await store.waitForClientDb(10_000);
+      // Without OPFS the first save needs a server acknowledgement. Agent
+      // selection starts authentication asynchronously, so wait for it.
+      if (!hasLocalStorage) await store.waitForServerConnected(10_000);
 
       // `agentName` pipes `DEV_DRIVE_AGENT_NAME` into the same
       // agent-resource save that `createDrive` already does (to wire up

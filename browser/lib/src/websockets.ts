@@ -85,6 +85,8 @@ import { perfMark, perfSpan } from './perf-trace.js';
 /** How long a drive's sync probe waits so the screen's first reads are not
  *  queued behind the version-vector scan. */
 const SYNC_PROBE_DELAY_MS = 2000;
+/** How long a pushed chunk may wait for its `SYNC_OK` before it is resent. */
+const SYNC_ACK_TIMEOUT_MS = 30_000;
 /** A drive with this many resources (last time it was synced) has its first
  *  sync probe held back; see `runVVSync`. */
 const LARGE_DRIVE_ENTRIES = 500;
@@ -260,6 +262,24 @@ function shortPropName(url: string): string {
   return lastSlash >= 0 ? url.slice(lastSlash + 1) : url;
 }
 
+interface SyncTransfer {
+  pendingAcks: number;
+  incoming: boolean;
+  count: number;
+  failed: boolean;
+  sent: Array<{
+    subject: string;
+    loroBytes: Uint8Array;
+    vv: Record<string, number>;
+  }>;
+  retries: number;
+  /** Fires when the outstanding `SYNC_OK`s do not arrive in time. */
+  ackTimer?: ReturnType<typeof setTimeout>;
+  envelopes?: Record<string, string[]>;
+  /** Pulled states handed to the database worker in bulk, still writing. */
+  writes?: Promise<unknown>[];
+}
+
 /**
  * A WebSocket client using the v2 binary protocol.
  * All messages are binary frames — no JSON-AD parsing on the hot path.
@@ -267,6 +287,8 @@ function shortPropName(url: string): string {
 export class WSClient {
   /** Tests set this to 0. */
   public static syncProbeDelayMs = SYNC_PROBE_DELAY_MS;
+  /** Tests shorten this. */
+  public static syncAckTimeoutMs = SYNC_ACK_TIMEOUT_MS;
 
   private ws: WebSocket;
   private store: Store;
@@ -283,6 +305,11 @@ export class WSClient {
 
   private _closed = false;
   private connection = new AbortController();
+  private activeSyncs = new Set<string>();
+  /** Drive → whether the queued follow-up round was explicitly requested. */
+  private queuedSyncs = new Map<string, boolean>();
+  private syncFrames: Promise<void> = Promise.resolve();
+  private syncTransfers = new Map<string, SyncTransfer>();
   private _retryDelay = 1000;
   private _retryTimer: ReturnType<typeof setTimeout> | undefined;
   private _onlineListener: (() => void) | undefined;
@@ -443,6 +470,10 @@ export class WSClient {
     // only inside the connect handshake misses it. Idempotent server-side.
     this._driveUnsub = store.on(StoreEvents.DriveChanged, () => {
       this._pendingSyncState.clear();
+      this.activeSyncs.clear();
+      this.queuedSyncs.clear();
+      this.syncTransfers.clear();
+      this.syncFrames = Promise.resolve();
       this.subscribeToDrive();
       void this.reconcileSubscribedDrive();
     });
@@ -467,6 +498,10 @@ export class WSClient {
       this.connection.abort(new RequestCancelledError('WebSocket replaced'));
       this.rejectAllPending('WebSocket replaced', true);
       this.connection = new AbortController();
+      this.activeSyncs.clear();
+      this.queuedSyncs.clear();
+      this.syncTransfers.clear();
+      this.syncFrames = Promise.resolve();
       const { signal } = this.connection;
       const ws = new WebSocket(wsURL.toString(), [WS_PROTOCOL]);
       ws.binaryType = 'arraybuffer';
@@ -826,6 +861,21 @@ export class WSClient {
   /** A resource by the subject a server answered with. A server without
    *  `canonical-scheme` echoes the `did:ad:` we sent while the store keys
    *  canonically, so the canonical spelling is tried second. */
+  private encodeWireSyncPush(
+    drive: string,
+    entries: Array<{ subject: string; loroBytes: Uint8Array }>,
+    envelopes: Record<string, string[]> | undefined,
+  ): Uint8Array[] {
+    return encodeSyncPushChunks(
+      this.wireSubject(drive),
+      entries.map(entry => ({
+        subject: this.wireSubject(entry.subject),
+        loroBytes: entry.loroBytes,
+      })),
+      envelopes && this.wireSubjectMap(envelopes),
+    );
+  }
+
   private hydratedResource(subject: string): Resource | undefined {
     return (
       this.store.resources.get(subject) ??
@@ -1211,14 +1261,49 @@ export class WSClient {
     this._probeSentAt = undefined;
 
     if (ev.data instanceof ArrayBuffer) {
-      this.handleBinary(new Uint8Array(ev.data));
+      const data = new Uint8Array(ev.data);
+
+      if (
+        data[0] === Tag.SYNC_DIFF ||
+        data[0] === Tag.SYNC_PUSH ||
+        data[0] === Tag.SYNC_OK
+      ) {
+        const current = this.connectionGuard();
+        this.syncFrames = this.syncFrames.then(async () => {
+          if (!current()) return;
+          const msg =
+            data[0] === Tag.SYNC_DIFF
+              ? decodeSyncDiff(data.subarray(1))
+              : data[0] === Tag.SYNC_PUSH
+                ? decodeSyncPush(data.subarray(1))
+                : decodeSyncOk(data.subarray(1));
+          if (!msg) return;
+          const drive = canonicalizeScheme(msg.drive);
+
+          if (this.syncTransfers.get(drive)?.failed) return;
+
+          try {
+            await this.handleBinary(data);
+          } catch (error) {
+            if (current()) this.failSyncTransfer(drive, error);
+          }
+        });
+
+        return;
+      }
+
+      this.handleBinary(data).catch(error => {
+        if (!(error instanceof RequestCancelledError))
+          this.store.notifyError(error);
+      });
     } else if (typeof ev.data === 'string') {
       // Legacy text messages (Loro sync, query updates) — handle minimally
       this.handleText(ev.data);
     }
   }
 
-  private handleBinary(data: Uint8Array) {
+  private async handleBinary(data: Uint8Array) {
+    const current = this.connectionGuard();
     if (data.length === 0) return;
 
     if (this.debug) {
@@ -1270,13 +1355,11 @@ export class WSClient {
         } else if (msg.code === ErrorCode.SYNC_REJECTED) {
           // Our SYNC_PUSH was refused as a whole (no write right on the
           // drive, quota, not enrolled). Nothing we sent landed and no
-          // SYNC_OK will follow for it. `handleSyncDiff` may already have
-          // reported the drive as synced (it does so as soon as the
-          // server has nothing left to push), so correct that: the drive
-          // is NOT in sync and the local edits stay where they are, to be
+          // SYNC_OK will follow for it. The drive remains unsynced and
+          // local edits stay where they are, to be
           // offered again on the next handshake.
           console.error('[WS] SYNC_PUSH rejected:', msg.message);
-          this.store.failDriveSync(
+          this.failSyncTransfer(
             this.driveFromRejection(msg.message),
             msg.message,
           );
@@ -1383,17 +1466,26 @@ export class WSClient {
           : undefined;
 
         if (pending) {
-          this.store.applyIncoming({
-            subject: msg.subject,
-            loroBytes: msg.loroBytes,
-            commitId: msg.commitId,
-            source: 'ws-pending-get',
-            // A GET response with the SNAPSHOT flag is authoritative full
-            // state — replace any partial doc the client seeded from an
-            // earlier SUB push, rather than merging (which can keep only the
-            // seed's props and render the resource class-less).
-            replaceLoroDocsFromRemote: !!(msg.flags & Flags.SNAPSHOT),
-          });
+          try {
+            await this.store.applyRemoteIncoming(
+              {
+                subject: msg.subject,
+                loroBytes: msg.loroBytes,
+                commitId: msg.commitId,
+                source: 'ws-pending-get',
+                // A GET response with the SNAPSHOT flag is authoritative full
+                // state — replace any partial doc the client seeded from an
+                // earlier SUB push, rather than merging (which can keep only the
+                // seed's props and render the resource class-less).
+                replaceLoroDocsFromRemote: !!(msg.flags & Flags.SNAPSHOT),
+              },
+              current,
+            );
+          } catch (error) {
+            pending.reject(error);
+            throw error;
+          }
+
           // The resource we just hydrated is what the GET caller is
           // waiting for — read it back from the store map.
           const resource = this.hydratedResource(msg.subject);
@@ -1409,12 +1501,15 @@ export class WSClient {
         // pre-import lastCommit equals the post-import (e.g. a
         // properties-only push) — applyIncoming sets it
         // unconditionally, so the gate runs once at the top.
-        this.store.applyIncoming({
-          subject: msg.subject,
-          loroBytes: msg.loroBytes,
-          commitId: msg.commitId,
-          source: msg.flags & Flags.PUSH ? 'ws-sub-push' : 'ws-pending-get',
-        });
+        await this.store.applyRemoteIncoming(
+          {
+            subject: msg.subject,
+            loroBytes: msg.loroBytes,
+            commitId: msg.commitId,
+            source: msg.flags & Flags.PUSH ? 'ws-sub-push' : 'ws-pending-get',
+          },
+          current,
+        );
 
         const resource = this.hydratedResource(msg.subject);
         if (resource) this.checkForMissingBlobs(resource);
@@ -1498,11 +1593,22 @@ export class WSClient {
         const msg = decodeSyncOk(payload);
 
         if (msg) {
-          this.store.finishDriveSync(
-            canonicalizeScheme(msg.drive),
-            0,
-            Date.now(),
-          );
+          // Sync state is keyed by the store's canonical drive; a server
+          // without `canonical-scheme` answers in the `did:ad:` spelling.
+          const drive = canonicalizeScheme(msg.drive);
+          const transfer = this.syncTransfers.get(drive);
+
+          if (transfer) {
+            transfer.pendingAcks = Math.max(0, transfer.pendingAcks - 1);
+            if (!transfer.pendingAcks) clearTimeout(transfer.ackTimer);
+            await this.finishSyncTransfer(drive);
+          } else if (this.activeSyncs.has(drive)) {
+            // A matching hash (including after a reduced/full-vector
+            // request) has no transfer in either direction.
+            this._pendingSyncState.delete(msg.drive);
+            this._pendingSyncState.delete(drive);
+            this.completeSyncDrive(drive, 0);
+          }
         }
 
         break;
@@ -1512,11 +1618,7 @@ export class WSClient {
         const msg = decodeSyncDiff(payload);
 
         if (msg) {
-          // handleSyncDiff is async but unawaited here — catch any
-          // unhandled rejection so it can't propagate to the WS pump.
-          this.handleSyncDiff(msg).catch(e =>
-            console.warn('[WS] handleSyncDiff failed:', e),
-          );
+          await this.handleSyncDiff(msg);
         }
 
         break;
@@ -1526,6 +1628,19 @@ export class WSClient {
         const msg = decodeSyncPush(payload);
 
         if (msg) {
+          const drive = canonicalizeScheme(msg.drive);
+
+          if (!this.syncTransfers.has(drive)) {
+            this.syncTransfers.set(drive, {
+              pendingAcks: 0,
+              incoming: true,
+              count: 0,
+              failed: false,
+              sent: [],
+              retries: 0,
+            });
+          }
+
           if (msg.entries.length > 0) this.store.startDriveSyncPull();
 
           // Per-entry `getResourceLoading + importLoroUpdate +
@@ -1559,23 +1674,32 @@ export class WSClient {
               );
               this.scheduleBackgroundImport();
               this.pulledInBulk = true;
-              workerDb
-                .applyStateUpdates(
-                  direct.map(e => e.subject),
-                  direct.map(e => e.loroBytes),
-                )
-                .catch(e =>
-                  console.warn('[WS] applying pulled states failed:', e),
-                );
+              // Not awaited per chunk, so the worker keeps writing while the
+              // next chunk arrives; the final chunk awaits every one of them
+              // before the transfer can complete.
+              const transfer = this.syncTransfers.get(drive)!;
+              const write = workerDb.applyStateUpdates(
+                direct.map(e => e.subject),
+                direct.map(e => e.loroBytes),
+              );
+              // Handled when the final chunk awaits it; until then a failure
+              // must not surface as an unhandled rejection.
+              write.catch(() => undefined);
+              (transfer.writes ??= []).push(write);
             }
           }
 
           for (const { subject, loroBytes } of entries) {
-            this.store.applyIncoming({
-              subject,
-              loroBytes,
-              source: 'ws-sync-push',
-            });
+            const result = await this.store.applyRemoteIncoming(
+              {
+                subject,
+                loroBytes,
+                source: 'ws-sync-push',
+              },
+              current,
+            );
+            if (result === 'invalid')
+              throw new Error('Incoming sync state could not be applied');
             const resource = this.hydratedResource(subject);
             if (resource) this.checkForMissingBlobs(resource);
           }
@@ -1593,33 +1717,37 @@ export class WSClient {
             }
           }
 
-          // Only mark the drive sync as finished on the final chunk —
-          // SYNC_PUSH is chunked and intermediate chunks shouldn't trigger
-          // the "done" UI state.
-          if (msg.last) {
-            const drive = canonicalizeScheme(msg.drive);
-            const count = msg.entries.length;
+          const transfer = this.syncTransfers.get(drive)!;
+          transfer.count += msg.entries.length;
 
-            const finish = () => {
-              this.store.finishDriveSync(drive, count, Date.now());
-
-              if (this.pulledInBulk) {
-                this.pulledInBulk = false;
-                this.store.notifyBulkApplied();
-              }
-            };
-
-            const clientDb = this.store.getClientDb();
+          // Only finish the drive sync on the final chunk — SYNC_PUSH is
+          // chunked and intermediate chunks shouldn't trigger the "done" UI
+          // state.
+          if (msg.last && current()) {
+            transfer.incoming = false;
+            // A failed bulk write fails the transfer: the pulled state is
+            // not stored, so the drive must not report as synced.
+            await Promise.all(transfer.writes ?? []);
+            transfer.writes = undefined;
 
             // "Synced" is what lets a collection believe its local answer,
             // an empty one included. Until the pulled resources are in the
             // local database that answer is a partial one (a large drive
             // takes minutes to land), so wait for the queued writes first.
+            const clientDb = this.store.getClientDb();
+
             if (typeof clientDb?.flush === 'function') {
-              clientDb.flush().then(finish, finish);
-            } else {
-              finish();
+              await clientDb.flush().catch(() => undefined);
             }
+
+            if (!current()) return;
+
+            if (this.pulledInBulk) {
+              this.pulledInBulk = false;
+              this.store.notifyBulkApplied();
+            }
+
+            await this.finishSyncTransfer(drive);
           }
         }
 
@@ -1633,7 +1761,6 @@ export class WSClient {
           const clientDb = this.store.getClientDb();
 
           if (clientDb) {
-            const current = this.connectionGuard();
             clientDb.getBlob(hash).then(bytes => {
               if (current() && bytes) {
                 this.sendBinary(encodeBlobResponse(hash, bytes));
@@ -2110,6 +2237,21 @@ export class WSClient {
     // reconcile, and computing it would only fail, once per call.
     if (this.store.getClientDb()?.initError) return;
 
+    // Round state is keyed by the store's canonical spelling, which is what
+    // incoming SYNC_OK / SYNC_DIFF / SYNC_PUSH frames are normalized to.
+    const key = canonicalizeScheme(drive);
+
+    // The protocol has drive IDs but no request IDs. Overlapping rounds
+    // would make a SYNC_OK ambiguous; coalesce a requested follow-up round.
+    // Checked here to skip computing the state, and again right before the
+    // probe is sent, which is where this run takes the round.
+    if (this.activeSyncs.has(key)) {
+      this.queueSync(key, explicit);
+
+      return;
+    }
+
+    let ownsRound = false;
     const current = this.connectionGuard();
 
     // Reading every version vector of a large drive keeps the local database
@@ -2171,6 +2313,16 @@ export class WSClient {
       });
       if (!current() || (!explicit && !this.canAutomaticallySyncDrive(drive)))
         return;
+
+      if (this.activeSyncs.has(key)) {
+        this.queueSync(key, explicit);
+
+        return;
+      }
+
+      this.activeSyncs.add(key);
+      this.syncTransfers.delete(key);
+      ownsRound = true;
       this.store.startDriveSync();
       this._pendingSyncState.set(drive, { state: syncState, current });
       this.sendBinary(
@@ -2188,8 +2340,19 @@ export class WSClient {
       perfMark('ws.SYNC.probe.sent');
     } catch (e) {
       close({ err: String(e) });
-      if (current()) console.warn('[WS] VV sync failed:', e);
+
+      if (current()) {
+        // A run that never took the round must not fail the one in flight.
+        if (ownsRound) this.failSyncTransfer(key, e);
+        else console.warn('[WS] VV sync failed:', e);
+      }
     }
+  }
+
+  /** Ask for one more round once the active one completes. An explicit
+   *  request stays explicit, so it is not dropped by the live-sync check. */
+  private queueSync(key: string, explicit: boolean): void {
+    this.queuedSyncs.set(key, explicit || !!this.queuedSyncs.get(key));
   }
 
   /** Force a fresh version-vector reconcile of a single drive with the
@@ -2278,8 +2441,8 @@ export class WSClient {
    * Handle SYNC_DIFF: server tells us which resources differ.
    * We send Loro deltas for resources the server needs (pull list).
    *
-   * For each `pull` subject we try the in-memory `Resource` first, then
-   * fall back to the on-disk ClientDb snapshot. The fallback breaks the
+   * For each `pull` subject we merge the in-memory Resource with its
+   * on-disk ClientDb snapshot. Including durable state breaks the
    * "stale VV" stalemate where server thinks the client is ahead but
    * the client has only just opened the WS — none of those resources
    * are in `store.resources` yet, so the old in-memory-only loop sent
@@ -2296,6 +2459,16 @@ export class WSClient {
   }) {
     const current = this.connectionGuard();
     if (!current()) return;
+    const transfer: SyncTransfer = {
+      pendingAcks: 0,
+      incoming: diff.push.length > 0,
+      count: 0,
+      failed: false,
+      sent: [],
+      retries: 0,
+    };
+    const drive = canonicalizeScheme(diff.drive);
+    this.syncTransfers.set(drive, transfer);
     const clientDb = this.store.getClientDb();
 
     for (const subject of diff.remove ?? []) {
@@ -2341,27 +2514,39 @@ export class WSClient {
 
       let loroBytes: Uint8Array | undefined;
       const serverVv = diff.pullFrom?.[remoteSubject];
+      // A mounted resource can lag OPFS during reload. Export the union,
+      // otherwise even a non-empty in-memory delta can omit acknowledged ops.
+      const stored = clientDb
+        ? await clientDb.getLoroSnapshot(subject)
+        : undefined;
+      if (!current()) return;
+      if (
+        this.store.outbox.hasPending(subject) ||
+        this.store.outbox.hasPending(remoteSubject)
+      )
+        continue;
       const memDoc = this.store.resources.get(subject)?.getLoroDoc?.();
 
-      if (memDoc) {
-        loroBytes = Resource.exportLoroBytesForSync(memDoc, serverVv);
+      let doc = memDoc;
+
+      if (stored?.length) {
+        const combined = new Resource(subject);
+        combined.importLoroUpdate(stored, true);
+        if (memDoc)
+          combined.importLoroUpdate(memDoc.export({ mode: 'snapshot' }));
+        doc = combined.getLoroDoc();
       }
 
-      if ((!loroBytes || loroBytes.length === 0) && clientDb) {
-        try {
-          const stored = await clientDb.getLoroSnapshot(subject);
-          if (!current()) return;
+      if (doc) loroBytes = Resource.exportLoroBytesForSync(doc, serverVv);
 
-          if (stored && stored.length > 0) {
-            loroBytes = stored;
-          }
-        } catch {
-          // skip
-        }
-      }
-
-      if (loroBytes && loroBytes.length > 0) {
+      if (loroBytes && loroBytes.length > 0 && doc) {
         entries.push({ subject, loroBytes });
+        // Freeze the version actually exported, not a later edit's version.
+        transfer.sent.push({
+          subject,
+          loroBytes,
+          vv: Object.fromEntries(doc.oplogVersion().toJSON()),
+        });
       }
     }
 
@@ -2380,31 +2565,167 @@ export class WSClient {
       }
 
       try {
-        for (const frame of encodeSyncPushChunks(
-          this.wireSubject(diff.drive),
-          entries.map(entry => ({
-            ...entry,
-            subject: this.wireSubject(entry.subject),
-          })),
-          this.wireSubjectMap(envelopes),
-        )) {
-          this.sendBinary(frame);
-        }
+        transfer.envelopes = envelopes;
+        const frames = this.encodeWireSyncPush(drive, entries, envelopes);
+        transfer.count += entries.length;
+        this.sendTransferFrames(drive, transfer, frames);
       } catch (e) {
-        console.warn('[WS] SYNC_PUSH send failed:', e);
+        this.failSyncTransfer(drive, e);
 
         return;
       }
     }
 
-    // If server has nothing to push, sync is done
-    if (diff.push.length === 0) {
-      this.store.finishDriveSync(
-        this.store.normalizeSubject(diff.drive),
-        entries.length,
-        Date.now(),
+    await this.finishSyncTransfer(drive);
+  }
+
+  /** Each chunk receives its own SYNC_OK: register before sending, and do
+   *  not wait for one that never comes. A missing ack resends the push under
+   *  the same retry bound as a failed verification, then fails explicitly. */
+  private sendTransferFrames(
+    drive: string,
+    transfer: SyncTransfer,
+    frames: Uint8Array[],
+  ): void {
+    clearTimeout(transfer.ackTimer);
+    transfer.pendingAcks = frames.length;
+    transfer.ackTimer = setTimeout(
+      () => this.onSyncAckTimeout(drive, transfer),
+      WSClient.syncAckTimeoutMs,
+    );
+    for (const frame of frames) this.sendBinary(frame);
+  }
+
+  private onSyncAckTimeout(drive: string, transfer: SyncTransfer): void {
+    if (
+      this.syncTransfers.get(drive) !== transfer ||
+      transfer.failed ||
+      !transfer.pendingAcks
+    )
+      return;
+
+    if (transfer.retries >= 2 || this.readyState !== WebSocket.OPEN) {
+      this.failSyncTransfer(
+        drive,
+        `The server did not acknowledge ${transfer.pendingAcks} sync chunk(s) in time. Local data is retained. Reconnect to retry.`,
       );
+
+      return;
     }
+
+    transfer.retries++;
+
+    try {
+      this.sendTransferFrames(
+        drive,
+        transfer,
+        this.encodeWireSyncPush(drive, transfer.sent, transfer.envelopes),
+      );
+    } catch (e) {
+      this.failSyncTransfer(drive, e);
+    }
+  }
+
+  private async finishSyncTransfer(drive: string): Promise<void> {
+    const transfer = this.syncTransfers.get(drive);
+    if (
+      !transfer ||
+      transfer.failed ||
+      transfer.pendingAcks ||
+      transfer.incoming
+    )
+      return;
+
+    if (transfer.sent.length) {
+      const current = this.connectionGuard();
+      // The range and the answer use the spelling this server reads.
+      const subjects = transfer.sent
+        .map(entry => this.wireSubject(entry.subject))
+        .sort();
+      // One metadata-only inventory query after the whole push has been
+      // acknowledged. An ACK alone admits a chunk but can skip its entries.
+      const items = await this.driveInventory(
+        drive,
+        subjects[0],
+        subjects.at(-1)! + '\0',
+      );
+      if (
+        !current() ||
+        this.syncTransfers.get(drive) !== transfer ||
+        transfer.failed
+      )
+        return;
+      const remote = new Map(
+        items.map(item => [canonicalizeScheme(item.subject), item.vv]),
+      );
+      const missing = transfer.sent.filter(entry => {
+        const vv = remote.get(entry.subject);
+
+        return (
+          !vv ||
+          Object.entries(entry.vv).some(
+            ([peer, count]) =>
+              !Number.isSafeInteger(vv[peer]) || vv[peer] < count,
+          )
+        );
+      });
+
+      if (missing.length) {
+        if (transfer.retries >= 2) {
+          this.failSyncTransfer(
+            drive,
+            `The server has not confirmed ${missing.length} resource(s) after sync retries. Local data is retained. Reconnect to retry.`,
+          );
+
+          return;
+        }
+
+        transfer.retries++;
+        const frames = this.encodeWireSyncPush(
+          drive,
+          missing,
+          transfer.envelopes,
+        );
+        this.sendTransferFrames(drive, transfer, frames);
+
+        return;
+      }
+    }
+
+    clearTimeout(transfer.ackTimer);
+    this.syncTransfers.delete(drive);
+    this.completeSyncDrive(drive, transfer.count);
+  }
+
+  private completeSyncDrive(drive: string, count: number): void {
+    this.activeSyncs.delete(drive);
+    this.store.finishDriveSync(drive, count, Date.now());
+    const explicit = this.queuedSyncs.get(drive);
+
+    if (this.queuedSyncs.delete(drive)) void this.startVVSync(drive, explicit);
+  }
+
+  private failSyncTransfer(wireDrive: string, error: unknown): void {
+    const drive = canonicalizeScheme(wireDrive);
+    const transfer = this.syncTransfers.get(drive) ?? {
+      pendingAcks: 0,
+      incoming: false,
+      count: 0,
+      failed: true,
+      sent: [],
+      retries: 0,
+    };
+    transfer.failed = true;
+    clearTimeout(transfer.ackTimer);
+    this.activeSyncs.delete(drive);
+    this.queuedSyncs.delete(drive);
+    this.syncTransfers.set(drive, transfer);
+    // The store gets the subject as the server named it; it is also the
+    // form `_lastDriveSyncError` and the refused-drive heal match on.
+    this.store.failDriveSync(
+      wireDrive,
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   // ---- Private: helpers ----

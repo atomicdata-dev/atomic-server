@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Store } from '@tomic/lib';
+import { AtomicError, ErrorType, type Store } from '@tomic/lib';
 import { deviceHasDriveData, driveHasServer } from './driveData';
 import { isOriginWithoutNode } from './originNode';
 
@@ -34,6 +34,59 @@ describe('refreshing drive availability', () => {
     expect(
       await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
     ).toBe(false);
+  });
+
+  it('asks again as the signed-in agent when the cached answer was a public 401', async () => {
+    const unauthorized = new AtomicError(
+      'Unauthorized.',
+      ErrorType.Unauthorized,
+    );
+    const store = {
+      getAgent: () => ({ subject: 'did:ad:agent:me' }),
+      getResource: vi.fn().mockResolvedValue({ error: unauthorized }),
+      fetchResourceFromServer: vi.fn().mockResolvedValue({ error: undefined }),
+    };
+
+    expect(
+      await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
+    ).toBe(true);
+    expect(store.fetchResourceFromServer).toHaveBeenCalledWith('did:ad:drive');
+  });
+
+  it('does not refetch a cached 401 when no agent is set', async () => {
+    const unauthorized = new AtomicError(
+      'Unauthorized.',
+      ErrorType.Unauthorized,
+    );
+    const store = {
+      getAgent: () => undefined,
+      getResource: vi.fn().mockResolvedValue({ error: unauthorized }),
+      fetchResourceFromServer: vi.fn(),
+    };
+
+    expect(
+      await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
+    ).toBe(false);
+    expect(store.fetchResourceFromServer).not.toHaveBeenCalled();
+  });
+
+  it('reports unavailable when the signed-in refetch is still a 401', async () => {
+    const unauthorized = new AtomicError(
+      'Unauthorized.',
+      ErrorType.Unauthorized,
+    );
+    const store = {
+      getAgent: () => ({ subject: 'did:ad:agent:me' }),
+      getResource: vi.fn().mockResolvedValue({ error: unauthorized }),
+      fetchResourceFromServer: vi
+        .fn()
+        .mockResolvedValue({ error: unauthorized }),
+    };
+
+    expect(
+      await deviceHasDriveData(store as unknown as Store, 'did:ad:drive'),
+    ).toBe(false);
+    expect(store.fetchResourceFromServer).toHaveBeenCalledTimes(1);
   });
 
   it('does not report availability when local storage rejects the read', async () => {

@@ -1,3 +1,4 @@
+import { sanitizeFeedbackEvent } from './feedback-privacy';
 import * as Sentry from '@sentry/react';
 import { StoreEvents, type Store } from '@tomic/react';
 
@@ -65,6 +66,7 @@ export function initSentry(): void {
     // tunnel each time.
     integrations: [Sentry.browserSessionIntegration({ lifecycle: 'page' })],
   });
+  Sentry.addEventProcessor(sanitizeFeedbackEvent);
 
   // Runs before the Dedupe integration and before any `beforeSend`, so it sees
   // every event the page raised, including those the SDK is about to drop.

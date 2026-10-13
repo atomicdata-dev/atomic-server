@@ -1371,6 +1371,7 @@ msgstr "Alt text"
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
+#: src/routes/DataRoute.tsx
 #: src/routes/Share/ShareRoute.tsx
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/Installation/InstallationPage.tsx
@@ -6103,6 +6104,7 @@ msgstr "Local stays on your devices. Vault is encrypted backup. Server hosts a r
 
 #: src/components/SideBar/AccountMenu.tsx
 #: src/components/SideBar/FeedbackButton.tsx
+#: src/components/SideBar/FeedbackButton.tsx
 msgid "Feedback"
 msgstr "Feedback"
 
@@ -6123,12 +6125,7 @@ msgstr "Thank you. Your feedback has been received."
 msgid "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
 msgstr "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
 
-#: src/components/SideBar/FeedbackButton.tsx
-msgid "Feedback <0/>"
-msgstr "Feedback <0/>"
-
 #: src/chunks/AI/ReportAIChatDialog.tsx
-#: src/components/SideBar/FeedbackButton.tsx
 msgid "Email for a reply (optional) <0/>"
 msgstr "Email for a reply (optional) <0/>"
 
@@ -11118,6 +11115,70 @@ msgstr "Discard upload"
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 
+#: src/routes/DataRoute.tsx
+msgid "Retry save"
+msgstr "Retry save"
+
+#: src/components/SideBar/FeedbackButton.tsx
+msgid "Email for a reply (optional)"
+msgstr "Email for a reply (optional)"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Include diagnostic data"
+msgstr "Include diagnostic data"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Recording locally"
+msgstr "Recording locally"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Not recording"
+msgstr "Not recording"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Retry clearing diagnostics"
+msgstr "Retry clearing diagnostics"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Stop and clear"
+msgstr "Stop and clear"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Start recording"
+msgstr "Start recording"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Diagnostic report preview"
+msgstr "Diagnostic report preview"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Kept in this tab only; it will be lost on reload."
+msgstr "Kept in this tab only; it will be lost on reload."
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Couldn’t clear local diagnostics. Recording is stopped; retry before leaving this browser."
+msgstr "Couldn’t clear local diagnostics. Recording is stopped; retry before leaving this browser."
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Reset in another tab. Reload to record again."
+msgstr "Reset in another tab. Reload to record again."
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Recent save and connection activity only. No document content, names, URLs, or error messages. Nothing is shared unless you attach it below."
+msgstr "Recent save and connection activity only. No document content, names, URLs, or error messages. Nothing is shared unless you attach it below."
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Review the timing and activity counts before sharing."
+msgstr "Review the timing and activity counts before sharing."
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Download report"
+msgstr "Download report"
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Diagnostic data"
+msgstr "Diagnostic data"
+
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "Messages"
 msgstr "Messages"
@@ -11579,10 +11640,6 @@ msgstr "⚠️ contains uncommitted changes"
 #: src/routes/DataRoute.tsx
 msgid "This means that (some) of your local changes are not yet saved."
 msgstr "This means that (some) of your local changes are not yet saved."
-
-#: src/routes/DataRoute.tsx
-msgid "save"
-msgstr "save"
 
 #: src/routes/DataRoute.tsx
 msgid "Usage"
@@ -12912,7 +12969,7 @@ msgstr "Could not open Trash"
 msgid "Items you deleted from this drive"
 msgstr "Items you deleted from this drive"
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr "This server does not have “{0}”"

@@ -33,6 +33,16 @@ export interface NodeClientDbOptions {
 }
 
 export class NodeClientDb {
+  private operations: Promise<unknown> = Promise.resolve();
+  private run<T>(operation: () => Promise<T>): Promise<T> {
+    // Match the browser worker: each public operation, including composed
+    // JSON/snapshot reads and writes, occupies one serialized queue slot.
+    const result = this.operations.then(operation);
+    this.operations = result.catch(() => undefined);
+
+    return result;
+  }
+
   private db: WasmModule | null = null;
   private wasm: WasmModule | null = null;
   private opts: NodeClientDbOptions;
@@ -134,9 +144,11 @@ export class NodeClientDb {
   /* ------------------------------- Public API ------------------------------ */
 
   async getResource(subject: string): Promise<string | null> {
-    const r = await this.requireDb().getResource(subject);
+    return this.run(async () => {
+      const r = await this.requireDb().getResource(subject);
 
-    return (r as string | null) ?? null;
+      return (r as string | null) ?? null;
+    });
   }
 
   /** Mirror of {@link ClientDbWorker.getResourceWithSnapshot} for the
@@ -146,10 +158,13 @@ export class NodeClientDb {
   async getResourceWithSnapshot(
     subject: string,
   ): Promise<{ jsonAd: string | null; snapshot: Uint8Array | null }> {
-    return (await this.requireDb().getResourceWithSnapshot(subject)) as {
-      jsonAd: string | null;
-      snapshot: Uint8Array | null;
-    };
+    return this.run(
+      async () =>
+        (await this.requireDb().getResourceWithSnapshot(subject)) as {
+          jsonAd: string | null;
+          snapshot: Uint8Array | null;
+        },
+    );
   }
 
   async getResourcesWithSnapshots(
@@ -160,11 +175,15 @@ export class NodeClientDb {
 
   /** Match the worker persistence barrier for headless Store clients. */
   async flush(): Promise<void> {
-    this.requireDb().flush();
+    return this.run(async () => {
+      this.requireDb().flush();
+    });
   }
 
   async putResource(jsonAd: string): Promise<void> {
-    await this.requireDb().putResource(jsonAd);
+    return this.run(async () => {
+      await this.requireDb().putResource(jsonAd);
+    });
   }
 
   /** Mirror of {@link ClientDbWorker.putResourceWithSnapshot}. */
@@ -174,20 +193,24 @@ export class NodeClientDb {
     snapshot?: Uint8Array,
     outbox?: ClientDbOutboxWrite,
   ): Promise<void> {
-    const db = this.requireDb();
+    return this.run(async () => {
+      const db = this.requireDb();
 
-    if (snapshot) {
-      await db.putResourceWithSnapshot(jsonAd, snapshot);
-    } else {
-      await db.putResource(jsonAd);
-    }
+      if (snapshot) {
+        await db.putResourceWithSnapshot(jsonAd, snapshot);
+      } else {
+        await db.putResource(jsonAd);
+      }
 
-    if (outbox) await this.outboxWrite(outbox, true);
+      if (outbox) this.writeOutbox(db, outbox, true);
+    });
   }
 
   /** Mirror of {@link ClientDbWorker.outboxEntries}. */
   async outboxEntries(agent: string): Promise<string[]> {
-    return this.requireDb().outboxEntries(agent) as string[];
+    return this.run(
+      async () => this.requireDb().outboxEntries(agent) as string[],
+    );
   }
 
   /** Mirror of {@link ClientDbWorker.outboxWrite}; in memory, so `durable`
@@ -196,7 +219,17 @@ export class NodeClientDb {
     write: ClientDbOutboxWrite,
     durable: boolean,
   ): Promise<void> {
-    const db = this.requireDb();
+    return this.run(async () => {
+      this.writeOutbox(this.requireDb(), write, durable);
+    });
+  }
+
+  /** Not queued itself: callers already hold the operation slot. */
+  private writeOutbox(
+    db: WasmModule,
+    write: ClientDbOutboxWrite,
+    durable: boolean,
+  ): void {
     db.outboxWrite(
       write.agent,
       JSON.stringify(write.puts),
@@ -210,35 +243,51 @@ export class NodeClientDb {
    *  keeping the API symmetric means callers don't branch on which backend
    *  is wired up. */
   async putResources(jsonAds: string[]): Promise<void> {
-    if (jsonAds.length === 0) return;
-    const db = this.requireDb();
+    return this.run(async () => {
+      if (jsonAds.length === 0) return;
+      const db = this.requireDb();
 
-    for (const jsonAd of jsonAds) {
-      await db.putResource(jsonAd);
-    }
+      for (const jsonAd of jsonAds) {
+        await db.putResource(jsonAd);
+      }
+    });
   }
 
   async applyCommit(commitJsonAd: string): Promise<void> {
-    await this.requireDb().applyCommit(commitJsonAd);
+    return this.run(async () => {
+      await this.requireDb().applyCommit(commitJsonAd);
+    });
   }
 
   async removeResource(subject: string): Promise<void> {
-    await this.requireDb().removeResource(subject);
+    return this.run(async () => {
+      await this.requireDb().removeResource(subject);
+    });
   }
 
   async query(opts: ClientDbQueryOpts = {}): Promise<ClientDbQueryResult> {
-    const r = await this.requireDb().query(
-      opts.property ?? null,
-      opts.value ?? null,
-      opts.sortBy ?? null,
-      opts.sortDesc ?? null,
-      opts.limit ?? null,
-      opts.offset ?? null,
-      opts.includeResources ?? null,
-      opts.drive ?? null,
-    );
+    return this.run(async () => {
+      const r = await this.requireDb().query(
+        opts.property ?? null,
+        opts.value ?? null,
+        opts.sortBy ?? null,
+        opts.sortDesc ?? null,
+        opts.limit ?? null,
+        opts.offset ?? null,
+        opts.includeResources ?? null,
+        opts.drive ?? null,
+      );
 
-    return r as ClientDbQueryResult;
+      const result = r as ClientDbQueryResult;
+
+      if (opts.includeResources) {
+        result.snapshots = result.subjects.map(
+          subject => this.requireDb().getLoroSnapshot(subject) ?? null,
+        );
+      }
+
+      return result;
+    });
   }
 
   async search(
@@ -249,116 +298,148 @@ export class NodeClientDb {
       filters?: Record<string, string | number | string[]>;
     } = {},
   ): Promise<string[]> {
-    const r = this.requireDb().search(
-      query,
-      opts.limit ?? null,
-      opts.parents ?? null,
-      opts.filters ?? null,
-    );
+    return this.run(async () => {
+      const r = this.requireDb().search(
+        query,
+        opts.limit ?? null,
+        opts.parents ?? null,
+        opts.filters ?? null,
+      );
 
-    return ((await r) as string[]) ?? [];
+      return ((await r) as string[]) ?? [];
+    });
   }
 
   async allSubjects(): Promise<string[]> {
-    return this.requireDb().allSubjects() as string[];
+    return this.run(async () => {
+      return this.requireDb().allSubjects() as string[];
+    });
   }
 
   async populate(): Promise<void> {
-    await this.requireDb().populate();
+    return this.run(async () => {
+      await this.requireDb().populate();
+    });
   }
 
   async exportAllResources(): Promise<string> {
-    return this.requireDb().exportAllResources() as string;
+    return this.run(async () => {
+      return this.requireDb().exportAllResources() as string;
+    });
   }
 
   async importAllResources(jsonArray: string): Promise<number> {
-    return (await this.requireDb().importAllResources(jsonArray)) as number;
+    return this.run(async () => {
+      return (await this.requireDb().importAllResources(jsonArray)) as number;
+    });
   }
 
   async getLoroSnapshot(subject: string): Promise<Uint8Array | null> {
-    const r = this.requireDb().getLoroSnapshot(subject);
+    return this.run(async () => {
+      const r = this.requireDb().getLoroSnapshot(subject);
 
-    return (r as Uint8Array | null) ?? null;
+      return (r as Uint8Array | null) ?? null;
+    });
   }
 
   async envelopesFor(subjects: string[]): Promise<Record<string, string[]>> {
-    const db = this.requireDb();
+    return this.run(async () => {
+      const db = this.requireDb();
 
-    if (subjects.length === 0 || typeof db.envelopesFor !== 'function') {
-      return {};
-    }
+      if (subjects.length === 0 || typeof db.envelopesFor !== 'function') {
+        return {};
+      }
 
-    return JSON.parse(db.envelopesFor(JSON.stringify(subjects))) as Record<
-      string,
-      string[]
-    >;
+      return JSON.parse(db.envelopesFor(JSON.stringify(subjects))) as Record<
+        string,
+        string[]
+      >;
+    });
   }
 
   async importEnvelopes(
     envelopes: Array<{ subject: string; json: string }>,
   ): Promise<number> {
-    const db = this.requireDb();
+    return this.run(async () => {
+      const db = this.requireDb();
 
-    if (envelopes.length === 0 || typeof db.importEnvelopes !== 'function') {
-      return 0;
-    }
+      if (envelopes.length === 0 || typeof db.importEnvelopes !== 'function') {
+        return 0;
+      }
 
-    return (await db.importEnvelopes(JSON.stringify(envelopes))) as number;
+      return (await db.importEnvelopes(JSON.stringify(envelopes))) as number;
+    });
   }
 
   async historyAttribution(
     subject: string,
   ): Promise<HistoryAttribution | null> {
-    const db = this.requireDb();
+    return this.run(async () => {
+      const db = this.requireDb();
 
-    if (typeof db.historyAttribution !== 'function') return null;
+      if (typeof db.historyAttribution !== 'function') return null;
 
-    return parseHistoryAttribution(await db.historyAttribution(subject));
+      return parseHistoryAttribution(await db.historyAttribution(subject));
+    });
   }
 
   async putBlob(hash: Uint8Array, data: Uint8Array): Promise<void> {
-    this.requireDb().putBlob(hash, data);
+    return this.run(async () => {
+      this.requireDb().putBlob(hash, data);
+    });
   }
 
   async getBlob(hash: Uint8Array): Promise<Uint8Array | null> {
-    const r = this.requireDb().getBlob(hash);
+    return this.run(async () => {
+      const r = this.requireDb().getBlob(hash);
 
-    return (r as Uint8Array | null) ?? null;
+      return (r as Uint8Array | null) ?? null;
+    });
   }
 
   async blake3Hash(data: Uint8Array): Promise<Uint8Array> {
-    // `blake3Hash` is a method on `ClientDb`, not on the wasm module. The
-    // db instance gives access to it; calling it on the module fails with
-    // "blake3Hash is not a function".
-    return this.requireDb().blake3Hash(data) as Uint8Array;
+    return this.run(async () => {
+      // `blake3Hash` is a method on `ClientDb`, not on the wasm module. The
+      // db instance gives access to it; calling it on the module fails with
+      // "blake3Hash is not a function".
+      return this.requireDb().blake3Hash(data) as Uint8Array;
+    });
   }
 
   async getAllVersionVectors(): Promise<
     Record<string, Record<string, number>>
   > {
-    const r = this.requireDb().getAllVersionVectors();
+    return this.run(async () => {
+      const r = this.requireDb().getAllVersionVectors();
 
-    return versionVectorRecords(r);
+      return versionVectorRecords(r);
+    });
   }
 
   async getVersionVectorsForDrive(
     drive: string,
   ): Promise<Record<string, Record<string, number>>> {
-    const r = await this.requireDb().getVersionVectorsForDrive(drive);
+    return this.run(async () => {
+      const r = await this.requireDb().getVersionVectorsForDrive(drive);
 
-    return versionVectorRecords(r);
+      return versionVectorRecords(r);
+    });
   }
 
   async getDriveSubjects(drive: string): Promise<string[]> {
-    return (await this.requireDb().getDriveSubjects(drive)) as string[];
+    return this.run(
+      async () => (await this.requireDb().getDriveSubjects(drive)) as string[],
+    );
   }
 
   async getVersionVectorsForSubjects(
     subjects: string[],
   ): Promise<Record<string, Record<string, number>>> {
-    const r = this.requireDb().getVersionVectorsForSubjects(subjects);
+    return this.run(async () => {
+      const r = this.requireDb().getVersionVectorsForSubjects(subjects);
 
-    return versionVectorRecords(r);
+      return versionVectorRecords(r);
+    });
   }
 
   private requireDb(): WasmModule {

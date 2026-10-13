@@ -102,6 +102,15 @@ const seededStorage = [
     : []),
 ];
 
+// Persistent WebKit profiles on macOS access the login Keychain to persist
+// CryptoKeys. They repeatedly prompt for the user's password during these
+// storage tests. Run this optional project on Linux, never on a user's Mac.
+if (process.env.ATOMIC_TEST_WEBKIT && process.platform === 'darwin') {
+  throw new Error(
+    'WebKit storage tests are disabled on macOS because they trigger login Keychain password prompts. Run ATOMIC_TEST_WEBKIT=1 on Linux instead.',
+  );
+}
+
 const config: PlaywrightTestConfig = {
   // Default `expect` timeout. Playwright's built-in is 5s; bump to 10s
   // so retrying assertions match the action timeout below. Tests that
@@ -231,7 +240,7 @@ const config: PlaywrightTestConfig = {
     // the firefox project above; running the full suite here is a separate,
     // much larger job.
     //
-    // Opt-in via ATOMIC_TEST_WEBKIT=1 because it needs `pnpm playwright-install
+    // Opt-in on Linux via ATOMIC_TEST_WEBKIT=1 because it needs `pnpm playwright-install
     // --webkit`, which the default `playwright-install` script does not fetch.
     // This is NOT a substitute for driving the real Tauri binary — same engine,
     // but an http:// origin instead of tauri://, and no embedded node.

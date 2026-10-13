@@ -1,5 +1,9 @@
 import { ResourceEvents, SaveQueuedError, type Resource } from './resource.js';
-import { ScheduledSave, type ResourceSaveState } from './scheduled-save.js';
+import {
+  ScheduledSave,
+  ResourceSaveStateKind,
+  type ResourceSaveState,
+} from './scheduled-save.js';
 import type { OutboxEntry } from './local-outbox.js';
 
 interface SaveStatusDependencies {
@@ -57,17 +61,19 @@ export class SaveStatusCoordinator {
     const target = resource.__internalObject;
     const scheduledCount = this.scheduledByResource.get(target) ?? 0;
     const entry = this.dependencies.getOutboxEntry(target.subject);
-    const error = entry?.lastAttemptError ?? target.commitError?.message;
+    const error = target.commitError?.message ?? entry?.lastAttemptError;
     let kind: ResourceSaveState['kind'];
-    if (target.isSaving) kind = 'saving';
-    else if (scheduledCount) kind = 'scheduled';
-    else if (entry?.blocked) kind = 'error';
-    else if (entry) kind = 'queued';
-    else if (error) kind = 'error';
-    else if (target.hasUnsavedChanges()) kind = 'dirty';
-    else kind = 'idle';
+    if (target.isSaving) kind = ResourceSaveStateKind.Saving;
+    else if (scheduledCount) kind = ResourceSaveStateKind.Scheduled;
+    else if (entry?.blocked) kind = ResourceSaveStateKind.Error;
+    else if (target.commitError) kind = ResourceSaveStateKind.Error;
+    else if (entry) kind = ResourceSaveStateKind.Queued;
+    else if (error) kind = ResourceSaveStateKind.Error;
+    else if (target.hasUnsavedChanges()) kind = ResourceSaveStateKind.Dirty;
+    else kind = ResourceSaveStateKind.Idle;
     const queuedReason = this.dependencies.isConnected() ? 'retry' : 'offline';
-    const reason = kind === 'queued' ? queuedReason : undefined;
+    const reason =
+      kind === ResourceSaveStateKind.Queued ? queuedReason : undefined;
     const previous = this.saveSnapshots.get(target);
     if (
       previous?.kind === kind &&

@@ -41,6 +41,16 @@ describe('oxc-transform-react', () => {
     ).toEqual([]);
   });
 
+  it('compiles feedback controls without optimization bailouts', () => {
+    for (const name of ['FeedbackButton', 'FeedbackDiagnostics']) {
+      const filename = join(srcDir, `components/SideBar/${name}.tsx`);
+      const result = compile(filename, readFileSync(filename, 'utf8'));
+      expect(result.fatal).toBe(false);
+      expect(result.errors).toEqual([]);
+      expect(result.code).toContain('react/compiler-runtime');
+    }
+  });
+
   it('does not evaluate TipTap command getters while rendering the node menu', () => {
     const filename = join(srcDir, 'chunks/RTE/NodeSelectMenu.tsx');
     const result = compile(filename, readFileSync(filename, 'utf8'));

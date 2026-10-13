@@ -18,10 +18,7 @@
  *     be opened, and the cache silently empties even though the server still
  *     has everything. That is exactly what "the content is gone" looks like.
  */
-import { test as base, expect, type Page, webkit } from './fixtures';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { test, expect, type Page } from './fixtures';
 import {
   before,
   clickAccountMenuItem,
@@ -31,40 +28,6 @@ import {
   setTitle,
   timestamp,
 } from './test-utils';
-
-// WebKit's ephemeral contexts on macOS reject OPFS even though regular
-// profiles support it. These tests assert persistence, so use an isolated
-// regular profile rather than exercising private-browsing storage policy.
-const test = base.extend({
-  context: async (
-    { browserName, context, headless, viewport, locale, timezoneId },
-    use,
-  ) => {
-    if (browserName !== 'webkit' || process.platform !== 'darwin') {
-      await use(context);
-
-      return;
-    }
-
-    const profile = await mkdtemp(join(tmpdir(), 'atomic-webkit-storage-'));
-    const persistent = await webkit.launchPersistentContext(profile, {
-      headless,
-      viewport,
-      locale,
-      timezoneId,
-    });
-    await persistent.addInitScript(() => {
-      localStorage.setItem('viewTransitionsEnabled', 'false');
-    });
-
-    try {
-      await use(persistent);
-    } finally {
-      await persistent.close();
-      await rm(profile, { recursive: true, force: true });
-    }
-  },
-});
 
 const SESSION_KEY_PREFIX = 'atomic.clientdb.session-key.';
 // New sign-ins write only the v2 (secret envelope) record; the v1 prefix

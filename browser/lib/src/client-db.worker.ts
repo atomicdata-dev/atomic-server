@@ -7,6 +7,7 @@
 
 import { openClientDb, isStorageBlockedDbError } from './client-db-open.js';
 import { wasmBinaryUrl } from './wasm-url.js';
+import type { ClientDbQueryResult } from './client-db.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WasmModule = any;
@@ -384,7 +385,7 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
     case 'query': {
       await ensureInit();
 
-      return db!.query(
+      const result = (await db!.query(
         msg.property ?? null,
         msg.value ?? null,
         msg.sortBy ?? null,
@@ -396,7 +397,18 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
         msg.filters ?? null,
         msg.aggregation ?? null,
         msg.expressionFilters ?? null,
-      );
+      )) as ClientDbQueryResult;
+
+      // Keep the JSON read cache and its causal history in the same worker
+      // operation. Reconstructing a LoroDoc from query JSON invents new ops
+      // and can replace a durable offline edit's history when the row renders.
+      if (msg.includeResources) {
+        result.snapshots = result.subjects.map(
+          subject => db!.getLoroSnapshot(subject) ?? null,
+        );
+      }
+
+      return result;
     }
 
     case 'search': {
@@ -476,6 +488,11 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
     case 'putBlob': {
       await ensureInit();
       db!.putBlob(msg.hash, msg.data);
+      // Upload callers may discard their File once this RPC succeeds.
+      // Persist bytes before acknowledging, and re-arm retry if fsync fails.
+      dirty = true;
+      db!.flush();
+      dirty = false;
 
       return;
     }
@@ -801,7 +818,6 @@ const WRITE_OPS: ReadonlySet<WorkerRequest['type']> = new Set([
   'putResources',
   'applyCommit',
   'removeResource',
-  'putBlob',
   'importAllResources',
   'populate',
 ]);

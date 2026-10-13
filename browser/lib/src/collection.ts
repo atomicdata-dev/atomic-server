@@ -6,6 +6,7 @@ import { decodeB64 } from './base64.js';
 import { decodeGenesisCert } from './genesis.js';
 import { GENESIS } from './urls.js';
 import { Store } from './store.js';
+import { server as serverOntology } from './ontologies/server.js';
 import { commits } from './ontologies/commits.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import { isCommitSubject } from './commit.js';
@@ -656,6 +657,12 @@ export class Collection {
     // row renders) and must not affect membership.
     if (subject.startsWith('_new:')) return 'unchanged';
 
+    // Server queries return member IDs before their resource bodies load.
+    // An empty loading placeholder has no parent yet; that is not evidence
+    // that the member was re-parented. Removing it here corrupts the shared
+    // query page while other collection readers are still hydrating it.
+    if (resource?.loading) return 'unchanged';
+
     // `r.get(fp)` is a string for single-valued properties (e.g. `parent`)
     // and an array for multi-valued ones (e.g. `isA`). Match like
     // server-side `/query` does ("value-in-property").
@@ -1207,7 +1214,23 @@ export class Collection {
     // `drive: undefined` for the rest of its life even once the drive is
     // known. Falling back to the store's current drive here is the same value
     // the builder would have captured a moment later.
-    const drive = this.params.drive ?? this.store.getDrive();
+    const parent =
+      this.params.property === core.properties.parent &&
+      typeof this.params.value === 'string'
+        ? this.store.resources.get(this.params.value)
+        : undefined;
+    // A process kill can lose session localStorage while OPFS retains the
+    // table and every acknowledged row. Its immutable drive is sufficient
+    // to query those rows without a server or session-drive selection.
+    const parentDrive = parent?.get('https://atomicdata.dev/properties/drive');
+    const drive =
+      this.params.drive ??
+      this.store.getDrive() ??
+      (typeof parentDrive === 'string'
+        ? parentDrive
+        : parent?.hasClasses(serverOntology.classes.drive)
+          ? parent.subject
+          : undefined);
 
     // Extra AND constraints route through the indexed path
     // (`query_complex`), which REQUIRES a drive scope: the query index is
@@ -1299,6 +1322,7 @@ export class Collection {
     result: {
       subjects: string[];
       resources?: string[];
+      snapshots?: Array<Uint8Array | null>;
       count: number;
       aggregates?: AggregateOutcome[];
     },
@@ -1381,6 +1405,7 @@ export class Collection {
         this.store.hydrateResourceFromJsonAd(
           result.subjects[i]!,
           result.resources[i]!,
+          result.snapshots?.[i] ?? undefined,
         );
       }
     }

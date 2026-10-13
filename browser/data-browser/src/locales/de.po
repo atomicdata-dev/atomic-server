@@ -1371,6 +1371,7 @@ msgstr ""
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
+#: src/routes/DataRoute.tsx
 #: src/routes/Share/ShareRoute.tsx
 #: src/views/Article/ArticleDescription.tsx
 #: src/views/Installation/InstallationPage.tsx
@@ -6097,6 +6098,7 @@ msgstr ""
 
 #: src/components/SideBar/AccountMenu.tsx
 #: src/components/SideBar/FeedbackButton.tsx
+#: src/components/SideBar/FeedbackButton.tsx
 msgid "Feedback"
 msgstr ""
 
@@ -6117,12 +6119,7 @@ msgstr ""
 msgid "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
 msgstr ""
 
-#: src/components/SideBar/FeedbackButton.tsx
-msgid "Feedback <0/>"
-msgstr ""
-
 #: src/chunks/AI/ReportAIChatDialog.tsx
-#: src/components/SideBar/FeedbackButton.tsx
 msgid "Email for a reply (optional) <0/>"
 msgstr ""
 
@@ -11105,6 +11102,70 @@ msgstr ""
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr ""
 
+#: src/routes/DataRoute.tsx
+msgid "Retry save"
+msgstr "Speichern erneut versuchen"
+
+#: src/components/SideBar/FeedbackButton.tsx
+msgid "Email for a reply (optional)"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Include diagnostic data"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Recording locally"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Not recording"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Retry clearing diagnostics"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Stop and clear"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Start recording"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Diagnostic report preview"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Kept in this tab only; it will be lost on reload."
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Couldn’t clear local diagnostics. Recording is stopped; retry before leaving this browser."
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Reset in another tab. Reload to record again."
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Recent save and connection activity only. No document content, names, URLs, or error messages. Nothing is shared unless you attach it below."
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Review the timing and activity counts before sharing."
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Download report"
+msgstr ""
+
+#: src/components/SideBar/FeedbackDiagnostics.tsx
+msgid "Diagnostic data"
+msgstr ""
+
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "Messages"
 msgstr ""
@@ -11565,10 +11626,6 @@ msgstr ""
 
 #: src/routes/DataRoute.tsx
 msgid "This means that (some) of your local changes are not yet saved."
-msgstr ""
-
-#: src/routes/DataRoute.tsx
-msgid "save"
 msgstr ""
 
 #: src/routes/DataRoute.tsx
@@ -12899,7 +12956,7 @@ msgstr ""
 msgid "Items you deleted from this drive"
 msgstr ""
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr ""

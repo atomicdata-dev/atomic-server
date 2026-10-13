@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
+  query: vi.fn(),
+  getLoroSnapshot: vi.fn(),
   vaultCommitSegment: vi.fn(),
   flush: vi.fn(),
 }));
@@ -62,3 +64,45 @@ it.each([false, true])(
     if (fail) expect(response.message).toBe('disk unavailable');
   },
 );
+
+it('returns causal snapshots with query payloads in the same worker operation', async () => {
+  vi.useFakeTimers();
+  const worker = {
+    onmessage: null as unknown as (event: unknown) => void,
+    postMessage: vi.fn(),
+  };
+  vi.stubGlobal('self', worker);
+  await import('./client-db.worker.js');
+  let id = 0;
+
+  async function send(message: object) {
+    const requestId = ++id;
+    const response = new Promise<Record<string, unknown>>(resolve => {
+      worker.postMessage.mockImplementation(value => {
+        if (value.id === requestId) resolve(value);
+      });
+    });
+    worker.onmessage({ data: { ...message, id: requestId } });
+
+    return response;
+  }
+
+  await send({
+    type: 'init',
+    wasmUrl: 'data:text/javascript,export default async function() {}',
+  });
+  db.query.mockResolvedValue({
+    subjects: ['a', 'b'],
+    resources: ['{}', '{}'],
+    count: 2,
+  });
+  db.getLoroSnapshot.mockImplementation(subject =>
+    subject === 'a' ? new Uint8Array([1, 2]) : null,
+  );
+  const response = await send({ type: 'query', includeResources: true });
+  expect(response.type).toBe('ok');
+  expect(response.data).toMatchObject({
+    snapshots: [new Uint8Array([1, 2]), null],
+  });
+  expect(db.getLoroSnapshot.mock.calls).toEqual([['a'], ['b']]);
+});

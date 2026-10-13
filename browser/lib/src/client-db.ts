@@ -138,6 +138,8 @@ function asInitError(e: unknown): Error {
 export interface ClientDbQueryResult {
   subjects: string[];
   resources: string[];
+  /** Causal state aligned with subjects/resources, included with query payloads. */
+  snapshots?: Array<Uint8Array | null>;
   count: number;
   /** Statistics over every matching resource, when the query asked for them. */
   aggregates?: AggregateOutcome[];

@@ -2,6 +2,12 @@
 
 Production remains on hold. Updated 2026-09-07.
 
+## Feedback diagnostics presentation
+
+- [x] Replace the verbose diagnostic disclosure with a compact, review-first
+  control that keeps the feedback form readable while preserving explicit
+  attachment and download flows.
+
 - [x] Audit browser initialization and sidebar.
 - [x] Report React caught, uncaught and recoverable errors using React 19 root callbacks.
 - [x] Add sidebar feedback with optional reply email, validation, retained text on delivery failure, and info@ontola.io fallback.
@@ -28,3 +34,32 @@ Links: [feedback report](https://ontola.sentry.io/issues/feedback/?feedbackSlug=
 CI initially caught explicit label association and spacing lint failures. Fixed both; full data-browser lint/format check, six unit tests and the feedback Playwright scenario pass locally afterward.
 
 Corrected server CI [34124278399](https://github.com/ontola/atomic-server/actions/runs/34124278399) passed, including main CI and the atomic-saas downstream compatibility check.
+
+## Readiness recheck — 2026-09-16
+
+This is a read-only readiness audit, not a deployed incident-delivery acceptance.
+
+- [x] Rerun local diagnostic report, persistent recorder and Sentry helper suites:
+  16 tests pass across three files.
+- [x] Read the public staging entry bundle: `/assets/index-B2vh6pw-.js` identifies
+  release `atomic-data-browser@0.41.0-beta.7+9c9cff0`. This is not the newly
+  committed stability branch.
+- [x] Check the documented pinned Sentry CLI: `@sentry/mcp-server@0.39.0 auth status`
+  reports not authenticated. No connected Sentry inspection tools are available
+  in this session. Device login is required before received-event inspection.
+- [x] Inspect repository-level Actions secret names for atomic-server and
+  atomic-saas: neither lists `SENTRY_AUTH_TOKEN`. No private upload step is present
+  in this repository's current build configuration. Organization/environment
+  secrets and deployment-host configuration were not audited.
+- [ ] With authenticated Sentry access and an appropriate deployed build, confirm
+  a feedback diagnostic attachment and a minified error's symbolicated stack.
+- [ ] Verify backend reporting and actual notification receipt independently.
+
+The inspected bundle has no sourceMappingURL or Sentry debug-id marker. That
+alone does not prove private source maps were never uploaded: release-based
+mapping can exist without public map references. The current check therefore
+does not claim either symbolication success or failure.
+
+No reports, feedback messages, alert notifications or deployment changes were
+initiated. Do not treat the 16 local tests or an accessible staging page as proof
+that end-to-end reporting works.

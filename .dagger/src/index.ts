@@ -1149,6 +1149,7 @@ export class AtomicServer {
       .withFile('/repo/target/debug/atomic-server', binary, {
         permissions: 0o755,
       })
+      .withEnvVariable('ATOMIC_SERVER_BINARY', '/repo/target/debug/atomic-server')
       .withDirectory('/repo/wasm/pkg', wasmPkg)
       .withWorkdir('/repo/browser/lib')
       .withExec(['pnpm', 'run', 'test:integration'])

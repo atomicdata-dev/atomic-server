@@ -15,6 +15,9 @@ artifact
 # only, kept out of the dev store on purpose.
 /.e2e-store
 /.e2e-runs
+
+# One-off diagnostic agent evaluation artifacts
+/browser/diagnostic-evaluations/
 server/assets_tmp
 # Same, for the plugin assets `build.rs` stages before embedding them.
 server/integrations_assets_tmp
@@ -26,6 +29,7 @@ scratchpad
 **/.claude/*
 !/.claude/settings.json
 !/.claude/hooks/
+.codex/*
 .antigravitycli
 
 # Release binaries and one-off rustc scratch files at repo root

@@ -5,6 +5,11 @@ use atomic_lib::{
     Db,
 };
 
+#[cfg(test)]
+mod benchmark;
+#[cfg(test)]
+mod durability_tests;
+
 /// Send and process a Commit.
 /// Currently only accepts JSON-AD
 #[tracing::instrument(skip(appstate))]
@@ -70,6 +75,16 @@ pub async fn apply_commit_json(
         &CommitIngestOpts::hub(source_id, Some(origin.to_string())),
     )
     .await?;
+
+    // HTTP success and WS COMMIT_OK let callers discard their pending edit.
+    // redb applies with Durability::None; waiting for the periodic flush would
+    // leave acknowledged writes vulnerable to a crash before the next tick.
+    // Keep blocking disk I/O off the async worker, and propagate failures so
+    // neither transport can report success without a durable commit point.
+    let durable_store = store.clone();
+    tokio::task::spawn_blocking(move || durable_store.flush())
+        .await
+        .map_err(|e| format!("Commit durability task failed: {e}"))??;
 
     crate::metrics::commit_applied();
 

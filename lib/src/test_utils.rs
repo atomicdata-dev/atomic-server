@@ -81,3 +81,19 @@ pub async fn setup_test_env(store: &Db) -> crate::errors::AtomicResult<()> {
     populate_collections(store).await?;
     Ok(())
 }
+
+/// Open a real file-backed store with only explicit durability barriers.
+/// Crash tests use this to prevent a background tick from hiding an early ACK.
+#[cfg(all(feature = "db-redb", not(target_arch = "wasm32")))]
+pub async fn init_redb_file_without_periodic_flush(
+    path: &std::path::Path,
+) -> crate::errors::AtomicResult<Db> {
+    Db::init_redb_file_inner(
+        path,
+        None,
+        &path.join("uploads"),
+        &crate::db::compaction::CompactionPolicy::default(),
+        false,
+    )
+    .await
+}

@@ -1,0 +1,4 @@
+[env]
+# libtest runs inside one process: Iroh tests share LIVE_PEERS and ROUTER.
+# Nextest runs separate processes and retains its own concurrency settings.
+RUST_TEST_THREADS = { value = "1", force = false }

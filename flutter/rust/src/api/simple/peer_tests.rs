@@ -220,10 +220,11 @@ async fn a_canvas_syncs_to_a_second_device_through_the_bridge() {
     let report: serde_json::Value =
         serde_json::from_str(&peer_sync(addr.node_id.clone()).await.expect("peer_sync")).unwrap();
 
-    assert!(
-        report["pushed"].as_i64().unwrap_or(0) > 0,
-        "the drawing should have been handed to the second device: {report}"
-    );
+    // `start_peer` runs an auto-connect loop that dials every known peer on a
+    // ~10s tick. When a tick lands between `add_known_peer` and the explicit
+    // sync above, the loop delivers the drawing first and this sync finds
+    // nothing left to push (`pushed: 0`). Whether the drawing arrived is
+    // therefore judged on the receiving side below, not on who pushed it.
     assert_eq!(
         report["peer_name"].as_str(),
         Some(REMOTE_NAME),

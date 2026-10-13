@@ -460,7 +460,7 @@ pub async fn handle_frame_full_for_caps(
                 .await
                 {
                     Ok(server_hash) if server_hash == sync.drive_hash => {
-                        vec![protocol::encode_sync_ok(&wire.subject(&sync.drive))]
+                        vec![durable_sync_ok(&wire.subject(&sync.drive), store)]
                     }
                     Ok(_) => vec![protocol::encode_sync_resend(&wire.subject(&sync.drive))],
                     Err(reason) => vec![protocol::encode_error(
@@ -1457,7 +1457,7 @@ pub async fn handle_sync_vv_reconcile(
         if server_hash == drive_hash {
             tracing::info!("SYNC: drive {} — hashes match, in sync", drive);
 
-            return vec![protocol::encode_sync_ok(&wire.subject(drive))];
+            return vec![durable_sync_ok(&wire.subject(drive), store)];
         }
     }
 
@@ -1708,9 +1708,23 @@ pub(crate) async fn may_accept_drive_write(
     false
 }
 
-/// Why a `SYNC_PUSH` was refused as a whole. Distinct from "imported zero
-/// entries" (every entry tombstoned or malformed), which is still a
-/// successful import from the protocol's point of view.
+/// A matching vector/hash can follow an earlier flush failure. It proves
+/// equality in memory, so make that state durable before acknowledging it.
+fn durable_sync_ok(drive: &str, store: &Db) -> Vec<u8> {
+    match store.flush() {
+        Ok(()) => protocol::encode_sync_ok(drive),
+        Err(error) => SyncPushRejected {
+            drive: drive.to_string(),
+            reason: format!("Could not persist sync state: {error}"),
+        }
+        .to_error_frame(),
+    }
+}
+
+/// Why a `SYNC_PUSH` cannot be acknowledged. Admission may reject the whole
+/// push; a flush failure may leave readable but not durably accepted writes.
+/// Distinct from "imported zero entries" (every entry tombstoned or malformed),
+/// which can still receive a chunk acknowledgement after a successful flush.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncPushRejected {
     /// The drive the push named.
@@ -2066,6 +2080,15 @@ pub async fn import_sync_push(
             );
         }
     }
+
+    // Both WebSocket acknowledgements and Iroh completion depend on this
+    // import returning. Readable redb state is still volatile until flushed.
+    // Also flush a replay/empty chunk: a prior failed flush may have left
+    // readable operations that must not be acknowledged on a later retry.
+    store.flush().map_err(|error| SyncPushRejected {
+        drive: push.drive.clone(),
+        reason: format!("Could not persist sync updates: {error}"),
+    })?;
 
     tracing::info!(
         "import_sync_push: imported {} resources for drive {}",

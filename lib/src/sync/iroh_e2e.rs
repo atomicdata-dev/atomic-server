@@ -979,3 +979,30 @@ async fn a_completed_peer_sync_names_the_drive_to_reconnect_to() {
         "after syncing a drive, the device must know to dial back for it"
     );
 }
+
+/// A live connection alone does not prove the receiver has our bulk export.
+/// A later matching probe does, and may advance the accepting side's timestamp.
+#[tokio::test]
+async fn accepting_peer_records_sync_only_after_matching_probe() {
+    let pair = setup_pair("accept_verified_timestamp").await;
+    let remote = pair.ep_b.node_id().to_string();
+    crate::sync::peer::add_known_peer(&pair.db_a, &remote, "Other device");
+    sync_b_from_a(&pair).await;
+    let peer = crate::sync::peer::get_known_peers(&pair.db_a)
+        .into_iter()
+        .find(|peer| peer.node_id == remote)
+        .unwrap();
+    assert!(
+        peer.last_synced.is_none(),
+        "sending snapshots is not a receipt"
+    );
+    sync_b_from_a(&pair).await;
+    let peer = crate::sync::peer::get_known_peers(&pair.db_a)
+        .into_iter()
+        .find(|peer| peer.node_id == remote)
+        .unwrap();
+    assert!(
+        peer.last_synced.is_some(),
+        "matching probe proves convergence"
+    );
+}

@@ -414,3 +414,9 @@ export {
   prepareAppPackageImport,
 } from './app-package.js';
 export type { AppPackage } from './app-package.js';
+
+export {
+  DiagnosticRecorder,
+  DiagnosticCode,
+  type DiagnosticEvent,
+} from './diagnostics.js';

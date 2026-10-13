@@ -15,6 +15,7 @@ vi.mock('@sentry/react', () => ({
   browserSessionIntegration: vi.fn(() => ({ name: 'BrowserSession' })),
   isEnabled: vi.fn(() => true),
   captureMessage: vi.fn(),
+  addEventProcessor: vi.fn(),
   getClient: vi.fn(() => undefined),
   setUser: vi.fn(),
 }));

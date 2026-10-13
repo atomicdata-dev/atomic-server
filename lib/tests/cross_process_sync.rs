@@ -38,7 +38,7 @@ fn handshake_path(dir: &Path) -> PathBuf {
 }
 
 async fn open_store(dir: &Path) -> atomic_lib::Db {
-    atomic_lib::Db::init_redb_file(dir, None, &dir.join("uploads"))
+    atomic_lib::test_utils::init_redb_file_without_periodic_flush(dir)
         .await
         .expect("open store")
 }
@@ -73,7 +73,7 @@ fn child_hosts_a_drive_over_iroh() {
             .await
             .unwrap();
 
-        let (node_id, router) = atomic_lib::sync::peer::start(store).await.unwrap();
+        let (node_id, router) = atomic_lib::sync::peer::start(store.clone()).await.unwrap();
         let addr = router.endpoint().node_addr().await.unwrap();
 
         let handshake = Handshake {
@@ -123,7 +123,7 @@ fn await_handshake(dir: &Path, child: &mut std::process::Child) -> Handshake {
 }
 
 #[tokio::test]
-async fn a_drive_reconciles_across_a_process_boundary() {
+async fn verified_sync_survives_receiver_kill() {
     use atomic_lib::Storelike;
 
     let dir = std::env::temp_dir().join(format!("atomic-xproc-{}", std::process::id()));
@@ -184,14 +184,73 @@ async fn a_drive_reconciles_across_a_process_boundary() {
     )
     .await;
 
+    let pushed = if synced.is_ok() {
+        atomic_lib::sync::peer::remove_live_peer_any(&remote.node_id);
+        let mut canvas = store
+            .get_resource(&remote.canvas.as_str().into())
+            .await
+            .unwrap();
+        canvas.ensure_materialized().unwrap();
+        canvas
+            .set_unsafe(
+                atomic_lib::urls::NAME.into(),
+                atomic_lib::Value::String("Offline edit from parent".into()),
+            )
+            .unwrap();
+        canvas.save_locally(&store).await.unwrap();
+        let result = atomic_lib::sync::peer::sync_drive_with_peer_using_outcome(
+            &endpoint,
+            &remote.node_id,
+            &remote.drive,
+            &store,
+            true,
+        )
+        .await;
+        Some(result)
+    } else {
+        None
+    };
     let _ = child.kill();
     let _ = child.wait();
+    endpoint.close().await;
 
     let count = synced.expect("sync with the remote process should succeed");
     assert!(
         count > 0,
         "expected resources to cross the process boundary"
     );
+
+    let outcome = pushed
+        .unwrap()
+        .expect("outbound offline edit must be verified");
+    assert!(outcome.pushed > 0);
+    // Reopen only after SIGKILL and wait: neither a graceful shutdown nor a
+    // periodic server flush can rescue an acknowledged-but-volatile write.
+    let recovered = open_store(&child_dir).await;
+    let resource = recovered
+        .get_resource(&remote.canvas.as_str().into())
+        .await
+        .unwrap();
+    assert_eq!(
+        resource.get(atomic_lib::urls::NAME).unwrap().to_string(),
+        "Offline edit from parent"
+    );
+    let key = atomic_lib::Subject::from_raw(&remote.canvas, None).pure_id();
+    let bytes = recovered
+        .kv
+        .get(atomic_lib::db::trees::Tree::LoroSnapshots, key.as_bytes())
+        .unwrap()
+        .unwrap();
+    let recovered_vv = atomic_lib::loro::AtomicLoroDoc::vv_map_from_snapshot(&bytes).unwrap();
+    let local_bytes = store
+        .kv
+        .get(atomic_lib::db::trees::Tree::LoroSnapshots, key.as_bytes())
+        .unwrap()
+        .unwrap();
+    let expected_vv = atomic_lib::loro::AtomicLoroDoc::vv_map_from_snapshot(&local_bytes).unwrap();
+    assert!(expected_vv
+        .iter()
+        .all(|(peer, count)| recovered_vv.get(peer).copied().unwrap_or(0) >= *count));
 
     // The drive arriving is not enough — the canvas the remote actually drew
     // has to be here, with its stroke intact.

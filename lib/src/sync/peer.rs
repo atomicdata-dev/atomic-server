@@ -984,8 +984,30 @@ fn invalidate_drive_cache_on_identity_change(
 #[allow(clippy::too_many_arguments)]
 fn register_live_peer(
     peer_id: String,
-    mut send: iroh::endpoint::SendStream,
-    mut recv: iroh::endpoint::RecvStream,
+    send: iroh::endpoint::SendStream,
+    recv: iroh::endpoint::RecvStream,
+    store: Db,
+    agent: ForAgent,
+    initiated_by_us: bool,
+    connection: Option<iroh::endpoint::Connection>,
+    peer_caps: Vec<String>,
+) {
+    register_live_peer_with_pending(
+        peer_id,
+        (send, recv),
+        store,
+        agent,
+        initiated_by_us,
+        connection,
+        Vec::new(),
+        peer_caps,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn register_live_peer_with_pending(
+    peer_id: String,
+    streams: (iroh::endpoint::SendStream, iroh::endpoint::RecvStream),
     store: Db,
     agent: ForAgent,
     // True when WE dialed this peer. Lets updates to a drive we own through
@@ -997,10 +1019,12 @@ fn register_live_peer(
     // the registration so the live stream is not dropped under it. The
     // accept side's connection is owned by the protocol handler.
     connection: Option<iroh::endpoint::Connection>,
+    pending: Vec<Vec<u8>>,
     // What the peer listed in its `AUTH_OK` (dial side) or `HELLO` (accept
     // side). Decides the identifier scheme on every frame this link carries.
     peer_caps: Vec<String>,
 ) {
+    let (mut send, mut recv) = streams;
     let key = normalize_node_id(&peer_id);
     let wire = super::engine::WireScheme::from_caps(&peer_caps);
     // F9 minimal (planning/unified-sync.md): this function upgrades BOTH
@@ -1165,6 +1189,7 @@ fn register_live_peer(
         // by a full reconnect. So the timeout only becomes a liveness signal
         // once the peer has shown it speaks it.
         let mut peer_sends_keepalives = false;
+        let mut pending = pending.into_iter();
         loop {
             // Silence is treated as death, not idleness. A half-open link is
             // otherwise invisible: this side keeps believing it is connected,
@@ -1173,63 +1198,69 @@ fn register_live_peer(
             // socket nobody reads — with no error anywhere. The peer sends a
             // KEEPALIVE every `KEEPALIVE_INTERVAL`, so hearing nothing for
             // `LIVENESS_TIMEOUT` means the connection is gone.
-            let read =
-                tokio::time::timeout(super::protocol::LIVENESS_TIMEOUT, recv.read_u32()).await;
-
-            let len = match read {
-                Ok(Ok(n)) => {
-                    tracing::trace!(
-                        "[live] received frame {} bytes from {}",
-                        n,
-                        &read_peer_id[..read_peer_id.len().min(12)]
-                    );
-                    n as usize
-                }
-                Ok(Err(e)) => {
-                    tracing::info!(
-                        "[live] read error from {}: {e}",
-                        &read_peer_id[..read_peer_id.len().min(12)]
-                    );
-                    break;
-                }
-                Err(_) if peer_sends_keepalives => {
-                    tracing::info!(
-                        "[live] no traffic from {} for {:?} — treating the link as dead",
-                        &read_peer_id[..read_peer_id.len().min(12)],
-                        super::protocol::LIVENESS_TIMEOUT
-                    );
-                    break;
-                }
-                Err(_) => {
-                    // Never heard a keepalive from this peer, so its silence
-                    // carries no information. Keep waiting rather than
-                    // manufacture a disconnect.
-                    tracing::debug!(
-                        "[live] {} is quiet and sends no keepalives — not assuming it is dead",
-                        &read_peer_id[..read_peer_id.len().min(12)]
-                    );
-                    continue;
-                }
-            };
-            // Same "no proven identity → tight budget" rule as the accept-side
-            // dispatch loop (`handle_stream`): a connection can reach live
-            // mode while still `ForAgent::Public` — an unauthenticated peer
-            // that completes the sync handshake transitions into live mode
-            // with whatever agent it has, which may be none. Gate on the
-            // loop's own (mutable, AUTH-updatable) `agent`, not a flat cap.
-            let frame_cap = if matches!(agent, ForAgent::Public) {
-                super::protocol::IROH_PREAUTH_FRAME_MAX_BYTES
+            let buf = if let Some(frame) = pending.next() {
+                frame
             } else {
-                super::protocol::IROH_FRAME_MAX_BYTES
-            };
-            if len == 0 || len > frame_cap {
-                break;
-            }
+                let read =
+                    tokio::time::timeout(super::protocol::LIVENESS_TIMEOUT, recv.read_u32()).await;
 
-            let mut buf = vec![0u8; len];
-            if recv.read_exact(&mut buf).await.is_err() {
-                break;
-            }
+                let len = match read {
+                    Ok(Ok(n)) => {
+                        tracing::trace!(
+                            "[live] received frame {} bytes from {}",
+                            n,
+                            &read_peer_id[..read_peer_id.len().min(12)]
+                        );
+                        n as usize
+                    }
+                    Ok(Err(e)) => {
+                        tracing::info!(
+                            "[live] read error from {}: {e}",
+                            &read_peer_id[..read_peer_id.len().min(12)]
+                        );
+                        break;
+                    }
+                    Err(_) if peer_sends_keepalives => {
+                        tracing::info!(
+                            "[live] no traffic from {} for {:?} — treating the link as dead",
+                            &read_peer_id[..read_peer_id.len().min(12)],
+                            super::protocol::LIVENESS_TIMEOUT
+                        );
+                        break;
+                    }
+                    Err(_) => {
+                        // Never heard a keepalive from this peer, so its silence
+                        // carries no information. Keep waiting rather than
+                        // manufacture a disconnect.
+                        tracing::debug!(
+                            "[live] {} is quiet and sends no keepalives — not assuming it is dead",
+                            &read_peer_id[..read_peer_id.len().min(12)]
+                        );
+                        continue;
+                    }
+                };
+                // Same "no proven identity → tight budget" rule as the accept-side
+                // dispatch loop (`handle_stream`): a connection can reach live
+                // mode while still `ForAgent::Public` — an unauthenticated peer
+                // that completes the sync handshake transitions into live mode
+                // with whatever agent it has, which may be none. Gate on the
+                // loop's own (mutable, AUTH-updatable) `agent`, not a flat cap.
+                let frame_cap = if matches!(agent, ForAgent::Public) {
+                    super::protocol::IROH_PREAUTH_FRAME_MAX_BYTES
+                } else {
+                    super::protocol::IROH_FRAME_MAX_BYTES
+                };
+                if len == 0 || len > frame_cap {
+                    break;
+                }
+
+                let mut buf = vec![0u8; len];
+                if recv.read_exact(&mut buf).await.is_err() {
+                    break;
+                }
+
+                buf
+            };
 
             if buf.is_empty() {
                 continue;
@@ -1920,22 +1951,19 @@ pub async fn sync_drive_with_peer_using_outcome(
     // that a failure — and one that finds both sides equal moves nothing at
     // all, which is the definition of success.
     let mut total_pushed = 0usize;
+    let mut sent_snapshots = Vec::new();
+    let mut pending_acks = 0usize;
     let mut acked_in_sync = false;
     let mut pull_subjects: Vec<String> = Vec::new();
 
     // Read frames until the peer is done
-    while let Ok(n) = recv.read_u32().await {
-        let len = n as usize;
-        if len == 0 || len > super::protocol::IROH_FRAME_MAX_BYTES {
-            break;
-        }
-
-        let mut buf = vec![0u8; len];
-        recv.read_exact(&mut buf).await.map_err(io_err)?;
-
-        if buf.is_empty() {
-            break;
-        }
+    loop {
+        let buf = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            super::peer_verification::read(&mut recv),
+        )
+        .await
+        .map_err(|_| "Peer reconciliation timed out; local data retained")??;
 
         let tag = buf[0];
         let payload = &buf[1..];
@@ -2021,11 +2049,13 @@ pub async fn sync_drive_with_peer_using_outcome(
                                 for chunk in super::engine::sync_push_chunks_for_wire(
                                     store, drive, &entries, wire,
                                 ) {
+                                    pending_acks += 1;
                                     send.write_u32(chunk.len() as u32).await.map_err(io_err)?;
                                     send.write_all(&chunk).await.map_err(io_err)?;
                                 }
                                 total_pushed += entries.len();
                                 tracing::info!("Pushed {} resources to peer", entries.len());
+                                sent_snapshots.extend(entries);
                             }
                         }
                         break;
@@ -2084,7 +2114,7 @@ pub async fn sync_drive_with_peer_using_outcome(
                         // came back. Nothing landed, and there is nothing to
                         // tell the peer — it did not ask us for anything.
                         Err(rejected) => {
-                            tracing::warn!("[sync] dropped incoming push: {rejected}");
+                            return Err(format!("Peer sync import refused: {rejected}").into());
                         }
                     }
                 }
@@ -2105,11 +2135,13 @@ pub async fn sync_drive_with_peer_using_outcome(
                         for chunk in
                             super::engine::sync_push_chunks_for_wire(store, drive, &entries, wire)
                         {
+                            pending_acks += 1;
                             send.write_u32(chunk.len() as u32).await.map_err(io_err)?;
                             send.write_all(&chunk).await.map_err(io_err)?;
                         }
                         total_pushed += entries.len();
                         tracing::info!("Pushed {} resources back to peer", entries.len());
+                        sent_snapshots.extend(entries);
                     }
                 }
                 break;
@@ -2133,8 +2165,7 @@ pub async fn sync_drive_with_peer_using_outcome(
                     tracing::warn!("[sync] peer refused: {msg}");
                     return Err(format!("Peer refused to sync: {msg}").into());
                 }
-                tracing::warn!("Peer returned error: {msg}");
-                break;
+                return Err(format!("Peer returned error: {msg}").into());
             }
             super::protocol::tag::AUTH => {
                 // The remote's best-effort auth-back (see handle_stream). Same
@@ -2196,6 +2227,27 @@ pub async fn sync_drive_with_peer_using_outcome(
         }
     }
 
+    // Verification reads the peer's acknowledgements and GET replies, which
+    // use the spelling this link negotiated, so compare in that spelling too.
+    let wire_snapshots: Vec<(String, Vec<u8>)> = sent_snapshots
+        .iter()
+        .map(|(subject, bytes)| (wire.subject(subject), bytes.clone()))
+        .collect();
+    let wire_envelopes: std::collections::HashMap<String, Vec<String>> =
+        crate::envelopes::for_subjects(store, sent_snapshots.iter().map(|(s, _)| s.as_str()))
+            .into_iter()
+            .map(|(subject, list)| (wire.subject(&subject), list))
+            .collect();
+    let pending = super::peer_verification::verify(
+        &mut send,
+        &mut recv,
+        &wire.subject(drive),
+        &wire_snapshots,
+        pending_acks,
+        &wire_envelopes,
+    )
+    .await?;
+
     tracing::info!(
         "sync_drive_with_peer: imported {total_imported} resources from {remote_node_id}"
     );
@@ -2251,14 +2303,14 @@ pub async fn sync_drive_with_peer_using_outcome(
     // Dial side: we initiated, so trust this peer to relay drives we own.
     // The connection goes into the registry with the stream, so a re-dial
     // replaces (and closes) the link it supersedes instead of leaking it.
-    register_live_peer(
+    register_live_peer_with_pending(
         remote_key.clone(),
-        send,
-        recv,
+        (send, recv),
         store.clone(),
         remote_agent,
         true,
         Some(conn),
+        pending,
         peer_caps.clone(),
     );
 
@@ -2937,20 +2989,16 @@ async fn handle_stream(
         // read SYNC_OK and registered, and we must not show "connected" only on one side.
         if sync_ok || client_pushed || sync_diff_needs_no_pushback {
             tracing::info!(
-                "[accept] sync complete, transitioning to live mode with {}",
+                "[accept] bulk frames sent, transitioning to live mode with {}",
                 &remote_key[..remote_key.len().min(12)]
             );
-            // Record it here too. This used to run only on the dialling side,
-            // so an always-on node — which is always the one being dialled —
-            // reported "not synced yet" about a peer it had been exchanging
-            // data with for hours. The counts are from this node's point of
-            // view: what it served, and what it took in.
-            //
-            // `mark_known_peer_synced`, not `mark_peer_synced`: this side did
-            // not choose the connection, so recording a sync must never be what
-            // introduces the peer. Updating a peer we already paired with is
-            // reporting; inserting one we have not is granting access.
-            mark_known_peer_synced(&store, &remote_key, None, Some(total_imported as u32));
+            // Becoming live is not proof that the initiator received our
+            // snapshots. Only a matching SYNC probe proves convergence here.
+            // Otherwise this side records completion when its own verified
+            // reconciliation runs; do not stamp an unverified success.
+            if tag == super::protocol::tag::SYNC && sync_ok {
+                mark_known_peer_synced(&store, &remote_key, Some(0), Some(0));
+            }
             // Accept side: the peer dialed us. No owned-drive relaxation — it
             // must hold real write rights to touch anything here.
             register_live_peer(
@@ -4145,4 +4193,180 @@ fn same_drive(store: &Db, a: &str, b: &str) -> bool {
     let base = store.get_base_domain();
     crate::Subject::from_raw(a, base.as_deref()).pure_id()
         == crate::Subject::from_raw(b, base.as_deref()).pure_id()
+}
+
+#[cfg(all(test, feature = "db-redb"))]
+mod sync_completion_tests {
+    use super::*;
+    use crate::sync::protocol;
+
+    async fn read(recv: &mut iroh::endpoint::RecvStream) -> Vec<u8> {
+        let len = recv.read_u32().await.unwrap() as usize;
+        assert!(len <= protocol::IROH_FRAME_MAX_BYTES);
+        let mut frame = vec![0; len];
+        recv.read_exact(&mut frame).await.unwrap();
+        frame
+    }
+
+    async fn write(send: &mut iroh::endpoint::SendStream, frame: &[u8]) {
+        send.write_u32(frame.len() as u32).await.unwrap();
+        send.write_all(frame).await.unwrap();
+    }
+
+    #[derive(Debug)]
+    struct FaultPeer {
+        agent: crate::agents::Agent,
+        drive: String,
+        receiver: Option<Db>,
+    }
+
+    impl iroh::protocol::ProtocolHandler for FaultPeer {
+        fn accept(
+            &self,
+            conn: iroh::endpoint::Connection,
+        ) -> futures::future::BoxFuture<'static, anyhow::Result<()>> {
+            let agent = self.agent.clone();
+            let drive = self.drive.clone();
+            let receiver = self.receiver.clone();
+            Box::pin(async move {
+                let (mut send, mut recv) = conn.accept_bi().await?;
+                assert_eq!(read(&mut recv).await[0], protocol::tag::AUTH);
+                write(&mut send, &protocol::encode_auth_ok()).await;
+                write(
+                    &mut send,
+                    &protocol::encode_auth(&agent, &conn.remote_node_id()?.to_string()).unwrap(),
+                )
+                .await;
+                loop {
+                    let frame = read(&mut recv).await;
+                    if frame[0] == protocol::tag::SYNC {
+                        break;
+                    }
+                }
+                write(
+                    &mut send,
+                    &protocol::encode_sync_diff(
+                        &drive,
+                        std::slice::from_ref(&drive),
+                        &[],
+                        &[],
+                        &Default::default(),
+                        &Default::default(),
+                    ),
+                )
+                .await;
+                assert_eq!(read(&mut recv).await[0], protocol::tag::SYNC_PUSH);
+                if let Some(receiver) = receiver {
+                    // Acknowledge without importing the first push. Subsequent
+                    // frames use the real engine and real receiving database.
+                    write(&mut send, &protocol::encode_sync_ok(&drive)).await;
+                    let mut as_agent = ForAgent::from(agent);
+                    loop {
+                        let frame = match super::super::peer_verification::read(&mut recv).await {
+                            Ok(frame) => frame,
+                            Err(_) => break,
+                        };
+                        for response in
+                            super::super::engine::handle_frame(&frame, &receiver, &mut as_agent)
+                                .await
+                        {
+                            write(&mut send, &response).await;
+                        }
+                    }
+                    return Ok(());
+                }
+
+                write(
+                    &mut send,
+                    &protocol::encode_error(
+                        0,
+                        protocol::error_code::SYNC_REJECTED,
+                        "test rejection after send",
+                    ),
+                )
+                .await;
+                let _ = recv.read_u32().await;
+                Ok(())
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn rejected_outbound_push_does_not_mark_peer_synced() {
+        let db = Db::init_temp("peer_rejected_completion").await.unwrap();
+        let (agent, drive) = db.setup("Alice").await.unwrap();
+        let remote = Endpoint::builder().bind().await.unwrap();
+        let router = Router::builder(remote)
+            .accept(
+                ATOMIC_ALPN,
+                FaultPeer {
+                    agent,
+                    drive: drive.clone(),
+                    receiver: None,
+                },
+            )
+            .spawn();
+        let local = Endpoint::builder().bind().await.unwrap();
+        local
+            .add_node_addr(router.endpoint().node_addr().await.unwrap())
+            .unwrap();
+        let node = router.endpoint().node_id().to_string();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            sync_drive_with_peer_using_outcome(&local, &node, &drive, &db, true),
+        )
+        .await
+        .unwrap();
+        assert!(
+            result.is_err(),
+            "a rejected push must not report success: {result:?}"
+        );
+        assert!(get_known_peers(&db).iter().all(|p| p.last_synced.is_none()));
+        assert!(
+            db.get_resource(&drive.into()).await.is_ok(),
+            "local data retained"
+        );
+        router.shutdown().await.unwrap();
+        local.close().await;
+    }
+    #[tokio::test]
+    async fn acknowledged_but_skipped_push_is_retried_before_completion() {
+        let db = Db::init_temp("peer_skipped_completion").await.unwrap();
+        let (agent, drive) = db.setup("Alice").await.unwrap();
+        let receiver = Db::init_temp("peer_skipped_receiver").await.unwrap();
+        receiver
+            .load_agent_from_secret(&agent.build_secret().unwrap())
+            .await
+            .unwrap();
+        let remote = Endpoint::builder().bind().await.unwrap();
+        let router = Router::builder(remote)
+            .accept(
+                ATOMIC_ALPN,
+                FaultPeer {
+                    agent,
+                    drive: drive.clone(),
+                    receiver: Some(receiver.clone()),
+                },
+            )
+            .spawn();
+        let local = Endpoint::builder().bind().await.unwrap();
+        local
+            .add_node_addr(router.endpoint().node_addr().await.unwrap())
+            .unwrap();
+        let node = router.endpoint().node_id().to_string();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            sync_drive_with_peer_using_outcome(&local, &node, &drive, &db, true),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(result.pushed, 1, "retry does not inflate sent count");
+        // One independent read immediately after completion, never polling.
+        assert!(receiver.get_resource(&drive.as_str().into()).await.is_ok());
+        assert!(get_known_peers(&db).iter().any(|p| p.last_synced.is_some()));
+        remove_live_peer_any(&node);
+        router.shutdown().await.unwrap();
+        local.close().await;
+    }
 }

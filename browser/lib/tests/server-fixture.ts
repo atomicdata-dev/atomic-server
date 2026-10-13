@@ -94,30 +94,30 @@ function parseConfigToml(text: string): MinimalConfigToml {
   return out;
 }
 
-export async function startServer(): Promise<ServerHandle> {
+export function serverBinaryPath(): string {
+  if (process.env.ATOMIC_SERVER_BINARY) return process.env.ATOMIC_SERVER_BINARY;
+
   // Respect Cargo's configured target directory, just like e2e-server.sh.
   // CI may provide only a prebuilt binary, without Cargo installed.
-  let targetDir =
-    process.env.CARGO_TARGET_DIR || path.join(REPO_ROOT, 'target');
+  let target = process.env.CARGO_TARGET_DIR || path.join(REPO_ROOT, 'target');
 
   try {
-    const metadata = JSON.parse(
-      execFileSync(
-        'cargo',
-        ['metadata', '--no-deps', '--format-version', '1'],
-        {
-          cwd: REPO_ROOT,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        },
-      ),
-    );
-    targetDir = metadata.target_directory;
+    target = JSON.parse(
+      execFileSync('cargo', ['metadata', '--format-version=1', '--no-deps'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    ).target_directory;
   } catch {
     // Use the supplied target directory or CI's conventional binary location.
   }
 
-  const binPath = path.resolve(REPO_ROOT, targetDir, 'debug/atomic-server');
+  return path.resolve(REPO_ROOT, target, 'debug/atomic-server');
+}
+
+export async function startServer(): Promise<ServerHandle> {
+  const binPath = serverBinaryPath();
 
   if (!existsSync(binPath)) {
     throw new Error(

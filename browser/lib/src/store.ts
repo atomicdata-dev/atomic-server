@@ -1,3 +1,4 @@
+import { DiagnosticRecorder } from './diagnostics.js';
 import type { ScheduledSave, ResourceSaveState } from './scheduled-save.js';
 import { SaveStatusCoordinator } from './save-status-coordinator.js';
 import { verifyLocalDriveCopy } from './local-drive-copy.js';
@@ -657,6 +658,9 @@ async function readDriveVersionVectors(
   return all;
 }
 
+/** How long `makeDriveLocal` waits for running syncs and saves to settle. */
+const MAKE_LOCAL_SETTLE_MS = 5_000;
+
 export class Store {
   /** A list of all functions that need to be called when a certain resource is updated */
   public subscribers: Map<string, ResourceCallback[]>;
@@ -774,6 +778,9 @@ export class Store {
   private clientDbExpected = false;
   /** Callbacks parked in {@link waitForClientDb} until the attach happens. */
   private clientDbWaiters = new Set<() => void>();
+  /** Opt-in local diagnostics, independent of durable application storage. */
+  public readonly diagnostics = new DiagnosticRecorder();
+
   /**
    * Single durable queue replacing the old `dirtyForSync` Set +
    * `atomic.dirtyForSync` + `atomic.offline.<subject>` quartet.
@@ -1264,6 +1271,13 @@ export class Store {
       return;
     }
 
+    // A drive reconcile or a save in flight is a moment, not a verdict: the
+    // boot-time round for the drive is still running when a person (or the
+    // template flow) goes straight to making a drive local, and refusing it
+    // outright made that click fail for nothing. Give it a bounded time to
+    // settle; `current()` below still refuses what does not.
+    await this.waitForSyncSettled(MAKE_LOCAL_SETTLE_MS);
+
     const serverUrl = this.serverUrl;
     // Sockets are registered under whatever string opened them, which is not
     // always `serverUrl`, so fall back to the drive's origin exactly as
@@ -1311,6 +1325,40 @@ export class Store {
     this.registerLocalOnlyDrive(drive);
     ws.unsubscribeFromDrive(drive);
     this.emitSyncStatus();
+  }
+
+  /** Resolves once no drive sync is running and nothing is waiting to save.
+   *  Rejects with a user-readable error after `timeoutMs`, so a stuck sync
+   *  surfaces fast instead of waiting silently. Driven by
+   *  `SyncStatusChanged`, not polling. Blocked outbox entries are not waited
+   *  for, they only clear when someone acts. */
+  private waitForSyncSettled(timeoutMs: number): Promise<void> {
+    const settled = () => {
+      const status = this.getSyncStatus();
+
+      return !status.syncInProgress && !status.pendingDirtyCount;
+    };
+
+    if (settled()) return Promise.resolve();
+
+    return new Promise<void>((resolve, reject) => {
+      const finish = () => {
+        clearTimeout(timer);
+        unsubscribe();
+      };
+
+      const unsubscribe = this.on(StoreEvents.SyncStatusChanged, () => {
+        if (!settled()) return;
+
+        finish();
+        resolve();
+      });
+
+      const timer = setTimeout(() => {
+        finish();
+        reject(new Error('Drive is still syncing, try again in a moment.'));
+      }, timeoutMs);
+    });
   }
 
   /** Forget a local-only drive (e.g. after deleting a demo workspace),
@@ -1571,7 +1619,19 @@ export class Store {
       await this.outbox.drain({
         sort: this.sortOutboxEntries,
         tierOf: this.outboxTierOf,
-        drainSubject: this.drainOutboxSubject,
+        drainSubject: async subject => {
+          const finish = this.diagnostics.beginDrain(
+            this.resources.get(subject)?.__internalObject,
+          );
+
+          try {
+            await this.drainOutboxSubject(subject);
+            finish(false);
+          } catch (error) {
+            finish(true);
+            throw error;
+          }
+        },
         isTerminalError: (_entry, e) => {
           const msg = e instanceof Error ? e.message : String(e);
           const code = e instanceof AtomicError ? e.code : undefined;
@@ -2725,6 +2785,123 @@ export class Store {
           this.notify(resource);
         }
       });
+  }
+
+  private remoteIngress = new Map<
+    string,
+    { tail: Promise<unknown>; cancelled: boolean }
+  >();
+
+  /**
+   * Remote state must merge with the durable local snapshot even when the
+   * resource is unmounted and a process crash lost its localStorage outbox.
+   * Serialize per subject so two remote arrivals cannot both read an old
+   * snapshot and overwrite each other's newly imported state.
+   */
+  public applyRemoteIncoming(
+    change: IncomingChange,
+    current: () => boolean = () => true,
+  ): Promise<'applied' | 'deduped' | 'invalid'> {
+    const subject = this.normalizeSubject(
+      change.resource?.subject ?? change.subject,
+    );
+    // Identity is the agent's subject, not the object: sign-in flows replace
+    // the Agent instance with an equal one (e.g. `Agent.fromSecret` after the
+    // dev drive is made) and that must not cancel reads in flight.
+    const identity = this.agent?.subject;
+    const previous = this.remoteIngress.get(subject);
+    const queue = previous ?? { tail: Promise.resolve(), cancelled: false };
+    const valid = () =>
+      current() && this.agent?.subject === identity && !queue.cancelled;
+
+    const apply = async () => {
+      if (!valid()) throw new RequestCancelledError('Remote ingress cancelled');
+      await this.waitForClientDb(10_000);
+      const db = this.clientDb;
+      let hasCompleteLocalState = false;
+
+      if (db && !db.unsupportedEnvironment && !db.initError) {
+        await db.waitForInit();
+
+        if (!valid() || this.clientDb !== db) {
+          throw new RequestCancelledError('Remote ingress database changed');
+        }
+
+        const { jsonAd, snapshot } = await db.getResourceWithSnapshot(subject);
+
+        if (!valid() || this.clientDb !== db) {
+          throw new RequestCancelledError('Remote ingress database changed');
+        }
+
+        if (jsonAd && snapshot?.length) {
+          const local = new Resource(subject);
+          local.applyHydratedValues(
+            Object.entries(JSON.parse(jsonAd)).filter(
+              ([key]) => key !== '@id',
+            ) as [string, JSONValue][],
+          );
+          hasCompleteLocalState = local.importLoroUpdate(
+            snapshot,
+            true,
+          ).complete;
+
+          if (hasCompleteLocalState) {
+            local.loading = false;
+            this.applyIncoming({
+              subject,
+              resource: local,
+              source: 'offline-replay',
+            });
+          }
+        }
+      }
+
+      if (!valid()) throw new RequestCancelledError('Remote ingress cancelled');
+
+      const result = this.applyIncoming({
+        ...change,
+        // A full server snapshot is not authority to discard local operations.
+        // Incomplete local seeds still use the existing full-state repair path.
+        replaceLoroDocsFromRemote: hasCompleteLocalState
+          ? false
+          : change.replaceLoroDocsFromRemote,
+      });
+      // addResource queues the canonical merged snapshot before notifying.
+      // Await that write, including its failure, before acknowledging ingress.
+      await this.lastPersisted.get(subject)?.done;
+      if (!valid()) throw new RequestCancelledError('Remote ingress cancelled');
+
+      return result;
+    };
+
+    // Keep the no-storage path synchronous for non-browser consumers. A
+    // legacy HTTP resource is owned by its server rather than by a local
+    // CRDT history, so it must not wait for the local database to start.
+    if (
+      !previous &&
+      ((!this.clientDb && !this.clientDbExpected) ||
+        !isAtomicIdentifier(subject))
+    ) {
+      if (!valid())
+        return Promise.reject(
+          new RequestCancelledError('Remote ingress cancelled'),
+        );
+
+      return Promise.resolve(this.applyIncoming(change));
+    }
+
+    const work = queue.tail.catch(() => undefined).then(apply);
+    queue.tail = work;
+    this.remoteIngress.set(subject, queue);
+
+    const clear = () => {
+      if (this.remoteIngress.get(subject) === queue && queue.tail === work)
+        this.remoteIngress.delete(subject);
+    };
+
+    void work.then(clear, clear);
+
+    return work;
   }
 
   /**
@@ -4545,11 +4722,15 @@ export class Store {
    * Used by collection page loads so members have their propvals available
    * for client-side sorting before the consumer's individual fetches happen.
    */
-  public hydrateResourceFromJsonAd(subject: string, jsonAd: string): boolean {
+  public hydrateResourceFromJsonAd(
+    subject: string,
+    jsonAd: string,
+    snapshot?: Uint8Array,
+  ): boolean {
     try {
       const parsed = JSON.parse(jsonAd) as Record<string, unknown>;
 
-      return this.hydrateResourceFromJson(subject, parsed);
+      return this.hydrateResourceFromJson(subject, parsed, snapshot);
     } catch {
       return false;
     }
@@ -4871,7 +5052,7 @@ export class Store {
       // The `subject` arg becomes the alias if it differs from the
       // resolved subject (e.g. POST endpoint that returns the
       // canonical resource).
-      this.applyIncoming({
+      await this.applyRemoteIncoming({
         subject,
         resource,
         source: 'http-fetch',
@@ -4879,16 +5060,17 @@ export class Store {
       });
 
       const primarySubject = this.normalizeSubject(resource.subject);
-      createdResources.forEach(r => {
+
+      for (const r of createdResources) {
         if (this.normalizeSubject(r.subject) !== primarySubject) {
-          this.applyIncoming({
+          await this.applyRemoteIncoming({
             subject: r.subject,
             resource: r,
             source: 'http-fetch',
             replaceLoroDocsFromRemote: !!opts.forceOverride,
           });
         }
-      });
+      }
     }
 
     // Resolve HTTP aliases of a DID (`https://host/did:ad:…` → `did:ad:…`)
@@ -5617,10 +5799,13 @@ export class Store {
       return;
     }
 
+    this.diagnostics.connection(connected);
     this._serverConnected = connected;
     this._serverConnectionError = nextError;
 
     if (!connected) {
+      this.finishDiagnosticSync?.('cancelled');
+      this.finishDiagnosticSync = undefined;
       this._driveSyncInProgress = false;
       this._driveSyncPulling = false;
     }
@@ -5702,8 +5887,21 @@ export class Store {
         const r = this.resources.get(subject);
 
         if (r) {
+          // An empty cancelled fetch remains pending so reconnect retries it;
+          // it must not look like a successfully loaded, class-less resource.
+          if (
+            e instanceof RequestCancelledError &&
+            !this.hasRenderableContent(r)
+          )
+            return;
+
           r.loading = false;
-          r.setError(e instanceof Error ? e : new Error(String(e)));
+
+          // Disconnecting cancels ingress; it does not invalidate local edits.
+          if (!(e instanceof RequestCancelledError)) {
+            r.setError(e instanceof Error ? e : new Error(String(e)));
+          }
+
           this.notify(r);
         }
       });
@@ -5744,7 +5942,13 @@ export class Store {
     return this.saveStatus.subscribe(resource, callback);
   }
 
+  private finishDiagnosticSync?: (
+    outcome: 'ok' | 'error' | 'cancelled',
+  ) => void;
+
   public startDriveSync(): void {
+    this.finishDiagnosticSync?.('cancelled');
+    this.finishDiagnosticSync = this.diagnostics.beginBoundary('reconcile');
     this._driveSyncInProgress = true;
     this.emitSyncStatus();
   }
@@ -5775,6 +5979,8 @@ export class Store {
   ): void {
     this._driveSyncInProgress = false;
     this._driveSyncPulling = false;
+    this.finishDiagnosticSync?.('ok');
+    this.finishDiagnosticSync = undefined;
     this._lastDriveSync = { drive, count, timestamp };
 
     if (drive) {
@@ -5811,12 +6017,15 @@ export class Store {
    * refused" instead of a green check.
    */
   public failDriveSync(drive: string, message: string): void {
+    this.finishDiagnosticSync?.('error');
+    this.finishDiagnosticSync = undefined;
     this._driveSyncInProgress = false;
     this._driveSyncPulling = false;
     this._lastDriveSyncError = { drive, message, timestamp: Date.now() };
 
     if (drive) {
       this._syncedDrives.delete(drive);
+      this._syncedDrives.delete(canonicalizeScheme(drive));
     }
 
     this.emitSyncStatus();
@@ -6053,6 +6262,13 @@ export class Store {
   /** Removes resource from this store, does not delete it from the server, use `resource.destroy()` to delete it from the server. */
   public removeResource(subjectRaw: string, shouldNotify = true): void {
     const resolved = this.resolveSubject(subjectRaw);
+    const ingress = this.remoteIngress.get(resolved);
+
+    if (ingress) {
+      // A late read started before deletion must not recreate the resource.
+      ingress.cancelled = true;
+      this.remoteIngress.delete(resolved);
+    }
 
     // The in-memory half of the tombstone below. Recorded before the eviction
     // notifies, so a listener that reacts by re-reading a query already sees
@@ -6136,6 +6352,7 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    if (this.agent?.subject !== agent?.subject) this.diagnostics.clear();
     // The current drive is an account context, not a server preference. Clear
     // it before reauthenticating, so the next identity never subscribes or
     // reconciles the previous identity's private workspace.
@@ -6552,6 +6769,8 @@ export class Store {
    *  so AppSettings-style UI mirrors stay in sync.
    */
   public setDrive(drive: string): void {
+    const previousDrive = this.drive;
+
     if (!drive) {
       this.drive = undefined;
     } else if (Client.isBareHttpOrigin(drive)) {
@@ -6564,7 +6783,9 @@ export class Store {
       localStorage.setItem('drive', JSON.stringify(drive));
     }
 
-    this.eventManager.emit(StoreEvents.DriveChanged, drive);
+    if (this.drive !== previousDrive) {
+      this.eventManager.emit(StoreEvents.DriveChanged, drive);
+    }
   }
 
   /** Opens a WebSocket for this Atomic Server URL */
@@ -7083,7 +7304,13 @@ export class Store {
   }
 
   private emitSyncStatus(): void {
-    this.eventManager.emit(StoreEvents.SyncStatusChanged, this.getSyncStatus());
+    const status = this.getSyncStatus();
+    this.diagnostics.queue(
+      status.pendingDirtyCount,
+      status.blockedCount,
+      status.serverConnected,
+    );
+    this.eventManager.emit(StoreEvents.SyncStatusChanged, status);
   }
 
   private pushCommitLog(
@@ -7530,12 +7757,17 @@ export class Store {
 
   /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
   public async postCommit(commit: Commit, endpoint: string): Promise<Commit> {
+    const finish = this.diagnostics.beginBoundary(
+      'server',
+      this.resources.get(commit.subject)?.__internalObject,
+    );
     const close = perfSpan('store.postCommit', {
       genesis: !!commit.isGenesis,
     });
 
     try {
       const created = await this.sendCommit(commit, endpoint);
+      finish('ok');
       close('ok');
       this.pushCommitLog(
         this.buildCommitLogEntry(commit, 'outgoing', 'sent', {
@@ -7546,6 +7778,7 @@ export class Store {
 
       return created;
     } catch (e) {
+      finish(e instanceof RequestCancelledError ? 'cancelled' : 'error');
       const errMsg = e instanceof Error ? e.message : String(e);
       close({ err: errMsg });
       // Pass the error through `extras.error`; the derived commitId in

@@ -20,6 +20,46 @@ describe('cancelled resource lifecycle', () => {
     ).rejects.toBeInstanceOf(RequestCancelledError);
   });
 
+  it('keeps a locally edited resource readable when a reconnect fetch is cancelled', async () => {
+    const store = new Store();
+    const resource = new Resource('did:ad:edited');
+    resource.setStore(store);
+    await resource.set(
+      'https://atomicdata.dev/properties/name',
+      'Unsaved edit',
+      false,
+    );
+    resource.loading = true;
+    store.resources.set(resource.subject, resource);
+    vi.spyOn(store, 'fetchResourceFromServer').mockRejectedValue(
+      new RequestCancelledError('Remote ingress cancelled'),
+    );
+    store.refetchOfflineErroredResources();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(resource.error).toBeUndefined();
+    expect(resource.loading).toBe(false);
+    expect(resource.get('https://atomicdata.dev/properties/name')).toBe(
+      'Unsaved edit',
+    );
+  });
+
+  it('keeps an empty cancelled reconnect fetch pending for the next connection', async () => {
+    const store = new Store();
+    const resource = new Resource('did:ad:cold');
+    resource.setStore(store);
+    resource.loading = true;
+    store.resources.set(resource.subject, resource);
+    const fetch = vi
+      .spyOn(store, 'fetchResourceFromServer')
+      .mockRejectedValue(new RequestCancelledError('Remote ingress cancelled'));
+    store.refetchOfflineErroredResources();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(resource.error).toBeUndefined();
+    expect(resource.loading).toBe(true);
+    store.refetchOfflineErroredResources();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('stops optional preloading quietly when its fetch is cancelled', async () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     const client = (

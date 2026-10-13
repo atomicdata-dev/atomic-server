@@ -281,6 +281,9 @@
 
   <body>
     <script>
+      // Configure Zod before any modules evaluate. Its capability probe uses
+      // new Function, which Firefox reports as a CSP violation even if caught.
+      globalThis.__zod_globalConfig = { jitless: true };
       // The app's dark mode setting ('always' | 'never' | 'auto', stored by
       // useDarkMode) can override the OS preference. Apply it before first
       // paint so the splash doesn't flash the wrong theme.

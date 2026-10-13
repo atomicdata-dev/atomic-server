@@ -1,3 +1,4 @@
+import { ResourceSaveStateKind } from '@tomic/lib';
 import { useState, type JSX } from 'react';
 import {
   useResource,
@@ -136,7 +137,7 @@ function Data(): JSX.Element {
             </PropValRow>
           )}
           <AllProps resource={resource} editable columns />
-          {saveState.kind !== 'idle' ? (
+          {saveState.kind !== ResourceSaveStateKind.Idle ? (
             <>
               <h2>⚠️ contains uncommitted changes</h2>
               <p>
@@ -144,10 +145,14 @@ function Data(): JSX.Element {
               </p>
               {saveState.error && <ErrMessage>{saveState.error}</ErrMessage>}
               <Button
-                disabled={saveState.kind === 'saving'}
-                onClick={() => resource.save()}
+                disabled={saveState.kind === ResourceSaveStateKind.Saving}
+                onClick={() =>
+                  resource.save().catch(error => store.notifyError(error))
+                }
               >
-                save
+                {saveState.kind === ResourceSaveStateKind.Error
+                  ? 'Retry save'
+                  : 'Save'}
               </Button>
             </>
           ) : null}

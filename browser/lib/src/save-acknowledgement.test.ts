@@ -5,11 +5,32 @@ import { testStore } from './test-store.js';
 import { AtomicError, ErrorType, RequestCancelledError } from './error.js';
 import { BLOCK_AFTER_FAILURES } from './local-outbox.js';
 import { ErrorCode } from './ws-v2.js';
-import { StoreEvents } from './store.js';
+import { StoreEvents, type Store } from './store.js';
+
+function localDatabase(store: Store, unsupportedEnvironment = false) {
+  const putResourceWithSnapshot = vi.fn().mockResolvedValue(undefined);
+  vi.spyOn(store, 'getClientDb').mockReturnValue({
+    unsupportedEnvironment,
+    putResourceWithSnapshot,
+  } as unknown as NonNullable<ReturnType<Store['getClientDb']>>);
+
+  return putResourceWithSnapshot;
+}
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('explicit save acknowledgement', () => {
+  it('does not claim local durability for a child waiting on an unsaved parent', async () => {
+    const { store, postCommitSpy } = await testStore();
+    const parent = await store.newResource({ noParent: true });
+    parent.new = true;
+    const child = await store.newResource({ parent: parent.subject });
+    await child.set(core.properties.name, 'Pending child', false);
+    await expect(child.save()).resolves.toBe('queued');
+    expect(postCommitSpy).not.toHaveBeenCalled();
+    expect(child.hasUnsavedChanges()).toBe(true);
+    store.setServerConnected(false);
+  });
   it.each([
     'Unauthorized: no write rights in parent',
     'Property content missing. Is required in class Message',
@@ -47,6 +68,7 @@ describe('explicit save acknowledgement', () => {
 
   it('keeps transport failures queued and returns offline', async () => {
     const { store, postCommitSpy } = await testStore();
+    localDatabase(store);
     const doc = await store.newResource({
       isA: 'https://atomicdata.dev/classes/Drive',
       noParent: true,
@@ -86,6 +108,84 @@ describe('explicit save acknowledgement', () => {
     store.setServerConnected(false);
   }, 10_000);
 
+  it.each(['missing', 'unsupported', 'failed'])(
+    'does not claim offline safety when local storage is %s, and can retry',
+    async state => {
+      const { store, postCommitSpy } = await testStore();
+      const doc = await store.newResource({
+        isA: 'https://atomicdata.dev/classes/Drive',
+        noParent: true,
+        propVals: { [core.properties.name]: 'Keep this edit' },
+      });
+
+      if (state !== 'missing') {
+        const write = localDatabase(store, state === 'unsupported');
+        if (state === 'failed') write.mockRejectedValue(new Error('Disk full'));
+      }
+
+      postCommitSpy.mockRejectedValue(new TypeError('Failed to fetch'));
+
+      await expect(doc.save()).rejects.toThrow();
+      expect(doc.get(core.properties.name)).toBe('Keep this edit');
+      expect(store.outbox.hasPending(doc.subject)).toBe(true);
+      expect(store.getSaveState(doc)).toMatchObject({ kind: 'error' });
+
+      const write = localDatabase(store);
+      await expect(doc.save()).resolves.toBe('offline');
+      expect(write).toHaveBeenCalled();
+      expect(doc.commitError).toBeUndefined();
+      expect(store.getSaveState(doc)).toMatchObject({ kind: 'queued' });
+    },
+  );
+
+  it('retries local-only persistence after signing without losing the edit or genesis', async () => {
+    const { store, postCommitSpy } = await testStore();
+    const doc = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Drive',
+      noParent: true,
+      propVals: { [core.properties.name]: 'Local-only edit' },
+    });
+    store.setServerConnected(false);
+    vi.spyOn(store, 'isLocalOnlySubject').mockReturnValue(true);
+    const publish = vi
+      .spyOn(store, 'publishPeerCommit')
+      .mockImplementation(() => {});
+    const write = localDatabase(store);
+    write.mockRejectedValueOnce(new Error('Disk full'));
+    await expect(doc.save()).rejects.toThrow('Disk full');
+    expect(doc.hasUnsavedChanges()).toBe(true);
+    expect(store.getSaveState(doc).kind).toBe('error');
+    expect(publish).not.toHaveBeenCalled();
+
+    await expect(doc.save()).resolves.toBe('persisted');
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls.some(([commit]) => commit.isGenesis)).toBe(true);
+    expect(doc.get(core.properties.name)).toBe('Local-only edit');
+    expect(doc.commitError).toBeUndefined();
+    expect(postCommitSpy).not.toHaveBeenCalled();
+    await expect(doc.save()).resolves.toBe('noop');
+  });
+
+  it.each([false, true])(
+    'local-only save requires available storage (unsupported: %s)',
+    async unsupported => {
+      const { store, postCommitSpy } = await testStore();
+      const doc = await store.newResource({
+        isA: 'https://atomicdata.dev/classes/Drive',
+        noParent: true,
+        propVals: { [core.properties.name]: 'Local safety' },
+      });
+      store.registerLocalOnlyDrive(doc.subject);
+      if (unsupported) localDatabase(store, true);
+      await expect(doc.save()).rejects.toThrow('Keep this window open');
+      expect(store.getSaveState(doc).kind).toBe('error');
+      const write = localDatabase(store);
+      await expect(doc.save()).resolves.toBe('persisted');
+      expect(write).toHaveBeenCalled();
+      expect(postCommitSpy).not.toHaveBeenCalled();
+      store.setServerConnected(false);
+    },
+  );
   it('clears the error after a successful retry', async () => {
     const { store, postCommitSpy } = await testStore();
     const doc = await store.newResource({

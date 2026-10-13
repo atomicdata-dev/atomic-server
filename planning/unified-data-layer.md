@@ -14,15 +14,24 @@ This is the browser cache/reactivity layer. The binding runtime is owned by
 
 ### Ingress and causal state
 
-`Store.applyIncoming` is the source-aware ingress for resource objects and Loro
-bytes. `addResource` remains a public compatibility/merge path; its callers and
+`Store.applyRemoteIncoming` restores and merges durable local causal state before
+HTTP/WebSocket updates, even when a crash loses the localStorage outbox entry.
+It serializes remote updates per subject and fences database/connection changes
+and deletion while a local read is pending.
+`Store.applyIncoming` is the synchronous source-aware ingestion primitive for
+resource objects and Loro bytes. `addResource` remains a public compatibility/merge path; its callers and
 notification/persistence behavior still need an audit before claiming that every
 producer uses exactly one path.
 
 Local hydration restores JSON and its Loro snapshot before publishing through
 `hydrateOfflineReplay`. It protects existing unsaved edits. Preserve that ordering
 and snapshot causality when extracting modules; JSON must not seed a competing
-fresh document before an authoritative snapshot is restored.
+fresh document before an authoritative snapshot is restored. Collection query
+payloads include aligned Loro snapshots from the same worker operation, so
+hydrating a displayed row does not manufacture competing causal history.
+Outbound reconciliation merges memory and durable snapshots before exporting;
+a non-empty in-memory delta alone does not establish that it includes every
+acknowledged local operation.
 
 ### Persistence and the outbound queue
 

@@ -57,8 +57,17 @@ export class ScheduledSave {
   }
 }
 
+export enum ResourceSaveStateKind {
+  Idle = 'idle',
+  Dirty = 'dirty',
+  Scheduled = 'scheduled',
+  Saving = 'saving',
+  Queued = 'queued',
+  Error = 'error',
+}
+
 export interface ResourceSaveState {
-  readonly kind: 'idle' | 'dirty' | 'scheduled' | 'saving' | 'queued' | 'error';
+  readonly kind: ResourceSaveStateKind;
   readonly scheduledCount: number;
   readonly error: string | undefined;
   readonly reason: 'offline' | 'retry' | undefined;

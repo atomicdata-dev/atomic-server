@@ -196,6 +196,9 @@ In E2E tests, most specs use `test.beforeEach(before)` from `test-utils.ts`, whi
 
 ## Debugging process
 
+When reading feedback diagnostic reports, use [browser/DIAGNOSTICS.md](browser/DIAGNOSTICS.md)
+for interpretation rules, evidence limits, investigation entry points and reporting guidance.
+
 1. Identify the bug, where it's coming from.
 2. Reproduce the bug in a test at the cheapest layer that can fail: Rust /
    vitest first, then `browser/lib` `*.integration.test.ts` (real server, no
@@ -394,6 +397,10 @@ Devices sync via [Iroh](https://iroh.computer) QUIC connections. The transport i
 - Known peers are also stored in `Tree::PluginMeta` as a JSON array.
 
 ## Testing
+
+Cargo defaults libtest to one thread via `.cargo/config.toml`: Iroh tests share
+process-global state. Do not override this for runs that include sync tests.
+Use nextest for process-isolated parallel execution.
 
 [`TESTING_COVERAGE.md`](./TESTING_COVERAGE.md) maps which flows are tested at
 which layer, and — more usefully — which are not. Read it before deciding where
