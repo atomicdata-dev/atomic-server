@@ -33,7 +33,9 @@ stale checkpoint races, checkpoint retention and deliberate later recreation.
       of the visible message. The focused missing/corrupt-object rerun passed.
 - [x] Finish staged commit checks: recursive browser lint and workspace Clippy
       passed with hooks enabled.
-- [ ] Publish paired Server PR and update SaaS #217, then inspect exact-head CI.
+- [x] Publish paired Server #2242 and update SaaS #217 on matching branch
+      `claude/project-thread-2u2wpm`.
+- [ ] Confirm exact-head CI succeeds. Local green does not close this item.
 
 CI's previous run is queued on Mancave; a queued run is not a pass. Initial
 Vault-only blob upload remains a separate implementation gap; the file drill
