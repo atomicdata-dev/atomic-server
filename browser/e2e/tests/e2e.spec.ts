@@ -13,6 +13,7 @@ import {
   spaUrl,
   before,
   changeDrive,
+  contextMenu,
   contextMenuClick,
   currentDialogOkButton,
   currentDriveTitle,
@@ -740,7 +741,15 @@ test.describe('data-browser', async () => {
     const nestedResource = await getCurrentSubject(page);
     expect(nestedResource).not.toBe(parentResource);
     await openSubject(page, parentResource);
-    await contextMenuClick('delete', page);
+    // The menu first offers a restorable move to the Trash; the permanent
+    // delete (and its cascade) is only offered once the item sits there.
+    await contextMenuClick('trash', page);
+    await expect(sidebarParent).toHaveCount(0);
+    await openSubject(page, parentResource);
+    await page.click(contextMenu);
+    await expect(page.getByTestId('menu-item-trash')).toHaveCount(0);
+    await expect(page.getByTestId('menu-item-restore')).toBeVisible();
+    await page.getByTestId('menu-item-delete').click();
     // Confirm the destroy in the dialog. Scoping to `dialog[open]` is needed
     // because the menu's "Delete" entry can still match `button:has-text` on
     // some renders before it unmounts, leading to flaky no-ops.
