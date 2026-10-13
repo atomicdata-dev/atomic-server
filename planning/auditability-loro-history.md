@@ -66,7 +66,11 @@ the only difference is whether the prune of older rows runs.
 `audit`, unset = inherit) on any resource. `envelopes::effective_retention`
 resolves the node setting raised to `All` by an `audit` on the resource or any
 ancestor (shallow reads up the parent chain, at most 32 levels); audit only ever
-wins, so a child cannot lower a parent. `record_ops`, `import_envelope` and
+wins, so a child cannot lower a parent. Lowering is non-destructive: a commit
+whose old or new state is audited is kept, and otherwise only the newest
+superseded envelope is dropped. An unreadable ancestor resolves to "unknown" and
+import then prunes nothing. Values other than `compact`/`audit` are refused at
+commit validation. `record_ops`, `import_envelope` and
 `attribute_history` use it instead of the node setting. No wire change.
 Open: who may lower it (needs the owner level, see the thread notes: today
 whoever can write the resource can), a notice period before dropping envelopes

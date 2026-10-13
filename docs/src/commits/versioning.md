@@ -40,8 +40,13 @@ A resource can ask for the audit log itself. Set its `retention` property to
 resource and of everything below it. The setting is inherited down the parent
 chain and only ever raises what a node keeps: `compact` on a child does not
 lower an `audit` above it, and a node running `--envelope-retention all` audits
-everything. Setting `audit` later protects history from that moment on; the
-envelopes a node already dropped are not recovered. Each node applies the
+everything. Only `compact` and `audit` are accepted; other values are refused.
+Setting `audit` later protects history from that moment on; the envelopes a
+node already dropped are not recovered. Taking `audit` off, or moving the
+resource out of an audited folder, never deletes what was kept: the commit that
+does it is stored beside the audit-era envelopes, and later commits replace only
+the newest one. A node that has not yet received an ancestor of a resource keeps
+every envelope it is sent until it can read the whole chain. Each node applies the
 setting to the resources it holds, so a device that is short on space can still
 keep less than a server does.
 

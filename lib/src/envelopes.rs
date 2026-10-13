@@ -122,50 +122,89 @@ fn decode(key: &[u8], value: Vec<u8>) -> Option<StoredEnvelope> {
     })
 }
 
-/// Most ancestors [`effective_retention`] looks at. A parent chain is a few
+/// Most ancestors [`resolve_retention`] looks at. A parent chain is a few
 /// levels deep; the bound only keeps a corrupt cycle from looping.
 const MAX_PARENT_DEPTH: usize = 32;
 
-/// The retention that applies to a resource: the node's setting, raised to
-/// `All` by a `retention: audit` on the resource itself or any ancestor.
+/// What a resource's `retention` property, and that of its ancestors, add up to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Resolved {
+    /// The resource or an ancestor says `audit`.
+    Audit,
+    /// The whole chain was read and none says `audit`: the node's setting applies.
+    Compact,
+    /// An ancestor could not be read (not held here yet), so an `audit` above
+    /// it may exist. Callers that cannot undo a drop treat it as `Audit`.
+    Unknown,
+}
+
+/// Reads the resource and its parent chain (propvals only, one shallow read
+/// per level) and says whether any of them asks for `audit`. Audit only ever
+/// wins: a `compact` on a child cannot lower an `audit` above it, so a setting
+/// made on a folder holds for everything below it.
 ///
-/// Audit only ever wins. A node running `all` audits everything, and a
-/// `compact` on a child cannot lower an `audit` above it, so a setting made
-/// on a folder holds for everything the folder contains. Lowering audit means
-/// editing the resource that set it.
-///
-/// `resource` is the state the commit produced (or the last state, for a
-/// destroy); `None` falls back to the node's setting. Ancestors are read
-/// propvals-only, one shallow read per level.
-pub fn effective_retention(store: &Db, resource: Option<&crate::Resource>) -> EnvelopeRetention {
-    let node = store.envelope_retention();
-    if node == EnvelopeRetention::All {
-        return node;
-    }
-    let Some(start) = resource else { return node };
+/// `resource` is the state a commit produced, or the last state for a destroy;
+/// `None` is [`Resolved::Unknown`].
+pub fn resolve_retention(store: &Db, resource: Option<&crate::Resource>) -> Resolved {
+    let Some(start) = resource else {
+        return Resolved::Unknown;
+    };
     if is_audit(start) {
-        return EnvelopeRetention::All;
+        return Resolved::Audit;
     }
     let mut parent = parent_of(start);
     for _ in 0..MAX_PARENT_DEPTH {
-        let Some(subject) = parent else { break };
+        let Some(subject) = parent else {
+            return Resolved::Compact;
+        };
         let Ok(ancestor) = store.get_resource_shallow(&subject) else {
-            break;
+            return Resolved::Unknown;
         };
         if is_audit(&ancestor) {
-            return EnvelopeRetention::All;
+            return Resolved::Audit;
         }
         parent = parent_of(&ancestor);
     }
-    node
+    Resolved::Compact
+}
+
+/// The retention that applies to a resource: the node's setting, raised to
+/// `All` when the resource or an ancestor asks for `audit`. An unreadable
+/// ancestor counts as the node's setting here; see [`Resolved::Unknown`].
+pub fn effective_retention(store: &Db, resource: Option<&crate::Resource>) -> EnvelopeRetention {
+    if store.envelope_retention() == EnvelopeRetention::All {
+        return EnvelopeRetention::All;
+    }
+    match resolve_retention(store, resource) {
+        Resolved::Audit => EnvelopeRetention::All,
+        Resolved::Compact | Resolved::Unknown => EnvelopeRetention::Latest,
+    }
+}
+
+/// True for the two values a `retention` property may hold.
+pub fn is_valid_retention_value(value: &str) -> bool {
+    matches!(value, "compact" | "audit")
+}
+
+/// Refuses a `retention` value that is neither `compact` nor `audit`, so a
+/// typo cannot silently mean "no audit".
+pub fn check_retention_value(resource: &crate::Resource) -> AtomicResult<()> {
+    match resource.get(crate::urls::RETENTION) {
+        Ok(value) if !is_valid_retention_value(&value.to_string()) => Err(format!(
+            "`retention` on {} must be `compact` or `audit`, got `{}`",
+            resource.get_subject(),
+            value
+        )
+        .into()),
+        _ => Ok(()),
+    }
 }
 
 fn is_audit(resource: &crate::Resource) -> bool {
     resource
         .get(crate::urls::RETENTION)
         .ok()
-        .and_then(|value| EnvelopeRetention::parse(&value.to_string()))
-        == Some(EnvelopeRetention::All)
+        .is_some_and(|value| value.to_string() == "audit")
 }
 
 fn parent_of(resource: &crate::Resource) -> Option<crate::Subject> {
@@ -192,16 +231,21 @@ pub fn record_ops(
     if genesis_is_kept_as_row(response) {
         return Ok(());
     }
-    let retention = effective_retention(
-        store,
-        response
-            .resource_new
-            .as_ref()
-            .or(response.resource_old.as_ref()),
-    );
-    // Later commits: under `All` the genesis envelope is history that has to
+    // A commit that takes audit away (clears `retention`, or moves the
+    // resource out of an audited folder) is still written under audit: the
+    // state before it asked for the full log, so its envelope joins it and
+    // the history written so far is kept. Only the commits after it prune,
+    // and each of those drops just the envelope it supersedes.
+    let audited = store.envelope_retention() == EnvelopeRetention::All
+        || [
+            response.resource_new.as_ref(),
+            response.resource_old.as_ref(),
+        ]
+        .into_iter()
+        .any(|state| resolve_retention(store, state) == Resolved::Audit);
+    // Later commits: under audit the genesis envelope is history that has to
     // stay, so write it out before something newer sits beside it.
-    if retention == EnvelopeRetention::All {
+    if audited {
         let nothing_stored = store
             .kv
             .scan_prefix(Tree::Envelopes, &prefix(subject))
@@ -219,8 +263,14 @@ pub fn record_ops(
         }
     }
 
-    if retention == EnvelopeRetention::Latest {
-        for existing in store.kv.scan_prefix(Tree::Envelopes, &prefix(subject)) {
+    if !audited {
+        // The one envelope this one supersedes. Rows written under audit,
+        // before a lowering, stay.
+        let superseded = store
+            .kv
+            .scan_prefix(Tree::Envelopes, &prefix(subject))
+            .last();
+        if let Some(existing) = superseded {
             let (old_key, _) = existing?;
             if old_key != new_key {
                 transaction.push(Operation {
@@ -351,14 +401,19 @@ pub async fn import_envelope(store: &Db, expected_subject: &str, json: &str) -> 
 
     let mut ops = Vec::new();
     let local = store.get_resource_shallow(&commit.subject).ok();
-    if effective_retention(store, local.as_ref()) == EnvelopeRetention::Latest {
+    // An ancestor that is not held yet may be the one asking for audit, and a
+    // dropped envelope cannot be fetched again, so only a fully read chain
+    // allows pruning.
+    let may_prune = store.envelope_retention() == EnvelopeRetention::Latest
+        && resolve_retention(store, local.as_ref()) == Resolved::Compact;
+    if may_prune {
         let existing = envelopes(store, commit.subject.as_str());
         if existing.iter().any(|e| e.created_at > commit.created_at) {
             // A newer envelope is already the latest; the incoming one is
             // history this node chose not to keep.
             return Ok(());
         }
-        for old in existing {
+        if let Some(old) = existing.last() {
             ops.push(Operation {
                 tree: Tree::Envelopes,
                 method: Method::Delete,
@@ -628,10 +683,11 @@ mod tests {
         assert_eq!(envelopes(&db, subject.as_str()).len(), 3);
     }
 
-    /// Taking `audit` off the resource that set it returns it to the node's
-    /// setting: from the next commit on, only the newest envelope stays.
+    /// Taking `audit` off never deletes the audit era: the lowering commit
+    /// is kept beside the earlier rows, and only later commits prune the
+    /// newest superseded envelope.
     #[tokio::test]
-    async fn removing_audit_returns_the_resource_to_the_node_setting() {
+    async fn lowering_audit_keeps_the_audit_era() {
         let db = Db::init_temp("envelopes_lowered").await.unwrap();
         let (_alice, drive) = db.setup("Alice").await.unwrap();
         let subject = child(&db, &drive).await;
@@ -639,7 +695,56 @@ mod tests {
         signed_edit(&db, &subject, "one").await;
         assert_eq!(envelopes(&db, subject.as_str()).len(), 3);
         set_retention(&db, &subject, "compact").await;
-        assert_eq!(envelopes(&db, subject.as_str()).len(), 1);
+        assert_eq!(
+            envelopes(&db, subject.as_str()).len(),
+            4,
+            "the lowering commit is kept beside the audit era"
+        );
+        signed_edit(&db, &subject, "two").await;
+        assert_eq!(
+            envelopes(&db, subject.as_str()).len(),
+            4,
+            "later commits replace only the newest row"
+        );
+    }
+
+    #[tokio::test]
+    async fn moving_out_of_an_audited_folder_keeps_the_audit_era() {
+        let db = Db::init_temp("envelopes_moved_out").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let folder = child(&db, &drive).await;
+        set_retention(&db, &folder, "audit").await;
+        let kid = child(&db, folder.as_str()).await;
+        signed_edit(&db, &kid, "one").await;
+        assert_eq!(envelopes(&db, kid.as_str()).len(), 2);
+        let mut resource = db.get_resource(&kid).await.unwrap();
+        resource
+            .set(
+                urls::PARENT.into(),
+                Value::AtomicUrl(crate::Subject::from_raw(&drive, None)),
+                &db,
+            )
+            .await
+            .unwrap();
+        resource.save_locally(&db).await.unwrap();
+        assert_eq!(
+            envelopes(&db, kid.as_str()).len(),
+            3,
+            "the move out is kept beside the audit era"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_invalid_retention_value_is_refused() {
+        let db = Db::init_temp("envelopes_invalid_value").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let mut resource = db.get_resource(&subject).await.unwrap();
+        resource
+            .set(urls::RETENTION.into(), Value::String("audits".into()), &db)
+            .await
+            .unwrap();
+        assert!(resource.save_locally(&db).await.is_err());
     }
 
     #[tokio::test]
@@ -666,6 +771,30 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(envelopes(&sink, subject.as_str()).len(), 4);
+    }
+
+    /// An ancestor the receiver does not hold yet may be the one asking for
+    /// audit, so nothing is pruned until the whole chain can be read.
+    #[tokio::test]
+    async fn import_before_the_parent_is_held_keeps_every_envelope() {
+        let source = Db::init_temp("envelopes_unknown_source").await.unwrap();
+        source.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = source.setup("Alice").await.unwrap();
+        let subject = child(&source, &drive).await;
+        signed_edit(&source, &subject, "one").await;
+        signed_edit(&source, &subject, "two").await;
+        let all = envelopes(&source, subject.as_str());
+        assert_eq!(all.len(), 3);
+
+        let sink = Db::init_temp("envelopes_unknown_sink").await.unwrap();
+        let resource = source.get_resource(&subject).await.unwrap();
+        sink.add_resource(&resource).await.unwrap();
+        for e in &all {
+            import_envelope(&sink, subject.as_str(), &e.json)
+                .await
+                .unwrap();
+        }
+        assert_eq!(envelopes(&sink, subject.as_str()).len(), 3);
     }
 
     #[tokio::test]
@@ -775,6 +904,11 @@ mod tests {
         let newest = all.last().unwrap().clone();
 
         let latest_sink = Db::init_temp("envelopes_import_ret_latest").await.unwrap();
+        // The resource arrives before its envelopes, as in a bulk push.
+        for held in [&subject, &crate::Subject::from_raw(&drive, None)] {
+            let resource = source.get_resource(held).await.unwrap();
+            latest_sink.add_resource(&resource).await.unwrap();
+        }
         // Newest first, then older ones: the older must not displace it.
         for e in all.iter().rev() {
             import_envelope(&latest_sink, subject.as_str(), &e.json)
