@@ -2042,6 +2042,14 @@ export class WSClient {
   }
 
   private async drainBackground(): Promise<void> {
+    // Server-only mode (no OPFS / Web Locks): nothing local to import or index,
+    // and every send would fail with `ClientDb unavailable`.
+    if (this.store.getClientDb()?.initError) {
+      this.pendingEnvelopes = [];
+
+      return;
+    }
+
     await this.drainEnvelopes();
     await this.drainSearchIndex();
   }
