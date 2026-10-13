@@ -1312,9 +1312,10 @@ function SyncPage() {
     nodeUsage?.resourceCount,
   );
 
-  /** The provider's own node, when this drive is on one. */
-  const managedServer =
-    connectionServers.find(server => isManagedServer(server)) ?? null;
+  // Hosting comes from the active drive's verified connection, independently
+  // of the saved-server picker. Its list can lag a same-origin enrollment
+  // because selecting the current URL does not change AppSettings.baseURL.
+  const managedServer = cloudHosted ? status.serverUrl : null;
 
   /** Is this one of ours? Mirrors `isCloud` inside the card renderer. */
   function isManagedServer(server: string): boolean {
@@ -1456,8 +1457,10 @@ function SyncPage() {
       }
 
       setCloudEnrollment({
-        drive: status.drive!,
-        server: status.serverUrl,
+        drive,
+        // Enabling a local drive switches the store to the returned node.
+        // This handler still closes over the pre-switch render's server.
+        server: result.replicated ? status.serverUrl : result.httpOrigin,
         value: true,
       });
       if (result.replicated)

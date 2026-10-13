@@ -76,7 +76,7 @@ const onConnected = vi.fn();
 
 function mount() {
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
+    <ThemeProvider theme={buildTheme(false, '#336699')}>
       <ConnectDeviceStep
         drive='did:ad:home'
         portalUrl='https://portal.example'

@@ -6,6 +6,7 @@ import { JSCryptoProvider } from './CryptoProvider.js';
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
 import { Store } from './store.js';
+import { LoroLoader } from './loro-loader.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -143,6 +144,169 @@ async function newAgent(): Promise<Agent> {
 }
 
 describe('the outbox in the client database', () => {
+  it('keeps the existing home title when creating another drive after reload', async () => {
+    const agent = await newAgent();
+    const db = new FakeClientDb();
+    const first = await tab(agent, db, false);
+    const home = await first.store.createDrive('My named home', {
+      localOnly: true,
+    });
+    const second = await tab(agent, db, false);
+
+    await second.store.createDrive('Project', {
+      personal: false,
+      localOnly: true,
+    });
+
+    const restored = await second.store.getResource(home.subject);
+    expect(restored.get(core.properties.name)).toBe('My named home');
+  });
+
+  it('creates a server-backed home when local storage is unsupported', async () => {
+    const db = new FakeClientDb();
+    db.unsupportedEnvironment = true;
+    db.isReady = false;
+    const { store } = await tab(await newAgent(), db, true);
+    vi.spyOn(db, 'getResourceWithSnapshot').mockRejectedValue(
+      new Error('ClientDb unavailable: unsupported environment'),
+    );
+    const home = await store.createDrive('Server home');
+    expect(home.get(core.properties.name)).toBe('Server home');
+    expect(store.outbox.hasPending(home.subject)).toBe(false);
+    store.setServerConnected(false);
+  });
+
+  it('does not overwrite a home when its local database read fails', async () => {
+    const agent = await newAgent();
+    const db = new FakeClientDb();
+    const first = await tab(agent, db, false);
+    await first.store.createDrive('My named home', { localOnly: true });
+    const second = await tab(agent, db, false);
+    const writes = db.putCalls.length;
+    vi.spyOn(db, 'getResourceWithSnapshot').mockRejectedValue(
+      new Error('database read failed'),
+    );
+
+    await expect(
+      second.store.createDrive('Project', { personal: false, localOnly: true }),
+    ).rejects.toThrow('database read failed');
+    expect(db.putCalls).toHaveLength(writes);
+  });
+
+  it('keeps edits made after a cached genesis while saving online', async () => {
+    const db = new FakeClientDb();
+    const { store, posted } = await tab(await newAgent(), db, true);
+    const doc = await store.newResource({
+      noParent: true,
+      propVals: { [core.properties.name]: 'Before' },
+    });
+    await doc.persistToClientDb();
+    await doc.set(core.properties.name, 'After the cached snapshot', false);
+    await doc.save();
+    const received = new LoroLoader.Loro.LoroDoc();
+
+    for (const commit of posted) {
+      if (commit.subject === doc.subject && commit.loroUpdate)
+        received.import(commit.loroUpdate);
+    }
+
+    expect(received.getMap('properties').get(core.properties.name)).toBe(
+      'After the cached snapshot',
+    );
+    expect(doc.get(core.properties.name)).toBe('After the cached snapshot');
+    store.setServerConnected(false);
+  });
+
+  it('merges an offline snapshot without discarding newer in-memory edits', async () => {
+    const db = new FakeClientDb();
+    const { store, posted } = await tab(await newAgent(), db, true);
+    const doc = await store.newResource({
+      noParent: true,
+      propVals: { [core.properties.name]: 'Before' },
+    });
+    await doc.save();
+    store.setServerConnected(false);
+    await doc.set(core.properties.description, 'Saved while offline', false);
+    await doc.save();
+    await doc.set(core.properties.name, 'Newer unsaved title', false);
+
+    store.setServerConnected(true);
+    await store.syncDirtyResources();
+    const received = new LoroLoader.Loro.LoroDoc();
+
+    for (const commit of posted) {
+      if (commit.subject === doc.subject && commit.loroUpdate)
+        received.import(commit.loroUpdate);
+    }
+
+    expect(received.getMap('properties').get(core.properties.name)).toBe(
+      'Newer unsaved title',
+    );
+    expect(received.getMap('properties').get(core.properties.description)).toBe(
+      'Saved while offline',
+    );
+    expect(store.outbox.hasPending(doc.subject)).toBe(false);
+    store.setServerConnected(false);
+  });
+
+  it.each([
+    { opened: false, legacy: false, reloadBeforeEdit: false },
+    { opened: true, legacy: false, reloadBeforeEdit: false },
+    { opened: false, legacy: true, reloadBeforeEdit: false },
+    { opened: true, legacy: true, reloadBeforeEdit: false },
+    { opened: false, legacy: false, reloadBeforeEdit: true },
+  ])(
+    'sends body edits after offline genesis across reload ($opened, legacy: $legacy, reloaded before edit: $reloadBeforeEdit)',
+    async ({ opened, legacy, reloadBeforeEdit }) => {
+      const agent = await newAgent();
+      const db = new FakeClientDb();
+      const first = await tab(agent, db, false);
+      let doc = await first.store.newResource({
+        noParent: true,
+        isA: 'https://atomicdata.dev/classes/DocumentV2',
+        propVals: { [core.properties.name]: 'Offline document' },
+      });
+      await doc.save();
+
+      if (reloadBeforeEdit) {
+        const editor = await tab(agent, db, false);
+        doc = await editor.store.getResource(doc.subject);
+      }
+
+      doc.getLoroDoc()!.getText('body').insert(0, 'alpha after genesis');
+      doc.getLoroDoc()!.commit();
+      doc.markDirty();
+      await doc.save();
+
+      if (legacy) {
+        // Queues written before this fix have the full local snapshot but
+        // no baseline for any edit while genesis was still unposted.
+        for (const rows of db.outbox.values()) {
+          const row = JSON.parse(rows.get(doc.subject)!);
+          delete row.baseVersion;
+          rows.set(doc.subject, JSON.stringify(row));
+        }
+      }
+
+      const second = await tab(agent, db, false);
+      if (opened) await second.store.getResource(doc.subject);
+      second.store.setServerConnected(true);
+      await second.store.syncDirtyResources();
+
+      const received = new LoroLoader.Loro.LoroDoc();
+
+      for (const commit of second.posted) {
+        if (commit.subject === doc.subject && commit.loroUpdate) {
+          received.import(commit.loroUpdate);
+        }
+      }
+
+      expect(received.getText('body').toString()).toBe('alpha after genesis');
+      expect(second.store.outbox.hasPending(doc.subject)).toBe(false);
+      second.store.setServerConnected(false);
+    },
+  );
+
   it('an offline edit survives a reload and drains on reconnect', async () => {
     const agent = await newAgent();
     const db = new FakeClientDb();

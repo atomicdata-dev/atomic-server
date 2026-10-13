@@ -19,6 +19,7 @@ beforeEach(() => {
   ensure = vi.fn().mockResolvedValue(undefined);
   store = {
     getAgent: () => agent,
+    getIdentityGeneration: () => 1,
     privateDriveSubject: async () => home,
     getServerUrl: () => 'https://app.example',
     ensurePrivateDrive: ensure,
@@ -33,7 +34,10 @@ beforeEach(() => {
   vi.mocked(deviceHasDriveData).mockResolvedValue(false);
   vi.mocked(restoreFromVault).mockResolvedValue({
     status: 'no-backup',
-    reason: 'no account session',
+    reason: 'drive is not backed up',
+    driveSubject: home,
+    agentSubject: 'did:ad:agent:test',
+    identityGeneration: 1,
   });
 });
 it('never synthesizes someone else’s workspace', async () => {
@@ -104,8 +108,40 @@ it('does not create a home after the user switches identity', async () => {
   vi.mocked(restoreFromVault).mockImplementation(async () => {
     agent = { subject: 'did:ad:agent:other' };
 
-    return { status: 'no-backup', reason: 'no account session' };
+    return {
+      status: 'no-backup',
+      reason: 'drive is not backed up',
+      driveSubject: home,
+      agentSubject: 'did:ad:agent:test',
+      identityGeneration: 1,
+    };
   });
   expect(await openPrivateHome(store, home)).toBeUndefined();
   expect(ensure).not.toHaveBeenCalled();
 });
+
+it('does not turn unavailable storage into an empty home', async () => {
+  vi.mocked(restoreFromVault).mockResolvedValue({
+    status: 'unavailable',
+    reason: 'no local database',
+  });
+  expect(await openPrivateHome(store, home)).toBeUndefined();
+  expect(ensure).not.toHaveBeenCalled();
+});
+
+it.each(['drive', 'identity', 'session'])(
+  'does not reuse absence from another %s',
+  async changed => {
+    const absence = {
+      status: 'no-backup' as const,
+      reason: 'drive is not backed up' as const,
+      driveSubject: changed === 'drive' ? 'did:ad:other' : home,
+      agentSubject:
+        changed === 'identity' ? 'did:ad:agent:other' : 'did:ad:agent:test',
+      identityGeneration: changed === 'session' ? 0 : 1,
+    };
+    expect(await openPrivateHome(store, home, absence)).toBeUndefined();
+    expect(ensure).not.toHaveBeenCalled();
+    expect(restoreFromVault).not.toHaveBeenCalled();
+  },
+);

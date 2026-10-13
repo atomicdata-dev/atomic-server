@@ -159,9 +159,10 @@ export const ChatMessagesContainer: React.FC<
       // swallowed a reader's scroll up made just after the keyboard opened.
       const atBottom = el.scrollHeight - el.clientHeight - top <= 1;
       const clamped =
-        height < lastScrollHeightRef.current ||
-        el.clientHeight > viewportHeightRef.current ||
-        (atBottom && performance.now() - resizedAtRef.current < 150);
+        atBottom &&
+        (height < lastScrollHeightRef.current ||
+          el.clientHeight > viewportHeightRef.current ||
+          performance.now() - resizedAtRef.current < 150);
 
       if (!readerScrolledRef.current) {
         // Still laying out, or a glide knocked back: the reader has not

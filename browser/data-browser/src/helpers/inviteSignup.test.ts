@@ -30,3 +30,32 @@ it('resumes at the local invite route, never an arbitrary destination', () => {
     '/app/invite?token=https%3A%2F%2Fevil.example&accept=true',
   );
 });
+
+it('carries the invitation node through email and another-browser recovery', () => {
+  const signup = new URL(
+    inviteSignupUrl(
+      { managed: true, portalUrl: 'https://portal.example' } as ManagedInfo,
+      'a+b/=',
+      'https://team.example',
+    )!,
+  );
+  const invitation = signup.searchParams.get('invite')!;
+  const resumed = new URL(resumeInviteUrl(invitation), 'https://app.example');
+  expect(resumed.origin).toBe('https://app.example');
+  expect(resumed.pathname).toBe('/app/invite');
+  expect(resumed.searchParams.get('token')).toBe('a+b/=');
+  expect(resumed.searchParams.get('server')).toBe('https://team.example');
+  expect(resumed.searchParams.get('accept')).toBe('true');
+});
+it('reads only the invitation token and node, ignoring redirect fields', () => {
+  const resumed = new URL(
+    resumeInviteUrl(
+      'https://team.example/app/invite?token=abc&next=https://evil.example',
+    ),
+    'https://app.example',
+  );
+  expect(resumed.origin).toBe('https://app.example');
+  expect(resumed.searchParams.get('server')).toBe('https://team.example');
+  expect(resumed.searchParams.get('token')).toBe('abc');
+  expect(resumed.searchParams.has('next')).toBe(false);
+});

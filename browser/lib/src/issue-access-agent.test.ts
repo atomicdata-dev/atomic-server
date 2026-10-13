@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Agent } from './agent.js';
 import type { Commit } from './commit.js';
 import {
@@ -12,6 +12,16 @@ import { core } from './ontologies/core.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import { server } from './ontologies/server.js';
 import { testStore } from './test-store.js';
+import type { Store } from './store.js';
+
+/** A local database that accepts writes: an offline save is only safe, and
+ *  only reported as `'offline'`, once it is stored on this device. */
+function localDatabase(store: Store): void {
+  vi.spyOn(store, 'getClientDb').mockReturnValue({
+    unsupportedEnvironment: false,
+    putResourceWithSnapshot: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NonNullable<ReturnType<Store['getClientDb']>>);
+}
 
 async function createWorkspace(
   store: Awaited<ReturnType<typeof testStore>>['store'],
@@ -310,6 +320,7 @@ describe('an issued agent queued while offline', () => {
     const { store, agentDID, posted, postCommitSpy } = await testStore();
     const drive = await createWorkspace(store, agentDID, 'Apps');
 
+    localDatabase(store);
     store.setServerConnected(false);
 
     const folder = await store.newResource({

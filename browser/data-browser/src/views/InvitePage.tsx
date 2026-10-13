@@ -47,7 +47,12 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
     void fetchManagedInfo(store.getServerUrl()).then(info => {
       const token = new URL(resource.subject).searchParams.get('token');
       if (active)
-        setSignupTarget(token ? (inviteSignupUrl(info, token) ?? null) : null);
+        setSignupTarget(
+          token
+            ? (inviteSignupUrl(info, token, new URL(resource.subject).origin) ??
+                null)
+            : null,
+        );
     });
 
     return () => {

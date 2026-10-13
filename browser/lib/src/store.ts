@@ -82,7 +82,7 @@ const LOCAL_READ_DEADLINE_DURING_SYNC_MS = 150;
 import { BLOB, endpoints, INTERNAL_ID } from './urls.js';
 import { SERVER_MANAGED_PROPS } from './server-managed-props.js';
 import { initOntologies } from './ontologies/index.js';
-import { decodeB64, encodeB64Url } from './base64.js';
+import { decodeB64, encodeB64, encodeB64Url } from './base64.js';
 import {
   canonicalizeScheme,
   isAgentSubject,
@@ -498,19 +498,32 @@ export type ChangeSource =
   | 'offline-replay'
   | 'peer-sync';
 
-/** One authoritative-or-local resource update. Either `loroBytes`
- * (WS paths) or `resource` (HTTP/local/offline) must be set. */
-export interface IncomingChange {
+interface IncomingChangeContext {
   subject: string;
-  loroBytes?: Uint8Array;
-  resource?: Resource;
   /** `did:ad:commit:<sig>` — used for echo dedup on the loroBytes path. */
   commitId?: string;
   source: ChangeSource;
   receivedAt?: number;
   forceNotify?: boolean;
-  replaceLoroDocsFromRemote?: boolean;
 }
+
+/** Exactly one representation. Bytes carry their own snapshot/update format;
+ * transports cannot choose to discard an existing causal document. */
+export type IncomingChange = IncomingChangeContext &
+  (
+    | {
+        resource: Resource;
+        loroBytes?: never;
+        /** @deprecated Ingress derives replacement from local causal state. */
+        replaceLoroDocsFromRemote?: boolean;
+      }
+    | {
+        loroBytes: Uint8Array;
+        resource?: never;
+        /** @deprecated Binary ingress derives replacement from local causal state. */
+        replaceLoroDocsFromRemote?: boolean;
+      }
+  );
 
 /** Returns True if the client has WebSocket support */
 const supportsWebSockets = () => typeof WebSocket !== 'undefined';
@@ -764,6 +777,12 @@ export class Store {
 
   /** Current Agent, used for signing commits. Is required for posting things. */
   private agent?: Agent;
+  private identityGeneration = 0;
+
+  /** Local session revision. Fences delayed work, including agent A → B → A. */
+  public getIdentityGeneration(): number {
+    return this.identityGeneration;
+  }
   /** Mapped from origin to websocket */
   private webSockets: Map<string, WSClient>;
 
@@ -785,6 +804,9 @@ export class Store {
     this.emitSyncStatus();
     this.scheduleOutboxDrain();
   });
+  /** Only restored queues need legacy genesis baseline repair. Online saves
+   * must remain independent of local database readiness. */
+  private restoredOutboxEntries = new WeakSet<OutboxEntry>();
   private outboxDrainTimer: ReturnType<typeof setTimeout> | undefined;
   /**
    * Macrotask-debounced auto-drain. Every local Loro op (`set`,
@@ -1244,6 +1266,7 @@ export class Store {
   public async makeDriveLocal(drive: string): Promise<void> {
     const normalized = this.normalizeSubject(drive);
     const agent = this.getAgent();
+    const generation = this.getIdentityGeneration();
 
     if (!agent) throw new Error('Sign in before disconnecting this workspace.');
 
@@ -1307,13 +1330,15 @@ export class Store {
         ErrorType.Server,
       );
 
-    const current = () => {
+    const current = (allowDriveSync = false) => {
       const status = this.getSyncStatus();
       if (
         this.getClientDb() !== db ||
         this.getAgent() !== agent ||
+        this.getIdentityGeneration() !== generation ||
         this.serverUrl !== serverUrl ||
-        status.syncInProgress ||
+        (status.syncInProgress &&
+          !(allowDriveSync && this._driveSyncInProgress)) ||
         status.pendingDirtyCount ||
         status.blockedCount
       )
@@ -1322,16 +1347,72 @@ export class Store {
         );
     };
 
-    current();
+    // Attaching the database can start reconciliation after the click. Let
+    // that read complete before checking the local copy; identity changes,
+    // pending writes and a stalled sync still prevent disconnection.
+    const deadline = Date.now() + 15_000;
+
+    const settled = async () => {
+      while (this._driveSyncInProgress && Date.now() < deadline) {
+        current(true);
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+
+      current();
+    };
+
+    await settled();
     // The caller's spelling goes to the socket and to the verification, not the
     // normalized one: `driveInventory` echoes the subjects it was asked about,
     // `verifyLocalDriveCopy` matches the drive against them, and the drive-wide
     // SUB this later drops was sent under `getDrive()`'s own spelling, which is
     // not normalized either. `registerLocalOnlyDrive` normalizes for itself.
     const inventory = await ws.driveInventory(drive, '');
+    // A newly created child can still be missing the server's stamped ops:
+    // its genesis POST succeeded before its subscription was installed.
+    // Acquire missing revisions explicitly and await their local writes.
+    // "Connected" and a drained outbox do not prove a complete local copy.
+    await Promise.all(
+      inventory.map(
+        item =>
+          this.lastPersisted.get(this.normalizeSubject(item.subject))?.done,
+      ),
+    );
+    const local = await db.getVersionVectorsForDrive(drive);
+
+    for (const item of inventory) {
+      const vv = local[item.subject];
+      if (
+        vv &&
+        Object.entries(item.vv).every(
+          ([peer, counter]) => (vv[peer] ?? 0) >= counter,
+        )
+      )
+        continue;
+      await settled();
+      const resource = await this.fetchResourceFromServer(item.subject, {
+        noWebSocket: true,
+      });
+      if (resource.error) throw resource.error;
+      await settled();
+      const jsonAd = resource.toClientDbJsonAd();
+      const snapshot = resource.getLoroDoc()?.export({ mode: 'snapshot' });
+
+      if (!jsonAd || !snapshot?.length) {
+        throw new Error(
+          'A resource is missing its local history. Keep the server connected.',
+        );
+      }
+
+      await this.persistState(db, resource.subject, jsonAd, snapshot, {
+        exact: true,
+      });
+    }
+
     await verifyLocalDriveCopy(db, drive, inventory);
     // A second inventory catches changes made while attachment verification ran.
     await verifyLocalDriveCopy(db, drive, await ws.driveInventory(drive, ''));
+    await settled();
     current();
     this.registerLocalOnlyDrive(drive);
     ws.unsubscribeFromDrive(drive);
@@ -1554,6 +1635,8 @@ export class Store {
    * row just records "this subject has unsynced edits."
    */
   private hydrateCommitLogFromOutbox(entry: OutboxEntry): void {
+    this.restoredOutboxEntries.add(entry);
+
     if (entry.signedGenesis) {
       this.pushCommitLog(
         this.buildCommitLogEntry(entry.signedGenesis, 'outgoing', 'pending'),
@@ -1889,6 +1972,28 @@ export class Store {
     if (entry.signedGenesis) {
       const genesis = entry.signedGenesis;
 
+      // Older queues omitted the baseline whenever genesis was unposted,
+      // including when the durable snapshot contained subsequent edits.
+      // Retain the envelope's version before clearing it so a reload can
+      // never mistake those edits for server-accepted state.
+      if (
+        this.restoredOutboxEntries.has(entry) &&
+        this.clientDb &&
+        !this.clientDb.unsupportedEnvironment &&
+        !entry.baseVersion &&
+        genesis.loroUpdate
+      ) {
+        this.outbox.setBaseVersion(
+          subject,
+          encodeB64(
+            LoroLoader.Loro.decodeImportBlobMeta(
+              genesis.loroUpdate,
+              false,
+            ).partialEndVersionVector.encode(),
+          ),
+        );
+      }
+
       // Ours, from before the POST: the echo can land before the ack and
       // must be recognised either way (see `applyIncoming`).
       if (genesis.signature) {
@@ -1898,6 +2003,14 @@ export class Store {
       }
 
       const created = await this.postCommit(genesis, endpoint);
+      this.resources
+        .get(subject)
+        ?.recordServerAcceptance(
+          endpoint,
+          created,
+          LoroLoader.Loro.decodeImportBlobMeta(genesis.loroUpdate!, false)
+            .partialEndVersionVector,
+        );
       // Publish the acknowledgement before ResourceSaved listeners decide
       // whether this new resource can be subscribed on the server.
       this.outbox.clearGenesis(subject);
@@ -2032,18 +2145,21 @@ export class Store {
             await this.clientDb.getResourceWithSnapshot(subject);
 
           if (jsonAd) {
-            this.hydrateResourceFromJson(subject, JSON.parse(jsonAd));
+            this.hydrateResourceFromJson(
+              subject,
+              JSON.parse(jsonAd),
+              snapshot ?? undefined,
+            );
           }
 
           const refreshed = this.resources.get(subject);
 
           if (refreshed && snapshot && snapshot.length > 0) {
-            // OPFS stores a full snapshot — replace any server-hydrated doc
-            // that raced ahead of the offline local state.
-            offlineSnapshotLoaded = refreshed.importLoroUpdate(
-              snapshot,
-              true,
-            ).complete;
+            // A stored snapshot can predate current edits. It supplies missing
+            // history, not permission to replace the live document. This also
+            // preserves edits made after an online genesis was cached.
+            offlineSnapshotLoaded =
+              refreshed.importLoroUpdate(snapshot).complete;
           }
 
           if (refreshed) resource = refreshed;
@@ -2151,6 +2267,7 @@ export class Store {
     // `await postCommit` round-trip are post-commit and must remain
     // dirty until the next drain pass.
     resource.markLoroSavedAt(versionAfterExport);
+    resource.recordServerAcceptance(endpoint, created, versionAfterExport);
 
     // The offline baseline (if any) has now been exported and acked — the
     // cursor sits at or past it, so drop it. Any still-dirty ops past the
@@ -2789,13 +2906,14 @@ export class Store {
   }
 
   /**
-   * Single ingress for resource state from any source: subject
-   * normalisation, commit-id dedup, Loro hydration, atomic OPFS
-   * persist, one `notify` — in that order.
+   * Materialize an incoming revision and notify observers. `applied` describes
+   * the in-memory view; its asynchronous local mirror is not a durability receipt.
    */
   public applyIncoming(
     change: IncomingChange,
   ): 'applied' | 'deduped' | 'invalid' {
+    // JavaScript callers do not have the TypeScript union's protection.
+    if (!!change.resource === !!change.loroBytes) return 'invalid';
     // A destroyed resource must not come back. Before the drain POSTs the
     // envelope the server still holds it, and after the ack an answer that
     // was computed before the destroy landed can still be in flight, so a SUB
@@ -2824,6 +2942,36 @@ export class Store {
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
 
+      // Computed query answers have no shared edit history. Merging them can
+      // combine yesterday's count with today's members. Editable documents,
+      // including nested query members, still retain their causal history.
+      let queryProjection = change.source === 'ws-query-update';
+
+      if (
+        change.source === 'http-fetch' &&
+        this.serverUrl &&
+        /^https?:/.test(change.subject)
+      ) {
+        const url = new URL(change.subject);
+        queryProjection =
+          url.pathname === '/query' &&
+          url.origin === new URL(this.serverUrl).origin &&
+          change.resource.subject === change.subject;
+      }
+
+      const existing = this.resources.get(
+        this.normalizeSubject(change.subject),
+      );
+      const replaceProjection =
+        (change.source === 'http-fetch' || queryProjection) &&
+        existing !== change.resource.__internalObject &&
+        (queryProjection ||
+          this._withoutLoroHistory.has(
+            this.normalizeSubject(change.subject),
+          )) &&
+        !existing?.hasUnsavedChanges() &&
+        !this.outbox.mayHavePending(change.subject);
+
       // The server's copy brings the real history with it.
       if (change.source === 'http-fetch') {
         this._withoutLoroHistory.delete(this.normalizeSubject(change.subject));
@@ -2832,7 +2980,7 @@ export class Store {
       this.addResource(change.resource, {
         skipCommitCompare: true,
         alias,
-        replaceLoroDocsFromRemote: change.replaceLoroDocsFromRemote,
+        replaceLoroDocsFromRemote: replaceProjection,
       });
 
       return 'applied';
@@ -2889,28 +3037,27 @@ export class Store {
         ? this.getResourceLoading(subject, { newResource: false })
         : new Resource(subject));
     resource.setStore(this);
-    // A GET response carrying the SNAPSHOT flag is authoritative full state
-    // (`replaceLoroDocsFromRemote`). REPLACE rather than merge it — merging a
-    // full snapshot into a doc the client already seeded with partial state (a
-    // SUB push that delivered only some props) can surface only the seed's
-    // props, leaving the resource class-less (the "deeply broken drive"). Don't
-    // replace a commit-detail delta, and don't clobber unsaved local edits.
-    //
-    // `hasUnsavedChanges()` is in-memory only, so it's blind on a cold
-    // reload: a WS reconnect can deliver the server's stale (pre-offline-
-    // edit) snapshot for a subject whose offline edit only exists in
-    // clientDb + the outbox's durable dirty bit —
-    // nothing has called `set()` on THIS freshly-created Resource object
-    // yet. Without also checking `outbox.hasPending`, `replace: true`
-    // wipes the doc via `resetLoroState()` before the OPFS-based local
-    // hydration (`fetchResourceWithLocalFallback`) gets a chance to merge
-    // the offline edit back in — silently dropping it. See
-    // `hydrateResourceFromJson`'s sibling comment for why that path
-    // deliberately does NOT gate the OPPOSITE decision (whether to
-    // hydrate at all) on this same durable bit — this is a different,
-    // narrower gate: only whether a destructive replace is safe.
+    // Preserve pending edits in memory and on disk. A cold local outbox can
+    // contain edits that this Resource has not hydrated yet.
+    // A full snapshot is not permission to discard another replica's history.
+    // Only a projection rebuilt from JSON lacks a causal base worth merging.
+    // Inspect the payload here so every transport applies the same policy.
+    let snapshot = false;
+
+    if (this._withoutLoroHistory.has(subject)) {
+      try {
+        snapshot = LoroLoader.Loro.decodeImportBlobMeta(
+          change.loroBytes,
+          false,
+        ).mode.includes('snapshot');
+      } catch {
+        return 'invalid';
+      }
+    }
+
     const replace =
-      !!change.replaceLoroDocsFromRemote &&
+      snapshot &&
+      this._withoutLoroHistory.has(subject) &&
       !isCommitSubject(subject) &&
       !resource.hasUnsavedChanges() &&
       !this.outbox.mayHavePending(subject);
@@ -3379,7 +3526,47 @@ export class Store {
 
     if (personal) {
       const existingDid = await this.resolvePrivateDriveSubject(agent);
-      const existing = this._resources.get(existingDid);
+      let existing = this._resources.get(existingDid);
+
+      // An empty memory cache after a reload is not evidence that this home
+      // is new. Read the durable copy before writing default properties to
+      // its deterministic subject. Unlike a display lookup, a failed read
+      // here must stop creation rather than become a cache miss.
+      if (
+        !existing?.isReady() &&
+        this.clientDb &&
+        !this.clientDb.unsupportedEnvironment
+      ) {
+        const db = this.clientDb;
+        const generation = this.getIdentityGeneration();
+        await db.waitForInit();
+        const { jsonAd, snapshot } =
+          await db.getResourceWithSnapshot(existingDid);
+
+        if (
+          this.getAgent() !== agent ||
+          this.getIdentityGeneration() !== generation ||
+          this.clientDb !== db
+        ) {
+          throw new Error(
+            'The active identity or local database changed while opening the personal drive.',
+          );
+        }
+
+        if (jsonAd) {
+          existing = this.hydrateOfflineReplay(
+            existingDid,
+            JSON.parse(jsonAd),
+            snapshot ?? undefined,
+          );
+
+          if (!existing?.hasClasses(server.classes.drive)) {
+            throw new Error(
+              'The stored personal drive is incomplete. Recover it before creating another drive.',
+            );
+          }
+        }
+      }
 
       if (
         existing?.isReady() &&
@@ -4079,10 +4266,9 @@ export class Store {
   ): Promise<Resource> {
     // `createDrive` returns the cached drive untouched when it already has
     // one, which is what keeps this from renaming a home the user has titled.
-    // Deliberately no lookup for a drive that is not in memory: a bounded
-    // `getResource` cannot be cancelled, so the abandoned fetch outlives the
-    // deadline and fails the drive this call then creates. Materializing is
-    // therefore a sign-in action, not something boot repeats.
+    // A cold cache reads the local database first. Remote recovery still
+    // belongs to sign-in: callers must establish backup/server absence before
+    // materializing a home this device has never held.
     return this.createDrive(name, {
       ...opts,
       personal: true,
@@ -6150,6 +6336,8 @@ export class Store {
    * might have security implications for your application.
    */
   public setAgent(agent: Agent | undefined): void {
+    if (this.agent !== agent) this.identityGeneration++;
+
     if (this.agent?.subject !== agent?.subject) {
       this.localReadsAwaitingAttach.clear();
     }
@@ -7280,11 +7468,24 @@ export class Store {
 
     const update = this._commitLogUpdates.get(entry.id);
     if (!update) return undefined;
+
+    // A restored log can render before the lazy WASM module is ready.
+    // Retry when it loads; do not cache "no properties" for this commit.
+    if (!LoroLoader.isLoaded()) {
+      LoroLoader.onReady(this.notifyCommitSummariesReady);
+
+      return undefined;
+    }
+
     const summaries = this.diffCommitProperties(entry.subject, update);
     this._commitLogSummaries.set(entry.id, summaries);
 
     return summaries;
   }
+
+  private notifyCommitSummariesReady = (): void => {
+    this.eventManager.emit(StoreEvents.CommitLogChanged, this.getCommitLog());
+  };
 
   private diffCommitProperties(
     subject: string,

@@ -161,6 +161,8 @@ test.describe('LocalizedText table columns', () => {
     await createLocalizedTable(page, 'i18n basic', 'tagline');
 
     await fillCell(page, 2, 2, 'r1');
+    await waitForSaved(page);
+    await expect(cell(page, 2, 2)).toHaveText('r1');
     await fillCell(page, 2, 3, 'Hello');
 
     await expect(page.getByRole('gridcell', { name: 'Hello' })).toBeVisible();
@@ -187,6 +189,11 @@ test.describe('LocalizedText table columns', () => {
     await createLocalizedTable(page, 'i18n full', 'tagline');
 
     await fillCell(page, 2, 2, 'r1');
+    // Materializing the draft inserts it into the collection asynchronously.
+    // Wait for that named row before targeting its next column by position;
+    // otherwise the same position can still be the trailing blank row.
+    await waitForSaved(page);
+    await expect(cell(page, 2, 2)).toHaveText('r1');
     await fillCell(page, 2, 3, 'Hello');
     await waitForSaved(page);
 

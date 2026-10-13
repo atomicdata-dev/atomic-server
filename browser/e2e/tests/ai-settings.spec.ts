@@ -126,23 +126,18 @@ test('AI configuration lives in Settings and persists agent, skill and MCP edits
   await expect(
     page.getByText('1 Models', { exact: true }).first(),
   ).toBeVisible();
-  await page
-    .getByText('Default chat model', { exact: true })
-    .locator('..')
-    .getByRole('combobox')
-    .fill('Gemini');
-  await expect(
-    page.getByRole('option', { name: 'Gemini Flash', exact: true }),
-  ).toHaveCount(0);
-  await page
-    .getByText('Default chat model', { exact: true })
-    .locator('..')
-    .getByRole('combobox')
-    .fill('Alternate');
   const modelInput = page
     .getByText('Default chat model', { exact: true })
     .locator('..')
     .getByRole('combobox');
+  // fill() can type below the viewport. Bring the control into view as a
+  // person would before opening its positioned suggestion list.
+  await modelInput.click();
+  await modelInput.fill('Gemini');
+  await expect(
+    page.getByRole('option', { name: 'Gemini Flash', exact: true }),
+  ).toHaveCount(0);
+  await modelInput.fill('Alternate');
   const inputWidth = await modelInput.evaluate(
     input => input.parentElement!.getBoundingClientRect().width,
   );

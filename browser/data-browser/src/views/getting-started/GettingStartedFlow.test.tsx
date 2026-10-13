@@ -32,6 +32,7 @@ const state = vi.hoisted(() => ({
     getServerUrl: () => 'https://node.example',
     getAgent: () => state.agent,
     privateDriveSubject: async () => 'did:ad:home',
+    getIdentityGeneration: () => 1,
     // The home is titled after its owner, which means reading the Agent. The
     // literal subject is `core.properties.name`; this block is hoisted above
     // the imports, so it cannot say so by name.
@@ -193,7 +194,10 @@ beforeEach(() => {
   state.hasData = true;
   state.restoreVault.mockResolvedValue({
     status: 'no-backup',
-    reason: 'no backup',
+    reason: 'drive is not backed up',
+    driveSubject: 'did:ad:home',
+    agentSubject: 'did:ad:agent:test',
+    identityGeneration: 1,
   });
   vi.spyOn(Agent, 'fromSecret').mockResolvedValue({
     subject: 'did:ad:agent:test',
@@ -384,7 +388,7 @@ it('opens a partial restore without backing it up, and says it is partial', asyn
   state.restoreVault.mockImplementation(async () => {
     state.hasData = true;
 
-    return { status: 'restored', outcome: { incomplete } };
+    return { status: 'partial', outcome: { incomplete }, reason: incomplete };
   });
   await show('?step=signin');
   await act(async () => {

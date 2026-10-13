@@ -149,15 +149,22 @@ describe('private website authoring', () => {
       assertPrivateWebsiteParent(store, 'site'),
     ).resolves.toBeUndefined();
   });
-  it('does not report a queued local save as durable', async () => {
-    const resource = {
-      subject: 'test-site',
-      save: vi.fn().mockResolvedValue('offline'),
-    } as unknown as Resource;
-    await expect(saveWebsiteResource(resource)).rejects.toThrow(
-      'pending locally',
-    );
-  });
+  it.each(['offline', 'queued', 'persisted'])(
+    'requires remote acceptance for a %s save',
+    async status => {
+      const resource = {
+        subject: 'test-site',
+        saveWithReceipt: vi.fn().mockResolvedValue({
+          status,
+          subject: 'test-site',
+          local: { version: 'local-only' },
+        }),
+      } as unknown as Resource;
+      await expect(saveWebsiteResource(resource)).rejects.toThrow(
+        'pending locally',
+      );
+    },
+  );
 });
 
 it('rejects layout references outside the explicit selection and duplicate sections', () => {

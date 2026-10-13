@@ -3,6 +3,7 @@ import { test, expect, type Page } from './session-fixtures';
 import {
   createTableFromDialog,
   inDialog,
+  pickFromMenu,
   pickTotal,
   setGridCell,
   waitForGridMounted,
@@ -168,8 +169,10 @@ test.describe('table totals', () => {
 
     // A filter narrows the rows AND the total with them — the totals describe
     // what you are looking at, not the whole table.
-    await page.getByTitle('Filter', { exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Hours', exact: true }).click();
+    await pickFromMenu(
+      page.getByTitle('Filter', { exact: true }),
+      page.getByRole('menuitem', { name: 'Hours', exact: true }),
+    );
     await page.getByPlaceholder('Value…').fill('4');
     await page.keyboard.press('Escape');
 

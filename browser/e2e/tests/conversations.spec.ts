@@ -41,6 +41,9 @@ async function waitForEncryptionKey(agent: string) {
 }
 
 async function send(page: Page, text: string) {
+  // The New message dialog restores focus while closing. Wait for the
+  // composer to receive a real click before typing into it.
+  await chatInput(page).click();
   await chatInput(page).fill(text);
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText(text)).toBeVisible({ timeout: 15_000 });

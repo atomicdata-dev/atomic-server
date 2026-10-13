@@ -346,34 +346,26 @@ test.describe('sync', () => {
     // Wait for all pending resources to sync.
     await waitForSynced(page);
 
-    // Wait for the search index to pick up the change
-    await waitForSearchIndex(page, 'Synced From Offline');
-
     // Ask the server for its own copy over HTTP, bypassing every local cache.
-    // The two waits above both have blind spots — `waitForSynced` proves the
-    // dirty bit cleared (which a poisoned drain can do without delivering
-    // anything: it once exported the offline delta from a server-hydrated doc
-    // and the ack cleared dirty), and `waitForSearchable` merges page1's own
-    // LOCAL index. This is the assertion that the edit actually left this
-    // machine; the second context below then proves a fresh device sees it.
-    // Poll: drains can still be running when the waits release.
+    // A normal fetch merges the answer into this browser's optimistic copy,
+    // so it cannot prove that the server received the edit. Check the raw
+    // server snapshot before search to distinguish delivery from indexing.
     await expect
       .poll(
         () =>
           page.evaluate(
             async ({ subject }) => {
-              const fresh = await window.store.fetchResourceFromServer(
-                subject,
-                { setLoading: true, noWebSocket: true },
-              );
+              const fresh = await window.store.readServerSnapshot(subject);
 
-              return fresh?.title;
+              return fresh['https://atomicdata.dev/properties/name'];
             },
             { subject: resourceSubject! },
           ),
         { timeout: 30000, intervals: [1000] },
       )
       .toBe('Synced From Offline');
+
+    await waitForSearchIndex(page, 'Synced From Offline');
 
     // 5. Open a fresh browser context (simulates another device)
     const context2 = await browser.newContext();

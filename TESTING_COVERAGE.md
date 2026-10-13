@@ -869,7 +869,7 @@ No automated end-to-end coverage: uploaded-file conversion through the full UI a
 | `createDrive({ personal: true })` uses the derived DID | `browser/lib/src/store.private-drive.test.ts` |
 | Two stores with the same key mint the same subject | `store.private-drive.test.ts` |
 | Extra drives are listed on the derived personal drive | `store.private-drive.test.ts` |
-| Extra drive created offline drains on reconnect (genesis must not set a rewind baseline) | `browser/lib/src/offline-create-drain.test.ts` |
+| Extra drive created offline drains on reconnect; genesis-only saves clear and later edits retain their baseline | `browser/lib/src/offline-create-drain.test.ts`, `browser/lib/src/outbox-client-db.test.ts` |
 | Idempotent offline saves clear only after a complete local snapshot matches the synced baseline | `browser/lib/src/offline-create-drain.test.ts`, `browser/e2e/tests/offline-create-then-online.spec.ts` |
 | Lists from a previous random-DID home are unioned onto the derived drive | `store.private-drive.test.ts` |
 | `Agent.privateDriveSubject` matches the genesis helper | `agent.test.ts` |
@@ -1041,6 +1041,14 @@ native clients.
   during an attach, and the localStorage fallback. `outbox-client-db.test.ts`
   runs offline edit, create and delete through `Store` + `Resource` with a
   reload (a second `Store` on the same database) and the reconnect drain.
+  It also checks body edits made after offline genesis, both cold and already
+  opened on reconnect, legacy queues without a baseline, and editing after an
+  earlier reload. Assertions import the actual posted commits into a fresh
+  Loro document. Creating another drive after reload must preserve the existing
+  home's title; a failed database read must reject without writing defaults.
+  Cached snapshots merge with newer in-memory edits before draining. Online
+  genesis stays independent of database readiness, and unsupported local
+  storage still permits creating a server-backed home.
   `tests/outbox-client-db.integration.test.ts` repeats those against the real
   WASM database in Node, plus per-agent isolation. `client-db-durable-put.test.ts`
   checks the worker writes the row with the snapshot under one flush. Not
@@ -1520,6 +1528,9 @@ download from the recipient account, and existing-agent acceptance. SaaS
 `portal/e2e/invite-signup.spec.ts` covers a real invitation through email signup,
 recovery-code backup, automatic acceptance, and workspace reload. It also restores
 the existing identity in a second browser before accepting the invitation again.
+Different app and node origins are covered: `inviteSignup.test.ts` preserves
+the source node across the opaque email handoff while resuming only the local
+invitation route, and the browser journey verifies the same round trip.
 The test injects the standalone node's managed/portal metadata and declines
 automatic workspace-vault enrollment (no S3 service). Invitation, email login,
 encrypted identity recovery, and workspace operations use real local services.
@@ -1852,6 +1863,10 @@ AI references, size limits and removal of undeclared authority/executable fields
 then adopts a fresh workspace without the demo edit or sample rows; it also checks
 blank creation and that the mobile feedback footer cannot cover its action.
 Existing `table-templates.spec.ts` exercises the same table adapter.
+`instantiate.test.ts` checks that a preview waits for database attachment and
+rejects failed readiness. `make-drive-local.test.ts` checks initial and mid-copy
+reconciliation before template setup disconnects an unenrolled home;
+`template-recovery.spec.ts` exercises those flows through the browser.
 Not covered: a live AI provider, durable interrupted-install resume, portable graph
 import/export, shared schema IDs, initial identity signup, physical mobile browsers.
 
@@ -2616,7 +2631,7 @@ repositories and rejects dependency lockfile drift before builds.
 
 ## Mobile AI chat (#1591)
 
-`browser/e2e/tests/ai-mobile.spec.ts` checks full-width phone layout and message bodies, long titles keeping the header menu on-screen, the chat resource menu targeting the saved conversation and opening its full-page view, a composer that fits above a simulated keyboard inset, options and token visibility, closing the panel, desktop composer bounds, and model selection with focus returning to the editor. A long-response regression reproduces the final sentence being clipped after keyboard resize, verifies bottom-following and the small gap above the composer, and preserves reading position when scrolled up. AI responses are mocked; a physical mobile keyboard is not exercised.
+`browser/e2e/tests/ai-mobile.spec.ts` checks full-width phone layout and message bodies, long titles keeping the header menu on-screen, the chat resource menu targeting the saved conversation and opening its full-page view, a composer that fits above a simulated keyboard inset, options and token visibility, closing the panel, desktop composer bounds, and model selection with focus returning to the editor. A long-response regression reproduces the final sentence being clipped after keyboard resize, verifies bottom-following and the small gap above the composer, and preserves reading position when scrolled up. `ChatMessagesContainer.test.tsx` pins reader scrolling that arrives while the viewport grows or the content shrinks: only a scroll ending at the bottom can count as browser clamping. AI responses are mocked; a physical mobile keyboard is not exercised.
 
 AI credit display: `helpers/managed/ai.test.ts` verifies usage notification when the SDK cancels a hosted stream; `components/AI/useHostedAI.test.tsx` verifies the immediate refresh and one delayed settlement refresh without ongoing polling. `HostedAICredits.test.tsx` covers fractional monthly and purchased balances and offers the purchase link only in a hosted distribution when SaaS reports checkout available. `ai-mobile.spec.ts` verifies the balance stays hidden until AI Chat options opens, refreshes from the account API, and does not offer checkout in a FOSS build. These use mocked account/provider responses and do not verify live billing or the chat error purchase action.
 
@@ -2750,6 +2765,45 @@ partition.
 
 
 ## Vault recovery contracts (2026-10-13)
+
+### Save, ingress and recovery boundaries
+
+- `save-acknowledgement.test.ts` requires a local database for offline/local-only
+  success, retains signed local work across flush failure, and distinguishes a
+  child queued behind its parent. These regressions and their explicit database
+  fixtures are shared with the durability work in #1531.
+- `save-receipt.test.ts` checks the actual acknowledged endpoint/version, local
+  snapshot versions, absence of a peer/backup guarantee, and a newer edit made
+  while a server acknowledgement is pending. Local completion is rejected after
+  identity or database replacement. These are protocol unit tests;
+  actual flush/crash coverage remains in the worker and acceptance suites.
+- `sync-delta-local-base.test.ts` verifies that stale HTTP and WebSocket snapshots
+  cannot discard already-received peer history, including the persisted snapshot.
+  Import failure must preserve local history and reject. Ambiguous/missing ingress
+  representations are rejected at both TypeScript and JavaScript boundaries.
+  Computed query answers replace the previous projection so members and counts
+  come from the same response; they are not independent editable documents.
+- `make-drive-local.test.ts` requires missing server revisions to be acquired and
+  durably written before disconnecting. Inventory verification still rejects
+  missing history or attachment bytes. `commit-log-summaries.test.ts` checks that
+  a cold Sync page retries summaries when Loro becomes ready without caching an
+  empty answer or producing a startup warning.
+- Managed browser acceptance checks that enabling Cloud Server on the current
+  origin reports the verified hosted connection even when the saved-server
+  picker has not refreshed. The indicator cannot use that picker as evidence
+  of whether the workspace is hosted.
+- `vaultAutoBackup.test.ts` distinguishes unavailable database/device/account
+  dependencies from confirmed absence and standalone configuration. It fences
+  recovery after an identity A → signed-out → A transition.
+- `openPrivateHome.test.ts` rejects unavailable recovery and absence evidence from
+  another drive, agent or identity generation. `GettingStartedFlow.test.tsx`
+  renders complete/partial recovery and default-home decisions. Website release
+  saves require a server receipt for an attempted write, rather than treating a
+  local-only `persisted` result as remote acceptance.
+
+Per-drive route ownership, general query coverage, native receipt parity and a
+shared complete/partial Rust Vault outcome remain open in
+`planning/sync-contracts.md`.
 
 Run shared persistence journeys for both Vault and Server. UI-only interactions
 still run once. Passing a Server journey does not establish Vault recovery:

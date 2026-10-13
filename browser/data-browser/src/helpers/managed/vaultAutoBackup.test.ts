@@ -436,6 +436,88 @@ describe('ensureVaultBackup', () => {
 });
 
 describe('restoreFromVault', () => {
+  it('keeps standalone configuration separate from an unavailable managed session', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({ isConfigured: () => false });
+    expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+      status: 'not-configured',
+      driveSubject: DRIVE,
+      agentSubject: store.getAgent()!.subject,
+      identityGeneration: store.getIdentityGeneration(),
+    });
+    expect(deps.hasAccount).not.toHaveBeenCalled();
+  });
+  it.each(['database', 'device'])(
+    'reports an unavailable %s without claiming the backup is absent',
+    async dependency => {
+      const store = await signedInStore();
+      const deps = fakeDeps(
+        dependency === 'database'
+          ? { db: vi.fn(async () => null) }
+          : { laneId: vi.fn(async () => null) },
+      );
+
+      expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+        status: 'unavailable',
+      });
+      expect(deps.restoreDrive).not.toHaveBeenCalled();
+    },
+  );
+
+  it('cancels an old restore after signing out and back in as the same agent', async () => {
+    const store = await signedInStore();
+    const agent = store.getAgent()!;
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        store.setAgent(undefined);
+        store.setAgent(agent);
+
+        return keys;
+      }),
+    });
+
+    expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(deps.restoreDrive).not.toHaveBeenCalled();
+    expect(deps.recoverDriveKey).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a completed import into a replacement identity session', async () => {
+    const store = await signedInStore();
+    const agent = store.getAgent()!;
+    const reopenDrive = vi.fn(async () => undefined);
+    const deps = fakeDeps({ reopenDrive });
+    const restore = deps.restoreDrive;
+    deps.restoreDrive = vi.fn(async args => {
+      const outcome = await restore(args);
+      store.setAgent(undefined);
+      store.setAgent(agent);
+
+      return outcome;
+    });
+    expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(reopenDrive).not.toHaveBeenCalled();
+  });
+
+  it('cancels before import when its selected database is replaced', async () => {
+    const store = await signedInStore();
+    const getDb = vi.spyOn(store, 'getClientDb').mockReturnValue(undefined);
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        getDb.mockReturnValue({} as never);
+
+        return keys;
+      }),
+    });
+    expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(deps.restoreDrive).not.toHaveBeenCalled();
+  });
+
   it('uses the recovered key epoch after a drive has been re-keyed', async () => {
     const store = await signedInStore();
     const deps = fakeDeps({
@@ -538,12 +620,12 @@ describe('restoreFromVault', () => {
     expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
   });
 
-  it('is no-backup without a session, so sign-in falls through quietly', async () => {
+  it('reports an unavailable session without waiting for the database', async () => {
     const store = await signedInStore();
     const deps = fakeDeps({ hasAccount: vi.fn(async () => false) });
 
     expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
-      'no-backup',
+      'unavailable',
     );
     expect(deps.listVaultDrives).not.toHaveBeenCalled();
     // The database wait is the long one (up to 20s); a device with no session
@@ -622,7 +704,9 @@ describe('restoreFromVault', () => {
     });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe('failed');
+    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
+      'cancelled',
+    );
     expect(warn).not.toHaveBeenCalled();
 
     warn.mockRestore();

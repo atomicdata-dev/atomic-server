@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, expect as assert, it, vi } from 'vitest';
 import type { ClientDbWorker } from './client-db.js';
 import { Resource } from './resource.js';
 import { testStore } from './test-store.js';
@@ -20,6 +20,66 @@ const dbStub = (initialized: boolean) =>
  * that told the user to do something they had already done.
  */
 describe('makeDriveLocal preconditions', () => {
+  it.each(['idle', 'initializing', 'inventory'])(
+    'acquires a missing server revision while %s before verifying the local copy',
+    async phase => {
+      const { store } = await testStore();
+      const resource = new Resource(DRIVE);
+      resource.setStore(store);
+      resource.applyHydratedValues([
+        ['https://atomicdata.dev/properties/name', 'Home'],
+      ]);
+      const doc = resource.getLoroDoc()!;
+      doc.commit();
+      const vv = Object.fromEntries(doc.oplogVersion().toJSON());
+      let local = {};
+
+      const reconcile = () => {
+        store.startDriveSync();
+        setTimeout(() => store.finishDriveSync(DRIVE, 1, Date.now()), 10);
+      };
+
+      const db = {
+        isReady: true,
+        waitForInit: async () => {
+          if (phase === 'initializing') reconcile();
+
+          return true;
+        },
+        flush: async () => {},
+        getVersionVectorsForDrive: async () => local,
+        getResourceWithSnapshot: async () => ({
+          jsonAd: '{}',
+          snapshot: doc.export({ mode: 'snapshot' }),
+        }),
+        putResourceWithSnapshot: vi.fn(async () => {
+          local = { [DRIVE]: vv };
+        }),
+      };
+      store.setClientDb(db as unknown as ClientDbWorker);
+      const ws = {
+        readyState: WebSocket.OPEN,
+        driveInventory: vi.fn(async () => {
+          if (phase === 'inventory') reconcile();
+
+          return [{ subject: DRIVE, vv }];
+        }),
+        unsubscribeFromDrive: vi.fn(),
+      };
+      vi.spyOn(store, 'getDefaultWebSocket').mockReturnValue(ws as never);
+      const fetch = vi
+        .spyOn(store, 'fetchResourceFromServer')
+        .mockResolvedValue(resource);
+
+      await store.makeDriveLocal(DRIVE);
+
+      assert(fetch).toHaveBeenCalledWith(DRIVE, { noWebSocket: true });
+      assert(db.putResourceWithSnapshot).toHaveBeenCalled();
+      assert(store.isLocalOnlyDrive(DRIVE)).toBe(true);
+      assert(ws.unsubscribeFromDrive).toHaveBeenCalledWith(DRIVE);
+    },
+  );
+
   it('asks a signed-out user to sign in', async ({ expect }) => {
     const { store } = await testStore();
     store.setAgent(undefined);

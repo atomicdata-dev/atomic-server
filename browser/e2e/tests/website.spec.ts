@@ -294,9 +294,14 @@ test('Assistant creates and redesigns a website using existing table content', a
   await page.goto(
     `${new URL(page.url()).origin}/app/show?subject=${encodeURIComponent(subject)}`,
   );
-  // The authoring assistant is still open after navigation; close it before
-  // exercising the menu so its delayed input autofocus cannot take menu focus.
-  await page.getByRole('button', { name: 'AI', exact: true }).click();
+  // A full navigation can already close the transient panel. Close it only
+  // when present: toggling AI would reopen it and steal focus from the menu.
+  const closeAI = page.getByRole('button', {
+    name: 'Close AI Sidebar',
+    exact: true,
+  });
+  if (await closeAI.isVisible()) await closeAI.click();
+  await expect(closeAI).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Publish site', exact: true }),
   ).toBeEnabled({ timeout: 30000 });

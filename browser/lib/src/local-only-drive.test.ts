@@ -6,7 +6,7 @@ import {
   isAtomicIdentifier,
   isCommitSubject,
 } from './index.js';
-import { testStore } from './test-store.js';
+import { testStore, attachTestDb } from './test-store.js';
 
 /**
  * Local-only drives (e.g. the demo workspace): resources save and
@@ -52,6 +52,7 @@ describe('Local-only drives', () => {
     expect,
   }) => {
     const { store, posted } = await testStore();
+    attachTestDb(store);
 
     const drive = await store.newResource({
       isA: server.classes.drive,
@@ -76,6 +77,7 @@ describe('Local-only drives', () => {
     expect,
   }) => {
     const { store, posted } = await testStore();
+    attachTestDb(store);
 
     const drive = await store.newResource({
       isA: server.classes.drive,
@@ -108,6 +110,7 @@ describe('Local-only drives', () => {
 
   it('leaves other drives untouched', async ({ expect }) => {
     const { store, posted } = await testStore();
+    attachTestDb(store);
 
     const localDrive = await store.newResource({
       isA: server.classes.drive,
