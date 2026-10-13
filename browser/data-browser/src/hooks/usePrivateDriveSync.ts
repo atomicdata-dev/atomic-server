@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StoreEvents, useDrive, useResource, useStore } from '@tomic/react';
 
 /**
@@ -15,11 +15,11 @@ import { StoreEvents, useDrive, useResource, useStore } from '@tomic/react';
  *    reconnect for what was missed.
  *
  * @param privateDrive Subject of the private drive, if known.
- * @param invalidateCollection Re-runs the collection that reads the private drive.
+ * @param invalidateCollection Optional. Re-runs the collection that reads the private drive.
  */
 export function usePrivateDriveSync(
   privateDrive: string | undefined,
-  invalidateCollection: () => unknown,
+  invalidateCollection?: () => unknown,
 ): void {
   const store = useStore();
   const [activeDrive] = useDrive();
@@ -27,8 +27,23 @@ export function usePrivateDriveSync(
   // (it may not exist yet, e.g. a fresh agent), and sends it once it is.
   useResource(privateDrive);
 
+  // Held in a ref so a callback that changes identity per render does not
+  // resubscribe the listener below.
+  const invalidateRef = useRef(invalidateCollection);
   useEffect(() => {
-    if (!privateDrive || privateDrive === activeDrive) return;
+    invalidateRef.current = invalidateCollection;
+  });
+
+  useEffect(() => {
+    if (!privateDrive) return;
+
+    if (
+      activeDrive &&
+      store.normalizeSubject(privateDrive) ===
+        store.normalizeSubject(activeDrive)
+    ) {
+      return;
+    }
 
     return store.subscribeLive(privateDrive);
   }, [store, privateDrive, activeDrive]);
@@ -36,8 +51,8 @@ export function usePrivateDriveSync(
   useEffect(
     () =>
       store.on(StoreEvents.ConnectionChanged, connected => {
-        if (connected) void invalidateCollection();
+        if (connected) void invalidateRef.current?.();
       }),
-    [store, invalidateCollection],
+    [store],
   );
 }
