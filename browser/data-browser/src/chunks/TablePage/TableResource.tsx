@@ -1112,11 +1112,18 @@ export const TableResource: React.FC<TableResourceProps> = ({
 
   const handleRowExpand = useCallback(
     async (index: number) => {
-      const row = await rowCollection.getMemberWithIndex(index);
+      const source = rowSource(index);
+      if (!source) return;
+      // A newly added row is already visible before collection membership
+      // catches up. Expand the row the grid renders, including session rows.
+      const row =
+        source.kind === 'member'
+          ? await source.collection.getMemberWithIndex(source.index)
+          : source.key;
       setExpandedRowSubject(row);
       setShowExpandedRowDialog(true);
     },
-    [rowCollection],
+    [rowSource],
   );
 
   // Rows ticked in the row header, by subject. A change of view, filter or
