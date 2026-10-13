@@ -909,6 +909,9 @@ fn newest_checkpoint(keys: &[String]) -> Option<String> {
 /// Safe to run against a populated store as well as an empty one: Loro merges
 /// rather than overwrites, so a restore over a partially-synced device
 /// converges instead of clobbering local edits.
+/// `vault.list(prefix)` must expose the complete inventory being restored.
+/// Download pages may be staged separately, but invoke this once after staging
+/// them all: a partial listing cannot establish lane completeness or pruning.
 ///
 /// `device_pubkey` is this device's lane, used only to record which other lanes
 /// were imported — that is what lets a checkpoint this device publishes later
@@ -985,7 +988,14 @@ pub async fn import_vault_batch(
             continue;
         };
         if !matches!(header.kind, ObjectKind::Pack | ObjectKind::Checkpoint) {
-            summary.objects_unreadable += 1;
+            if parse_segment_key(object_key).is_some() || parse_checkpoint_key(object_key).is_some()
+            {
+                summary.objects_unreadable += 1;
+            } else {
+                // Index/blob envelopes are readable auxiliary objects. Their
+                // recovery is separate from reconstructing resource history.
+                summary.objects_skipped += 1;
+            }
             continue;
         }
         let pack = Pack::decode(&plaintext)?;
@@ -1143,6 +1153,48 @@ mod tests {
 
     const PSEUDONYM: &str = "testpseudonym";
     const DEVICE: &str = "testdevice";
+
+    #[tokio::test]
+    async fn auxiliary_objects_do_not_make_a_complete_pack_restore_partial() {
+        let store = Db::init_temp("vault_auxiliary").await.unwrap();
+        let vault = MemoryVaultStore::new();
+        let key = key();
+        let pack = envelope::seal(
+            &key,
+            ObjectKind::Pack,
+            &Pack::new(vec![], vec![]).encode().unwrap(),
+        )
+        .unwrap();
+        vault
+            .put(&segment_key(PSEUDONYM, DEVICE, 1), &pack)
+            .unwrap();
+        for (kind, name) in [(ObjectKind::Blob, "blob"), (ObjectKind::Index, "index")] {
+            vault
+                .put(
+                    &format!("{}{name}", drive_prefix(PSEUDONYM)),
+                    &envelope::seal(&key, kind, b"auxiliary").unwrap(),
+                )
+                .unwrap();
+        }
+        let summary = import_vault_batch(&store, &key, &vault, &drive_prefix(PSEUDONYM), None)
+            .await
+            .unwrap();
+        assert_eq!(summary.completeness, RestoreCompleteness::Complete);
+        assert_eq!(summary.objects_unreadable, 0);
+        assert_eq!(summary.objects_skipped, 2);
+        // A blob masquerading as a required lane segment is still corrupt.
+        vault
+            .put(
+                &segment_key(PSEUDONYM, DEVICE, 2),
+                &envelope::seal(&key, ObjectKind::Blob, b"wrong-kind").unwrap(),
+            )
+            .unwrap();
+        let summary = import_vault_batch(&store, &key, &vault, &drive_prefix(PSEUDONYM), None)
+            .await
+            .unwrap();
+        assert_eq!(summary.completeness, RestoreCompleteness::Partial);
+        assert_eq!(summary.objects_unreadable, 1);
+    }
 
     #[tokio::test]
     async fn missing_or_corrupt_segments_never_certify_prunable_coverage() {

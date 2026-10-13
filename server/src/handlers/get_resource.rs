@@ -54,12 +54,12 @@ pub async fn handle_get_resource(
 
     timer.add("parse_headers");
 
-    // Extract host for drive mapping, stripping port if present
-    let host = headers
-        .get("Host")
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.split(':').next().unwrap_or(h))
-        .unwrap_or("localhost");
+    // Routing and authentication must use the same validated origin. Behind
+    // a proxy, Host can name the physical node while X-Forwarded-Host names
+    // the tenant. Reading Host again bypassed RequestContext's decision and
+    // resolved the node's root instead of the drive bound to the tenant.
+    let origin_url = url::Url::parse(&origin).map_err(|e| e.to_string())?;
+    let host = origin_url.host_str().unwrap_or("localhost");
 
     let full_url = if subject_string.starts_with('/') {
         format!("{}{}", origin, subject_string)
