@@ -90,16 +90,33 @@ selected database and managed session before publishing results.
 Managed invitation handoffs carry both the signed token and its node origin
 through email and identity recovery. The resumed destination is always the
 app's invitation screen. It extracts the token and server from the invitation;
-an arbitrary redirect field is never followed. Legacy token-only links remain
-readable, but do not themselves identify a node.
+an arbitrary redirect field is never followed. Invitation URLs cannot select the
+startup signing server. The screen requires confirmation of an unrecognized exact
+origin before mounting invite readers or changing servers; sibling subdomains are
+separate origins. Legacy token-only links remain readable but do not name a node.
 
 ## Subscription and query ownership
 
 A `Store.subscribeLive()` holder releases its interest at most once. Switching
 accounts invalidates old holders, so their later cleanup cannot unsubscribe a
 new account. `getRoutingGeneration()` fences delayed routing decisions, including
-a switch away and back to the same route. It does not provide simultaneous
-per-drive server routing.
+a switch away and back to the same route. Anonymous public subscriptions remain
+held through first sign-in; switching existing accounts revokes their old holders.
+
+Each drive has an account-scoped server origin. `setDriveServer(drive, origin)`
+sets or explicitly migrates that placement. Changing the default server alone
+never migrates an existing drive. Reads, commits, queued work, queries, blobs,
+subscriptions and reconciliation use the owning drive. Exact scheme, hostname,
+subdomain and port matter. Connection and reconciliation state are per origin and
+drive, so one offline destination cannot pause another drive's writes.
+
+A cold opaque resource ID needs its drive hint, a scoped query that discovered
+it, or a previously recorded route. HTTP root aliases preserve the resource's
+canonical identity and record the resolved origin. Identity/placement changes
+cancel late reads and receipts. Queued mutations persist their destination with
+the local snapshot. Parentless Agent profiles are shared identities: a fresh
+profile edit publishes to the selected node, while an already queued edit retains
+its destination. This does not claim profile fan-out to every previous node.
 
 `Collection.completeness` is `complete`, `partial`, or `unavailable`. A complete
 query was answered by its authority or by a reconciled/local-only index for its
@@ -116,7 +133,12 @@ observed heads can prove an earlier segment is missing. Only checkpoint coverage
 can excuse that gap. Imported lane coverage advances through contiguous recovered
 segments, so a partial restore cannot authorize pruning the missing history.
 Old import cursors that did not establish this guarantee are discarded on upgrade;
-resource and backup cursors remain intact.
+resource and backup cursors remain intact. Readable auxiliary index/blob envelopes
+are skipped by graph import; a required pack/checkpoint key with the wrong kind
+is still unreadable. Callers must stage the complete object inventory before one
+import call. Download URL batching is not an import boundary. Legacy history with
+unprovable earlier segments remains unprunable until a covering checkpoint or
+complete prefix establishes safety.
 
 `complete` here describes metadata coverage that the available objects establish.
 It does not prove that an unmentioned tail or entire lane was present, or that

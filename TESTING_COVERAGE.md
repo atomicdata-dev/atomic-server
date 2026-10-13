@@ -2823,7 +2823,7 @@ partition.
   The production acceptance run caught this gap despite passing source-level tests;
   changed recovery messages must also exist in the compiled translation catalogs.
 
-Still open: simultaneous per-drive routing, authoritative expected lane tails,
+Still open: authoritative expected lane tails,
 resource/blob dependency coverage, key/epoch handles, notification event identity
 and read/unread merge semantics, closed-app delivery, native runtime and seeded
 network/process fault campaigns. See `planning/sync-contracts.md`.
@@ -2895,3 +2895,40 @@ restore budgets, arbitrary missing segments, notification read-state convergence
 Cloud Server revoke/regrant and full invitation revocation parity still need
 coverage. Native deletion tests include checkpoint retention and stale lanes;
 browser compaction, pruning and Discard history races remain untested.
+
+
+### Critic follow-up and per-drive placement (2026-10-13)
+
+- `save-receipt.test.ts` rejects accepted-genesis replay after receipt bookkeeping
+  throws. `store-live-ownership.test.ts` retains anonymous holders through login.
+- `ingress-error-recovery.test.ts` starts with a partial SUB that lacks its causal
+  base, applies a full GET snapshot, and retains a later local edit after a stale
+  GET. Computed query replacement remains covered separately in
+  `sync-delta-local-base.test.ts`; import errors are surfaced and retain history.
+- `useInbox.test.tsx` covers offline partial results settling without an endless
+  spinner. `make-drive-local.test.ts` checks missing-revision acquisition during
+  initial sync and inventory races. Fetches carry ownership and run eight at a time.
+- `per-drive-routing.test.ts` covers cross-drive saves, sibling subdomains, account
+  separation, migration A → B → A, stale HTTP completion, concurrent sync progress,
+  cold query-member ownership and late authoritative snapshots. Outbox tests cover
+  cold genesis/edit/delete routing after the default server changes and legacy
+  edits whose ownership can still be recovered from the local database.
+- `tests/per-drive-routing.integration.test.ts` uses two separate real databases,
+  keeps both live subscriptions while switching drives, recovers a disconnected
+  destination and signs a root-alias read on a bound tenant hostname. The agent
+  profile integration covers publication after switching to another node.
+- `inviteNode.test.ts` excludes token URLs and encoded/case/trailing-slash invite
+  paths from startup routing. `InviteOriginGate.test.tsx` checks that unconfirmed
+  children do not mount and sibling origins require separate confirmation.
+  `onboarding-storage.spec.ts` exercises the compiled warning in a signed-in
+  browser, checks no request reaches the foreign origin before confirmation, and
+  has a paired `identity-recovery.spec.ts` case in the regular SaaS browser suite
+  for fresh-profile recovery options without a managed session.
+- Vault core tests distinguish auxiliary blobs/indexes from required graph packs.
+  Automatic recovery checks authoritative absence before needing a local database.
+  The managed billing E2E again asserts unpaid 402 and separate hosting consent.
+
+Limits: these checks do not establish automatic Vault pull, blob-only fresh-device
+upload/recovery, arbitrary orphan ID discovery, profile fan-out, multi-process
+control-plane leadership, native runtime parity or complete production incident
+coverage. Validation counts and unresolved runs belong in the active PR evidence.

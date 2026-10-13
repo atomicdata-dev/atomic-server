@@ -1,6 +1,6 @@
 # Sync contracts
 
-Status: second slice implemented and locally verified, 2026-10-13. Based on the latest recovery
+Status: third slice and Critic fixes locally verified, 2026-10-13. Based on the latest recovery
 work in #2242; CI maintenance remains separate. Preserve peer multiplayer and
 independent Vault / hosted capabilities.
 
@@ -60,9 +60,33 @@ Current acceptance evidence is in
 
 ## Remaining architecture work
 
-- [ ] Replace the global server route with per-drive ownership throughout fetch,
-  commit, subscriptions, reconciliation and migration. Generations fence races;
-  they do not implement simultaneous multi-origin routing.
+### Complexity Critic follow-up (merge remains on hold)
+
+- [x] Reproduce accepted-genesis receipt failure and anonymous login subscription loss; fix both.
+- [x] Trace invitation server selection through app bootstrap; require exact-origin confirmation before invite effects.
+- [x] Check authoritative backup absence before requiring local storage; retain recovery failure guards.
+- [x] Test partial SUB followed by full GET and a later local edit; current causal merge passes.
+- [x] Restore explicit hosting consent for paid plans, matching checkout copy.
+- [x] Validate notification offline loading, computed queries, Vault object-kind handling and callers.
+- [x] Finish per-drive routing validation and regression checks; update coverage and PR evidence.
+- [x] Paired review: policy generations, snapshot coherence, restart behavior and consent journey.
+
+The working tree includes the third slice below. Existing CI and reviewer comments
+cover the previously pushed revision. Do not retarget or merge here; TrekMeester
+owns integration with the Vault pair. Keep follow-up fixes in separate commits
+so the save/ingress, recovery, routing and managed-policy changes remain reviewable.
+
+### Third slice: per-drive server routes
+
+- [x] Reproduce cross-drive save/fetch routing and late response failures.
+- [x] Give each drive an account-scoped route; preserve exact origins for
+  subdomains, explicit migrations, HTTP aliases and cold outbox replay.
+- [x] Use that route for reads, commits, queries, blobs, subscriptions and
+  reconciliation; isolate connection state and stale work by destination.
+- [x] Register routes in onboarding, discovery and cloud migration adapters.
+- [x] Verify two live servers and vanity hosts, reconnect/account switches,
+  relevant suites and full lint; update coverage and PR evidence.
+
 - [ ] Carry a drive key and its epoch as one handle through every adapter; add a
   manifest proving expected lane tails and resource/blob dependencies. Readable
   metadata and contiguous listed segments alone do not prove complete recovery.
@@ -76,3 +100,66 @@ Current acceptance evidence is in
 The private cross-repository review is maintained in
 `atomic-saas/planning/SYNC_CONTRACT_REVIEW.md`. This plan and public documentation
 describe generic runtime guarantees and avoid managed-service implementation details.
+
+## Critic follow-up evidence
+
+- Unknown emailed invite origins are confirmed before any invite reader mounts or
+  bootstrap changes the signing server. Exact origins include scheme, host and
+  port; sibling subdomains do not inherit trust. The compiled warning is visible.
+- Recovery asks whether a backup exists before requiring local storage. Unknown
+  recovery still cannot justify creating a replacement home. The paired default
+  browser suite now includes `identity-recovery.spec.ts`: a fresh profile with an
+  existing identity and no account session offers recovery and a working skip path.
+- Full GET snapshots merge real Loro state after a class-less partial SUB; stale
+  snapshots preserve later local edits. Computed query rows replace projections.
+  Incoming import errors notify the error channel and reject their caller.
+- Accepted genesis cleanup precedes fallible receipt bookkeeping. Anonymous live
+  subscriptions survive login, verified with actual WebSocket delivery.
+- Offline partial Inbox loading settles. Local-copy reconciliation uses event
+  completion and bounded parallel reads. Vault auxiliary objects do not taint
+  graph completeness; whole-inventory import and conservative legacy pruning
+  remain explicit contracts. E2E saves that require persistence check the result.
+- Two real nodes verify independent drive destinations, reconnection and login;
+  a forwarded tenant hostname resolves its canonical drive. Cold query members,
+  new outbox entries and locally recoverable older queued edits keep ownership.
+  An old queue with no surviving ownership metadata cannot reconstruct a lost
+  historical destination; this is not a general historical-route migration.
+
+The same PR pair is retained as requested. No base retarget, rebase, merge or
+intervention in the previously queued run was performed. Updated paired CI and
+Vault-base integration remain prerequisites for removing the hold.
+
+### Third-slice local checks
+
+- Library: 1,720 passed / 1 skipped; all real-server integrations: 26 passed /
+  1 skipped. The anonymous-login case verifies real delivery after login.
+- App: 2,146 passed plus 2 stdio checks. Notification browser journeys: 2 passed;
+  compiled invite guard and storage journeys: 3 passed. Paired identity recovery
+  and paid-hosting consent: 1 each, with visible warning screenshots inspected.
+- Rust server: 392 passed / 4 ignored; Vault core: 42 passed. WASM rebuilt.
+- Full browser build, recursive lint, types, Rust format and all-target Clippy
+  pass. Commits run the repository hooks. Paired API: 611 passed / 3 ignored,
+  managed-node: 27 passed.
+- Two initial Rust build attempts exhausted disk space; the full server suite
+  subsequently passed. A unit integration initially reached an unrelated local
+  node; the full suite passed with the isolated server URL explicitly selected.
+- Billing reruns exposed a stopped ephemeral object store and its missing bucket
+  after restart; after restoring that fixture the full consent journey passed.
+  The first acceptance attempt watched the direct API URL while the browser used
+  the portal proxy; this configuration was corrected before the final matrix.
+
+These are scoped local results. The unfiltered app E2Es and broad portal profiles
+were not repeated for this follow-up, and old CI does not validate the new heads.
+
+The final acceptance run initially exposed two test-fixture problems: G1 required
+an extra pack even when automatic backup already held the uploaded File; D1's
+base-36 marker could trigger rich-text multiplication typography before sync.
+G1 now verifies confirmed encrypted storage and exact cold File recovery, retaining
+missing/corrupt blob and access checks. Typed markers use hexadecimal IDs. The
+pre-correction complete matrix was 8 passed / 1 failed; the marker issue was found
+in a subsequent run and fixed before the final matrix.
+
+Final matrix: **9 passed, zero failures, retries or skips**, including the real
+managed-node restart. Evidence: `/tmp/critic-acceptance-final4.log` and
+`/tmp/critic-acceptance-final4-html/`. The local Critic follow-up is complete;
+remote paired CI and Vault-base integration still own the merge hold.
