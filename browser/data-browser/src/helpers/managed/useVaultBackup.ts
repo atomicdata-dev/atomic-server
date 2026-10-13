@@ -121,6 +121,7 @@ export function useVaultBackup({
   proofMessage,
   devicePubkey,
   getDisplayMetadata,
+  afterRestore,
 }: {
   db: VaultCapableDb | null;
   keys: VaultKeyOps | null;
@@ -131,6 +132,13 @@ export function useVaultBackup({
   proofMessage: Uint8Array | null;
   devicePubkey: string | null;
   getDisplayMetadata?: () => Promise<{ name?: string; emoji?: string }>;
+  /**
+   * Runs once a restore has imported data, before the vault stops being busy.
+   * The caller's follow-up (reopening the drive in the store) can take
+   * seconds; if it ran after `busy` cleared, the Restore button would look
+   * idle and finished while the page had not yet reacted.
+   */
+  afterRestore?: () => Promise<void>;
 }): UseVaultBackup {
   const [status, setStatus] = useState<VaultStatus>({ state: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -399,12 +407,26 @@ export function useVaultBackup({
     ],
   );
 
-  /** A partial restore keeps its data but must still show the error. */
-  const surfaceIncomplete = useCallback((outcome: RestoreOutcome) => {
-    if (outcome.incomplete) setError(outcome.incomplete);
+  /**
+   * A partial restore keeps its data but must still show the error. Then the
+   * caller's follow-up runs, still inside the busy window.
+   */
+  const surfaceIncomplete = useCallback(
+    async (outcome: RestoreOutcome) => {
+      if (outcome.incomplete) setError(outcome.incomplete);
 
-    return outcome;
-  }, []);
+      try {
+        await afterRestore?.();
+      } catch (e) {
+        // The data is imported; a failed refresh must not turn that into a
+        // failed restore.
+        console.warn('[cloud-vault] refreshing after restore failed', e);
+      }
+
+      return outcome;
+    },
+    [afterRestore],
+  );
 
   const restore = useCallback(async () => {
     if (status.state !== 'on') return null;
@@ -415,7 +437,7 @@ export function useVaultBackup({
       setRestoreProgress(0);
 
       try {
-        return surfaceIncomplete(
+        return await surfaceIncomplete(
           await restoreDrive({
             db: db!,
             drivePseudonym: status.enrollment.drive_pseudonym,
@@ -486,7 +508,7 @@ export function useVaultBackup({
         setRestoreProgress(0);
 
         try {
-          return surfaceIncomplete(
+          return await surfaceIncomplete(
             await restoreDriveFromFile({
               file,
               db: db!,
