@@ -383,6 +383,31 @@ fn mark_search_ready(store: &Db) -> AtomicResult<()> {
 /// filters lists PropValSub matches (then parent-scoped), which is what the
 /// file picker and class selector send.
 pub fn query(store: &Db, query_str: &str, opts: &SearchOpts) -> AtomicResult<Vec<SearchHit>> {
+    query_timed(store, query_str, opts).map(|(hits, _)| hits)
+}
+
+/// Where a [`query`] spent its time, for `Server-Timing`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct QueryTimings {
+    /// Walking the postings and BM25-scoring them, scope checks excluded.
+    pub score: std::time::Duration,
+    /// Loading candidate docs and checking scope / existence.
+    pub scope: std::time::Duration,
+    /// Combining tokens, sorting and truncating.
+    pub rank: std::time::Duration,
+    /// Distinct documents that matched a token (before scoping).
+    pub candidates: usize,
+    /// Documents that were in scope.
+    pub in_scope: usize,
+}
+
+/// [`query`], also reporting where the time went.
+pub fn query_timed(
+    store: &Db,
+    query_str: &str,
+    opts: &SearchOpts,
+) -> AtomicResult<(Vec<SearchHit>, QueryTimings)> {
+    let mut timings = QueryTimings::default();
     let tokens: Vec<String> = tokenize(query_str);
     let filter_pairs = opts_filter_pairs(opts);
     let filter_set = if filter_pairs.is_empty() {
@@ -402,57 +427,49 @@ pub fn query(store: &Db, query_str: &str, opts: &SearchOpts) -> AtomicResult<Vec
 
     if tokens.is_empty() {
         let Some(allowed) = filter_set else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), timings));
         };
-        return filter_only_hits(store, allowed, &parents, limit);
+        return Ok((filter_only_hits(store, allowed, &parents, limit)?, timings));
     }
 
     let n_docs = store.kv.len(Tree::SearchDocs).unwrap_or(0) as f32;
     if n_docs == 0.0 {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), timings));
     }
 
-    // Per query token: document → best score for that token.
+    let allowed_ids: Option<HashSet<DocId>> = filter_set
+        .as_ref()
+        .map(|allowed| allowed.iter().map(|s| doc_id(s)).collect());
+    let mut candidates = Candidates::new(store, parents, allowed_ids);
+
+    // Per query token: document -> best score for that token. Only documents
+    // that pass the scope filter are scored (and have their length read); a
+    // term's document frequency still counts every posting, so the scores of
+    // surviving documents are exactly what an unscoped run would give them.
+    let started = web_time::Instant::now();
     let mut per_token: Vec<HashMap<DocId, f32>> = Vec::with_capacity(tokens.len());
     for token in &tokens {
-        per_token.push(score_token(store, token, n_docs)?);
+        per_token.push(score_token(store, token, n_docs, &mut candidates)?);
     }
 
     // AND: a doc must score on every query token.
-    let mut ids: HashSet<DocId> = per_token[0].keys().copied().collect();
+    let ranking = web_time::Instant::now();
+    let mut ids: Vec<DocId> = per_token[0].keys().copied().collect();
     for map in per_token.iter().skip(1) {
         ids.retain(|id| map.contains_key(id));
     }
-    if let Some(allowed) = &filter_set {
-        let allowed_ids: HashSet<DocId> = allowed.iter().map(|s| doc_id(s)).collect();
-        ids.retain(|id| allowed_ids.contains(id));
-    }
 
-    let mut hits: Vec<SearchHit> = Vec::new();
-    let mut doc_cache: HashMap<DocId, SearchDoc> = HashMap::new();
-
+    let mut hits: Vec<SearchHit> = Vec::with_capacity(ids.len());
     for id in ids {
-        let doc = load_doc(store, id, &mut doc_cache)?;
-        if doc.subject.is_empty() {
+        let Some(subject) = candidates.subject(id) else {
             continue;
-        }
-        // An entry whose resource is gone (left behind by an interrupted
-        // write, or by a store older than the unindex-on-destroy) would
-        // otherwise be listed and then fail to open.
-        if !store.has_resource_locally(&doc.subject) {
-            continue;
-        }
-        if !parents.is_empty()
-            && !subject_in_parents(store, &doc.subject, &parents, &mut doc_cache)?
-        {
-            continue;
-        }
+        };
         let mut score = 0.0;
         for map in &per_token {
             score += map.get(&id).copied().unwrap_or(0.0);
         }
         hits.push(SearchHit {
-            subject: Subject::from(doc.subject),
+            subject: Subject::from(subject.to_string()),
             score,
         });
     }
@@ -465,7 +482,124 @@ pub fn query(store: &Db, query_str: &str, opts: &SearchOpts) -> AtomicResult<Vec
     });
     hits.truncate(limit);
 
-    Ok(hits)
+    timings.rank = ranking.elapsed();
+    timings.scope = candidates.spent;
+    timings.score = started
+        .elapsed()
+        .saturating_sub(timings.rank + timings.scope);
+    timings.candidates = candidates.seen.len();
+    timings.in_scope = candidates.seen.values().filter(|c| c.is_some()).count();
+    Ok((hits, timings))
+}
+
+/// A candidate document that passed scoping.
+struct Candidate {
+    subject: String,
+    len: f32,
+}
+
+/// Decides, once per document, whether a posting hit may be returned:
+/// it must pass the property filters, sit under `parents` and still exist.
+/// Memoized, so the document row is read once however many terms and query
+/// tokens post it, and ancestors and out-of-drive parent walks are shared.
+struct Candidates<'a> {
+    store: &'a Db,
+    parents: Vec<String>,
+    scope_ids: HashSet<DocId>,
+    allowed: Option<HashSet<DocId>>,
+    seen: HashMap<DocId, Option<Candidate>>,
+    /// Ancestor rows read while walking parents.
+    doc_cache: HashMap<DocId, SearchDoc>,
+    /// Outcome of the fallback resource walk, per (drive, parent).
+    walk_cache: HashMap<(DocId, DocId), bool>,
+    spent: std::time::Duration,
+}
+
+impl<'a> Candidates<'a> {
+    fn new(store: &'a Db, parents: Vec<String>, allowed: Option<HashSet<DocId>>) -> Self {
+        let scope_ids = parents.iter().map(|p| doc_id(p)).collect();
+        Self {
+            store,
+            parents,
+            scope_ids,
+            allowed,
+            seen: HashMap::new(),
+            doc_cache: HashMap::new(),
+            walk_cache: HashMap::new(),
+            spent: std::time::Duration::ZERO,
+        }
+    }
+
+    /// The document length when `id` may be returned.
+    fn len_of(&mut self, id: DocId) -> AtomicResult<Option<f32>> {
+        if let Some(known) = self.seen.get(&id) {
+            return Ok(known.as_ref().map(|c| c.len));
+        }
+        let started = web_time::Instant::now();
+        let verdict = self.judge(id)?;
+        self.spent += started.elapsed();
+        let len = verdict.as_ref().map(|c| c.len);
+        self.seen.insert(id, verdict);
+        Ok(len)
+    }
+
+    fn subject(&self, id: DocId) -> Option<&str> {
+        self.seen.get(&id)?.as_ref().map(|c| c.subject.as_str())
+    }
+
+    fn judge(&mut self, id: DocId) -> AtomicResult<Option<Candidate>> {
+        if let Some(allowed) = &self.allowed {
+            if !allowed.contains(&id) {
+                return Ok(None);
+            }
+        }
+        let Some(doc) = load_doc_by_id(self.store, id, false)? else {
+            return Ok(None);
+        };
+        if doc.subject.is_empty() {
+            return Ok(None);
+        }
+        if !self.parents.is_empty() && !self.in_parents(&doc)? {
+            return Ok(None);
+        }
+        // An entry whose resource is gone (left behind by an interrupted
+        // write, or by a store older than the unindex-on-destroy) would
+        // otherwise be listed and then fail to open.
+        if !self.store.has_resource_locally(&doc.subject) {
+            return Ok(None);
+        }
+        let len = doc.field_lens.iter().sum::<u32>();
+        Ok(Some(Candidate {
+            len: if len == 0 { AVGDL } else { len as f32 },
+            subject: doc.subject,
+        }))
+    }
+
+    fn in_parents(&mut self, doc: &SearchDoc) -> AtomicResult<bool> {
+        if in_scope(
+            &doc.subject,
+            doc,
+            &self.parents,
+            &self.scope_ids,
+            self.store,
+            &mut self.doc_cache,
+        )? {
+            return Ok(true);
+        }
+        // Not reachable through indexed ancestors (an ancestor may have no
+        // searchable text): walk the resources themselves. The answer is the
+        // same for every sibling, so it is kept per (drive, parent).
+        if doc.drive != 0 && doc.parent != 0 {
+            let key = (doc.drive, doc.parent);
+            if let Some(known) = self.walk_cache.get(&key) {
+                return Ok(*known);
+            }
+            let verdict = resource_in_parents(self.store, &doc.subject, &self.parents)?;
+            self.walk_cache.insert(key, verdict);
+            return Ok(verdict);
+        }
+        resource_in_parents(self.store, &doc.subject, &self.parents)
+    }
 }
 
 fn opts_filter_pairs(opts: &SearchOpts) -> Vec<(String, String)> {
@@ -564,10 +698,13 @@ fn filter_only_hits(
 ) -> AtomicResult<Vec<SearchHit>> {
     let mut hits = Vec::new();
     let mut doc_cache: HashMap<DocId, SearchDoc> = HashMap::new();
+    let scope_ids: HashSet<DocId> = parents.iter().map(|p| doc_id(p)).collect();
     let mut subjects: Vec<String> = allowed.into_iter().collect();
     subjects.sort();
     for subject in subjects {
-        if !parents.is_empty() && !subject_in_parents(store, &subject, parents, &mut doc_cache)? {
+        if !parents.is_empty()
+            && !subject_in_parents(store, &subject, parents, &scope_ids, &mut doc_cache)?
+        {
             continue;
         }
         hits.push(SearchHit {
@@ -585,11 +722,12 @@ fn subject_in_parents(
     store: &Db,
     subject: &str,
     parents: &[String],
+    scope_ids: &HashSet<DocId>,
     cache: &mut HashMap<DocId, SearchDoc>,
 ) -> AtomicResult<bool> {
     let id = doc_id(subject);
     let doc = load_doc(store, id, cache)?;
-    if in_scope(subject, &doc, parents, store, cache)? {
+    if in_scope(subject, &doc, parents, scope_ids, store, cache)? {
         return Ok(true);
     }
     // Not in SearchDocs (no searchable text) — walk the resource itself.
@@ -634,7 +772,12 @@ fn resource_in_parents(store: &Db, subject: &str, parents: &[String]) -> AtomicR
     Ok(false)
 }
 
-fn score_token(store: &Db, q: &str, n_docs: f32) -> AtomicResult<HashMap<DocId, f32>> {
+fn score_token(
+    store: &Db,
+    q: &str,
+    n_docs: f32,
+    candidates: &mut Candidates,
+) -> AtomicResult<HashMap<DocId, f32>> {
     let mut scores: HashMap<DocId, f32> = HashMap::new();
     let mut seen_terms: HashSet<(u8, String)> = HashSet::new();
 
@@ -649,7 +792,6 @@ fn score_token(store: &Db, q: &str, n_docs: f32) -> AtomicResult<HashMap<DocId, 
         collect_trigram_candidates(store, q, &mut seen_terms)?;
     }
 
-    let mut lengths: HashMap<DocId, f32> = HashMap::new();
     for (field_id, term) in seen_terms {
         let field = Field::from_u8(field_id).unwrap_or(Field::Title);
         let kind = classify_match(q, &term);
@@ -669,13 +811,8 @@ fn score_token(store: &Db, q: &str, n_docs: f32) -> AtomicResult<HashMap<DocId, 
         }
         let idf = ((n_docs - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln();
         for (id, tf) in postings {
-            let dl = match lengths.get(&id) {
-                Some(dl) => *dl,
-                None => {
-                    let dl = doc_len(store, id).unwrap_or(AVGDL);
-                    lengths.insert(id, dl);
-                    dl
-                }
+            let Some(dl) = candidates.len_of(id)? else {
+                continue;
             };
             let tf_norm = (tf as f32 * (BM25_K1 + 1.0))
                 / (tf as f32 + BM25_K1 * (1.0 - BM25_B + BM25_B * (dl / AVGDL)));
@@ -894,24 +1031,14 @@ fn load_doc_by_id(store: &Db, id: DocId, with_tokens: bool) -> AtomicResult<Opti
         .map(|bytes| decode_doc(&bytes, with_tokens)))
 }
 
-fn doc_len(store: &Db, id: DocId) -> Option<f32> {
-    let doc = load_doc_by_id(store, id, false).ok()??;
-    let len = doc.field_lens.iter().sum::<u32>();
-    if len == 0 {
-        Some(AVGDL)
-    } else {
-        Some(len as f32)
-    }
-}
-
 fn in_scope(
     subject: &str,
     doc: &SearchDoc,
     parents: &[String],
+    scope_ids: &HashSet<DocId>,
     store: &Db,
     cache: &mut HashMap<DocId, SearchDoc>,
 ) -> AtomicResult<bool> {
-    let scope_ids: HashSet<DocId> = parents.iter().map(|p| doc_id(p)).collect();
     if parents.iter().any(|p| p == subject) {
         return Ok(true);
     }

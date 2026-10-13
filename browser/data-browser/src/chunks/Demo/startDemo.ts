@@ -1,6 +1,12 @@
 // React Compiler: plain helpers, not components (see DemoDirector.ts).
 'use no memo';
-import { core, enableLoro, type Store } from '@tomic/react';
+import {
+  StoreEvents,
+  core,
+  enableLoro,
+  type Agent,
+  type Store,
+} from '@tomic/react';
 import {
   createDemoWorkspace,
   saveDemoManifest,
@@ -13,6 +19,20 @@ import { whenRevealed } from '../../helpers/bootSplash';
 import { holdDemoLock, releaseDemoLock } from '../../helpers/demoTabLock';
 
 let activeDirector: DemoDirector | undefined;
+let unwatchAgent: (() => void) | undefined;
+
+/**
+ * Whether the demo may keep playing for `next` after starting for `started`.
+ * It is a scene for a guest: once another identity signs in, or this one gets
+ * a personal drive (it became an account), the personas must stop writing, or
+ * their lines land in a real account's chats, notifier and Inbox.
+ */
+export function demoOutlivesAgentChange(
+  started: string,
+  next: Pick<Agent, 'subject' | 'privateDrive'> | undefined,
+): boolean {
+  return !!next && next.subject === started && !next.privateDrive;
+}
 
 /** Pause between the workspace appearing and the first persona moving. */
 const DIRECTOR_DELAY_MS = 1_200;
@@ -67,8 +87,7 @@ export async function startDemoWorkspace(
   onStep('storage');
   await checkOnboardingStorage(store);
 
-  activeDirector?.stop();
-  activeDirector = undefined;
+  stopDemoDirector();
 
   onStep('cleanup');
   await cleanupAllDemoDrives(store);
@@ -87,11 +106,21 @@ export async function startDemoWorkspace(
   // Other tabs join this demo rather than replacing it (demoTabLock.ts).
   holdDemoLock();
 
+  const startedAs = store.getAgent()?.subject;
+
+  if (startedAs) {
+    unwatchAgent = store.on(StoreEvents.AgentChanged, next => {
+      if (!demoOutlivesAgentChange(startedAs, next)) stopDemoDirector();
+    });
+  }
+
   return manifest;
 }
 
 /** Stop the scripted scenario (personas leave immediately). */
 export function stopDemoDirector(): void {
+  unwatchAgent?.();
+  unwatchAgent = undefined;
   activeDirector?.stop();
   activeDirector = undefined;
   releaseDemoLock();

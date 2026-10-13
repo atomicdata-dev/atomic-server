@@ -60,7 +60,7 @@ cargo install --path ./
 Run `atomic-cli command --help` for mor information about specific commands.
 
 The write commands (`set`, `remove`, `edit`, `destroy`) require some authentication config, which needs to match with the target [atomic-server](https://crates.io/crates/atomic-server).
-It will read the `~/.config/atomic/config.toml` file, and create one using some prompts if it is not yet present.
+It reads the `~/.config/atomic/config.toml` file. Create one with `atomic-cli connect --server https://your-server`: it makes a key on this machine and prints a link to your Atomic app, where you pick which drives it may reach and whether it may edit, and click Allow. Your own agent secret is never needed, and you can revoke the key under Connected apps in your account settings.
 
 ## Features
 

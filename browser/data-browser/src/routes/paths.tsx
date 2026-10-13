@@ -31,10 +31,14 @@ export const pathNames = {
   demo: '/demo',
   invite: '/invite',
   signOut: '/sign-out',
+  connectAgent: '/connect-agent',
+  authorizeMcp: '/authorize-mcp',
 } as const;
 export const paths = {
   welcome: `${pathNames.app}${pathNames.welcome}`,
   agentSettings: `${pathNames.app}${pathNames.agentSettings}`,
+  connectAgent: `${pathNames.app}${pathNames.connectAgent}`,
+  authorizeMcp: `${pathNames.app}${pathNames.authorizeMcp}`,
   appSettings: `${pathNames.app}${pathNames.appSettings}`,
   integrations: `${pathNames.app}${pathNames.integrations}`,
   notifications: `${pathNames.app}${pathNames.notifications}`,

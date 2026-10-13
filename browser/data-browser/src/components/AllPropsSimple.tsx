@@ -11,7 +11,7 @@ import { useMemo, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { InlineFormattedResourceList } from './InlineFormattedResourceList';
 import { isNeverEditableProp } from '../helpers/hiddenProperties';
-import { formatPlainValue } from '../helpers/formatPlainValue';
+import { asSubject, formatPlainValue } from '../helpers/formatPlainValue';
 
 export interface AllPropsSimpleProps {
   resource: Resource;
@@ -45,11 +45,13 @@ function Row({ prop, val }: RowProps): JSX.Element {
   const [dataType] = useSubject(propResource, properties.datatype);
 
   const value = useMemo(() => {
-    if (dataType === datatypes.atomicUrl) {
+    // Only a string can be looked up. Anything else (a nested object, a
+    // number) falls through to plain text, never to a raw React child.
+    if (dataType === datatypes.atomicUrl && asSubject(val)) {
       return <Value subject={val as string} />;
     }
 
-    if (dataType === datatypes.resourceArray) {
+    if (dataType === datatypes.resourceArray && Array.isArray(val)) {
       return (
         <InlineFormattedResourceList
           subjects={val as string[]}

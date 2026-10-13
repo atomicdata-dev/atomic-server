@@ -92,3 +92,28 @@ it('deduplicates subscriptions and releases them on unsubscribe, reload and clos
   expect(f.target.postMessage).not.toHaveBeenCalledWith('after unmount', '*');
   expect(f.host.removeEventListener).toHaveBeenCalledTimes(1);
 });
+
+it('tells the frame whether the host is light or dark, and keeps saying so on reload', () => {
+  const f = fixture();
+  f.bridge.setStyle('css-dark', 'dark');
+  expect(f.target.postMessage).toHaveBeenLastCalledWith(
+    { type: '__atomic_style', css: 'css-dark', colorScheme: 'dark' },
+    '*',
+  );
+  // A reloaded frame gets the same theme it had.
+  f.send({ type: '__atomic_plugin_ready' });
+  expect(f.target.postMessage).toHaveBeenLastCalledWith(
+    { type: '__atomic_style', css: 'css-dark', colorScheme: 'dark' },
+    '*',
+  );
+  f.reload();
+  expect(f.target.postMessage).toHaveBeenLastCalledWith(
+    { type: '__atomic_style', css: 'css-dark', colorScheme: 'dark' },
+    '*',
+  );
+  f.bridge.setStyle('css-light', 'light');
+  expect(f.target.postMessage).toHaveBeenLastCalledWith(
+    { type: '__atomic_style', css: 'css-light', colorScheme: 'light' },
+    '*',
+  );
+});

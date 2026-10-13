@@ -122,3 +122,28 @@ export function appendStringToType<T extends JSONValue>(
       return value as T;
   }
 }
+
+export type PasteValue =
+  | { action: 'set'; value: JSONValue }
+  | { action: 'clear' }
+  | { action: 'skip' };
+
+/**
+ * What pasting `data` into a column of `datatype` should do. A value the type
+ * can read is set. An empty clipboard cell clears the property. Text the type
+ * cannot read is skipped, so a stray character never wipes a stored value.
+ * `Resource.set` throws for `undefined`, so none of these is ever
+ * `set(prop, undefined)`.
+ */
+export function resolvePasteValue(
+  data: string,
+  datatype: Datatype,
+): PasteValue {
+  const value = appendStringToType(undefined, data, datatype);
+
+  if (value !== undefined) {
+    return { action: 'set', value };
+  }
+
+  return data.trim() === '' ? { action: 'clear' } : { action: 'skip' };
+}

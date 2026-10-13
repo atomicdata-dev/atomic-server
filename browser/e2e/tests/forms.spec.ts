@@ -6,6 +6,9 @@ const FORM_FIELD_TYPE = 'https://atomicdata.dev/properties/form-field-type';
 const FORM_MAPS_TO = 'https://atomicdata.dev/properties/form-maps-to';
 const ALLOWS_ONLY = 'https://atomicdata.dev/properties/allowsOnly';
 const NAME = 'https://atomicdata.dev/properties/name';
+const PARENT = 'https://atomicdata.dev/properties/parent';
+const FORM_DATA_CLASS = 'https://atomicdata.dev/properties/form-data-class';
+const CONSTRAINTS = 'https://atomicdata.dev/properties/constraints';
 const SHORTNAME = 'https://atomicdata.dev/properties/shortname';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 
@@ -89,27 +92,44 @@ const fieldRowDeleteButton = (page: Page, key: string) =>
 
 /**
  * The option labels of a choice question. Options are not stored on the field:
- * they are the Tags on its mapped Property's `allowsOnly`, so this walks
- * field -> property -> tags the way the definition builder does.
+ * they are the Tags in the `enum` of the form's data class for the column
+ * (the Property's legacy `allowsOnly` as the fallback), so this walks
+ * field -> page -> form -> data class -> tags the way the definition builder
+ * does.
  */
 const getOptionLabels = (page: Page, fieldSubject: string) =>
   page.evaluate(
-    ({ subject, mapsToProp, allowsOnlyProp, nameProp }) => {
-      const field = window.store.resources.get(subject);
-      const property = window.store.resources.get(
-        field?.get(mapsToProp) as string,
-      );
-      const tags = (property?.get(allowsOnlyProp) as string[]) ?? [];
+    ({ subject, props }) => {
+      const get = (s: string | undefined) =>
+        s ? window.store.resources.get(s) : undefined;
+      const canonical = (s: string) => s.replace(/^did:ad:/, 'atomic:');
+      const field = get(subject);
+      const mapsTo = field?.get(props.mapsTo) as string;
+      const formPage = get(field?.get(props.parent) as string);
+      const form = get(formPage?.get(props.parent) as string);
+      const dataClass = get(form?.get(props.dataClass) as string);
+      const raw = dataClass?.get(props.constraints);
+      const map = (typeof raw === 'string' ? JSON.parse(raw) : raw) as
+        | Record<string, { enum?: string[] }>
+        | undefined;
+      const entry = Object.entries(map ?? {}).find(
+        ([key]) => canonical(key) === canonical(mapsTo),
+      )?.[1];
+      const tags =
+        entry?.enum ?? (get(mapsTo)?.get(props.allowsOnly) as string[]) ?? [];
 
-      return tags.map(
-        t => window.store.resources.get(t)?.get(nameProp) as string,
-      );
+      return tags.map(t => get(t)?.get(props.name) as string);
     },
     {
       subject: fieldSubject,
-      mapsToProp: FORM_MAPS_TO,
-      allowsOnlyProp: ALLOWS_ONLY,
-      nameProp: NAME,
+      props: {
+        mapsTo: FORM_MAPS_TO,
+        allowsOnly: ALLOWS_ONLY,
+        name: NAME,
+        parent: PARENT,
+        dataClass: FORM_DATA_CLASS,
+        constraints: CONSTRAINTS,
+      },
     },
   );
 
@@ -251,15 +271,16 @@ test.describe('forms', async () => {
     await waitForSync(page);
 
     // --- 3. Property-sync spot checks ---
-    // Rename the short-text field's label; the mapped Property's shortname
-    // (and thus the Table column header) must follow.
+    // Rename the short-text field's label; the mapped Property's shortname is
+    // part of its content-addressed ID, so it must NOT follow.
     await page.getByTestId('field-row-short-text').click();
     const shortTextSubject = await getFieldSubjectByType(page, 'short-text');
-    const shortTextProperty = (await getMappedProperty(
+    let shortTextProperty = (await getMappedProperty(
       page,
       shortTextSubject as string,
     )) as string;
     expect(shortTextProperty).toBeTruthy();
+    const originalProperty = shortTextProperty;
     const labelInput = page.getByTestId('field-label-input');
     // The Data name is read-only text until the pencil turns it into an input.
     const shortnameValue = page.getByTestId('field-shortname-value');
@@ -272,11 +293,11 @@ test.describe('forms', async () => {
       NAME,
       'Full name',
     );
-    await waitForPropertyValue(page, shortTextProperty, SHORTNAME, 'full-name');
-    await expect(shortnameValue).toHaveText('full-name');
+    await expect(shortnameValue).toHaveText('short-text');
 
-    // An edited Data name is pinned: it is the identifier the answers are
-    // stored under, so a later Label edit must not silently re-slug it.
+    // Choosing another Data name creates a new Property (the shortname is part
+    // of the ID) and points the field at it. A later Label edit must not
+    // re-slug it.
     await page.getByTestId('field-shortname-edit').click();
     const shortnameInput = page.getByTestId('field-shortname-input');
     await expect(shortnameInput).toBeFocused();
@@ -284,6 +305,16 @@ test.describe('forms', async () => {
     // Enter commits and drops back to the read-only row (so does blur).
     await shortnameInput.press('Enter');
     await expect(shortnameInput).not.toBeVisible();
+    await expect
+      .poll(async () => {
+        shortTextProperty = (await getMappedProperty(
+          page,
+          shortTextSubject as string,
+        )) as string;
+
+        return shortTextProperty;
+      })
+      .not.toBe(originalProperty);
     await waitForPropertyValue(
       page,
       shortTextProperty,
@@ -441,7 +472,7 @@ test.describe('forms', async () => {
       await choiceInputs.nth(index).fill(label);
     }
 
-    await page.getByTestId('field-option-maxSelected').fill('2');
+    await page.getByTestId('field-option-maxItems').fill('2');
 
     // The option names are debounced; the preview reads the store, so wait
     // for the Tags themselves rather than for a commit to land.
@@ -585,31 +616,86 @@ test.describe('forms', async () => {
 
     /** Records the form's own page animations as they start. Other keyframes
      * on the page (the dialog's own entrance, under a hashed
-     * styled-components name) are filtered out here. */
+     * styled-components name) are filtered out here. A timeline of what the
+     * browser did rides along (animation events, long tasks, visibility) so a
+     * red run says whether the animation never started or the page was too
+     * busy to start it. */
     const recordAnimations = () =>
       page.evaluate(() => {
         const names: string[] = [];
-        (window as unknown as { __formAnims: string[] }).__formAnims = names;
-        document.addEventListener(
-          'animationstart',
-          event => {
-            const name = (event as AnimationEvent).animationName;
+        const trace: string[] = [];
+        const w = window as unknown as {
+          __formAnims: string[];
+          __formTrace: string[];
+        };
+        w.__formAnims = names;
+        w.__formTrace = trace;
+        const started = performance.now();
+        const stamp = (what: string) =>
+          trace.push(`${Math.round(performance.now() - started)}ms ${what}`);
 
-            if (
-              name.startsWith('atomic-form-page-') ||
-              name === 'atomic-form-stagger-in'
-            ) {
-              names.push(name);
-            }
-          },
-          true,
+        stamp(
+          `visibility=${document.visibilityState} reducedMotion=${
+            matchMedia('(prefers-reduced-motion: reduce)').matches
+          }`,
         );
+
+        for (const type of [
+          'animationstart',
+          'animationend',
+          'animationcancel',
+        ]) {
+          document.addEventListener(
+            type,
+            event => {
+              const name = (event as AnimationEvent).animationName;
+
+              if (
+                name.startsWith('atomic-form-page-') ||
+                name === 'atomic-form-stagger-in'
+              ) {
+                stamp(`${type} ${name}`);
+
+                if (type === 'animationstart') names.push(name);
+              }
+            },
+            true,
+          );
+        }
+
+        try {
+          new PerformanceObserver(list => {
+            for (const entry of list.getEntries()) {
+              stamp(`long task ${Math.round(entry.duration)}ms`);
+            }
+          }).observe({ type: 'longtask' });
+        } catch {
+          stamp('long task timing unavailable');
+        }
       });
 
     const readAnimations = () =>
       page.evaluate(
         () => (window as unknown as { __formAnims: string[] }).__formAnims,
       );
+
+    /** `expect.poll(readAnimations).toEqual(...)`, with the browser's timeline
+     * added to the failure. */
+    const expectAnimations = async (expected: string[]) => {
+      try {
+        await expect.poll(readAnimations).toEqual(expected);
+      } catch (error) {
+        const trace = await page
+          .evaluate(
+            () => (window as unknown as { __formTrace: string[] }).__formTrace,
+          )
+          .catch(() => ['(page gone)']);
+
+        throw new Error(
+          `${(error as Error).message}\n\nBrowser timeline:\n${trace.join('\n')}`,
+        );
+      }
+    };
 
     const openPreview = async () => {
       await page.getByRole('button', { name: 'Preview', exact: true }).click();
@@ -650,25 +736,24 @@ test.describe('forms', async () => {
     // (the newer intent wins) but would leave nothing to observe.
     await preview.getByRole('button', { name: 'Next' }).click();
     await expect(preview.getByRole('button', { name: 'Submit' })).toBeVisible();
-    await expect
-      .poll(readAnimations)
-      .toEqual(['atomic-form-page-exit-up', 'atomic-form-stagger-in']);
+    await expectAnimations([
+      'atomic-form-page-exit-up',
+      'atomic-form-stagger-in',
+    ]);
 
     await preview.getByRole('button', { name: 'Back' }).click();
     await expect(preview.getByRole('button', { name: 'Next' })).toBeVisible();
     // Page 1's four things fade separately — not one event for the page, and
     // not one for the whole radio question either.
-    await expect
-      .poll(readAnimations)
-      .toEqual([
-        'atomic-form-page-exit-up',
-        'atomic-form-stagger-in',
-        'atomic-form-page-exit-down',
-        'atomic-form-stagger-in',
-        'atomic-form-stagger-in',
-        'atomic-form-stagger-in',
-        'atomic-form-stagger-in',
-      ]);
+    await expectAnimations([
+      'atomic-form-page-exit-up',
+      'atomic-form-stagger-in',
+      'atomic-form-page-exit-down',
+      'atomic-form-stagger-in',
+      'atomic-form-stagger-in',
+      'atomic-form-stagger-in',
+      'atomic-form-stagger-in',
+    ]);
 
     // …in document order, and the options take the slots after the question
     // they belong to rather than restarting from it, so the heading below

@@ -19,6 +19,33 @@ export interface MessageFacts {
   replyTo?: string;
 }
 
+/**
+ * Facts about one entry of a ChatLog page, as if it were a Message resource:
+ * its id is `<page>#<key>`, the author and time are the entry's own, and the
+ * chat (`parent`) or the commented item (`about`) are the page's.
+ */
+export function entryFacts(
+  pageSubject: string,
+  page: Pick<MessageFacts, 'parent' | 'about'>,
+  key: string,
+  entry: { a: string; c: number; r?: string; k?: unknown },
+): MessageFacts {
+  return {
+    subject: `${pageSubject}#${key}`,
+    isA: [
+      dataBrowser.classes.message,
+      ...(entry.k === dataBrowser.classes.followEvent
+        ? [dataBrowser.classes.followEvent]
+        : []),
+    ],
+    createdBy: entry.a,
+    createdAt: entry.c,
+    parent: page.parent,
+    about: page.about,
+    replyTo: entry.r,
+  };
+}
+
 export interface MessageContext {
   /** The signed-in agent. Without one there is nobody to notify. */
   me?: string;
@@ -28,6 +55,12 @@ export interface MessageContext {
   classesOf: (subject: string) => string[] | undefined;
   /** Creator of a resource, if it could be loaded. */
   creatorOf: (subject: string) => string | undefined;
+  /**
+   * Whether a subject lives in a local-only drive (the demo, a template
+   * preview). Nobody else can write there, so a message by someone else is
+   * scripted, never a teammate; it must not reach the Inbox of a real account.
+   */
+  isLocalOnly?: (subject: string) => boolean;
 }
 
 export interface MessageNotification {
@@ -72,6 +105,10 @@ export function classifyMessage(
 
   if (!target) return undefined;
 
+  if (ctx.isLocalOnly?.(target) || ctx.isLocalOnly?.(msg.subject)) {
+    return undefined;
+  }
+
   const base = {
     message: msg.subject,
     author,
@@ -97,3 +134,10 @@ export function classifyMessage(
 
   return undefined;
 }
+
+/**
+ * The id of the bubble that announces messages in `target`. One per place, so
+ * a burst of lines in the same chat is one bubble showing the latest, not a
+ * stack that covers the screen.
+ */
+export const bubbleId = (target: string): string => `message:${target}`;

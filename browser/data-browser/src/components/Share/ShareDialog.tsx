@@ -29,7 +29,10 @@ import { Dialog, useDialog } from '../Dialog';
 import { Button } from '../Button';
 import { ErrorLook } from '../ErrorLook';
 import { TeamProfileStep } from '../TeamProfileStep';
-import { profileReviewedBefore, rememberProfileReviewed } from '../InviteForm';
+import {
+  profileReviewedBefore,
+  rememberProfileReviewed,
+} from './profileReviewed';
 import { useIsPrivateDrive } from '@hooks/useIsPrivateDrive';
 import { useInheritedRights } from '../../routes/Share/useInheritedRights';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
@@ -39,6 +42,7 @@ import {
 } from '../../helpers/managed/session';
 import { sendShareInvites } from '../../helpers/managed/shareInvites';
 import { EmailInviteInput, isEmailAddress } from './EmailInviteInput';
+import { describeEditorSeats, useEditorSeats } from './useEditorSeats';
 import { PeopleWithAccess, effectiveRole } from './PeopleWithAccess';
 import { ResourceLinkNavigationContext } from '../ResourceLinkNavigationContext';
 import { PublicAccess } from './PublicAccess';
@@ -46,6 +50,12 @@ import { RoleSwitch, type ShareRole } from './RoleSelect';
 import { useShareRights } from './useShareRights';
 import { useClassLabel } from './useClassLabel';
 import { inviteLinkPrefix, useCreateInviteLink } from './useCreateInviteLink';
+import {
+  UNLIMITED,
+  UsageLimitField,
+  parseMaxUsages,
+  type UsageLimitState,
+} from './UsageLimit';
 
 export interface ShareDialogProps {
   subject: string;
@@ -191,6 +201,7 @@ function ShareOverview({
   const [rights, setRole] = useShareRights(resource);
   const inheritedRights = useInheritedRights(resource);
   const createInviteLink = useCreateInviteLink(resource);
+  const editorSeats = useEditorSeats(resource);
   const agentDetail = useCurrentAgentDetail(agent?.subject, isSaas);
   const agentResource = useResource(agent?.subject);
   const [agentName] = useTitle(agentResource);
@@ -276,6 +287,9 @@ function ShareOverview({
               onRoleChange={setEmailRole}
               disabled={sending}
             />
+          )}
+          {canWrite && isSaas && editorSeats && (
+            <SeatsNote>{describeEditorSeats(editorSeats)}</SeatsNote>
           )}
           {canWrite && !isSaas && (
             <InviteLinkField createInviteLink={createInviteLink} />
@@ -370,8 +384,9 @@ type CreateInviteLink = ReturnType<typeof useCreateInviteLink>;
 async function copyInviteLink(
   createInviteLink: CreateInviteLink,
   role: ShareRole,
+  maxUsages?: number,
 ): Promise<string> {
-  const link = await createInviteLink({ write: role === 'write' });
+  const link = await createInviteLink({ write: role === 'write', maxUsages });
 
   try {
     await navigator.clipboard.writeText(link);
@@ -436,6 +451,7 @@ function InviteLinkField({
 }): JSX.Element {
   const store = useStore();
   const [role, setRole] = useState<ShareRole>('write');
+  const [limit, setLimit] = useState<UsageLimitState>(UNLIMITED);
   const [link, setLink] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<Error>();
@@ -445,7 +461,8 @@ function InviteLinkField({
     setErr(undefined);
 
     try {
-      setLink(await copyInviteLink(createInviteLink, role));
+      const maxUsages = parseMaxUsages(limit);
+      setLink(await copyInviteLink(createInviteLink, role, maxUsages));
     } catch (e) {
       setErr(e as Error);
     }
@@ -478,6 +495,14 @@ function InviteLinkField({
           {busy ? 'Preparing invite…' : 'Copy invite link'}
         </Button>
       </LinkRow>
+      <UsageLimitField
+        limit={limit}
+        onChange={next => {
+          setLimit(next);
+          setLink(undefined);
+        }}
+        disabled={busy}
+      />
       {err && <ErrorLook>{err.message}</ErrorLook>}
     </>
   );
@@ -593,6 +618,12 @@ const MessageField = styled.div`
       color: ${p => p.theme.colors.textLight};
     }
   }
+`;
+
+const SeatsNote = styled.p`
+  margin: 0;
+  font-size: 0.9em;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const Optional = styled.span`

@@ -56,12 +56,17 @@ export function PropertyForm({
   const handleNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
-      const newShortName = stringToSlug((value ?? '').trim());
 
       setName(value);
-      setShortName(newShortName);
+
+      // The shortname is part of the property's identity, so it only follows
+      // the name while the property is being created. Renaming an existing
+      // property changes the label only.
+      if (!existingProperty) {
+        setShortName(stringToSlug((value ?? '').trim()));
+      }
     },
-    [setName, setShortName],
+    [setName, setShortName, existingProperty],
   );
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = useCallback(
@@ -125,7 +130,7 @@ export function PropertyForm({
         </InputWrapper>
         {nameError && <ErrorChip>{nameError}</ErrorChip>}
       </div>
-      <CategoryForm resource={resource} />
+      <CategoryForm resource={resource} existingProperty={existingProperty} />
       {/* Needed for inputs to submit on enter */}
       <HiddenSubmitButton type='submit' />
     </Form>

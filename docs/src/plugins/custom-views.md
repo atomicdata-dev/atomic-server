@@ -12,7 +12,7 @@ The iframe receives a generated HTML document that:
 
 1. Loads a reset stylesheet.
 2. Optionally loads your `ui.css` file.
-3. Injects the current theme as CSS custom properties via a `<style>` block.
+3. Injects the current theme as CSS custom properties via a `<style>` block: colours such as `--t-color-bg`, `--t-color-text`, `--t-color-main`, `--t-color-alert`, `--t-color-warning` and `--t-color-success`, plus `color-scheme: light` or `dark` on `:root`. The theme message (`{ type: '__atomic_style', css, colorScheme }`, `ThemeMessage` in `@tomic/plugin`) also names `colorScheme: 'light' | 'dark'`, taken from the host's own setting, so a view does not have to guess dark mode from the background colour.
 4. Loads your `ui.js` as a `<script type="module">`.
 
 A strict Content Security Policy is applied: only scripts and styles with the correct nonce are allowed to run. External scripts or inline scripts without the nonce will be blocked.
@@ -165,3 +165,31 @@ The contract borrows from how Android and iOS let apps use what the system offer
 ### Legacy `RPCClient`
 
 Plugins written before `store` use `new RPCClient()` with `getPageContext`, `getResource`, `commit`, `subscribe`, `navigate`, `pickResource` and `pickFile`. It keeps working, and `rpc.ui` is the same object as `store.ui`, but new plugins should use `store`.
+
+## App frames
+
+A drive app's view (an app made with `createApp`, or an Installation's app) gets a `store` from `/plugin-ui?format=client` instead of an `RPCClient`. It speaks the same versioned wire protocol (`atomic.view.request` / `atomic.view.response`, the `ViewOperation`s in `@tomic/plugin`). Besides the shared `store` calls above, it has these:
+
+#### `store.getMany(subjects): Promise<Array<Resource | { subject, error }>>`
+
+Reads up to 100 resources in one round trip to the host, instead of one `getResource` per row. Each subject is read exactly as `getResource` reads it: through the signed-in person's store, so the app sees what they can see, including their own writes. The array is in the order asked. A subject that cannot be read is `{ subject, error }` in its place, so one missing row does not fail the rest. More than 100 subjects are refused, so ask in batches.
+
+```js
+const subjects = await store.query({ property: PARENT, value: table });
+const rows = await store.getMany(subjects.slice(0, 100));
+for (const row of rows) if (!row.error) render(row.get(NAME));
+```
+
+#### `store.getTheme(): { colorScheme: 'light' | 'dark' }` and `store.onThemeChange(handler)`
+
+Whether the host is drawn light or dark, from the host's actual setting. `onThemeChange` calls back with `{ colorScheme }` when the person switches, and returns a function that stops it. For colours, use the `--t-color-*` CSS variables. They change with the theme, so CSS that uses them needs no JavaScript.
+
+```js
+const { colorScheme } = store.getTheme();
+chart.setDark(colorScheme === 'dark');
+store.onThemeChange(({ colorScheme }) => chart.setDark(colorScheme === 'dark'));
+```
+
+```css
+.saved { color: var(--t-color-success); }
+```

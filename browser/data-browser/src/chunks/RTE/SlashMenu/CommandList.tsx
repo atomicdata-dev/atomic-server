@@ -11,6 +11,7 @@ import { ScrollArea } from '../../../components/ScrollArea';
 import type { SuggestionItem } from '../types';
 import { useOnValueChange } from '@helpers/useOnValueChange';
 import { Column } from '@components/Row';
+import { Spinner } from '@components/Spinner';
 
 export type CommandListRefType = {
   onKeyDown: (event: KeyboardEvent) => boolean;
@@ -18,6 +19,8 @@ export type CommandListRefType = {
 
 export interface CommandListProps {
   items: SuggestionItem[];
+  /** True while the suggestion's async `items()` is still pending. */
+  loading?: boolean;
   ownerDocument?: Document;
   command: (item: SuggestionItem) => void;
 }
@@ -35,7 +38,7 @@ const scrollToSelectedItem = (
     ?.scrollIntoView({ block: 'nearest' });
 
 export const CommandList = forwardRef<CommandListRefType, CommandListProps>(
-  ({ items, command, ownerDocument = document }, ref) => {
+  ({ items, loading = false, command, ownerDocument = document }, ref) => {
     const compId = useId();
 
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -90,7 +93,13 @@ export const CommandList = forwardRef<CommandListRefType, CommandListProps>(
     return (
       <ScrollingList type='hover' data-testid='rte-command-list'>
         <ContainedColumn gap='0'>
-          {items.length === 0 && <div>No results found</div>}
+          {loading && items.length === 0 && (
+            <SearchingRow role='status' data-testid='rte-command-list-loading'>
+              <Spinner size='1rem' inheritColor />
+              <span>Searching...</span>
+            </SearchingRow>
+          )}
+          {!loading && items.length === 0 && <div>No results found</div>}
           {items.map((item, index) => {
             const Icon = item.icon;
 
@@ -158,3 +167,21 @@ const ListItemButton = styled.button<{ active: boolean }>`
 `;
 
 const ContainedColumn = styled(Column)``;
+
+// Fades in after a short delay so a fast (or static) item list never flashes
+// the loading row.
+const SearchingRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  padding: 0.5rem;
+  color: ${p => p.theme.colors.textLight};
+  opacity: 0;
+  animation: searchingFadeIn 120ms ease-out 150ms forwards;
+
+  @keyframes searchingFadeIn {
+    to {
+      opacity: 1;
+    }
+  }
+`;

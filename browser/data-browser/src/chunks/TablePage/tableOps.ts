@@ -1,6 +1,7 @@
 import {
   core,
   dataBrowser,
+  getEffectiveConstraint,
   type Datatype,
   type JSONValue,
   type Resource,
@@ -72,11 +73,13 @@ export async function readTableColumns(
 
     // A select column's options are resources of their own; the caller names
     // them ("Done"), so map those names to their subjects.
-    const allowsOnly = resource.get(core.properties.allowsOnly) as
-      | string[]
-      | undefined;
+    // Options live in the table class's `constraints` (`enum`), with the
+    // Property's legacy `allowsOnly` as a fallback.
+    const allowsOnly = (
+      getEffectiveConstraint(store, [tableClass.subject], subject).enum ?? []
+    ).filter((v): v is string => typeof v === 'string');
 
-    if (allowsOnly?.length) {
+    if (allowsOnly.length) {
       const options: Record<string, string> = {};
 
       const lookup: Record<string, string> = {};

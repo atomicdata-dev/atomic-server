@@ -18,7 +18,7 @@ import { getRuntimeManagedPortalUrl } from './api';
 //   3. A remote drive is copied by its source server, with verified receipt.
 //      A local-only drive connects to the assigned node before promotion.
 
-import { getManagedAccount } from './session';
+import { getManagedAccount, noteManagedSessionChanged } from './session';
 import { safePortalUrl } from './api';
 import { createManagedSyncEnrollment, genesisCertOf } from './enrollment';
 import { getManagedEnrollments } from './enrollmentApi';
@@ -136,7 +136,7 @@ function delay(ms: number): Promise<void> {
 export async function ensureManagedSession(
   portalUrl: string,
 ): Promise<boolean> {
-  if (await getManagedAccount().catch(() => null)) return true;
+  if (await getManagedAccount({ fresh: true }).catch(() => null)) return true;
 
   // Not an address this app opens (see safePortalUrl): reported as "no
   // session" rather than thrown, which is the caller's existing fallback.
@@ -154,7 +154,12 @@ export async function ensureManagedSession(
     while (Date.now() - start < AUTH_TIMEOUT_MS) {
       await delay(AUTH_POLL_MS);
 
-      if (await getManagedAccount().catch(() => null)) return true;
+      if (await getManagedAccount({ fresh: true }).catch(() => null)) {
+        noteManagedSessionChanged();
+
+        return true;
+      }
+
       if (await win.isClosed()) return false;
     }
 

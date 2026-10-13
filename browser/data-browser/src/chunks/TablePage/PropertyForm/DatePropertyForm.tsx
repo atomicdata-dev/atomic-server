@@ -13,7 +13,6 @@ export function DatePropertyForm({
   const [dateFormat, setDateFormat] = useString(
     resource,
     urls.properties.constraints.dateFormat,
-    { commit: true },
   );
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   lateFinishContext,
   stallContext,
+  stallWaitMs,
   stepDurations,
 } from './demoSetupReport';
 
@@ -65,5 +66,21 @@ describe('lateFinishContext', () => {
     expect(lateFinishContext({}, 50_000).tags).toEqual({
       demo_slowest_step: 'none',
     });
+  });
+});
+
+describe('stallWaitMs', () => {
+  it('waits out the rest of the deadline when the timer fired after two seconds', () => {
+    expect(stallWaitMs(2188, 45_000)).toBe(42_812);
+  });
+
+  it('reports once the deadline has passed', () => {
+    expect(stallWaitMs(45_000, 45_000)).toBe(0);
+    expect(stallWaitMs(60_000, 45_000)).toBe(0);
+  });
+
+  it('allows five seconds of tolerance below the deadline', () => {
+    expect(stallWaitMs(40_000, 45_000)).toBe(0);
+    expect(stallWaitMs(39_999, 45_000)).toBe(5001);
   });
 });

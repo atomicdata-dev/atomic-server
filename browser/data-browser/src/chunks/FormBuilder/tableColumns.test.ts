@@ -54,23 +54,35 @@ describe('table column presentations', () => {
       [core.properties.allowsOnly]: [],
     };
     expect(
+      compatibleFieldTypes(property(Datatype.RESOURCEARRAY, select), {
+        maxItems: 1,
+      }),
+    ).toEqual(['dropdown', 'radio', 'picture-choice']);
+    // The legacy `max` on the Property still counts when the class says nothing.
+    expect(
       compatibleFieldTypes(
         property(Datatype.RESOURCEARRAY, {
           ...select,
           [dataBrowser.properties.max]: 1,
         }),
+        { maxItems: 1 },
       ),
     ).toEqual(['dropdown', 'radio', 'picture-choice']);
     expect(
       compatibleFieldTypes(property(Datatype.RESOURCEARRAY, select)),
     ).toEqual(['dropdown-multi', 'multi-select']);
     expect(
-      compatibleFieldTypes(
-        property(Datatype.RESOURCEARRAY, {
-          [core.properties.classtype]: 'https://example.com/Person',
-        }),
-      ),
+      compatibleFieldTypes(property(Datatype.RESOURCEARRAY), {
+        class: 'https://example.com/Person',
+      }),
     ).toEqual(['dropdown']);
+    // A select whose options are in the class map, not on the Property.
+    expect(
+      compatibleFieldTypes(property(Datatype.RESOURCEARRAY), {
+        enum: ['a', 'b'],
+        maxItems: 1,
+      }),
+    ).toEqual(['dropdown', 'radio', 'picture-choice']);
     expect(compatibleFieldTypes(property(Datatype.RESOURCEARRAY))).toEqual([]);
   });
   it('never guesses composite or unknown types', () => {
@@ -106,10 +118,15 @@ describe('table column presentations', () => {
     ).toEqual(['a', 'b']);
   });
   it('rejects mapping a property outside the row class before creating anything', async () => {
-    const dataClass = { getSubjects: () => [] } as unknown as Resource;
+    const dataClass = {
+      subject: 'class',
+      getSubjects: () => [],
+    } as unknown as Resource;
     await expect(
       createMappedField(
-        {} as Store,
+        {
+          getResourceLoading: () => ({ get: () => undefined }),
+        } as unknown as Store,
         {} as Resource,
         dataClass,
         property(Datatype.STRING),
@@ -121,12 +138,14 @@ describe('table column presentations', () => {
 it('creates only a FormField when mapping a required existing column', async () => {
   const column = property(Datatype.INTEGER, { [core.properties.name]: 'Age' });
   const dataClass = {
+    subject: 'class',
     getSubjects: (p: string) =>
       p === core.properties.requires ? [column.subject] : [],
   } as unknown as Resource;
   let created: Parameters<Store['newResource']>[0] | undefined;
   const field = { save: async () => {} };
   const store = {
+    getResourceLoading: () => ({ get: () => undefined }),
     newResource: async (opts: Parameters<Store['newResource']>[0]) => {
       created = opts;
 

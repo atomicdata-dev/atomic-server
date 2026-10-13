@@ -24,21 +24,54 @@ import { server as serverOnt } from '../src/ontologies/server.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const wasmPath = path.resolve(here, '../../../wasm/pkg/atomic_wasm_bg.wasm');
 
+/** Every store the tests opened, closed in `afterAll`: a store left connected
+ * logs "Server disconnected" (and its outbox retries) after the server stops,
+ * and a log that lands in the worker's teardown fails the run. */
+const openStores: Store[] = [];
+
 async function storeFor(url: string, agent: Agent): Promise<Store> {
   const clientDb = new NodeClientDb({ wasmPath, baseUrl: url });
   await clientDb.init();
   const store = new Store({ serverUrl: url, agent });
   store.setClientDb(clientDb as unknown as ClientDbWorker);
+  openStores.push(store);
   await delay(500);
 
   return store;
 }
 
-async function nameOn(url: string, viewer: Agent, subject: string) {
-  const store = await storeFor(url, viewer);
-  const resource = await store.getResource(subject);
+/**
+ * Waits until the server itself reports `expected` as the agent's name and
+ * returns the last name it saw. Reads the server's authoritative snapshot over
+ * HTTP, so no local cache or fixed sleep decides the answer: a write takes as
+ * long as the box lets it, and the wall only has to tell "slow" from "never".
+ */
+async function nameOn(
+  url: string,
+  viewer: Agent,
+  subject: string,
+  expected: string,
+  wallMs = 60_000,
+) {
+  const store = new Store({ serverUrl: url, agent: viewer, connect: false });
+  openStores.push(store);
+  const deadline = Date.now() + wallMs;
+  let last: unknown;
 
-  return resource.get(core.properties.name);
+  while (Date.now() < deadline) {
+    try {
+      const snapshot = await store.readServerSnapshot(subject);
+      last = snapshot[core.properties.name];
+
+      if (last === expected) return last;
+    } catch (e) {
+      last = `read failed: ${String(e)}`;
+    }
+
+    await delay(500);
+  }
+
+  return last;
 }
 
 describe('agent profile across servers', () => {
@@ -50,6 +83,12 @@ describe('agent profile across servers', () => {
   }, 180_000);
 
   afterAll(async () => {
+    for (const store of openStores) {
+      store.disconnect();
+      store.setServerConnected(false);
+    }
+
+    await delay(500);
     await a?.stop();
     await b?.stop();
   });
@@ -68,8 +107,9 @@ describe('agent profile across servers', () => {
       agentName: 'Old name',
     });
     expect(home.error).toBeUndefined();
-    await delay(1500);
-    expect(await nameOn(a.serverUrl, viewer, owner.subject!)).toBe('Old name');
+    expect(
+      await nameOn(a.serverUrl, viewer, owner.subject!, 'Old name'),
+    ).toBe('Old name');
 
     // The same browser then works against server B, which has never seen the
     // agent resource.
@@ -89,9 +129,12 @@ describe('agent profile across servers', () => {
     const agentResource = await storeA.getResource(owner.subject!);
     await agentResource.set(core.properties.name, 'New name');
     await agentResource.save().catch(() => undefined);
-    await delay(12_000);
 
+    // The first save is refused (it depends on ops B never had); the outbox
+    // retries with a snapshot B can merge, so the name arrives on its own.
     const viewerB = await Agent.fromSecret(b.agentSecret);
-    expect(await nameOn(b.serverUrl, viewerB, owner.subject!)).toBe('New name');
+    expect(
+      await nameOn(b.serverUrl, viewerB, owner.subject!, 'New name'),
+    ).toBe('New name');
   }, 120_000);
 });

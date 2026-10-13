@@ -12,6 +12,8 @@
  */
 
 let nextId = 0;
+/** The host refuses larger `getMany` batches; say so before asking. */
+const MAX_GET_MANY = 100;
 const pending = new Map();
 
 window.addEventListener('message', event => {
@@ -51,6 +53,38 @@ function point(at) {
   if (at && typeof at.clientX === 'number') return { x: at.clientX, y: at.clientY };
 
   return at;
+}
+
+// ---- Theme: whether the host is light or dark ----
+
+/** The last `colorScheme` the host sent, once one has arrived here. */
+let colorScheme;
+const themeListeners = new Set();
+
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.data?.type !== '__atomic_style') return;
+  const next = event.data.colorScheme;
+  if (next !== 'light' && next !== 'dark') return;
+  // Compared with what `getTheme()` already said, so the first message after
+  // load is not reported as a switch.
+  const changed = next !== currentColorScheme();
+  colorScheme = next;
+  if (changed) for (const listener of themeListeners) listener({ colorScheme });
+});
+
+/**
+ * The host's scheme. The page shell applies the host's theme before this
+ * module runs, so until a message arrives here, read it back from the
+ * `color-scheme` the theme stylesheet sets on `:root`.
+ */
+function currentColorScheme() {
+  if (colorScheme) return colorScheme;
+
+  try {
+    return getComputedStyle(document.documentElement).colorScheme.split(' ').includes('dark') ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
 }
 
 /**
@@ -212,6 +246,30 @@ export const store = {
   },
 
   /**
+   * Reads up to 100 resources in one round trip, with the same rights as
+   * `getResource` and seeing this person's own writes the same way.
+   * Resolves to an array in the order asked: a resource for each one that
+   * could be read, and `{ subject, error }` in the place of one that could
+   * not, so one missing row does not fail the rest. More than 100 is
+   * refused; ask in batches.
+   */
+  async getMany(subjects) {
+    const list = Array.from(subjects ?? []);
+
+    if (list.length > MAX_GET_MANY) {
+      throw new Error(`getMany reads at most ${MAX_GET_MANY} subjects at a time; ask in batches`);
+    }
+
+    if (list.length === 0) return [];
+
+    const results = await send('getMany', { subjects: list });
+
+    return results.map(entry =>
+      entry.error === undefined ? makeResource(entry.subject, entry.props, entry.title) : { subject: entry.subject, error: entry.error },
+    );
+  },
+
+  /**
    * Creates a resource. `parent` defaults to the app, which is the one place
    * a view may always write.
    */
@@ -263,6 +321,27 @@ export const store = {
       window.removeEventListener('message', listener);
       void send('unsubscribe', { subject });
     };
+  },
+
+  /**
+   * The host's theme, as far as an app needs to branch on it:
+   * `{ colorScheme: 'light' | 'dark' }`, from the host's actual setting.
+   * Colours themselves are CSS variables on `:root` (`--t-color-bg`,
+   * `--t-color-text`, `--t-color-main`, `--t-color-alert`,
+   * `--t-color-warning`, `--t-color-success`, ...).
+   */
+  getTheme() {
+    return { colorScheme: currentColorScheme() };
+  },
+
+  /**
+   * Calls back with `{ colorScheme }` when the person switches the host
+   * between light and dark, until the returned function runs.
+   */
+  onThemeChange(handler) {
+    themeListeners.add(handler);
+
+    return () => themeListeners.delete(handler);
   },
 
   /**

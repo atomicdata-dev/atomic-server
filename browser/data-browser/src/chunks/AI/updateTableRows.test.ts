@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { core, type Store } from '@tomic/lib';
 import { updateTableRows } from './updateTableRows';
-vi.mock('./jsonAdCompact', () => ({
+vi.mock('@tomic/react', async importOriginal => ({
+  ...(await importOriginal<typeof import('@tomic/react')>()),
   buildClassContext: async () => ({}),
   resolveKey: (_: unknown, key: string) => ({ subject: key }),
   coerceValueIn: (_: unknown, value: unknown) => value,

@@ -741,8 +741,7 @@ export async function sendChatMessage(
   // Then wait for any toast to clear. Toasts stack in the bottom-right corner,
   // which is exactly where this sidebar's Send button is: the container is
   // `pointer-events: none` but each toast bar sets `auto` (it has Clear and
-  // Copy buttons), so a leftover setup toast — "Signed in!", "Dev agent
-  // created" — swallows the click for as long as it is on screen. Observed as
+  // Copy buttons), so a leftover setup toast (such as the dev agent one) swallows the click for as long as it is on screen. Observed as
   // a 10s retry loop reporting `<div data-rht-toaster> subtree intercepts
   // pointer events`.
   //

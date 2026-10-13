@@ -2,13 +2,15 @@
 use crate::{atoms::IndexAtom, errors::AtomicResult, storelike::Storelike, Db, Value};
 
 use super::{
-    query_index::{sort_part, IndexIterator, SEPARATION_BIT},
+    query_index::{
+        property_from_key_part, property_key_part, sort_part, IndexIterator, SEPARATION_BIT,
+    },
     trees::{Method, Operation, Transaction, Tree},
 };
 
 /// Finds all Atoms for a given {property}-{value} tuple.
 pub fn find_in_prop_val_sub_index(store: &Db, prop: &str, val: Option<&Value>) -> IndexIterator {
-    let mut prefix: Vec<u8> = [prop.as_bytes(), &[SEPARATION_BIT]].concat();
+    let mut prefix: Vec<u8> = [&property_key_part(prop)[..], &[SEPARATION_BIT]].concat();
     if let Some(value) = val {
         prefix.extend(value.to_sortable_string().as_bytes());
         prefix.extend([SEPARATION_BIT]);
@@ -49,18 +51,18 @@ pub fn add_atom_to_prop_val_sub_index(
 /// part empty then instead of writing a long URL or text twice
 /// ([`sort_part`]). Keys from before that kept it, and are still read.
 pub fn propvalsub_key(atom: &IndexAtom) -> Vec<u8> {
-    key_with_sort_part(atom, sort_part(atom))
+    key_with_sort_part(&property_key_part(&atom.property), atom, sort_part(atom))
 }
 
 /// The key as stores before the sort part was left out wrote it. Removing an
 /// atom deletes this form too, so rows from an older store go with it.
 pub fn propvalsub_legacy_key(atom: &IndexAtom) -> Vec<u8> {
-    key_with_sort_part(atom, atom.sort_value.as_bytes())
+    key_with_sort_part(atom.property.as_bytes(), atom, atom.sort_value.as_bytes())
 }
 
-fn key_with_sort_part(atom: &IndexAtom, sort: &[u8]) -> Vec<u8> {
+fn key_with_sort_part(property: &[u8], atom: &IndexAtom, sort: &[u8]) -> Vec<u8> {
     [
-        atom.property.as_bytes(),
+        property,
         &[SEPARATION_BIT],
         atom.ref_value.as_bytes(),
         &[SEPARATION_BIT],
@@ -75,8 +77,7 @@ fn key_with_sort_part(atom: &IndexAtom, sort: &[u8]) -> Vec<u8> {
 /// Note that the Value of the atom will always be a single AtomicURL here.
 fn key_to_index_atom(key: &[u8], base_domain: Option<&str>) -> AtomicResult<IndexAtom> {
     let mut parts = key.split(|b| b == &SEPARATION_BIT);
-    let prop = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
-        .map_err(|_| "Can't parse prop into string")?;
+    let prop = property_from_key_part(parts.next().ok_or("Invalid key for prop_val_sub_index")?)?;
     let ref_val = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
         .map_err(|_| "Can't parse ref_val into string")?;
     let sort_val = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
@@ -84,7 +85,7 @@ fn key_to_index_atom(key: &[u8], base_domain: Option<&str>) -> AtomicResult<Inde
     let sub = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
         .map_err(|_| "Can't parse subject into string")?;
     Ok(IndexAtom {
-        property: prop.into(),
+        property: prop,
         ref_value: ref_val.into(),
         sort_value: if sort_val.is_empty() {
             ref_val

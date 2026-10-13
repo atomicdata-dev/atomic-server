@@ -65,6 +65,19 @@ export async function getOrCreateCommentsFolder(
   );
 }
 
+/** The Drive's Trash folder: where "Delete" in the sidebar parks resources. */
+export async function getOrCreateTrashFolder(
+  store: Store,
+  driveSubject: string,
+): Promise<string> {
+  return getOrCreateDriveLocation(
+    store,
+    driveSubject,
+    dataBrowser.properties.trashFolder,
+    { isA: dataBrowser.classes.folder, name: /* @wc-ignore */ 'Trash' },
+  );
+}
+
 /** Coalesce first use in one store; independent devices derive the same DID. */
 const aiFolderRequests = new WeakMap<Store, Map<string, Promise<string>>>();
 

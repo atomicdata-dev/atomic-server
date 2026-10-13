@@ -11,6 +11,7 @@ import {
   addMessageToChatResource,
   persistMessageResourceToServer,
   queueChatWrite,
+  type AiMessageRef,
 } from './chatConversionUtils';
 import { DEFAULT_AICHAT_NAME } from '@components/AI/aiContstants';
 
@@ -25,10 +26,10 @@ export type PersistSidebarMessageArgs = {
   isChatSavedRef: React.MutableRefObject<boolean>;
   titlePromiseRef: React.MutableRefObject<TitlePromise | undefined>;
   setMessageToResourceMap: React.Dispatch<
-    React.SetStateAction<Map<AtomicUIMessage, Resource>>
+    React.SetStateAction<Map<AtomicUIMessage, AiMessageRef>>
   >;
   messageToResourceMapRef: React.MutableRefObject<
-    Map<AtomicUIMessage, Resource>
+    Map<AtomicUIMessage, AiMessageRef>
   >;
   setIsChatSaved: React.Dispatch<React.SetStateAction<boolean>>;
   shouldGenerateTitles: boolean;
@@ -89,10 +90,7 @@ export const persistSidebarMessage = async ({
     message,
     resource,
     store,
-    {
-      saveChat: !wasDraft,
-      persistToServer: !wasDraft,
-    },
+    { persistToServer: !wasDraft },
   );
 
   // Persistence must not depend on React executing a deferred state updater.
@@ -114,10 +112,7 @@ export const persistSidebarMessage = async ({
       // Persist child messages (and their parts) before the chat resource
       // references them on the server — matches AIChatPage / addMessageToChatResource.
       for (const pendingMessageResource of messageToResourceMapRef.current.values()) {
-        await persistMessageResourceToServer(
-          pendingMessageResource as Resource<Ai.AiMessage>,
-          store,
-        );
+        await persistMessageResourceToServer(pendingMessageResource, store);
       }
 
       await resource.save();
@@ -136,12 +131,7 @@ export const persistSidebarMessage = async ({
     // absent from the server, and gone on the next reload, because the
     // checkpoint interval has already recorded the content it just wrote and
     // will not repeat itself.
-    await persistMessageResourceToServer(
-      messageResource as Resource<Ai.AiMessage>,
-      store,
-    );
-    // `saveChat` was false, so the chat still holds this message's subject
-    // only locally.
+    await persistMessageResourceToServer(messageResource, store);
     await resource.save();
   }
 

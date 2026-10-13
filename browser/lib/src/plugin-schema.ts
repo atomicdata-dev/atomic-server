@@ -2,6 +2,14 @@ import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
 import type { Datatype } from './datatypes.js';
 import type { JSONValue } from './value.js';
+import { canonicalizeScheme } from './subject.js';
+import {
+  planOntology,
+  readConstraintsValue,
+  sortedJson,
+  type OntologyInput,
+  type OntologyPlan,
+} from './ontology-input.js';
 
 /**
  * Creates a plugin's classes and properties as ordinary Atomic resources in the
@@ -46,7 +54,7 @@ export interface EnsuredSchema {
   classes: Record<string, string>;
 }
 
-interface SchemaResource {
+export interface SchemaResource {
   subject: string;
   get(property: string): unknown;
   set(property: string, value: JSONValue): Promise<void>;
@@ -66,11 +74,17 @@ export interface SchemaStore {
     parent: string;
     isA: string[];
     propVals: Record<string, JSONValue>;
+    /** Derive the subject from parent, shortname and datatype. */
+    contentAddressedProperty?: boolean;
   }): Promise<SchemaResource>;
 }
 
 /**
  * Makes a spec real in a drive, reusing anything already there.
+ *
+ * @deprecated Describe the ontology with {@link ensureOntology}, which also
+ * creates the ontology and sets class constraints. This is the same engine
+ * pointed at the drive's default ontology.
  *
  * Idempotent by shortname: a second call finds what the first created rather
  * than making a parallel set, which matters because a plugin's first run and
@@ -85,7 +99,152 @@ export async function ensureSchema(
   drive: string,
   spec: SchemaSpec,
 ): Promise<EnsuredSchema> {
-  const ontologySubject = await findOntology(store, drive);
+  return ensureTerms(store, drive, await findOntology(store, drive), spec);
+}
+
+const DRIVE_PROPERTY = 'https://atomicdata.dev/properties/drive';
+
+export interface EnsureOntologyOptions {
+  /** The drive `parent` lives in. Defaults to the parent's own `drive`, or the parent. */
+  drive?: string;
+}
+
+export interface EnsuredOntology extends EnsuredSchema {
+  /** Subject of the Ontology resource. */
+  ontology: string;
+}
+
+/**
+ * Makes an ontology real under `parent`: the Ontology resource, its
+ * content-addressed Properties, and its Classes with `requires`, `recommends`
+ * and `constraints`. Returns shortname to subject for classes and properties.
+ *
+ * Idempotent: the Ontology is found again by its shortname under `parent`, a
+ * Property by its `atomic:prop:` subject (the same ontology, shortname and
+ * datatype always give the same one), a Class by its shortname in the
+ * ontology. A second run with the same input writes nothing.
+ *
+ * What is brought back in line on a class that already exists: `requires`,
+ * `recommends` and, when the input has `constraints`, the constraints. Names
+ * and descriptions are left alone, as someone may have edited them. Properties
+ * are immutable, so an existing one is reused as it is.
+ *
+ * Throws before writing anything when the input is inconsistent (see
+ * {@link planOntology}) or an existing shortname is ambiguous.
+ */
+export async function ensureOntology(
+  store: SchemaStore,
+  parent: string,
+  input: OntologyInput,
+  options: EnsureOntologyOptions = {},
+): Promise<EnsuredOntology> {
+  const plan = planOntology(input);
+  const parentResource = await store.getResource(parent);
+  const drive =
+    options.drive ??
+    (typeof parentResource.get(DRIVE_PROPERTY) === 'string'
+      ? (parentResource.get(DRIVE_PROPERTY) as string)
+      : parent);
+
+  const ontology = await ensureOntologyResource(store, drive, parent, input);
+  const terms = await ensureTerms(store, drive, ontology, {
+    properties: plan.properties,
+    classes: plan.classes,
+  });
+
+  await ensureConstraints(store, plan, terms);
+
+  return { ontology, ...terms };
+}
+
+const ontologyLocalId = (shortname: string): string =>
+  `schema:ontology:${shortname}`;
+
+async function ensureOntologyResource(
+  store: SchemaStore,
+  drive: string,
+  parent: string,
+  input: OntologyInput,
+): Promise<string> {
+  const localId = ontologyLocalId(input.shortname);
+  const existing = await store.findByLocalId(drive, parent, localId);
+
+  if (existing) return existing.subject;
+
+  const name = input.name ?? input.shortname;
+  const created = await store.newResource({
+    parent,
+    isA: [core.classes.ontology],
+    propVals: {
+      [core.properties.shortname]: input.shortname,
+      [core.properties.name]: name,
+      [core.properties.description]: input.description ?? name,
+      [core.properties.localId]: localId,
+    },
+  });
+
+  try {
+    await created.save();
+  } catch (error) {
+    const winner = await store.findByLocalId(drive, parent, localId);
+
+    if (!winner) throw error;
+
+    return winner.subject;
+  }
+
+  return created.subject;
+}
+
+/**
+ * Writes `constraints` after the classes exist, as a `class` keyword needs the
+ * subject of another class. Skipped when the stored map already says the same.
+ */
+async function ensureConstraints(
+  store: SchemaStore,
+  plan: OntologyPlan,
+  terms: EnsuredSchema,
+): Promise<void> {
+  for (const [classShortname, own] of Object.entries(plan.constraints)) {
+    if (own === undefined) continue;
+
+    const desired: Record<string, JSONValue> = {};
+
+    for (const [property, keywords] of Object.entries(own)) {
+      const subject = canonicalizeScheme(terms.properties[property]);
+      const resolved: Record<string, JSONValue> = { ...keywords };
+      const target = keywords.class;
+
+      if (typeof target === 'string' && !target.includes(':')) {
+        resolved.class = canonicalizeScheme(terms.classes[target]);
+      }
+
+      desired[subject] = resolved;
+    }
+
+    const klass = await store.getResource(terms.classes[classShortname]);
+    const current = readConstraintsValue(
+      klass.get(core.properties.constraints),
+    );
+    const same =
+      current === undefined
+        ? Object.keys(desired).length === 0
+        : sortedJson(current) === sortedJson(desired);
+
+    if (same) continue;
+
+    await klass.set(core.properties.constraints, desired);
+    await klass.save();
+  }
+}
+
+/** Creates or finds the properties and classes of a spec in an ontology. */
+async function ensureTerms(
+  store: SchemaStore,
+  drive: string,
+  ontologySubject: string,
+  spec: SchemaSpec,
+): Promise<EnsuredSchema> {
   const ontology = await store.getResource(ontologySubject);
 
   const properties = await ensureAll(
@@ -310,6 +469,8 @@ type Binding =
   /** A term that does not exist yet. */
   | {
       kind: 'create';
+      /** A Property: created under its content-addressed ID. */
+      contentAddressed: boolean;
       localId: string;
       isA: string[];
       propVals: Record<string, JSONValue>;
@@ -365,7 +526,14 @@ async function bindOne<T extends { shortname: string; subject?: string }>(
     return { kind: 'recovered', subject: hit, propVals: desired.propVals };
   }
 
-  return { kind: 'create', localId, ...desired };
+  return {
+    kind: 'create',
+    // New properties get content-addressed IDs; lookup above still finds the
+    // legacy ones by shortname / localId.
+    contentAddressed: listProperty === core.properties.properties,
+    localId,
+    ...desired,
+  };
 }
 
 /** Carries out a {@link Binding}, returning the term's subject. */
@@ -383,11 +551,12 @@ async function writeOne(
     return binding.subject;
   }
 
-  const { localId, isA, propVals } = binding;
+  const { localId, isA, propVals, contentAddressed } = binding;
   const created = await store.newResource({
     parent: ontology.subject,
     isA,
     propVals: { ...propVals, [core.properties.localId]: localId },
+    ...(contentAddressed ? { contentAddressedProperty: true } : {}),
   });
 
   try {

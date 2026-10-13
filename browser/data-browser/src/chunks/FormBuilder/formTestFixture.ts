@@ -19,6 +19,9 @@ export function formTestFixture() {
       set: vi.fn(async (key: string, value: unknown) => {
         values[key] = value;
       }),
+      remove: vi.fn((key: string) => {
+        delete values[key];
+      }),
       push: vi.fn(async (key: string, value: unknown[]) => {
         values[key] = [...((values[key] as unknown[]) ?? []), ...value];
       }),
@@ -41,6 +44,10 @@ export function formTestFixture() {
     core.properties.name,
   );
   const store = {
+    // The synchronous read the constraint helpers use; unknown resources read
+    // as empty rather than throwing, like a resource that is still loading.
+    getResourceLoading: (s: string) =>
+      resources.get(s) ?? { isReady: () => false, get: () => undefined },
     getResource: async (s: string) => {
       if (!resources.has(s)) throw new Error(`Missing ${s}`);
 

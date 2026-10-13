@@ -4,6 +4,7 @@ import {
   type Property,
   type Resource,
 } from '@tomic/react';
+import { localCalendarDate } from '@helpers/dates/calendarDate';
 
 /**
  * The verbs a row action can perform.
@@ -113,9 +114,7 @@ export const ROW_ACTION_GENERATORS: Record<RowActionKind, RowActionGenerator> =
       // between them, so writing millis into a date column stored a value that
       // rendered as an empty cell and computed as no date at all.
       next: (_current, _spec, property) =>
-        property?.datatype === Datatype.DATE
-          ? new Date().toISOString().slice(0, 10)
-          : Date.now(),
+        property?.datatype === Datatype.DATE ? localCalendarDate() : Date.now(),
       isActive: current => current !== undefined && current !== '',
     },
     setValue: {

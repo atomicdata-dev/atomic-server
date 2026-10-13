@@ -1,4 +1,3 @@
-import { isCalendarDate } from '@tomic/lib';
 import {
   calendarWeekdays,
   defaultRepeatRule,
@@ -16,6 +15,7 @@ import { BasicSelect } from '@components/forms/BasicSelect';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { ButtonClean } from '@components/Button';
 import { describeRepeat, weekdayName } from './repeatSummary';
+import { untilDateToCommit } from './untilDraft';
 
 interface RepeatFieldProps {
   parsed: RepeatParse;
@@ -196,19 +196,11 @@ export function RepeatField({
               </BasicSelect>
               {rule.end.type === 'until' && (
                 <DateWrapper>
-                  <InputStyled
-                    type='date'
-                    aria-label='Last day'
+                  <UntilDateInput
                     min={anchor.date}
                     value={rule.end.date}
                     disabled={disabled}
-                    onChange={e => {
-                      if (isCalendarDate(e.target.value)) {
-                        update({
-                          end: { type: 'until', date: e.target.value },
-                        });
-                      }
-                    }}
+                    onCommit={date => update({ end: { type: 'until', date } })}
                   />
                 </DateWrapper>
               )}
@@ -405,3 +397,42 @@ const JsonToggle = styled(ButtonClean)`
   text-decoration: underline;
   font-size: 0.9em;
 `;
+
+/** Keeps what is typed in a local draft and commits on blur or Enter, so the
+ * input keeps focus while a date is typed (#2137). */
+function UntilDateInput({
+  min,
+  value,
+  disabled,
+  onCommit,
+}: {
+  min: string;
+  value: string;
+  disabled?: boolean;
+  onCommit: (date: string) => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    const date = untilDateToCommit(draft, value);
+
+    setDraft(null);
+
+    if (date) onCommit(date);
+  };
+
+  return (
+    <InputStyled
+      type='date'
+      aria-label='Last day'
+      min={min}
+      value={draft ?? value}
+      disabled={disabled}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') commit();
+      }}
+    />
+  );
+}

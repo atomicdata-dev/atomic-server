@@ -12,6 +12,7 @@ import {
 import type { IconType } from 'react-icons';
 import { styled } from 'styled-components';
 import { getIconForClass } from '../helpers/iconMap';
+import { AvatarImg } from './AvatarImg';
 
 import type { JSX } from 'react';
 
@@ -90,18 +91,22 @@ function GlyphImage({
   const [downloadUrl] = useString(file, server.properties.downloadUrl);
   const src = useFileObjectUrl(file, downloadUrl);
 
-  if (!src) {
-    return null;
-  }
-
-  return <IconImg src={src} alt='' $circle={!!circle} className={className} />;
+  // The box is there from the first render, so whatever sits beside the glyph
+  // does not move when the picture arrives; `AvatarImg` fills it with a
+  // placeholder until then and retries a load that failed.
+  return (
+    <IconBox $circle={!!circle} className={className}>
+      <AvatarImg src={src} alt='' />
+    </IconBox>
+  );
 }
 
-const IconImg = styled.img<{ $circle: boolean }>`
+const IconBox = styled.span<{ $circle: boolean }>`
+  display: inline-block;
   width: 1.2em;
   height: 1.2em;
-  object-fit: cover;
   border-radius: ${p => (p.$circle ? '50%' : '20%')};
+  overflow: hidden;
   vertical-align: -0.25em;
   flex-shrink: 0;
 `;

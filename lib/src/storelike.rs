@@ -461,6 +461,12 @@ pub trait Storelike: Sized + Send + Sync {
         false
     }
 
+    /// The active lenses (see [`crate::lens`]), or `None` when there are none.
+    /// Stores that do not keep a lens index return `None`: no value is derived.
+    fn lens_index(&self) -> Option<std::sync::Arc<crate::lens::LensIndex>> {
+        None
+    }
+
     /// The fingerprint of the built-in defaults (`lib/defaults/*.json` + base
     /// models) that were last seeded into this store, if the store persists
     /// one. See [`crate::populate::bootstrap`]. Stores that do not persist it

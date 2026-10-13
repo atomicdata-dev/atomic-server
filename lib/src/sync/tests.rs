@@ -2018,12 +2018,14 @@ mod peer_sync_tests {
                 source_id: None,
                 validate_loro_causality: true,
                 enforce_subject_ownership: true,
+                validate_constraints: true,
                 response_origin: None,
             },
             CommitIngestOpts {
                 source_id: None,
                 validate_loro_causality: false,
                 enforce_subject_ownership: false,
+                validate_constraints: false,
                 response_origin: None,
             },
         ]
@@ -2169,6 +2171,7 @@ mod peer_sync_tests {
             source_id: None,
             validate_loro_causality: true,
             enforce_subject_ownership: true,
+            validate_constraints: true,
             response_origin: None,
         };
         let hub_err = ingest_commit_json(&db, &commit_json, &hub_opts)
@@ -2184,6 +2187,7 @@ mod peer_sync_tests {
             source_id: None,
             validate_loro_causality: false,
             enforce_subject_ownership: false,
+            validate_constraints: false,
             response_origin: None,
         };
         // With the gate off, the outcome must differ from the hub case above:
@@ -2197,6 +2201,42 @@ mod peer_sync_tests {
                 "peer policy has the ownership gate off, so it must not fail with the ownership message"
             ),
         }
+    }
+
+    /// Behind a TLS-terminating proxy the store is booted as `http://host` while
+    /// the browser names its resources `https://host/…`. That is this server,
+    /// not "another domain".
+    #[tokio::test]
+    async fn ownership_gate_ignores_the_scheme_of_the_boot_origin() {
+        use crate::client::commit_to_wire_json;
+        use crate::commit::CommitBuilder;
+        use crate::sync::engine::{ingest_commit_json, CommitIngestOpts};
+
+        let db = Db::init_temp("ingest_commit_ownership_scheme")
+            .await
+            .unwrap();
+        let (alice, _drive) = db.setup("Alice").await.unwrap();
+        let db = db.clone_with_url("http://atomic.example.de".into());
+
+        let subject = "https://atomic.example.de/_new:01m370mvgky7aszw76azkqxtxn".to_string();
+        let empty = crate::Resource::new(subject.clone());
+        let mut builder = CommitBuilder::new(subject.clone().into());
+        builder.destroy(true);
+        let commit = builder.sign(&alice, &db, &empty).await.unwrap();
+        let commit_json = commit_to_wire_json(&commit, &db).await.unwrap();
+
+        let opts = CommitIngestOpts {
+            source_id: None,
+            validate_loro_causality: true,
+            validate_constraints: true,
+            enforce_subject_ownership: true,
+            response_origin: None,
+        };
+        let err = ingest_commit_json(&db, &commit_json, &opts)
+            .await
+            .expect_err("nothing to destroy")
+            .to_string();
+        assert!(!err.contains("should be sent to other domain"), "{err}");
     }
 
     /// The binary `SYNC` probe: the hash over what the session may read

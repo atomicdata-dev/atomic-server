@@ -1,5 +1,12 @@
-import { forms, Resource, useValue, type JSONValue } from '@tomic/react';
+import {
+  forms,
+  Resource,
+  useString,
+  useValue,
+  type JSONValue,
+} from '@tomic/react';
 import { useCallback } from 'react';
+import { normalizeFieldOptions } from '../formConstraints';
 
 export type FieldOptionsBag = Record<string, JSONValue>;
 
@@ -24,7 +31,11 @@ export function useFieldOptions(
     [setRaw],
   );
 
-  return [parseFieldOptions(raw), setOptions];
+  const [type] = useString(field, forms.properties.formFieldType);
+
+  // Limits stored under their pre-JSON Schema names read as the new ones, and
+  // the next write replaces them.
+  return [normalizeFieldOptions(type, parseFieldOptions(raw)), setOptions];
 }
 
 /**

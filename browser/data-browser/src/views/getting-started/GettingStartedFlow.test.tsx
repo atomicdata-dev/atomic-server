@@ -54,6 +54,7 @@ vi.mock('../../helpers/AppSettings', () => ({
     setAgent: state.setAgent,
     setDrive: state.setDrive,
     setServer: state.setServer,
+    setBaseURL: vi.fn(),
   }),
 }));
 vi.mock('../../hooks/useNavigateWithTransition', () => ({
@@ -109,6 +110,9 @@ vi.mock('../../helpers/managed/vaultAutoBackup', () => ({
 vi.mock('../../helpers/managed/reconcile', () => ({
   connectHostedDrive: async () => true,
   shortDid: (subject: string) => subject,
+}));
+vi.mock('../../helpers/discoverHomeServer', () => ({
+  discoverHomeServerForApp: async () => false,
 }));
 vi.mock('../../helpers/agentStorage', () => ({ saveAgentToIDB: vi.fn() }));
 vi.mock('../../helpers/deviceLock', () => ({ beat: vi.fn() }));

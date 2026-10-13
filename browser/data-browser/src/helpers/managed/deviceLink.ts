@@ -6,6 +6,7 @@ import {
   safePortalUrl,
   setManagedDeviceToken,
 } from './api';
+import { noteManagedSessionChanged } from './session';
 import { isRunningInTauri } from '../tauri';
 import { sha256 } from '@noble/hashes/sha2.js';
 
@@ -162,6 +163,7 @@ export async function redeemDeviceLink(
   if (!body.token) return false;
 
   setManagedDeviceToken(body.token, portalUrl);
+  noteManagedSessionChanged();
   rememberProvider(portalUrl);
 
   return true;
@@ -220,6 +222,7 @@ export async function awaitDeviceLink(
       // here on, this is the only origin the token goes to, whatever a later
       // connected node reports as its portal.
       setManagedDeviceToken(progress.token, portalUrl);
+      noteManagedSessionChanged();
       rememberProvider(portalUrl);
 
       return 'linked';
@@ -236,6 +239,7 @@ export async function awaitDeviceLink(
 /** Forget the session. The provider still has it until it expires. */
 export function unlinkDevice(): void {
   setManagedDeviceToken(null);
+  noteManagedSessionChanged();
 }
 
 export function isDeviceLinked(): boolean {

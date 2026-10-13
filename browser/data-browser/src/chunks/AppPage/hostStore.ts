@@ -6,6 +6,7 @@ import { ViewChanges } from '@helpers/extensions/viewApply';
 import { parseViewSearch, runViewSearch } from '@helpers/extensions/viewSearch';
 import {
   core,
+  destinationTablesFor,
   errorMessageFromResponse,
   findSchema,
   pluginSchema,
@@ -42,7 +43,15 @@ export interface HostRequest {
   connectionId?: string;
   /** The frame's own Ed25519 public key, base64url. */
   publicKey?: string;
+  /** `getMany`: the subjects to read, in order. Checked, since the frame sends it. */
+  subjects?: unknown;
 }
+
+/**
+ * How many subjects one `getMany` may ask for. Enough for a page of rows in
+ * one round trip, and a bound on what a frame can make this page load at once.
+ */
+export const MAX_GET_MANY = 100;
 
 export interface HostReply {
   id: number | string;
@@ -123,27 +132,52 @@ export async function handleRequest(
       // names what its rows are, and duplicating that on the app would be two
       // places to disagree.
       const tableResource = await store.getResource(subject);
+      // A table an importer's Set up created together with others (a
+      // manifest `destination.tables`): its siblings, by the keys the
+      // manifest declared, so a view of transactions can find statements.
+      const tables = await destinationTablesFor(store, drive, subject);
 
       return {
         table: subject,
         rowClass: tableResource.get(core.properties.classtype) as
           | string
           | undefined,
+        ...(tables ? { tables } : {}),
       };
     }
 
-    case 'get': {
-      const resource = await store.getResource(
-        required(request.subject, 'subject'),
+    case 'get':
+      return readForApp(store, required(request.subject, 'subject'));
+
+    // Many `get`s in one round trip: each subject is read exactly as `get`
+    // reads it, through this person's store, so it sees what they see and
+    // their own writes. One that cannot be read is reported in its place
+    // rather than failing the rest.
+    case 'getMany': {
+      const subjects = request.subjects;
+
+      if (
+        !Array.isArray(subjects) ||
+        !subjects.every(s => typeof s === 'string' && s !== '')
+      )
+        throw new Error('getMany takes an array of subjects');
+
+      if (subjects.length > MAX_GET_MANY)
+        throw new Error(
+          `getMany reads at most ${MAX_GET_MANY} subjects at a time; ask in batches`,
+        );
+
+      return Promise.all(
+        (subjects as string[]).map(async subject => {
+          try {
+            const { propVals, ...rest } = await readForApp(store, subject);
+
+            return { ...rest, props: propVals, loading: false };
+          } catch (e) {
+            return { subject, error: (e as Error).message };
+          }
+        }),
       );
-
-      if (resource.error) throw resource.error;
-
-      return {
-        subject: resource.subject,
-        title: resource.title,
-        propVals: resource.getPropVals(),
-      };
     }
 
     case 'query':
@@ -260,6 +294,19 @@ export async function handleRequest(
         `This app asked for something the host does not do: ${request.op}`,
       );
   }
+}
+
+/** One resource, as this person's store has it. What `get` answers. */
+async function readForApp(store: Store, subject: string) {
+  const resource = await store.getResource(subject);
+
+  if (resource.error) throw resource.error;
+
+  return {
+    subject: resource.subject,
+    title: resource.title,
+    propVals: resource.getPropVals(),
+  };
 }
 
 /**

@@ -24,6 +24,7 @@ import { beat } from '../../helpers/deviceLock';
 import { fetchPrivateDriveSubject } from '../../helpers/privateDrive';
 import { connectHostedDrive, shortDid } from '../../helpers/managed/reconcile';
 import { deviceHasDriveData } from '../../helpers/driveData';
+import { discoverHomeServerForApp } from '../../helpers/discoverHomeServer';
 import { openPrivateHome } from '../../helpers/openPrivateHome';
 import { privateHomeNudge } from '../../helpers/privateHomeNudge';
 import { withDeadline } from '../../helpers/withDeadline';
@@ -155,7 +156,7 @@ export function GettingStartedFlow({
   useWelcomeLayoutEffect();
   const store = useStore();
   const navigate = useNavigateWithTransition();
-  const { setAgent, setDrive, setServer, baseURL } = useSettings();
+  const { setAgent, setDrive, setServer, setBaseURL, baseURL } = useSettings();
   // When the connected node is "managed" (reports a dashboard/portal URL via
   // /node-info), account creation goes through the portal (email
   // verification). Self-hosted / FOSS nodes report nothing here, so we keep the
@@ -643,9 +644,19 @@ export function GettingStartedFlow({
         ));
 
       // Resolve hosting before a failed read sends this device to Cloud Vault.
-      const hosted = target
+      const hostedByAccount = target
         ? await connectHostedDrive(store, target, setServer)
         : false;
+
+      // No account to ask (or it does not know this drive): the secret alone
+      // names the drive, and pkarr says which servers announced it. Only
+      // when the server in use does not already have it.
+      const hosted =
+        hostedByAccount ||
+        (!!target &&
+          (await discoverHomeServerForApp(store, target, setBaseURL, subject =>
+            deviceHasDriveData(store, subject),
+          )));
 
       // Check for existing data before creating anything, so a newly writable
       // home is never mistaken for successful recovery of previous content.
@@ -1009,7 +1020,7 @@ export function GettingStartedFlow({
     <Shell>
       {step === 'welcome' && !createTarget ? (
         <div role='status' aria-label='Loading account'>
-          <Spinner />
+          <Spinner size='4rem' />
         </div>
       ) : step === 'opening-workspace' ? (
         <Swap key='opening-workspace'>

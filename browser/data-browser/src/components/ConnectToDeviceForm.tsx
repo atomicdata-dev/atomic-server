@@ -13,14 +13,17 @@ interface ConnectToDeviceFormProps {
 }
 
 /**
- * The two ways to take in another device's pairing code: scan its QR with the
- * camera (phones and tablets), or paste the code as text (everywhere).
+ * Opens the camera to scan another device's QR code. Phones and tablets only:
+ * renders nothing elsewhere, where pasting the code is the way in.
  */
-export function ConnectToDeviceForm({
+export function ScanCodeButton({
   onCode,
   disabled,
-}: ConnectToDeviceFormProps): JSX.Element {
-  const [typedCode, setTypedCode] = useState('');
+  className,
+}: ConnectToDeviceFormProps & { className?: string }): JSX.Element | null {
+  if (!isMobileTauri()) {
+    return null;
+  }
 
   const scan = async () => {
     const result = await scanPairingCode();
@@ -34,6 +37,30 @@ export function ConnectToDeviceForm({
     }
   };
 
+  return (
+    <Button
+      className={className}
+      onClick={scan}
+      disabled={disabled}
+      data-testid='scan-code'
+    >
+      <ScanButtonInner>
+        <FaCamera aria-hidden /> Scan a QR code
+      </ScanButtonInner>
+    </Button>
+  );
+}
+
+/**
+ * The two ways to take in another device's pairing code: scan its QR with the
+ * camera (phones and tablets), or paste the code as text (everywhere).
+ */
+export function ConnectToDeviceForm({
+  onCode,
+  disabled,
+}: ConnectToDeviceFormProps): JSX.Element {
+  const [typedCode, setTypedCode] = useState('');
+
   const submit = () => {
     const code = typedCode.trim();
 
@@ -44,13 +71,7 @@ export function ConnectToDeviceForm({
 
   return (
     <>
-      {isMobileTauri() && (
-        <ScanButton onClick={scan} disabled={disabled}>
-          <ScanButtonInner>
-            <FaCamera aria-hidden /> Scan a QR code
-          </ScanButtonInner>
-        </ScanButton>
-      )}
+      <StackedScanButton onCode={onCode} disabled={disabled} />
       <CodeForm
         onSubmit={e => {
           e.preventDefault();
@@ -71,7 +92,7 @@ export function ConnectToDeviceForm({
   );
 }
 
-const ScanButton = styled(Button)`
+const StackedScanButton = styled(ScanCodeButton)`
   margin-bottom: 0.6rem;
 `;
 

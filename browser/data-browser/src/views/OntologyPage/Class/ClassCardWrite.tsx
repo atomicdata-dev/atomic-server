@@ -77,6 +77,7 @@ export function ClassCardWrite({ subject }: ClassCardWriteProps): JSX.Element {
             <PropertyLineWrite
               key={s}
               subject={s}
+              classResource={resource}
               onRemove={prop => removeProperty('requires', prop)}
             />
           ))}
@@ -90,6 +91,7 @@ export function ClassCardWrite({ subject }: ClassCardWriteProps): JSX.Element {
             <PropertyLineWrite
               key={s}
               subject={s}
+              classResource={resource}
               onRemove={prop => removeProperty('recommends', prop)}
             />
           ))}

@@ -27,6 +27,7 @@ import { NoHostNudge, ShareLinkPanel } from './ShareLinkPanel';
 import { SummaryTab } from './Summary/SummaryTab';
 import { SettingsTab } from './SettingsTab';
 import { useFormHostOrigin } from './formHostOrigin';
+import { FormDataClassContext } from './formDataClass';
 
 type BuilderTab = 'fields' | 'results' | 'summary' | 'settings';
 
@@ -66,135 +67,140 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   }, [pages, activePage]);
 
   return (
-    <Shell>
-      <TitleSlot>
-        {isTableForm && (
-          <BackLink subject={tableSubject}>
-            <FaArrowLeft aria-hidden /> Back to table
-          </BackLink>
-        )}
-        <HeaderRow>
-          <TitleArea>
-            <EditableTitle resource={resource} id={titleId} />
-          </TitleArea>
-          <HeaderActions>
-            {hostOrigin ? (
-              <ShareLinkPanel resource={resource} origin={hostOrigin} />
-            ) : null}
-            <FormPreviewButton formSubject={resource.subject} />
-            {hostOrigin ? (
-              <PublishToggle resource={resource} />
-            ) : (
-              !hostPending && <NoHostNudge />
-            )}
-          </HeaderActions>
-        </HeaderRow>
-      </TitleSlot>
-      <TabsSlot role='tablist'>
-        <TabButton
-          role='tab'
-          type='button'
-          $active={activeTab === 'fields'}
-          aria-selected={activeTab === 'fields'}
-          onClick={() => setActiveTab('fields')}
-        >
-          Fields
-        </TabButton>
-        <TabButton
-          role='tab'
-          type='button'
-          $active={activeTab === 'settings'}
-          aria-selected={activeTab === 'settings'}
-          onClick={() => setActiveTab('settings')}
-        >
-          Settings
-        </TabButton>
-        {!isTableForm && (
+    <FormDataClassContext.Provider value={dataClassSubject}>
+      <Shell>
+        <TitleSlot>
+          {isTableForm && (
+            <BackLink subject={tableSubject}>
+              <FaArrowLeft aria-hidden /> Back to table
+            </BackLink>
+          )}
+          <HeaderRow>
+            <TitleArea>
+              <EditableTitle resource={resource} id={titleId} />
+            </TitleArea>
+            <HeaderActions>
+              {hostOrigin ? (
+                <ShareLinkPanel resource={resource} origin={hostOrigin} />
+              ) : null}
+              <FormPreviewButton formSubject={resource.subject} />
+              {hostOrigin ? (
+                <PublishToggle resource={resource} />
+              ) : (
+                !hostPending && <NoHostNudge />
+              )}
+            </HeaderActions>
+          </HeaderRow>
+        </TitleSlot>
+        <TabsSlot role='tablist'>
           <TabButton
             role='tab'
             type='button'
-            $active={activeTab === 'results'}
-            aria-selected={activeTab === 'results'}
-            onClick={() => setActiveTab('results')}
+            $active={activeTab === 'fields'}
+            aria-selected={activeTab === 'fields'}
+            onClick={() => setActiveTab('fields')}
           >
-            Results
+            Fields
           </TabButton>
-        )}
-        <TabButton
-          role='tab'
-          type='button'
-          $active={activeTab === 'summary'}
-          aria-selected={activeTab === 'summary'}
-          onClick={() => setActiveTab('summary')}
-        >
-          Summary
-        </TabButton>
-      </TabsSlot>
-      {activeTab === 'fields' ? (
-        <FieldsGrid>
-          <MainSlot>
-            {missing.length > 0 && (
-              <p role='alert'>
-                Required table columns are missing from this form:{' '}
-                {missing
-                  .map(s => columns.find(p => p.subject === s))
-                  .map((p, i) => (p ? columnLabel(p) : missing[i]))
-                  .join(', ')}
-                . Responses cannot be saved without them.
-              </p>
-            )}
-            {activePage && dataClassSubject && (
-              <FieldList
-                ownsSchema={ownsSchema}
-                tableSubject={tableSubject}
-                form={resource}
-                dataClassSubject={dataClassSubject}
-                pageSubject={activePage}
-                selectedField={selectedField}
-                onSelectField={setSelectedField}
+          <TabButton
+            role='tab'
+            type='button'
+            $active={activeTab === 'settings'}
+            aria-selected={activeTab === 'settings'}
+            onClick={() => setActiveTab('settings')}
+          >
+            Settings
+          </TabButton>
+          {!isTableForm && (
+            <TabButton
+              role='tab'
+              type='button'
+              $active={activeTab === 'results'}
+              aria-selected={activeTab === 'results'}
+              onClick={() => setActiveTab('results')}
+            >
+              Results
+            </TabButton>
+          )}
+          <TabButton
+            role='tab'
+            type='button'
+            $active={activeTab === 'summary'}
+            aria-selected={activeTab === 'summary'}
+            onClick={() => setActiveTab('summary')}
+          >
+            Summary
+          </TabButton>
+        </TabsSlot>
+        {activeTab === 'fields' ? (
+          <FieldsGrid>
+            <MainSlot>
+              {missing.length > 0 && (
+                <p role='alert'>
+                  Required table columns are missing from this form:{' '}
+                  {missing
+                    .map(s => columns.find(p => p.subject === s))
+                    .map((p, i) => (p ? columnLabel(p) : missing[i]))
+                    .join(', ')}
+                  . Responses cannot be saved without them.
+                </p>
+              )}
+              {activePage && dataClassSubject && (
+                <FieldList
+                  ownsSchema={ownsSchema}
+                  tableSubject={tableSubject}
+                  form={resource}
+                  dataClassSubject={dataClassSubject}
+                  pageSubject={activePage}
+                  selectedField={selectedField}
+                  onSelectField={setSelectedField}
+                />
+              )}
+            </MainSlot>
+            <SettingsSlot>
+              {selectedField && dataClassSubject ? (
+                <FieldSettingsPanel
+                  ownsSchema={ownsSchema}
+                  tableSubject={tableSubject}
+                  fieldSubject={selectedField}
+                  dataClassSubject={dataClassSubject}
+                  form={resource}
+                />
+              ) : (
+                activePage && (
+                  <PageSettingsPanel pageSubject={activePage} form={resource} />
+                )
+              )}
+            </SettingsSlot>
+            <PageBarSlot>
+              <PageTabBar
+                formResource={resource}
+                activePage={activePage}
+                onSelectPage={subject => {
+                  setActivePage(subject);
+                  setSelectedField(undefined);
+                }}
               />
-            )}
-          </MainSlot>
-          <SettingsSlot>
-            {selectedField && dataClassSubject ? (
-              <FieldSettingsPanel
-                ownsSchema={ownsSchema}
-                tableSubject={tableSubject}
-                fieldSubject={selectedField}
-                dataClassSubject={dataClassSubject}
-                form={resource}
-              />
-            ) : (
-              activePage && (
-                <PageSettingsPanel pageSubject={activePage} form={resource} />
-              )
-            )}
-          </SettingsSlot>
-          <PageBarSlot>
-            <PageTabBar
-              formResource={resource}
-              activePage={activePage}
-              onSelectPage={subject => {
-                setActivePage(subject);
-                setSelectedField(undefined);
-              }}
+            </PageBarSlot>
+          </FieldsGrid>
+        ) : activeTab === 'settings' ? (
+          <ResultsSlot>
+            <SettingsTab resource={resource} />
+          </ResultsSlot>
+        ) : activeTab === 'results' ? (
+          <ResultsSlot>
+            <ResultsTab tableResource={tableResource} />
+          </ResultsSlot>
+        ) : (
+          <ResultsSlot>
+            <SummaryTab
+              formSubject={resource.subject}
+              noServer={!hostOrigin && !hostPending}
             />
-          </PageBarSlot>
-        </FieldsGrid>
-      ) : activeTab === 'settings' ? (
-        <ResultsSlot>
-          <SettingsTab resource={resource} />
-        </ResultsSlot>
-      ) : activeTab === 'results' ? (
-        <ResultsSlot>
-          <ResultsTab tableResource={tableResource} />
-        </ResultsSlot>
-      ) : (
-        <ResultsSlot>
-          <SummaryTab formSubject={resource.subject} />
-        </ResultsSlot>
-      )}
-    </Shell>
+          </ResultsSlot>
+        )}
+      </Shell>
+    </FormDataClassContext.Provider>
   );
 }
 

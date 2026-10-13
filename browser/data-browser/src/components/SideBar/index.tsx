@@ -3,6 +3,11 @@ import * as React from 'react';
 import { useHover } from '../../helpers/useHover';
 import { useSettings } from '../../helpers/AppSettings';
 import { SideBarDrive } from './SideBarDrive';
+import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { createPortal } from 'react-dom';
+import { SidebarDropZones } from './SidebarDropZones';
+import { SidebarItemTitle } from './ResourceSideBar/SidebarItemTitle';
+import { sidebarCollisionDetection, useSidebarDnd } from './useSidebarDnd';
 import {
   DragAreaBase,
   responsiveWidth,
@@ -34,9 +39,19 @@ const SideBarDriveMemo = React.memo(SideBarDrive);
 
 export function SideBar(): JSX.Element {
   const targetRef = useRef<HTMLDivElement>(null);
-  const [isRearanging, setIsRearanging] = React.useState(false);
 
   const { drive, sideBarLocked, setSideBarLocked } = useSettings();
+  const [isRearanging, setIsRearanging] = React.useState(false);
+  const {
+    handleDragStart,
+    handleDragEnd,
+    handleDragCancel,
+    draggingResource,
+    sensors,
+    animateDrop,
+    dndExplanation,
+    announcements,
+  } = useSidebarDnd(setIsRearanging);
   const { activePanel } = useRightPanel();
   const [ref, hoveringOverSideBar, listeners] = useHover<HTMLElement>();
   // Check if the window is small enough to hide the sidebar
@@ -108,29 +123,68 @@ export function SideBar(): JSX.Element {
           $dragging={isDragging}
           {...listeners}
         >
-          {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
-          <SideBarDriveMemo
-            onItemClick={closeSideBar}
-            key={drive}
-            onIsRearangingChange={setIsRearanging}
-          />
-          <MenuWrapper>
-            <Column gap='0.5rem' align='stretch'>
-              <SideBarHomePanels onItemClick={closeSideBar} />
-              {enabledPanels.has(Panel.AIChats) && <AIChatsPanel key={drive} />}
-              {enabledPanels.has(Panel.Ontologies) && (
-                <SideBarPanel
-                  title='Ontologies'
-                  heightStorageKey='ontologiesPanelHeight'
-                  initialHeight={160}
-                  key={drive}
-                >
-                  <OntologiesPanel />
-                </SideBarPanel>
-              )}
-              <AccountMenu onItemClick={closeSideBar} />
-            </Column>
-          </MenuWrapper>
+          {/* The DndContext lives here so the tree (draggables, drop edges) and
+              the Favorites / Trash zones (which take the panels' place while
+              dragging) share one context. It renders no DOM of its own. */}
+          <DndContext
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            sensors={sensors}
+            // `closestCenter` lets the 3-pixel `DropEdge` strips between
+            // siblings win over the much-taller "drop onto folder row"
+            // targets when the dragged item is over a sibling gap. With the
+            // default `rectIntersection` the bigger row always swallowed
+            // every drop and inter-sibling reordering became unreachable. The
+            // Favorites / Trash zones take priority while the pointer is on
+            // them.
+            collisionDetection={sidebarCollisionDetection}
+            accessibility={{
+              announcements,
+              screenReaderInstructions: {
+                draggable: dndExplanation,
+              },
+            }}
+          >
+            {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
+            <SideBarDriveMemo onItemClick={closeSideBar} key={drive} />
+            {/* While dragging, the zones take the panels' spot. The panels are
+                hidden (display: none), not unmounted, so their state and
+                scroll position survive the drag. */}
+            <SidebarDropZones draggingResource={draggingResource} />
+            <MenuWrapper $hidden={!!draggingResource}>
+              <Column gap='0.125rem' align='stretch'>
+                <SideBarHomePanels onItemClick={closeSideBar} />
+                {enabledPanels.has(Panel.AIChats) && (
+                  <AIChatsPanel key={drive} />
+                )}
+                {enabledPanels.has(Panel.Ontologies) && (
+                  <SideBarPanel
+                    title='Ontologies'
+                    panel={Panel.Ontologies}
+                    heightStorageKey='ontologiesPanelHeight'
+                    initialHeight={160}
+                    key={drive}
+                  >
+                    <OntologiesPanel />
+                  </SideBarPanel>
+                )}
+                <AccountMenu onItemClick={closeSideBar} />
+              </Column>
+            </MenuWrapper>
+            {createPortal(
+              <DragOverlay dropAnimation={animateDrop}>
+                {draggingResource && (
+                  <SidebarItemTitle
+                    subject={draggingResource}
+                    hideActionButtons
+                    isDragging
+                  />
+                )}
+              </DragOverlay>,
+              document.body,
+            )}
+          </DndContext>
           {!isRearanging && (
             <SideBarDragArea
               ref={dragAreaRef}
@@ -176,11 +230,11 @@ const StyledNav = styled.nav<StyledNavProps>`
   padding-bottom: ${p => p.theme.size()};
 `;
 
-const MenuWrapper = styled.div`
+const MenuWrapper = styled.div<{ $hidden?: boolean }>`
+  display: ${p => (p.$hidden ? 'none' : 'flex')};
   margin-top: auto;
   flex-direction: column;
   justify-items: flex-end;
-  display: flex;
   justify-content: end;
   box-sizing: border-box;
   width: 100%;

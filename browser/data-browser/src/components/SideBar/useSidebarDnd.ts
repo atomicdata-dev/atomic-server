@@ -1,21 +1,29 @@
 import {
   Announcements,
+  closestCenter,
+  CollisionDetection,
   DragEndEvent,
   DragStartEvent,
   DropAnimationFunction,
   KeyboardSensor,
   MouseSensor,
-  TouchSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import { core, dataBrowser, useStore } from '@tomic/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState, type MouseEvent } from 'react';
+import toast from 'react-hot-toast';
+import { isContentAddressed } from '../../helpers/propertyIdentity';
 import {
   SIDEBAR_TRANSITION_TAG,
   getTransitionName,
 } from '../../helpers/transitionName';
 import { useSettings } from '../../helpers/AppSettings';
+import { useFavorites } from '../../hooks/useFavorites';
+import { moveToTrash } from '../../helpers/trash';
+import { useResourceContextMenu } from '../ResourceContextMenu/ResourceContextMenuContext';
+import { HoldMoveTouchSensor } from './holdMoveTouchSensor';
 // Fractional-key math shared with table row insertion.
 import {
   computeSortOrder,
@@ -44,17 +52,120 @@ export type SideBarDropData = {
   nextSubject?: string;
 };
 
+/** Drop zones that act on the dragged item instead of moving it. */
+export type SideBarZoneKind = 'favorites' | 'trash';
+
+/** Data attached to the Favorites / Trash drop zones. */
+export type SideBarZoneData = {
+  zone: SideBarZoneKind;
+};
+
 export type SideBarDragData = {
   renderedUnder: string;
+};
+
+export const isZoneData = (data: unknown): data is SideBarZoneData => {
+  const zone = (data as Partial<SideBarZoneData> | null | undefined)?.zone;
+
+  return zone === 'favorites' || zone === 'trash';
+};
+
+/**
+ * The zones sit far from the tree, so when the pointer is inside one it wins
+ * outright. Everything else keeps using `closestCenter` (see SideBar).
+ */
+export const sidebarCollisionDetection: CollisionDetection = args => {
+  const zoneHits = pointerWithin({
+    ...args,
+    droppableContainers: args.droppableContainers.filter(c =>
+      isZoneData(c.data.current),
+    ),
+  });
+
+  return zoneHits.length > 0 ? zoneHits : closestCenter(args);
+};
+
+interface ZoneDropDeps {
+  favorites: string[];
+  addFavorite: (subject: string) => void;
+  moveToTrash: (subject: string) => Promise<unknown>;
+}
+
+/**
+ * Applies a drop on a zone, so the caller skips the parent / sortOrder logic.
+ * Trash parks the item in the drive's Trash folder (nothing is destroyed);
+ * the returned promise settles once that move is saved.
+ */
+export const handleZoneDrop = async (
+  zone: SideBarZoneKind,
+  subject: string,
+  { favorites, addFavorite, moveToTrash: move }: ZoneDropDeps,
+): Promise<void> => {
+  if (zone === 'trash') {
+    try {
+      if (await move(subject)) {
+        toast.success('Moved to Trash');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not move to Trash');
+    }
+
+    return;
+  }
+
+  if (favorites.includes(subject)) {
+    toast('Already in your favorites');
+
+    return;
+  }
+
+  addFavorite(subject);
+  toast.success('Added to favorites');
+};
+
+/** How long the overlay takes to vanish into the Trash zone, in ms. */
+export const TRASH_DROP_MS = 150;
+
+/**
+ * Keyframes for the overlay disappearing into the zone it was dropped on: it
+ * shrinks and fades in place (the pointer is already over the zone's centre).
+ */
+export const zoneDropKeyframes = (transform: {
+  x: number;
+  y: number;
+}): Keyframe[] => {
+  /* @wc-ignore */
+  const at = `translate(${transform.x}px, ${transform.y}px)`;
+
+  return [
+    /* @wc-ignore */
+    { transform: `${at} scale(1)`, opacity: 0.9 },
+    /* @wc-ignore */
+    { transform: `${at} scale(0.2)`, opacity: 0 },
+  ];
 };
 
 export const useSidebarDnd = (
   onIsRearangingChange: (isRearanging: boolean) => void,
 ) => {
   const store = useStore();
-  const { sidebarKeyboardDndEnabled } = useSettings();
+  const { sidebarKeyboardDndEnabled, drive } = useSettings();
 
   const keyboardSensor = useSensor(KeyboardSensor);
+  const { openResourceMenu } = useResourceContextMenu();
+
+  const onHold = useCallback(
+    (subject: string, point: { x: number; y: number }) => {
+      // The menu only needs a position; there is no mouse event for a held touch.
+      openResourceMenu(subject, {
+        clientX: point.x,
+        clientY: point.y,
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      } as MouseEvent);
+    },
+    [openResourceMenu],
+  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -62,17 +173,24 @@ export const useSidebarDnd = (
         distance: 10,
       },
     }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
-      },
+    // Touch: a quick swipe scrolls, a tap navigates, holding still and
+    // lifting opens the context menu, holding and then moving drags.
+    useSensor(HoldMoveTouchSensor, {
+      holdDelay: 400,
+      scrollTolerance: 8,
+      dragThreshold: 8,
+      onHold,
     }),
     sidebarKeyboardDndEnabled ? keyboardSensor : undefined,
   );
 
   const [draggingResource, setDraggingResource] = useState<string>();
-  const [waitForSavePromise, setWaitForSavePromise] = useState<Promise<void>>();
+  // Refs, not state: dnd-kit calls `animateDrop` right after `onDragEnd`, before
+  // a state update would have re-created the callback, so state set in
+  // `handleDragEnd` would be read stale (the previous drag's promise).
+  const waitForSaveRef = useRef<Promise<void>>(undefined);
+  const lastDropRef = useRef<{ zone: SideBarZoneKind } | undefined>(undefined);
+  const [favorites, addFavorite] = useFavorites();
 
   const animateDrop: DropAnimationFunction = useCallback(
     ({ active, dragOverlay, transform }) => {
@@ -80,8 +198,23 @@ export const useSidebarDnd = (
         return;
       }
 
-      return new Promise(resolve => {
-        waitForSavePromise?.then(() => {
+      // The item leaves the tree on a Trash drop, but the `parent=` query can
+      // still list its row for a moment. Flying to that row would send the
+      // overlay back to where the item came from, so shrink into the zone.
+      if (lastDropRef.current?.zone === 'trash') {
+        return new Promise<void>(resolve => {
+          const animation = dragOverlay.node.animate(
+            zoneDropKeyframes(transform),
+            { duration: TRASH_DROP_MS, easing: 'ease-in', fill: 'forwards' },
+          );
+
+          animation.onfinish = () => resolve();
+        });
+      }
+
+      return new Promise<void>(resolve => {
+        // Favorites keeps the item in place, so flying back to its row is right.
+        (waitForSaveRef.current ?? Promise.resolve()).then(() => {
           const targetNode = document.querySelector(
             `[data-sidebar-id="${getTransitionName(
               SIDEBAR_TRANSITION_TAG,
@@ -126,24 +259,57 @@ export const useSidebarDnd = (
         });
       });
     },
-    [waitForSavePromise],
+    [],
   );
 
   const handleDragStart = (event: DragStartEvent) => {
+    lastDropRef.current = undefined;
+    waitForSaveRef.current = undefined;
     onIsRearangingChange(true);
     setDraggingResource(event.active.id as string);
   };
 
+  // Escape or a cancelled touch ends a drag without a drop: leave drag mode so
+  // the panels come back.
+  const handleDragCancel = () => {
+    lastDropRef.current = undefined;
+    setDraggingResource(undefined);
+    onIsRearangingChange(false);
+    waitForSaveRef.current = Promise.resolve();
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
+    // Set synchronously: `animateDrop` runs before any state update lands.
+    lastDropRef.current = isZoneData(event.over?.data.current)
+      ? { zone: event.over.data.current.zone }
+      : undefined;
+
     if (!event.over) {
       setDraggingResource(undefined);
       onIsRearangingChange(false);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
 
     const subject = event.active.id as string;
+
+    if (isZoneData(event.over.data.current)) {
+      // The Favorites drop animation waits on this; Trash does not (see above).
+      const promise = handleZoneDrop(event.over.data.current.zone, subject, {
+        favorites,
+        addFavorite,
+        moveToTrash: s => moveToTrash(store, s, drive),
+      });
+
+      waitForSaveRef.current = promise;
+      await promise;
+      setDraggingResource(undefined);
+      onIsRearangingChange(false);
+
+      return;
+    }
+
     const { renderedUnder } = event.active.data
       .current as unknown as SideBarDragData;
     const {
@@ -158,7 +324,17 @@ export const useSidebarDnd = (
     if (subject === dropParent) {
       onIsRearangingChange(false);
       setDraggingResource(undefined);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
+
+      return;
+    }
+
+    // A content-addressed property's parent is part of its ID: it cannot move.
+    if (renderedUnder !== dropParent && isContentAddressed(subject)) {
+      toast.error("A property can't be moved to another parent.");
+      onIsRearangingChange(false);
+      setDraggingResource(undefined);
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -172,7 +348,7 @@ export const useSidebarDnd = (
     ) {
       setDraggingResource(undefined);
       onIsRearangingChange(false);
-      setWaitForSavePromise(Promise.resolve());
+      waitForSaveRef.current = Promise.resolve();
 
       return;
     }
@@ -200,7 +376,7 @@ export const useSidebarDnd = (
       await resource.save();
     })();
 
-    setWaitForSavePromise(promise);
+    waitForSaveRef.current = promise;
     await promise;
     setDraggingResource(undefined);
     onIsRearangingChange(false);
@@ -209,6 +385,16 @@ export const useSidebarDnd = (
   const dndExplanation: string = sidebarKeyboardDndEnabled
     ? 'To rearange items, press space or enter to start dragging. While dragging, use the arrow keys to move the item in any given direction. Press space or enter again to drop the item in its new position, or press escape to cancel.'
     : 'Keyboard support for drag and drop is disabled. Enable it in the settings.';
+
+  const describeTarget = (data: unknown): string => {
+    if (isZoneData(data)) {
+      return data.zone === 'trash' ? 'the trash' : 'your favorites';
+    }
+
+    const { parent } = data as SideBarDropData;
+
+    return store.getResourceLoading(parent).title;
+  };
 
   const announcements: Announcements = {
     onDragStart: ({ active }) => {
@@ -222,9 +408,8 @@ export const useSidebarDnd = (
       }
 
       const dragResource = store.getResourceLoading(active.id as string);
-      const dropResource = store.getResourceLoading(over.data.current.parent);
 
-      return `Draggable item ${dragResource.title} was moved over droppable area in ${dropResource.title}`;
+      return `Draggable item ${dragResource.title} was moved over droppable area in ${describeTarget(over.data.current)}`;
     },
     onDragEnd: ({ active, over }) => {
       if (!over || !over.data.current) {
@@ -232,9 +417,14 @@ export const useSidebarDnd = (
       }
 
       const dragResource = store.getResourceLoading(active.id as string);
-      const dropResource = store.getResourceLoading(over.data.current.parent);
 
-      return `${dragResource.title} was moved to ${dropResource.title}`;
+      if (isZoneData(over.data.current)) {
+        return over.data.current.zone === 'trash'
+          ? `${dragResource.title} was moved to the trash`
+          : `${dragResource.title} was dropped on your favorites`;
+      }
+
+      return `${dragResource.title} was moved to ${describeTarget(over.data.current)}`;
     },
     onDragCancel: () => {
       return `Dragging canceled`;
@@ -244,6 +434,7 @@ export const useSidebarDnd = (
   return {
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
     draggingResource,
     sensors,
     animateDrop,

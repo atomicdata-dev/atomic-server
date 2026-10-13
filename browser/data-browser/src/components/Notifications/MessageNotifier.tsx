@@ -12,11 +12,15 @@ import {
 } from '@tomic/react';
 import { AgentAvatar } from '../Presence/AgentAvatar';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
+import { useFollow } from '../Presence/FollowContext';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
+import { parseEntryId } from '../../helpers/chatLog';
 import {
+  bubbleId,
   classifyMessage,
+  entryFacts,
   isCandidate,
   type MessageFacts,
   type MessageNotification,
@@ -39,6 +43,12 @@ const TEXT_MAX = 140;
 
 /** Messages created before the app started are backlog, not news. */
 const APP_STARTED = Date.now();
+
+/**
+ * Entries announced (or ruled out) in this page load. Outside the component:
+ * a remount used to start from an empty set and announce every entry again.
+ */
+const handledEntries = new Set<string>();
 
 function factsOf(resource: Resource): MessageFacts {
   const stable = resource.stable;
@@ -99,12 +109,27 @@ export function MessageNotifier(): null {
   const store = useStore();
   const [agent] = useCurrentAgent();
   const [currentSubject] = useCurrentSubject();
-  const { activePanel, setPanelOpen } = useRightPanel();
+  const { activePanel, selectedMeeting, setPanelOpen } = useRightPanel();
+  const { followedSession, activeMeeting } = useFollow();
+  // The meeting chat in the right panel, when it is open (as the panel picks it).
+  const panelChat =
+    activePanel === 'followSession'
+      ? (selectedMeeting ?? followedSession ?? activeMeeting)
+      : undefined;
   const navigate = useNavigateWithTransition();
   const { privateDrive } = usePrivateDrive();
   const [sharedWithMe] = usePrivateDriveList(core.properties.sharedWithMe);
 
-  const handled = useRef(new Set<string>());
+  // Toasts on screen, so opening the meeting panel can take them away.
+  const shown = useRef(new Set<string>());
+  const meetingPanelOpen = activePanel === 'followSession';
+
+  useEffect(() => {
+    if (!meetingPanelOpen) return;
+
+    shown.current.forEach(id => toast.dismiss(id));
+    shown.current.clear();
+  }, [meetingPanelOpen]);
   // Announced while away, with system notifications not decided yet.
   const missed = useRef(0);
   // Inbox writes still in flight, per target, so reading waits for them.
@@ -208,6 +233,16 @@ export function MessageNotifier(): null {
 
   const isLookingAt = useEffectEvent((n: MessageNotification) => {
     if (document.hidden || !document.hasFocus()) return false;
+
+    // The meeting chat is open beside the page: its messages are on screen
+    // whatever the page is.
+    if (
+      panelChat &&
+      store.normalizeSubject(panelChat) === store.normalizeSubject(n.target)
+    ) {
+      return true;
+    }
+
     if (!currentSubject) return false;
 
     if (
@@ -220,100 +255,158 @@ export function MessageNotifier(): null {
     return !n.openComments || activePanel === 'comments';
   });
 
+  const announce = useEffectEvent(
+    async (facts: MessageFacts, text: string): Promise<void> => {
+      const subject = facts.subject;
+      const ctx = { me: agent?.subject, since: APP_STARTED };
+
+      // Replies can point at an entry; its author is on the entry's page.
+      const replyPage = facts.replyTo && parseEntryId(facts.replyTo)?.page;
+      const related = await loadAll(store, [
+        facts.parent,
+        facts.about,
+        replyPage || facts.replyTo,
+        facts.createdBy,
+      ]);
+      const n = classifyMessage(facts, {
+        ...ctx,
+        classesOf: s =>
+          related.get(s)?.get(core.properties.isA) as string[] | undefined,
+        isLocalOnly: s => store.isLocalOnlySubject(s),
+        creatorOf: s => {
+          const entry = parseEntryId(s);
+
+          return entry
+            ? related.get(entry.page)?.getChatLogEntry(entry.key)?.a
+            : related.get(s)?.getCreatedBy();
+        },
+      });
+
+      if (!n) return;
+
+      if (isLookingAt(n)) {
+        // Another open device may still record it; read that copy too.
+        const seenAt = Date.now();
+        setTimeout(() => readAbout(n.target, seenAt), 3000);
+
+        return;
+      }
+
+      const authorName = related.get(n.author)?.title ?? 'Someone';
+      const targetTitle = related.get(n.target)?.title ?? '';
+      const title = headline(n.kind, authorName, targetTitle);
+      const body =
+        text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text;
+
+      if (privateDrive) {
+        const before = recording.current.get(n.target);
+        const record = recordNotification(store, privateDrive, {
+          source: subject,
+          about: n.target,
+          kind: n.kind,
+          actor: n.author,
+          title,
+          body,
+          occurredAt: facts.createdAt ?? Date.now(),
+        }).catch(e => console.error('Could not add to the inbox:', e));
+        const all = Promise.all([before, record]);
+        recording.current.set(n.target, all);
+        void all.then(() => {
+          if (recording.current.get(n.target) === all) {
+            recording.current.delete(n.target);
+          }
+        });
+      }
+
+      if (!document.hidden && document.hasFocus()) {
+        // The meeting panel covers or crowds the page and has its own chat
+        // open; a bubble over its message box is noise. Still in the Inbox.
+        if (meetingPanelOpen) return;
+
+        shown.current.add(bubbleId(n.target));
+        toast.custom(
+          t => (
+            <ToastCard
+              type='button'
+              onClick={() => {
+                open(n);
+                toast.dismiss(t.id);
+              }}
+            >
+              <AgentAvatar agentSubject={n.author} size='1.8rem' />
+              <ToastBody>
+                <ToastTitle>{title}</ToastTitle>
+                <ToastText>{body}</ToastText>
+              </ToastBody>
+            </ToastCard>
+          ),
+          { duration: 6000, id: bubbleId(n.target) },
+        );
+
+        return;
+      }
+
+      if (shouldOfferOsNotifications()) missed.current += 1;
+
+      showOsNotification({
+        title,
+        body,
+        tag: bubbleId(n.target),
+        onClick: () => open(n),
+      });
+    },
+  );
+
   const onUpdate = useEffectEvent(async (resource: Resource) => {
     const subject = resource.stable.subject;
+    const ctx = { me: agent?.subject, since: APP_STARTED };
+    const classes =
+      (resource.stable.get(core.properties.isA) as string[] | undefined) ?? [];
 
-    if (handled.current.has(subject)) return;
+    // A page of a chat log: its entries are the messages. Every update asks
+    // about all of them; the ones already handled (and edits of those) are
+    // skipped.
+    if (classes.includes(dataBrowser.classes.chatLog)) {
+      const page = resource.stable;
+
+      // Nobody but you writes in a local-only drive, so whoever speaks there
+      // is the demo's script. Not news, and never the Inbox of a real account.
+      if (store.isLocalOnlySubject(page.subject)) return;
+
+      for (const { key, entry } of page.listChatLogEntries()) {
+        const facts = entryFacts(page.subject, factsOf(page), key, entry);
+
+        if (handledEntries.has(facts.subject)) continue;
+
+        // Not decidable yet: the page's own metadata hasn't arrived.
+        if (isCandidate(facts, ctx) === undefined) continue;
+
+        handledEntries.add(facts.subject);
+
+        if (isCandidate(facts, ctx)) await announce(facts, entry.t);
+      }
+
+      return;
+    }
+
+    if (handledEntries.has(subject)) return;
 
     const facts = factsOf(resource);
-    const ctx = { me: agent?.subject, since: APP_STARTED };
     const candidate = isCandidate(facts, ctx);
 
     // Not decidable yet: its genesis hasn't arrived. A later update will ask again.
     if (candidate === undefined) return;
 
-    handled.current.add(subject);
+    handledEntries.add(subject);
 
     if (!candidate) return;
 
-    const related = await loadAll(store, [
-      facts.parent,
-      facts.about,
-      facts.replyTo,
-      facts.createdBy,
-    ]);
-    const n = classifyMessage(facts, {
-      ...ctx,
-      classesOf: s =>
-        related.get(s)?.get(core.properties.isA) as string[] | undefined,
-      creatorOf: s => related.get(s)?.getCreatedBy(),
-    });
-
-    if (!n) return;
-
-    if (isLookingAt(n)) {
-      // Another open device may still record it; read that copy too.
-      const seenAt = Date.now();
-      setTimeout(() => readAbout(n.target, seenAt), 3000);
-
-      return;
-    }
-
-    const authorName = related.get(n.author)?.title ?? 'Someone';
-    const targetTitle = related.get(n.target)?.title ?? '';
-    const title = headline(n.kind, authorName, targetTitle);
-    const text =
+    await announce(
+      facts,
       (resource.stable.get(core.properties.description) as
         | string
-        | undefined) ?? '';
-    const body = text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text;
-
-    if (privateDrive) {
-      const before = recording.current.get(n.target);
-      const record = recordNotification(store, privateDrive, {
-        source: subject,
-        about: n.target,
-        kind: n.kind,
-        actor: n.author,
-        title,
-        body,
-        occurredAt: facts.createdAt ?? Date.now(),
-      }).catch(e => console.error('Could not add to the inbox:', e));
-      const all = Promise.all([before, record]);
-      recording.current.set(n.target, all);
-      void all.then(() => {
-        if (recording.current.get(n.target) === all) {
-          recording.current.delete(n.target);
-        }
-      });
-    }
-
-    if (!document.hidden && document.hasFocus()) {
-      toast.custom(
-        t => (
-          <ToastCard
-            type='button'
-            onClick={() => {
-              open(n);
-              toast.dismiss(t.id);
-            }}
-          >
-            <AgentAvatar agentSubject={n.author} size='1.8rem' />
-            <ToastBody>
-              <ToastTitle>{title}</ToastTitle>
-              <ToastText>{body}</ToastText>
-            </ToastBody>
-          </ToastCard>
-        ),
-        { duration: 6000, id: subject },
-      );
-
-      return;
-    }
-
-    if (shouldOfferOsNotifications()) missed.current += 1;
-
-    showOsNotification({ title, body, tag: subject, onClick: () => open(n) });
+        | undefined) ?? '',
+    );
   });
 
   // Things shared with you out of drives you can't open are only delivered to

@@ -1,10 +1,17 @@
 import {
   core,
   forms,
+  getEffectiveConstraint,
   useArray,
+  useResource,
   useResources,
+  useStore,
+  useString,
+  useValue,
   type Resource,
+  type Store,
 } from '@tomic/react';
+import { optionSubjects } from '@helpers/withConstraint';
 import { useMemo } from 'react';
 import type { FieldOption } from '@tomic/form-renderer';
 import type { FormFieldType } from './fieldTypes';
@@ -43,12 +50,18 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
 
   const fieldResources = useResources(fieldSubjects);
 
-  // Choice options live on the mapped Property's `allowsOnly`, so resolving
-  // them takes two more hops: the Properties, then their Tags. A question
-  // borrowing another column's tags mirrors them here too (see
-  // `applyOptionsSource`), so it lands in the same place. A *row*-sourced
-  // question has no fixed list — `choiceOptions` stays undefined and
-  // `ConditionsEditor` falls back to a free-text value input.
+  // Choice options are the `enum` of the data class's constraint for the
+  // mapped column, so resolving them takes two more hops: the Properties (for
+  // columns that predate the class map), then their Tags. A question borrowing
+  // another column's tags mirrors them here too (see `applyOptionsSource`), so
+  // it lands in the same place. A *row*-sourced question has no fixed list —
+  // `choiceOptions` stays undefined and `ConditionsEditor` falls back to a
+  // free-text value input.
+  const store = useStore();
+  const [dataClassSubject] = useString(form, forms.properties.formDataClass);
+  const dataClass = useResource(dataClassSubject);
+  // Read so a change to the class's constraints re-renders this hook.
+  const [classConstraints] = useValue(dataClass, core.properties.constraints);
   const propertySubjects = useMemo(
     () =>
       [...fieldResources.values()]
@@ -60,10 +73,10 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
 
   const tagSubjects = useMemo(
     () =>
-      [...propertyResources.values()].flatMap(
-        p => (p.get(core.properties.allowsOnly) as string[] | undefined) ?? [],
+      [...propertyResources.keys()].flatMap(subject =>
+        columnTags(store, dataClassSubject, subject, classConstraints),
       ),
-    [propertyResources],
+    [store, dataClassSubject, propertyResources, classConstraints],
   );
   const tagResources = useResources(tagSubjects);
 
@@ -108,10 +121,9 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
     return questions;
 
     function choiceOptionsFor(mapsTo?: string): FieldOption[] | undefined {
-      const property = mapsTo ? propertyResources.get(mapsTo) : undefined;
-      const tags = property?.get(core.properties.allowsOnly) as
-        | string[]
-        | undefined;
+      const tags = mapsTo
+        ? columnTags(store, dataClassSubject, mapsTo, classConstraints)
+        : undefined;
 
       if (!tags?.length) return undefined;
 
@@ -130,7 +142,36 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
         };
       });
     }
-  }, [pages, pageResources, fieldResources, propertyResources, tagResources]);
+  }, [
+    pages,
+    pageResources,
+    fieldResources,
+    tagResources,
+    store,
+    dataClassSubject,
+    classConstraints,
+  ]);
+}
+
+/**
+ * The option Tags of a column: the `enum` of the data class's constraint, or
+ * the Property's legacy `allowsOnly`. `classConstraints` is the class's raw
+ * `constraints` value: it is not read here (the store is), but passing it makes
+ * callers recompute when the class's map changes.
+ */
+function columnTags(
+  store: Store,
+  dataClassSubject: string | undefined,
+  propertySubject: string,
+  _classConstraints: unknown,
+): string[] {
+  return optionSubjects(
+    getEffectiveConstraint(
+      store,
+      dataClassSubject ? [dataClassSubject] : [],
+      propertySubject,
+    ),
+  );
 }
 
 /** Questions the current field/page is allowed to condition on: earlier

@@ -29,7 +29,6 @@ export function ArticleDescription({
     try {
       await resource.save();
       setEditMode(false);
-      toast.success('Content saved');
     } catch (e) {
       setEditMode(true);
       toast.error('Could not save resource...');

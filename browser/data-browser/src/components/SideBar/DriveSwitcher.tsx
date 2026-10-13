@@ -1,3 +1,4 @@
+import { driveDisplayName } from '../../helpers/driveDisplayName';
 import { canonicalizeScheme } from '@tomic/lib';
 import styled from 'styled-components';
 import { useAccountDriveCatalog } from '../../hooks/useAccountDriveCatalog';
@@ -34,7 +35,10 @@ export const DriveSwitcherChevronTrigger = buildDefaultTrigger(
 );
 
 function getTitle(resource: Resource): string {
-  return (resource.get(core.properties.name) as string) ?? resource.subject;
+  return driveDisplayName(
+    resource.get(core.properties.name) as string | undefined,
+    resource.subject,
+  );
 }
 
 /**
@@ -106,7 +110,7 @@ export function DriveSwitcher({
         resource && !resource.error
           ? getTitle(resource)
           : catalog.entries.find(e => e.drive_subject === subject)
-              ?.drive_name || subject;
+              ?.drive_name || driveDisplayName(undefined, subject);
 
       return {
         id: subject,

@@ -8,7 +8,7 @@ import {
 import { readManagedAccountBinding } from './binding';
 import { canHoldProviderCookie } from './deviceLink';
 import { readCachedBackups, sameAgent } from './recovery';
-import { getManagedAccount } from './session';
+import { getManagedAccount, noteManagedSessionChanged } from './session';
 
 /**
  * One sign-in for the app and the account: the identity this device has
@@ -92,7 +92,7 @@ export async function signInAccountWithAgent(
       return false;
 
     const auth = await createAuthentication(challenge.challenge, agent);
-    const signedIn = await managedFetch('/auth/agent', {
+    const signedIn = await managedFetch('/auth/agent?if_linked=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -101,7 +101,11 @@ export async function signInAccountWithAgent(
         signature: auth['https://atomicdata.dev/properties/auth/signature'],
       }),
     });
-    if (!signedIn.ok) return false;
+    // Only 204 establishes a session. A verified identity without an account
+    // returns 200 with signed_in:false; no follow-up account read is needed.
+    if (signedIn.status !== 204) return false;
+
+    noteManagedSessionChanged();
 
     return !!(await getManagedAccount());
   } catch {

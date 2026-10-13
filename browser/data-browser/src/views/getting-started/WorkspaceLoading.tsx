@@ -10,7 +10,7 @@ export function WorkspaceLoading({
   return (
     <Column gap='1rem' role='status' aria-live='polite' aria-busy='true'>
       <div style={{ alignSelf: 'center' }}>
-        <Spinner size='2.5rem' />
+        <Spinner size='4rem' />
       </div>
       <CardTitle>Opening your workspace</CardTitle>
       <CardSubtitle>

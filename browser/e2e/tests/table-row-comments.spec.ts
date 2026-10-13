@@ -92,6 +92,13 @@ test.describe('table row comments', () => {
       { timeout: 15000 },
     );
 
+    // The comment is an entry in the row's chat log page, not a resource.
+    await expect(
+      panel
+        .locator('[data-entry-key]')
+        .filter({ hasText: 'Needs a second look' }),
+    ).toHaveCount(1);
+
     // The count is live, and it belongs to the first row alone.
     await expect(bubble(page, 2)).toHaveText('1', { timeout: 15000 });
     await expect(bubble(page, 3)).toHaveText('');
@@ -120,5 +127,15 @@ test.describe('table row comments', () => {
     await expect(
       page.getByTestId('comments-panel').locator('text=Needs a second look'),
     ).toBeVisible({ timeout: 15000 });
+
+    // A second comment goes to the same page: the count adds up, and the
+    // unread badge clears while the thread is open.
+    const input = page.getByTestId('comments-panel').getByLabel('Chat input');
+    await input.fill('And a follow-up');
+    await input.press('Enter');
+    await expect(
+      page.getByTestId('comments-panel').locator('[data-entry-key]'),
+    ).toHaveCount(2, { timeout: 15000 });
+    await expect(bubble(page, 2)).toHaveText('2', { timeout: 15000 });
   });
 });

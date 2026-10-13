@@ -24,7 +24,11 @@ import {
 } from './vault';
 import { loadVaultKeyOps } from './vaultKeyOps';
 import { getOrCreateDeviceId } from './devices';
-import { getManagedAccount, onManagedLogout } from './session';
+import {
+  getManagedAccount,
+  onManagedLogout,
+  onManagedSessionChanged,
+} from './session';
 import { evaluateIdentityReconciliation } from './reconcile';
 import { nodeVault } from './nodeVault';
 import { isRunningInTauri } from '../tauri';
@@ -645,8 +649,8 @@ export function watchForVaultBackups(
     if (!identity) return;
 
     void (async () => {
-      // Avoid enrollment discovery requests when signed out. Keep work queued
-      // so a reconnect or periodic retry can finish it later.
+      // Avoid enrollment discovery requests when signed out. Failures keep
+      // work queued so a reconnect or periodic retry can finish it later.
       const retry = (drive: string) => {
         if (
           !stopped &&
@@ -657,11 +661,16 @@ export function watchForVaultBackups(
       };
 
       try {
-        if (!drives.length || stopped || !(await deps.hasAccount())) {
+        if (!drives.length || stopped) {
           drives.forEach(retry);
 
           return;
         }
+
+        // Signed out: drop the queue instead of asking again on every flush.
+        // A sign-in in this tab resets the scheduler; one in another tab is
+        // found by the next edit, focus or periodic pass.
+        if (!(await deps.hasAccount())) return;
 
         const remote = drives.filter(
           drive =>
@@ -730,6 +739,7 @@ export function watchForVaultBackups(
     store.on(StoreEvents.DriveChanged, schedule),
     store.on(StoreEvents.AgentChanged, reset),
     onManagedLogout(reset),
+    onManagedSessionChanged(reset),
   ];
   // Also catches native-node changes that do not emit browser Store events,
   // and accounts linked after the initial mount. No-change passes upload nothing.

@@ -2,11 +2,15 @@ import { isNumber } from './datatypes.js';
 import { enableLoro } from './loro-loader.js';
 import { Collections, collections } from './ontologies/collections.js';
 import { Resource, normalizeLoroChangeTimestampMs } from './resource.js';
+import { decodeB64 } from './base64.js';
+import { decodeGenesisCert } from './genesis.js';
+import { GENESIS } from './urls.js';
 import { Store } from './store.js';
 import { commits } from './ontologies/commits.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
 import { isCommitSubject } from './commit.js';
 import { core } from './ontologies/core.js';
+import { withDeadline } from './withDeadline.js';
 
 /**
  * Strips `did:ad:commit:` subjects from a member list. Commit resources don't
@@ -1071,20 +1075,27 @@ export class Collection {
 
     const sortDesc = !!this.params.sort_desc;
     const key = this.sortKeyOf(subject, sortBy);
-    const keys = members.map(member => this.sortKeyOf(member, sortBy));
 
     // A member the store does not hold yet has no key to compare against.
-    if (key === undefined || keys.some(k => k === undefined)) {
-      return [...members, subject];
-    }
+    if (key === undefined) return [...members, subject];
 
+    // Walk back from the end only as far as the new member sorts before the
+    // one it is compared with. A late arrival usually belongs at the end, so
+    // this reads one key, not the whole list: reading every key per added
+    // member made loading a large collection quadratic.
     let at = members.length;
 
-    while (
-      at > 0 &&
-      compareSortKeys(keys[at - 1], key, members[at - 1]!, subject, sortDesc) >
-        0
-    ) {
+    while (at > 0) {
+      const prev = this.sortKeyOf(members[at - 1]!, sortBy);
+
+      if (prev === undefined) return [...members, subject];
+
+      if (
+        compareSortKeys(prev, key, members[at - 1]!, subject, sortDesc) <= 0
+      ) {
+        break;
+      }
+
       at -= 1;
     }
 
@@ -1208,7 +1219,19 @@ export class Collection {
       return 'no-db';
     }
 
-    const result = await this.store.queryLocalDb({
+    // While a drive sync is still pulling data, the local database may hold
+    // only part of the members (a chat of thousands of messages, say). The
+    // server has them all, so let it answer instead of a partial list, and do
+    // not queue a query behind the sync's writes first.
+    if (
+      this.store.serverConnected &&
+      this.store.isDriveSyncPulling() &&
+      !this.store.hasCompletedDriveSyncFor(drive)
+    ) {
+      return 'no-db';
+    }
+
+    const query = this.store.queryLocalDb({
       property: this.params.property,
       value: this.params.value,
       filters: this.params.filters,
@@ -1228,6 +1251,18 @@ export class Collection {
         : undefined,
     });
 
+    // With a server to ask, a local query that has not answered by the read
+    // deadline (a worker busy with a drive sync's writes) is no answer. A
+    // local-only parent has no server to ask, so it waits as long as it takes.
+    const result =
+      this.store.serverConnected &&
+      !(
+        typeof this.params.value === 'string' &&
+        this.store.isLocalOnlySubject(this.params.value)
+      )
+        ? await withDeadline(query, this.store.localReadDeadlineMs(), null)
+        : await query;
+
     // Worker returned no result (query error / DB not available). Don't
     // overwrite the page — `fetchPage` races us against `/query`, and a
     // late `setEmptyPage` here can clobber a server result that already
@@ -1236,9 +1271,7 @@ export class Collection {
       return 'no-db';
     }
 
-    // While a drive sync is still pulling data, the local database may hold
-    // only part of the members (a chat of thousands of messages, say). The
-    // server has them all, so let it answer instead of a partial list.
+    // The sync may have started pulling while the query ran.
     if (
       this.store.serverConnected &&
       this.store.isDriveSyncPulling() &&
@@ -1696,6 +1729,30 @@ const LAZY_HYDRATE_THRESHOLD = 200;
  * creation time, from the genesis change) is not in the JSON, so the caller
  * builds the resources instead and gets the same order as before.
  */
+/** Creation time (ms) of a JSON-AD member, as `Resource.getCreatedAt` reads it:
+ *  the genesis certificate first, then the materialized `createdAt`. */
+function createdAtFromJson(
+  parsed: Record<string, unknown>,
+): number | undefined {
+  const encoded = parsed[GENESIS];
+
+  if (typeof encoded === 'string' && encoded.length > 0) {
+    try {
+      const cert = decodeGenesisCert(decodeB64(encoded));
+
+      if (cert.createdAt > 0) return cert.createdAt;
+    } catch {
+      // Fall through to the propval.
+    }
+  }
+
+  const fromPropval = parsed[commits.properties.createdAt];
+
+  return typeof fromPropval === 'number'
+    ? normalizeLoroChangeTimestampMs(fromPropval)
+    : undefined;
+}
+
 function sortKeysFromJsonAd(
   sortBy: string,
   jsonBySubject: Map<string, string>,
@@ -1709,7 +1766,17 @@ function sortKeysFromJsonAd(
     let value: unknown;
 
     try {
-      value = (JSON.parse(json) as Record<string, unknown>)[sortBy];
+      const parsed = JSON.parse(json) as Record<string, unknown>;
+
+      value = parsed[sortBy];
+
+      // Rows nobody has repositioned have no `sortOrder`: they sort by
+      // creation time, which `Resource.getCreatedAt` reads from the genesis
+      // certificate. Read it from the JSON too, or every page of such a table
+      // (most of them) builds all its rows into resources just to sort.
+      if (value === undefined && derived) {
+        value = createdAtFromJson(parsed);
+      }
     } catch {
       return undefined;
     }

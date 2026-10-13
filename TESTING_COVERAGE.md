@@ -1,3 +1,7 @@
+Chat log entries (2026-10-09, `planning/chat-log.md`): `lib/tests/chat_log.rs` applies signed commits through the real rights path for a `ChatLog` page: an author adds, edits and deletes own entries; a member cannot touch another's entry, claim or forge one, or change page properties; a writer on the chat moderates; page genesis grants no `write` and refuses a self-granted one; entries more than ten minutes ahead of the server clock are rejected. `lib/src/db/test.rs` checks entries reach no propval, index or search row, and `measure_chat_log_entry_bytes` (ignored) prints bytes per message. `browser/lib/src/chat-log.test.ts` covers the TS helpers and that entry changes ride in a saved commit's `loroUpdate`. Step 2 (group chat and comments in the log): `browser/lib/tests/chat-log.integration.test.ts` runs two agents against a real server (an appender adds, edits and removes own entries, is refused on another's, a writer moderates). `helpers/chatLog.test.ts` covers entry ids, the merge and window of old messages and entries, and the page choice; `messageNotification.test.ts` covers entry notifications. Playwright: `chat-log.spec.ts` (entry, edit, reply, copy link, delete, reload, a second member seeing entries and edits live and no edit buttons on another's), `e2e.spec.ts` chatroom, `offline-chatroom.spec.ts`, `chat-mention.spec.ts`, `table-row-comments.spec.ts` (comment and count as entries) and `notifications.spec.ts` (chat, reply and comment toasts for entries, unseen badge). Migration of existing messages (`planning/chat-log.md`, "Existing messages"): `lib/src/db/chat_migration_test.rs` checks grouping by chat and by commented item, the split at 256 with the oldest on the first page, authors and times kept, deterministic keys, replies mapped across pages and left alone for an outside target, follow events keeping their kind, an edited message getting `e`, the old resource and its genesis commit row, snapshot, envelopes and indexes gone, a re-run being a no-op, a run that stopped after the pages and a straggler arriving meanwhile, the slices resuming from the stored state, a member editing own migrated entry and not another's while the chat owner can, a cache of a hosted drive only dropping rows that have their entry, opening a store migrating it, and the bytes per message before and after (`migrating_a_chat_shrinks_the_store`). `client-db.worker.migration.test.ts` covers the worker running the message slices after the index rebuild with progress and the local-only drives; `migratedEntryKey` has one test vector in Rust and TS; `helpers/chatLog.test.ts` covers hiding migrated old messages. Playwright: `chat-log-migration.spec.ts` shows old Message resources, then the same chat once their entries exist (stale copies hidden, one without an entry still listed, order kept); `meetings.spec.ts` covers follow events as entries. Not covered: the browser worker migrating a local-only drive end to end (WASM and OPFS), a real server restart with old messages in an e2e run, and an edited message's genesis commit row (kept). Not covered: concurrent edits of one entry by two members, a chat past one page (256 entries) in the browser, scrolling to a linked entry (not built), and DMs (later step).
+
+AI chat in the log (`planning/chat-log.md`, "Step 3: AI chat"): `lib/src/db/ai_chat_migration_test.rs` checks the order coming from the `messages` list and not `createdAt`, parts (reasoning, text, tool calls with input and output) inlined, authors, the old messages and every part resource gone and `messages` cleared, a re-run being a no-op, a run that stopped before the removal resuming without duplicates, a cache of a hosted drive writing nothing, and the bytes before and after for a 20-message chat with tool calls. `client-db.worker.migration.test.ts` covers the AI step after the message step. `chunks/AI/aiChatLog.test.ts` covers message <-> entry (parts, tool calls, context, errors, summary), a re-save keeping key and time, draft chats not saving, the page rollover at 256, removing one and all-following, entries sorted by `c`, and old messages merged in front and hidden once their entry exists. Playwright: `ai-chat-log-migration.spec.ts` (old chat shows once with and without entries; a new chat stores one page and no message resources) next to `ai.spec.ts`, `ai-chat-discovery.spec.ts`, `ai-sidebar-navigation.spec.ts` and `ai-mobile.spec.ts`. Not covered: the browser worker migrating a local-only AI chat end to end, tool outputs large enough to matter for a page's size, and a chat past 256 messages in the browser.
+
 Date-only values (#1795, 2026-09-25): `browser/data-browser/src/helpers/dates/calendarDate.test.tsx` renders a `date` value through `ValueComp` (row dialog, resource page), the table cell, a min/max aggregate, day and month group headings and the history diff, in Europe/Amsterdam and America/New_York. Each must show the same civil day with no time. The tests set `process.env.TZ` themselves, so they fail on the bug in any CI zone.
 Row dialog fields (#1796, 2026-09-25): `browser/data-browser/src/components/PropVal.test.tsx` checks that the row dialog labels a value with its property's name (or a readable shortname when it has none), with the shortname in the tooltip. The label must not be a link, the property opens in a new tab, and the edited checkbox gets its accessible name from the label. Resource pages keep the linked shortname. `browser/e2e/tests/row-dialog.spec.ts` covers the same in a real Grocery list and runs axe (`label`, `link-name`) on the open dialog. It also covers the `ValueFormEdit` key warning through the browser-diagnostics fixture: that warning only shows with the wuchale transform, which vitest does not run.
 
@@ -1867,6 +1871,22 @@ window, clears its deadline on completion, and rejects a host that stays silent.
 The packaged adapter additionally tests canonical requests, caller-supplied policy
 spoofing, subscription acknowledgements and unsupported operations.
 
+App frame `store.getMany(subjects)` (#1737): `hostStore.test.ts` checks it
+answers in order through the same store read as `get` (same state after a
+local change), reports an unreadable subject in its place without failing the
+rest, and refuses more than 100 subjects or a non-array before reading any.
+`viewProtocol.test.ts` checks the generated client makes one request for the
+batch, hands back resources like `getResource`'s, asks nothing for an empty
+list and refuses 101 without asking.
+
+App frame theme (#1738): `views/PluginView/useCreateThemeVars.test.ts` checks
+the frame stylesheet carries `--t-color-success` and `color-scheme` from the
+built theme's `darkMode`. `FrameBridge.test.ts` checks the theme message
+carries `colorScheme` and keeps it across a ready message and a reload.
+`viewProtocol.test.ts` checks `store.getTheme()` reads the scheme from the
+applied stylesheet before any message, then from messages (only the parent's,
+only `light`/`dark`), and `onThemeChange` fires once per change until stopped.
+
 `apps.spec.ts` runs the first write scenario with both the served SDK and this
 checkout's v1 JS asset. The latter explicitly intercepts only `format=client`;
 resource creation and signing still use the real local backend. This verifies the
@@ -2393,6 +2413,41 @@ truncation (a table with more than 1,000 rows silently offering only the first
 1,000, and rejecting a pick past the cap) is untested, and the preview
 deliberately applies no cap at all.
 
+Class constraints in tables, kanban and the ontology editor
+(`planning/class-constraints-and-forms.md`, step 2): `getEffectiveConstraint` /
+`setClassConstraint` are unit-tested in `browser/lib/src/effective-constraint.test.ts`
+(merge across classes, per-keyword fallback to `allowsOnly` / `classtype` /
+`min` / `max`, edit semantics). `createSelectProperty.test.ts` pins that a new
+select column's options and single pick land in the row class's `constraints`
+(not on the Property), that a reused property gets Tags of its own, and the
+`constraintsOn: 'property'` mode the form builder still uses. `ontology.spec.ts`
+drives linked class, options and instance restrictions through the class card;
+`tables.spec.ts` creates and fills a select column. Not covered: editing an
+existing select column's options in `EditPropertyDialog` (class save, legacy
+dual-write), the number / text range and relation class going from the dialog
+to the class map, `useTableColumns` re-reading columns when the class map
+changes, `TagPropertyCard`'s class usage rows, and forms bound to a table column
+whose options now live only in the class map (see the forms entry below).
+
+Class constraints in forms (`planning/class-constraints-and-forms.md`, step 3):
+`formFieldSettings.test.ts` and `formConstraints.test.ts` pin the limit
+keywords, that old names read and are rewritten on edit, that a question can only
+tighten its column's constraint (rejected before any write), and the
+`describe_form` JSON Schema (class narrowed by the question, `enum` of Tags).
+`createFormFromSpec.test.ts` / `formOps.test.ts` pin that a new choice question's
+options and single pick land in the data class's constraints and that choice
+edits write the class, not the Property. `server/src/forms.rs` tests cover
+options from the class `enum` over legacy `allowsOnly`, legacy key renaming,
+narrowing, exclusive bounds, `pattern` and row counts in `validate_submission`;
+`class_constraints.rs` covers `effective_constraint` / `tighten`. The renderer
+checks the same keywords in `validation.test.ts`. `forms.spec.ts` reads option
+labels from the class map. Not covered: linking options to another table in the
+builder writes the class (no unit test; the e2e links a table), the Rust and TS
+narrowing are separate implementations without a shared fixture, a `pattern`
+the Rust regex and the JS `RegExp` read differently, and legacy forms whose
+Property keeps `allowsOnly` after a row link (the class `enum` is removed but the
+Property fallback still lists the old tags in the builder).
+
 Not covered (drafts): the debounce/flush wiring in `useFormDraft` — the
 `pagehide` and `visibilitychange` flushes in particular — is only exercised
 through the e2e (which waits for the debounced write rather than forcing a
@@ -2617,3 +2672,39 @@ tamper rejection, and closing during a pending request. Atomic Audio additionall
 checks isolated native identity installation and actual bidirectional iroh/Loro
 with BLAKE3 files introduced after pairing. Production account approval, Vault
 transport and recovery on a physical device are not covered by these tests.
+
+## Lenses (`docs/src/schema/lenses.md`)
+
+Both implementations run the cases in `lib/tests/fixtures/lenses.json`
+(rename, wrap and head, enum map, string to integer with an unparseable value,
+both properties present, no chaining): `lens::tests::shared_fixture` (JSON and
+propvals paths) in `lib/src/lens.rs`, and `browser/lib/src/lens.test.ts`. Lens
+ID vectors are asserted on both sides. Store level: `db::test::lenses` covers
+derived values on read and in the value index (backfill when the Lens arrives,
+an edit of the old property, a real value winning, index rebuild from stored Lens
+resources), the `parent` authority check, ID mismatch and identity
+immutability; `lens.test.ts` covers `ensureLens`, activation, and
+re-materializing a loaded resource when a Lens arrives.
+
+Not covered: lens application on the Iroh and WebSocket sync import paths (they
+share `persist_replicated_*`, which is covered through `build_projection_tx`
+only by reasoning, not a test), a browser reload with lenses loaded through
+`loadLenses`, and the data-browser flows that mint a lens (datatype change,
+form question shortname) end to end.
+
+## Optional account sign-in after local identity unlock
+
+`helpers/managed/agentSession.test.ts` checks that a local identity can unlock
+without an account, avoids a redundant account read after that result, and
+retains linked-account sign-in. Paired SaaS HTTP tests verify the optional
+lookup returns a normal signed-out result only after a valid signature; explicit
+unlinked sign-in remains 404 and tampered signatures remain 401.
+`signout-signin-data.spec.ts` verifies content and the same encrypted database
+key survive sign-out/sign-in with strict browser console checks enabled.
+
+Paired SaaS `hosted-recovery-live.spec.ts` opts into isolated nodes and mock
+billing. It onboards a fresh account, uploads its browser-only drive to a
+managed node, reads a saved child directly over HTTP, queues an edit with WS
+disconnected, reconnects, then signs in on a fresh browser and verifies the
+edited child after reload. It does not certify real billing or a full network
+partition.

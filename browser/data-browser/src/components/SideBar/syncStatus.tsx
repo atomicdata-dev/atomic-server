@@ -67,6 +67,18 @@ export function getSyncIcon(status: StoreSyncStatus): JSX.Element {
   return <FaWifi title='Connected' />;
 }
 
+/**
+ * Whether the sidebar shows its warning icon: changes that could not sync, or
+ * that wait with nothing else going on. The Sync page's banner explains it.
+ */
+export function hasSyncWarning(status: StoreSyncStatus): boolean {
+  return (
+    status.serverConnected &&
+    !status.syncInProgress &&
+    (status.blockedCount > 0 || status.pendingDirtyCount > 0)
+  );
+}
+
 export function getSyncLabel(status: StoreSyncStatus): string {
   if (!status.serverConnected) return 'Offline';
   if (status.syncInProgress) return 'Syncing...';

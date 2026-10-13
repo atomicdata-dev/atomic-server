@@ -15,6 +15,7 @@ import { test, expect, type Page } from './fixtures';
 import {
   before,
   clickAccountMenuItem,
+  currentDriveTitle,
   openAccountMenu,
   editableTitle,
   getCurrentSubject,
@@ -207,6 +208,147 @@ test.describe('notifications', () => {
     await expect(
       page.getByRole('heading', { name: 'Notify Chat' }),
     ).toBeVisible({ timeout: 15_000 });
+
+    await guestContext.close();
+  });
+
+  test('a reply and a comment on something you made notify you', async ({
+    page,
+    browser,
+    context,
+  }) => {
+    test.slow();
+
+    await page.addInitScript(() => {
+      document.hasFocus = () => true;
+      Object.defineProperty(document, 'hidden', { get: () => false });
+      Object.defineProperty(document, 'visibilityState', {
+        get: () => 'visible',
+      });
+    });
+    await page.reload();
+
+    await newResource('folder', page);
+    await editableTitle(page).click();
+    await page.keyboard.press(
+      process.platform === 'darwin' ? 'Meta+a' : 'Control+a',
+    );
+    await page.keyboard.type('Comment Folder');
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('heading', { name: 'Comment Folder' }),
+    ).toBeVisible();
+    const folderSubject = await getCurrentSubject(page);
+
+    // The owner leaves the first remark in the folder's comments.
+    await page.getByTestId('navbar-comments-button').click();
+    const remark = `Owner remark ${timestamp()}`;
+    const panelInput = page
+      .getByTestId('comments-panel')
+      .getByLabel('Chat input');
+    await panelInput.fill(remark);
+    await panelInput.press('Enter');
+    await expect(
+      page.getByTestId('comments-panel').getByText(remark),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+      origin: new URL(FRONTEND_URL).origin,
+    });
+    // Comments live in the drive's Comments folder, so whoever is to see and
+    // add them is invited to the drive, not to the folder alone.
+    await currentDriveTitle(page).click();
+    await expect(
+      page.getByRole('heading', { name: 'Comment Folder' }),
+    ).toHaveCount(0);
+    await topBarShareButton(page).click();
+    await page.getByLabel('Full name', { exact: true }).fill('Folder Owner');
+    await page
+      .getByRole('button', { name: 'Save and continue', exact: true })
+      .click();
+    await page
+      .getByRole('radiogroup', {
+        name: 'Role for people who join with the link',
+      })
+      .getByRole('radio', { name: 'Write' })
+      .check();
+    await page.getByRole('button', { name: 'Copy invite link' }).click();
+    const inviteUrl = await page
+      .locator('[data-invite-link]')
+      .getAttribute('data-invite-link');
+    expect(inviteUrl).toBeTruthy();
+    await page.keyboard.press('Escape');
+    await waitForSynced(page);
+
+    const guestContext = await browser.newContext();
+    const guest = await guestContext.newPage();
+    await guest.goto(spaUrl(inviteUrl as string));
+    await acceptInvite(guest);
+    await guest.waitForURL(/\/app\//, { timeout: 15_000 });
+
+    const folderHref = new URL('/app/show', FRONTEND_URL);
+    folderHref.searchParams.set('subject', folderSubject);
+    await guest.goto(folderHref.href);
+
+    // The guest has not opened the thread yet: it is counted and unseen.
+    const guestButton = guest.getByTestId('navbar-comments-button');
+    await expect(guestButton).toHaveAttribute('data-unseen', '', {
+      timeout: 20_000,
+    });
+    await expect(guestButton).toContainText('1');
+    await guestButton.click();
+    const guestPanel = guest.getByTestId('comments-panel');
+    await expect(guestPanel.getByText(remark)).toBeVisible({ timeout: 15_000 });
+    await expect(guestButton).not.toHaveAttribute('data-unseen', '');
+
+    // The owner is somewhere else in the app.
+    await page.getByTestId('sidebar-settings-button').click();
+    await expect(
+      page.getByRole('heading', { name: 'Settings', exact: true }),
+    ).toBeVisible();
+
+    // A reply to the owner's remark ...
+    await guestPanel
+      .locator('[data-entry-key]')
+      .filter({ hasText: remark })
+      .hover();
+    await guestPanel
+      .locator('[data-entry-key]')
+      .filter({ hasText: remark })
+      .getByTitle('Reply to this message')
+      .click();
+    const replyText = `Guest reply ${timestamp()}`;
+    await guestPanel.getByLabel('Chat input').fill(replyText);
+    await guestPanel.getByLabel('Chat input').press('Enter');
+    await expect(guestPanel.getByText(replyText)).toBeVisible({
+      timeout: 15_000,
+    });
+    const replied = page.getByRole('button', { name: /replied to you/ });
+    await expect(replied).toBeVisible({ timeout: 20_000 });
+    await expect(replied).toContainText(replyText);
+    await replied.click();
+    await expect(
+      page.getByRole('heading', { name: 'Comment Folder' }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // ... and a plain comment, once the owner has gone elsewhere again.
+    await page.getByTestId('sidebar-settings-button').click();
+    await expect(
+      page.getByRole('heading', { name: 'Settings', exact: true }),
+    ).toBeVisible();
+    const note = `Guest note ${timestamp()}`;
+    await guestPanel.getByLabel('Chat input').fill(note);
+    await guestPanel.getByLabel('Chat input').press('Enter');
+    const commented = page.getByRole('button', {
+      name: /commented on Comment Folder/,
+    });
+    await expect(commented).toBeVisible({ timeout: 20_000 });
+    await expect(commented).toContainText(note);
+
+    // The owner's own comments never notify the owner.
+    await expect(
+      page.getByRole('button', { name: new RegExp(remark) }),
+    ).toHaveCount(0);
 
     await guestContext.close();
   });

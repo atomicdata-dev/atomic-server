@@ -323,3 +323,11 @@ describe('aggregateRows', () => {
     ]);
   });
 });
+
+describe('formatAggregateValue for an empty answer', () => {
+  it('reads a count over no rows as 0, but not a sum, and not an unanswered one', () => {
+    expect(formatAggregateValue(null, 'count', undefined)).toBe('0');
+    expect(formatAggregateValue(null, 'sum', undefined)).toBe('—');
+    expect(formatAggregateValue(undefined, 'count', undefined)).toBe('—');
+  });
+});

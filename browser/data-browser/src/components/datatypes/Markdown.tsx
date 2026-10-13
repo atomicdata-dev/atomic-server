@@ -5,7 +5,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
 import { Button } from '@components/Button';
 import { truncateMarkdown } from '@helpers/markdown';
-import { tryExpandRef } from '@helpers/subjectRefs';
+import { tryExpandRef } from '@tomic/react';
 import { FC, useState } from 'react';
 import { AtomicLink, AtomicLinkProps } from '@components/AtomicLink';
 import { isAtomicIdentifier } from '@tomic/react';

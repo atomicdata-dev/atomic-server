@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -135,6 +136,48 @@ describe('portable app package resources', () => {
       ),
     ).toThrow();
     expect(importer.query).not.toHaveBeenCalled();
+  });
+
+  it('carries single- and multi-table destinations without changing package content', () => {
+    const manifest = (name: string) =>
+      JSON.parse(
+        readFileSync(
+          new URL(`../../../testdata/plugin-manifest/${name}`, import.meta.url),
+          'utf8',
+        ),
+      );
+
+    const stored = (release: Record<string, unknown>) => {
+      const pkg = JSON.parse(json);
+      pkg.release.manifest = release;
+      const verdict = prepareAppPackageImport(
+        host(),
+        JSON.stringify(pkg),
+        parent,
+        schema,
+      );
+      const intent = verdict.intents[0];
+      if (intent.op !== 'create') throw new Error('Expected package create');
+
+      return intent.set[content] as string;
+    };
+
+    const sha = (text: string) =>
+      createHash('sha256').update(text).digest('hex');
+
+    // Pinned: these bytes are what an imported package resource holds.
+    expect(sha(stored(JSON.parse(json).release.manifest))).toBe(
+      '1cca98e4ad15c9d3b75a175301bf582cc835859350372f61745e76a119c24fe6',
+    );
+    expect(sha(stored(manifest('v2-accepts-destination.json')))).toBe(
+      'd779cbeb7976f6b356269951b3dd3e808b57e5aa0f29681d0e73734cf8e347f9',
+    );
+    const multi = manifest('v2-destination-tables.json');
+    expect(JSON.parse(stored(multi)).release.manifest).toEqual(multi);
+
+    const broken = structuredClone(multi);
+    broken.destination.tables.statements.rowClass = 'bank-account';
+    expect(() => stored(broken)).toThrow('table rowClass must name a class');
   });
 
   it('rejects ambiguous resource labels instead of rewriting them as links', () => {

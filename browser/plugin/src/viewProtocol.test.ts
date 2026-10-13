@@ -473,3 +473,85 @@ it('sends a menu at the point clicked and waits on the person with no timeout', 
   });
   expect(await chosen).toBe('rename');
 });
+
+it('reads many resources in one round trip, with errors in place', async () => {
+  expect(isViewRequest(viewRequest(1, 'getMany', { subjects: [] }))).toBe(true);
+  const f = frame();
+  const store = generatedStore(f);
+
+  const pending = store.getMany(['did:ad:a', 'did:ad:secret']);
+  expect(f.parent.postMessage).toHaveBeenCalledTimes(1);
+  const ask = f.parent.postMessage.mock.calls[0][0];
+  expect(ask).toMatchObject({
+    op: 'getMany',
+    args: { subjects: ['did:ad:a', 'did:ad:secret'] },
+  });
+  f.reply({
+    type: 'atomic.view.response',
+    version: 1,
+    id: ask.id,
+    result: [
+      { subject: 'did:ad:a', title: 'A', props: { name: 'A' }, loading: false },
+      { subject: 'did:ad:secret', error: 'Unauthorized' },
+    ],
+  });
+  const [a, secret] = await pending;
+  // A resource like getResource's: read, stage, save.
+  expect(a.subject).toBe('did:ad:a');
+  expect(a.get('name')).toBe('A');
+  expect(typeof a.save).toBe('function');
+  expect(secret).toEqual({ subject: 'did:ad:secret', error: 'Unauthorized' });
+
+  // Nothing to ask for, nothing asked.
+  expect(await store.getMany([])).toEqual([]);
+  await expect(
+    store.getMany(Array.from({ length: 101 }, (_, i) => `did:ad:${i}`)),
+  ).rejects.toThrow('at most 100');
+  expect(f.parent.postMessage).toHaveBeenCalledTimes(1);
+});
+
+it('knows whether the host is light or dark, before and after a theme message', () => {
+  const f = frame();
+  const source = readFileSync(
+    new URL(
+      '../../../server/src/plugins/assets/view-client.js',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  // The shell applied the host stylesheet (`color-scheme: dark` on :root)
+  // before this module ran, so it missed that first message.
+  let computed = 'dark';
+  const store = new Function(
+    'window',
+    'setTimeout',
+    'clearTimeout',
+    'document',
+    'getComputedStyle',
+    source.replace('export const store', 'const store') + '\nreturn store;',
+  )(
+    f.window,
+    () => 0,
+    () => undefined,
+    { documentElement: {} },
+    () => ({ colorScheme: computed }),
+  );
+  expect(store.getTheme()).toEqual({ colorScheme: 'dark' });
+  computed = 'normal';
+  expect(store.getTheme()).toEqual({ colorScheme: 'light' });
+
+  const seen: unknown[] = [];
+  const stop = store.onThemeChange((theme: unknown) => seen.push(theme));
+  const style = (colorScheme: unknown, from?: unknown) =>
+    f.reply({ type: '__atomic_style', css: '', colorScheme }, from);
+  style('dark');
+  style('dark');
+  style('purple');
+  style('light', {});
+  expect(seen).toEqual([{ colorScheme: 'dark' }]);
+  expect(store.getTheme()).toEqual({ colorScheme: 'dark' });
+  style('light');
+  stop();
+  style('dark');
+  expect(seen).toEqual([{ colorScheme: 'dark' }, { colorScheme: 'light' }]);
+});

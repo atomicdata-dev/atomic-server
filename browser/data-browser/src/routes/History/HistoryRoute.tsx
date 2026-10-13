@@ -59,7 +59,6 @@ function History(): JSX.Element {
 
     try {
       await resource.setVersion(selectedVersion);
-      toast.success('Resource version updated');
       navigate(constructOpenURL(subject));
     } catch (e) {
       toast.error(

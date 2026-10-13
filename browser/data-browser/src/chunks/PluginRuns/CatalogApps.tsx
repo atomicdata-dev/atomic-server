@@ -121,7 +121,6 @@ export function CatalogApps({
     try {
       await updateCatalogApp(store, { drive, subject, app });
       await refresh();
-      toast.success(`${app.name} updated to ${app.version}`);
     } catch (error) {
       toast.error(String(error instanceof Error ? error.message : error));
     } finally {

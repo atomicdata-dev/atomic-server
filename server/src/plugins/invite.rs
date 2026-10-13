@@ -8,7 +8,7 @@ use atomic_lib::{
     Resource, Storelike, Subject, Value,
 };
 
-use crate::invite_token::InviteToken;
+use crate::invite_token::{acceptance_lock, InviteToken};
 
 fn read_token_from_subject(subject: &url::Url) -> Option<String> {
     for (k, v) in subject.query_pairs() {
@@ -77,6 +77,13 @@ pub fn handle_invite_request<'a>(
             )
             .await?;
 
+        // Let the page say so up front when nobody can use this link anymore.
+        if let Some(left) = token.usages_left(store)? {
+            invite
+                .set(urls::USAGES_LEFT.into(), Value::Integer(left), store)
+                .await?;
+        }
+
         let target_resource = store.get_resource(&token.target.clone()).await?;
         let title = target_resource
             .get(urls::NAME)
@@ -131,6 +138,11 @@ pub fn handle_invite_post<'a>(
             }
         };
 
+        // Check and record under one lock, so two people opening a one-use link
+        // at the same moment cannot both get in.
+        let _guard = acceptance_lock().lock().await;
+        token.check_usages(store, agent.as_str())?;
+
         if atomic_lib::identifiers::is_agent_id(agent.as_str())
             && store.get_resource(&agent.as_str().into()).await.is_err()
         {
@@ -148,6 +160,8 @@ pub fn handle_invite_post<'a>(
         if token.write {
             add_rights(agent.as_str(), token.target.as_str(), false, store).await?;
         }
+
+        token.record_acceptance(store, agent.as_str())?;
 
         let mut redirect = Resource::new_instance(urls::REDIRECT, store).await?;
         redirect
@@ -224,5 +238,62 @@ mod tests {
                 .unwrap_or(0);
             assert_eq!(count, 1, "{prop} should list the agent once");
         }
+    }
+
+    async fn accept(
+        store: &atomic_lib::Db,
+        token: &InviteToken,
+        agent: &Agent,
+    ) -> AtomicResult<ResourceResponse> {
+        let mut subject = url::Url::parse("http://localhost/invites").unwrap();
+        subject
+            .query_pairs_mut()
+            .append_pair("token", &token.encode().unwrap());
+        let for_agent = atomic_lib::agents::ForAgent::AgentSubject(agent.subject.clone());
+
+        handle_invite_post(HandlePostContext {
+            subject,
+            store,
+            for_agent: &for_agent,
+            body: Vec::new(),
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn one_use_invite_admits_one_agent() {
+        let store = atomic_lib::test_utils::init_store().await;
+        let drive = atomic_lib::test_utils::create_test_drive(&store)
+            .await
+            .unwrap();
+        let issuer = store.get_default_agent().unwrap();
+        let token = InviteToken::new(
+            drive.to_string(),
+            false,
+            atomic_lib::utils::now() + 100_000,
+            &issuer,
+            Some(1),
+        )
+        .unwrap();
+        let first = Agent::new(None).unwrap();
+        let second = Agent::new(None).unwrap();
+
+        accept(&store, &token, &first).await.unwrap();
+        // Opening the link again is harmless for someone already let in.
+        accept(&store, &token, &first).await.unwrap();
+
+        let err = match accept(&store, &token, &second).await {
+            Ok(_) => panic!("a second agent got in on a one-use invite"),
+            Err(e) => e,
+        };
+        assert!(err.to_string().contains("no usages left"), "{err}");
+
+        let drive = store.get_resource(&drive).await.unwrap();
+        let readers = drive.get(urls::READ).unwrap().to_string();
+        assert!(readers.contains(first.subject.as_str()));
+        assert!(
+            !readers.contains(second.subject.as_str()),
+            "a rejected accept must not grant rights"
+        );
     }
 }

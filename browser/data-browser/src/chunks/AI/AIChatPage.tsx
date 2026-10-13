@@ -1,14 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Ai,
-  ai,
-  dataBrowser,
-  useArray,
-  useCanWrite,
-  useStore,
-  useTitle,
-  type Resource,
-} from '@tomic/react';
+import { Ai, dataBrowser, useCanWrite, useStore, useTitle } from '@tomic/react';
 import type { ResourcePageProps } from '@views/ResourcePage';
 import toast from 'react-hot-toast';
 import { type AIMessageContext, type AtomicUIMessage } from './types';
@@ -20,7 +11,8 @@ import { DEFAULT_AICHAT_NAME } from '@components/AI/aiContstants';
 import { useGenerativeData } from './useGenerativeData';
 import {
   addMessageToChatResource,
-  messageResourcesToDisplayMessages,
+  type AiMessageRef,
+  loadChatMessages,
   removeFollowingMessagesFromChatResource,
   removeMessageFromChatResource,
 } from './chatConversionUtils';
@@ -29,6 +21,7 @@ import { useAISettings } from '@components/AI/AISettingsContext';
 import { styled } from 'styled-components';
 import { consumePendingFirstMessage } from './pendingFirstMessage';
 import { userTiming } from '@helpers/userTiming';
+import { Spinner } from '@components/Spinner';
 
 const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
   const store = useStore();
@@ -39,9 +32,8 @@ const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
     [],
   );
   const [contextItems, setContextItems] = useState<AIMessageContext[]>([]);
-  const [messageSubjects] = useArray(resource, ai.properties.messages);
   const [messageToResourceMap, setMessageToResourceMap] = useState(
-    new Map<AtomicUIMessage, Resource>(),
+    new Map<AtomicUIMessage, AiMessageRef>(),
   );
   const [title, setTitle] = useTitle(resource);
   const [autoSubmitMessage, setAutoSubmitMessage] = useState<string>();
@@ -111,7 +103,7 @@ const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
 
     if (messageResource) {
       try {
-        await removeMessageFromChatResource(messageResource, resource);
+        await removeMessageFromChatResource(messageResource, resource, store);
       } catch (error) {
         console.error('Error removing message:', error);
         toast.error('Failed to remove message resource');
@@ -170,6 +162,7 @@ const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
         allMessages,
         messageToResourceMap,
         resource,
+        store,
       );
 
       setMessageToResourceMap(prev => {
@@ -195,7 +188,7 @@ const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
   // On load create AIChatDisplayMessages from the resource's messages.
   useEffect(() => {
     const timing = userTiming('chat:page');
-    messageResourcesToDisplayMessages(messageSubjects, store).then(map => {
+    loadChatMessages(resource, store).then(map => {
       timing.step('load');
       const allMessages = Array.from(map.keys());
       const lastSummaryIndex = allMessages.findLastIndex(
@@ -226,7 +219,7 @@ const AIChatPage: React.FC<ResourcePageProps<Ai.AiChat>> = ({ resource }) => {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <Spinner centered />;
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useSettings } from '@helpers/AppSettings';
-import { shortenSubject } from '@helpers/subjectRefs';
+import { shortenSubject } from '@tomic/react';
 import {
   ai,
   CollectionBuilder,

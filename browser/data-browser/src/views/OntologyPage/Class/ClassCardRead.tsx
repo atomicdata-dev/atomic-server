@@ -35,7 +35,9 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
         <StyledH4>Requires</StyledH4>
         <StyledTable>
           {requires.length > 0 ? (
-            requires.map(s => <PropertyLineRead key={s} subject={s} />)
+            requires.map(s => (
+              <PropertyLineRead key={s} subject={s} classSubject={subject} />
+            ))
           ) : (
             <span>none</span>
           )}
@@ -43,7 +45,9 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
         <StyledH4>Recommends</StyledH4>
         <StyledTable>
           {recommends.length > 0 ? (
-            recommends.map(s => <PropertyLineRead key={s} subject={s} />)
+            recommends.map(s => (
+              <PropertyLineRead key={s} subject={s} classSubject={subject} />
+            ))
           ) : (
             <span>none</span>
           )}

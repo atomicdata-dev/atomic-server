@@ -1,4 +1,6 @@
-import type { JSX } from 'react';
+import { styled } from 'styled-components';
+import { useState, type JSX } from 'react';
+import { ErrorChip } from '@components/forms/ErrorChip';
 import Field from '@components/forms/Field';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import type { FieldOptionsBag } from './useFieldOptions';
@@ -13,6 +15,9 @@ interface BoundFieldProps {
    * has none. */
   min?: number;
   max?: number;
+  /** A limit the data class already demands: the question can only tighten it,
+   * so a value below it is raised to it. */
+  floor?: number;
   helper?: string;
 }
 
@@ -32,16 +37,20 @@ export function BoundField({
   setOptions,
   min,
   max,
+  floor,
   helper,
 }: BoundFieldProps): JSX.Element {
   const stored = options[optionKey] as number | undefined;
+  // What the last edit was held to, so the user is told rather than left
+  // wondering why the typed number changed.
+  const [held, setHeld] = useState<'max' | 'floor'>();
 
   return (
     <Field label={label} helper={helper}>
       <InputWrapper>
         <InputStyled
           type='number'
-          min={min}
+          min={floor ?? min}
           max={max}
           data-testid={`field-option-${optionKey}`}
           value={stored ?? ''}
@@ -51,16 +60,47 @@ export function BoundField({
             if (e.target.value.trim() === '') {
               delete next[optionKey];
             } else {
-              next[optionKey] = Math.min(
+              const typed = Number(e.target.value);
+              const clamped = Math.min(
                 max ?? Infinity,
-                Number(e.target.value),
+                Math.max(floor ?? -Infinity, typed),
               );
+              next[optionKey] = clamped;
+              setHeld(
+                clamped === typed
+                  ? undefined
+                  : typed > clamped
+                    ? 'max'
+                    : 'floor',
+              );
+            }
+
+            if (e.target.value.trim() === '') {
+              setHeld(undefined);
             }
 
             setOptions(next);
           }}
         />
       </InputWrapper>
+      {held === 'max' && (
+        <BoundError>Cannot exceed the table column limit ({max}).</BoundError>
+      )}
+      {held === 'floor' && (
+        <BoundError>
+          Cannot go below the table column minimum ({floor}).
+        </BoundError>
+      )}
     </Field>
   );
 }
+
+/** In normal flow under the input, so it wraps inside the column instead of
+ * overflowing it and pushing the paired field out of line. */
+const BoundError = styled(ErrorChip).attrs({ noMovement: true })`
+  top: 0;
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+`;

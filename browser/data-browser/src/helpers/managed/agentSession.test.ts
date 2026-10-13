@@ -16,7 +16,10 @@ import { readManagedAccountBinding } from './binding';
 import { canHoldProviderCookie } from './deviceLink';
 import { readCachedBackups } from './recovery';
 
-vi.mock('./session', () => ({ getManagedAccount: vi.fn() }));
+vi.mock('./session', () => ({
+  getManagedAccount: vi.fn(),
+  noteManagedSessionChanged: vi.fn(),
+}));
 vi.mock('./api', () => ({
   getManagedApiBase: vi.fn(),
   getManagedDeviceToken: vi.fn(),
@@ -70,7 +73,7 @@ it('signs the account in with the unlocked identity', async () => {
   expect(await signInAccountWithAgent(agent)).toBe(true);
 
   const [, signIn] = vi.mocked(managedFetch).mock.calls;
-  expect(signIn[0]).toBe('/auth/agent');
+  expect(signIn[0]).toBe('/auth/agent?if_linked=true');
   const body = JSON.parse(signIn[1]!.body as string);
   expect(body.nonce).toBe('n1');
   expect(typeof body.signature).toBe('string');
@@ -99,6 +102,17 @@ it('tries a just-unlocked identity once, and not again after a refusal', async (
   expect(await signInAccountWithAgent(agent, { proven: true })).toBe(false);
   expect(await signInAccountWithAgent(agent, { proven: true })).toBe(false);
   expect(managedFetch).toHaveBeenCalledTimes(2);
+});
+
+it('treats a verified local identity without an account as a normal result', async () => {
+  vi.mocked(readManagedAccountBinding).mockReturnValue(null);
+  answerChallenge(Response.json({ signed_in: false }));
+
+  expect(await signInAccountWithAgent(agent, { proven: true })).toBe(false);
+  expect(vi.mocked(managedFetch).mock.calls[1][0]).toBe(
+    '/auth/agent?if_linked=true',
+  );
+  expect(getManagedAccount).toHaveBeenCalledTimes(1);
 });
 
 it('does nothing where the account cookie cannot live', async () => {

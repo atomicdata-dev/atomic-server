@@ -19,6 +19,7 @@ import {
   SideBarMenuItemLink,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
+import { Panel } from './usePanelList';
 
 /** Discover chats throughout the private drive, including legacy duplicate folders. */
 export function AIChatsPanel(): JSX.Element | null {
@@ -30,6 +31,7 @@ export function AIChatsPanel(): JSX.Element | null {
   return (
     <SideBarPanel
       title='AI Chats'
+      panel={Panel.AIChats}
       heightStorageKey='aiChatsPanelHeight'
       data-testid='ai-chats-panel'
       actions={<NewSidebarChatButton />}

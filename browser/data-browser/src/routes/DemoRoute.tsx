@@ -21,6 +21,7 @@ import type { DemoSetupStep } from '../chunks/Demo/startDemo';
 import {
   lateFinishContext,
   stallContext,
+  stallWaitMs,
   type StepStarts,
 } from '../chunks/Demo/demoSetupReport';
 import { localAgentIsDisposable } from '../helpers/managed/reconcile';
@@ -119,7 +120,7 @@ function reportLateFinish(): void {
 function startRun(
   store: Store,
   currentDrive: string | undefined,
-  onReady: (manifest: { welcomeDoc: string }) => void,
+  onReady: (manifest: { welcomeDoc: string; meeting?: string }) => void,
   onSignedIn: (target: string) => void,
 ): void {
   run = { startedAt: Date.now(), stepStarts: {}, done: false, reported: false };
@@ -171,7 +172,7 @@ function startRun(
  * Starts the demo workspace immediately: mints a guest agent when
  * nobody is signed in, builds a FRESH drive (cleaning up a previous
  * demo run), starts the scripted scenario, and navigates to the
- * welcome doc. No interstitial — "Try the live demo" means the demo
+ * onboarding meeting. No interstitial — "Try the live demo" means the demo
  * starts.
  */
 const DemoRoute: React.FC = () => {
@@ -211,13 +212,17 @@ const DemoRoute: React.FC = () => {
         drive,
         manifest => {
           if (window.innerWidth < SIDEBAR_TOGGLE_WIDTH) setSideBarLocked(true);
-          void revealWhenReady(store, manifest.welcomeDoc);
+          // A fresh demo opens in its onboarding meeting; joining another
+          // tab's demo (no `meeting` in what that tab stored) opens the doc.
+          const landing = manifest.meeting ?? manifest.welcomeDoc;
+
+          void revealWhenReady(store, landing);
           // Replace, don't push: /app/demo builds a fresh demo every time it
           // loads, so leaving it in history made Back rebuild the demo (and
           // tear down the one just left) instead of returning to the page the
           // visitor came from.
           navigate({
-            to: constructOpenURL(manifest.welcomeDoc),
+            to: constructOpenURL(landing),
             replace: true,
           });
         },
@@ -240,15 +245,30 @@ const DemoRoute: React.FC = () => {
     listeners.add(sync);
     sync();
 
-    const timer = setTimeout(
-      () => {
+    // The deadline is checked against the wall clock when the timer fires. A
+    // timer that fires early (a bot with virtual time, a throttled or
+    // suspended tab) is not a stall: reschedule for what is left instead.
+    let timer: ReturnType<typeof setTimeout>;
+
+    const arm = (delay: number) => {
+      timer = setTimeout(() => {
         if (!run || run.done || run.error) return;
+
+        const elapsed = Date.now() - run.startedAt;
+        const wait = stallWaitMs(elapsed, STALLED_AFTER_MS);
+
+        if (wait > 0) {
+          arm(wait);
+
+          return;
+        }
+
         setStalled(true);
         if (run.reported) return;
         run.reported = true;
         const { tags, extra } = stallContext(
           run.stepStarts,
-          Date.now() - run.startedAt,
+          elapsed,
           document.visibilityState,
         );
 
@@ -257,9 +277,10 @@ const DemoRoute: React.FC = () => {
           tags: { demo_step: run.step ?? 'loading', ...tags },
           extra,
         });
-      },
-      Math.max(0, STALLED_AFTER_MS - (Date.now() - run!.startedAt)),
-    );
+      }, delay);
+    };
+
+    arm(Math.max(0, STALLED_AFTER_MS - (Date.now() - run!.startedAt)));
 
     return () => {
       listeners.delete(sync);
@@ -314,14 +335,14 @@ const DemoRoute: React.FC = () => {
 };
 
 /**
- * Take the splash away once the welcome document can be shown with its
+ * Take the splash away once the landing resource can be shown with its
  * content, not as soon as the route changes: a reveal onto "Loading…" is the
  * very jump the splash is there to hide. Capped, so a slow document still
  * gets revealed.
  */
-async function revealWhenReady(store: Store, welcomeDoc: string) {
+async function revealWhenReady(store: Store, landing: string) {
   await withDeadline(
-    store.getResource(welcomeDoc).then(() => undefined),
+    store.getResource(landing).then(() => undefined),
     2_000,
     undefined,
   ).catch(() => undefined);

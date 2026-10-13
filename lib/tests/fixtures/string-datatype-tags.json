@@ -1,0 +1,19 @@
+{
+  "_comment": "Shared by lib/src/loro.rs (datatype_tag) and browser/lib/src/datatypes.test.ts (datatypeTag), like the other Rust/TS fixtures in lib/tests/fixtures (mounted into the Dagger lib container). tagged = a plain string value gets the `string` datatype tag, because the untagged reader heuristic would reinterpret it as JSON or a reference. `atomic://` links are not references to that heuristic (is_atomic_identifier excludes them), so they stay untagged.",
+  "cases": [
+    { "value": "[", "tagged": true },
+    { "value": "[\"a\",\"b\"]", "tagged": true },
+    { "value": "{", "tagged": true },
+    { "value": "{\"a\":1}", "tagged": true },
+    { "value": "atomic:x", "tagged": true },
+    { "value": "atomic://x", "tagged": false },
+    { "value": "did:ad:x", "tagged": true },
+    { "value": "http://", "tagged": true },
+    { "value": "https://", "tagged": true },
+    { "value": "https://example.com", "tagged": true },
+    { "value": "hello", "tagged": false },
+    { "value": "", "tagged": false },
+    { "value": "atomicx", "tagged": false },
+    { "value": " {", "tagged": false }
+  ]
+}

@@ -1,5 +1,4 @@
 import { useEffect, type FC } from 'react';
-import toast from 'react-hot-toast';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +36,6 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
             onCreated?.(resource);
             onClose();
             if (!skipNavigation) navigate(constructOpenURL(resource.subject));
-            toast.success('Drive created');
           }}
         />
       </DialogContent>

@@ -1,8 +1,9 @@
 // @wc-ignore-file
 import { z } from 'zod';
-import type { JSONValue } from '@tomic/react';
+import type { Constraint, JSONValue } from '@tomic/react';
 import type { AddableFieldType } from './fieldTypes';
 import { parseFieldOptions } from './FieldOptions/useFieldOptions';
+import { assertOptionsTighten, normalizeFieldOptions } from './formConstraints';
 
 /** Mirrors the editable form-field-options keys in the builder. Resolved
  * choices, storage datatype and choice sources are managed separately. */
@@ -15,47 +16,60 @@ export const formFieldOptionsSchema = z
       .describe(
         'Input hint for text, email, phone, URL, country or number questions.',
       ),
-    min: z
-      .number()
-      .nullable()
-      .optional()
-      .describe('Minimum allowed numeric answer (number/currency).'),
-    max: z
+    minimum: z
       .number()
       .nullable()
       .optional()
       .describe(
-        'Maximum numeric answer (number/currency), or rating steps (integer 3–10).',
+        'Minimum allowed numeric answer (number/currency), a JSON Schema keyword. Can only tighten the table column limit.',
       ),
+    maximum: z
+      .number()
+      .nullable()
+      .optional()
+      .describe(
+        'Maximum allowed numeric answer (number/currency), a JSON Schema keyword. Can only tighten the table column limit.',
+      ),
+    max: z
+      .number()
+      .nullable()
+      .optional()
+      .describe('Rating steps (integer 3–10). Not a limit on an answer.'),
     minLength: z
       .number()
       .int()
       .positive()
       .nullable()
       .optional()
-      .describe('Minimum characters for short-text/long-text.'),
+      .describe(
+        'Minimum characters for short-text/long-text. Can only tighten the table column limit.',
+      ),
     maxLength: z
       .number()
       .int()
       .positive()
       .nullable()
       .optional()
-      .describe('Maximum characters for short-text/long-text.'),
-    minSelected: z
+      .describe(
+        'Maximum characters for short-text/long-text. Can only tighten the table column limit.',
+      ),
+    minItems: z
       .number()
       .int()
-      .positive()
+      .nonnegative()
       .nullable()
       .optional()
-      .describe('Minimum choices for multi-select/dropdown-multi.'),
-    maxSelected: z
+      .describe(
+        'Minimum choices for multi-select/dropdown-multi, or minimum rows for table-input (a JSON Schema keyword). Can only tighten the table column limit.',
+      ),
+    maxItems: z
       .number()
       .int()
       .positive()
       .nullable()
       .optional()
       .describe(
-        'Maximum choices for multi-select/dropdown-multi; cannot exceed the column limit.',
+        'Maximum choices for multi-select/dropdown-multi, or maximum rows for table-input (a JSON Schema keyword); cannot exceed the table column limit.',
       ),
     currency: z
       .string()
@@ -120,30 +134,16 @@ export const formFieldOptionsSchema = z
       .describe(
         'Choice-matrix: string labels. Table-input: objects with label and type (text/number).',
       ),
-    minRows: z
-      .number()
-      .int()
-      .nonnegative()
-      .nullable()
-      .optional()
-      .describe('Minimum rows in a table-input answer.'),
-    maxRows: z
-      .number()
-      .int()
-      .positive()
-      .nullable()
-      .optional()
-      .describe('Maximum rows in a table-input answer.'),
   })
   .describe(
-    'Type-specific field options. Omitted keys stay unchanged; null clears a key. Numeric min/max differ from text minLength/maxLength, choice minSelected/maxSelected and table minRows/maxRows.',
+    'Type-specific field options. Omitted keys stay unchanged; null clears a key. Limits use JSON Schema keywords and may only tighten the limits of the table column: minimum/maximum for numbers, minLength/maxLength for text, minItems/maxItems for the number of choices or table rows. max is the number of steps of a rating.',
   );
 
 export type FormFieldOptionsPatch = z.infer<typeof formFieldOptionsSchema>;
 
 const text = ['placeholder'] as const;
-const numeric = ['min', 'max', 'placeholder'] as const;
-const multiple = ['minSelected', 'maxSelected'] as const;
+const numeric = ['minimum', 'maximum', 'placeholder'] as const;
+const multiple = ['minItems', 'maxItems'] as const;
 
 export const FORM_OPTION_KEYS: Record<
   AddableFieldType,
@@ -163,7 +163,7 @@ export const FORM_OPTION_KEYS: Record<
   'multi-select': multiple,
   'dropdown-multi': multiple,
   'choice-matrix': ['rows', 'columns'],
-  'table-input': ['columns', 'minRows', 'maxRows'],
+  'table-input': ['columns', 'minItems', 'maxItems'],
   date: [],
   datetime: [],
   radio: [],
@@ -175,16 +175,20 @@ export const FORM_OPTION_KEYS: Record<
   'info-box': [],
 };
 
-/** Validate the resulting bounds, not just the patch: min: 20 must fail if
- * an existing max is 10. Does not modify the property or the original bag. */
+/** Validate the resulting bounds, not just the patch: minimum: 20 must fail if
+ * an existing maximum is 10. A limit may only tighten the data class's own
+ * constraint for the column (`classConstraint`, as `columnConstraint` reads
+ * it). Does not modify the property, the class or the original bag; options
+ * stored under the names forms used before JSON Schema keywords come back
+ * under the new ones. */
 export function applyFormFieldOptions(
   type: AddableFieldType,
   raw: JSONValue | undefined,
   input: FormFieldOptionsPatch = {},
-  columnMax?: number,
+  classConstraint?: Constraint,
 ): Record<string, JSONValue> {
   const patch = formFieldOptionsSchema.parse(input);
-  const options = { ...parseFieldOptions(raw) };
+  const options = { ...normalizeFieldOptions(type, parseFieldOptions(raw)) };
 
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
@@ -202,10 +206,9 @@ export function applyFormFieldOptions(
   }
 
   for (const [min, max] of [
-    ['min', 'max'],
+    ['minimum', 'maximum'],
     ['minLength', 'maxLength'],
-    ['minSelected', 'maxSelected'],
-    ['minRows', 'maxRows'],
+    ['minItems', 'maxItems'],
   ] as const) {
     if (
       FORM_OPTION_KEYS[type].includes(min) &&
@@ -238,16 +241,7 @@ export function applyFormFieldOptions(
   )
     throw new Error('Table-input columns must have a label and type');
 
-  if (
-    columnMax !== undefined &&
-    (type === 'multi-select' || type === 'dropdown-multi')
-  ) {
-    for (const key of multiple)
-      if (typeof options[key] === 'number' && options[key] > columnMax)
-        throw new Error(
-          `${key} cannot exceed the table column limit (${columnMax})`,
-        );
-  }
+  if (classConstraint) assertOptionsTighten(type, options, classConstraint);
 
   return options;
 }

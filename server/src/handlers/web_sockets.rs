@@ -96,6 +96,7 @@ pub async fn web_socket_handler(
             write_rate_limiter: appstate.write_rate_limiter.clone(),
             peer_ip: crate::helpers::peer_ip(&req),
             index_status_subscribed: std::collections::HashSet::new(),
+            sync_frames: Arc::default(),
         },
         &req,
         stream,
@@ -155,6 +156,10 @@ pub struct WebSocketConnection {
     write_rate_limiter: Arc<crate::rate_limit::WriteRateLimiter>,
     /// Socket peer address of the upgrade request; the anonymous rate key.
     peer_ip: String,
+    /// Held while a `SYNC` or `SYNC_PUSH` runs off the worker thread, so this
+    /// connection's reconcile frames still run one at a time, in the order
+    /// they arrived. The lock queues its waiters first come, first served.
+    sync_frames: Arc<tokio::sync::Mutex<()>>,
 }
 
 #[derive(Message)]
@@ -491,12 +496,27 @@ impl WebSocketConnection {
                 // gets `did:ad:` back, not a scheme it cannot parse.
                 let wire =
                     atomic_lib::sync::engine::WireScheme::from_caps(&self.client_capabilities);
+                // A drive reconcile walks every resource in the drive, without
+                // yielding, and so held this worker thread for seconds: every
+                // GET and query on this socket (and on the other connections
+                // this worker serves) waited behind it, so a device opening a
+                // large drive saw nothing until its sync had been computed.
+                let off_worker = matches!(bin[0], ws_v2::tag::SYNC | ws_v2::tag::SYNC_PUSH);
+                let sync_frames = self.sync_frames.clone();
+                let work = async move {
+                    atomic_lib::sync::engine::handle_frame_full_for_caps(
+                        &bin_vec, &store, &mut agent, wire,
+                    )
+                    .await
+                };
                 ctx.spawn(
                     async move {
-                        atomic_lib::sync::engine::handle_frame_full_for_caps(
-                            &bin_vec, &store, &mut agent, wire,
-                        )
-                        .await
+                        if off_worker {
+                            let _turn = sync_frames.lock().await;
+                            run_off_worker(work).await
+                        } else {
+                            work.await
+                        }
                     }
                     .into_actor(self)
                     .map(|out, actor, ctx| {
@@ -932,6 +952,30 @@ impl Handler<IndexStatusPush> for WebSocketConnection {
         });
         if let Ok(s) = serde_json::to_string(&payload) {
             ctx.text(format!("INDEX_STATUS {}", s));
+        }
+    }
+}
+
+/// Run `fut` on the blocking pool, so the worker thread that owns this
+/// connection keeps answering its other frames meanwhile. Tasks it spawns and
+/// timers it sets still belong to the worker's runtime.
+async fn run_off_worker<F>(fut: F) -> atomic_lib::sync::engine::HandleOutput
+where
+    F: std::future::Future<Output = atomic_lib::sync::engine::HandleOutput> + Send + 'static,
+{
+    let handle = tokio::runtime::Handle::current();
+    match actix_web::rt::task::spawn_blocking(move || handle.block_on(fut)).await {
+        Ok(out) => out,
+        Err(e) => {
+            tracing::error!("Sync frame task failed: {e}");
+            atomic_lib::sync::engine::HandleOutput {
+                frames: vec![ws_v2::encode_error(
+                    0,
+                    ws_v2::error_code::UNKNOWN,
+                    "Sync failed on the server",
+                )],
+                ..Default::default()
+            }
         }
     }
 }

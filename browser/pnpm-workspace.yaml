@@ -7,6 +7,9 @@ packages:
 
 allowBuilds:
   '@parcel/watcher': true
+  # The upload binary ships as an optional platform package; the postinstall
+  # only downloads a fallback, which a restricted network can block.
+  '@sentry/cli': false
   '@swc/core': true
   cbor-extract: true
   esbuild: true

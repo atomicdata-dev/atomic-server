@@ -8,16 +8,16 @@ import {
 
 /**
  * The Sync page's device-facing surface: the pairing code a user scans, and
- * the form they add an always-on device with.
+ * the Connect a device section they add an always-on device with.
  *
  * `sync.spec.ts` covers data actually syncing. This file covers the parts a
  * user touches to *set that up*, which had no coverage at all — the pairing
  * code in particular is the one string a second device has to act on, and
  * nothing checked it was even well-formed.
  *
- * Paired-peer cards and the paste-a-code form are gated on `isRunningInTauri()`
- * and cannot render in a browser run, so they are out of scope here; they need
- * a desktop harness.
+ * Paired-peer cards and taking a pairing code are gated on `isRunningInTauri()`
+ * and cannot work in a browser run, so they are out of scope here; they need
+ * a desktop harness. The browser answers a pasted code with a message instead.
  */
 
 const PAIRING_CODE = /^atomic:node:[0-9a-f]{64}\?/i;
@@ -161,13 +161,12 @@ test.describe('sync page devices', () => {
   }) => {
     await gotoSync(page);
 
-    await page
-      .getByRole('button', { name: 'Connect a device', exact: true })
-      .click();
+    // One section, always there: no button to reveal it first.
+    await expect(
+      page.getByRole('heading', { name: 'Connect a device', exact: true }),
+    ).toBeVisible();
 
-    const address = page.getByPlaceholder(
-      'localhost:9883 or your-server.example',
-    );
+    const address = page.getByPlaceholder('Code or server address');
     await expect(address).toBeVisible();
 
     const connect = page.getByRole('button', { name: 'Connect', exact: true });
@@ -176,10 +175,25 @@ test.describe('sync page devices', () => {
     await address.fill('example.test:9883');
     await expect(connect).toBeEnabled();
 
-    // Cancelling must not leave a half-added device behind.
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(address).not.toBeVisible();
+    // Clearing the box must not leave a half-added device behind.
+    await address.fill('');
+    await expect(connect).toBeDisabled();
     await expect(page.getByText('example.test:9883')).toHaveCount(0);
+  });
+
+  test('a pasted pairing code in a browser tab says where it can be entered', async ({
+    page,
+  }) => {
+    await gotoSync(page);
+
+    await page
+      .getByPlaceholder('Code or server address')
+      .fill(`atomic:node:${'a'.repeat(64)}?v=1`);
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+
+    await expect(page.getByTestId('connect-device-message')).toContainText(
+      'device that runs the app',
+    );
   });
 
   test('the devices section lists the server this drive syncs with', async ({

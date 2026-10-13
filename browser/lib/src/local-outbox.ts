@@ -1507,7 +1507,10 @@ export function isSettledDestroyErrorMessage(message: string): boolean {
   return (
     message.includes('was already applied here; refusing replay') ||
     message.includes("predates the resource's genesis") ||
-    message.includes('is_genesis: false, but the resource does not exist yet')
+    message.includes(
+      'is_genesis: false, but the resource does not exist yet',
+    ) ||
+    message.includes('has no such resource to destroy')
   );
 }
 

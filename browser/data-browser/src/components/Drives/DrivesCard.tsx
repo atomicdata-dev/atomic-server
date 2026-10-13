@@ -107,7 +107,7 @@ const StyledNewInstanceButton = styled(NewInstanceButton)`
   padding: 0;
 
   &&:hover,
-  &&:focus {
+  &&:focus-visible {
     box-shadow: none;
   }
 `;

@@ -331,11 +331,32 @@ impl Resource {
         doc: crate::loro::AtomicLoroDoc,
         snapshot: Vec<u8>,
     ) -> AtomicResult<()> {
+        self.apply_state_doc_with_lenses(doc, snapshot, None)
+    }
+
+    /// [`Self::apply_state_doc`] that also derives values through `lenses`
+    /// (see [`crate::lens`]). The doc is never changed; only the propvals
+    /// cache gets the derived values.
+    pub fn apply_state_doc_with_lenses(
+        &mut self,
+        doc: crate::loro::AtomicLoroDoc,
+        snapshot: Vec<u8>,
+        lenses: Option<&crate::lens::LensIndex>,
+    ) -> AtomicResult<()> {
         let mut propvals = Self::materialize_propvals_from_loro_doc(&doc);
+        if let Some(lenses) = lenses {
+            lenses.apply_propvals(&mut propvals);
+        }
         propvals.insert(urls::LORO_UPDATE.into(), Value::LoroDoc(snapshot));
         self.propvals = propvals;
         self.loro = Some(doc);
         Ok(())
+    }
+
+    /// Add the values `lenses` derive to the propvals, keeping real values.
+    /// Returns the properties that were derived.
+    pub fn apply_lenses(&mut self, lenses: &crate::lens::LensIndex) -> Vec<String> {
+        lenses.apply_propvals(&mut self.propvals)
     }
 
     fn set_loro_snapshot_state(&mut self, snapshot: Vec<u8>) -> AtomicResult<()> {
@@ -572,8 +593,86 @@ impl Resource {
         None
     }
 
+    /// The open doc's changes since `base`, if a doc is open.
+    pub(crate) fn export_open_delta(&self, base: &::loro::VersionVector) -> Option<Vec<u8>> {
+        self.loro.as_ref().map(|doc| doc.export_updates_since(base))
+    }
+
     pub(crate) fn export_open_state(&self) -> Option<Vec<u8>> {
         self.loro.as_ref().map(|doc| doc.export_snapshot())
+    }
+
+    /// The live Loro doc, loaded if needed. For edits no property setter
+    /// covers, such as a document's rich-text body. Follow with
+    /// [`Self::sign_pending`] or [`Self::sign_genesis_pending`].
+    pub fn live_doc(&mut self) -> AtomicResult<&crate::loro::AtomicLoroDoc> {
+        self.ensure_materialized()?;
+        Ok(self.loro())
+    }
+
+    /// Signs everything changed so far as `agent` and returns the commit
+    /// without applying it. For a caller that sends the commit through the
+    /// normal pipeline (signature, rights, subject ownership, broadcast)
+    /// instead of [`Self::save_as`], which skips the rights check. `None`
+    /// when nothing changed.
+    pub async fn sign_pending(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<Option<crate::Commit>> {
+        self.sync_loro_changes_to_commit_builder()?;
+        if !self.get_commit_builder().has_changes() {
+            self.reset_commit_builder();
+            return Ok(None);
+        }
+        let commit = self
+            .get_commit_builder()
+            .clone()
+            .sign(agent, store, self)
+            .await?;
+
+        Ok(Some(commit))
+    }
+
+    /// Like [`Self::sign_pending`], for a commit that destroys this resource
+    /// and, on the node, everything inside it.
+    pub async fn sign_destroy_pending(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::Commit> {
+        self.commit.destroy(true);
+
+        self.get_commit_builder()
+            .clone()
+            .sign(agent, store, self)
+            .await
+    }
+
+    /// Like [`Self::sign_pending`], for a new DID resource: signs a genesis
+    /// commit and sets this resource's subject to the `did:ad:` it derives.
+    pub async fn sign_genesis_pending(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::Commit> {
+        self.subject = Subject::from_raw("did:ad:placeholder", None);
+        self.commit.set_subject(self.subject.clone());
+        self.sync_loro_changes_to_commit_builder()?;
+
+        let mut builder = self.get_commit_builder().clone();
+        builder.is_genesis = true;
+        let mut commit = builder.sign(agent, store, self).await?;
+        let signature = commit
+            .signature
+            .as_ref()
+            .ok_or("No signature generated for genesis commit")?;
+        let did = Subject::from_raw(&crate::identifiers::resource_subject(signature), None);
+
+        self.subject = did.clone();
+        commit.subject = did;
+
+        Ok(commit)
     }
 
     /// Load versioned state before history reads (`get_history`, `view_at`).
@@ -1146,7 +1245,7 @@ impl Resource {
         store: &impl Storelike,
     ) -> AtomicResult<Property> {
         // If it's a URL, were done quickly!
-        if is_url(shortname) {
+        if is_url(shortname) || crate::identifiers::is_prop_id(shortname) {
             return store.get_property(shortname).await;
         }
         // First, iterate over all existing properties, see if any of these work.
@@ -1203,7 +1302,11 @@ impl Resource {
         };
         let update = if let Some(ref snapshot) = base {
             let base_doc = crate::loro::AtomicLoroDoc::from_snapshot(snapshot)?;
-            doc.export_updates_since(&base_doc.oplog_vv())
+            doc.export_updates_since(
+                &base_doc
+                    .tokened_base_vv()
+                    .unwrap_or_else(|| base_doc.oplog_vv()),
+            )
         } else {
             doc.export_snapshot()
         };
@@ -1218,10 +1321,11 @@ impl Resource {
         &mut self,
         store: &impl Storelike,
         commit: crate::Commit,
+        agent: &crate::agents::Agent,
     ) -> AtomicResult<CommitResponse> {
-        let agent = store.get_default_agent()?;
         let opts = CommitOpts {
             validate_schema: true,
+            validate_constraints: true,
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
@@ -1305,7 +1409,7 @@ impl Resource {
         if should_post {
             crate::client::post_commit(&commit, store).await?;
         }
-        self.apply_signed_commit(store, commit).await
+        self.apply_signed_commit(store, commit, agent).await
     }
 
     /// Saves the resource (with all the changes) to the store by creating a Commit.
@@ -1325,7 +1429,7 @@ impl Resource {
             .clone()
             .sign(&agent, store, self)
             .await?;
-        self.apply_signed_commit(store, commit).await
+        self.apply_signed_commit(store, commit, &agent).await
     }
 
     /// Saves the resource as a new DID-native resource.
@@ -1371,6 +1475,7 @@ impl Resource {
 
         let opts = CommitOpts {
             validate_schema: true,
+            validate_constraints: true,
             validate_signature: true,
             validate_timestamp: false,
             validate_rights: false,
@@ -1490,7 +1595,9 @@ impl Resource {
         store: &impl Storelike,
     ) -> AtomicResult<&mut Self> {
         let full_prop = store.get_property(&property).await?;
-        if let Some(allowed) = full_prop.allows_only {
+        // An empty `allowsOnly` is a SelectProperty whose options live in the
+        // class constraint map; it restricts nothing here.
+        if let Some(allowed) = full_prop.allows_only.filter(|a| !a.is_empty()) {
             let error = Err(format!(
                 "Property '{}' does not allow value '{}'. Allowed: {:?}",
                 property, value, allowed
@@ -1769,6 +1876,7 @@ mod test {
             let subject = commit.subject.to_string();
             let opts = crate::commit::CommitOpts {
                 validate_schema: false,
+                validate_constraints: false,
                 validate_signature: true,
                 validate_timestamp: false,
                 validate_rights: false,
@@ -1986,6 +2094,7 @@ mod test {
                 commit,
                 &CommitOpts {
                     validate_schema: true,
+                    validate_constraints: true,
                     validate_signature: true,
                     validate_timestamp: true,
                     validate_rights: false,

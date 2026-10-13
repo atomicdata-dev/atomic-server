@@ -119,6 +119,7 @@ export function TableTotalsFooter({
     setColumnAggregate,
     removeAggregateRow,
     rowCount,
+    rowsLoading,
     canWriteTable,
     classProperties,
     breakdownColumn,
@@ -173,6 +174,7 @@ export function TableTotalsFooter({
             aria-colindex={1}
             row={row}
             rowCount={rowCount}
+            rowsLoading={rowsLoading}
             totalRows={totalRows}
             canWrite={canWriteTable}
             classProperties={classProperties}
@@ -210,6 +212,7 @@ export function TableTotalsFooter({
 function LeadCell({
   row,
   rowCount,
+  rowsLoading,
   totalRows,
   canWrite,
   classProperties,
@@ -222,6 +225,7 @@ function LeadCell({
 }: {
   row: number;
   rowCount: number;
+  rowsLoading: boolean;
   totalRows: number;
   canWrite: boolean;
   classProperties: Property[];
@@ -268,7 +272,8 @@ function LeadCell({
   ];
 
   // The count describes the table, not a particular totals row.
-  const label = row === 0 ? rowCount.toLocaleString() : '';
+  // While the rows are on their way "0" would be a claim, not a count.
+  const label = row === 0 && !rowsLoading ? rowCount.toLocaleString() : '';
 
   if (!canWrite) {
     return (

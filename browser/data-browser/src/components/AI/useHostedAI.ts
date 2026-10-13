@@ -5,7 +5,11 @@ import {
   type HostedAIStatus,
 } from '@helpers/managed/ai';
 import { hasManagedApi } from '@helpers/managed/api';
-import { onManagedLogout } from '@helpers/managed/session';
+import {
+  hasManagedSession,
+  onManagedLogout,
+  onManagedSessionChanged,
+} from '@helpers/managed/session';
 
 /** Delays before asking again while the status could not be read. */
 export const HOSTED_AI_RETRY_DELAYS_MS = [1500, 4000, 10_000, 30_000];
@@ -23,17 +27,21 @@ export function useHostedAI() {
       const request = ++generation;
       clearTimeout(retryTimer);
       let known = false;
+      // Without a session there is nothing to wait for: a sign-in announces
+      // itself (`onManagedSessionChanged`), and a return to the tab refreshes.
+      let signedIn = true;
 
       try {
         const next = await getHostedAIStatus();
         if (active && generation === request) setStatus(next);
         known = next !== undefined;
+        if (!known) signedIn = await hasManagedSession().catch(() => true);
       } catch {
         // Preserve an existing balance during a transient outage. Requests are
         // always authorized and metered by the server, never by this display.
       }
 
-      if (known) {
+      if (known || !signedIn) {
         attempt = 0;
 
         return;
@@ -73,6 +81,8 @@ export function useHostedAI() {
 
     window.addEventListener('focus', refreshOnFocus);
 
+    const removeSessionChanged = onManagedSessionChanged(refreshOnFocus);
+
     const removeLogout = onManagedLogout(() => {
       generation++;
       clearTimeout(settlementRefresh);
@@ -85,6 +95,7 @@ export function useHostedAI() {
       clearTimeout(settlementRefresh);
       clearTimeout(retryTimer);
       removeLogout();
+      removeSessionChanged();
       window.removeEventListener(HOSTED_AI_USAGE_EVENT, refreshUsage);
       window.removeEventListener('focus', refreshOnFocus);
     };

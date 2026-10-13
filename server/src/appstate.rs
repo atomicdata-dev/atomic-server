@@ -60,6 +60,9 @@ impl AppState {
                 "Slow mode is enabled. This will introduce random delays in the server, to simulate a slow connection."
             );
         }
+        if let Some(message) = crate::host_mode::proxy_origin_warning(&config.opts) {
+            tracing::warn!("{message}");
+        }
         if config.opts.development {
             tracing::warn!(
                 "Development mode is enabled. This will use staging environments for services like LetsEncrypt."

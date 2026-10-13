@@ -1,8 +1,9 @@
-import { Resource } from '@tomic/react';
+import { Resource, useStore } from '@tomic/react';
 import { useNavigate } from '@tanstack/react-router';
 import { constructOpenURL } from '@helpers/navigation';
-import { compatibleFieldTypes, columnLabel } from './tableColumns';
-import { useMemo, type JSX } from 'react';
+import { compatibleColumnTypes, columnLabel } from './tableColumns';
+import { FormDataClassContext } from './formDataClass';
+import { useContext, useMemo, type JSX } from 'react';
 import { FaPlus } from 'react-icons/fa6';
 import { DIVIDER, DropdownMenu, DropdownItem } from '@components/Dropdown';
 import { buildDefaultTrigger } from '@components/Dropdown/DefaultTrigger';
@@ -27,6 +28,8 @@ export function AddFieldMenu({
   tableSubject,
 }: AddFieldMenuProps): JSX.Element {
   const navigate = useNavigate();
+  const store = useStore();
+  const dataClassSubject = useContext(FormDataClassContext);
   const items = useMemo((): DropdownItem[] => {
     const toItem = (type: AddableFieldType) => ({
       id: type,
@@ -41,7 +44,11 @@ export function AddFieldMenu({
 
     if (columns) {
       const columnItems: DropdownItem[] = columns.map(property => {
-        const type = compatibleFieldTypes(property)[0];
+        const type = compatibleColumnTypes(
+          store,
+          dataClassSubject,
+          property,
+        )[0];
         const Icon = type && FIELD_TYPE_META[type].icon;
 
         return {
@@ -79,7 +86,7 @@ export function AddFieldMenu({
       ...(index === 0 ? [] : [DIVIDER]),
       ...group.map(toItem),
     ]);
-  }, [onAdd, columns, tableSubject, navigate]);
+  }, [onAdd, columns, tableSubject, navigate, store, dataClassSubject]);
 
   return <DropdownMenu Trigger={AddFieldTrigger} items={items} />;
 }

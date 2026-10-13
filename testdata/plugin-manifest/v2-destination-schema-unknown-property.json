@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "name": "money",
+  "namespace": "example",
+  "version": "0.1.0",
+  "secrets": [],
+  "operations": [],
+  "destination": {
+    "schema": {
+      "properties": [],
+      "classes": [
+        {
+          "shortname": "bank-statement",
+          "name": "Bank statement",
+          "description": "x",
+          "requires": [
+            "statement-number"
+          ]
+        }
+      ]
+    },
+    "tables": {
+      "statements": {
+        "name": "Bank statements",
+        "rowClass": "bank-statement",
+        "columns": []
+      }
+    }
+  }
+}

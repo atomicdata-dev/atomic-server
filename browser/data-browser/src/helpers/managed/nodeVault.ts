@@ -39,6 +39,7 @@ export const nodeVault: VaultCapableDb = {
     checkpointN,
     driveHasCheckpoint,
     observedLanes,
+    currentStateOnly,
   ) {
     const result = await invoke<
       | (Omit<SealedObject, 'objectKey'> & {
@@ -60,6 +61,7 @@ export const nodeVault: VaultCapableDb = {
       checkpointN,
       driveHasCheckpoint,
       observedLanes,
+      currentStateOnly: currentStateOnly ?? false,
     });
 
     // Null is a real answer, not a failure: nothing has changed since this

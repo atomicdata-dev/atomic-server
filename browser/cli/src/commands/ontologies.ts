@@ -15,14 +15,17 @@ import { validateOntologies } from '../validateOntologies.js';
 import { ready } from '../store.js';
 
 export const ontologiesCommand = async (_args: string[]) => {
+  await generateTypes(atomicConfig.ontologies);
+};
+
+/** Generates the typescript files for the given ontology subjects. */
+export const generateTypes = async (ontologies: string[]) => {
   await ready;
   const propertyRecord = new PropertyRecord();
 
-  console.log(
-    chalk.blue(`Found ${chalk.red(atomicConfig.ontologies.length)} ontologies`),
-  );
+  console.log(chalk.blue(`Found ${chalk.red(ontologies.length)} ontologies`));
 
-  const [valid, report] = await validateOntologies(atomicConfig.ontologies);
+  const [valid, report] = await validateOntologies(ontologies);
 
   if (!valid) {
     console.log(chalk.red('ERROR: Could not generate ontologies'));
@@ -34,7 +37,7 @@ export const ontologiesCommand = async (_args: string[]) => {
 
   checkOrCreateFolder(atomicConfig.outputFolder);
 
-  for (const subject of atomicConfig.ontologies) {
+  for (const subject of ontologies) {
     await write(await generateOntology(subject, propertyRecord));
   }
 
@@ -53,7 +56,7 @@ export const ontologiesCommand = async (_args: string[]) => {
 
   console.log(chalk.blue('Generating index...'));
 
-  await write(generateIndex(atomicConfig.ontologies, missingProps.length > 0));
+  await write(generateIndex(ontologies, missingProps.length > 0));
 
   console.log(chalk.green('Done!'));
   console.log(

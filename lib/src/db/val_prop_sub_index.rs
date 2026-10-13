@@ -2,7 +2,9 @@
 use crate::{atoms::IndexAtom, errors::AtomicResult, Db, Value};
 
 use super::{
-    query_index::{sort_part, IndexIterator, SEPARATION_BIT},
+    query_index::{
+        property_from_key_part, property_key_part, sort_part, IndexIterator, SEPARATION_BIT,
+    },
     trees::{Method, Operation, Transaction, Tree},
 };
 
@@ -39,19 +41,19 @@ pub fn add_atom_to_valpropsub_index(
 /// when it equals the reference value, as in
 /// [`super::prop_val_sub_index::propvalsub_key`].
 pub fn valpropsub_key(atom: &IndexAtom) -> Vec<u8> {
-    key_with_sort_part(atom, sort_part(atom))
+    key_with_sort_part(&property_key_part(&atom.property), atom, sort_part(atom))
 }
 
 /// The key as stores before the sort part was left out wrote it.
 pub fn valpropsub_legacy_key(atom: &IndexAtom) -> Vec<u8> {
-    key_with_sort_part(atom, atom.sort_value.as_bytes())
+    key_with_sort_part(atom.property.as_bytes(), atom, atom.sort_value.as_bytes())
 }
 
-fn key_with_sort_part(atom: &IndexAtom, sort: &[u8]) -> Vec<u8> {
+fn key_with_sort_part(property: &[u8], atom: &IndexAtom, sort: &[u8]) -> Vec<u8> {
     [
         atom.ref_value.as_bytes(),
         &[SEPARATION_BIT],
-        atom.property.as_bytes(),
+        property,
         &[SEPARATION_BIT],
         sort,
         &[SEPARATION_BIT],
@@ -74,7 +76,7 @@ pub fn find_in_val_prop_sub_index(store: &Db, val: &Value, prop: Option<&str>) -
     };
     let mut prefix: Vec<u8> = [value_key.as_bytes(), &[SEPARATION_BIT]].concat();
     if let Some(prop) = prop {
-        prefix.extend(prop.as_bytes());
+        prefix.extend(property_key_part(prop));
         prefix.extend([SEPARATION_BIT]);
     }
     Box::new(store.kv.scan_prefix(Tree::ValPropSub, &prefix).map(|kv| {
@@ -89,14 +91,13 @@ fn key_to_index_atom(key: &[u8]) -> AtomicResult<IndexAtom> {
     let mut parts = key.split(|b| b == &SEPARATION_BIT);
     let ref_val = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
         .map_err(|_| "Can't parse ref_val into string")?;
-    let prop = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
-        .map_err(|_| "Can't parse prop into string")?;
+    let prop = property_from_key_part(parts.next().ok_or("Invalid key for prop_val_sub_index")?)?;
     let sort_val = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
         .map_err(|_| "Can't parse sort_val into string")?;
     let sub = std::str::from_utf8(parts.next().ok_or("Invalid key for prop_val_sub_index")?)
         .map_err(|_| "Can't parse subject into string")?;
     Ok(IndexAtom {
-        property: prop.into(),
+        property: prop,
         ref_value: ref_val.into(),
         sort_value: if sort_val.is_empty() {
             ref_val

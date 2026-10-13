@@ -118,14 +118,14 @@ export function TableInputOptions({
       <FieldPair>
         <BoundField
           label='Min rows'
-          optionKey='minRows'
+          optionKey='minItems'
           options={options}
           setOptions={setOptions}
           min={0}
         />
         <BoundField
           label='Max rows'
-          optionKey='maxRows'
+          optionKey='maxItems'
           options={options}
           setOptions={setOptions}
           min={1}

@@ -472,5 +472,222 @@
     "name": "v1 has no accepts",
     "file": "v1-accepts.json",
     "error": "unknown field"
+  },
+  {
+    "name": "v2 destination with a primary table and keyed tables",
+    "file": "v2-destination-tables.json",
+    "serialized": {
+      "schemaVersion": 2,
+      "name": "money",
+      "namespace": "example",
+      "version": "0.1.0",
+      "secrets": [],
+      "operations": [],
+      "destination": {
+        "schema": {
+          "properties": [
+            {
+              "shortname": "bank-amount",
+              "name": "Amount",
+              "description": "Exact decimal string.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            },
+            {
+              "shortname": "statement-number",
+              "name": "Statement number",
+              "description": "Number and sequence of the statement.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            },
+            {
+              "shortname": "balance-date",
+              "name": "Balance date",
+              "description": "Date of the closing balance.",
+              "datatype": "https://atomicdata.dev/datatypes/date"
+            }
+          ],
+          "classes": [
+            {
+              "shortname": "bank-transaction",
+              "name": "Bank transaction",
+              "description": "One booked entry.",
+              "requires": [
+                "bank-amount"
+              ]
+            },
+            {
+              "shortname": "bank-statement",
+              "name": "Bank statement",
+              "description": "One imported statement.",
+              "requires": [
+                "statement-number"
+              ]
+            },
+            {
+              "shortname": "closing-balance",
+              "name": "Closing balance",
+              "description": "A balance at the end of a statement.",
+              "requires": [
+                "bank-amount",
+                "balance-date"
+              ]
+            }
+          ]
+        },
+        "table": {
+          "name": "Bank transactions",
+          "rowClass": "bank-transaction",
+          "columns": [
+            "bank-amount"
+          ]
+        },
+        "tables": {
+          "statements": {
+            "name": "Bank statements",
+            "rowClass": "bank-statement",
+            "columns": [
+              "statement-number"
+            ]
+          },
+          "closingBalances": {
+            "name": "Closing balances",
+            "rowClass": "closing-balance",
+            "columns": [
+              "balance-date",
+              "bank-amount"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "v2 destination with keyed tables only",
+    "file": "v2-destination-tables-only.json",
+    "serialized": {
+      "schemaVersion": 2,
+      "name": "money",
+      "namespace": "example",
+      "version": "0.1.0",
+      "secrets": [],
+      "operations": [],
+      "destination": {
+        "schema": {
+          "properties": [
+            {
+              "shortname": "bank-amount",
+              "name": "Amount",
+              "description": "Exact decimal string.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            },
+            {
+              "shortname": "statement-number",
+              "name": "Statement number",
+              "description": "Number and sequence of the statement.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            },
+            {
+              "shortname": "balance-date",
+              "name": "Balance date",
+              "description": "Date of the closing balance.",
+              "datatype": "https://atomicdata.dev/datatypes/date"
+            }
+          ],
+          "classes": [
+            {
+              "shortname": "bank-transaction",
+              "name": "Bank transaction",
+              "description": "One booked entry.",
+              "requires": [
+                "bank-amount"
+              ]
+            },
+            {
+              "shortname": "bank-statement",
+              "name": "Bank statement",
+              "description": "One imported statement.",
+              "requires": [
+                "statement-number"
+              ]
+            },
+            {
+              "shortname": "closing-balance",
+              "name": "Closing balance",
+              "description": "A balance at the end of a statement.",
+              "requires": [
+                "bank-amount",
+                "balance-date"
+              ]
+            }
+          ]
+        },
+        "tables": {
+          "statements": {
+            "name": "Bank statements",
+            "rowClass": "bank-statement",
+            "columns": [
+              "statement-number"
+            ]
+          },
+          "closingBalances": {
+            "name": "Closing balances",
+            "rowClass": "closing-balance",
+            "columns": [
+              "balance-date",
+              "bank-amount"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "v2 destination without any table",
+    "file": "v2-destination-no-table.json",
+    "error": "destination: declare `table` or `tables`"
+  },
+  {
+    "name": "v2 destination with an empty tables map",
+    "file": "v2-destination-tables-empty.json",
+    "error": "destination: tables must not be empty"
+  },
+  {
+    "name": "v2 destination table key that is not an identifier",
+    "file": "v2-destination-tables-bad-key.json",
+    "error": "destination: table keys must"
+  },
+  {
+    "name": "v2 destination table key that is reserved",
+    "file": "v2-destination-tables-reserved-key.json",
+    "error": "destination: table keys must"
+  },
+  {
+    "name": "v2 destination tables sharing a row class",
+    "file": "v2-destination-tables-shared-class.json",
+    "error": "destination: each table needs its own rowClass"
+  },
+  {
+    "name": "v2 destination table naming an undeclared class",
+    "file": "v2-destination-tables-unknown-class.json",
+    "error": "table rowClass must name a class in schema"
+  },
+  {
+    "name": "v2 destination table column naming an undeclared property",
+    "file": "v2-destination-tables-unknown-column.json",
+    "error": "table columns must name properties in schema"
+  },
+  {
+    "name": "v2 destination table with an unknown field",
+    "file": "v2-destination-tables-unknown-field.json",
+    "error": "destination: unknown field `parent`"
+  },
+  {
+    "name": "v2 destination table without a name",
+    "file": "v2-destination-table-no-name.json",
+    "error": "table name must be nonempty text"
+  },
+  {
+    "name": "v2 destination class requiring an undeclared property",
+    "file": "v2-destination-schema-unknown-property.json",
+    "error": "class bank-statement names an undeclared property"
   }
 ]

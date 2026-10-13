@@ -21,9 +21,12 @@
 //!   conversation's subject are associated data, so a ciphertext cannot be
 //!   moved into another conversation. Revealing one message's key (to report
 //!   abuse) reveals nothing else.
+//! - **Sealed files.** An attachment is encrypted under its own random key,
+//!   which travels only inside the sealed message that carries it. See
+//!   [`seal_file`].
 
 use crate::errors::AtomicResult;
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+use chacha20poly1305::aead::{Aead, AeadInPlace, KeyInit, Payload};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -36,9 +39,16 @@ const ENCRYPTION_KEY_CONTEXT: &str = "atomic 2026 agent conversation encryption 
 const WRAP_CONTEXT: &str = "atomic 2026 conversation key wrap";
 /// Turns an epoch key and a message id into that message's key.
 const MESSAGE_CONTEXT: &str = "atomic 2026 sealed message key";
+/// Prefixes the associated data of a sealed file, so a file ciphertext can
+/// never be read as a message or the other way around.
+const FILE_CONTEXT: &str = "atomic 2026 conversation file";
 
 pub const KEYRING_FORMAT: u32 = 1;
 const SEALED_VERSION: u8 = 1;
+const FILE_VERSION: u8 = 1;
+/// version (1) + nonce (24); the AEAD tag (16) follows the ciphertext.
+const FILE_HEADER_LEN: usize = 1 + NONCE_LEN;
+const FILE_TAG_LEN: usize = 16;
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 24;
 const MESSAGE_ID_LEN: usize = 16;
@@ -417,6 +427,64 @@ pub fn open_revealed_message(
     )
 }
 
+fn file_aad(conversation: &str) -> Vec<u8> {
+    [FILE_CONTEXT.as_bytes(), conversation.as_bytes()].concat()
+}
+
+/// Encrypts an attachment for `conversation`. Returns the file key (base64url)
+/// and the ciphertext, laid out as `version(1) | nonce(24) | ciphertext+tag`.
+///
+/// The key is random and belongs to this file alone. It is not derived from
+/// the conversation's epoch key: it travels only inside the sealed message
+/// that references the file, so rotating the epoch later changes nothing, and
+/// revealing one attachment's key reveals nothing else. The conversation's
+/// subject is associated data, so the ciphertext cannot be moved into another
+/// conversation. Sealing the same bytes twice gives unrelated ciphertexts.
+pub fn seal_file(conversation: &str, plaintext: &[u8]) -> AtomicResult<(String, Vec<u8>)> {
+    let mut key = [0u8; KEY_LEN];
+    rand::thread_rng().fill_bytes(&mut key);
+    let nonce = random_nonce();
+    // One allocation: header, then the plaintext, encrypted where it lies.
+    let mut out = Vec::with_capacity(FILE_HEADER_LEN + plaintext.len() + FILE_TAG_LEN);
+    out.push(FILE_VERSION);
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(plaintext);
+    let tag = XChaCha20Poly1305::new(Key::from_slice(&key))
+        .encrypt_in_place_detached(
+            XNonce::from_slice(&nonce),
+            &file_aad(conversation),
+            &mut out[FILE_HEADER_LEN..],
+        )
+        .map_err(|_| "failed to encrypt the file")?;
+    out.extend_from_slice(&tag);
+    Ok((b64(&key), out))
+}
+
+/// Decrypts what [`seal_file`] produced, given the conversation it was sealed
+/// for and the key from the message that references it.
+pub fn open_file(conversation: &str, key: &str, sealed: &[u8]) -> AtomicResult<Vec<u8>> {
+    let key = unb64_array::<KEY_LEN>(key, "file key")?;
+    if sealed.len() < FILE_HEADER_LEN + FILE_TAG_LEN {
+        return Err("sealed file is too short".into());
+    }
+    if sealed[0] != FILE_VERSION {
+        return Err(format!("unsupported sealed file version {}", sealed[0]).into());
+    }
+    let nonce = &sealed[1..FILE_HEADER_LEN];
+    let (body, tag) =
+        sealed[FILE_HEADER_LEN..].split_at(sealed.len() - FILE_HEADER_LEN - FILE_TAG_LEN);
+    let mut plaintext = body.to_vec();
+    XChaCha20Poly1305::new(Key::from_slice(&key))
+        .decrypt_in_place_detached(
+            XNonce::from_slice(nonce),
+            &file_aad(conversation),
+            &mut plaintext,
+            tag.into(),
+        )
+        .map_err(|_| "could not decrypt the file: wrong key, or the data was altered")?;
+    Ok(plaintext)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -584,6 +652,76 @@ mod tests {
             encryption_key: b64(&[0u8; 32]),
         };
         assert!(keyring.add_epoch(&[bad]).is_err());
+    }
+
+    #[test]
+    fn a_file_round_trips() {
+        let (key, sealed) = seal_file(ROOM, b"holiday photo").unwrap();
+        assert_ne!(&sealed[FILE_HEADER_LEN..], b"holiday photo");
+        assert_eq!(open_file(ROOM, &key, &sealed).unwrap(), b"holiday photo");
+    }
+
+    #[test]
+    fn a_file_cannot_be_moved_to_another_conversation() {
+        let (key, sealed) = seal_file(ROOM, b"only here").unwrap();
+        assert!(open_file("did:ad:other-room", &key, &sealed).is_err());
+    }
+
+    #[test]
+    fn a_file_needs_its_own_key() {
+        let (_, sealed) = seal_file(ROOM, b"secret").unwrap();
+        let (other_key, _) = seal_file(ROOM, b"secret").unwrap();
+        assert!(open_file(ROOM, &other_key, &sealed).is_err());
+        assert!(open_file(ROOM, "not a key", &sealed).is_err());
+    }
+
+    #[test]
+    fn a_tampered_file_is_refused_wherever_the_byte_flips() {
+        let (key, sealed) = seal_file(ROOM, b"some bytes worth protecting").unwrap();
+        // Version, nonce, body and tag.
+        for index in [
+            0,
+            1,
+            FILE_HEADER_LEN,
+            sealed.len() - FILE_TAG_LEN,
+            sealed.len() - 1,
+        ] {
+            let mut altered = sealed.clone();
+            altered[index] ^= 1;
+            assert!(
+                open_file(ROOM, &key, &altered).is_err(),
+                "flipping byte {index} went unnoticed"
+            );
+        }
+        assert!(open_file(ROOM, &key, &sealed[..sealed.len() - 1]).is_err());
+        assert!(open_file(ROOM, &key, &[]).is_err());
+    }
+
+    #[test]
+    fn sealing_the_same_file_twice_gives_different_output() {
+        let (key_a, a) = seal_file(ROOM, b"same bytes").unwrap();
+        let (key_b, b) = seal_file(ROOM, b"same bytes").unwrap();
+        assert_ne!(key_a, key_b);
+        assert_ne!(a, b);
+        assert_ne!(a[1..FILE_HEADER_LEN], b[1..FILE_HEADER_LEN], "nonce reused");
+    }
+
+    #[test]
+    fn an_empty_file_round_trips() {
+        let (key, sealed) = seal_file(ROOM, b"").unwrap();
+        assert_eq!(sealed.len(), FILE_HEADER_LEN + FILE_TAG_LEN);
+        assert!(open_file(ROOM, &key, &sealed).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_largest_attachment_round_trips() {
+        let plaintext: Vec<u8> = (0..25 * 1024 * 1024).map(|i| (i % 251) as u8).collect();
+        let (key, sealed) = seal_file(ROOM, &plaintext).unwrap();
+        assert_eq!(
+            sealed.len(),
+            plaintext.len() + FILE_HEADER_LEN + FILE_TAG_LEN
+        );
+        assert!(open_file(ROOM, &key, &sealed).unwrap() == plaintext);
     }
 
     #[test]

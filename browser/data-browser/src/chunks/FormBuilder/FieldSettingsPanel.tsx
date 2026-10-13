@@ -3,6 +3,7 @@ import { AtomicLink } from '@components/AtomicLink';
 import { ResourceInline } from '@views/ResourceInline/ResourceInline';
 import { Checkbox } from '@components/forms/Checkbox';
 import { compatibleFieldTypes } from './tableColumns';
+import { useFieldConstraint } from './formDataClass';
 import { useTableFormColumns } from './useTableFormColumns';
 import {
   core,
@@ -76,7 +77,7 @@ export function FieldSettingsPanel({
   const property = useResource(mapsTo ?? unknownSubject);
   const { requires } = useTableFormColumns(dataClassSubject);
   const forcedRequired = !!mapsTo && requires.includes(mapsTo);
-  const compatible = compatibleFieldTypes(property);
+  const compatible = compatibleFieldTypes(property, useFieldConstraint(field));
 
   useEffect(() => {
     if (forcedRequired && field.get(forms.properties.required) !== true) {
@@ -324,8 +325,9 @@ interface FieldShortnameFieldProps {
  *
  * Deliberately quiet: it sits under the Label as read-only text, because for
  * most questions it is derived and nobody needs to touch it. The pencil turns
- * it into an input for the people who do. Typing pins it — later Label edits
- * leave it be; clearing it un-pins it, handing it back to the Label.
+ * it into an input for the people who do. Label edits never change it: a
+ * content-addressed Property's shortname is part of its ID, so choosing another
+ * one here creates a new Property (see `setFieldShortname`).
  */
 function FieldShortnameField({
   field,

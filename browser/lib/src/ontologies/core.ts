@@ -3,7 +3,7 @@
  * For more info on how to use ontologies: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/cli/readme.md
  * -------------------------------- */
 
-import type { OntologyBaseObject, BaseProps } from '../index.js';
+import type { OntologyBaseObject, BaseProps, JSONObject } from '../index.js';
 
 export const core = {
   classes: {
@@ -12,10 +12,12 @@ export const core = {
     agent: 'https://atomicdata.dev/classes/Agent',
     datatype: 'https://atomicdata.dev/classes/Datatype',
     ontology: 'https://atomicdata.dev/class/ontology',
+    lens: 'https://atomicdata.dev/classes/Lens',
   },
   properties: {
     allowsOnly: 'https://atomicdata.dev/properties/allowsOnly',
     classtype: 'https://atomicdata.dev/properties/classtype',
+    constraints: 'https://atomicdata.dev/properties/constraints',
     datatype: 'https://atomicdata.dev/properties/datatype',
     description: 'https://atomicdata.dev/properties/description',
     incomplete: 'https://atomicdata.dev/properties/incomplete',
@@ -40,6 +42,9 @@ export const core = {
       'https://atomicdata.dev/properties/importReferenceReview',
     importResolution: 'https://atomicdata.dev/properties/importResolution',
     importBaseline: 'https://atomicdata.dev/properties/importBaseline',
+    lensFrom: 'https://atomicdata.dev/properties/lensFrom',
+    lensTo: 'https://atomicdata.dev/properties/lensTo',
+    lensTransform: 'https://atomicdata.dev/properties/lensTransform',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Class']: [
@@ -47,6 +52,7 @@ export const core = {
       'https://atomicdata.dev/properties/description',
       'https://atomicdata.dev/properties/recommends',
       'https://atomicdata.dev/properties/requires',
+      'https://atomicdata.dev/properties/constraints',
     ],
     ['https://atomicdata.dev/classes/Property']: [
       'https://atomicdata.dev/properties/shortname',
@@ -76,6 +82,12 @@ export const core = {
       'https://atomicdata.dev/properties/properties',
       'https://atomicdata.dev/properties/instances',
     ],
+    ['https://atomicdata.dev/classes/Lens']: [
+      'https://atomicdata.dev/properties/lensFrom',
+      'https://atomicdata.dev/properties/lensTo',
+      'https://atomicdata.dev/properties/lensTransform',
+      'https://atomicdata.dev/properties/description',
+    ],
   },
 } as const satisfies OntologyBaseObject;
 
@@ -86,6 +98,7 @@ export namespace Core {
   export type Agent = typeof core.classes.agent;
   export type Datatype = typeof core.classes.datatype;
   export type Ontology = typeof core.classes.ontology;
+  export type Lens = typeof core.classes.lens;
 }
 
 declare module '../index.js' {
@@ -97,7 +110,8 @@ declare module '../index.js' {
         | typeof core.properties.description;
       recommends:
         | typeof core.properties.recommends
-        | typeof core.properties.requires;
+        | typeof core.properties.requires
+        | typeof core.properties.constraints;
     };
     [core.classes.property]: {
       requires:
@@ -137,11 +151,20 @@ declare module '../index.js' {
         | typeof core.properties.properties
         | typeof core.properties.instances;
     };
+    [core.classes.lens]: {
+      requires:
+        | BaseProps
+        | typeof core.properties.lensFrom
+        | typeof core.properties.lensTo
+        | typeof core.properties.lensTransform;
+      recommends: typeof core.properties.description;
+    };
   }
 
   interface PropTypeMapping {
     [core.properties.allowsOnly]: string[];
     [core.properties.classtype]: string;
+    [core.properties.constraints]: JSONObject;
     [core.properties.datatype]: string;
     [core.properties.description]: string;
     [core.properties.incomplete]: boolean;
@@ -162,11 +185,15 @@ declare module '../index.js' {
     [core.properties.classes]: string[];
     [core.properties.isLocked]: boolean;
     [core.properties.localId]: string;
+    [core.properties.lensFrom]: string;
+    [core.properties.lensTo]: string;
+    [core.properties.lensTransform]: JSONObject;
   }
 
   interface PropSubjectToNameMapping {
     [core.properties.allowsOnly]: 'allowsOnly';
     [core.properties.classtype]: 'classtype';
+    [core.properties.constraints]: 'constraints';
     [core.properties.datatype]: 'datatype';
     [core.properties.description]: 'description';
     [core.properties.incomplete]: 'incomplete';
@@ -187,5 +214,8 @@ declare module '../index.js' {
     [core.properties.classes]: 'classes';
     [core.properties.isLocked]: 'isLocked';
     [core.properties.localId]: 'localId';
+    [core.properties.lensFrom]: 'lensFrom';
+    [core.properties.lensTo]: 'lensTo';
+    [core.properties.lensTransform]: 'lensTransform';
   }
 }

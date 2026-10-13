@@ -5,6 +5,7 @@ import {
   getCurrentSubject,
   installCommitWatcher,
   newResource,
+  expectPkarrLookupMiss,
   setTitle,
   smoke,
 } from './test-utils';
@@ -127,7 +128,8 @@ async function expectWritableHome(page: Page, home: string) {
 test(
   'a secret with no recoverable data opens its writable private home',
   smoke,
-  async ({ page }) => {
+  async ({ page, browserDiagnostics }) => {
+    expectPkarrLookupMiss(browserDiagnostics);
     const { secret, home } = await unknownAccount();
     await signIn(page, secret);
     // The nudge is a toast, raised from `ShowRoute`'s effect once
@@ -152,6 +154,7 @@ test('an unavailable legacy home does not prevent a writable derived home', asyn
   page,
   browserDiagnostics,
 }) => {
+  expectPkarrLookupMiss(browserDiagnostics);
   const { secret, home } = await unknownAccount(true);
   const legacy = JSON.parse(atob(secret)).initialDrive as string;
   browserDiagnostics.expect(
@@ -178,6 +181,7 @@ test('a restored session can initialize its missing private home from a direct l
   page,
   browserDiagnostics,
 }) => {
+  expectPkarrLookupMiss(browserDiagnostics);
   const { secret, home } = await unknownAccount();
   browserDiagnostics.expect(
     'warning',
@@ -240,6 +244,7 @@ test('Sync does not claim an unreadable drive is cached or on another device', a
   page,
   browserDiagnostics,
 }) => {
+  expectPkarrLookupMiss(browserDiagnostics);
   const { secret, home } = await unknownAccount();
   await signIn(page, secret);
   await expect

@@ -16,3 +16,12 @@ export function formatPlainValue(val: AtomicValue): string {
 
   return String(val);
 }
+
+/**
+ * The value as a subject to look up, or `undefined` when it is not a string.
+ * A stored value can be an object or a number where a column expects a link;
+ * `useResource` needs a string, and throws on anything else.
+ */
+export function asSubject(val: unknown): string | undefined {
+  return typeof val === 'string' && val !== '' ? val : undefined;
+}

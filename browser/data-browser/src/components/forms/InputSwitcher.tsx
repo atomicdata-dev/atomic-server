@@ -10,6 +10,7 @@ import InputBoolean from './InputBoolean';
 import InputSlug from './InputSlug';
 import { InputTimestamp } from './InputTimestamp';
 import { InputDate } from './InputDate';
+import { useConstrainedProperty } from '@helpers/withConstraint';
 import { FilePicker } from './FilePicker/FilePicker';
 
 import type { JSX } from 'react';
@@ -19,7 +20,15 @@ import { InputLoroDoc } from './InputLoroDoc';
 import InputLocalizedText from './InputLocalizedText';
 
 /** Renders a fitting HTML input depending on the Datatype */
-export default function InputSwitcher(props: InputProps): JSX.Element {
+export default function InputSwitcher(inputProps: InputProps): JSX.Element {
+  // The resource's classes may narrow the Property: options from `enum`, the
+  // linked class from `class`. See `planning/class-constraints-and-forms.md`.
+  const property = useConstrainedProperty(
+    inputProps.resource,
+    inputProps.property,
+  );
+  const props = { ...inputProps, property };
+
   switch (props.property.datatype) {
     case Datatype.STRING: {
       return <InputString {...props} />;

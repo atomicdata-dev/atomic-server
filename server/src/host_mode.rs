@@ -149,6 +149,31 @@ pub fn domain_looks_public(domain: &str) -> bool {
     host.contains('.')
 }
 
+/// Said at boot when the server is probably behind a TLS-terminating proxy and
+/// has not been told its public URL. Without `--server-url` the store's origin
+/// is built from `--https`, i.e. `http://domain`, and every resource the server
+/// names itself (WebSocket, sync, `/query`) reaches an `https://` page as
+/// mixed content. A warning only: the same flags are a legitimate plain-http
+/// setup on a LAN name, so it is never an error.
+pub fn proxy_origin_warning(opts: &crate::config::Opts) -> Option<String> {
+    let has_server_url = opts
+        .server_url
+        .as_deref()
+        .is_some_and(|u| !u.trim().is_empty());
+
+    if opts.https || has_server_url || !domain_looks_public(&opts.domain) {
+        return None;
+    }
+
+    Some(format!(
+        "ATOMIC_HTTPS is off but ATOMIC_DOMAIN is `{}`, which looks like a public name. If a \
+         reverse proxy or tunnel terminates TLS in front of this server, set \
+         ATOMIC_SERVER_URL=https://{} (or --server-url); otherwise the server advertises \
+         itself as http:// and browsers block those requests as mixed content.",
+        opts.domain, opts.domain
+    ))
+}
+
 fn is_private_ip(ip: &std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
@@ -392,6 +417,35 @@ mod tests {
     use super::*;
 
     const OWNER: &str = "did:ad:agent:RqPwpgHv+PK7Pnz/dVab8hmHjYnvTL1YrlVa6L9G9Zg=";
+
+    #[test]
+    fn a_public_domain_without_https_or_server_url_warns_about_the_origin() {
+        use clap::Parser;
+        let parse = |args: &[&str]| {
+            let mut full = vec!["atomic-server"];
+            full.extend_from_slice(args);
+            crate::config::Opts::parse_from(full)
+        };
+
+        assert!(proxy_origin_warning(&parse(&["--domain", "atomic.example.de"])).is_some());
+        assert!(proxy_origin_warning(&parse(&[])).is_none(), "localhost");
+        assert!(proxy_origin_warning(&parse(&["--domain", "nas.local"])).is_none());
+        assert!(proxy_origin_warning(&parse(&[
+            "--domain",
+            "atomic.example.de",
+            "--server-url",
+            "https://atomic.example.de"
+        ]))
+        .is_none());
+        assert!(proxy_origin_warning(&parse(&[
+            "--domain",
+            "atomic.example.de",
+            "--https",
+            "--email",
+            "a@b.c"
+        ]))
+        .is_none());
+    }
 
     #[test]
     fn nothing_configured_stays_open() {

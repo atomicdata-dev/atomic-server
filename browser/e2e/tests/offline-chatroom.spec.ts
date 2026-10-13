@@ -106,7 +106,7 @@ test.describe('offline chatroom', () => {
     for (const text of MESSAGES) {
       await chatInput.fill(text);
       // Pressing Enter submits via the chatroom's keyboard handler. Avoids
-      // the Send button being intercepted by the "chatroom created" toast.
+      // the Send button being intercepted by an overlapping toast.
       await chatInput.press('Enter');
       await expect(chatInput).toHaveValue('');
       await expect(page.locator(`text=${text}`).first()).toBeVisible({
@@ -162,6 +162,10 @@ test.describe('offline chatroom', () => {
       firstMessage.locator('time'),
       'Message date missing after offline→sync→reload',
     ).toHaveAttribute('datetime', new RegExp(`^${year}-`));
+
+    // New messages are entries in the chat's log page, which synced and
+    // reloaded like the rest.
+    await expect(page.locator('[data-entry-key]')).toHaveCount(MESSAGES.length);
 
     // No duplicates: each message must appear exactly once. `getByText` with
     // `exact: true` ensures we don't accidentally match substrings of a

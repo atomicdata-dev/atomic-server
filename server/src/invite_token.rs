@@ -1,6 +1,16 @@
-use atomic_lib::{errors::AtomicResult, urls, Db, Resource, Storelike, Value};
+use atomic_lib::{db::trees::Tree, errors::AtomicResult, urls, Db, Resource, Storelike, Value};
 use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
+
+/// Error shown when an invite has been accepted by as many agents as it allows.
+pub const INVITE_EXHAUSTED: &str = "This invite has no usages left. Ask for a new one.";
+
+/// Serializes check-then-record of acceptances, so two people opening a
+/// one-use link at the same moment cannot both get in.
+pub fn acceptance_lock() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+}
 
 /// A stateless invite token that is signed by the user.
 /// It is a base64-encoded JSON-AD representation of a "virtual" Invite resource.
@@ -11,60 +21,15 @@ pub struct InviteToken {
     pub expires_at: i64,
     pub signer: atomic_lib::Subject,
     pub signature: String,
+    /// How many different agents may accept this invite. Part of the signed
+    /// payload, so the recipient cannot raise it. `None` means unlimited
+    /// (and is how tokens issued before the limit existed decode).
+    pub max_usages: Option<i64>,
 }
 
 impl InviteToken {
-    /// Creates a new signed InviteToken
-    #[cfg(test)]
-    pub fn new(
-        target: String,
-        write: bool,
-        expires_at: i64,
-        signer_agent: &atomic_lib::agents::Agent,
-    ) -> AtomicResult<Self> {
-        // Normalize the target through Subject parsing so the signed string
-        // matches what encode()/verify() will produce via self.target.as_str().
-        let target_subject = atomic_lib::Subject::from(target);
-        let target_normalized = target_subject.as_str().to_string();
-
-        let mut signable_json = serde_json::Map::new();
-        signable_json.insert(
-            urls::TARGET.into(),
-            serde_json::Value::String(target_normalized.clone()),
-        );
-        signable_json.insert(urls::WRITE_BOOL.into(), serde_json::Value::Bool(write));
-        signable_json.insert(
-            urls::EXPIRES_AT.into(),
-            serde_json::Value::Number(expires_at.into()),
-        );
-        signable_json.insert(
-            urls::SIGNER.into(),
-            serde_json::Value::String(signer_agent.subject.as_str().to_string()),
-        );
-
-        let serialized = serde_jcs::to_string(&signable_json)
-            .map_err(|e| format!("Failed to serialize invite data: {}", e))?;
-
-        let signature = atomic_lib::commit::sign_message(
-            &serialized,
-            signer_agent
-                .private_key
-                .as_ref()
-                .ok_or("Agent has no private key")?,
-            &signer_agent.public_key,
-        )?;
-
-        Ok(Self {
-            target: target_subject,
-            write,
-            expires_at,
-            signer: signer_agent.subject.clone(),
-            signature,
-        })
-    }
-    /// Encodes the InviteToken into a base64 string.
-    #[cfg(test)]
-    pub fn encode(&self) -> AtomicResult<String> {
+    /// The JSON-AD that the issuer signs: everything except the signature.
+    fn signable_json(&self) -> serde_json::Map<String, serde_json::Value> {
         let mut map = serde_json::Map::new();
         map.insert(
             urls::TARGET.into(),
@@ -79,6 +44,105 @@ impl InviteToken {
             urls::SIGNER.into(),
             serde_json::Value::String(self.signer.as_str().to_string()),
         );
+        // Only present when limited, so unlimited tokens keep their old bytes.
+        if let Some(max) = self.max_usages {
+            map.insert(
+                urls::USAGES_LEFT.into(),
+                serde_json::Value::Number(max.into()),
+            );
+        }
+        map
+    }
+
+    /// Key under which the agents that accepted this invite are recorded.
+    /// The signature identifies the token: it covers every signed field.
+    fn acceptances_key(&self) -> Vec<u8> {
+        format!("invite-acceptances:{}", self.signature).into_bytes()
+    }
+
+    /// Agents that have accepted this invite so far.
+    pub fn accepted_by(&self, store: &Db) -> AtomicResult<Vec<String>> {
+        match store.kv.get(Tree::PluginMeta, &self.acceptances_key())? {
+            Some(bytes) => serde_json::from_slice(&bytes)
+                .map_err(|e| format!("Malformed invite acceptance record: {e}").into()),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// How many agents can still accept, or `None` when unlimited.
+    pub fn usages_left(&self, store: &Db) -> AtomicResult<Option<i64>> {
+        let Some(max) = self.max_usages else {
+            return Ok(None);
+        };
+
+        Ok(Some((max - self.accepted_by(store)?.len() as i64).max(0)))
+    }
+
+    /// Errors with [`INVITE_EXHAUSTED`] when the limit is reached and `agent`
+    /// has not accepted before. Someone who already accepted may open the
+    /// link again: that grants nothing new, so it does not use a place.
+    pub fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()> {
+        if self.usages_left(store)? == Some(0)
+            && !self.accepted_by(store)?.iter().any(|a| a == agent)
+        {
+            return Err(INVITE_EXHAUSTED.into());
+        }
+        Ok(())
+    }
+
+    /// Records that `agent` accepted. Callers must hold [`acceptance_lock`]
+    /// from before [`Self::check_usages`] until after this call.
+    pub fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()> {
+        let mut accepted = self.accepted_by(store)?;
+        if accepted.iter().any(|a| a == agent) {
+            return Ok(());
+        }
+        accepted.push(agent.to_string());
+        store.kv.insert(
+            Tree::PluginMeta,
+            &self.acceptances_key(),
+            &serde_json::to_vec(&accepted).map_err(|e| e.to_string())?,
+        )
+    }
+    /// Creates a new signed InviteToken
+    #[cfg(test)]
+    pub fn new(
+        target: String,
+        write: bool,
+        expires_at: i64,
+        signer_agent: &atomic_lib::agents::Agent,
+        max_usages: Option<i64>,
+    ) -> AtomicResult<Self> {
+        // Normalize the target through Subject parsing so the signed string
+        // matches what encode()/verify() will produce via self.target.as_str().
+        let mut token = Self {
+            target: atomic_lib::Subject::from(target),
+            write,
+            expires_at,
+            signer: signer_agent.subject.clone(),
+            signature: String::new(),
+            max_usages,
+        };
+
+        let serialized = serde_jcs::to_string(&token.signable_json())
+            .map_err(|e| format!("Failed to serialize invite data: {}", e))?;
+
+        token.signature = atomic_lib::commit::sign_message(
+            &serialized,
+            signer_agent
+                .private_key
+                .as_ref()
+                .ok_or("Agent has no private key")?,
+            &signer_agent.public_key,
+        )?;
+
+        Ok(token)
+    }
+
+    /// Encodes the InviteToken into a base64 string.
+    #[cfg(test)]
+    pub fn encode(&self) -> AtomicResult<String> {
+        let mut map = self.signable_json();
         map.insert(
             urls::SIGNATURE.into(),
             serde_json::Value::String(self.signature.clone()),
@@ -134,12 +198,22 @@ impl InviteToken {
             .ok_or("Signature must be a string")?
             .to_string();
 
+        let max_usages = match json.get(urls::USAGES_LEFT) {
+            None | Some(serde_json::Value::Null) => None,
+            Some(v) => Some(
+                v.as_i64()
+                    .filter(|n| *n >= 0)
+                    .ok_or("Usages must be a non-negative integer")?,
+            ),
+        };
+
         Ok(Self {
             target,
             write,
             expires_at,
             signer,
             signature,
+            max_usages,
         })
     }
 
@@ -203,20 +277,7 @@ impl InviteToken {
         let pubkey_bytes = atomic_lib::agents::decode_base64(&public_key)?;
 
         // The data that was signed is the JSON-AD without the signature.
-        let mut signable_json = serde_json::Map::new();
-        signable_json.insert(
-            urls::TARGET.into(),
-            serde_json::Value::String(self.target.as_str().to_string()),
-        );
-        signable_json.insert(urls::WRITE_BOOL.into(), serde_json::Value::Bool(self.write));
-        signable_json.insert(
-            urls::EXPIRES_AT.into(),
-            serde_json::Value::Number(self.expires_at.into()),
-        );
-        signable_json.insert(
-            urls::SIGNER.into(),
-            serde_json::Value::String(self.signer.as_str().to_string()),
-        );
+        let signable_json = self.signable_json();
 
         let serialized = serde_jcs::to_string(&signable_json)
             .map_err(|e| format!("Failed to serialize invite data for verification: {}", e))?;
@@ -305,6 +366,7 @@ mod test {
             expires_at,
             signer: agent.subject.clone(),
             signature,
+            max_usages: None,
         };
 
         let encoded = token.encode().expect("Failed to encode");
@@ -332,7 +394,7 @@ mod test {
         let expires_at = atomic_lib::utils::now() + 10000;
 
         // Use the production code path: InviteToken::new
-        let token = InviteToken::new(target.clone(), true, expires_at, &agent)
+        let token = InviteToken::new(target.clone(), true, expires_at, &agent, None)
             .expect("Failed to create invite token");
 
         let encoded = token.encode().expect("Failed to encode");
@@ -367,7 +429,7 @@ mod test {
         let target = "https://atomicdata.dev".to_string();
         let expires_at = atomic_lib::utils::now() + 10000;
 
-        let token = InviteToken::new(target.clone(), true, expires_at, &agent)
+        let token = InviteToken::new(target.clone(), true, expires_at, &agent, None)
             .expect("Failed to create invite token");
 
         let encoded = token.encode().expect("Failed to encode");
@@ -401,10 +463,79 @@ mod test {
             expires_at,
             signer: agent.subject.clone(),
             signature: "invalid".to_string(),
+            max_usages: None,
         };
 
         let result = token.verify(&store).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("expired"));
+    }
+
+    async fn limited_setup(name: &str, max: i64) -> (atomic_lib::Db, InviteToken) {
+        let store = atomic_lib::Db::init_temp(name).await.unwrap();
+        atomic_lib::test_utils::setup_test_env(&store)
+            .await
+            .unwrap();
+        let agent = store.get_default_agent().unwrap();
+        let token = InviteToken::new(
+            urls::PROPERTIES.to_string(),
+            false,
+            atomic_lib::utils::now() + 10000,
+            &agent,
+            Some(max),
+        )
+        .unwrap();
+        (store, token)
+    }
+
+    #[tokio::test]
+    async fn limited_token_roundtrips_and_is_signed() {
+        let (store, token) = limited_setup("invite_limited_roundtrip", 2).await;
+        let decoded = InviteToken::decode(&token.encode().unwrap()).unwrap();
+        assert_eq!(decoded.max_usages, Some(2));
+        decoded.verify(&store).await.unwrap();
+
+        // Raising the limit by hand invalidates the signature.
+        let mut tampered = InviteToken::decode(&token.encode().unwrap()).unwrap();
+        tampered.max_usages = Some(1000);
+        assert!(tampered.verify(&store).await.is_err());
+        tampered.max_usages = None;
+        assert!(tampered.verify(&store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn rejects_acceptance_beyond_limit() {
+        let (store, token) = limited_setup("invite_limited_exhausted", 1).await;
+        assert_eq!(token.usages_left(&store).unwrap(), Some(1));
+
+        token.check_usages(&store, "did:ad:agent:first").unwrap();
+        token
+            .record_acceptance(&store, "did:ad:agent:first")
+            .unwrap();
+        assert_eq!(token.usages_left(&store).unwrap(), Some(0));
+
+        let err = token
+            .check_usages(&store, "did:ad:agent:second")
+            .unwrap_err();
+        assert!(err.to_string().contains("no usages left"), "{err}");
+
+        // The first agent opening the link again is not a new usage.
+        token.check_usages(&store, "did:ad:agent:first").unwrap();
+        token
+            .record_acceptance(&store, "did:ad:agent:first")
+            .unwrap();
+        assert_eq!(token.usages_left(&store).unwrap(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn unlimited_token_never_runs_out() {
+        let (store, mut token) = limited_setup("invite_unlimited", 1).await;
+        token.max_usages = None;
+        for i in 0..5 {
+            let agent = format!("did:ad:agent:{i}");
+            token.check_usages(&store, &agent).unwrap();
+            token.record_acceptance(&store, &agent).unwrap();
+        }
+        assert_eq!(token.usages_left(&store).unwrap(), None);
     }
 }

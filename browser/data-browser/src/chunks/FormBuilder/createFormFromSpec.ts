@@ -15,6 +15,7 @@ import {
   createRowClass,
   resolveOntologyParent,
 } from '../TablePage/createTableFromSpec';
+import { columnConstraint } from './formConstraints';
 import { createFormField } from './useFormFieldPropertySync';
 import {
   FIELD_TYPE_DEFAULT_OPTIONS,
@@ -158,19 +159,19 @@ export async function buildFormFromSpec(
             `Unknown or ambiguous column "${field.column}". Available: ${columns.map(columnLabel).join(', ')}`,
           );
         const property = matches[0];
-        if (!compatibleFieldTypes(property).includes(field.type))
+        const constraint = columnConstraint(
+          store,
+          dataClass!.subject,
+          property.subject,
+        );
+        if (!compatibleFieldTypes(property, constraint).includes(field.type))
           throw new Error(
             `Incompatible field type for column "${field.column}"`,
           );
         if (used.has(property.subject))
           throw new Error(`Column "${field.column}" is used more than once`);
         used.add(property.subject);
-        applyFormFieldOptions(
-          field.type,
-          undefined,
-          field.options,
-          property.get(dataBrowser.properties.max) as number | undefined,
-        );
+        applyFormFieldOptions(field.type, undefined, field.options, constraint);
         mappings.set(field, property);
       }
     }

@@ -25,6 +25,8 @@ import { loopingIndex } from '../../helpers/loopingIndex';
 import { useControlLock } from '../../hooks/useControlLock';
 import { useDialogTreeInfo } from '../Dialog/dialogContext';
 import { floatingSurface } from '../floatingSurface';
+import { useBackToClose } from '../../hooks/useBackToClose';
+import { isTouchPrimary } from '../../helpers/pointer';
 
 export const DIVIDER = 'divider' as const;
 
@@ -225,6 +227,9 @@ export function DropdownMenu({
     setIsActive(false);
   }, [setIsActive]);
 
+  // Back closes the menu.
+  useBackToClose(isActive, handleClose);
+
   useClickAwayListener([triggerRef, dropdownRef], handleClose, isActive, [
     'click',
   ]);
@@ -419,7 +424,9 @@ export function DropdownMenu({
         // Focus only after this exact menu has been revealed. A separate
         // effect's RAF can run before the positioning RAF under React's
         // scheduling, and browsers refuse focus on visibility:hidden inputs.
-        if (searchable) {
+        // Not on a touch device: focusing a text field there raises the
+        // on-screen keyboard over the menu the moment it opens.
+        if (searchable && !isTouchPrimary()) {
           searchInputRef.current?.focus();
         } else if (!menu.contains(document.activeElement)) {
           menu.focus();

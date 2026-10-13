@@ -7,15 +7,19 @@ import { ErrorLook } from '../../../components/ErrorLook';
 import { CARD_CONTAINER } from '../../../helpers/containers';
 import { dataTypeIconMap } from '../../../helpers/iconMap';
 import { Row } from '../../../components/Row';
+import { ClassConstraintSummary } from '../Class/ClassConstraintSummary';
 
 import type { JSX } from 'react';
 
 interface PropertyLineReadProps {
   subject: string;
+  /** The class this line belongs to, to show its constraints for the property. */
+  classSubject?: string;
 }
 
 export function PropertyLineRead({
   subject,
+  classSubject,
 }: PropertyLineReadProps): JSX.Element {
   const resource = useResource<Core.Property>(subject);
   const [description] = useString(resource, urls.properties.description);
@@ -41,6 +45,12 @@ export function PropertyLineRead({
       <MarkdownWrapper>
         <Markdown text={description ?? ''} />
       </MarkdownWrapper>
+      {classSubject && (
+        <ClassConstraintSummary
+          classSubject={classSubject}
+          propertySubject={subject}
+        />
+      )}
     </SubGrid>
   );
 }

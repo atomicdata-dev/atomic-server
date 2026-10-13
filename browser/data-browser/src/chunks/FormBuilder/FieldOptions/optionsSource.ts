@@ -1,10 +1,13 @@
 import {
   core,
   dataBrowser,
+  getEffectiveConstraint,
   Resource,
+  setClassConstraint,
   type JSONValue,
   type Store,
 } from '@tomic/react';
+import { optionSubjects } from '@helpers/withConstraint';
 import type { OptionsSource } from '@tomic/form-renderer';
 import { useCallback } from 'react';
 import { useFieldOptions } from './useFieldOptions';
@@ -72,58 +75,69 @@ export function useOptionsSource(
 }
 
 /**
- * Rewires the question's own Property to match `column`, and returns the
+ * Rewires the question's column to match `column`, and returns the
  * `optionsSource` to store on the field.
  *
- * The server resolves the published options from the source, but the Property
- * is also a real column on the responses table, so it has to keep describing
- * what lands in it:
+ * The server resolves the published options from the source, but the column is
+ * also a real column on the responses table, so the data class has to keep
+ * describing what lands in it. That is the class's `constraints` entry for the
+ * question's Property (which is immutable and so is never touched):
  *
- * - Borrowing another column's Tags keeps it a SelectProperty and mirrors that
- *   column's `allowsOnly`, so the response column still renders and edits as
- *   the enum it is. The mirror is a snapshot — the *published* list always
- *   comes from the source, so the two only diverge inside the table UI until
- *   the next {@link syncMirroredTags}.
- * - Borrowing rows makes it a plain relation column (`classtype` = the table's
- *   row class, no `allowsOnly`) — there is no fixed set to enumerate.
+ * - Borrowing another column's Tags mirrors that column's `enum`, so the
+ *   response column still renders and edits as the enum it is. The mirror is a
+ *   snapshot — the *published* list always comes from the source, so the two
+ *   only diverge inside the table UI until the next {@link syncMirroredTags}.
+ * - Borrowing rows makes it a plain relation column (`class` = the table's row
+ *   class, no `enum`) — there is no fixed set to enumerate.
  *
  * Options the question created for itself are destroyed on the way: they are
  * parented under this Property and nothing else can reach them.
  */
 export async function applyOptionsSource(
   store: Store,
+  dataClass: Resource,
   fieldProperty: Resource,
   table: Resource,
   column: Resource,
 ): Promise<OptionsSource> {
-  const previousTags = fieldProperty.getSubjects(core.properties.allowsOnly);
+  const previousTags = columnTags(store, dataClass.subject, fieldProperty);
 
   let source: OptionsSource;
 
   if (column.hasClasses(dataBrowser.classes.selectProperty)) {
-    await fieldProperty.addClasses(dataBrowser.classes.selectProperty);
-    await fieldProperty.set(core.properties.classtype, dataBrowser.classes.tag);
-    await fieldProperty.set(
-      core.properties.allowsOnly,
-      column.getSubjects(core.properties.allowsOnly),
-    );
-    source = { table: table.subject, property: column.subject };
-  } else {
-    // `SelectProperty` requires `allowsOnly`, and a row-sourced column has no
-    // fixed list — so it stops being one.
-    fieldProperty.removeClasses(dataBrowser.classes.selectProperty);
-    await fieldProperty.set(
-      core.properties.classtype,
+    const sourceClass = await store.getResource(
       table.get(core.properties.classtype) as string,
     );
-    fieldProperty.remove(core.properties.allowsOnly);
+    await setClassConstraint(dataClass, fieldProperty.subject, {
+      enum: columnTags(store, sourceClass.subject, column),
+      class: dataBrowser.classes.tag,
+    });
+    source = { table: table.subject, property: column.subject };
+  } else {
+    // A row-sourced column has no fixed list to enumerate.
+    await setClassConstraint(dataClass, fieldProperty.subject, {
+      enum: undefined,
+      class: table.get(core.properties.classtype) as string,
+    });
     source = { table: table.subject, labelProperty: column.subject };
   }
 
-  await fieldProperty.save();
+  await dataClass.save();
   await destroyOwnTags(store, fieldProperty.subject, previousTags);
 
   return source;
+}
+
+/** The option Tags a class puts on a column: its `enum`, or the Property's
+ * legacy `allowsOnly`. */
+function columnTags(
+  store: Store,
+  classSubject: string,
+  property: Resource,
+): string[] {
+  return optionSubjects(
+    getEffectiveConstraint(store, [classSubject], property.subject),
+  );
 }
 
 /**
@@ -134,25 +148,31 @@ export async function applyOptionsSource(
  * table, and editing a label here would rename it over there.
  */
 export async function clearOptionsSource(
+  dataClass: Resource,
   fieldProperty: Resource,
 ): Promise<void> {
-  await fieldProperty.addClasses(dataBrowser.classes.selectProperty);
-  await fieldProperty.set(core.properties.classtype, dataBrowser.classes.tag);
-  await fieldProperty.set(core.properties.allowsOnly, []);
-  await fieldProperty.save();
+  await setClassConstraint(dataClass, fieldProperty.subject, {
+    enum: [],
+    class: dataBrowser.classes.tag,
+  });
+  await dataClass.save();
 }
 
 /**
- * Re-reads the source column's Tags into the question's own `allowsOnly`.
- * Cheap no-op when they already match — called when the settings panel opens
- * so the response column does not drift while the source gains or loses tags.
+ * Re-reads the source column's Tags into the question's own `enum`. Cheap
+ * no-op when they already match — called when the settings panel opens so the
+ * response column does not drift while the source gains or loses tags.
+ * `sourceClass` is the row class of the table the source column belongs to.
  */
 export async function syncMirroredTags(
+  store: Store,
+  dataClass: Resource,
   fieldProperty: Resource,
+  sourceClass: string,
   sourceProperty: Resource,
 ): Promise<void> {
-  const wanted = sourceProperty.getSubjects(core.properties.allowsOnly);
-  const current = fieldProperty.getSubjects(core.properties.allowsOnly);
+  const wanted = columnTags(store, sourceClass, sourceProperty);
+  const current = columnTags(store, dataClass.subject, fieldProperty);
 
   if (
     wanted.length === current.length &&
@@ -161,8 +181,8 @@ export async function syncMirroredTags(
     return;
   }
 
-  await fieldProperty.set(core.properties.allowsOnly, wanted);
-  await fieldProperty.save();
+  await setClassConstraint(dataClass, fieldProperty.subject, { enum: wanted });
+  await dataClass.save();
 }
 
 /** Destroys the option Tags parented under this Property — the ones the form

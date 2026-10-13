@@ -1,4 +1,4 @@
-import { Resource } from '@tomic/react';
+import { Resource, type Constraint } from '@tomic/react';
 import type { JSX } from 'react';
 import Field from '@components/forms/Field';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
@@ -6,6 +6,7 @@ import { useFieldOptions, type FieldOptionsBag } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
 import { BoundField } from './BoundField';
 import { Divider } from './Divider';
+import { useFieldConstraint } from '../formDataClass';
 
 interface TextOptionsProps {
   field: Resource;
@@ -20,6 +21,7 @@ export function TextOptions({
   lengthBounds,
 }: TextOptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
+  const constraint = useFieldConstraint(field);
   const placeholder = (options.placeholder as string | undefined) ?? '';
 
   return (
@@ -37,7 +39,11 @@ export function TextOptions({
       {lengthBounds && (
         <>
           <Divider />
-          <LengthBounds options={options} setOptions={setOptions} />
+          <LengthBounds
+            options={options}
+            setOptions={setOptions}
+            constraint={constraint}
+          />
         </>
       )}
     </>
@@ -46,16 +52,18 @@ export function TextOptions({
 
 /**
  * How long an answer may be. Both bounds are optional — an unbounded text
- * question is the common case — and live in the field's own options bag
- * rather than on the mapped Property, because they constrain this question
- * rather than the column its answers land in.
+ * question is the common case — and live in the field's own options bag, as
+ * `minLength` / `maxLength`. They may only tighten what the data class
+ * already demands of the column (`constraint`).
  */
 function LengthBounds({
   options,
   setOptions,
+  constraint,
 }: {
   options: FieldOptionsBag;
   setOptions: (next: FieldOptionsBag) => void;
+  constraint: Constraint;
 }): JSX.Element {
   return (
     <FieldPair>
@@ -65,6 +73,8 @@ function LengthBounds({
         options={options}
         setOptions={setOptions}
         min={1}
+        floor={constraint.minLength}
+        max={constraint.maxLength}
         helper='The fewest characters an answer may carry. An unanswered question still counts as unanswered rather than as too short — that is what Required is for.'
       />
       <BoundField
@@ -73,6 +83,8 @@ function LengthBounds({
         options={options}
         setOptions={setOptions}
         min={1}
+        floor={constraint.minLength}
+        max={constraint.maxLength}
         helper='The most characters an answer may carry. Going over is shown as an error rather than blocked, but the form cannot be submitted until it is back under.'
       />
     </FieldPair>

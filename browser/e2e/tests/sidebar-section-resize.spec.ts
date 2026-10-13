@@ -71,7 +71,8 @@ test('mobile section headers resize without collapsing, persist height and retai
   await expect(section.getByRole('link')).toHaveCount(14);
   const header = section.locator('button[aria-expanded]');
   await header.scrollIntoViewIfNeeded();
-  expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // Panel headers share the touch bar height (SIDEBAR_BAR_HEIGHT_TOUCH, 2.5rem).
+  expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(40);
   const start = (await section.boundingBox())!.height;
   await dragHeader(page, header, 90);
   await expect(header).toHaveAttribute('aria-expanded', 'true');

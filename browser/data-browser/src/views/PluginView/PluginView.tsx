@@ -9,7 +9,7 @@ import { signRequest } from '@tomic/lib';
 import { ErrorBlock } from '@components/ErrorLook';
 
 import resetCss from '../../reset.css?raw';
-import { useCreateThemeVars } from './useCreateThemeVars';
+import { useCreateThemeVars, useFrameColorScheme } from './useCreateThemeVars';
 import { useCustomViews } from '@components/CustomViewProvider';
 
 export enum ViewType {
@@ -63,9 +63,11 @@ const PluginViewSession: React.FC<PluginViewProps> = ({ plugin }) => {
   const { getUIPluginData } = useCustomViews();
   const pluginData = getUIPluginData(plugin);
   const stylesheet = useCreateThemeVars();
+  const colorScheme = useFrameColorScheme();
   const [frameRef, resourcePickerDialog] = usePluginRPC(
     pluginData,
     `${resetCss}\n${stylesheet}`,
+    colorScheme,
   );
   const pluginUrl = `${store.getServerUrl()}/plugin-ui?drive=${encodeURIComponent(drive)}&plugin=${encodeURIComponent(plugin)}`;
   const src = `${pluginUrl}&format=html`;

@@ -300,6 +300,24 @@ pub enum SegmentKind {
 pub struct CheckpointPolicy {
     pub max_segments: u32,
     pub bytes_ratio: f64,
+    /// How much edit history a checkpoint keeps. Only consulted when the pass
+    /// *is* a checkpoint; delta packs always carry exactly the new ops.
+    pub history: HistoryKeep,
+}
+
+/// What a checkpoint keeps of each resource's edit history.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HistoryKeep {
+    /// Every resource's whole oplog, plus the signed commit envelopes that
+    /// attribute it. What "Compress now" and the automatic cadence write.
+    #[default]
+    Full,
+    /// A Loro *shallow snapshot* per resource at its current frontiers: all
+    /// current values, none of the edit history before them. No envelopes are
+    /// shipped either, since they attribute changes that are no longer in the
+    /// pack. This is "Discard history": the vault keeps only the current
+    /// state. Devices keep whatever history they hold locally.
+    CurrentStateOnly,
 }
 
 impl Default for CheckpointPolicy {
@@ -307,6 +325,7 @@ impl Default for CheckpointPolicy {
         Self {
             max_segments: 64,
             bytes_ratio: 1.0,
+            history: HistoryKeep::Full,
         }
     }
 }
@@ -421,6 +440,7 @@ async fn contribution(
     subject_str: &str,
     cursor: Option<&VersionVectorMap>,
     full: bool,
+    history: HistoryKeep,
 ) -> Contribution {
     // The cheap path, and the one that carries the whole win: if this
     // resource's version vector still matches what the lane shipped, there is
@@ -452,7 +472,12 @@ async fn contribution(
         (false, Some(cursor)) => AtomicLoroDoc::vv_from_map(&cursor.clone().into_iter().collect()),
         _ => Default::default(),
     };
-    let update = doc.export_updates_since(&since);
+    let shallow = full && history == HistoryKeep::CurrentStateOnly;
+    let update = if shallow && !doc.oplog_vv_map().is_empty() {
+        doc.export_shallow_snapshot()
+    } else {
+        doc.export_updates_since(&since)
+    };
     let reached: VersionVectorMap = doc.oplog_vv_map().into_iter().collect();
 
     if update.is_empty() {
@@ -509,9 +534,23 @@ pub async fn export_vault_segment(
     let mut unchanged = 0usize;
 
     for subject_str in &subjects {
-        match contribution(store, subject_str, state.cursors.get(subject_str), full).await {
+        match contribution(
+            store,
+            subject_str,
+            state.cursors.get(subject_str),
+            full,
+            policy.history,
+        )
+        .await
+        {
             Contribution::Update(update, reached) => {
-                let stored = crate::envelopes::envelopes(store, subject_str);
+                // Envelopes attribute ops; a shallow checkpoint no longer
+                // carries those ops, so it ships none.
+                let stored = if full && policy.history == HistoryKeep::CurrentStateOnly {
+                    Vec::new()
+                } else {
+                    crate::envelopes::envelopes(store, subject_str)
+                };
                 // `>=`, not `>`: two commits can share a millisecond, and
                 // re-shipping one envelope is cheaper than losing one.
                 let floor = if full {
@@ -519,7 +558,12 @@ pub async fn export_vault_segment(
                 } else {
                     state.envelope_cursors.get(subject_str).copied()
                 };
-                let newest = stored.iter().map(|e| e.created_at).max();
+                let newest = if stored.is_empty() {
+                    // Nothing shipped: leave the marker as it was.
+                    None
+                } else {
+                    stored.iter().map(|e| e.created_at).max()
+                };
                 entries.push(PackEntry {
                     subject: subject_str.clone(),
                     update,
@@ -1263,6 +1307,7 @@ mod tests {
             CheckpointPolicy {
                 max_segments: u32::MAX,
                 bytes_ratio: f64::INFINITY,
+                history: HistoryKeep::Full,
             },
             true,
         )
@@ -2182,6 +2227,7 @@ mod tests {
             CheckpointPolicy {
                 max_segments: 1,
                 bytes_ratio: 1.0,
+                history: HistoryKeep::Full,
             },
             true,
         )
@@ -2223,5 +2269,397 @@ mod tests {
             target.get_resource(&doomed).await.is_err(),
             "a resource deleted before this checkpoint must stay deleted — recovering it is what an OLDER object would be kept for"
         );
+    }
+
+    /// "Compress now" forces a checkpoint by telling the exporter the vault has
+    /// no anchor, even though it does. That must be an ordinary checkpoint in
+    /// every other respect: it advances the lane like any pass, later passes go
+    /// back to deltas, and the vault restores from it alone.
+    #[tokio::test]
+    async fn a_forced_checkpoint_replaces_the_chain_and_restores_alone() {
+        let source = Db::init_temp("vault_forced_checkpoint").await.unwrap();
+        let (_agent, drive) = source.setup("alice").await.unwrap();
+        let note_str = source
+            .create_resource(FOLDER, &drive, "note", None)
+            .await
+            .unwrap();
+        let note = Subject::from_raw(&note_str, source.get_base_domain().as_deref());
+        let drive_subject = Subject::from_raw(&drive, source.get_base_domain().as_deref());
+        let key = key();
+        let vault = MemoryVaultStore::new();
+
+        let first = backup(&source, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        assert_eq!(first.kind, SegmentKind::Checkpoint);
+        for name in ["one", "two"] {
+            rename(&source, &note_str, name).await;
+            let pass = backup(&source, &drive_subject, &key, &vault, DEVICE)
+                .await
+                .unwrap();
+            assert_eq!(pass.kind, SegmentKind::Pack, "an anchor exists: deltas");
+        }
+
+        // The forced pass: same inputs the host sends, with the anchor denied.
+        let keys = vault.list(&drive_prefix(PSEUDONYM)).unwrap();
+        let mut observed: BTreeMap<String, u32> = BTreeMap::new();
+        for object_key in &keys {
+            if let Some((lane, segment)) = parse_segment_key(object_key) {
+                let slot = observed.entry(lane).or_insert(0);
+                *slot = (*slot).max(segment);
+            }
+        }
+        assert_eq!(observed.get(DEVICE), Some(&2));
+        let forced = export_vault_segment(
+            &source,
+            &drive_subject,
+            &key,
+            &vault,
+            PSEUDONYM,
+            DEVICE,
+            3,
+            2,
+            false,
+            &observed,
+            CheckpointPolicy::default(),
+        )
+        .await
+        .unwrap()
+        .expect("a forced pass over a populated drive writes an object");
+        assert_eq!(forced.kind, SegmentKind::Checkpoint);
+        assert_eq!(
+            forced.coverage.get(DEVICE),
+            Some(&2),
+            "it subsumes every delta this lane has written"
+        );
+        commit_lane_state(&source, PSEUDONYM, DEVICE, 3).unwrap();
+
+        // Cursors moved with it: the next ordinary pass is a delta carrying
+        // only the new edit, not another full export.
+        rename(&source, &note_str, "three").await;
+        let after = backup(&source, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        assert_eq!(after.kind, SegmentKind::Pack);
+        assert_eq!(after.resources, 1, "only the edited resource");
+
+        // A vault holding only the forced checkpoint restores the drive as of
+        // that pass, edit history included.
+        let only = MemoryVaultStore::new();
+        let ckpt = checkpoint_key(PSEUDONYM, 2);
+        only.put(&ckpt, &vault.get(&ckpt).unwrap()).unwrap();
+        let target = Db::init_temp("vault_forced_checkpoint_target")
+            .await
+            .unwrap();
+        restore(&target, &key, &only).await;
+        let restored = target.get_resource(&note).await.unwrap();
+        assert_eq!(
+            restored.get(crate::urls::NAME).unwrap().to_string(),
+            "two",
+            "the state when the checkpoint was taken"
+        );
+        let live = source.get_resource(&note).await.unwrap();
+        assert_eq!(
+            crate::history::versions(&restored).unwrap().len() + 1,
+            crate::history::versions(&live).unwrap().len(),
+            "the checkpoint carries every version up to the pass; only the later edit is missing"
+        );
+    }
+
+    /// "Discard history": a forced checkpoint (the anchor is denied) that keeps
+    /// only each resource's current state.
+    async fn discard_history(
+        store: &Db,
+        drive: &Subject,
+        key: &DriveVaultKey,
+        vault: &dyn VaultObjectStore,
+        device: &str,
+    ) -> BackupSummary {
+        let keys = vault.list(&drive_prefix(PSEUDONYM)).unwrap();
+        let mut observed: BTreeMap<String, u32> = BTreeMap::new();
+        let mut highest = 0u64;
+        for object_key in &keys {
+            if let Some((lane, segment)) = parse_segment_key(object_key) {
+                let slot = observed.entry(lane).or_insert(0);
+                *slot = (*slot).max(segment);
+            }
+            if let Some(n) = parse_checkpoint_key(object_key) {
+                highest = highest.max(n);
+            }
+        }
+        let segment = observed.get(device).copied().unwrap_or(0) + 1;
+        let summary = export_vault_segment(
+            store,
+            drive,
+            key,
+            vault,
+            PSEUDONYM,
+            device,
+            segment,
+            highest + 1,
+            false,
+            &observed,
+            CheckpointPolicy {
+                history: HistoryKeep::CurrentStateOnly,
+                ..CheckpointPolicy::default()
+            },
+        )
+        .await
+        .unwrap()
+        .expect("a populated drive writes an object");
+        commit_lane_state(store, PSEUDONYM, device, segment).unwrap();
+        summary
+    }
+
+    async fn edit(store: &Db, subject: &Subject, name: &str) {
+        let mut resource = store.get_resource(subject).await.unwrap();
+        let doc = resource.build_state_doc().unwrap();
+        doc.set_property(crate::urls::NAME, &crate::Value::String(name.into()))
+            .unwrap();
+        doc.commit_with_message(&format!("rename to {name}"));
+        resource.apply_state_doc(doc).unwrap();
+        store
+            .add_resource_opts(&resource, false, true, true)
+            .await
+            .unwrap();
+    }
+
+    async fn name_of(store: &Db, subject: &Subject) -> String {
+        store
+            .get_resource(subject)
+            .await
+            .unwrap()
+            .get(crate::urls::NAME)
+            .unwrap()
+            .to_string()
+    }
+
+    /// A vault holding only a current-state checkpoint restores the drive's
+    /// state (values, children, deletions) but none of its edit history, ships
+    /// no envelopes, and is smaller than the full checkpoint.
+    #[tokio::test]
+    async fn a_current_state_checkpoint_restores_state_without_history() {
+        let source = Db::init_temp("vault_shallow_source").await.unwrap();
+        let (_agent, drive) = source.setup("alice").await.unwrap();
+        let drive_subject = Subject::from_raw(&drive, source.get_base_domain().as_deref());
+        let note_str = source
+            .create_resource(FOLDER, &drive, "note", None)
+            .await
+            .unwrap();
+        let note = Subject::from_raw(&note_str, source.get_base_domain().as_deref());
+        let child_str = source
+            .create_resource(FOLDER, &note_str, "child", None)
+            .await
+            .unwrap();
+        let child = Subject::from_raw(&child_str, source.get_base_domain().as_deref());
+        let doomed = source
+            .create_resource(FOLDER, &drive, "doomed", None)
+            .await
+            .unwrap();
+        for i in 0..30 {
+            edit(&source, &note, &format!("edit-{i}")).await;
+        }
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        let full = backup(&source, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        source
+            .remove_resource(&Subject::from_raw(&doomed, None))
+            .await
+            .unwrap();
+        let live_versions = crate::history::versions(&source.get_resource(&note).await.unwrap())
+            .unwrap()
+            .len();
+        assert!(live_versions > 20);
+
+        let shallow = discard_history(&source, &drive_subject, &key, &vault, DEVICE).await;
+        assert_eq!(shallow.kind, SegmentKind::Checkpoint);
+        assert_eq!(shallow.tombstones, 1);
+        println!(
+            "full checkpoint {} bytes, current-state checkpoint {} bytes",
+            full.sealed_bytes, shallow.sealed_bytes
+        );
+        assert!(shallow.sealed_bytes < full.sealed_bytes);
+
+        // Only the shallow checkpoint.
+        let only = MemoryVaultStore::new();
+        let ckpt = vault
+            .list(&checkpoint_prefix(PSEUDONYM))
+            .unwrap()
+            .into_iter()
+            .max()
+            .unwrap();
+        only.put(&ckpt, &vault.get(&ckpt).unwrap()).unwrap();
+        let target = Db::init_temp("vault_shallow_target").await.unwrap();
+        restore(&target, &key, &only).await;
+
+        assert_eq!(name_of(&target, &note).await, "edit-29");
+        assert!(
+            target.get_resource(&child).await.is_ok(),
+            "children survive"
+        );
+        assert!(
+            target
+                .get_resource(&Subject::from_raw(&doomed, None))
+                .await
+                .is_err(),
+            "a deleted resource stays deleted"
+        );
+        assert_eq!(
+            drive_contents(&target, &drive_subject).await,
+            drive_contents(&source, &drive_subject).await,
+            "the materialized drive is identical"
+        );
+
+        // No history, no envelopes; and the History code path copes.
+        let restored = target.get_resource(&note).await.unwrap();
+        let versions = crate::history::versions(&restored).unwrap();
+        assert!(versions.len() < live_versions, "history was discarded");
+        assert!(crate::envelopes::envelopes(&target, &note_str).is_empty());
+        // Reading a discarded version is an error, not a panic.
+        if let Some(v) = versions.first() {
+            let _ = crate::history::at_version(&restored, &v.id);
+        }
+        crate::envelopes::attribute_history(&target, &note_str)
+            .await
+            .expect("attribution tolerates absent history");
+    }
+
+    /// The restored shallow doc is a live replica: it accepts edits, and it
+    /// exchanges ops both ways with the device that still holds the full
+    /// history, with no conflict or lost-ops error.
+    #[tokio::test]
+    async fn a_restored_shallow_doc_syncs_with_a_full_history_device() {
+        let source = Db::init_temp("vault_shallow_sync_source").await.unwrap();
+        let (_agent, drive) = source.setup("alice").await.unwrap();
+        let drive_subject = Subject::from_raw(&drive, source.get_base_domain().as_deref());
+        let note_str = source
+            .create_resource(FOLDER, &drive, "note", None)
+            .await
+            .unwrap();
+        let note = Subject::from_raw(&note_str, source.get_base_domain().as_deref());
+        for i in 0..10 {
+            edit(&source, &note, &format!("a-{i}")).await;
+        }
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        discard_history(&source, &drive_subject, &key, &vault, DEVICE).await;
+
+        let target = Db::init_temp("vault_shallow_sync_target").await.unwrap();
+        restore(&target, &key, &vault).await;
+        let shallow_doc = target
+            .get_resource(&note)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        assert!(shallow_doc.is_shallow(), "the restore really is shallow");
+        let before_vv = source
+            .get_resource(&note)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        assert!(!before_vv.is_shallow());
+
+        // The restored device keeps editing.
+        edit(&target, &note, "from-shallow").await;
+        assert_eq!(name_of(&target, &note).await, "from-shallow");
+
+        // Shallow -> full: ship the shallow side's ops since the full side's
+        // version vector.
+        let full_doc = source
+            .get_resource(&note)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        let shallow_doc = target
+            .get_resource(&note)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        let to_full = shallow_doc.export_updates_since(&full_doc.oplog_vv());
+        let pending = full_doc.import_update_status(&to_full).unwrap();
+        assert!(!pending, "no ops parked as pending on the full device");
+
+        // Full -> shallow: the full device edits concurrently and ships a delta.
+        edit(&source, &note, "from-full").await;
+        let full_doc2 = source
+            .get_resource(&note)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        let to_shallow = full_doc2.export_updates_since(&shallow_doc.oplog_vv());
+        let pending = shallow_doc.import_update_status(&to_shallow).unwrap();
+        assert!(!pending, "no ops parked as pending on the shallow device");
+
+        // The full device sends its entire history to the shallow one: a
+        // no-op for ops it already cut, not an error.
+        shallow_doc
+            .import_update(&full_doc2.export_snapshot())
+            .expect("full history imports onto a shallow doc");
+        // And a peer behind the shallow cut is answered with the state.
+        let stale = crate::loro::AtomicLoroDoc::new();
+        let catch_up = shallow_doc.export_updates_since(&stale.oplog_vv());
+        stale.import_update(&catch_up).unwrap();
+
+        full_doc
+            .import_update(&shallow_doc.export_snapshot())
+            .unwrap();
+        for doc in [&full_doc, &shallow_doc, &stale] {
+            assert_eq!(
+                doc.get_string_property(crate::urls::NAME),
+                full_doc.get_string_property(crate::urls::NAME),
+                "all replicas converge"
+            );
+        }
+    }
+
+    /// A lane whose cursor predates a discard: after the checkpoint the next
+    /// pass is an ordinary delta from the cursor the checkpoint left.
+    #[tokio::test]
+    async fn deltas_continue_after_a_current_state_checkpoint() {
+        let source = Db::init_temp("vault_shallow_lane").await.unwrap();
+        let (_agent, drive) = source.setup("alice").await.unwrap();
+        let drive_subject = Subject::from_raw(&drive, source.get_base_domain().as_deref());
+        let note_str = source
+            .create_resource(FOLDER, &drive, "note", None)
+            .await
+            .unwrap();
+        let note = Subject::from_raw(&note_str, source.get_base_domain().as_deref());
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&source, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        edit(&source, &note, "one").await;
+        discard_history(&source, &drive_subject, &key, &vault, DEVICE).await;
+        edit(&source, &note, "two").await;
+        let delta = backup(&source, &drive_subject, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+        assert_eq!(delta.kind, SegmentKind::Pack);
+        assert_eq!(delta.resources, 1);
+
+        let target = Db::init_temp("vault_shallow_lane_target").await.unwrap();
+        let ckpt = vault
+            .list(&checkpoint_prefix(PSEUDONYM))
+            .unwrap()
+            .into_iter()
+            .max()
+            .unwrap();
+        let only = MemoryVaultStore::new();
+        only.put(&ckpt, &vault.get(&ckpt).unwrap()).unwrap();
+        for k in vault.list(&lane_prefix(PSEUDONYM, DEVICE)).unwrap() {
+            if parse_segment_key(&k).is_some() {
+                only.put(&k, &vault.get(&k).unwrap()).unwrap();
+            }
+        }
+        restore(&target, &key, &only).await;
+        assert_eq!(name_of(&target, &note).await, "two");
     }
 }

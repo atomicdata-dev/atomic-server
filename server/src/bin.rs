@@ -20,6 +20,7 @@ mod host_mode;
 mod https;
 mod invite_token;
 mod jsonerrors;
+mod mcp;
 mod metrics;
 mod node_key;
 pub mod plugins;

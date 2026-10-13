@@ -29,6 +29,21 @@ export function stepDurations(
   return durations;
 }
 
+/** How early the stall timer may fire, by the wall clock, and still count. */
+export const STALL_TOLERANCE_MS = 5_000;
+
+/**
+ * How much longer to wait before declaring a stall, given the time elapsed
+ * since setup began. Zero means the deadline has really passed: report. A
+ * timer can fire long before its deadline (a bot running on virtual time, a
+ * clock jump), and those reports said "stalled" after about two seconds.
+ */
+export function stallWaitMs(elapsed: number, stalledAfter: number): number {
+  if (elapsed >= stalledAfter - STALL_TOLERANCE_MS) return 0;
+
+  return stalledAfter - elapsed;
+}
+
 /**
  * What a "setup stalled" report says besides the step it stopped on. A stall
  * fires at a fixed deadline, so on its own it cannot tell a machine that is

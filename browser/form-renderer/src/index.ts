@@ -18,6 +18,8 @@ export {
   tableColumns,
   selectionBounds,
   selectionHint,
+  rowBounds,
+  valueBounds,
   lengthBounds,
   minLengthHint,
   isOverLength,

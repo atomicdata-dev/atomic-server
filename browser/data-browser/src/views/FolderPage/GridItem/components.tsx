@@ -41,13 +41,13 @@ export const GridItemWrapper = styled.a`
   cursor: pointer;
   gap: 1rem;
 
-  &:hover ${GridCard}, &:focus ${GridCard} {
+  &:hover ${GridCard}, &:focus-visible ${GridCard} {
     --interaction-shadow: 0px 0px 0px 1px ${p => p.theme.colors.main};
     border: 1px solid ${p => p.theme.colors.main};
   }
 
   &:hover,
-  &:focus {
+  &:focus-visible {
     color: ${p => p.theme.colors.main};
   }
 `;

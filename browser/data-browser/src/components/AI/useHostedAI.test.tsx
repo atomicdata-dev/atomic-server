@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useHostedAI } from './useHostedAI';
+import { hasManagedSession } from '@helpers/managed/session';
 import { getHostedAIStatus, HOSTED_AI_USAGE_EVENT } from '@helpers/managed/ai';
 
 vi.mock('@helpers/managed/ai', () => ({
@@ -11,12 +12,15 @@ vi.mock('@helpers/managed/ai', () => ({
 }));
 vi.mock('@helpers/managed/api', () => ({ hasManagedApi: () => true }));
 vi.mock('@helpers/managed/session', () => ({
+  hasManagedSession: vi.fn(async () => true),
   onManagedLogout: () => () => {},
+  onManagedSessionChanged: () => () => {},
 }));
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.resetAllMocks();
+  vi.mocked(hasManagedSession).mockResolvedValue(true);
 });
 
 it('refreshes after usage and once more after server settlement, then stops', async () => {
@@ -81,4 +85,20 @@ it('asks again when the first read finds no status, instead of settling on none'
     await vi.advanceTimersByTimeAsync(60_000);
   });
   expect(getHostedAIStatus).toHaveBeenCalledTimes(3);
+});
+
+it('does not retry while signed out, and asks again on focus', async () => {
+  vi.useFakeTimers();
+  vi.mocked(hasManagedSession).mockResolvedValue(false);
+  vi.mocked(getHostedAIStatus).mockResolvedValue(undefined);
+  renderHook(useHostedAI);
+  await act(async () => {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  expect(getHostedAIStatus).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+  });
+  expect(getHostedAIStatus).toHaveBeenCalledTimes(2);
 });

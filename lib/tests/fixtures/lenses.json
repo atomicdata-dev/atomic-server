@@ -1,0 +1,736 @@
+{
+  "description": "Shared by atomic_lib (lib/src/lens.rs) and @tomic/lib (browser/lib/src/lens.test.ts). `doc` holds the properties a Loro document really has, `expected` the materialized properties after lenses. `fromDatatype`/`toDatatype` are only used by Rust to type derived values.",
+  "cases": [
+    {
+      "name": "rename: old data appears under the new name",
+      "description": "A document written before the rename holds only `title`; `name` is derived.",
+      "lenses": [
+        {
+          "from": "atomic:prop:title",
+          "to": "atomic:prop:name",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:title": "Hello"
+      },
+      "expected": {
+        "atomic:prop:title": "Hello",
+        "atomic:prop:name": "Hello"
+      }
+    },
+    {
+      "name": "rename: new data appears under the old name",
+      "description": "A new client wrote only `name`; an old client still reads `title`.",
+      "lenses": [
+        {
+          "from": "atomic:prop:title",
+          "to": "atomic:prop:name",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:name": "Hello"
+      },
+      "expected": {
+        "atomic:prop:name": "Hello",
+        "atomic:prop:title": "Hello"
+      }
+    },
+    {
+      "name": "rename: real values win",
+      "description": "Both properties are really set, so nothing is derived and nothing is overwritten.",
+      "lenses": [
+        {
+          "from": "atomic:prop:title",
+          "to": "atomic:prop:name",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:title": "Old",
+        "atomic:prop:name": "New"
+      },
+      "expected": {
+        "atomic:prop:title": "Old",
+        "atomic:prop:name": "New"
+      }
+    },
+    {
+      "name": "rename: an unrelated document is untouched",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:title",
+          "to": "atomic:prop:name",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:other": "x"
+      },
+      "expected": {
+        "atomic:prop:other": "x"
+      }
+    },
+    {
+      "name": "rename: old client keeps writing the old property",
+      "description": "The new client sees the old client's latest write, because `name` was never really set.",
+      "lenses": [
+        {
+          "from": "atomic:prop:title",
+          "to": "atomic:prop:name",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:title": "Edited by old client",
+        "atomic:prop:other": "x"
+      },
+      "expected": {
+        "atomic:prop:title": "Edited by old client",
+        "atomic:prop:name": "Edited by old client",
+        "atomic:prop:other": "x"
+      }
+    },
+    {
+      "name": "wrap: single assignee becomes assignees",
+      "description": "Scalar to one-item array.",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignee",
+          "to": "atomic:prop:assignees",
+          "transform": {
+            "op": "wrap"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/atomicURL",
+          "toDatatype": "https://atomicdata.dev/datatypes/resourceArray"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignee": "https://example.com/people/alice"
+      },
+      "expected": {
+        "atomic:prop:assignee": "https://example.com/people/alice",
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice"
+        ]
+      }
+    },
+    {
+      "name": "wrap: one assignee maps back",
+      "description": "Backward, an array of one item gives the scalar.",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignee",
+          "to": "atomic:prop:assignees",
+          "transform": {
+            "op": "wrap"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/atomicURL",
+          "toDatatype": "https://atomicdata.dev/datatypes/resourceArray"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice"
+        ]
+      },
+      "expected": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice"
+        ],
+        "atomic:prop:assignee": "https://example.com/people/alice"
+      }
+    },
+    {
+      "name": "wrap: several assignees do not map back",
+      "description": "Backward is lossless only for one item, so an old client sees no assignee rather than a wrong one.",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignee",
+          "to": "atomic:prop:assignees",
+          "transform": {
+            "op": "wrap"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/atomicURL",
+          "toDatatype": "https://atomicdata.dev/datatypes/resourceArray"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice",
+          "https://example.com/people/bob"
+        ]
+      },
+      "expected": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice",
+          "https://example.com/people/bob"
+        ]
+      }
+    },
+    {
+      "name": "wrap: no assignees do not map back",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignee",
+          "to": "atomic:prop:assignees",
+          "transform": {
+            "op": "wrap"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/atomicURL",
+          "toDatatype": "https://atomicdata.dev/datatypes/resourceArray"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignees": []
+      },
+      "expected": {
+        "atomic:prop:assignees": []
+      }
+    },
+    {
+      "name": "wrap: real values win",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignee",
+          "to": "atomic:prop:assignees",
+          "transform": {
+            "op": "wrap"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/atomicURL",
+          "toDatatype": "https://atomicdata.dev/datatypes/resourceArray"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignee": "https://example.com/people/alice",
+        "atomic:prop:assignees": [
+          "https://example.com/people/bob"
+        ]
+      },
+      "expected": {
+        "atomic:prop:assignee": "https://example.com/people/alice",
+        "atomic:prop:assignees": [
+          "https://example.com/people/bob"
+        ]
+      }
+    },
+    {
+      "name": "head: first item of an array",
+      "description": "Array to its first item.",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignees",
+          "to": "atomic:prop:assignee",
+          "transform": {
+            "op": "head"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/resourceArray",
+          "toDatatype": "https://atomicdata.dev/datatypes/atomicURL"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice",
+          "https://example.com/people/bob"
+        ]
+      },
+      "expected": {
+        "atomic:prop:assignees": [
+          "https://example.com/people/alice",
+          "https://example.com/people/bob"
+        ],
+        "atomic:prop:assignee": "https://example.com/people/alice"
+      }
+    },
+    {
+      "name": "head: an empty array gives nothing",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignees",
+          "to": "atomic:prop:assignee",
+          "transform": {
+            "op": "head"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/resourceArray",
+          "toDatatype": "https://atomicdata.dev/datatypes/atomicURL"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignees": []
+      },
+      "expected": {
+        "atomic:prop:assignees": []
+      }
+    },
+    {
+      "name": "head: scalar maps back to a one-item array",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:assignees",
+          "to": "atomic:prop:assignee",
+          "transform": {
+            "op": "head"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/resourceArray",
+          "toDatatype": "https://atomicdata.dev/datatypes/atomicURL"
+        }
+      ],
+      "doc": {
+        "atomic:prop:assignee": "https://example.com/people/bob"
+      },
+      "expected": {
+        "atomic:prop:assignee": "https://example.com/people/bob",
+        "atomic:prop:assignees": [
+          "https://example.com/people/bob"
+        ]
+      }
+    },
+    {
+      "name": "map: enum value rename",
+      "description": "Listed values are renamed, others pass through.",
+      "lenses": [
+        {
+          "from": "atomic:prop:status",
+          "to": "atomic:prop:state",
+          "transform": {
+            "op": "map",
+            "values": {
+              "todo": "open",
+              "done": "closed"
+            }
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:status": "todo"
+      },
+      "expected": {
+        "atomic:prop:status": "todo",
+        "atomic:prop:state": "open"
+      }
+    },
+    {
+      "name": "map: unlisted values pass through",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:status",
+          "to": "atomic:prop:state",
+          "transform": {
+            "op": "map",
+            "values": {
+              "todo": "open",
+              "done": "closed"
+            }
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:status": "blocked"
+      },
+      "expected": {
+        "atomic:prop:status": "blocked",
+        "atomic:prop:state": "blocked"
+      }
+    },
+    {
+      "name": "map: backward is the inverse",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:status",
+          "to": "atomic:prop:state",
+          "transform": {
+            "op": "map",
+            "values": {
+              "todo": "open",
+              "done": "closed"
+            }
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:state": "closed"
+      },
+      "expected": {
+        "atomic:prop:state": "closed",
+        "atomic:prop:status": "done"
+      }
+    },
+    {
+      "name": "map: a map that is not injective has no backward direction",
+      "description": "Forward still works.",
+      "lenses": [
+        {
+          "from": "atomic:prop:status",
+          "to": "atomic:prop:state",
+          "transform": {
+            "op": "map",
+            "values": {
+              "todo": "open",
+              "new": "open"
+            }
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:state": "open"
+      },
+      "expected": {
+        "atomic:prop:state": "open"
+      }
+    },
+    {
+      "name": "map: a map that is not injective still maps forward",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:status",
+          "to": "atomic:prop:state",
+          "transform": {
+            "op": "map",
+            "values": {
+              "todo": "open",
+              "new": "open"
+            }
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:status": "new"
+      },
+      "expected": {
+        "atomic:prop:status": "new",
+        "atomic:prop:state": "open"
+      }
+    },
+    {
+      "name": "convert: string to integer",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:count",
+          "to": "atomic:prop:count-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/integer"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/integer"
+        }
+      ],
+      "doc": {
+        "atomic:prop:count": "42"
+      },
+      "expected": {
+        "atomic:prop:count": "42",
+        "atomic:prop:count-n": 42
+      }
+    },
+    {
+      "name": "convert: negative integers and padding",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:count",
+          "to": "atomic:prop:count-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/integer"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/integer"
+        }
+      ],
+      "doc": {
+        "atomic:prop:count": " -7 "
+      },
+      "expected": {
+        "atomic:prop:count": " -7 ",
+        "atomic:prop:count-n": -7
+      }
+    },
+    {
+      "name": "convert: an unparseable value gives nothing, not an error",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:count",
+          "to": "atomic:prop:count-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/integer"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/integer"
+        }
+      ],
+      "doc": {
+        "atomic:prop:count": "forty"
+      },
+      "expected": {
+        "atomic:prop:count": "forty"
+      }
+    },
+    {
+      "name": "convert: a decimal is not an integer",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:count",
+          "to": "atomic:prop:count-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/integer"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/integer"
+        }
+      ],
+      "doc": {
+        "atomic:prop:count": "4.5"
+      },
+      "expected": {
+        "atomic:prop:count": "4.5"
+      }
+    },
+    {
+      "name": "convert: integer back to string",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:count",
+          "to": "atomic:prop:count-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/integer"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/integer"
+        }
+      ],
+      "doc": {
+        "atomic:prop:count-n": 7
+      },
+      "expected": {
+        "atomic:prop:count-n": 7,
+        "atomic:prop:count": "7"
+      }
+    },
+    {
+      "name": "convert: string to float",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:price",
+          "to": "atomic:prop:price-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/float"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/float"
+        }
+      ],
+      "doc": {
+        "atomic:prop:price": "12.5"
+      },
+      "expected": {
+        "atomic:prop:price": "12.5",
+        "atomic:prop:price-n": 12.5
+      }
+    },
+    {
+      "name": "convert: float back to string",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:price",
+          "to": "atomic:prop:price-n",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/float"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/float"
+        }
+      ],
+      "doc": {
+        "atomic:prop:price-n": 12.5
+      },
+      "expected": {
+        "atomic:prop:price-n": 12.5,
+        "atomic:prop:price": "12.5"
+      }
+    },
+    {
+      "name": "convert: string to boolean",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:done",
+          "to": "atomic:prop:done-b",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/boolean"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/boolean"
+        }
+      ],
+      "doc": {
+        "atomic:prop:done": "TRUE"
+      },
+      "expected": {
+        "atomic:prop:done": "TRUE",
+        "atomic:prop:done-b": true
+      }
+    },
+    {
+      "name": "convert: not a boolean",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:done",
+          "to": "atomic:prop:done-b",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/boolean"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/boolean"
+        }
+      ],
+      "doc": {
+        "atomic:prop:done": "yes"
+      },
+      "expected": {
+        "atomic:prop:done": "yes"
+      }
+    },
+    {
+      "name": "convert: boolean back to string",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:done",
+          "to": "atomic:prop:done-b",
+          "transform": {
+            "op": "convert",
+            "to": "https://atomicdata.dev/datatypes/boolean"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/boolean"
+        }
+      ],
+      "doc": {
+        "atomic:prop:done-b": false
+      },
+      "expected": {
+        "atomic:prop:done-b": false,
+        "atomic:prop:done": "false"
+      }
+    },
+    {
+      "name": "no chaining",
+      "description": "A derived value never feeds another lens (v1).",
+      "lenses": [
+        {
+          "from": "atomic:prop:a",
+          "to": "atomic:prop:b",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        },
+        {
+          "from": "atomic:prop:b",
+          "to": "atomic:prop:c",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:a": "x"
+      },
+      "expected": {
+        "atomic:prop:a": "x",
+        "atomic:prop:b": "x"
+      }
+    },
+    {
+      "name": "two lenses on different properties",
+      "description": "",
+      "lenses": [
+        {
+          "from": "atomic:prop:a",
+          "to": "atomic:prop:b",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        },
+        {
+          "from": "atomic:prop:t",
+          "to": "atomic:prop:u",
+          "transform": {
+            "op": "rename"
+          },
+          "fromDatatype": "https://atomicdata.dev/datatypes/string",
+          "toDatatype": "https://atomicdata.dev/datatypes/string"
+        }
+      ],
+      "doc": {
+        "atomic:prop:a": "x",
+        "atomic:prop:u": "y"
+      },
+      "expected": {
+        "atomic:prop:a": "x",
+        "atomic:prop:b": "x",
+        "atomic:prop:u": "y",
+        "atomic:prop:t": "y"
+      }
+    }
+  ]
+}

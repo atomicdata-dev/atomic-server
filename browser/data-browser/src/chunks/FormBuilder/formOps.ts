@@ -3,6 +3,10 @@ import {
   core,
   dataBrowser,
   forms,
+  JSON_SCHEMA_DIALECT,
+  propertyJsonSchema,
+  setClassConstraint,
+  type JSONObject,
   type JSONValue,
   type Resource,
   type Store,
@@ -21,6 +25,12 @@ import {
   compatibleFieldTypes,
 } from './tableColumns';
 import { parseFieldOptions } from './FieldOptions/useFieldOptions';
+import {
+  columnConstraint,
+  narrowedConstraintKeywords,
+  normalizeFieldOptions,
+} from './formConstraints';
+import { optionSubjects } from '@helpers/withConstraint';
 import {
   FIELD_TYPE_DEFAULT_OPTIONS,
   FIELD_TYPE_TO_DATATYPE,
@@ -295,6 +305,74 @@ async function conditions(store: Store, resource: Resource) {
   );
 }
 
+/**
+ * The JSON Schema a submission to the form has to satisfy: one property per
+ * question, keyed by the column's shortname, written from the data class's
+ * constraint for the column (`enum`, `maxItems`, `minimum`, ...) narrowed by
+ * the question's own options. Outside validators and API submissions can use
+ * it as it is.
+ */
+async function formJsonSchema(
+  store: Store,
+  graph: Awaited<ReturnType<typeof readForm>>,
+): Promise<JSONObject> {
+  const { form, dataClass } = graph;
+  const requiredByClass = dataClass.getSubjects(core.properties.requires);
+  const properties: JSONObject = {};
+  const required: string[] = [];
+
+  for (const { fields } of graph.pages) {
+    for (const field of fields) {
+      const mapsTo = field.get(forms.properties.formMapsTo) as
+        | string
+        | undefined;
+
+      if (!mapsTo || !field.hasClasses(forms.classes.formField)) continue;
+
+      const property = await store.getResource(mapsTo);
+      const shortname = property.get(core.properties.shortname) as string;
+      const keywords = narrowedConstraintKeywords(
+        fieldType(field),
+        parseFieldOptions(field.get(forms.properties.formFieldOptions)),
+        columnConstraint(store, dataClass.subject, mapsTo),
+      );
+
+      properties[shortname] = propertyJsonSchema(
+        {
+          subject: mapsTo,
+          shortname,
+          datatype: property.get(core.properties.datatype) as string,
+          name: property.get(core.properties.name) as string | undefined,
+          description: property.get(core.properties.description) as
+            | string
+            | undefined,
+          classtype: property.get(core.properties.classtype) as
+            | string
+            | undefined,
+        },
+        keywords,
+      );
+
+      if (
+        field.get(forms.properties.required) ||
+        requiredByClass.includes(mapsTo)
+      )
+        required.push(shortname);
+    }
+  }
+
+  return {
+    $schema: JSON_SCHEMA_DIALECT,
+    title: (form.get(core.properties.name) as string | undefined) ?? '',
+    type: 'object',
+    'x-atomic-form': form.subject,
+    'x-atomic-subject': dataClass.subject,
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+    additionalProperties: false,
+  };
+}
+
 export async function describeForm(store: Store, subject: string) {
   const graph = await readForm(store, subject);
   const { form, dataClass } = graph;
@@ -308,7 +386,10 @@ export async function describeForm(store: Store, subject: string) {
         shortname: p.get(core.properties.shortname),
         datatype: p.get(core.properties.datatype),
         required: dataClass.getSubjects(core.properties.requires).includes(s),
-        compatibleTypes: compatibleFieldTypes(p),
+        compatibleTypes: compatibleFieldTypes(
+          p,
+          columnConstraint(store, dataClass.subject, s),
+        ),
       };
     }),
   );
@@ -326,15 +407,17 @@ export async function describeForm(store: Store, subject: string) {
           const property = propertySubject
             ? await store.getResource(propertySubject)
             : undefined;
+          // The options are the `enum` of the data class's constraint for the
+          // column (the Property's legacy `allowsOnly` for older forms).
           const choices = property
             ? await Promise.all(
-                property
-                  .getSubjects(core.properties.allowsOnly)
-                  .map(async s => {
-                    const tag = await store.getResource(s);
+                optionSubjects(
+                  columnConstraint(store, dataClass.subject, property.subject),
+                ).map(async s => {
+                  const tag = await store.getResource(s);
 
-                    return { subject: s, label: columnLabel(tag) };
-                  }),
+                  return { subject: s, label: columnLabel(tag) };
+                }),
               )
             : [];
 
@@ -351,8 +434,9 @@ export async function describeForm(store: Store, subject: string) {
                 dataClass
                   .getSubjects(core.properties.requires)
                   .includes(propertySubject)),
-            options: parseFieldOptions(
-              field.get(forms.properties.formFieldOptions),
+            options: normalizeFieldOptions(
+              fieldType(field),
+              parseFieldOptions(field.get(forms.properties.formFieldOptions)),
             ),
             choices,
             infoBoxStyle: field.get(forms.properties.formInfoBoxStyle),
@@ -376,6 +460,7 @@ export async function describeForm(store: Store, subject: string) {
     customCss: form.get(forms.properties.formCustomCss),
     columns,
     pages,
+    schema: await formJsonSchema(store, graph),
   };
 }
 
@@ -610,8 +695,13 @@ export async function configureFormField(store: Store, input: FieldConfig) {
       'Select an existing table column; add new columns on the table first',
     );
 
+  // What the data class demands of the column: the question can only tighten it.
+  const constraint = property
+    ? columnConstraint(store, graph.dataClass.subject, property.subject)
+    : undefined;
+
   if (property && !isLayoutType(type)) {
-    const allowed = compatibleFieldTypes(property);
+    const allowed = compatibleFieldTypes(property, constraint);
     // Composite standalone fields have no table picker presentation yet.
     if (
       !allowed.includes(type) &&
@@ -636,7 +726,7 @@ export async function configureFormField(store: Store, input: FieldConfig) {
     );
   if (!field && !property && isChoiceFieldType(type) && !config.choices)
     throw new Error('A new choice question requires choices');
-  const existingTags = property?.getSubjects(core.properties.allowsOnly) ?? [];
+  const existingTags = constraint ? optionSubjects(constraint) : [];
 
   if (config.choices) {
     const subjects = config.choices.flatMap(c =>
@@ -668,7 +758,7 @@ export async function configureFormField(store: Store, input: FieldConfig) {
         ? field.get(forms.properties.formFieldOptions)
         : FIELD_TYPE_DEFAULT_OPTIONS[type],
       config.options,
-      property?.get(dataBrowser.properties.max) as number | undefined,
+      constraint,
     );
   const editsExistingChoices = !!property;
 
@@ -713,8 +803,10 @@ export async function configureFormField(store: Store, input: FieldConfig) {
       tags.push(tag.subject);
     }
 
-    await property.set(core.properties.allowsOnly, tags);
-    await property.save();
+    // The options belong to the data class, so the immutable Property stays
+    // as it is.
+    await setClassConstraint(graph.dataClass, property.subject, { enum: tags });
+    await graph.dataClass.save();
   }
 
   if (config.label !== undefined)
@@ -747,6 +839,9 @@ export async function configureFormField(store: Store, input: FieldConfig) {
           type,
           field.get(forms.properties.formFieldOptions),
           config.options,
+          property
+            ? columnConstraint(store, graph.dataClass.subject, property.subject)
+            : undefined,
         ),
       );
   }

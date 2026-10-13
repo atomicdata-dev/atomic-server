@@ -10,6 +10,7 @@ import { styled } from 'styled-components';
 import { OnboardingFeedback } from './OnboardingFeedback';
 import { SideBar } from './SideBar';
 import { OverlayContainer } from './OverlayContainer';
+import { ShareDialogHost } from './Share/ShareDialogHost';
 import { CalculatedPageHeight } from '../globalCssVars';
 import { AISidebarContextProvider } from './AI/AISidebarContext';
 import { AISidebarContainer } from './AI/AISidebarContainer';
@@ -137,6 +138,7 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
             </SideBarWrapper>
             {hideGlobalChrome && <OnboardingFeedback />}
             <OverlayContainer />
+            <ShareDialogHost />
           </AppSetupProvider>
         </AppVerifierProvider>
       </AISidebarContextProvider>

@@ -90,9 +90,6 @@ function PersonRoleSelect({
 
     try {
       await onSetRole(right.agentSubject, role);
-      toast.success(
-        role === 'remove' ? `Removed ${name}` : `${name} ${roleLabel(role)}`,
-      );
     } catch (e) {
       toast.error((e as Error).message);
     }

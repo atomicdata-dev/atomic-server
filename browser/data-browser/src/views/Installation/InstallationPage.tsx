@@ -131,7 +131,6 @@ export const InstallationPage: React.FC<
       await setStatus(next);
       await resource.save();
       await refreshCustomViews();
-      toast.success(`Installation ${next}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -190,7 +189,6 @@ export const InstallationPage: React.FC<
       version: p.review.version,
     });
     await refreshCustomViews();
-    toast.success('Plugin updated');
   };
 
   return (
@@ -399,7 +397,6 @@ export const InstallationPage: React.FC<
           await resource.destroy();
           await refreshCustomViews();
           navigate(constructOpenURL(parent));
-          toast.success('Plugin uninstalled');
         }}
         onCancel={() => setConfirm(undefined)}
       >

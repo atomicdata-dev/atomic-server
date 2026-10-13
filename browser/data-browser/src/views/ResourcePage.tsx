@@ -31,6 +31,7 @@ import { ChatRoomPage } from './ChatRoomPage';
 import { ConversationPage } from './Conversation/ConversationPage';
 import { InboxPage } from './InboxPage';
 import { MessagePage } from './MessagePage';
+import { ChatLogPage } from './ChatLogPage';
 import { BookmarkPage } from './BookmarkPage/BookmarkPage';
 import { ImporterPage } from './ImporterPage.jsx';
 import { FolderPage } from './FolderPage';
@@ -166,10 +167,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
   if (resource.loading && !loadingExceeded && !hasLoadedThisSubject) {
     return (
       <Main subject={subject}>
-        <ContainerNarrow>
-          <p>Loading...</p>
-          <Spinner />
-        </ContainerNarrow>
+        <Spinner centered />
       </Main>
     );
   }
@@ -209,7 +207,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               {websiteExportClass ? (
                 <WebsiteExportPage resource={resource} />
               ) : (
@@ -236,7 +234,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <AppPage resource={resource} />
             </Suspense>
           </ErrorBoundary>
@@ -250,7 +248,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <AtomicPluginPage resource={resource} drive={drive!} />
             </Suspense>
           </ErrorBoundary>
@@ -264,7 +262,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
       return (
         <Main subject={subject}>
           <ErrorBoundary>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<Spinner centered />}>
               <PluginView resource={resource} plugin={plugin} />
             </Suspense>
           </ErrorBoundary>
@@ -276,7 +274,7 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
   return (
     <Main subject={subject}>
       <ErrorBoundary>
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<Spinner centered />}>
           {/* A fork renders through its content class's own view, so the bar is
               the only thing telling you this is not the original. */}
           <ForkBar resource={resource} />
@@ -313,6 +311,8 @@ function selectComponent(klass: string | undefined) {
       return ConversationPage;
     case dataBrowser.classes.message:
       return MessagePage;
+    case dataBrowser.classes.chatLog:
+      return ChatLogPage;
     case dataBrowser.classes.bookmark:
       return BookmarkPage;
     case dataBrowser.classes.importer:
