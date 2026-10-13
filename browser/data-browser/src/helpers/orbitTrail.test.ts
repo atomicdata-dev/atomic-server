@@ -1,7 +1,12 @@
 // @wc-ignore-file
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { orbitTrailMarkup, trailBands } from './orbitTrail';
+
+const brandSvgUrl = new URL(
+  '../../../../brand/src/place-mark.svg',
+  import.meta.url,
+);
 
 describe('orbitTrail', () => {
   it('starts at 3 o clock and ends at the top, fading in', () => {
@@ -28,18 +33,20 @@ describe('orbitTrail', () => {
     expect(inline).toBe(orbitTrailMarkup());
   });
 
-  it('is the same trail brand/src/place-mark.svg draws, in white', () => {
-    const svg = readFileSync(
-      new URL('../../../../brand/src/place-mark.svg', import.meta.url),
-      'utf8',
-    );
-    const inline = svg
-      .split(/<!-- orbit-trail:start -->|<!-- orbit-trail:end -->/)[1]
-      ?.trim()
-      .split('\n')
-      .map(line => line.trim())
-      .join('\n');
+  // The Dagger test container mounts only browser/, so brand/ is absent
+  // there; the check runs in local and full-checkout runs.
+  it.skipIf(!existsSync(brandSvgUrl))(
+    'is the same trail brand/src/place-mark.svg draws, in white',
+    () => {
+      const svg = readFileSync(brandSvgUrl, 'utf8');
+      const inline = svg
+        .split(/<!-- orbit-trail:start -->|<!-- orbit-trail:end -->/)[1]
+        ?.trim()
+        .split('\n')
+        .map(line => line.trim())
+        .join('\n');
 
-    expect(inline).toBe(orbitTrailMarkup('#fff'));
-  });
+      expect(inline).toBe(orbitTrailMarkup('#fff'));
+    },
+  );
 });
