@@ -423,6 +423,31 @@ impl KvStore for RedbStore {
             .collect()
     }
 
+    fn range_value_sizes(
+        &self,
+        tree: Tree,
+        start: Vec<u8>,
+        end: Vec<u8>,
+        limit: usize,
+    ) -> AtomicResult<Vec<(Vec<u8>, u64)>> {
+        let tx = self
+            .db
+            .begin_read()
+            .map_err(|e| format!("redb read tx: {e}"))?;
+        let table = tx
+            .open_table(table_def(tree))
+            .map_err(|e| format!("redb open table: {e}"))?;
+        let rows = table
+            .range(start.as_slice()..end.as_slice())
+            .map_err(|e| format!("redb range: {e}"))?;
+        rows.take(limit)
+            .map(|row| {
+                let (k, v) = row.map_err(|e| format!("redb range entry: {e}"))?;
+                Ok((k.value().to_vec(), v.value().len() as u64))
+            })
+            .collect()
+    }
+
     fn first_entry(&self, tree: Tree) -> AtomicResult<Option<KvPair>> {
         let tx = self
             .db
