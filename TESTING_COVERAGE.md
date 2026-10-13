@@ -2817,6 +2817,11 @@ partition.
   observed versus covered segments, and migration of unsafe legacy import cursors.
   Pruning coverage advances only through a contiguous recovered prefix. WASM and
   desktop serialize the same `RestoreSummary`; the browser surfaces its partial result.
+- `VaultPanel.test.tsx`, `useVaultBackup.restore.test.ts` and automatic-recovery
+  tests keep partial recovery visible even when warning translations are empty or
+  absent. Success comes from structured coverage, never warning-string truthiness.
+  The production acceptance run caught this gap despite passing source-level tests;
+  changed recovery messages must also exist in the compiled translation catalogs.
 
 Still open: simultaneous per-drive routing, authoritative expected lane tails,
 resource/blob dependency coverage, key/epoch handles, notification event identity

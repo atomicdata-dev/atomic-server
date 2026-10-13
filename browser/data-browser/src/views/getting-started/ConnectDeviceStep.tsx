@@ -1,3 +1,7 @@
+import {
+  restoreIsIncomplete,
+  incompleteRestoreMessage,
+} from '../../helpers/managed/vaultRestoreOutcome';
 import { DiscoverWorkspace } from './DiscoverWorkspace';
 import React, { useEffect, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
@@ -248,8 +252,11 @@ export function ConnectDeviceStep({
     // A partial restore kept what it recovered but is not a connected device:
     // leaving now would hide the message. Stay, say so, and let the user
     // retry or open what was recovered.
-    if (outcome.incomplete) {
-      setPartialRestore({ drive: vaultDrive, message: outcome.incomplete });
+    if (restoreIsIncomplete(outcome)) {
+      setPartialRestore({
+        drive: vaultDrive,
+        message: incompleteRestoreMessage(outcome),
+      });
 
       return;
     }

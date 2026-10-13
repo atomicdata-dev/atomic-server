@@ -56,6 +56,35 @@ const show = (
 
 afterEach(cleanup);
 
+it.each([
+  { completeness: 'partial', incomplete: '' },
+  { objectsUnreadable: 1 },
+  { objectsMissing: 1 },
+])(
+  'keeps an incomplete restore open without warning copy: %j',
+  async partial => {
+    const vault = vaultWith(1000);
+    vi.mocked(vault.restore).mockResolvedValue({
+      packsRead: 1,
+      resourcesRestored: 3,
+      tombstonesApplied: 0,
+      objectsSkipped: 0,
+      objectsUnreadable: 0,
+      ...partial,
+    } as Awaited<ReturnType<UseVaultBackup['restore']>>);
+    const onRestored = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <VaultPanel vault={vault} onRestored={onRestored} />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId('vault-restore'));
+    await waitFor(() => expect(vault.restore).toHaveBeenCalled());
+    expect(onRestored).not.toHaveBeenCalled();
+  },
+);
+
 it('shows no bar or quota when included in Cloud Server', () => {
   show(545 * 1024 ** 2, true);
 

@@ -12918,11 +12918,14 @@ msgstr ""
 msgid "Restore incomplete: {0} backup objects could not be downloaded. Recovered data was kept. Retry the restore."
 msgstr ""
 
-#. 0: outcome.objectsUnreadable
-#: src/helpers/managed/vault.ts
-msgid "Restore incomplete: {0} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key."
-msgstr ""
+#~ msgid "Restore incomplete: {0} backup objects were unreadable. Recovered data was kept. Retry with a complete backup and its current key."
+#~ msgstr ""
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Open recovered workspace"
 msgstr ""
+
+#. 0: outcome.objectsUnreadable; 1: outcome.objectsMissing ?? 0
+#: src/helpers/managed/vault.ts
+msgid "Restore incomplete: {0} backup objects were unreadable, {1} were missing. Recovered data was kept. Retry with a complete backup and its current key."
+msgstr "Restauration incomplète : {0} objets de sauvegarde étaient illisibles et {1} manquaient. Les données récupérées ont été conservées. Réessayez avec une sauvegarde complète et sa clé actuelle."

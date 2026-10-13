@@ -563,6 +563,26 @@ describe('restoreFromVault', () => {
     );
   });
 
+  it('keeps automatic recovery partial when translated warning copy is empty', async () => {
+    const store = await signedInStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const deps = fakeDeps({
+      restoreDrive: vi.fn(async () => ({
+        packsRead: 1,
+        resourcesRestored: 3,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 1,
+        incomplete: '',
+      })),
+    });
+    expect(await restoreFromVault(store, DRIVE, deps)).toMatchObject({
+      status: 'partial',
+      reason: expect.stringContaining('Restore incomplete.'),
+    });
+    warn.mockRestore();
+  });
+
   it.each([ErrorType.NotFound, ErrorType.Transport])(
     'only a confirmed node absence makes a restored drive local (%s)',
     async errorType => {

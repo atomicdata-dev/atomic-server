@@ -12,6 +12,7 @@ import { UsageMeter } from '../Cloud/UsageMeter';
 import { VaultStorage } from './VaultStorage';
 import { PRODUCT_NAME } from '../../helpers/managed/product';
 import type { UseVaultBackup } from '../../helpers/managed/useVaultBackup';
+import { restoreIsIncomplete } from '../../helpers/managed/vaultRestoreOutcome';
 
 /**
  * Cloud Vault for one drive, as one {@link ServiceRow}.
@@ -54,7 +55,7 @@ export function VaultPanel({
     const outcome = await vault.restore();
 
     // An incomplete restore keeps its error on screen instead of reloading.
-    if (outcome && !outcome.incomplete) onRestored?.();
+    if (outcome && !restoreIsIncomplete(outcome)) onRestored?.();
   }
 
   async function handleDownload() {
@@ -73,7 +74,7 @@ export function VaultPanel({
     const outcome = await vault.restoreFromFile(file);
 
     // An incomplete restore keeps its error on screen instead of reloading.
-    if (outcome && !outcome.incomplete) onRestored?.();
+    if (outcome && !restoreIsIncomplete(outcome)) onRestored?.();
   }
 
   // Still settling, or cannot say. Neither is "off": an enable button when we

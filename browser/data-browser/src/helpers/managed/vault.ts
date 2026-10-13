@@ -1132,7 +1132,7 @@ export async function restoreDrive({
     // here would make every restore fail again although the readable data was
     // imported, so the drive could never be recovered. Return the outcome
     // flagged instead; callers surface `incomplete`.
-    return { ...outcome, incomplete: message };
+    return { ...outcome, completeness: 'partial', incomplete: message };
   }
 
   return outcome;

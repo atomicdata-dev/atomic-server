@@ -1,3 +1,7 @@
+import {
+  restoreIsIncomplete,
+  incompleteRestoreMessage,
+} from './vaultRestoreOutcome';
 import { driveDisplayMetadata } from './driveDisplayMetadata';
 import { hasManagedApi } from './api';
 import {
@@ -664,10 +668,11 @@ export async function restoreFromVault(
     });
     notifyVaultChanged(driveSubject);
 
-    if (outcome.incomplete) {
-      console.warn('[cloud-vault]', outcome.incomplete);
+    if (restoreIsIncomplete(outcome)) {
+      const reason = incompleteRestoreMessage(outcome);
+      console.warn('[cloud-vault]', reason);
 
-      return { status: 'partial', outcome, reason: outcome.incomplete };
+      return { status: 'partial', outcome, reason };
     }
 
     return { status: 'restored', outcome };

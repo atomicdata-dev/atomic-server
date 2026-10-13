@@ -716,9 +716,9 @@ export function GettingStartedFlow({
           hasData = await canRead(target, false);
 
           // Readable data was kept; say that the restore was partial.
-          if (restored.outcome.incomplete) {
-            vaultReason = restored.outcome.incomplete;
-            partialRestore = restored.outcome.incomplete;
+          if (restored.status === 'partial') {
+            vaultReason = restored.reason;
+            partialRestore = restored.reason;
           }
         } else if (restored.status === 'failed') {
           vaultReason = restored.error.message;

@@ -1,3 +1,7 @@
+import {
+  restoreIsIncomplete,
+  incompleteRestoreMessage,
+} from './vaultRestoreOutcome';
 import { getManagedAccount } from './session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -401,7 +405,8 @@ export function useVaultBackup({
 
   /** A partial restore keeps its data but must still show the error. */
   const surfaceIncomplete = useCallback((outcome: RestoreOutcome) => {
-    if (outcome.incomplete) setError(outcome.incomplete);
+    if (restoreIsIncomplete(outcome))
+      setError(incompleteRestoreMessage(outcome));
 
     return outcome;
   }, []);

@@ -20,7 +20,8 @@ Most UX mistakes here come from getting this wrong. It is not symmetric.
 | device ↔ device (either one always-on) | Iroh, by scanning a code — a node id needs no address, port or certificate | each side serves what the other's key **may read** (`check_read`), per subject |
 | device → always-on device | Iroh, or a push over WS if you have its address | needs write rights there, signed as *your* agent |
 | always-on device → device | WS subscribe + fetch | the device must know its address |
-| browser tab ↔ anything | only through an always-on device | a browser tab **is not a node**: it cannot pair, and holds nothing |
+| browser tab ↔ server | HTTP/WS, with OPFS for local persistence | the server checks read/write rights; local durability and remote acceptance are separate |
+| browser tab ↔ browser tab | authorized WebRTC peer sync with signaling | both peers must be reachable; Vault remains an independent encrypted backup path |
 
 Three consequences that keep being forgotten:
 
@@ -90,10 +91,15 @@ that moves data.
 | new account on Flutter mobile | another Flutter mobile | pairing code | ✅ |
 | new account on Flutter mobile | browser later | scan the browser's code — the always-on device it reads from — or push over WS | ✅ Iroh, or `syncDriveToServer` |
 | new account anywhere | atomicserver.eu later | device pushes up, then everything reads from there | ⚠️ untested |
-| new account in browser A | browser B, no machine in common | **nothing crosses** | ❌ by design — say so |
+| new account in browser A | browser B, no server copy | authorized WebRTC peer sync or explicit Vault recovery | ✅ distinct live collaboration and recovery paths |
 
-The last row is the one to get right in copy: two browser tabs with no machine
-between them cannot reach each other, ever. Neither is a node.
+Browser multiplayer does not require a hosted server copy. It requires an
+authorized peer route; a closed peer cannot supply data. Vault recovery can work
+after all writers close, provided the required encrypted objects are available.
+
+Recovery warnings must follow the structured restore result, never the presence
+of translated text. The browser and Tauri share this guard in `VaultPanel` and
+onboarding. Flutter has no corresponding Cloud Vault restore screen yet.
 
 ## 4. Where the logic lives
 
