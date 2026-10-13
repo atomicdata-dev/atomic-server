@@ -937,6 +937,35 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   authenticated read from the real managed node. Plan purchase alone creates
   no enrollment. Real Stripe-hosted test-card checkout remains a deployment check.
 
+## Cloud lifecycle audit (October 7)
+
+- `vaultAutoBackup.test.ts`: a persisted Vault disable prevents automatic
+  enrollment after reload and stops a tab with cached enrollment state. An
+  explicit portal enable overrides an older browser-local opt-out. Restore
+  passes the key envelope's epoch to the importer, including epochs above 1.
+- `vault.test.ts`: an empty, re-enabled Vault refreshes its durable key envelope
+  before uploading from a tab that still holds the old key. Existing epoch
+  mismatch tests continue to refuse stale writes.
+- Paired SaaS `cloud-admin-vault-live.spec.ts`: real API and S3, portal off/on
+  with and without an app reload, edits while off, automatic backup remains
+  off, then recovery in a fresh browser after closing both owner tabs. These
+  two cases run in the default portal suite, with strict console diagnostics.
+- Paired SaaS `cloud-admin-invite-live.spec.ts`: admin grant/revoke, active
+  drive plan, initial managed upload, distinct editor invitation, edits in
+  both directions, plan cancellation and real node write refusal, then
+  resumption and queued edit convergence after reconnect/reload. A member
+  downgraded to read still receives owner edits. Requires
+  `ATOMIC_CLOUD_ADMIN_LIVE=1`, a managed node, S3 and development mail.
+
+Remaining gaps: that managed browser journey is opt-in and is not wired into
+CI. Its invitation includes the server origin; it does not prove fresh member
+host discovery without it. Resume explicitly reconnects clients after the
+policy poll. Missing invited profile names, complete member revocation,
+expired invitations, simultaneous toggles/uploads, attachment recovery and
+node replacement need dedicated coverage. The portal has no admin Vault
+toggle or direct Cloud Server de-enrollment control; an access grant revoke
+deliberately leaves an existing enrollment active.
+
 ## Host-to-Drive routing and hosted vanity subdomains
 
 `Tree::DriveMapping` is what makes one server answer for many hostnames. It
@@ -2702,6 +2731,120 @@ tamper rejection, and closing during a pending request. Atomic Audio additionall
 checks isolated native identity installation and actual bidirectional iroh/Loro
 with BLAKE3 files introduced after pairing. Production account approval, Vault
 transport and recovery on a physical device are not covered by these tests.
+
+## Deeper cloud coverage audit (October 7)
+
+The paired private SaaS coverage report records two locally reproduced control
+plane findings and further transition tests. These are open findings, not fixes
+in the October 7 Vault toggle change. Public client/browser gaps include:
+
+- Partial Vault recovery: `lib/src/vault/sync.rs` returns
+  `objects_unreadable` when only some objects open. `VaultPanel.handleRestore`
+  calls `onRestored` for any returned outcome, and automatic recovery treats a
+  readable root as recovered. Add a real corrupt-object case that retains good
+  content, exposes incomplete recovery and preserves a retry path.
+- Identity reconciliation: paired `identity-scenarios.spec.ts` ends at sign-in
+  and a portal account assertion. Complete the switch with unsent local work,
+  verify the intended account's recovered content, then return to the old
+  identity and verify its pending edits and routing.
+- Interrupted setup: close a tab after identity creation, after recovery
+  envelope storage and during first hosted replication. Resume with the same
+  identity, preserve offline edits and verify children/blob bytes on a fresh
+  device before reporting success. Current setup helper tests mock transfer.
+- Concurrent Vault writers: race two real browser contexts through key setup
+  and checkpoint publication, then close both and restore their edits in a
+  third context. Unit tests cover individual races; the full browser/S3 path
+  still needs the combined case.
+- OPFS quota and eviction during backup/restore: verify visible failure and
+  durable outbox/key state after reload; existing locks tests cover orderly
+  leader closure rather than this storage failure.
+- Weak sync smoke assertion: `sync.spec.ts`'s online save/reload case checks
+  that the drive and any first sidebar link exist, not that the created
+  document's subject/title came back. A lost document could pass this case.
+- Engine and origin fidelity: the paired portal suite has one Chromium
+  project; public Firefox coverage is scoped to locks and WebKit is opt-in
+  and scoped to sign-out persistence. Neither proves cloud recovery through
+  real native origins or mobile authenticator/storage behavior.
+
+The private audit also records partial deletion, outstanding object-store
+leases, account purge acknowledgment, multiple placements, device removal,
+real vanity routing and incomplete diagnostic-fixture adoption. Existing
+unit/protocol coverage should be retained; these are additional acceptance
+checks above it.
+
+## Notification sync between browser instances (October 7, 2026)
+
+`browser/e2e/tests/notifications.spec.ts` now uses an invited sender and two
+isolated browser contexts signed in as the recipient. The conversation lives
+in a project; the second recipient keeps an unrelated project selected with
+its Notifications page open. It checks new inbox rows, unread dots and the
+account-menu badge without reload, remote Mark all as read, reload persistence,
+and a real WebSocket disconnect followed by missed-item catch-up without
+reload. Opening that item on the second instance marks it read on the first.
+All contexts use the strict browser diagnostic fixture. OS notifications use
+a stub; message commits, inbox resources, WebSockets and OPFS are real.
+
+The previous fixture only had one recipient instance, and placing the chat in
+the personal drive hid the missing personal-drive subscription. Merely setting
+Playwright offline leaves existing WebSockets alive: the new test explicitly
+disconnects the Store and checks its connection state before sending.
+
+`hooks/useInbox.test.tsx` covers subscription ownership and cleanup on identity
+change. `browser/lib/src/websockets.test.ts` covers overlapping active/live
+drive subscriptions and reconciliation of a live drive outside the selected
+workspace, including subscription replay. These tests failed before the fixes.
+
+## Notification pagination, identity and server-only mode (October 8, 2026)
+
+`browser/e2e/tests/notification-inbox.spec.ts` signs the same recipient into two
+isolated contexts with unrelated projects selected. It concurrently saves two
+independent Notification genesis resources for the same source and checks that
+both inboxes show one unread item. It then adds 101 distinct sources and checks
+102 unread, grouping, remote Mark all as read, and reload persistence. It signs
+out and into a different real identity in the existing browser and checks an
+empty inbox. Seeded notifications use the real Store, server, OPFS and WebSocket;
+this does not simulate the MessageNotifier check/create race itself.
+
+`notification-comments.spec.ts` invites a writer to a project, posts a comment
+and a reply to the owner's comment, and checks both owner inboxes. Opening the
+reply in the second instance must open the comments panel and sync read state
+back to the first. This caught a navigation/panel race in addition to reply
+notifications failing to open the comment panel.
+
+`notifications.spec.ts` now runs with Local DB both enabled and deliberately
+disabled in the second recipient. It also disconnects that instance while the
+first reads a cached unread item and checks read-state catch-up without reload.
+The disabled path caught onboarding waiting for a database that will never
+attach, spurious VV sync failures, and missed inbox updates after reconnect.
+Every permanent journey uses the strict diagnostic fixture across all contexts.
+OS permission/delivery remain stubbed in the original chat journey.
+
+Cheaper regressions cover all-page counts and read-about operations (including
+preserving arrivals newer than the read cutoff), personal-drive query replacement,
+scoped local/optimistic membership, account isolation on the first render,
+server-only reconnect membership and cached read state, and waiting for navigation
+before opening a reply's comment panel. See `hooks/useInbox.test.tsx`,
+`hooks/usePrivateDrive.test.tsx`, `helpers/notifications/inbox.test.ts`,
+`helpers/onboardingStorage.test.ts`, `components/Notifications/NotificationList.test.tsx`,
+`browser/lib/src/collection-explicit-drive.test.ts`, and `websockets.test.ts`.
+
+### Still open
+
+A separate local diagnostic closed both recipient windows, sent a message,
+restored the recipient into a fresh context and confirmed the message was visible
+in its chat but absent from the Inbox. This is evidence of the existing gap, not
+passing delivery acceptance. It is not a permanent test that asserts missing
+notifications as correct behavior. `MessageNotifier` records only while an app
+is open and ignores messages created before startup. The durable notifier and
+push work remain in [`planning/notifications.md`](./planning/notifications.md).
+
+Real macOS/Android notification permission, display and activation remain
+unverified. The pinned Tauri plugin's Notification constructor submits to the
+native plugin but does not connect the assigned `onclick` callback. The browser
+service-worker fallback also lacks a notification click handler and target data.
+Neither native activation nor all-apps-closed delivery is established by these
+Chromium inbox tests. Failed browser database initialization is distinct from the
+explicit Local DB off mode tested here and needs its own notification journey.
 
 ## Lenses (`docs/src/schema/lenses.md`)
 

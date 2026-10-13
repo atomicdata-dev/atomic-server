@@ -1,4 +1,6 @@
 import { Resource } from './resource.js';
+import { core } from './ontologies/core.js';
+import { server } from './ontologies/server.js';
 import { AtomicError, ErrorType } from './error.js';
 import { describe, it, vi, afterEach, expect as assert } from 'vitest';
 import { testStore } from './test-store.js';
@@ -110,6 +112,10 @@ async function connectedClient() {
   // these frame-level tests.
   vi.spyOn(store, 'syncDirtyResources').mockResolvedValue(undefined);
   vi.spyOn(store, 'getDrive').mockReturnValue(undefined);
+  // These frame tests supply version vectors through computeDriveSyncState
+  // spies. Model an attached database at that boundary; server-only tests
+  // override it to false.
+  vi.spyOn(store, 'waitForClientDb').mockResolvedValue(true);
   const client = new WSClient('wss://example.com/ws', store);
   const socket = socketOf(client);
   socket.open();
@@ -717,6 +723,65 @@ describe('WSClient drive subscription', () => {
     vi.restoreAllMocks();
   });
 
+  it('does not reconcile a browser with Local DB disabled', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(store, 'getClientDb').mockReturnValue(undefined);
+    vi.spyOn(store, 'waitForClientDb').mockResolvedValue(false);
+    vi.spyOn(store, 'getDrive').mockReturnValue('atomic:personal');
+    const compute = vi
+      .spyOn(store, 'computeDriveSyncState')
+      .mockRejectedValue(new Error('No database'));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await client.resyncDrive('atomic:personal');
+    expect(compute).not.toHaveBeenCalled();
+    expect(warning).not.toHaveBeenCalled();
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(0);
+    client.close();
+  });
+
+  it('reconciles a live drive outside the active workspace, including after reconnect', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('personal-catchup'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    vi.spyOn(store, 'getDrive').mockReturnValue('atomic:project');
+    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+    const compute = vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+      drive: 'atomic:personal',
+      driveHash: 'personal-hash',
+      resources: {},
+      peers: [],
+    });
+    const personal = new Resource('atomic:personal');
+    await personal.set(core.properties.isA, [server.classes.drive], false);
+    store.resources.set(personal.subject, personal);
+    const stop = store.subscribeLive(personal.subject);
+    await vi.waitFor(() =>
+      expect(compute).toHaveBeenCalledWith(personal.subject, { sparse: false }),
+    );
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(1),
+    );
+    (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(2),
+    );
+    client.subscribeResource('did:ad:document');
+    expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(2);
+    stop();
+    client.close();
+  });
+
   it('subscribes mounted agent profiles, restores them on reconnect, and releases the last reader', async ({
     expect,
   }) => {
@@ -1104,6 +1169,59 @@ describe('WSClient drive subscription', () => {
     vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:missing-drive');
     subscribe();
     expect(framesWithTag(socket, Tag.SUB)).toHaveLength(3);
+    client.close();
+  });
+
+  it('keeps a live personal drive subscribed when the active workspace changes', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('inbox-subscription'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    const subscribe = (
+      client as unknown as { subscribeToDrive(): void }
+    ).subscribeToDrive.bind(client);
+    vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:personal');
+    subscribe();
+    const stopInbox = store.subscribeLive('did:ad:personal');
+    vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:project');
+    subscribe();
+    expect(framesWithTag(socket, Tag.UNSUB)).toHaveLength(0);
+    stopInbox();
+    expect(framesWithTag(socket, Tag.UNSUB)).toHaveLength(1);
+    client.close();
+  });
+
+  it('keeps the active drive subscribed when its last live reader unmounts', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('inbox-unmount'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:personal');
+    const subscribe = (
+      client as unknown as { subscribeToDrive(): void }
+    ).subscribeToDrive.bind(client);
+    subscribe();
+    store.subscribeLive('did:ad:personal')();
+    expect(framesWithTag(socket, Tag.UNSUB)).toHaveLength(0);
+    vi.spyOn(store, 'getDrive').mockReturnValue('did:ad:project');
+    subscribe();
+    expect(framesWithTag(socket, Tag.UNSUB)).toHaveLength(1);
     client.close();
   });
 });

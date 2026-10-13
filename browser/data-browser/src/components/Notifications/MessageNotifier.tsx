@@ -145,8 +145,8 @@ export function MessageNotifier(): null {
       .catch(e => console.error('Could not mark notifications read:', e));
   });
 
-  const open = useEffectEvent((n: MessageNotification) => {
-    navigate(constructOpenURL(n.target));
+  const open = useEffectEvent(async (n: MessageNotification) => {
+    await navigate(constructOpenURL(n.target));
     if (n.openComments) setPanelOpen('comments', true);
     readAbout(n.target);
   });
@@ -329,7 +329,7 @@ export function MessageNotifier(): null {
             <ToastCard
               type='button'
               onClick={() => {
-                open(n);
+                void open(n);
                 toast.dismiss(t.id);
               }}
             >
@@ -352,7 +352,7 @@ export function MessageNotifier(): null {
         title,
         body,
         tag: bubbleId(n.target),
-        onClick: () => open(n),
+        onClick: () => void open(n),
       });
     },
   );

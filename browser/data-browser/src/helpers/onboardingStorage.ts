@@ -11,6 +11,7 @@ export async function checkOnboardingStorage(
   store: OnboardingStore,
   nativeNodeOrigin?: string,
   fetchNode: typeof fetch = fetch,
+  clientDbEnabled = true,
 ): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -47,6 +48,15 @@ export async function checkOnboardingStorage(
             }
 
             await new Promise(resolve => setTimeout(resolve, 250));
+          }
+        } else if (!clientDbEnabled) {
+          // The user chose server-only mode. Gate saves on the actual socket,
+          // rather than waiting for a worker that will never be started.
+          if (
+            !store.waitForServerConnected ||
+            !(await store.waitForServerConnected(20_000))
+          ) {
+            throw new Error('The server is not connected.');
           }
         } else {
           await store.waitForClientDb(20_000);

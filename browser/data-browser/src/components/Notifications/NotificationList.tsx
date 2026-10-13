@@ -1,6 +1,8 @@
 import { styled } from 'styled-components';
 import {
   core,
+  dataBrowser,
+  notifications,
   unknownSubject,
   useResource,
   useStore,
@@ -34,15 +36,26 @@ export function NotificationList(): React.JSX.Element {
   const navigate = useNavigateWithTransition();
   const { setPanelOpen } = useRightPanel();
 
-  const open = (group: NotificationGroup) => {
+  const open = async (group: NotificationGroup) => {
+    // Replies can belong to a chat or a comment thread. The Message's `about`
+    // distinguishes them; the notification kind alone cannot.
+    const source = group.items[0]?.get(
+      notifications.properties.notificationSource,
+    );
+    const reply =
+      group.kind === 'reply' && typeof source === 'string'
+        ? await store.getResource(source)
+        : undefined;
+    const openComments =
+      group.kind === 'comment' || !!reply?.get(dataBrowser.properties.about);
     void markRead(
       store,
       group.items.map(n => n.subject),
     );
     if (!group.about) return;
-    navigate(constructOpenURL(group.about));
+    await navigate(constructOpenURL(group.about));
 
-    if (group.kind === 'comment') {
+    if (openComments) {
       setPanelOpen('comments', true);
     }
   };
@@ -78,7 +91,7 @@ export function NotificationList(): React.JSX.Element {
             <li key={group.key}>
               <Item
                 type='button'
-                onClick={() => open(group)}
+                onClick={() => void open(group)}
                 data-unread={group.unread || undefined}
               >
                 <AgentAvatar agentSubject={group.actors[0] ?? ''} size='2rem' />

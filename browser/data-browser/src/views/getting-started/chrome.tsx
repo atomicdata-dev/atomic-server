@@ -5,6 +5,7 @@
 
 import { useEffect, useState, type ComponentProps } from 'react';
 import { useStore } from '@tomic/react';
+import { isClientDbEnabled } from '../../helpers/clientDbMode';
 import { checkOnboardingStorage } from '../../helpers/onboardingStorage';
 import { getLocalServerOrigin, isRunningInTauri } from '../../helpers/tauri';
 import { styled, css } from 'styled-components';
@@ -14,6 +15,7 @@ import '@tomic/service-ui/background.css';
 export function Shell({ children, ...props }: ComponentProps<'div'>) {
   const store = useStore();
   const native = isRunningInTauri();
+  const clientDbEnabled = isClientDbEnabled();
   const [state, setState] = useState<'checking' | 'ready' | 'failed'>(
     'checking',
   );
@@ -22,6 +24,8 @@ export function Shell({ children, ...props }: ComponentProps<'div'>) {
     void checkOnboardingStorage(
       store,
       native ? getLocalServerOrigin() : undefined,
+      fetch,
+      clientDbEnabled,
     ).then(
       () => {
         if (active) setState('ready');
@@ -34,7 +38,7 @@ export function Shell({ children, ...props }: ComponentProps<'div'>) {
     return () => {
       active = false;
     };
-  }, [native, store]);
+  }, [native, store, clientDbEnabled]);
 
   return (
     <ShellSurface {...props}>
@@ -53,6 +57,14 @@ export function Shell({ children, ...props }: ComponentProps<'div'>) {
                     AtomicServer stores this app’s data in its embedded node.
                     Quit other AtomicServer processes using the same data
                     directory or port 9883, then reopen the app.
+                  </p>
+                </>
+              ) : !clientDbEnabled ? (
+                <>
+                  <CardTitle>The server could not be reached</CardTitle>
+                  <p>
+                    Check your connection and that your server is running, then
+                    try again.
                   </p>
                 </>
               ) : (

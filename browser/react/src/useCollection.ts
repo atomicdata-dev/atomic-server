@@ -151,6 +151,7 @@ export function useCollection(
   const queryIdentity = [
     queryFilterMemo.property,
     queryFilterMemo.value,
+    queryFilterMemo.drive,
     filtersDep,
     queryFilterMemo.sort_by,
     String(!!queryFilterMemo.sort_desc),
@@ -159,7 +160,9 @@ export function useCollection(
     String(pageSize),
     server ?? '',
     String(includeNested),
+    String(preferServer),
   ].join('\0');
+  const builtFor = useRef({ store, queryIdentity });
 
   // Build collection once, reuse on remount. Only rebuild when query params change.
   // The collection that is being (re)built lives in the ref; the one on screen
@@ -218,17 +221,8 @@ export function useCollection(
 
     if (
       !col ||
-      col.property !== queryFilterMemo.property ||
-      col.value !== queryFilterMemo.value ||
-      filtersKey(col.filters) !== filtersKey(queryFilterMemo.filters) ||
-      col.sortBy !== queryFilterMemo.sort_by ||
-      col.sortDesc !== !!queryFilterMemo.sort_desc ||
-      // Baked into the page subject the store answers, like sort — a changed
-      // aggregation needs a new collection, not a refresh.
-      aggregationKey(col.aggregation) !==
-        aggregationKey(queryFilterMemo.aggregation) ||
-      expressionFiltersKey(col.expressionFilters) !==
-        expressionFiltersKey(queryFilterMemo.expression_filters)
+      builtFor.current.store !== store ||
+      builtFor.current.queryIdentity !== queryIdentity
     ) {
       const built = buildCollection(
         store,
@@ -240,6 +234,7 @@ export function useCollection(
       );
       col = built.__internalObject;
       collectionRef.current = col;
+      builtFor.current = { store, queryIdentity };
     }
 
     let cancelled = false;

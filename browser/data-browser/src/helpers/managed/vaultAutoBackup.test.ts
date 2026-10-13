@@ -251,12 +251,41 @@ describe('ensureVaultBackup', () => {
     expect(deps.runVaultBackup).toHaveBeenCalledTimes(2);
   });
 
+  it('stops using a cached enrollment when Vault was disabled elsewhere', async () => {
+    const store = await signedInStore();
+    const canEnroll = vi.fn(async () => true);
+    const deps = fakeDeps({ canEnroll });
+    await ensureVaultBackup(store, DRIVE, deps);
+    canEnroll.mockResolvedValue(false);
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+    expect(deps.setUpVaultForDrive).toHaveBeenCalledTimes(1);
+    canEnroll.mockResolvedValue(true);
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.setUpVaultForDrive).toHaveBeenCalledTimes(2);
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(2);
+  });
+
+  it('resumes after a persisted enable even if this browser remembers opting out', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      optedOut: () => true,
+      canEnroll: vi.fn(async () => true),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'backed-up',
+    });
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+  });
+
   it('does not attempt to claim a drive backed up by another account', async () => {
     const store = await signedInStore();
     const deps = fakeDeps({ canEnroll: vi.fn(async () => false) });
     expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
       status: 'skipped',
-      reason: 'drive backup belongs to another account',
+      reason: 'drive backup is off or unavailable for this account',
     });
     expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
     expect(deps.runVaultBackup).not.toHaveBeenCalled();
@@ -436,6 +465,20 @@ describe('ensureVaultBackup', () => {
 });
 
 describe('restoreFromVault', () => {
+  it('restores with the epoch recovered from the key envelope', async () => {
+    const store = await signedInStore();
+    const deps = fakeDeps({
+      recoverDriveKey: vi.fn(async () => ({ driveKey: KEY, keyEpoch: 7 })),
+    });
+
+    expect((await restoreFromVault(store, DRIVE, deps)).status).toBe(
+      'restored',
+    );
+    expect(deps.restoreDrive).toHaveBeenCalledWith(
+      expect.objectContaining({ driveKey: KEY, keyEpoch: 7 }),
+    );
+  });
+
   it('restores a drive with a confirmed backup', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();

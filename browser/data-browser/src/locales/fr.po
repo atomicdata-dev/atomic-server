@@ -12899,7 +12899,7 @@ msgstr ""
 msgid "Items you deleted from this drive"
 msgstr ""
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr ""
@@ -12927,4 +12927,12 @@ msgstr ""
 
 #: src/views/DriveUnavailable.tsx
 msgid "Not connected to the server yet."
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "The server could not be reached"
+msgstr ""
+
+#: src/views/getting-started/chrome.tsx
+msgid "Check your connection and that your server is running, then try again."
 msgstr ""

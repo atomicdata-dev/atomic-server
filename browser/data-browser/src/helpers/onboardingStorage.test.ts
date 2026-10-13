@@ -99,3 +99,14 @@ it('does not allow native onboarding while the node socket is disconnected', asy
     checkOnboardingStorage(store, 'http://localhost:9883', fetchNode),
   ).rejects.toThrow('not connected');
 });
+
+it('uses the server when local storage was deliberately disabled', async () => {
+  const store = {
+    waitForClientDb: vi.fn(),
+    getClientDb: vi.fn(),
+    waitForServerConnected: vi.fn().mockResolvedValue(true),
+  };
+  await checkOnboardingStorage(store, undefined, fetch, false);
+  expect(store.waitForClientDb).not.toHaveBeenCalled();
+  expect(store.waitForServerConnected).toHaveBeenCalledWith(20_000);
+});

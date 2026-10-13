@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { dataBrowser, notifications, type Resource } from '@tomic/react';
-import { dedupeBySource, groupNotifications, isUnread } from './inbox';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  core,
+  dataBrowser,
+  notifications,
+  Store,
+  type Resource,
+} from '@tomic/react';
+import {
+  dedupeBySource,
+  groupNotifications,
+  isUnread,
+  markReadAbout,
+} from './inbox';
 
 const fake = (
   subject: string,
@@ -83,4 +94,47 @@ describe('groupNotifications', () => {
       ['old'],
     ]);
   });
+});
+
+it('reads every page of a conversation while preserving newer arrivals', async () => {
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
+  const drive = 'atomic:personal';
+  const resources = Array.from({ length: 102 }, (_, i) =>
+    JSON.stringify({
+      '@id': `atomic:notification-${i}`,
+      [core.properties.isA]: [notifications.classes.notification],
+      [dataBrowser.properties.about]: 'atomic:chat',
+      [notifications.properties.occurredAt]: i,
+      ['https://atomicdata.dev/properties/drive']: drive,
+    }),
+  );
+  store.setDrive(drive);
+  store.finishDriveSync(drive, 102, Date.now());
+  store.setClientDb({
+    isReady: true,
+    query: async () => ({
+      subjects: resources.map(r => JSON.parse(r)['@id']),
+      resources,
+      count: 102,
+    }),
+  } as unknown as Parameters<Store['setClientDb']>[0]);
+
+  for (const text of resources) {
+    store.hydrateResourceFromJsonAd(JSON.parse(text)['@id'], text);
+    const r = await store.getResource(JSON.parse(text)['@id']);
+    vi.spyOn(r, 'save').mockResolvedValue('persisted');
+  }
+
+  await markReadAbout(store, drive, 'atomic:chat', 100);
+
+  for (let i = 0; i <= 100; i++) {
+    expect(
+      isUnread(await store.getResource(`atomic:notification-${i}`)),
+      `notification ${i}`,
+    ).toBe(false);
+  }
+
+  expect(isUnread(await store.getResource('atomic:notification-101'))).toBe(
+    true,
+  );
 });

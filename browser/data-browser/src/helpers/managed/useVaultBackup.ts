@@ -1,6 +1,7 @@
 import { getManagedAccount } from './session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ensureVaultKeyForEnrollment,
   agentVaultProof,
   compactVaultBackup,
   type CompactResult,
@@ -248,12 +249,18 @@ export function useVaultBackup({
 
   /** Drop the cached key and fetch the drive's current envelope. */
   const refreshKey = useCallback(
-    async (drivePseudonym: string): Promise<DriveKeyHandle> => {
+    async (enrollment: VaultEnrollment): Promise<DriveKeyHandle> => {
       driveKey.current = null;
+      const fresh = await ensureVaultKeyForEnrollment({
+        enrollment,
+        keys: keys!,
+        agentSecret: await agentVaultProof(signer!, proofMessage!),
+      });
+      driveKey.current = fresh;
 
-      return ensureKey(drivePseudonym);
+      return fresh;
     },
-    [ensureKey],
+    [keys, signer, proofMessage],
   );
 
   /** Run an action with a single busy flag and a readable error. */
@@ -301,7 +308,7 @@ export function useVaultBackup({
         devicePubkey: devicePubkey!,
         driveKey: key,
         driveKeyEpoch: keyEpoch,
-        refreshDriveKey: () => refreshKey(enrollment.drive_pseudonym),
+        refreshDriveKey: refreshKey,
       });
       await refresh();
     });
@@ -344,7 +351,7 @@ export function useVaultBackup({
         devicePubkey: devicePubkey!,
         driveKey: key.driveKey,
         driveKeyEpoch: key.keyEpoch,
-        refreshDriveKey: () => refreshKey(status.enrollment.drive_pseudonym),
+        refreshDriveKey: refreshKey,
       });
       await refresh();
     });
@@ -377,7 +384,7 @@ export function useVaultBackup({
               devicePubkey: devicePubkey!,
               driveKey: key.driveKey,
               driveKeyEpoch: key.keyEpoch,
-              refreshDriveKey: () => refreshKey(drivePseudonym),
+              refreshDriveKey: refreshKey,
               forceCheckpoint: true,
               currentStateOnly,
             }),
@@ -416,6 +423,7 @@ export function useVaultBackup({
           // to a device that is gone ever becomes prunable.
           devicePubkey: devicePubkey!,
           driveKey: key.driveKey,
+          keyEpoch: key.keyEpoch,
           onProgress: (done, total) =>
             setRestoreProgress(total === 0 ? 1 : done / total),
         });

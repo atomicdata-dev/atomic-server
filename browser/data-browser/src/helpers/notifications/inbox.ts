@@ -87,14 +87,7 @@ export async function findNotificationsFor(
     .build();
   await collection.waitForReady();
 
-  const found: string[] = [];
-
-  for (let i = 0; i < Math.min(collection.totalMembers, 10); i++) {
-    const member = await collection.getMemberWithIndex(i);
-    if (member) found.push(member);
-  }
-
-  return found;
+  return collection.getAllMembers();
 }
 
 /**
@@ -203,14 +196,7 @@ export async function markReadAbout(
     .build();
   await collection.waitForReady();
 
-  const found: string[] = [];
-
-  for (let i = 0; i < Math.min(collection.totalMembers, 100); i++) {
-    const member = await collection.getMemberWithIndex(i);
-    if (member) found.push(member);
-  }
-
-  await markRead(store, found, upTo);
+  await markRead(store, await collection.getAllMembers(), upTo);
 }
 
 /**

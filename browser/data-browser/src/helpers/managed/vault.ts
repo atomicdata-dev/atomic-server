@@ -1108,6 +1108,22 @@ export async function setUpVaultForDrive({
     metadata,
     signal,
   );
+
+  return ensureVaultKeyForEnrollment({ enrollment, keys, agentSecret, signal });
+}
+
+/** Establish the durable key for an already active enrollment without enabling it. */
+export async function ensureVaultKeyForEnrollment({
+  enrollment,
+  keys,
+  agentSecret,
+  signal,
+}: {
+  enrollment: VaultEnrollment;
+  keys: VaultKeyOps;
+  agentSecret: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<{ enrollment: VaultEnrollment } & DriveKeyHandle> {
   const existing = await getVaultKeyEnvelopeRecord(
     enrollment.drive_pseudonym,
     signal,
@@ -1229,7 +1245,7 @@ export function runVaultBackup(args: {
    * would pass the server's check and produce objects the new key cannot
    * read, which is the exact hole the epoch exists to close.
    */
-  refreshDriveKey?: () => Promise<DriveKeyHandle>;
+  refreshDriveKey?: (enrollment: VaultEnrollment) => Promise<DriveKeyHandle>;
   /** Force this pass to be a full checkpoint. See {@link backupDrive}. */
   forceCheckpoint?: boolean;
   /** Make that checkpoint keep only the current state. See {@link backupDrive}. */
@@ -1268,14 +1284,22 @@ export function runVaultBackup(args: {
     let { driveKey } = args;
     let heldEpoch = args.driveKeyEpoch ?? 1;
 
-    if (heldEpoch !== currentEpoch) {
+    // Disabling deletes the envelope and objects, but a tab may still hold
+    // the old key at the same epoch. Before the first new object, establish
+    // its durable envelope again so another device can decrypt that object.
+    if (
+      heldEpoch !== currentEpoch ||
+      (state.confirmed_objects === 0 && args.refreshDriveKey)
+    ) {
       if (!args.refreshDriveKey) {
         throw new Error(
           `This drive was re-keyed (epoch ${currentEpoch}, key in hand is epoch ${heldEpoch}); fetch the current key envelope before backing up.`,
         );
       }
 
-      ({ driveKey, keyEpoch: heldEpoch } = await args.refreshDriveKey());
+      ({ driveKey, keyEpoch: heldEpoch } = await args.refreshDriveKey(
+        state.enrollment,
+      ));
 
       if (heldEpoch !== currentEpoch) {
         throw new Error(

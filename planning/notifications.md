@@ -1,18 +1,22 @@
 # Notifications
 
-Status: **Proposal, 2026-09-28.** Builds on #1859 (toasts, OS notifications,
-Inbox in the private drive). Nothing below is implemented yet.
+Status: **Server delivery proposal, updated 2026-10-08.** Client recording,
+grouping and read state exist. Client sync/pagination/identity fixes and browser
+regressions are pending in PR #2130. The server notifier, following and closed-app
+push below remain proposed.
 
-## Where #1859 leaves us
+## Current client recording
 
 Today the recipient's own open app decides what is news. `MessageNotifier`
 listens to `ResourceUpdated` for `Message` resources and writes a
 `Notification` into the Inbox of the private drive. That has limits that no
 client change can remove:
 
-- **Only the open drive notifies.** The WebSocket subscribes to one drive at a
-  time (`subscribeToDrive` in `browser/lib/src/websockets.ts`), so a message in
-  a team drive never arrives while you are in your private drive.
+- **The selected workspace and explicitly shared conversations notify.**
+  `MessageNotifier` holds live subscriptions for `sharedWithMe`; the personal
+  drive subscription in PR #2130 keeps Inbox and read state current independently
+  of the selected project. Other inactive project drives still need a delivery
+  policy and source subscription or the server notifier.
 - **Nothing is recorded while every app is closed**, so the Inbox has gaps and
   push has nothing to send.
 - **Several open devices each record the same event**, and dedupe afterwards.
@@ -23,6 +27,33 @@ client change can remove:
 So the server should decide who is told what, and deliver it into the
 recipient's Inbox. The client keeps showing it: toast, OS notification,
 Notifications page.
+
+## Remaining acceptance work
+
+- [ ] Deliver an Inbox item while every recipient app is closed. The October 8
+  local diagnostic confirmed a new message was readable after restoration but
+  missing from the Inbox. Replaying every old message as a new toast is not an
+  implementation of durable delivery.
+- [ ] Implement the server after-apply notifier and constrained Inbox append
+  authorization below. Keep recipient keys on their devices; use a server-signed
+  append grant and recheck recipient access before delivering titles/excerpts.
+- [ ] Make delivery retry-safe across restarts and reconnects; test duplicate
+  source events, read updates during delivery, revoked access and an inaccessible
+  or differently hosted personal drive. Negotiate the server capability before
+  disabling the existing client recorder.
+- [ ] Notify from incoming Inbox records for notifier-capable servers. Today
+  toasts still originate from source Messages, so a durable Inbox alone does not
+  establish foreground or OS announcement.
+- [ ] Verify real native permission, receipt and click activation on macOS and
+  Android. The pinned Tauri Notification polyfill submits to the plugin but does
+  not wire `onclick`; the browser service-worker fallback has neither target data
+  nor a `notificationclick` handler. A fake window.Notification cannot accept
+  these paths.
+- [ ] Cover failed OPFS initialization separately from the deliberate Local DB
+  off mode, which now has notification reconnect coverage on PR #2130.
+
+The implemented client regressions are mapped in
+[`TESTING_COVERAGE.md`](../TESTING_COVERAGE.md#notification-pagination-identity-and-server-only-mode-october-8-2026).
 
 ## Model
 

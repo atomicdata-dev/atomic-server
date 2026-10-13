@@ -78,7 +78,7 @@ fork review diff) are recorded in their owning plans, not here.
 - [Drive sharing and hosting state](drive-sharing-state.md) — verified transition for unenrolled drives; authoritative seat counts and staging acceptance remain.
 - [Website publishing](./website-publishing.md) — FOSS publication on `develop` since #1500 (2026-09-17); managed SaaS adapter and the open follow-ups carried from that PR's handoff.
 - [Assistant-authored websites](./assistant-websites.md) — prototype merged with #1500; plugin abstraction audit and remaining SaaS deployment work.
-- [Notifications](./notifications.md) — proposal 2026-09-28: the server delivers into the Inbox, a follow model, and kinds for invites, access requests, new and changed resources and meetings.
+- [Notifications](./notifications.md) — server delivery proposal, updated 2026-10-08; client sync regressions pending PR #2130. Remaining work covers Inbox append authorization, a durable notifier, following, native activation and closed-app push.
 
 Remaining work, not "this file exists."
 

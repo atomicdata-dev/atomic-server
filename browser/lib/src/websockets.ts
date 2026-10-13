@@ -17,6 +17,7 @@ import {
   emitSubjectForCaps,
 } from './subject.js';
 import { Resource } from './resource.js';
+import { server } from './ontologies/server.js';
 import { recordServerVersionFromWsProtocol } from './serverCapabilities.js';
 import { StoreEvents, type Store } from './store.js';
 import type { DriveItem } from './local-drive-copy.js';
@@ -1841,6 +1842,17 @@ export class WSClient {
     if (this._liveSent.has(subject)) return;
     this._liveSent.add(subject);
     this.sendBinary(encodeSub(this.wireSubject(subject)));
+
+    // SUB only delivers future commits. Live drives outside the selected
+    // workspace (the personal Inbox) also need their missed changes on boot
+    // and reconnect. Ordinary shared resources are not whole-drive syncs.
+    if (
+      this.hydratedResource(subject)?.hasClasses(server.classes.drive) &&
+      this.store.normalizeSubject(subject) !==
+        this.store.normalizeSubject(this.store.getDrive() ?? '')
+    ) {
+      void this.startVVSync(subject).catch(() => undefined);
+    }
   }
 
   /** Called when a resource changes: sends the held SUB that was waiting for it. */
@@ -2178,9 +2190,13 @@ export class WSClient {
     if (this.readyState !== WebSocket.OPEN) return;
     // Server-only mode (no OPFS / Web Locks): there is no local state to
     // reconcile, and computing it would only fail, once per call.
-    if (this.store.getClientDb()?.initError) return;
-
     const current = this.connectionGuard();
+    if (
+      !(await this.store.waitForClientDb()) ||
+      this.store.getClientDb()?.initError ||
+      !current()
+    )
+      return;
 
     // Reading every version vector of a large drive keeps the local database
     // worker busy for a second or more, and everything the screen is waiting

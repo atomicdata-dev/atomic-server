@@ -1381,6 +1381,37 @@ describe('scheduling', () => {
    * would pass the server's check and leave objects the new key cannot read,
    * so the key must be refreshed first and the export sealed with it.
    */
+  it('refreshes a cached key before writing to an empty re-enabled Vault', async () => {
+    const fresh = new Uint8Array(32).fill(42);
+    const db: VaultCapableDb = {
+      vaultExport: vi.fn(async () => null),
+      vaultImport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+    };
+    mockFetch(url =>
+      url.endsWith('/state')
+        ? { ok: true, status: 200, json: async () => state({}, 'active', 1) }
+        : undefined,
+    );
+    const refreshDriveKey = vi.fn(async () => ({
+      driveKey: fresh,
+      keyEpoch: 1,
+    }));
+    await runVaultBackup({
+      db,
+      driveSubject: 'did:ad:drive',
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+      driveKeyEpoch: 1,
+      refreshDriveKey,
+    });
+    expect(refreshDriveKey).toHaveBeenCalledTimes(1);
+    expect(
+      (db.vaultExport as ReturnType<typeof vi.fn>).mock.calls[0].slice(1, 3),
+    ).toEqual([fresh, 1]);
+  });
+
   it('refreshes the key when the drive reports a newer epoch', async () => {
     const FRESH = new Uint8Array(32).fill(9);
     const db: VaultCapableDb = {
@@ -1465,7 +1496,11 @@ describe('scheduling', () => {
     };
     mockFetch(url =>
       url.endsWith('/state')
-        ? { ok: true, status: 200, json: async () => state({}) }
+        ? {
+            ok: true,
+            status: 200,
+            json: async () => ({ ...state({}), confirmed_objects: 1 }),
+          }
         : undefined,
     );
     const refreshDriveKey = vi.fn();

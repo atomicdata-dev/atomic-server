@@ -188,6 +188,7 @@ export class CollectionBuilder {
 
     return new Collection(this.store, server, params, false, {
       preferServer: this.preferServer,
+      explicitDrive: this.explicitDrive,
     });
   }
 
