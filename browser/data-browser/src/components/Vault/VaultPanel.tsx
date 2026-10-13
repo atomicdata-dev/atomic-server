@@ -36,10 +36,17 @@ export function VaultPanel({
   /** Cloud Server is on, so the vault is part of it rather than the plan. */
   included?: boolean;
 }) {
-  const { status, busy, error, restoreProgress } = vault;
+  const { status, error, restoreProgress } = vault;
   const [storageOpen, setStorageOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // A finished restore hands over to `onRestored` (a page reload). Until the
+  // page is actually gone the buttons must not look idle again: a Restore
+  // button that is enabled with no error and no progress reads as a restore
+  // that did nothing, and lets a second restore start against a database that
+  // is about to be reopened.
+  const [leaving, setLeaving] = useState(false);
+  const busy = vault.busy || leaving;
   // What Cloud Vault is: the same sentence in every state. Declared in here,
   // not at module level, so the translation extractor sees it.
   const tagline = 'Encrypted backup of your data. Only you can read it.';
@@ -50,11 +57,16 @@ export function VaultPanel({
       : 'current'
     : null;
 
+  function finish() {
+    setLeaving(true);
+    onRestored?.();
+  }
+
   async function handleRestore() {
     const outcome = await vault.restore();
 
     // An incomplete restore keeps its error on screen instead of reloading.
-    if (outcome && !outcome.incomplete) onRestored?.();
+    if (outcome && !outcome.incomplete) finish();
   }
 
   async function handleDownload() {
@@ -73,7 +85,7 @@ export function VaultPanel({
     const outcome = await vault.restoreFromFile(file);
 
     // An incomplete restore keeps its error on screen instead of reloading.
-    if (outcome && !outcome.incomplete) onRestored?.();
+    if (outcome && !outcome.incomplete) finish();
   }
 
   // Still settling, or cannot say. Neither is "off": an enable button when we

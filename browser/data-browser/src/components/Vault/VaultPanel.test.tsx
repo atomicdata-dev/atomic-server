@@ -113,3 +113,22 @@ it('restores from a picked file and clears the input', async () => {
   await waitFor(() => expect(onRestored).toHaveBeenCalled());
   expect(vault.restoreFromFile).toHaveBeenCalledWith(file);
 });
+
+it('keeps Restore disabled after a finished restore until the page reloads', async () => {
+  const vault = vaultWith(1000);
+  vault.restore = vi.fn(async () => ({}) as never);
+  // The reload is not instant: the button must not look idle meanwhile.
+  const onRestored = vi.fn();
+  render(
+    <ThemeProvider theme={theme}>
+      <VaultPanel vault={vault} onRestored={onRestored} />
+    </ThemeProvider>,
+  );
+
+  fireEvent.click(screen.getByTestId('vault-restore'));
+
+  await waitFor(() => expect(onRestored).toHaveBeenCalled());
+  expect(
+    (screen.getByTestId('vault-restore') as HTMLButtonElement).disabled,
+  ).toBe(true);
+});
