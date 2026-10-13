@@ -289,7 +289,10 @@ export class WSClient {
   private _driveUnsub: (() => void) | undefined;
   private _savedDriveUnsub: (() => void) | undefined;
   private _liveUpdatedUnsub: (() => void) | undefined;
-  /** Subjects whose SUB went out on this socket (cleared when it closes). */
+  private _liveSavedUnsub: (() => void) | undefined;
+  /** Subjects whose live SUB is considered sent on the current socket. Entries
+   *  are removed by `unsubscribeResource`, and the set is cleared when the
+   *  socket closes and in `reSubscribeAll` (which resends them). */
   private _liveSent = new Set<string>();
   /** Drive-sync state computed for a hash-first probe, kept until the server
    *  either accepts it (`SYNC_OK`) or asks for the full state (`SYNC_RESEND`),
@@ -464,6 +467,12 @@ export class WSClient {
       this.retryLiveSubscription(store.normalizeSubject(resource.subject));
     });
 
+    // A first save clears the genesis before ResourceSaved fires, and
+    // ResourceUpdated is not guaranteed to follow: retry a held SUB here too.
+    this._liveSavedUnsub = store.on(StoreEvents.ResourceSaved, resource => {
+      this.retryLiveSubscription(store.normalizeSubject(resource.subject));
+    });
+
     const wsURL = new URL(url);
     wsURL.protocol = wsURL.protocol === 'http:' ? 'ws' : 'wss';
     wsURL.pathname = '/ws';
@@ -527,6 +536,7 @@ export class WSClient {
         this._serverCaps = [];
         this._challengeNonce = undefined;
         this._subscribedDrive = undefined;
+        this._liveSent.clear();
 
         this._retryTimer = setTimeout(() => {
           this.authenticatedWith = undefined;
@@ -656,6 +666,8 @@ export class WSClient {
     this._savedDriveUnsub = undefined;
     this._liveUpdatedUnsub?.();
     this._liveUpdatedUnsub = undefined;
+    this._liveSavedUnsub?.();
+    this._liveSavedUnsub = undefined;
 
     if (
       this._onlineListener &&
@@ -808,6 +820,17 @@ export class WSClient {
    */
   public unsubscribeFromDrive(drive: string): void {
     if (this.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // A live subscription still holds this subject, and the server keeps one
+    // subscription per (connection, subject): leave it, and record that it is
+    // subscribed so it is neither lost nor sent twice.
+    const held = this.store.normalizeSubject(drive);
+
+    if (this.store.liveSubjects.has(held)) {
+      this._liveSent.add(held);
+
       return;
     }
 
@@ -1834,6 +1857,13 @@ export class WSClient {
   public unsubscribeResource(subject: string): void {
     this._liveSent.delete(subject);
     if (this.readyState !== WebSocket.OPEN) return;
+    // The drive-wide SUB owns this subject; UNSUB would cancel it.
+    if (
+      this._subscribedDrive &&
+      this.store.normalizeSubject(subject) ===
+        this.store.normalizeSubject(this._subscribedDrive)
+    )
+      return;
     this.sendBinary(encodeUnsub(this.wireSubject(subject)));
   }
 

@@ -909,6 +909,115 @@ describe('WSClient drive subscription', () => {
     });
   });
 
+  describe('a subject owned by both a live subscription and the drive SUB', () => {
+    const PRIVATE = 'did:ad:private-home';
+    const TEAM = 'did:ad:team-drive';
+
+    async function setup() {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+      vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+
+      for (const subject of [PRIVATE, TEAM]) {
+        const resource = new Resource(subject);
+        resource.new = false;
+        store.resources.set(store.normalizeSubject(subject), resource);
+      }
+
+      const subjects = (tag: number) =>
+        framesWithTag(socket, tag).map(frame =>
+          new TextDecoder().decode(frame.subarray(1)),
+        );
+      const internal = client as unknown as {
+        subscribeToDrive(): void;
+        reSubscribeAll(): void;
+      };
+
+      return { client, socket, store, subjects, internal };
+    }
+
+    it('sends the held SUB after ResourceSaved once the genesis is cleared', async () => {
+      const { client, socket, store } = await setup();
+      const resource = store.resources.get(store.normalizeSubject(PRIVATE))!;
+      resource.new = true;
+      store.outbox.setGenesisCommit(PRIVATE, signedCommit());
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      store.outbox.clearGenesis(PRIVATE);
+      resource.new = false;
+      // No ResourceUpdated fires, only ResourceSaved.
+      await store.notifyResourceSaved(resource);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+
+    it('does not UNSUB the private drive when the hook releases after the drive switch', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      const release = store.subscribeLive(PRIVATE);
+      expect(subjects(Tag.SUB)).toEqual([TEAM, PRIVATE]);
+      // DriveChanged handler runs first, then the hook cleanup.
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      // Team drive is released; the private one is held by the live SUB.
+      expect(subjects(Tag.UNSUB)).toEqual([TEAM]);
+      release();
+      expect(subjects(Tag.UNSUB)).toEqual([TEAM]);
+      client.close();
+    });
+
+    it('UNSUBs the old drive on a switch only when no live subscription holds it', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      const release = store.subscribeLive(PRIVATE);
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      expect(subjects(Tag.UNSUB)).toEqual([]);
+      // The live SUB still works for reconnects and is not sent twice.
+      const before = subjects(Tag.SUB).length;
+      release();
+      expect(subjects(Tag.UNSUB)).toEqual([PRIVATE]);
+      expect(subjects(Tag.SUB)).toHaveLength(before);
+      // Without a live holder the switch away UNSUBs.
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      expect(subjects(Tag.UNSUB)).toEqual([PRIVATE, TEAM, PRIVATE]);
+      client.close();
+    });
+
+    it('resends a held SUB once and a sent one once after a reconnect', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      store.subscribeLive(PRIVATE);
+      const held = store.resources.get(store.normalizeSubject(TEAM))!;
+      held.new = true;
+      store.subscribeLive(TEAM);
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE]);
+      internal.reSubscribeAll();
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE, PRIVATE]);
+      held.new = false;
+      store.notifyResourceUpdated(held);
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE, PRIVATE, TEAM]);
+      store.notifyResourceUpdated(held);
+      expect(subjects(Tag.SUB)).toHaveLength(3);
+      internal.reSubscribeAll();
+      expect(subjects(Tag.SUB).sort()).toEqual(
+        [PRIVATE, PRIVATE, TEAM, PRIVATE, TEAM].sort(),
+      );
+      client.close();
+    });
+  });
+
   it.each([ErrorType.NotFound, ErrorType.Unauthorized])(
     'does not automatically sync an unreadable drive under its legacy alias (%s)',
     async errorType => {
