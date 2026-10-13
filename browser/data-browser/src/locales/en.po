@@ -12925,3 +12925,19 @@ msgstr "This server does not have another workspace on this device"
 #: src/helpers/syncProblem.ts
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
+
+#: src/views/DriveUnavailable.tsx
+msgid "This item hasn't reached this device yet"
+msgstr "This item hasn't reached this device yet"
+
+#: src/views/DriveUnavailable.tsx
+msgid "Your private drive is kept on your devices. It will appear here once the server or your other device answers."
+msgstr "Your private drive is kept on your devices. It will appear here once the server or your other device answers."
+
+#: src/views/DriveUnavailable.tsx
+msgid "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."
+msgstr "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."
+
+#: src/views/DriveUnavailable.tsx
+msgid "Not connected to the server yet."
+msgstr "Not connected to the server yet."
