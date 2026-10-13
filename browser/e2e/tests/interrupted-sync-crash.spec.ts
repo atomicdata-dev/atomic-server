@@ -274,7 +274,11 @@ test('two offline clients converge after interrupted sync and SIGKILL', async ({
         const { snapshot } = await window.store
           .getClientDb()!
           .getResourceWithSnapshot(subject);
-        const example = window.store.resources.get(window.store.getDrive()!)!;
+        // The drive may not be loaded yet after the restart; getResourceLoading
+        // always hands back a Resource instance to take the class from.
+        const example = window.store.getResourceLoading(
+          window.store.getDrive()!,
+        );
         const ResourceType = example.constructor as new (
           id: string,
         ) => typeof example;
