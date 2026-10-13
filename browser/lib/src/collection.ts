@@ -1595,8 +1595,17 @@ export class Collection {
     )
       return this.fetchLegacyPage(page);
     const subject = this.buildSubject(page);
+    // A query answer is derived state, not a history to merge: the server builds
+    // it per request, so it shares no Loro ancestry with the copy this store
+    // already holds. CRDT-merging two such docs resolves `members` as a
+    // concurrent last-writer-wins by Loro's lamport and then random peer id, so
+    // an older answer could outrank the newer one and a refresh kept returning
+    // the previous member list.
     const resource =
-      await this.store.fetchResourceFromServer<Collections.Collection>(subject);
+      await this.store.fetchResourceFromServer<Collections.Collection>(
+        subject,
+        { forceOverride: true },
+      );
 
     if (!resource) {
       throw new Error('Invalid collection: resource does not exist');
