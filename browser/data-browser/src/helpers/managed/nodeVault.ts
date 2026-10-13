@@ -13,9 +13,19 @@
 // Only sealing lives on the other side of this. The network half — presigned
 // URLs, uploads, the agent-signed proof — stays in `vault.ts`, where the
 // agent's key already is. See `desktop/src/lib.rs`.
-import { decodeB64, encodeB64 } from '@tomic/lib';
+import {
+  decodeB64,
+  encodeB64,
+  validateDriveKey,
+  validateRecoveryExpectation,
+} from '@tomic/lib';
 import { invoke } from '@tauri-apps/api/core';
-import type { RestoreOutcome, SegmentKind, VaultCapableDb } from './vault';
+import type {
+  RestoreOutcome,
+  SegmentKind,
+  VaultCapableDb,
+  SealedBlob,
+} from './vault';
 
 /**
  * Bytes cross the IPC boundary base64-encoded rather than as arrays.
@@ -32,7 +42,6 @@ export const nodeVault: VaultCapableDb = {
   async vaultExport(
     driveSubject,
     key,
-    keyEpoch,
     drivePseudonym,
     devicePubkey,
     segment,
@@ -41,6 +50,7 @@ export const nodeVault: VaultCapableDb = {
     observedLanes,
     currentStateOnly,
   ) {
+    validateDriveKey(key);
     const result = await invoke<
       | (Omit<SealedObject, 'objectKey'> & {
           objectKey: string;
@@ -49,12 +59,13 @@ export const nodeVault: VaultCapableDb = {
           unchanged: number;
           tombstones: number;
           coverage: Record<string, number>;
+          blobs: (Omit<SealedBlob, 'sealed'> & { sealed: string })[];
         })
       | null
     >('vault_export', {
       driveSubject,
-      key: encodeB64(key),
-      keyEpoch,
+      key: encodeB64(key.driveKey),
+      keyEpoch: key.keyEpoch,
       drivePseudonym,
       devicePubkey,
       segment,
@@ -69,6 +80,10 @@ export const nodeVault: VaultCapableDb = {
     if (!result) return null;
 
     return {
+      blobs: result.blobs.map(blob => ({
+        ...blob,
+        sealed: decodeB64(blob.sealed),
+      })),
       objectKey: result.objectKey,
       sealed: decodeB64(result.sealed),
       kind: result.kind,
@@ -81,14 +96,18 @@ export const nodeVault: VaultCapableDb = {
 
   async vaultImport(
     key,
-    keyEpoch,
     drivePseudonym,
     devicePubkey,
     objects,
+    expectation,
   ): Promise<RestoreOutcome> {
+    validateDriveKey(key);
+    if (expectation) validateRecoveryExpectation(expectation);
+
     return invoke<RestoreOutcome>('vault_import', {
-      key: encodeB64(key),
-      keyEpoch,
+      expectation,
+      key: encodeB64(key.driveKey),
+      keyEpoch: key.keyEpoch,
       drivePseudonym,
       devicePubkey,
       // The importer plans its own order from the newest checkpoint's coverage

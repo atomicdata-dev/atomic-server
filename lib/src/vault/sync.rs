@@ -64,6 +64,9 @@ pub struct LaneState {
     /// need, and is always safe because it is a superset of what is missing.
     #[serde(default)]
     pub cursors: BTreeMap<String, VersionVectorMap>,
+    /// Forces a complete dependency checkpoint on upgrade or key rotation.
+    #[serde(default)]
+    pub blob_key_epoch: u32,
     /// Subject `pure_id()` → the newest envelope `createdAt` (Unix ms) this
     /// lane has shipped. A delta pack carries only envelopes at or after it,
     /// so under `all` retention an edit does not re-ship every earlier
@@ -376,6 +379,8 @@ pub struct BackupSummary {
     pub unchanged: usize,
     pub tombstones: usize,
     pub sealed_bytes: usize,
+    /// Separate encrypted file chunks, uploaded before the graph object.
+    pub blobs: Vec<super::blobs::BlobUpload>,
     /// Checkpoints only — the lanes this object provably subsumes, which is
     /// what the control plane prunes against. Empty for a delta pack.
     pub coverage: BTreeMap<String, u32>,
@@ -391,8 +396,16 @@ pub enum RestoreCompleteness {
     Partial,
 }
 
-/// Metadata coverage only. Attachment bytes live in the separate blob store
-/// and need their own availability check before claiming full drive recovery.
+/// Confirmed progress retained independently of the current object listing.
+/// The control plane supplies one coherent inventory with these high-water marks.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryExpectation {
+    pub lanes: BTreeMap<String, u32>,
+    pub checkpoint_n: u64,
+}
+
+/// Verified graph history and separate encrypted file dependencies.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestoreSummary {
@@ -410,6 +423,14 @@ pub struct RestoreSummary {
     /// Cannot detect a missing tail that no available object ever mentions.
     pub objects_missing: usize,
     pub completeness: RestoreCompleteness,
+    #[serde(default)]
+    pub blobs_restored: usize,
+    #[serde(default)]
+    pub blobs_missing: usize,
+    #[serde(default)]
+    pub subjects_restored: Vec<String>,
+    #[serde(default)]
+    pub subjects_deleted: Vec<String>,
 }
 
 /// Count absent segments above verified checkpoint coverage. Listing an
@@ -504,7 +525,7 @@ fn cheap_version_vector(store: &Db, subject: &str) -> Option<VersionVectorMap> {
 /// One resource's contribution to this pass.
 enum Contribution {
     /// Ship these bytes and advance the cursor to this vector.
-    Update(Vec<u8>, VersionVectorMap),
+    Update(Vec<u8>, VersionVectorMap, BTreeSet<String>),
     /// Nothing moved since the cursor.
     Unchanged,
     /// The store could not produce it; leave the cursor alone.
@@ -517,14 +538,14 @@ async fn contribution(
     cursor: Option<&VersionVectorMap>,
     full: bool,
     history: HistoryKeep,
-) -> Contribution {
+) -> AtomicResult<Contribution> {
     // The cheap path, and the one that carries the whole win: if this
     // resource's version vector still matches what the lane shipped, there is
     // nothing to export and no reason to build the document to find that out.
     if !full {
         if let Some(cursor) = cursor {
             if cheap_version_vector(store, subject_str).as_ref() == Some(cursor) {
-                return Contribution::Unchanged;
+                return Ok(Contribution::Unchanged);
             }
         }
     }
@@ -535,10 +556,10 @@ async fn contribution(
     // fatal: the walk reads an index, and a resource deleted between the two
     // is an ordinary race rather than a corrupt drive.
     let Ok(resource) = store.get_resource(&subject).await else {
-        return Contribution::Unreadable;
+        return Ok(Contribution::Unreadable);
     };
     let Ok(doc) = resource.build_state_doc() else {
-        return Contribution::Unreadable;
+        return Ok(Contribution::Unreadable);
     };
 
     // A checkpoint exports against an empty vector — the whole oplog, still a
@@ -561,10 +582,14 @@ async fn contribution(
         // empty cursor means the resource has no history to ship at all. Both
         // are "contribute nothing", but only the first may advance a cursor —
         // and it advances to a vector we just read, not one we assumed.
-        return Contribution::Unchanged;
+        return Ok(Contribution::Unchanged);
     }
 
-    Contribution::Update(update, reached)
+    Ok(Contribution::Update(
+        update,
+        reached,
+        super::blobs::references(&resource)?,
+    ))
 }
 
 /// Export one pass of a drive's history into `vault`.
@@ -598,7 +623,8 @@ pub async fn export_vault_segment(
     policy: CheckpointPolicy,
 ) -> AtomicResult<Option<BackupSummary>> {
     let mut state = read_lane_state(store, drive_pseudonym, device_pubkey);
-    let full = policy.wants_checkpoint(&state, drive_has_checkpoint);
+    let full = policy.wants_checkpoint(&state, drive_has_checkpoint)
+        || (!state.cursors.is_empty() && state.blob_key_epoch != key.epoch());
 
     let mut subjects: HashSet<String> =
         crate::sync::engine::collect_drive_subjects(store, drive).await;
@@ -608,6 +634,7 @@ pub async fn export_vault_segment(
     let mut cursors: BTreeMap<String, VersionVectorMap> = BTreeMap::new();
     let mut envelope_cursors: BTreeMap<String, i64> = BTreeMap::new();
     let mut unchanged = 0usize;
+    let mut blob_hashes = BTreeSet::new();
 
     for subject_str in &subjects {
         match contribution(
@@ -617,9 +644,10 @@ pub async fn export_vault_segment(
             full,
             policy.history,
         )
-        .await
+        .await?
         {
-            Contribution::Update(update, reached) => {
+            Contribution::Update(update, reached, references) => {
+                blob_hashes.extend(references);
                 // Envelopes attribute ops; a shallow checkpoint no longer
                 // carries those ops, so it ships none.
                 let stored = if full && policy.history == HistoryKeep::CurrentStateOnly {
@@ -726,7 +754,7 @@ pub async fn export_vault_segment(
     }
     let tombstones = tombstones.into_iter().collect();
 
-    let (pack, kind, object_key, coverage) = if full {
+    let (mut pack, kind, object_key, coverage) = if full {
         // Coverage is a claim the control plane acts on by deleting, so it
         // names only lanes whose ops this device can show it holds: its own,
         // which it wrote, and any it has imported. Every other lane keeps its
@@ -755,6 +783,19 @@ pub async fn export_vault_segment(
         return Ok(None);
     }
 
+    // Dependencies come from the same snapshot as the graph contribution.
+    // Refuse to advance its cursor while any referenced bytes are unavailable.
+    let mut blobs = Vec::new();
+    for hash in blob_hashes {
+        let bytes = store
+            .get_blob(&hex::decode(&hash).map_err(|e| e.to_string())?)
+            .await?
+            .ok_or_else(|| format!("file bytes missing for {hash}; backup incomplete"))?;
+        let (dependency, uploads) = super::blobs::seal(key, drive_pseudonym, &hash, &bytes, vault)?;
+        pack.blobs.push(dependency);
+        blobs.extend(uploads);
+    }
+
     let resources = pack.entries.len();
     let tombstone_count = pack.tombstones.len();
     let object_kind = match kind {
@@ -770,6 +811,7 @@ pub async fn export_vault_segment(
             envelope_cursors.entry(subject.clone()).or_insert(*at);
         }
     }
+    state.blob_key_epoch = key.epoch();
     state.cursors = cursors;
     state.envelope_cursors = envelope_cursors;
     match kind {
@@ -807,6 +849,7 @@ pub async fn export_vault_segment(
         unchanged,
         tombstones: tombstone_count,
         sealed_bytes: sealed.len(),
+        blobs,
         coverage,
     }))
 }
@@ -925,6 +968,25 @@ pub async fn import_vault_batch(
     prefix: &str,
     drive_pseudonym: Option<(&str, &str)>,
 ) -> AtomicResult<RestoreSummary> {
+    import_vault_batch_expected(
+        store,
+        key,
+        vault,
+        prefix,
+        drive_pseudonym,
+        &RecoveryExpectation::default(),
+    )
+    .await
+}
+
+pub async fn import_vault_batch_expected(
+    store: &Db,
+    key: &DriveVaultKey,
+    vault: &dyn VaultObjectStore,
+    prefix: &str,
+    drive_pseudonym: Option<(&str, &str)>,
+    expected: &RecoveryExpectation,
+) -> AtomicResult<RestoreSummary> {
     let mut summary = RestoreSummary::default();
 
     // Sorted by the store contract, so segments replay in the order written.
@@ -964,6 +1026,8 @@ pub async fn import_vault_batch(
     let mut verified_coverage = BTreeMap::new();
     let mut verified_observed = BTreeMap::new();
     let mut imported: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
+    let mut dependencies = BTreeMap::new();
+    let mut restored_subjects = BTreeSet::new();
 
     // Deletion wins over stale entries across lanes. A listing's `observed`
     // mark is not proof of import: its checkpoint can still contain a subject
@@ -972,6 +1036,12 @@ pub async fn import_vault_batch(
     // clears a local tombstone, as before.
     let mut tombstones: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for object_key in &plan.order {
+        if object_key.starts_with(&format!("{prefix}blobs/")) {
+            // Verify only live dependencies below. Retained, unreferenced
+            // ciphertext from an older epoch cannot invalidate today's copy.
+            summary.objects_skipped += 1;
+            continue;
+        }
         let sealed = vault.get(object_key)?;
 
         // One unopenable object must not cost the user every other one. A
@@ -1000,6 +1070,9 @@ pub async fn import_vault_batch(
         }
         let pack = Pack::decode(&plaintext)?;
         summary.packs_read += 1;
+        for dependency in &pack.blobs {
+            dependencies.insert(dependency.hash.clone(), dependency.clone());
+        }
         // An older checkpoint can cover a lane the newest anchor never
         // imported. Every checkpoint actually restored may supply proof.
         if header.kind == ObjectKind::Checkpoint {
@@ -1015,6 +1088,7 @@ pub async fn import_vault_batch(
         }
 
         for entry in pack.entries {
+            restored_subjects.insert(entry.subject.clone());
             // A later segment from the deleting device is an intentional
             // recreation. A different lane's stale copy has no such ordering
             // proof. Checkpoint coverage also proves the earlier deletion was
@@ -1104,6 +1178,8 @@ pub async fn import_vault_batch(
         .into_iter()
         .filter_map(|(subject, deletions)| (!deletions.is_empty()).then_some(subject))
         .collect();
+    summary.subjects_deleted = tombstones.iter().cloned().collect();
+    summary.subjects_restored = restored_subjects.difference(&tombstones).cloned().collect();
     for subject_str in &tombstones {
         let subject = Subject::from_raw(subject_str, None);
         // Remove data and index entries as well as recording the marker. On
@@ -1135,8 +1211,52 @@ pub async fn import_vault_batch(
             record_imported_lane(store, pseudonym, device, &lane, segment);
         }
     }
+    // Only live references need bytes: deleted files do not prevent recovery.
+    // Verify remote bytes even when this device has a cached copy, so missing
+    // backup objects cannot be hidden by the device doing the verification.
+    let mut live_blobs = BTreeSet::new();
+    for subject in restored_subjects {
+        if let Ok(resource) = store.get_resource(&Subject::from_raw(&subject, None)).await {
+            live_blobs.extend(super::blobs::references(&resource)?);
+        }
+    }
+    summary.blobs_missing += live_blobs
+        .iter()
+        .filter(|hash| !dependencies.contains_key(*hash))
+        .count();
+    for (hash, dependency) in dependencies {
+        if !live_blobs.contains(&hash) {
+            continue;
+        }
+        match super::blobs::open(key, prefix, &dependency, vault) {
+            Ok(bytes) => {
+                store
+                    .put_blob(&hex::decode(&hash).map_err(|e| e.to_string())?, &bytes)
+                    .await?;
+                summary.blobs_restored += 1;
+            }
+            Err(error) => {
+                tracing::warn!("Vault file recovery incomplete: {error}");
+                summary.blobs_missing += 1;
+            }
+        }
+    }
+    for (lane, segment) in &expected.lanes {
+        let head = verified_observed.entry(lane.clone()).or_insert(0);
+        *head = (*head).max(*segment);
+    }
     summary.objects_missing = missing_segments(&keys, &verified_coverage, &verified_observed);
-    summary.completeness = if summary.objects_missing > 0 || summary.objects_unreadable > 0 {
+    if expected.checkpoint_n > 0
+        && !keys
+            .iter()
+            .any(|key| parse_checkpoint_key(key) == Some(expected.checkpoint_n))
+    {
+        summary.objects_missing = summary.objects_missing.saturating_add(1);
+    }
+    summary.completeness = if summary.objects_missing > 0
+        || summary.objects_unreadable > 0
+        || summary.blobs_missing > 0
+    {
         RestoreCompleteness::Partial
     } else if summary.packs_read == 0 {
         RestoreCompleteness::Empty
@@ -1153,6 +1273,52 @@ mod tests {
 
     const PSEUDONYM: &str = "testpseudonym";
     const DEVICE: &str = "testdevice";
+
+    #[tokio::test]
+    async fn recovery_inventory_detects_an_absent_tail_and_checkpoint() {
+        let store = Db::init_temp("vault_expected_tail").await.unwrap();
+        let vault = MemoryVaultStore::new();
+        let key = key();
+        let expected = RecoveryExpectation {
+            lanes: BTreeMap::from([(DEVICE.to_string(), 2)]),
+            checkpoint_n: 3,
+        };
+        let first = envelope::seal(
+            &key,
+            ObjectKind::Pack,
+            &Pack::new(vec![], vec![]).encode().unwrap(),
+        )
+        .unwrap();
+        vault
+            .put(&segment_key(PSEUDONYM, DEVICE, 1), &first)
+            .unwrap();
+        let summary = import_vault_batch_expected(
+            &store,
+            &key,
+            &vault,
+            &drive_prefix(PSEUDONYM),
+            None,
+            &expected,
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary.completeness, RestoreCompleteness::Partial);
+        assert_eq!(summary.objects_missing, 2);
+
+        let empty = MemoryVaultStore::new();
+        let summary = import_vault_batch_expected(
+            &store,
+            &key,
+            &empty,
+            &drive_prefix(PSEUDONYM),
+            None,
+            &expected,
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary.completeness, RestoreCompleteness::Partial);
+        assert_eq!(summary.objects_missing, 3);
+    }
 
     #[tokio::test]
     async fn auxiliary_objects_do_not_make_a_complete_pack_restore_partial() {
@@ -1535,6 +1701,88 @@ mod tests {
     }
 
     const FOLDER: &str = "https://atomicdata.dev/classes/Folder";
+
+    #[tokio::test]
+    async fn vault_only_attachment_survives_loss_of_the_source_store() {
+        let source = Db::init_temp("vault_blob_source").await.unwrap();
+        let (_, drive) = source.setup("alice").await.unwrap();
+        let bytes = b"a file created without any hosted server";
+        let hash = blake3::hash(bytes);
+        source.put_blob(hash.as_bytes(), bytes).await.unwrap();
+        let file = source
+            .create_resource(FOLDER, &drive, "attachment", None)
+            .await
+            .unwrap();
+        let mut file = source
+            .get_resource(&Subject::from_raw(&file, None))
+            .await
+            .unwrap();
+        let doc = file.build_state_doc().unwrap();
+        doc.set_property(
+            crate::urls::BLOB,
+            &crate::Value::AtomicUrl(Subject::from_blob_hash(hash.as_bytes())),
+        )
+        .unwrap();
+        file.apply_state_doc(doc).unwrap();
+        source
+            .add_resource_opts(&file, false, true, true)
+            .await
+            .unwrap();
+        let vault = MemoryVaultStore::new();
+        backup(
+            &source,
+            &Subject::from_raw(&drive, None),
+            &key(),
+            &vault,
+            DEVICE,
+        )
+        .await
+        .unwrap();
+        let missing = MemoryVaultStore::new();
+        for object_key in vault.list(&drive_prefix(PSEUDONYM)).unwrap() {
+            if !object_key.contains("/blobs/") {
+                missing
+                    .put(&object_key, &vault.get(&object_key).unwrap())
+                    .unwrap();
+            }
+        }
+        let partial = Db::init_temp("vault_blob_missing").await.unwrap();
+        let result = restore(&partial, &key(), &missing).await;
+        assert_eq!(result.completeness, RestoreCompleteness::Partial);
+        assert_eq!(result.blobs_missing, 1);
+        assert!(partial.get_blob(hash.as_bytes()).await.unwrap().is_none());
+        // A missing local attachment prevents a graph-only acknowledgement.
+        source
+            .kv
+            .remove(crate::db::trees::Tree::Blobs, hash.as_bytes())
+            .unwrap();
+        let attempt = export_vault_segment(
+            &source,
+            &Subject::from_raw(&drive, None),
+            &key(),
+            &MemoryVaultStore::new(),
+            PSEUDONYM,
+            DEVICE,
+            1,
+            2,
+            false,
+            &BTreeMap::new(),
+            CheckpointPolicy::default(),
+        )
+        .await;
+        assert!(attempt
+            .unwrap_err()
+            .to_string()
+            .contains("file bytes missing"));
+        drop(source);
+        let recovered = Db::init_temp("vault_blob_recovered").await.unwrap();
+        let result = restore(&recovered, &key(), &vault).await;
+        assert_eq!(result.completeness, RestoreCompleteness::Complete);
+        assert_eq!(
+            recovered.get_blob(hash.as_bytes()).await.unwrap(),
+            Some(bytes.to_vec())
+        );
+    }
 
     /// What a host driver does around one pass: ask the vault what it already
     /// holds, export against that, and — unless told otherwise — confirm.

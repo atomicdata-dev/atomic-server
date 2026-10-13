@@ -5243,6 +5243,59 @@ export class Store {
     }
   }
 
+  /** Publish a completed local import into live resources using their causal history.
+   * Reads are fenced to the database and identity that owned the import. */
+  public async refreshRestoredResources(
+    subjects: string[],
+    deleted: string[],
+  ): Promise<void> {
+    const db = this.clientDb;
+    const generation = this.getIdentityGeneration();
+    const current = () =>
+      this.clientDb === db && this.getIdentityGeneration() === generation;
+
+    const check = () => {
+      if (!current())
+        throw new RequestCancelledError('Recovery session changed');
+    };
+
+    if (db) {
+      await db.waitForInit();
+      check();
+      const rows = await db.getResourcesWithSnapshots(subjects);
+      check();
+      subjects.forEach((subject, index) => {
+        const row = rows[index];
+        if (!row?.jsonAd)
+          throw new Error(`Restored resource is missing: ${subject}`);
+        this.hydrateResourceFromJson(
+          this.normalizeSubject(subject),
+          JSON.parse(row.jsonAd),
+          row.snapshot ?? undefined,
+        );
+      });
+    } else {
+      // Native imports write the embedded node, whose normal fetch path
+      // already fences route changes and merges snapshots into open editors.
+      for (const subject of subjects) {
+        check();
+        await this.reloadResource(subject);
+        check();
+        const resource = this.getResolved(subject);
+        if (resource?.error) throw resource.error;
+      }
+    }
+
+    check();
+
+    for (const subject of deleted) {
+      this.markDestroyed(this.resolveSubject(subject));
+      // The importer already durably deleted it. Do not enqueue a second
+      // database delete that could race a subsequent recreation.
+      this.evictResource(subject);
+    }
+  }
+
   private hydrateResourceFromJson(
     subject: string,
     parsed: Record<string, unknown>,

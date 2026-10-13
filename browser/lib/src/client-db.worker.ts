@@ -1,3 +1,4 @@
+import type { RecoveryExpectation } from './vault-types.js';
 /**
  * Web Worker that hosts the WASM ClientDb.
  * Communicates with the main thread via typed postMessage.
@@ -154,6 +155,7 @@ export type WorkerRequest =
       drivePseudonym: string;
       devicePubkey: string;
       objects: { objectKey: string; sealed: Uint8Array }[];
+      expectation?: RecoveryExpectation;
     }
   | {
       id: number;
@@ -526,6 +528,7 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
         msg.drivePseudonym,
         msg.devicePubkey,
         msg.objects,
+        msg.expectation,
       );
       // A restore writes a whole drive behind `Durability::None`, so without
       // persisting it here those writes wait for the next flush tick.

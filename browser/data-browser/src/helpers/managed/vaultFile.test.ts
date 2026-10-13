@@ -191,22 +191,24 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch,
+        key: { driveKey: KEY, keyEpoch: keyEpoch },
       });
 
       expect(outcome.resourcesRestored).toBe(1);
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(db.vaultImport).toHaveBeenCalledTimes(1);
-      const [key, epoch, pseudonym, device, imported] = db.vaultImport.mock
+      const [key, pseudonym, device, imported] = db.vaultImport.mock
         .calls[0] as unknown as [
-        Uint8Array,
-        number,
+        { driveKey: Uint8Array; keyEpoch: number },
         string,
         string,
         { objectKey: string; sealed: Uint8Array }[],
       ];
-      expect([key, epoch, pseudonym, device]).toEqual([KEY, keyEpoch, P, 'me']);
+      expect([key, pseudonym, device]).toEqual([
+        { driveKey: KEY, keyEpoch },
+        P,
+        'me',
+      ]);
       expect(imported.map(o => o.objectKey)).toEqual(
         objects.map(o => o.object_key),
       );
@@ -223,8 +225,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: 'other',
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toThrow(/different workspace/);
     expect(db.vaultImport).not.toHaveBeenCalled();
@@ -239,8 +240,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 2,
+        key: { driveKey: KEY, keyEpoch: 2 },
       }),
     ).rejects.toThrow(/different encryption key/);
     expect(db.vaultImport).not.toHaveBeenCalled();
@@ -257,8 +257,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toThrow(/checksum/);
     expect(db.vaultImport).not.toHaveBeenCalled();

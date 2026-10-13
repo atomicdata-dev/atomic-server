@@ -246,8 +246,8 @@ mod vault_ipc {
     dek::DriveVaultKey,
     store::{MemoryVaultStore, VaultObjectStore},
     sync::{
-      commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch, CheckpointPolicy,
-      HistoryKeep, SegmentKind,
+      commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch_expected,
+      CheckpointPolicy, HistoryKeep, SegmentKind,
     },
   };
   pub use base64::engine::general_purpose::STANDARD;
@@ -264,6 +264,7 @@ mod vault_ipc {
   #[derive(serde::Serialize)]
   #[serde(rename_all = "camelCase")]
   pub struct VaultExportOut {
+    pub blobs: Vec<VaultBlobOut>,
     pub object_key: String,
     /// base64
     pub sealed: String,
@@ -281,6 +282,14 @@ mod vault_ipc {
     pub coverage: std::collections::BTreeMap<String, u32>,
   }
 
+  #[derive(serde::Serialize)]
+  #[serde(rename_all = "camelCase")]
+  pub struct VaultBlobOut {
+    #[serde(flatten)]
+    pub metadata: atomic_lib::vault::blobs::BlobUpload,
+    pub sealed: String,
+  }
+
   pub fn kind_name(kind: SegmentKind) -> &'static str {
     match kind {
       SegmentKind::Pack => "pack",
@@ -291,6 +300,9 @@ mod vault_ipc {
   pub type VaultImportOut = atomic_lib::vault::sync::RestoreSummary;
 
   pub fn decode_key(key_b64: &str, epoch: u32) -> Result<DriveVaultKey, String> {
+    if epoch == 0 {
+      return Err("drive vault key epoch must be positive".into());
+    }
     let raw = STANDARD
       .decode(key_b64)
       .map_err(|e| format!("drive vault key is not valid base64: {e}"))?;
@@ -405,7 +417,22 @@ async fn vault_export(
       .get(&summary.object_key)
       .map_err(|e| format!("Sealed object went missing before it could be read: {e}"))?;
 
+    let blobs = summary
+      .blobs
+      .into_iter()
+      .map(|metadata| {
+        let bytes = staging
+          .get(&metadata.object_key)
+          .map_err(|e| e.to_string())?;
+        Ok(vault_ipc::VaultBlobOut {
+          metadata,
+          sealed: STANDARD.encode(bytes),
+        })
+      })
+      .collect::<Result<Vec<_>, String>>()?;
+
     Ok(Some(vault_ipc::VaultExportOut {
+      blobs,
       sealed: STANDARD.encode(&sealed),
       object_key: summary.object_key,
       kind: vault_ipc::kind_name(summary.kind),
@@ -448,6 +475,7 @@ async fn vault_import(
   drive_pseudonym: String,
   device_pubkey: String,
   objects: Vec<vault_ipc::VaultObjectIn>,
+  expectation: Option<atomic_lib::vault::sync::RecoveryExpectation>,
   node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
 ) -> Result<vault_ipc::VaultImportOut, String> {
   let store = vault_ipc::store_of(&node)?;
@@ -471,12 +499,13 @@ async fn vault_import(
         .map_err(|e| format!("Could not stage vault object {}: {e}", object.object_key))?;
     }
 
-    let summary = vault_ipc::block_on(vault_ipc::import_vault_batch(
+    let summary = vault_ipc::block_on(vault_ipc::import_vault_batch_expected(
       &store,
       &key,
       &staging,
       &vault_ipc::drive_prefix(&drive_pseudonym),
       Some((&drive_pseudonym, &device_pubkey)),
+      &expectation.unwrap_or_default(),
     ))?
     .map_err(|e| format!("Could not restore from the vault: {e}"))?;
 

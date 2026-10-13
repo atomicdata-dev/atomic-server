@@ -303,8 +303,8 @@ export function useVaultBackup({
         driveSubject: driveSubject!,
         drivePseudonym: enrollment.drive_pseudonym,
         devicePubkey: devicePubkey!,
-        driveKey: key,
-        driveKeyEpoch: keyEpoch,
+        key: { driveKey: key, keyEpoch: keyEpoch },
+
         refreshDriveKey: () => refreshKey(enrollment.drive_pseudonym),
       });
       await refresh();
@@ -346,8 +346,8 @@ export function useVaultBackup({
         driveSubject: driveSubject!,
         drivePseudonym: status.enrollment.drive_pseudonym,
         devicePubkey: devicePubkey!,
-        driveKey: key.driveKey,
-        driveKeyEpoch: key.keyEpoch,
+        key: { driveKey: key.driveKey, keyEpoch: key.keyEpoch },
+
         refreshDriveKey: () => refreshKey(status.enrollment.drive_pseudonym),
       });
       await refresh();
@@ -379,8 +379,8 @@ export function useVaultBackup({
               driveSubject: driveSubject!,
               drivePseudonym,
               devicePubkey: devicePubkey!,
-              driveKey: key.driveKey,
-              driveKeyEpoch: key.keyEpoch,
+              key: { driveKey: key.driveKey, keyEpoch: key.keyEpoch },
+
               refreshDriveKey: () => refreshKey(drivePseudonym),
               forceCheckpoint: true,
               currentStateOnly,
@@ -429,8 +429,8 @@ export function useVaultBackup({
             // here later claim coverage for them — the only way a lane belonging
             // to a device that is gone ever becomes prunable.
             devicePubkey: devicePubkey!,
-            driveKey: key.driveKey,
-            keyEpoch: key.keyEpoch,
+            key: { driveKey: key.driveKey, keyEpoch: key.keyEpoch },
+
             onProgress: (done, total) =>
               setRestoreProgress(total === 0 ? 1 : done / total),
           }),
@@ -497,8 +497,8 @@ export function useVaultBackup({
               db: db!,
               drivePseudonym,
               devicePubkey: devicePubkey!,
-              driveKey: key.driveKey,
-              keyEpoch: key.keyEpoch,
+              key: { driveKey: key.driveKey, keyEpoch: key.keyEpoch },
+
               onProgress: (done, total) =>
                 setRestoreProgress(total === 0 ? 1 : done / total),
             }),

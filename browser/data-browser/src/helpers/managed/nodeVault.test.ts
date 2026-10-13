@@ -28,6 +28,14 @@ describe('nodeVault', () => {
       objectKey: 'v1/drive/lane/000001',
       sealed: btoa(String.fromCharCode(...sealed)),
       kind: 'pack',
+      blobs: [
+        {
+          objectKey: 'vault/pseudo/blobs/opaque/000000',
+          contentHash: 'opaque',
+          chunkIndex: 0,
+          sealed: btoa(String.fromCharCode(...sealed)),
+        },
+      ],
       resources: 3,
       unchanged: 9,
       tombstones: 1,
@@ -36,8 +44,7 @@ describe('nodeVault', () => {
 
     const result = await nodeVault.vaultExport(
       'did:ad:drive',
-      key,
-      2,
+      { driveKey: key, keyEpoch: 2 },
       'pseudo',
       'dev',
       1,
@@ -56,6 +63,13 @@ describe('nodeVault', () => {
 
     expect(result?.sealed).toBeInstanceOf(Uint8Array);
     expect([...(result?.sealed ?? [])]).toEqual([...sealed]);
+    expect(result?.blobs?.[0].sealed).toBeInstanceOf(Uint8Array);
+    expect(result?.blobs?.[0]).toMatchObject({
+      objectKey: 'vault/pseudo/blobs/opaque/000000',
+      contentHash: 'opaque',
+      chunkIndex: 0,
+    });
+    expect([...(result?.blobs?.[0].sealed ?? [])]).toEqual([...sealed]);
     expect(result?.objectKey).toBe('v1/drive/lane/000001');
     expect(result?.resources).toBe(3);
     expect(result?.kind).toBe('pack');
@@ -74,8 +88,7 @@ describe('nodeVault', () => {
     expect(
       await nodeVault.vaultExport(
         'did:ad:drive',
-        key,
-        1,
+        { driveKey: key, keyEpoch: 1 },
         'p',
         'd',
         4,
@@ -96,6 +109,7 @@ describe('nodeVault', () => {
       objectKey: 'vault/pseudo/checkpoints/ckpt-000002.loro',
       sealed: btoa('xx'),
       kind: 'checkpoint',
+      blobs: [],
       resources: 40,
       unchanged: 0,
       tombstones: 2,
@@ -104,8 +118,7 @@ describe('nodeVault', () => {
 
     const result = await nodeVault.vaultExport(
       'did:ad:drive',
-      key,
-      1,
+      { driveKey: key, keyEpoch: 1 },
       'pseudo',
       'dev',
       8,
@@ -129,18 +142,26 @@ describe('nodeVault', () => {
       tombstonesApplied: 0,
       objectsSkipped: 1,
       objectsUnreadable: 0,
+      blobsRestored: 2,
+      blobsMissing: 1,
+      subjectsRestored: ['did:ad:file'],
+      subjectsDeleted: ['did:ad:deleted'],
     });
 
     const objects = [
       { objectKey: 'a/000001', sealed: new Uint8Array([1, 2]) },
       { objectKey: 'a/000002', sealed: new Uint8Array([3, 4]) },
+      {
+        objectKey: 'vault/pseudo/blobs/opaque/000000',
+        sealed: new Uint8Array([0, 255, 128]),
+      },
     ];
     const outcome = await nodeVault.vaultImport(
-      key,
-      1,
+      { driveKey: key, keyEpoch: 1 },
       'pseudo',
       'dev',
       objects,
+      { lanes: { dev: 7 }, checkpointN: 2 },
     );
 
     const [, args] = invoke.mock.calls[0] as [string, Record<string, unknown>];
@@ -150,9 +171,40 @@ describe('nodeVault', () => {
     // side by `plan_restore`, from the newest checkpoint's coverage and
     // observed maps. What must not happen here is objects being dropped or
     // reordered on the way.
-    expect(sent.map(o => o.objectKey)).toEqual(['a/000001', 'a/000002']);
+    expect(sent.map(o => o.objectKey)).toEqual(objects.map(o => o.objectKey));
     expect(sent.every(o => typeof o.sealed === 'string')).toBe(true);
+    expect(
+      sent.map(o => [...atob(o.sealed)].map(c => c.charCodeAt(0))),
+    ).toEqual(objects.map(o => [...o.sealed]));
+    expect(args.expectation).toEqual({ lanes: { dev: 7 }, checkpointN: 2 });
     expect(outcome.resourcesRestored).toBe(5);
+    expect(outcome.blobsRestored).toBe(2);
+    expect(outcome.blobsMissing).toBe(1);
+    expect(outcome.subjectsRestored).toEqual(['did:ad:file']);
+    expect(outcome.subjectsDeleted).toEqual(['did:ad:deleted']);
+  });
+
+  it.each([0, -1, 1.5, 0x100000000])(
+    'rejects invalid key epoch %s before IPC',
+    async keyEpoch => {
+      await expect(
+        nodeVault.vaultImport({ driveKey: key, keyEpoch }, 'pseudo', 'dev', []),
+      ).rejects.toThrow('Invalid Vault key or epoch');
+      expect(invoke).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects malformed expected history before IPC', async () => {
+    await expect(
+      nodeVault.vaultImport(
+        { driveKey: key, keyEpoch: 1 },
+        'pseudo',
+        'dev',
+        [],
+        { lanes: { dev: -1 }, checkpointN: 2 },
+      ),
+    ).rejects.toThrow('Invalid Vault recovery inventory');
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it('commits a segment by name', async () => {

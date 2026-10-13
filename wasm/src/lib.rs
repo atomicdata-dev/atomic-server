@@ -15,8 +15,8 @@ use atomic_lib::{
     vault::secret_envelope::{NewWrapper, SecretEnvelope, Unlock},
     vault::store::{MemoryVaultStore, VaultObjectStore},
     vault::sync::{
-        commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch,
-        CheckpointPolicy, HistoryKeep, SegmentKind,
+        commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch_expected,
+        CheckpointPolicy, HistoryKeep, RecoveryExpectation, SegmentKind,
     },
     Db, Resource, Subject, Value,
 };
@@ -1454,6 +1454,9 @@ fn check_agent_proof(proof: &[u8]) -> Result<(), JsError> {
 }
 
 fn drive_key(key_bytes: &[u8], epoch: u32) -> Result<DriveVaultKey, JsError> {
+    if epoch == 0 {
+        return Err(JsError::new("drive vault key epoch must be positive"));
+    }
     let bytes: [u8; 32] = key_bytes
         .try_into()
         .map_err(|_| JsError::new("drive vault key must be exactly 32 bytes"))?;
@@ -1553,6 +1556,14 @@ impl ClientDb {
         })
         .map_err(to_js_err)?;
 
+        let blobs = js_sys::Array::new();
+        for blob in summary.blobs {
+            let bytes = staging.get(&blob.object_key).map_err(to_js_err)?;
+            let value = serde_wasm_bindgen::to_value(&blob).map_err(to_js_err)?;
+            blobs.push(&attach_sealed(value, &bytes)?);
+        }
+        js_sys::Reflect::set(&result, &JsValue::from_str("blobs"), &blobs)
+            .map_err(|_| JsError::new("could not attach sealed blob dependencies"))?;
         attach_sealed(result, &sealed)
     }
 
@@ -1594,6 +1605,7 @@ impl ClientDb {
         drive_pseudonym: &str,
         device_pubkey: &str,
         objects: JsValue,
+        expectation: JsValue,
     ) -> Result<JsValue, JsError> {
         let key = drive_key(key_bytes, key_epoch)?;
         let objects: Vec<VaultObjectInput> =
@@ -1606,12 +1618,19 @@ impl ClientDb {
                 .map_err(to_js_err)?;
         }
 
-        let summary = import_vault_batch(
+        let expectation: RecoveryExpectation =
+            if expectation.is_undefined() || expectation.is_null() {
+                RecoveryExpectation::default()
+            } else {
+                serde_wasm_bindgen::from_value(expectation).map_err(to_js_err)?
+            };
+        let summary = import_vault_batch_expected(
             self.db(),
             &key,
             &staging,
             &drive_prefix(drive_pseudonym),
             Some((drive_pseudonym, device_pubkey)),
+            &expectation,
         )
         .await
         .map_err(to_js_err)?;

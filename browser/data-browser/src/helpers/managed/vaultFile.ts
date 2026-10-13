@@ -1,12 +1,15 @@
+import { validateRecoveryExpectation } from '@tomic/lib';
 import {
   downloadVaultObjects,
-  listVaultObjects,
+  getVaultRecoveryManifest,
   restoreDrive,
   type RestoreOutcome,
   type RestoreSource,
   type SealedObject,
   type VaultCapableDb,
   type VaultObject,
+  type DriveKeyHandle,
+  type RecoveryExpectation,
 } from './vault';
 
 /**
@@ -62,6 +65,7 @@ export type VaultFileHeader = {
   drivePseudonym: string;
   keyEpoch: number;
   objects: VaultFileObject[];
+  expectation?: RecoveryExpectation;
 };
 
 export type VaultFileProblem =
@@ -146,11 +150,13 @@ export async function buildVaultFile({
   objects,
   bodies,
   now = Date.now(),
+  expectation,
 }: {
   drivePseudonym: string;
   objects: VaultObject[];
   bodies: Blob[];
   now?: number;
+  expectation?: RecoveryExpectation;
 }): Promise<VaultFileBuild> {
   if (objects.length !== bodies.length) {
     throw new VaultFileError('mismatch');
@@ -174,6 +180,7 @@ export async function buildVaultFile({
 
   const header: VaultFileHeader = {
     version: VAULT_FILE_VERSION,
+    expectation,
     createdAt: now,
     drivePseudonym,
     keyEpoch: entries.reduce((max, e) => Math.max(max, e.keyEpoch), 1),
@@ -285,6 +292,14 @@ export async function parseVaultFile(file: Blob): Promise<ParsedVaultFile> {
     throw new VaultFileError('badHeader');
   }
 
+  if (header.expectation !== undefined) {
+    try {
+      validateRecoveryExpectation(header.expectation);
+    } catch {
+      throw new VaultFileError('badHeader');
+    }
+  }
+
   const offsets: number[] = [];
   let cursor = PREAMBLE + headerLength;
 
@@ -337,7 +352,9 @@ export function fileRestoreSource(parsed: ParsedVaultFile): RestoreSource {
       onProgress?.(i + 1, total);
     }
 
-    return out;
+    return parsed.header.expectation
+      ? { objects: out, expectation: parsed.header.expectation }
+      : out;
   };
 }
 
@@ -426,7 +443,8 @@ export async function fetchVaultBackupFile(
   drivePseudonym: string,
   onProgress?: (done: number, total: number) => void,
 ): Promise<VaultFileBuild | null> {
-  const objects = await listVaultObjects(drivePseudonym);
+  const { objects, expectation } =
+    await getVaultRecoveryManifest(drivePseudonym);
 
   if (objects.length === 0) return null;
 
@@ -437,7 +455,7 @@ export async function fetchVaultBackupFile(
     onProgress,
   );
 
-  return buildVaultFile({ drivePseudonym, objects, bodies });
+  return buildVaultFile({ drivePseudonym, objects, bodies, expectation });
 }
 
 /**
@@ -447,16 +465,15 @@ export async function fetchVaultBackupFile(
 export async function restoreDriveFromFile({
   file,
   drivePseudonym,
-  keyEpoch,
+  key,
   ...rest
 }: {
   file: Blob;
   drivePseudonym: string;
   /** The epoch of the drive key in hand; the file must be sealed under it. */
-  keyEpoch: number;
+  key: DriveKeyHandle;
   db: VaultCapableDb;
   devicePubkey: string;
-  driveKey: Uint8Array;
   onProgress?: (done: number, total: number) => void;
 }): Promise<RestoreOutcome> {
   const parsed = await parseVaultFile(file);
@@ -465,14 +482,14 @@ export async function restoreDriveFromFile({
     throw new VaultFileError('otherDrive');
   }
 
-  if (parsed.header.keyEpoch !== keyEpoch) {
+  if (parsed.header.keyEpoch !== key.keyEpoch) {
     throw new VaultFileError('otherKey');
   }
 
   return restoreDrive({
     ...rest,
     drivePseudonym,
-    keyEpoch,
+    key,
     source: fileRestoreSource(parsed),
   });
 }

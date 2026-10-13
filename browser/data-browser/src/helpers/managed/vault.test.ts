@@ -3,6 +3,7 @@ import {
   agentVaultProof,
   enrollVault,
   getVaultUsage,
+  getVaultKeyEnvelopeRecord,
   freeUpVaultStorage,
   vaultLaneId,
   backupDrive,
@@ -41,6 +42,11 @@ it('sends name and emoji as optional enrollment metadata', async () => {
     drive_name: 'Design',
     drive_emoji: '🎨',
   });
+});
+
+const manifest = (objects: unknown[]) => ({
+  objects,
+  expectation: { lanes: {}, checkpointN: 0 },
 });
 
 const DEVICE = '03'.repeat(32);
@@ -93,7 +99,7 @@ const PASS = {
   driveSubject: 'did:ad:drive',
   drivePseudonym: PSEUDONYM,
   devicePubkey: DEVICE,
-  driveKey: KEY,
+  key: { driveKey: KEY, keyEpoch: 1 },
   segment: 1,
   checkpointN: 1,
   driveHasCheckpoint: true,
@@ -105,7 +111,18 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
   const calls: { url: string; method: string }[] = [];
   const spy = vi.fn(async (url: string, init?: RequestInit) => {
     calls.push({ url, method: init?.method ?? 'GET' });
-    const result = handler(url, init);
+    const result = handler(url, init) as
+      | { json?: () => Promise<unknown> }
+      | undefined;
+
+    if (url.endsWith('/recovery-manifest') && result?.json) {
+      const body = await result.json();
+
+      return {
+        ...result,
+        json: async () => (Array.isArray(body) ? manifest(body) : body),
+      };
+    }
 
     return (
       result ?? {
@@ -120,7 +137,116 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
   return calls;
 }
 
+it.each([0, -1, 1.5, 0x100000000, null, '2'])(
+  'rejects a malformed stored key epoch %s',
+  async key_epoch => {
+    mockFetch(() => ({
+      ok: true,
+      json: async () => ({ envelope: 'wrapped-key', key_epoch }),
+    }));
+    await expect(getVaultKeyEnvelopeRecord(PSEUDONYM)).rejects.toThrow(
+      'epoch is malformed',
+    );
+  },
+);
+
 describe('backupDrive', () => {
+  it.each([
+    undefined,
+    'reserve:blob',
+    'put:blob',
+    'confirm:blob',
+    'reserve:pack',
+    'put:pack',
+    'confirm:pack',
+  ])('keeps the cursor retryable after failure at %s', async failure => {
+    const blob = {
+      objectKey: `vault/${PSEUDONYM}/blobs/abcd/000000`,
+      contentHash: 'abcd',
+      chunkIndex: 0,
+      sealed: new Uint8Array([4, 5, 6]),
+    };
+    const db: VaultCapableDb = {
+      vaultExport: vi.fn(async () => ({
+        ...sealedPack(PACK_KEY),
+        blobs: [blob],
+      })),
+      vaultImport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+    };
+    const expected = [
+      'reserve:blob',
+      'put:blob',
+      'confirm:blob',
+      'reserve:pack',
+      'put:pack',
+      'confirm:pack',
+    ];
+    const order: string[] = [];
+    let injectFailure = failure;
+
+    function step(name: string) {
+      order.push(name);
+      if (name === injectFailure) throw new Error(`injected ${name}`);
+    }
+
+    mockFetch((url, init) => {
+      if (url.endsWith('/upload-urls')) {
+        const {
+          objects: [object],
+        } = JSON.parse(String(init?.body));
+        step(`reserve:${object.kind}`);
+
+        return {
+          ok: true,
+          json: async () => ({
+            uploads: [
+              {
+                object_id: object.kind,
+                object_key: object.kind === 'blob' ? blob.objectKey : PACK_KEY,
+                url: `https://s3.test/${object.kind}`,
+                headers: [],
+              },
+            ],
+          }),
+        };
+      }
+
+      if (url.startsWith('https://s3.test')) {
+        step(`put:${url.split('/').at(-1)}`);
+        expect(init?.body).toBeInstanceOf(Uint8Array);
+
+        return { ok: true, status: 200 };
+      }
+
+      if (url.endsWith('/confirm-upload')) {
+        const {
+          confirmations: [confirmed],
+        } = JSON.parse(String(init?.body));
+        step(`confirm:${confirmed.object_id}`);
+        if (confirmed.object_id === 'blob')
+          expect(confirmed.content_hash).toBe(blob.contentHash);
+      }
+
+      return undefined;
+    });
+
+    if (failure) {
+      await expect(backupDrive({ db, ...PASS })).rejects.toThrow(
+        `injected ${failure}`,
+      );
+      expect(order).toEqual(expected.slice(0, expected.indexOf(failure) + 1));
+      expect(db.vaultCommitSegment).not.toHaveBeenCalled();
+      injectFailure = undefined;
+      order.length = 0;
+    }
+
+    await backupDrive({ db, ...PASS });
+    expect(order).toEqual(expected);
+    expect(db.vaultCommitSegment).toHaveBeenCalledOnce();
+    expect(db.vaultExport).toHaveBeenCalledTimes(failure ? 2 : 1);
+  });
+
   it('uploads nothing when the drive has not changed', async () => {
     const db: VaultCapableDb = {
       vaultExport: vi.fn(async () => null),
@@ -569,8 +695,8 @@ describe('restoreDrive', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
-      if (url.endsWith('/objects'))
-        return new Response(JSON.stringify(objects));
+      if (url.endsWith('/recovery-manifest'))
+        return new Response(JSON.stringify(manifest(objects)));
       if (url.endsWith('/download-urls'))
         return new Response(
           JSON.stringify({
@@ -590,16 +716,22 @@ describe('restoreDrive', () => {
         db,
         drivePseudonym: PSEUDONYM,
         devicePubkey: DEVICE,
-        driveKey: KEY,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toMatchObject({
       message: expect.stringMatching(/Restore incomplete:/),
       cause: expect.stringMatching(/404/),
     });
-    expect(db.vaultImport).toHaveBeenCalledWith(KEY, 1, PSEUDONYM, DEVICE, [
-      { objectKey: 'a', sealed: new Uint8Array([7]) },
-      { objectKey: 'c', sealed: new Uint8Array([7]) },
-    ]);
+    expect(db.vaultImport).toHaveBeenCalledWith(
+      { driveKey: KEY, keyEpoch: 1 },
+      PSEUDONYM,
+      DEVICE,
+      [
+        { objectKey: 'a', sealed: new Uint8Array([7]) },
+        { objectKey: 'c', sealed: new Uint8Array([7]) },
+      ],
+      { lanes: {}, checkpointN: 0 },
+    );
   });
 
   it('returns a flagged outcome when some objects are unreadable but data was restored', async () => {
@@ -619,7 +751,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
       source: async () => [{ objectKey: 'pack', sealed: new Uint8Array([1]) }],
     });
 
@@ -646,7 +778,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
       source: async () => [{ objectKey: 'pack', sealed: new Uint8Array([1]) }],
     });
     expect(outcome.resourcesRestored).toBe(5);
@@ -671,7 +803,7 @@ describe('restoreDrive', () => {
         db,
         drivePseudonym: PSEUDONYM,
         devicePubkey: DEVICE,
-        driveKey: KEY,
+        key: { driveKey: KEY, keyEpoch: 1 },
         source: async () => [
           { objectKey: 'pack', sealed: new Uint8Array([1]) },
         ],
@@ -700,8 +832,8 @@ describe('restoreDrive', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
-      if (url.endsWith('/objects'))
-        return new Response(JSON.stringify(objects));
+      if (url.endsWith('/recovery-manifest'))
+        return new Response(JSON.stringify(manifest(objects)));
       if (url.endsWith('/download-urls'))
         return new Response(
           JSON.stringify({
@@ -722,7 +854,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     });
     await vi.waitFor(() => expect(releases.length).toBeGreaterThan(1));
 
@@ -738,7 +870,7 @@ describe('restoreDrive', () => {
     await restoring;
     expect(peak).toBeLessThanOrEqual(4);
     expect(
-      db.vaultImport.mock.calls[0][4].map(
+      db.vaultImport.mock.calls[0][3].map(
         (o: { objectKey: string }) => o.objectKey,
       ),
     ).toEqual(objects.map(o => o.object_key));
@@ -751,7 +883,7 @@ describe('restoreDrive', () => {
       vaultCommitSegment: vi.fn(),
     };
     mockFetch(url =>
-      url.endsWith('/objects')
+      url.endsWith('/recovery-manifest')
         ? { ok: true, status: 200, json: async () => [] }
         : undefined,
     );
@@ -760,7 +892,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     });
 
     expect(outcome.resourcesRestored).toBe(0);
@@ -782,8 +914,7 @@ describe('restoreDrive', () => {
       vaultExport: vi.fn(),
       vaultImport: vi.fn(
         async (
-          _k: Uint8Array,
-          _e: number,
+          _k: { driveKey: Uint8Array; keyEpoch: number },
           _p: string,
           _d: string,
           objects: { objectKey: string; sealed: Uint8Array }[],
@@ -803,7 +934,7 @@ describe('restoreDrive', () => {
     };
 
     mockFetch(url => {
-      if (url.endsWith('/objects')) {
+      if (url.endsWith('/recovery-manifest')) {
         return {
           ok: true,
           status: 200,
@@ -839,7 +970,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     });
 
     expect(imported).toEqual([first, second]);
@@ -856,7 +987,7 @@ describe('restoreDrive', () => {
 
     const db: VaultCapableDb = {
       vaultExport: vi.fn(),
-      vaultImport: vi.fn(async (_k, _e, _p, _d, sealed: unknown[]) => {
+      vaultImport: vi.fn(async (_k, _p, _d, sealed: unknown[]) => {
         imported = sealed.length;
 
         return {
@@ -871,7 +1002,7 @@ describe('restoreDrive', () => {
     };
 
     mockFetch((url, init) => {
-      if (url.endsWith('/objects')) {
+      if (url.endsWith('/recovery-manifest')) {
         return { ok: true, status: 200, json: async () => objects };
       }
 
@@ -914,7 +1045,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     });
 
     expect(batchSizes).toEqual([64, 64, 22]);
@@ -934,7 +1065,7 @@ describe('restoreDrive', () => {
       vaultCommitSegment: vi.fn(),
     };
     mockFetch(url => {
-      if (url.endsWith('/objects')) {
+      if (url.endsWith('/recovery-manifest')) {
         return {
           ok: true,
           status: 200,
@@ -970,7 +1101,7 @@ describe('restoreDrive', () => {
       db,
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
       onProgress: (done, total) => seen.push([done, total]),
     });
 
@@ -987,7 +1118,7 @@ describe('restoreDrive', () => {
       vaultCommitSegment: vi.fn(),
     };
     mockFetch(url => {
-      if (url.endsWith('/objects')) {
+      if (url.endsWith('/recovery-manifest')) {
         return {
           ok: true,
           status: 200,
@@ -1007,7 +1138,7 @@ describe('restoreDrive', () => {
         db,
         drivePseudonym: PSEUDONYM,
         devicePubkey: DEVICE,
-        driveKey: KEY,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toMatchObject({
       message: expect.stringMatching(/Restore incomplete:/),
@@ -1446,7 +1577,7 @@ describe('scheduling', () => {
       driveSubject: 'did:ad:drive',
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     };
     const [a, b] = await Promise.all([
       runVaultBackup(args),
@@ -1479,7 +1610,7 @@ describe('scheduling', () => {
       driveSubject: 'did:ad:drive',
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     };
     await runVaultBackup(args);
     await runVaultBackup(args);
@@ -1505,7 +1636,7 @@ describe('scheduling', () => {
       driveSubject: 'did:ad:drive',
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
     });
 
     expect(outcome).toEqual({ status: 'nothing-to-do' });
@@ -1540,16 +1671,16 @@ describe('scheduling', () => {
       driveSubject: 'did:ad:drive',
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
-      driveKeyEpoch: 1,
+      key: { driveKey: KEY, keyEpoch: 1 },
+
       refreshDriveKey,
     });
 
     expect(refreshDriveKey).toHaveBeenCalledTimes(1);
-    const [, keyUsed, epochUsed] = (db.vaultExport as ReturnType<typeof vi.fn>)
-      .mock.calls[0];
-    expect(keyUsed).toBe(FRESH);
-    expect(epochUsed).toBe(2);
+    const [, keyUsed] = (db.vaultExport as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(keyUsed.driveKey).toBe(FRESH);
+    expect(keyUsed.keyEpoch).toBe(2);
   });
 
   it('does not seal anything when a re-keyed drive cannot be refreshed', async () => {
@@ -1570,8 +1701,7 @@ describe('scheduling', () => {
         driveSubject: 'did:ad:drive',
         drivePseudonym: PSEUDONYM,
         devicePubkey: DEVICE,
-        driveKey: KEY,
-        driveKeyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toThrow(/re-keyed/);
     expect(db.vaultExport).not.toHaveBeenCalled();
@@ -1584,8 +1714,8 @@ describe('scheduling', () => {
         driveSubject: 'did:ad:drive',
         drivePseudonym: PSEUDONYM,
         devicePubkey: DEVICE,
-        driveKey: KEY,
-        driveKeyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
+
         refreshDriveKey: async () => ({ driveKey: KEY, keyEpoch: 1 }),
       }),
     ).rejects.toThrow(/epoch 1/);
@@ -1594,7 +1724,7 @@ describe('scheduling', () => {
 
   /** A drive that was never re-keyed is at epoch 1, which is what a caller
    *  without an epoch is assumed to hold: no refresh, no error. */
-  it('accepts a caller without an epoch on a drive still at epoch 1', async () => {
+  it('carries the recovered epoch through to the exporter', async () => {
     const db: VaultCapableDb = {
       vaultExport: vi.fn(async () => null),
       vaultImport: vi.fn(),
@@ -1612,14 +1742,14 @@ describe('scheduling', () => {
       driveSubject: 'did:ad:drive',
       drivePseudonym: PSEUDONYM,
       devicePubkey: DEVICE,
-      driveKey: KEY,
+      key: { driveKey: KEY, keyEpoch: 1 },
       refreshDriveKey,
     });
 
     expect(refreshDriveKey).not.toHaveBeenCalled();
-    expect((db.vaultExport as ReturnType<typeof vi.fn>).mock.calls[0][2]).toBe(
-      1,
-    );
+    expect(
+      (db.vaultExport as ReturnType<typeof vi.fn>).mock.calls[0][1].keyEpoch,
+    ).toBe(1);
   });
 });
 
@@ -1868,7 +1998,7 @@ describe('compacting the backup', () => {
     driveSubject: 'did:ad:drive',
     drivePseudonym: PSEUDONYM,
     devicePubkey: DEVICE,
-    driveKey: KEY,
+    key: { driveKey: KEY, keyEpoch: 1 },
   });
 
   it('tells the exporter there is no anchor when a checkpoint is forced', async () => {
@@ -1878,7 +2008,7 @@ describe('compacting the backup', () => {
     await runVaultBackup({ ...args(db), forceCheckpoint: true });
 
     // Argument 8 is driveHasCheckpoint. The vault has one, yet it is false.
-    expect(db.vaultExport.mock.calls[0][7]).toBe(false);
+    expect(db.vaultExport.mock.calls[0][6]).toBe(false);
     // Cursors and lane state still advance through the normal commit.
     expect(db.vaultCommitSegment).toHaveBeenCalledWith(PSEUDONYM, DEVICE, 6);
   });
@@ -1889,7 +2019,7 @@ describe('compacting the backup', () => {
 
     await runVaultBackup(args(db));
 
-    expect(db.vaultExport.mock.calls[0][7]).toBe(true);
+    expect(db.vaultExport.mock.calls[0][6]).toBe(true);
   });
 
   it('does not join an ordinary pass that is already running', async () => {
@@ -1901,7 +2031,7 @@ describe('compacting the backup', () => {
     await Promise.all([ordinary, forced]);
 
     expect(db.vaultExport).toHaveBeenCalledTimes(2);
-    expect(db.vaultExport.mock.calls[1][7]).toBe(false);
+    expect(db.vaultExport.mock.calls[1][6]).toBe(false);
   });
 
   it('publishes the checkpoint before it frees anything', async () => {
@@ -1948,7 +2078,7 @@ describe('compacting the backup', () => {
       });
 
       // Argument 10 is currentStateOnly: "Compress now" keeps the history.
-      expect(db.vaultExport.mock.calls[0][9]).toBe(discard);
+      expect(db.vaultExport.mock.calls[0][8]).toBe(discard);
     }
   });
 
@@ -1958,7 +2088,7 @@ describe('compacting the backup', () => {
 
     await runVaultBackup(args(db));
 
-    expect(db.vaultExport.mock.calls[0][9]).toBe(false);
+    expect(db.vaultExport.mock.calls[0][8]).toBe(false);
   });
 
   it('passes the undo-window choice through to free-up', async () => {

@@ -1,3 +1,9 @@
+import {
+  validateDriveKey,
+  validateRecoveryExpectation,
+  type DriveKeyHandle,
+  type RecoveryExpectation,
+} from './vault-types.js';
 /**
  * ClientDbWorker: typed async wrapper around the WASM ClientDb.
  *
@@ -1269,8 +1275,7 @@ export class ClientDbWorker {
    */
   async vaultExport(
     driveSubject: string,
-    key: Uint8Array,
-    keyEpoch: number,
+    key: DriveKeyHandle,
     drivePseudonym: string,
     devicePubkey: string,
     segment: number,
@@ -1281,17 +1286,24 @@ export class ClientDbWorker {
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
+    blobs: {
+      objectKey: string;
+      contentHash: string;
+      chunkIndex: number;
+      sealed: Uint8Array;
+    }[];
     kind: 'pack' | 'checkpoint';
     resources: number;
     unchanged: number;
     tombstones: number;
     coverage: Record<string, number>;
   } | null> {
+    validateDriveKey(key);
     const r = await this.send({
       type: 'vaultExport',
       driveSubject,
-      key,
-      keyEpoch,
+      key: key.driveKey,
+      keyEpoch: key.keyEpoch,
       drivePseudonym,
       devicePubkey,
       segment,
@@ -1304,6 +1316,12 @@ export class ClientDbWorker {
     return (r ?? null) as {
       objectKey: string;
       sealed: Uint8Array;
+      blobs: {
+        objectKey: string;
+        contentHash: string;
+        chunkIndex: number;
+        sealed: Uint8Array;
+      }[];
       kind: 'pack' | 'checkpoint';
       resources: number;
       unchanged: number;
@@ -1323,27 +1341,34 @@ export class ClientDbWorker {
    * being duplicated in every host's JS.
    */
   async vaultImport(
-    key: Uint8Array,
-    keyEpoch: number,
+    key: DriveKeyHandle,
     drivePseudonym: string,
     devicePubkey: string,
     objects: { objectKey: string; sealed: Uint8Array }[],
+    expectation?: RecoveryExpectation,
   ): Promise<{
     packsRead: number;
     resourcesRestored: number;
     tombstonesApplied: number;
     objectsSkipped: number;
     objectsUnreadable: number;
+    subjectsRestored?: string[];
+    subjectsDeleted?: string[];
+    blobsRestored?: number;
+    blobsMissing?: number;
     objectsMissing?: number;
     completeness?: 'empty' | 'complete' | 'partial';
   }> {
+    validateDriveKey(key);
+    if (expectation) validateRecoveryExpectation(expectation);
     const r = await this.send({
       type: 'vaultImport',
-      key,
-      keyEpoch,
+      key: key.driveKey,
+      keyEpoch: key.keyEpoch,
       drivePseudonym,
       devicePubkey,
       objects,
+      expectation,
     });
 
     return r as {

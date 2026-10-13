@@ -376,8 +376,19 @@ mod tests {
             restored_file.get(urls::NAME).unwrap().to_string(),
             "recovered.txt"
         );
-        // Graph recovery cannot conjure file bytes. Without the S3 backend,
-        // the restored reference still exists but the file is unavailable.
+        // Format 3 restores encrypted dependencies into the cold local cache.
+        assert_eq!(summary.blobs_restored, 1);
+        assert_eq!(
+            replacement
+                .get_blob(hash.as_bytes())
+                .await
+                .unwrap()
+                .unwrap(),
+            bytes
+        );
+        // The independently stored Cloud Server copy still works when the
+        // local recovered cache is gone and the replacement node selects S3.
+        replacement.kv.remove(Tree::Blobs, hash.as_bytes()).unwrap();
         assert!(replacement
             .get_blob(hash.as_bytes())
             .await
