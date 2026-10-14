@@ -2243,8 +2243,14 @@ export class Resource<C extends OptionalClass = any> {
       // JS object for every change in the history. On a resource with a long
       // history (or a sidebar sorting thousands of children) that was the
       // dominant cost of opening a drive.
-      for (const peer of doc.oplogVersion().toJSON().keys()) {
+      for (const [peer, end] of doc.oplogVersion().toJSON()) {
         consider(doc.getChangeAt({ peer, counter: 0 }));
+        // Loro's snapshot block cache can hold the first block without its
+        // later blocks. A subsequent import then tries appending to that
+        // earlier block and panics ("counter should be continuous"). Touch
+        // the tail too: two reads per peer still avoid scanning all history,
+        // and leave the live document and its unsaved edits intact.
+        if (end > 1) doc.getChangeAt({ peer, counter: end - 1 });
       }
     } catch {
       genesis = undefined;
