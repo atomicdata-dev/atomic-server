@@ -21,7 +21,7 @@ use crate::{
     sync::protocol,
 };
 use futures::{SinkExt, StreamExt};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 /// A message received from the server over WebSocket.
@@ -145,6 +145,8 @@ pub struct WsClient {
     /// The nonce from the server's `CHALLENGE`, once it arrived. `None` on a
     /// server that predates the frame.
     challenge: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    /// Flips to `true` when the reader task ends, i.e. the socket closed.
+    closed: watch::Receiver<bool>,
 }
 
 /// How long `authenticate` waits for the server's `CHALLENGE` when it has
@@ -190,6 +192,7 @@ impl WsClient {
         let (tx, mut rx) = mpsc::channel::<Message>(64);
         let (broadcast_tx, _) = broadcast::channel::<WsMessage>(256);
         let broadcast_tx_clone = broadcast_tx.clone();
+        let (closed_tx, closed_rx) = watch::channel(false);
 
         // Writer task: forwards frames verbatim to the WebSocket
         tokio::spawn(async move {
@@ -227,6 +230,7 @@ impl WsClient {
                     let _ = broadcast_tx_clone.send(parsed);
                 }
             }
+            let _ = closed_tx.send(true);
         });
 
         let client = Self {
@@ -235,6 +239,7 @@ impl WsClient {
             origin,
             server_capabilities,
             challenge,
+            closed: closed_rx,
         };
         // Introduce ourselves: the capabilities we speak, so the server can
         // answer COMMIT with a slim COMMIT_OK. A pre-2026-09 server drops the
@@ -246,6 +251,22 @@ impl WsClient {
             ))
             .await?;
         Ok(client)
+    }
+
+    /// Whether the socket has closed (the server went away or dropped us).
+    pub fn is_closed(&self) -> bool {
+        *self.closed.borrow()
+    }
+
+    /// Resolves once the socket has closed. Used by load tests to notice a
+    /// server restart without waiting for a keepalive to fail.
+    pub async fn wait_closed(&self) {
+        let mut rx = self.closed.clone();
+        while !*rx.borrow_and_update() {
+            if rx.changed().await.is_err() {
+                return;
+            }
+        }
     }
 
     /// The nonce the server issued in its `CHALLENGE`, if it has arrived.
