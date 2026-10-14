@@ -129,6 +129,7 @@ msgstr "AI Agents"
 #: src/components/AvatarCropper.tsx
 #: src/components/Cloud/DriveAddress.tsx
 #: src/components/ConfirmationDialog.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
@@ -144,8 +145,6 @@ msgstr "AI Agents"
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
 #: src/routes/History/HistoryMobileView.tsx
 #: src/views/Conversation/NewMessageDialog.tsx
 #: src/views/Installation/AssignRights.tsx
@@ -264,11 +263,9 @@ msgstr "Automatically compact the conversation when input tokens exceed this per
 #: src/chunks/AI/MessageContextItem.tsx
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 #: src/chunks/RTE/EditLinkForm.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/QuickAddDialog.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/forms/ResourceSelector/ResourceSelector.tsx
@@ -489,8 +486,7 @@ msgstr "Optional HTTP headers to send when connecting to this MCP server"
 
 #: src/actions/resourceActions.tsx
 #: src/chunks/AI/AgentConfigItem.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/MetaSetter.tsx
 #: src/routes/EditRoute.tsx
@@ -2288,8 +2284,7 @@ msgstr "Allow all writes done by this plugin"
 msgid "Deny"
 msgstr "Deny"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/views/PluginView/useRequestPermissionDialog.tsx
 msgid "Allow"
 msgstr "Allow"
@@ -3123,10 +3118,8 @@ msgstr "Export table as CSV"
 msgid "Table filters"
 msgstr "Table filters"
 
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
@@ -11910,11 +11903,6 @@ msgstr "<0/> Add {0}"
 msgid "<0/> Select File"
 msgstr "<0/> Select File"
 
-#. 0: classType ? classTypeTitle \\: 'new item'; 1: ' '
-#: src/components/forms/ResourceSelector/DropdownInput.tsx
-msgid "Create {0}:{1} <0/>"
-msgstr "Create {0}:{1} <0/>"
-
 #. 0: ' '
 #: src/components/forms/SearchBox/SearchBoxWindow.tsx
 msgid "Create{0} <0/>"
@@ -12385,28 +12373,23 @@ msgstr "This link points at {0}, which is not the server you are signed in to, s
 msgid "Sign in first, then open this link again."
 msgstr "Sign in first, then open this link again."
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read only"
 msgstr "Read only"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read and edit"
 msgstr "Read and edit"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Connecting"
 msgstr "Connecting"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can reach"
 msgstr "What it can reach"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can do"
 msgstr "What it can do"
 

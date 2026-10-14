@@ -5,6 +5,7 @@ import {
   useArray,
   useNumber,
   useResource,
+  useResources,
   useString,
   useStore,
   properties,
@@ -25,10 +26,7 @@ import { NewInstanceButton } from '../components/NewInstanceButton';
 import ResourceCard from './Card/ResourceCard';
 import Table from '../components/Table';
 import { useSubjectParam } from '../helpers/useCurrentSubject';
-import {
-  DropdownInput,
-  DropDownMini,
-} from '../components/forms/ResourceSelector/DropdownInput';
+import { ComboBox, type ComboBoxOption } from '../components/ComboBox';
 import { AtomicLink } from '../components/AtomicLink';
 import { ResourcePageProps } from './ResourcePage';
 import { useEffectOnce } from '../hooks/useEffectOnce';
@@ -194,11 +192,10 @@ function Collection({ resource }: ResourcePageProps): JSX.Element {
         )}
         {isClass && (
           <DropDownMini>
-            <DropdownInput
-              placeholder={'sort by...'}
-              initial={sortBy}
-              options={propsArrayFull}
-              onUpdate={handleSetSort}
+            <SortByPicker
+              properties={propsArrayFull}
+              selected={sortBy}
+              onSelect={handleSetSort}
             />
           </DropDownMini>
         )}
@@ -236,6 +233,41 @@ function Collection({ resource }: ResourcePageProps): JSX.Element {
   );
 }
 
+type SortByPickerProps = {
+  /** Subjects of the properties the collection can be sorted by. */
+  properties: string[];
+  selected: string | undefined;
+  onSelect: (by: string | undefined) => void;
+};
+
+function SortByPicker({
+  properties: subjects,
+  selected,
+  onSelect,
+}: SortByPickerProps): JSX.Element {
+  const resources = useResources(subjects);
+
+  const options = React.useMemo<ComboBoxOption[]>(
+    () =>
+      subjects.map(subject => {
+        const label = resources.get(subject)?.title ?? subject;
+
+        return { value: subject, label, searchLabel: label };
+      }),
+    [subjects, resources],
+  );
+
+  return (
+    <ComboBox
+      options={options}
+      selectedItem={selected}
+      onSelect={onSelect}
+      ariaLabel='sort by'
+      placeholder='sort by...'
+    />
+  );
+}
+
 type CardListProps = {
   members: string[];
   subject: string;
@@ -262,6 +294,13 @@ function CardList({ members, subject }: CardListProps): JSX.Element {
 }
 
 /** Use this to wrap around items to make them fit in the grid */
+const DropDownMini = styled.div`
+  display: inline-flex;
+  margin-bottom: 1rem;
+  flex: 1;
+  max-width: 20rem;
+`;
+
 const GridItem = styled.div`
   margin: 0;
   /* display: grid; */
