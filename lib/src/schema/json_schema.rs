@@ -1212,19 +1212,19 @@ fn ontology_from_node(root: &Node, options: &ImportOptions) -> AtomicResult<Onto
 // Checking a plan
 // ---------------------------------------------------------------------------
 
-struct CheckedClass {
-    shortname: String,
+pub(super) struct CheckedClass {
+    pub(super) shortname: String,
     name: String,
     description: String,
-    requires: Vec<String>,
-    recommends: Vec<String>,
+    pub(super) requires: Vec<String>,
+    pub(super) recommends: Vec<String>,
     /// `None`: leave the class's constraints alone.
-    constraints: Option<BTreeMap<String, Map<String, Json>>>,
+    pub(super) constraints: Option<BTreeMap<String, Map<String, Json>>>,
 }
 
 pub(super) struct CheckedPlan {
     pub(super) properties: Vec<PropertyPlan>,
-    classes: Vec<CheckedClass>,
+    pub(super) classes: Vec<CheckedClass>,
 }
 
 fn unique(names: &[String]) -> Vec<String> {

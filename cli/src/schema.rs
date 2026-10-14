@@ -1,4 +1,4 @@
-//! `schema push | lock | check`: a schema file in your own language (a JSON
+//! `schema push | lock | check | diff`: a schema file in your own language (a JSON
 //! Schema or an `OntologyInput` JSON) becomes a real ontology plus a lockfile
 //! that pins its property IDs. See `docs/src/schema/json-schema.md`.
 use std::{
@@ -10,9 +10,10 @@ use atomic_lib::{
     agents::Agent,
     errors::AtomicResult,
     schema::{
+        compat::{self, Change, Level},
         json_schema::{
-            ensure_ontology_with, ontology_from_json_schema_str, EnsureTarget, ImportOptions,
-            OntologyPlan,
+            ensure_ontology_with, ontology_from_json_schema_str, ontology_to_json_schema,
+            EnsureTarget, ImportOptions, OntologyPlan,
         },
         lockfile::Lockfile,
     },
@@ -117,6 +118,99 @@ pub fn check(
         .map_err(|e| format!("{}: {e}", path.display()).into())
 }
 
+/// The ontology as the server has it, read back into a plan. Names are the
+/// server's, so compare it with [`compat::diff`], which ignores them.
+async fn server_plan(
+    context: &Context,
+    ontology: &str,
+    shortname: &str,
+) -> AtomicResult<OntologyPlan> {
+    let json = ontology_to_json_schema(&context.store, ontology).await?;
+    ontology_from_json_schema_str(
+        &json.to_string(),
+        &ImportOptions {
+            shortname: Some(shortname.to_string()),
+        },
+    )
+}
+
+/// The changes grouped by level, worst first. Empty text when there are none.
+pub fn format_changes(changes: &[Change]) -> String {
+    let mut text = String::new();
+    for level in [Level::Breaking, Level::Tightening, Level::Compatible] {
+        let of_level: Vec<_> = changes.iter().filter(|c| c.level == level).collect();
+        if of_level.is_empty() {
+            continue;
+        }
+        let title = format!("{} ({})", level.to_string().to_uppercase(), of_level.len());
+        text.push_str(&match level {
+            Level::Breaking => title.red().bold().to_string(),
+            Level::Tightening => title.yellow().bold().to_string(),
+            Level::Compatible => title.green().bold().to_string(),
+        });
+        text.push('\n');
+        for change in of_level {
+            let place = match (&change.class, &change.property) {
+                (Some(c), Some(p)) => format!("{c}.{p}"),
+                (Some(c), None) => c.clone(),
+                (None, Some(p)) => format!("property {p}"),
+                (None, None) => "ontology".to_string(),
+            };
+            text.push_str(&format!("  {place}: {}\n", change.detail));
+        }
+    }
+    text
+}
+
+/// How `file` differs from `against` (a schema file), or from the ontology on
+/// the server that the lockfile pins. Prints the changes, and fails when one
+/// of them is breaking.
+pub async fn diff(
+    context: &Context,
+    file: &Path,
+    against: Option<PathBuf>,
+    shortname: Option<String>,
+    lockfile: Option<PathBuf>,
+) -> AtomicResult<()> {
+    let new = read_plan(file, shortname.clone())?;
+    let lock = read_lockfile(&lockfile.unwrap_or_else(|| default_lockfile_path(file)))?;
+    let changes = match against {
+        Some(old_file) => {
+            let old = read_plan(&old_file, shortname)?;
+            let ontology = lock.map_or(OFFLINE_ONTOLOGY.to_string(), |l| l.ontology);
+            compat::diff(&old, &new, &ontology)?
+        }
+        None => {
+            let lock = lock.ok_or(
+                "No lockfile to say which ontology on the server to compare with. \
+                 Run `schema push` first, or pass --against <old schema file>",
+            )?;
+            let old = server_plan(context, &lock.ontology, &new.shortname).await?;
+            compat::diff(&old, &new, &lock.ontology)?
+        }
+    };
+    report(&changes)
+}
+
+/// Any ontology will do offline: IDs are only compared with each other.
+const OFFLINE_ONTOLOGY: &str = "atomic:ontologyGenesis";
+
+fn report(changes: &[Change]) -> AtomicResult<()> {
+    if changes.is_empty() {
+        println!("{}", "No changes to the schema's contract".green());
+        return Ok(());
+    }
+    print!("{}", format_changes(changes));
+    let breaking = changes
+        .iter()
+        .filter(|c| c.level == Level::Breaking)
+        .count();
+    if breaking > 0 {
+        return Err(format!("{breaking} breaking change(s)").into());
+    }
+    Ok(())
+}
+
 /// Makes the schema real on the configured server and writes the lockfile.
 pub async fn push(
     context: &Context,
@@ -125,6 +219,7 @@ pub async fn push(
     shortname: Option<String>,
     lockfile: Option<PathBuf>,
     accept_changes: bool,
+    allow_breaking: bool,
 ) -> AtomicResult<()> {
     let plan = read_plan(file, shortname)?;
     let path = lockfile.unwrap_or_else(|| default_lockfile_path(file));
@@ -133,7 +228,7 @@ pub async fn push(
     // A pinned lockfile must still match, or the push would quietly make new
     // properties next to the old ones.
     if let Some(previous) = &previous {
-        if let Err(e) = previous.check(&plan) {
+        if let Err(e) = previous.check_identities(&plan) {
             if !accept_changes {
                 return Err(format!(
                     "{}: {e}\nPass --accept-changes to push anyway",
@@ -150,6 +245,35 @@ pub async fn push(
         .ok_or("No parent to put the ontology in. Pass --parent <subject>")?;
     let agent = Agent::from_secret(&config.shared.agent_secret)?;
 
+    // What this push would do to data under the ontology as it is now.
+    if let Some(previous) = &previous {
+        match server_plan(context, &previous.ontology, &plan.shortname).await {
+            Ok(old) => {
+                let changes = compat::diff(&old, &plan, &previous.ontology)?;
+                let worst = changes.iter().map(|c| c.level).max();
+                if worst >= Some(Level::Tightening) {
+                    print!("{}", format_changes(&changes));
+                }
+                if worst == Some(Level::Breaking) && !allow_breaking {
+                    return Err("The push has breaking changes. Pass --allow-breaking to push anyway".into());
+                }
+                if worst == Some(Level::Tightening) {
+                    println!(
+                        "{}",
+                        "Existing data may fail the new constraints".yellow()
+                    );
+                }
+            }
+            Err(e) if !allow_breaking => {
+                return Err(format!(
+                    "Could not read the ontology on the server to compare with: {e}\nPass --allow-breaking to push without comparing"
+                )
+                .into())
+            }
+            Err(_) => {}
+        }
+    }
+
     let target = EnsureTarget {
         remote: true,
         ontology: previous.map(|p| p.ontology),
@@ -164,7 +288,7 @@ pub async fn push(
     )
     .await?;
 
-    let lock = Lockfile::from_ensured(&ensured);
+    let lock = Lockfile::from_ensured(&ensured, &plan)?;
     write_lockfile(&path, &lock)?;
     println!(
         "{} {} ({} classes, {} properties)",
@@ -275,6 +399,72 @@ mod test {
             .unwrap_err()
             .to_string()
             .contains("No lockfile"));
+    }
+
+    const OLD_SCHEMA: &str = r#"{
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Notes",
+      "$defs": { "note": { "type": "object",
+        "properties": { "title": { "type": "string", "minLength": 1 }, "pinned": { "type": "boolean" } },
+        "required": ["title"] } }
+    }"#;
+
+    fn changes_between(old: &str, new: &str) -> Vec<Change> {
+        compat::diff(
+            &parse_plan(old, None).unwrap(),
+            &parse_plan(new, None).unwrap(),
+            OFFLINE_ONTOLOGY,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn diff_against_a_file_groups_by_level() {
+        // Tighter (minLength 1 -> 3) and a new optional property.
+        let new = OLD_SCHEMA
+            .replace("\"minLength\": 1", "\"minLength\": 3")
+            .replace(
+                "\"pinned\"",
+                "\"color\": { \"type\": \"string\" }, \"pinned\"",
+            );
+        let changes = changes_between(OLD_SCHEMA, &new);
+        let text = format_changes(&changes);
+        assert!(text.find("TIGHTENING").unwrap() < text.find("COMPATIBLE").unwrap());
+        assert!(!text.contains("BREAKING"));
+        assert!(
+            text.contains("note.title: minLength raised from 1 to 3"),
+            "{text}"
+        );
+        assert!(report(&changes).is_ok());
+    }
+
+    #[test]
+    fn diff_fails_on_breaking_changes_only() {
+        let breaking = OLD_SCHEMA.replace(
+            "\"pinned\": { \"type\": \"boolean\" }",
+            "\"pinned\": { \"type\": \"string\" }",
+        );
+        let changes = changes_between(OLD_SCHEMA, &breaking);
+        assert_eq!(changes[0].level, Level::Breaking);
+        let error = report(&changes).unwrap_err().to_string();
+        assert!(error.contains("1 breaking"), "{error}");
+
+        assert!(changes_between(OLD_SCHEMA, OLD_SCHEMA).is_empty());
+        assert!(report(&[]).is_ok());
+    }
+
+    #[test]
+    fn lockfile_made_by_lock_notices_a_tightened_schema() {
+        let file = temp_file("fingerprint.schema.json", OLD_SCHEMA);
+        lock(&file, ONTOLOGY, None, None).unwrap();
+        check(&file, None, None).unwrap();
+        std::fs::write(
+            &file,
+            OLD_SCHEMA.replace("\"minLength\": 1", "\"minLength\": 3"),
+        )
+        .unwrap();
+        let error = check(&file, None, None).unwrap_err().to_string();
+        assert!(error.contains("`schema diff`"), "{error}");
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Structs and models at the core of Atomic Schema (Class, Property, Datatype).
 
+pub mod compat;
 pub mod json_schema;
 pub mod lockfile;
 
