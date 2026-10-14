@@ -46,7 +46,7 @@ pub const MAX_PACE_MS: u32 = 10_000;
 /// Lower bound of the retry delay: never tell a client to come right back.
 pub const MIN_RETRY_MS: u64 = 250;
 
-/// Defaults, derived from `stresstest/results-2026-10-14.md`: one 4-core node
+/// Defaults, from the first load test (`tools/loadtest`): one 4-core node
 /// saturates near 200 commits/s. At 100 commits/s ack latency was ~330 ms,
 /// so ~33 commits were in flight (Little's law): that is where latency
 /// starts to be noticeable, hence a soft limit of 32. At 400 closed-loop

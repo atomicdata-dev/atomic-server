@@ -1209,28 +1209,13 @@ export class LocalOutbox {
       // waits for a fresh `markDirty` to re-arm — never retried on its own.
       if (live.blocked) return;
 
-      // Backoff: skip an entry still inside its post-failure window. The next
-      // drain (scheduled at `nextDueAt`) re-attempts it once it's due. Prevents
-      // the immediate-retry spin on a persistently-failing commit.
-      if (
-        live.failures &&
-        live.lastAttemptAt !== undefined &&
-        Date.now() < live.lastAttemptAt + drainBackoffMs(live.failures)
-      ) {
-        return;
-      }
-
+      // Not due yet: still inside its post-failure backoff, a BUSY wait, or
+      // the commit pace since this subject's last commit. The next drain
+      // (scheduled at `nextDueAt`) picks it up; edits keep accumulating in
+      // the Loro doc and go out as one merged delta.
       const now = Date.now();
 
-      // The server asked for a wait (BUSY) or the commit pace has not elapsed
-      // since this subject's last commit. Edits keep accumulating in the
-      // Loro doc and go out as one merged delta when it is due.
-      if (
-        (live.busyUntil !== undefined && now < live.busyUntil) ||
-        now < this.paceDueAt(live, now)
-      ) {
-        return;
-      }
+      if (now < this.dueAtOf(live, now)) return;
 
       live.busyUntil = undefined;
       live.lastAttemptAt = now;
