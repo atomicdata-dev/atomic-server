@@ -36,6 +36,7 @@ import {
   markReadAbout,
   recordNotification,
 } from '../../helpers/notifications/inbox';
+import { actorName } from '../../helpers/notifications/actorName';
 import { usePrivateDrive } from '../../hooks/usePrivateDrive';
 import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
 
@@ -292,7 +293,8 @@ export function MessageNotifier(): null {
         return;
       }
 
-      const authorName = related.get(n.author)?.title ?? 'Someone';
+      const authorName =
+        actorName(related.get(n.author)?.title, n.author) ?? 'Someone';
       const targetTitle = related.get(n.target)?.title ?? '';
       const title = headline(n.kind, authorName, targetTitle);
       const body =

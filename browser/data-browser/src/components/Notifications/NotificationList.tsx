@@ -14,6 +14,7 @@ import {
   occurredAt,
   type NotificationGroup,
 } from '../../helpers/notifications/inbox';
+import { actorName } from '../../helpers/notifications/actorName';
 import { formatTimeAgo } from '../../helpers/formatTimeAgo';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -116,8 +117,12 @@ function LoadingRows(): React.JSX.Element {
 
 /** Who, what and where, written now: current names, the reader's language. */
 function Headline({ group }: { group: NotificationGroup }): React.JSX.Element {
-  const [first] = useTitle(useResource(group.actors[0] ?? unknownSubject));
-  const [second] = useTitle(useResource(group.actors[1] ?? unknownSubject));
+  const [firstTitle] = useTitle(useResource(group.actors[0] ?? unknownSubject));
+  const [secondTitle] = useTitle(
+    useResource(group.actors[1] ?? unknownSubject),
+  );
+  const first = actorName(firstTitle, group.actors[0]) ?? 'Someone';
+  const second = actorName(secondTitle, group.actors[1]) ?? 'Someone';
   const [on] = useTitle(useResource(group.about ?? unknownSubject));
   const count = group.items.length;
   const others = group.actors.length - 1;
@@ -126,7 +131,7 @@ function Headline({ group }: { group: NotificationGroup }): React.JSX.Element {
   // the notification was stored with.
   const stored = group.items[0].get(core.properties.name) as string;
 
-  if (!group.actors[0] || !first || !on) return <>{stored}</>;
+  if (!group.actors[0] || !on) return <>{stored}</>;
 
   let who = first;
 
