@@ -181,6 +181,7 @@ const settle = async () => {
 it('carries the proxy ops; the relay op is gone', () => {
   for (const op of [
     'proxyCapability',
+    'proxyFetch',
     'proxyConnections',
     'proxyConnect',
   ] as const)
@@ -199,32 +200,12 @@ it('carries the proxy ops; the relay op is gone', () => {
   ]);
 });
 
-it('calls the proxy directly with a capability and a v2 signature by its own key', async () => {
+it('has the host send the proxy request it signed with its own key', async () => {
   const f = frame();
   const store = generatedStore(f);
-  const fetches: { url: string; init: RequestInit }[] = [];
-  let refusals = 1;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string, init: RequestInit) => {
-      fetches.push({ url, init });
-
-      if (refusals-- > 0)
-        return new Response(
-          JSON.stringify({ error: 'capability_expired', message: 'expired' }),
-          { status: 401 },
-        );
-
-      return new Response(JSON.stringify([{ id: 1 }]), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          link: '<https://pets.example/pets?page=2>; rel="next"',
-          'set-cookie': 'never=forwarded',
-        },
-      });
-    }),
-  );
+  // The frame has no network (CSP `connect-src 'none'`): it must never fetch.
+  const directFetch = vi.fn();
+  vi.stubGlobal('fetch', directFetch);
 
   const pending = store.proxy.request({
     platform: 'pets',
@@ -235,24 +216,59 @@ it('calls the proxy directly with a capability and a v2 signature by its own key
     body: '{"name":"Rex"}',
   });
 
-  // Two mints: the first capability is refused as expired, once.
-  for (let mint = 0; mint < 2; mint++) {
+  const next = async (op: string) => {
     await settle();
     const ask = f.parent.postMessage.mock.calls.at(-1)![0];
     expect(isViewRequest(ask)).toBe(true);
-    expect(ask.op).toBe('proxyCapability');
+    expect(ask.op).toBe(op);
+
+    return ask;
+  };
+
+  const answer = (id: unknown, result: unknown) =>
+    f.reply({ type: 'atomic.view.response', version: 1, id, result });
+
+  // Two mints: the first capability is refused as expired, once.
+  const sent: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+  }[] = [];
+
+  for (let mint = 0; mint < 2; mint++) {
+    const ask = await next('proxyCapability');
     expect(ask.args).toMatchObject({ platform: 'pets', connectionId: 'c 1' });
     expect(ask.args.publicKey).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    f.reply({
-      type: 'atomic.view.response',
-      version: 1,
-      id: ask.id,
-      result: {
-        capability: `cap-${mint}`,
-        aud: 'https://proxy.example',
-        exp: Math.floor(Date.now() / 1000) + 600,
-      },
+    answer(ask.id, {
+      capability: `cap-${mint}`,
+      aud: 'https://proxy.example',
+      exp: Math.floor(Date.now() / 1000) + 600,
     });
+
+    const request = await next('proxyFetch');
+    sent.push(request.args);
+    answer(
+      request.id,
+      mint === 0
+        ? {
+            status: 401,
+            headers: {},
+            text: JSON.stringify({
+              error: 'capability_expired',
+              message: 'expired',
+            }),
+          }
+        : {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+              link: '<https://pets.example/pets?page=2>; rel="next"',
+              'set-cookie': 'never=forwarded',
+            },
+            text: JSON.stringify([{ id: 1 }]),
+          },
+    );
   }
 
   const result = await pending;
@@ -264,17 +280,12 @@ it('calls the proxy directly with a capability and a v2 signature by its own key
     },
     body: [{ id: 1 }],
   });
-  expect(fetches).toHaveLength(2);
+  expect(directFetch).not.toHaveBeenCalled();
 
-  const { url, init } = fetches[1];
+  const { url, method, headers, body } = sent[1];
   expect(url).toBe('https://proxy.example/proxy/c%201/pets/pets?page=2');
-  expect(init).toMatchObject({
-    method: 'POST',
-    body: '{"name":"Rex"}',
-    credentials: 'omit',
-    redirect: 'error',
-  });
-  const headers = init.headers as Record<string, string>;
+  expect(method).toBe('POST');
+  expect(body).toBe('{"name":"Rex"}');
   expect(headers.Authorization).toBe('Capability cap-1');
   expect(headers['x-atomic-signature-version']).toBe('2');
   const publicKey = headers['x-atomic-public-key'];
@@ -302,9 +313,7 @@ it('calls the proxy directly with a capability and a v2 signature by its own key
     ),
   ).toBe(true);
   // Same frame key for both attempts; it never leaves the frame.
-  expect(
-    (fetches[0].init.headers as Record<string, string>)['x-atomic-public-key'],
-  ).toBe(publicKey);
+  expect(sent[0].headers['x-atomic-public-key']).toBe(publicKey);
 });
 
 it('refuses a path that would leave the connection, before asking anything', async () => {
