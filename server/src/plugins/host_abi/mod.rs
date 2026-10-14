@@ -36,6 +36,8 @@ mod run;
 mod store;
 
 #[cfg(test)]
+pub(crate) mod tests;
+#[cfg(test)]
 mod wit_tests;
 
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
