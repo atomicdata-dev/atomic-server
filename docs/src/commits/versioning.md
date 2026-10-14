@@ -49,7 +49,10 @@ already dropped are not recovered. Taking `audit` off, or moving the resource
 out of an audited folder, never deletes what was kept: the commit that does it
 is kept beside the audit-era commits, and later commits replace only the newest
 one. That newest one is the lowering commit itself, so after one more edit the
-signed record of who lowered `audit` is gone while the audit era stays. A
+envelope row of who lowered `audit` is replaced, but the commit that changed
+`retention` is kept like a rights change, so who lowered it stays provable.
+Any writer can change `retention`; who may lower it is an open question for an
+owner level. A
 receiver that already holds a newer commit for a compact resource still drops
 an older incoming one, audit-era or not. A node that has not yet received an
 ancestor of a resource keeps every commit it is sent until it can read the

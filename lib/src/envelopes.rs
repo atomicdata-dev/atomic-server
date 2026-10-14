@@ -761,6 +761,28 @@ mod tests {
         assert!(envelopes(&db, subject.as_str()).len() >= 2);
     }
 
+    /// The commit that takes audit off is an authorization-relevant commit:
+    /// it is kept as a commit resource, so who lowered audit stays provable
+    /// after later edits replace its envelope row.
+    #[tokio::test]
+    async fn the_commit_that_lowers_audit_stays_provable() {
+        let db = Db::init_temp("envelopes_lowering_kept").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        set_retention(&db, &subject, "audit").await;
+        let mut resource = db.get_resource(&subject).await.unwrap();
+        resource
+            .set(urls::RETENTION.into(), Value::String("compact".into()), &db)
+            .await
+            .unwrap();
+        let response = resource.save_locally(&db).await.unwrap();
+        let lowering = response.commit_resource.get_subject().to_string();
+        for name in ["one", "two"] {
+            signed_edit(&db, &subject, name).await;
+        }
+        assert!(db.has_resource_locally(&lowering));
+    }
+
     #[tokio::test]
     async fn moving_out_of_an_audited_folder_keeps_the_audit_era() {
         let db = Db::init_temp("envelopes_moved_out").await.unwrap();
