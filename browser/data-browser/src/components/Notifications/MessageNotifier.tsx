@@ -32,6 +32,7 @@ import {
   turnOnOsNotifications,
 } from '../../helpers/notifications/osNotifications';
 import { Button } from '../Button';
+import { ToastBody, ToastCard, ToastText, ToastTitle } from './toastStyles';
 import {
   markReadAbout,
   recordNotification,
@@ -434,21 +435,6 @@ export function MessageNotifier(): null {
   return null;
 }
 
-const ToastCard = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 22rem;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background: ${p => p.theme.colors.bg};
-  box-shadow: ${p => p.theme.boxShadowSoft};
-  cursor: pointer;
-  text-align: left;
-  color: ${p => p.theme.colors.text};
-`;
-
 const OfferCard = styled.div`
   display: flex;
   flex-direction: column;
@@ -471,26 +457,4 @@ const OfferButtons = styled.div`
   display: flex;
   gap: 0.5rem;
   margin-top: 0.2rem;
-`;
-
-const ToastBody = styled.span`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const ToastTitle = styled.span`
-  font-weight: 600;
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const ToastText = styled.span`
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.textLight};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 `;
