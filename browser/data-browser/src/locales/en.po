@@ -982,27 +982,27 @@ msgstr "Resources"
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Tags"
 msgstr "Tags"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Add LLM instructions"
 msgstr "Add LLM instructions"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "LLM Instructions"
 msgstr "LLM Instructions"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Default Ontology"
 msgstr "Default Ontology"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Plugins"
 msgstr "Plugins"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Remove tag"
 msgstr "Remove tag"
 
@@ -2050,6 +2050,7 @@ msgstr "Shortname"
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewFormDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewOntologyDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Create"
 msgstr "Create"
 
@@ -2127,8 +2128,6 @@ msgid "Add tag"
 msgstr "Add tag"
 
 #. 0: label
-#. 0: getTitle(resource)
-#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr "Switch to {0}"
@@ -2186,6 +2185,7 @@ msgstr "<0/> Note"
 #: src/components/NewInstanceButton/QuickCreateRow.tsx
 #: src/routes/IntegrationStore.tsx
 #: src/routes/SettingsAgent.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "New"
 msgstr "New"
 
@@ -3784,7 +3784,7 @@ msgstr "Tap <0>Undo</0> / <1>Redo</1> to step through edits; drag the undo butto
 msgid "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
 msgstr "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
 msgstr "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
 
@@ -3990,10 +3990,6 @@ msgstr "<0/> and{0} <1/> are typing"
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
 msgstr "Private drive"
-
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
-msgstr "Manage drives"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View and organize all your drives."
@@ -7638,6 +7634,8 @@ msgid "Integration sections"
 msgstr "Integration sections"
 
 #: src/chunks/PluginRuns/PluginPage.tsx
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Activity"
 msgstr "Activity"
 
@@ -9306,19 +9304,26 @@ msgstr "{0} replied to you"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr "{0} commented on {1}"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
 msgstr "{0} in {1}"
 
 #: src/components/Notifications/MessageNotifier.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "Someone"
 msgstr "Someone"
 
@@ -9445,6 +9450,7 @@ msgid "Searching in {0}"
 msgstr "Searching in {0}"
 
 #: src/components/OverlayContainer.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr "Recently opened"
 
@@ -10478,7 +10484,9 @@ msgid "{0}: {1} comments on {2}"
 msgstr "{0}: {1} comments on {2}"
 
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr "{0} replied to you in {1}"
 
@@ -12884,3 +12892,64 @@ msgstr "Delete this resource permanently. This cannot be undone."
 #: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Hide formatting toolbar"
 msgstr "Hide formatting toolbar"
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Free browser sync is meant for small groups of up to 4 people. For more people, use a Cloud Server on atomic.place."
+msgstr "Free browser sync is meant for small groups of up to 4 people. For more people, use a Cloud Server on atomic.place."
+
+#: src/views/NotificationPage.tsx
+msgid "Open conversation"
+msgstr "Open conversation"
+
+#: src/views/NotificationPage.tsx
+msgid "All notifications"
+msgstr "All notifications"
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "View all drives"
+msgstr "View all drives"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Currently on this drive"
+msgstr "Currently on this drive"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Activity will show up here"
+msgstr "Activity will show up here"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show less"
+msgstr "Show less"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show all"
+msgstr "Show all"
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Edited {0}"
+msgstr "Edited {0}"
+
+#: src/views/Drive/DrivePage.tsx
+msgid "<0/> Drive settings"
+msgstr "<0/> Drive settings"
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet. Create something with New, or drop files on this page."
+msgstr "Nothing here yet. Create something with New, or drop files on this page."
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet."
+msgstr "Nothing here yet."
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Drive settings"
+msgstr "Drive settings"
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Server members meet through for free browser sync."
+msgstr "Server members meet through for free browser sync."
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Browser sync server"
+msgstr "Browser sync server"
