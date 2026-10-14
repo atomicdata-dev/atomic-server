@@ -69,14 +69,14 @@ async fn from_draft(
         .ok_or_else(|| {
             AtomicServerError::bad_request("Published releases require a versioned manifest")
         })?;
-    let host = js_runtime::StoreHost {
-        db: std::sync::Arc::new(store.clone()),
-        plugin: body.plugin.clone(),
-        drive: body.drive.clone(),
-        for_agent: agent.clone(),
-        manifest: Some(manifest.clone()),
-    };
-    host.validate_binding().await?;
+    js_runtime::StoreHost::bound(
+        store,
+        &body.drive,
+        &body.plugin,
+        agent.clone(),
+        Some(manifest.clone()),
+    )
+    .await?;
     let schemas = match &body.schemas {
         Some(schemas) => schemas.clone(),
         None => {

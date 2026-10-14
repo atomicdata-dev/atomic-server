@@ -158,120 +158,43 @@ impl From<String> for AtomicError {
     }
 }
 
-impl From<std::boxed::Box<dyn std::error::Error>> for AtomicError {
-    fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            subject: None,
-            error_type: AtomicErrorType::OtherError,
-        }
-    }
+/// Implements `From<$source> for AtomicError` as an `OtherError` carrying the
+/// source's `Display` text.
+macro_rules! other_error_from_display {
+    ($($(#[$meta:meta])* $source:ty),+ $(,)?) => {
+        $(
+            $(#[$meta])*
+            impl From<$source> for AtomicError {
+                fn from(error: $source) -> Self {
+                    AtomicError {
+                        message: error.to_string(),
+                        subject: None,
+                        error_type: AtomicErrorType::OtherError,
+                    }
+                }
+            }
+        )+
+    };
 }
 
-// The following feel very redundant. Can this be simplified?
+other_error_from_display!(
+    std::boxed::Box<dyn std::error::Error>,
+    std::io::Error,
+    url::ParseError,
+    serde_json::Error,
+    std::string::FromUtf8Error,
+    ParseFloatError,
+    ParseIntError,
+    DecodeError,
+    ParseBoolError,
+    Infallible,
+    #[cfg(feature = "db-sled")]
+    sled::Error,
+);
+
+// Generic over the guard type, which the macro above does not cover.
 impl<T> From<std::sync::PoisonError<T>> for AtomicError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<std::io::Error> for AtomicError {
-    fn from(error: std::io::Error) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            subject: None,
-            error_type: AtomicErrorType::OtherError,
-        }
-    }
-}
-
-impl From<url::ParseError> for AtomicError {
-    fn from(error: url::ParseError) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<serde_json::Error> for AtomicError {
-    fn from(error: serde_json::Error) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<std::string::FromUtf8Error> for AtomicError {
-    fn from(error: std::string::FromUtf8Error) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<ParseFloatError> for AtomicError {
-    fn from(error: ParseFloatError) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<ParseIntError> for AtomicError {
-    fn from(error: ParseIntError) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            subject: None,
-            error_type: AtomicErrorType::OtherError,
-        }
-    }
-}
-
-impl From<DecodeError> for AtomicError {
-    fn from(error: DecodeError) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-impl From<ParseBoolError> for AtomicError {
-    fn from(error: ParseBoolError) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            subject: None,
-            error_type: AtomicErrorType::OtherError,
-        }
-    }
-}
-
-impl From<Infallible> for AtomicError {
-    fn from(error: Infallible) -> Self {
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-#[cfg(feature = "db-sled")]
-impl From<sled::Error> for AtomicError {
-    fn from(error: sled::Error) -> Self {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
