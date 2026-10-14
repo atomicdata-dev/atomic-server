@@ -77,6 +77,31 @@ error) of its previous commit before sending the next. It still targets
 and counted as `skipped_ticks` (summary line and JSON). Achieved rate then
 shows what the server sustains with one commit in flight per resource.
 
+The tool advertises `commit-pace` in its `HELLO`. In `--closed-loop` mode a
+writer also honours the server's load signals: it sends at most one commit per
+`max(--debounce-ms, pace_ms)`, and on `BUSY` (error code 12) it waits the
+told `retry_after_ms` plus jitter and resends the same commit (counted as
+`busy_refusals`, not as an error). The summary and JSON report `server_pace_ms`
+(distribution of the `pace_ms` that arrived on `COMMIT_OK`).
+
+**Edits model.** `--edit-rate E` makes each writer edit locally `E` times per
+second. Edits accumulate, and a writer sends one commit carrying every pending
+edit whenever it may send (previous commit acked, pace and BUSY waits over).
+It implies `--closed-loop`; `--rate` is ignored. This is how the real client
+behaves, and it shows what pacing buys:
+
+```
+atomic-loadtest commit --writers 400 --subscribers 50 --edit-rate 2 --duration 60
+```
+
+Reports edits/s that reached the server (acked inside the window), commits/s,
+edits per commit, `busy_refusals`, the `pace_ms` distribution and edit-to-server
+latency (time from an edit to the ack of the commit that carried it). Edits
+still pending when the window closes get 15 s to flush. After a BUSY the same
+signed commit is resent unchanged (the writer's chain already moved past it),
+so unlike the app it does not merge the edits made during the wait into it;
+they ride in the next commit.
+
 ### storm
 
 ```

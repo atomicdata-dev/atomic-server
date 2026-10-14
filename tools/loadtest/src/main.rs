@@ -67,6 +67,18 @@ enum Cmd {
         /// commit before sending the next; ticks it misses are skipped
         #[arg(long)]
         closed_loop: bool,
+        /// Edits per second per writer, applied locally and accumulated: one
+        /// commit carries every pending edit whenever the writer may send
+        /// (closed loop, server `pace_ms`, BUSY waits). Implies
+        /// `--closed-loop`; `--rate` is ignored. Reports edits/s that reached
+        /// the server and edit-to-server latency.
+        #[arg(long)]
+        edit_rate: Option<f64>,
+        /// Least time between two commits of one writer (the app's debounce),
+        /// in `--closed-loop` and `--edit-rate` mode. The writer waits
+        /// max(this, server pace_ms) after each commit.
+        #[arg(long, default_value_t = 100)]
+        debounce_ms: u64,
     },
     /// Reconnect storm: connect N clients, wait for the server to drop, measure recovery
     Storm {
@@ -116,6 +128,8 @@ async fn main() {
             duration,
             ramp_secs,
             closed_loop,
+            edit_rate,
+            debounce_ms,
         } => {
             let r = commit::run(
                 &common,
@@ -126,6 +140,8 @@ async fn main() {
                     duration,
                     ramp_secs,
                     closed_loop,
+                    edit_rate,
+                    debounce_ms,
                 },
             )
             .await;

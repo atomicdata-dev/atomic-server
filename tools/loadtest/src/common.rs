@@ -170,3 +170,15 @@ pub async fn setup_drives(
     }
     Ok((Arc::new(client), drives))
 }
+
+/// Like `line`, for samples that are not milliseconds (counts, `pace_ms`
+/// values, which already say what they are in the label).
+pub fn line_plain(j: &Json) -> String {
+    if j["count"].as_u64().unwrap_or(0) == 0 {
+        return "no samples".into();
+    }
+    format!(
+        "n={} p50={} p95={} p99={} max={}",
+        j["count"], j["p50"], j["p95"], j["p99"], j["max"]
+    )
+}
