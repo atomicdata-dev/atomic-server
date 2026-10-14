@@ -17,6 +17,16 @@ describe('hasConversationsEndpoint', () => {
     vi.restoreAllMocks();
   });
 
+  it('does not inherit a session cookie while probing public endpoint metadata', async () => {
+    const fetchMock = vi.fn(async () => answer(200, 'application/ad+json'));
+    vi.stubGlobal('fetch', fetchMock);
+    await hasConversationsEndpoint('http://app', '/conversations');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://app/conversations',
+      expect.objectContaining({ credentials: 'omit' }),
+    );
+  });
+
   it('is false for a server that answers with its HTML page', async () => {
     vi.stubGlobal(
       'fetch',

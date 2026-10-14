@@ -39,6 +39,8 @@ export function hasConversationsEndpoint(
 
 async function probe(url: string): Promise<boolean> {
   const response = await fetch(url, {
+    // Capability discovery is public; another tab's server cookie is unrelated.
+    credentials: 'omit',
     headers: { Accept: 'application/ad+json' },
     signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
   });
