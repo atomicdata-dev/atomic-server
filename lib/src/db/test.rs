@@ -2167,6 +2167,7 @@ async fn db_events_say_whether_a_commit_produced_the_change() {
     store.set_default_agent(agent);
 
     let mut events = store.subscribe_events();
+    let mut external = store.subscribe_external_changes();
 
     // A commit: the hook fires, so listeners must NOT fan this out again.
     let mut committed = Resource::new_instance(urls::CLASS, &store).await.unwrap();
@@ -2195,6 +2196,10 @@ async fn db_events_say_whether_a_commit_produced_the_change() {
         }
     };
     assert!(from_commit, "an applied commit must say so");
+    assert!(matches!(
+        external.try_recv(),
+        Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+    ));
 
     // A raw write, as a peer import performs: no commit, no hook, and nothing
     // would reach the UI unless a listener notices.
@@ -2227,6 +2232,13 @@ async fn db_events_say_whether_a_commit_produced_the_change() {
         !from_commit,
         "a write with no commit must be recognisable, or nothing announces it"
     );
+    assert!(matches!(
+        external.try_recv(),
+        Ok(DbEvent::Changed {
+            from_commit: false,
+            ..
+        })
+    ));
 }
 
 /// A cascade-deleted child must say which drive it belonged to.
@@ -5271,4 +5283,72 @@ async fn index_keys_migration_rebuilds_old_rows_in_slices() {
         .unwrap()
         .is_some());
     assert!(propvalsub_key(&atom).len() < old_key.len());
+}
+
+#[tokio::test]
+async fn external_changes_are_not_evicted_by_commit_or_query_traffic() {
+    use crate::DbEvent;
+
+    let store = Db::init_temp("external_event_isolation").await.unwrap();
+    let mut all_events = store.subscribe_events();
+    let mut external = store.subscribe_external_changes();
+    let change = |from_commit| DbEvent::Changed {
+        subject: "atomic:event-source".into(),
+        delta: None,
+        source_id: None,
+        is_new: false,
+        from_commit,
+    };
+    store.publish_db_event(change(false));
+    for i in 0..128 {
+        store.publish_db_event(change(true));
+        store.publish_db_event(DbEvent::QueryMembershipChanged {
+            query_id: vec![0; 16],
+            subject: format!("atomic:member-{i}"),
+            added: true,
+            source_id: None,
+        });
+    }
+    assert!(matches!(
+        all_events.try_recv(),
+        Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_))
+    ));
+    assert!(
+        matches!(
+            external.try_recv(),
+            Ok(DbEvent::Changed {
+                from_commit: false,
+                ..
+            })
+        ),
+        "traffic already delivered by other paths must not evict replica changes"
+    );
+    assert!(matches!(
+        external.try_recv(),
+        Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+    ));
+    store.publish_db_event(DbEvent::Destroyed {
+        subject: "atomic:deleted-child".into(),
+        drive: Some("atomic:drive".into()),
+        source_id: None,
+        from_commit: false,
+        commit_json: None,
+    });
+    assert!(matches!(
+        external.try_recv(),
+        Ok(DbEvent::Destroyed {
+            drive: Some(_),
+            from_commit: false,
+            ..
+        })
+    ));
+    // Relevant overflow must remain visible: silently dropping it would leave
+    // subscribed browsers stale instead of asking them to reconcile.
+    for _ in 0..128 {
+        store.publish_db_event(change(false));
+    }
+    assert!(matches!(
+        external.try_recv(),
+        Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_))
+    ));
 }

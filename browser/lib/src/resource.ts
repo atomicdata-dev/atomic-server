@@ -478,6 +478,16 @@ export class Resource<C extends OptionalClass = any> {
     return this._store?.outbox.hasPending(this.subject) ?? false;
   }
 
+  /** Local creation has not yet been acknowledged by the server. Signing a
+   * genesis already clears `new`, so that flag alone cannot answer this. */
+  public get awaitingCreation(): boolean {
+    return (
+      this.new ||
+      !!this._pendingGenesis ||
+      !!this._store?.outbox.getEntry(this.subject)?.signedGenesis
+    );
+  }
+
   private get store(): Store {
     if (!this._store) {
       console.error(`Resource ${this.subject} has no store`);
@@ -2243,8 +2253,14 @@ export class Resource<C extends OptionalClass = any> {
       // JS object for every change in the history. On a resource with a long
       // history (or a sidebar sorting thousands of children) that was the
       // dominant cost of opening a drive.
-      for (const peer of doc.oplogVersion().toJSON().keys()) {
+      for (const [peer, end] of doc.oplogVersion().toJSON()) {
         consider(doc.getChangeAt({ peer, counter: 0 }));
+        // Loro's snapshot block cache can hold the first block without its
+        // later blocks. A subsequent import then tries appending to that
+        // earlier block and panics ("counter should be continuous"). Touch
+        // the tail too: two reads per peer still avoid scanning all history,
+        // and leave the live document and its unsaved edits intact.
+        if (end > 1) doc.getChangeAt({ peer, counter: end - 1 });
       }
     } catch {
       genesis = undefined;
@@ -3707,6 +3723,7 @@ export class Resource<C extends OptionalClass = any> {
       return 'noop';
     }
 
+    const identity = this.store.getIdentityGeneration();
     this._saveDepth++;
     this.eventManager.emit(ResourceEvents.SaveStateChange);
     const closeSave = perfSpan('resource.save');
@@ -3716,7 +3733,11 @@ export class Resource<C extends OptionalClass = any> {
     } catch (error) {
       this.commitError =
         error instanceof Error ? error : new Error(String(error));
-      this.applyToStore('local-pre-push');
+
+      if (identity === this.store.getIdentityGeneration()) {
+        this.applyToStore('local-pre-push');
+      }
+
       throw error;
     } finally {
       closeSave();
@@ -3842,7 +3863,12 @@ export class Resource<C extends OptionalClass = any> {
       const entry = this.store.outbox.getEntry(this.subject);
       const savingVersion = this._loroDoc?.oplogVersion().toJSON();
       const previousReceipt = this._lastServerReceipt;
+      const route = this.store.captureRoute(this.subject);
       await this.store.syncDirtyResources();
+
+      if (!route.current()) {
+        throw new RequestCancelledError('Save destination or identity changed');
+      }
 
       if (entry?.lastAttemptFailure) {
         throw entry.lastAttemptFailure.cause;
@@ -3859,6 +3885,20 @@ export class Resource<C extends OptionalClass = any> {
           );
 
         if (!acknowledged) {
+          // The connection can close after the online check but before the
+          // drain reaches this entry. It then skips the entry without an
+          // attempted POST or a transport exception. Preserve the same local
+          // durability guarantee as any other offline save, without inventing
+          // a server acknowledgement.
+          if (
+            !this.store.requireOnlineWrites &&
+            !this.store.isServerConnectedFor(this.subject)
+          ) {
+            await this.saveOffline(false, completion);
+
+            return 'offline';
+          }
+
           throw new SaveQueuedError();
         }
       }

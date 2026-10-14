@@ -15,8 +15,8 @@ use atomic_lib::{
     vault::secret_envelope::{NewWrapper, SecretEnvelope, Unlock},
     vault::store::{MemoryVaultStore, VaultObjectStore},
     vault::sync::{
-        commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch,
-        CheckpointPolicy, HistoryKeep, SegmentKind,
+        commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch_expected,
+        CheckpointPolicy, HistoryKeep, RecoveryExpectation, SegmentKind,
     },
     Db, Resource, Subject, Value,
 };
@@ -1263,6 +1263,18 @@ pub fn vault_proof_message() -> Vec<u8> {
     atomic_lib::vault::secret_envelope::AGENT_VAULT_PROOF_MESSAGE.to_vec()
 }
 
+/// Inspect retained contents without opening or mutating a client database.
+#[wasm_bindgen(js_name = "vaultInspectPack")]
+pub fn vault_inspect_pack(
+    key_bytes: &[u8],
+    key_epoch: u32,
+    sealed: &[u8],
+) -> Result<JsValue, JsError> {
+    let key = drive_key(key_bytes, key_epoch)?;
+    let report = atomic_lib::vault::inspect::inspect_pack(&key, sealed).map_err(to_js_err)?;
+    serde_wasm_bindgen::to_value(&report).map_err(to_js_err)
+}
+
 /// Wrap a drive vault key so it survives this device.
 ///
 /// This is what makes "clear site data, sign in again, restore" work. The key
@@ -1454,6 +1466,9 @@ fn check_agent_proof(proof: &[u8]) -> Result<(), JsError> {
 }
 
 fn drive_key(key_bytes: &[u8], epoch: u32) -> Result<DriveVaultKey, JsError> {
+    if epoch == 0 {
+        return Err(JsError::new("drive vault key epoch must be positive"));
+    }
     let bytes: [u8; 32] = key_bytes
         .try_into()
         .map_err(|_| JsError::new("drive vault key must be exactly 32 bytes"))?;
@@ -1553,6 +1568,14 @@ impl ClientDb {
         })
         .map_err(to_js_err)?;
 
+        let blobs = js_sys::Array::new();
+        for blob in summary.blobs {
+            let bytes = staging.get(&blob.object_key).map_err(to_js_err)?;
+            let value = serde_wasm_bindgen::to_value(&blob).map_err(to_js_err)?;
+            blobs.push(&attach_sealed(value, &bytes)?);
+        }
+        js_sys::Reflect::set(&result, &JsValue::from_str("blobs"), &blobs)
+            .map_err(|_| JsError::new("could not attach sealed blob dependencies"))?;
         attach_sealed(result, &sealed)
     }
 
@@ -1594,6 +1617,7 @@ impl ClientDb {
         drive_pseudonym: &str,
         device_pubkey: &str,
         objects: JsValue,
+        expectation: JsValue,
     ) -> Result<JsValue, JsError> {
         let key = drive_key(key_bytes, key_epoch)?;
         let objects: Vec<VaultObjectInput> =
@@ -1606,12 +1630,19 @@ impl ClientDb {
                 .map_err(to_js_err)?;
         }
 
-        let summary = import_vault_batch(
+        let expectation: RecoveryExpectation =
+            if expectation.is_undefined() || expectation.is_null() {
+                RecoveryExpectation::default()
+            } else {
+                serde_wasm_bindgen::from_value(expectation).map_err(to_js_err)?
+            };
+        let summary = import_vault_batch_expected(
             self.db(),
             &key,
             &staging,
             &drive_prefix(drive_pseudonym),
             Some((drive_pseudonym, device_pubkey)),
+            &expectation,
         )
         .await
         .map_err(to_js_err)?;

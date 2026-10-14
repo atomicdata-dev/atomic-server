@@ -10,15 +10,18 @@ import type { JSX } from 'react';
 interface DownloadButtonProps {
   downloadFile: () => void;
   fileSize?: number;
+  disabled?: boolean;
 }
 
 export function DownloadIconButton({
   downloadFile,
   fileSize,
+  disabled,
 }: DownloadButtonProps): JSX.Element {
   return (
     <IconButton
       title={`Download file (${displayFileSize(fileSize ?? 0)})`}
+      disabled={disabled}
       onClick={downloadFile}
     >
       <DownloadIcon />
@@ -33,9 +36,11 @@ const DownloadIcon = styled(FaDownload)`
 export function DownloadButton({
   downloadFile,
   fileSize,
+  disabled,
 }: DownloadButtonProps): JSX.Element {
   return (
     <StyledButton
+      disabled={disabled}
       onClick={downloadFile}
       title={`Download file (${displayFileSize(fileSize ?? 0)})`}
     >

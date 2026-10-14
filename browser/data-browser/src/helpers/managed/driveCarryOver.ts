@@ -73,6 +73,7 @@ type StagedDrive = {
   objectKey: string;
   sealed: Uint8Array;
   blobs: StagedBlob[];
+  sealedBlobs?: { objectKey: string; sealed: Uint8Array }[];
 };
 
 /** Drives exported from one identity's database, for `to`'s. */
@@ -163,8 +164,7 @@ export async function stageDriveCarryOver(
     // A new lane with no checkpoint: always a full checkpoint of the drive.
     const exported = await db.vaultExport(
       drive,
-      key,
-      KEY_EPOCH,
+      { driveKey: key, keyEpoch: KEY_EPOCH },
       pseudonym,
       LANE,
       1,
@@ -177,6 +177,7 @@ export async function stageDriveCarryOver(
 
     const blobs = await blobsOf(db, drive);
     bytes += exported.sealed.byteLength;
+    for (const blob of exported.blobs ?? []) bytes += blob.sealed.byteLength;
 
     for (const blob of blobs) bytes += blob.data.byteLength;
 
@@ -191,6 +192,7 @@ export async function stageDriveCarryOver(
       pseudonym,
       objectKey: exported.objectKey,
       sealed: exported.sealed,
+      sealedBlobs: exported.blobs,
       blobs,
     });
   }
@@ -279,11 +281,13 @@ async function runImport(
     store.registerLocalOnlyDrive(entry.drive);
 
     const result = await db.vaultImport(
-      entry.key,
-      KEY_EPOCH,
+      { driveKey: entry.key, keyEpoch: KEY_EPOCH },
       entry.pseudonym,
       LANE,
-      [{ objectKey: entry.objectKey, sealed: entry.sealed }],
+      [
+        { objectKey: entry.objectKey, sealed: entry.sealed },
+        ...(entry.sealedBlobs ?? []),
+      ],
     );
 
     if (result.packsRead === 0)

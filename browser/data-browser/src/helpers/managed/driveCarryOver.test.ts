@@ -40,8 +40,7 @@ function fakeDb(options: { sealedSize?: number; file?: Uint8Array } = {}) {
     vaultExport: vi.fn(
       async (
         drive: string,
-        _key: Uint8Array,
-        _epoch: number,
+        _key: { driveKey: Uint8Array; keyEpoch: number },
         pseudonym: string,
       ) => ({
         objectKey: `vault/${pseudonym}/checkpoints/ckpt-000001.loro`,
@@ -57,15 +56,14 @@ function fakeDb(options: { sealedSize?: number; file?: Uint8Array } = {}) {
     ),
     vaultImport: vi.fn(
       async (
-        key: Uint8Array,
-        _epoch: number,
+        key: { driveKey: Uint8Array; keyEpoch: number },
         pseudonym: string,
         _lane: string,
         objects: { objectKey: string; sealed: Uint8Array }[],
       ) => {
         db.imported.push({
           drive: new TextDecoder().decode(objects[0].sealed),
-          key,
+          key: key.driveKey,
           pseudonym,
         });
 
@@ -145,8 +143,8 @@ describe('staging local-only drives before the switch', () => {
     // A fresh key and lane per drive: always a full checkpoint.
     const [first, second] = db.vaultExport.mock.calls;
     expect(first[1]).not.toEqual(second[1]);
-    expect(first[3]).not.toBe(second[3]);
-    expect(first.slice(5, 8)).toEqual([1, 1, false]);
+    expect(first[2]).not.toBe(second[2]);
+    expect(first.slice(4, 7)).toEqual([1, 1, false]);
     expect(record?.drives[0].blobs).toEqual([
       { hash: expect.any(Uint8Array), data: file },
     ]);

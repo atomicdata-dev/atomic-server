@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildVaultFile,
+  fetchVaultBackupFile,
   checkpointNumberFromKey,
   parseVaultFile,
   restoreDriveFromFile,
@@ -57,7 +58,41 @@ const build = (keyEpoch = 1) =>
 
 const asBytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+describe('cloud backup export', () => {
+  it.each([
+    { lanes: { [LANE]: 3 }, checkpointN: 0 },
+    { lanes: {}, checkpointN: 2 },
+  ])(
+    'rejects an empty inventory with recorded history: %j',
+    async expectation => {
+      vi.stubEnv('VITE_MANAGED_PORTAL_URL', 'https://control.test');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ objects: [], expectation })),
+      );
+
+      await expect(fetchVaultBackupFile(P)).rejects.toThrow(/incomplete/i);
+    },
+  );
+
+  it('returns no backup only when the manifest has no recorded history', async () => {
+    vi.stubEnv('VITE_MANAGED_PORTAL_URL', 'https://control.test');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          objects: [],
+          expectation: { lanes: {}, checkpointN: 0 },
+        }),
+      ),
+    );
+
+    await expect(fetchVaultBackupFile(P)).resolves.toBeNull();
+  });
+});
 
 describe('vault file format', () => {
   it('round-trips header and sealed bytes in order', async () => {
@@ -191,22 +226,24 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch,
+        key: { driveKey: KEY, keyEpoch: keyEpoch },
       });
 
       expect(outcome.resourcesRestored).toBe(1);
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(db.vaultImport).toHaveBeenCalledTimes(1);
-      const [key, epoch, pseudonym, device, imported] = db.vaultImport.mock
+      const [key, pseudonym, device, imported] = db.vaultImport.mock
         .calls[0] as unknown as [
-        Uint8Array,
-        number,
+        { driveKey: Uint8Array; keyEpoch: number },
         string,
         string,
         { objectKey: string; sealed: Uint8Array }[],
       ];
-      expect([key, epoch, pseudonym, device]).toEqual([KEY, keyEpoch, P, 'me']);
+      expect([key, pseudonym, device]).toEqual([
+        { driveKey: KEY, keyEpoch },
+        P,
+        'me',
+      ]);
       expect(imported.map(o => o.objectKey)).toEqual(
         objects.map(o => o.object_key),
       );
@@ -223,8 +260,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: 'other',
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toThrow(/different workspace/);
     expect(db.vaultImport).not.toHaveBeenCalled();
@@ -239,8 +275,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 2,
+        key: { driveKey: KEY, keyEpoch: 2 },
       }),
     ).rejects.toThrow(/different encryption key/);
     expect(db.vaultImport).not.toHaveBeenCalled();
@@ -257,8 +292,7 @@ describe('restoreDriveFromFile', () => {
         db,
         drivePseudonym: P,
         devicePubkey: 'me',
-        driveKey: KEY,
-        keyEpoch: 1,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     ).rejects.toThrow(/checksum/);
     expect(db.vaultImport).not.toHaveBeenCalled();

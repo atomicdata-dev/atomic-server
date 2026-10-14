@@ -36,6 +36,7 @@ import { serializeDeterministically } from './commit.js';
  */
 class FakeWebSocket {
   public static readonly OPEN = 1;
+  public static readonly CONNECTING = 0;
   public url: string;
   public protocol = 'atomicdata-ws.v2';
   public binaryType = 'arraybuffer';
@@ -58,6 +59,9 @@ class FakeWebSocket {
   }
 
   public send(data: Uint8Array | string): void {
+    if (this.readyState !== FakeWebSocket.OPEN)
+      throw new Error('send on closed socket');
+
     if (typeof data === 'string') {
       this.sent.push(new TextEncoder().encode(data));
     } else {
@@ -94,6 +98,23 @@ const socketOf = (client: WSClient): FakeWebSocket =>
 const framesWithTag = (socket: FakeWebSocket, tag: number) =>
   socket.sent.filter(f => f[0] === tag);
 
+const enc = new TextEncoder();
+
+/** A complete UPDATE frame carrying a Loro snapshot, as the server builds it. */
+const updateFrame = (requestId: number, subject: string, loro: Uint8Array) => {
+  const s = enc.encode(subject);
+  const buf = new Uint8Array(6 + s.length + loro.length);
+  const view = new DataView(buf.buffer);
+  buf[0] = Tag.UPDATE;
+  buf[1] = Flags.SNAPSHOT;
+  view.setUint16(2, requestId);
+  view.setUint16(4, s.length);
+  buf.set(s, 6);
+  buf.set(loro, 6 + s.length);
+
+  return buf;
+};
+
 const signedCommit = (): Commit =>
   ({
     subject: 'did:ad:doc',
@@ -128,6 +149,56 @@ describe('WSClient handshake', () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
+
+  it('cancels immediately but closes a connecting socket only after it opens', async () => {
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    const { store } = await testStore();
+    const client = new WSClient('wss://example.com/ws', store);
+    const socket = socketOf(client);
+    const close = vi.spyOn(socket, 'close');
+    client.close();
+    assert(close).not.toHaveBeenCalled();
+    socket.open();
+    await Promise.resolve();
+    assert(close).toHaveBeenCalledOnce();
+    assert(socket.sent).toEqual([]);
+  });
+
+  it.each(['disconnect', 'identity', 'database', 'current'])(
+    'fences a pending blob read against %s changes',
+    async mode => {
+      const { client, socket, store } = await connectedClient();
+      let finish!: (value: Uint8Array | null) => void;
+      const db = {
+        getBlob: () =>
+          new Promise<Uint8Array | null>(resolve => {
+            finish = resolve;
+          }),
+      };
+      const database = vi
+        .spyOn(store, 'getClientDb')
+        .mockReturnValue(db as never);
+      const resource = new Resource('did:ad:file');
+      vi.spyOn(resource, 'get').mockReturnValue(
+        `did:ad:blob:${'ab'.repeat(32)}`,
+      );
+      const read = (
+        client as unknown as {
+          checkForMissingBlobs(r: Resource): Promise<void>;
+        }
+      ).checkForMissingBlobs(resource);
+      if (mode === 'disconnect') client.close();
+      if (mode === 'identity')
+        vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      if (mode === 'database') database.mockReturnValue({} as never);
+      finish(null);
+      await read;
+      assert(framesWithTag(socket, Tag.BLOB_REQUEST)).toHaveLength(
+        mode === 'current' ? 1 : 0,
+      );
+      client.close();
+    },
+  );
 
   it.each([
     'atomic:workspace',
@@ -232,6 +303,39 @@ describe('WSClient handshake', () => {
     socket.receive(encodeError(requestId, ErrorCode.UNKNOWN, message));
     await rejected;
     client.close();
+  });
+
+  it('rejects an invalid GET snapshot instead of leaving its caller waiting', async () => {
+    const { client, socket } = await connectedClient();
+    vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+    const settled = vi.fn();
+    const subject = 'https://example.com/query?drive=atomic:home';
+    const result = client.fetch(subject).then(
+      value => settled(value),
+      error => settled(error),
+    );
+
+    try {
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+      );
+      const frame = framesWithTag(socket, Tag.GET)[0];
+      const requestId = new DataView(frame.buffer, frame.byteOffset).getUint16(
+        1,
+      );
+      socket.receive(updateFrame(requestId, subject, new Uint8Array([0])));
+      await vi.waitFor(() =>
+        assert(settled).toHaveBeenCalledWith(
+          assert.objectContaining({
+            type: ErrorType.Server,
+            message: `Invalid resource update for ${subject}`,
+          }),
+        ),
+      );
+      await result;
+    } finally {
+      client.close();
+    }
   });
 
   it('introduces itself with a HELLO listing its capabilities on open', async ({
@@ -410,6 +514,70 @@ describe('WSClient drive sync probe', () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
+
+  it.each([true, false])(
+    'recovers a planned restart and an in-flight save (clean=%s)',
+    async wasClean => {
+      const { client, socket, store } = await connectedClient();
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(store, 'getDrive').mockReturnValue('https://example.com/drive');
+      vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+      const compute = vi
+        .spyOn(store, 'computeDriveSyncState')
+        .mockResolvedValue({
+          drive: 'https://example.com/drive',
+          driveHash: 'current',
+          peers: [],
+          resources: {},
+        } as never);
+      socket.receive(encodeChallenge('first'));
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+      );
+      socket.receive(encodeAuthOk([]));
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.SYNC)).toHaveLength(1),
+      );
+      compute.mockClear();
+      vi.spyOn(
+        store as unknown as {
+          getWebSocketForEndpoint(endpoint: string): WSClient;
+        },
+        'getWebSocketForEndpoint',
+      ).mockReturnValue(client);
+      const commit = signedCommit();
+      const saving = store.postCommit(commit, 'https://example.com/commit');
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.COMMIT)).toHaveLength(1),
+      );
+
+      vi.useFakeTimers();
+      socket.close();
+      socket.fire('close', { code: 1012, reason: '', wasClean });
+      assert((await saving).signature).toBe(commit.signature);
+      assert(store.serverConnected).toBe(false);
+      await vi.advanceTimersByTimeAsync(1000);
+      vi.useRealTimers();
+      const replacement = socketOf(client);
+      assert(replacement).not.toBe(socket);
+      replacement.open();
+      replacement.receive(encodeChallenge('restart'));
+      await vi.waitFor(() =>
+        assert(framesWithTag(replacement, Tag.AUTH)).toHaveLength(1),
+      );
+      replacement.receive(encodeAuthOk([]));
+      await vi.waitFor(() =>
+        assert(framesWithTag(replacement, Tag.SYNC)).toHaveLength(1),
+      );
+      assert(framesWithTag(replacement, Tag.SUB).length).toBeGreaterThan(0);
+      assert(compute).toHaveBeenCalledWith('https://example.com/drive', {
+        sparse: false,
+      });
+      assert(store.serverConnected).toBe(true);
+      client.close();
+      assert(warning).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not send a sync probe computed for a previous identity', async ({
     expect,
@@ -736,6 +904,126 @@ describe('WSClient drive subscription', () => {
     stopDocument();
     expect(subjects(Tag.UNSUB)).toEqual([subject, subject]);
     client.close();
+  });
+
+  it('recovers a missed profile edit after reconnect without replacing the live resource', async () => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('profile-catchup'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    store.setServerConnected(true);
+    await LoroLoader.initializeLoro();
+    const doc = new LoroLoader.Loro.LoroDoc();
+    const name = 'https://atomicdata.dev/properties/name';
+    const subject = 'did:ad:agent:missed-profile';
+    doc.getMap('properties').set(name, 'Before disconnect');
+    doc.commit();
+    const initial = client.fetch(subject);
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+    );
+
+    const respond = () => {
+      const get = framesWithTag(socket, Tag.GET).at(-1)!;
+      const requestId = new DataView(get.buffer, get.byteOffset).getUint16(1);
+      socket.receive(
+        updateFrame(requestId, subject, doc.export({ mode: 'snapshot' })),
+      );
+    };
+
+    respond();
+    const resource = await initial;
+    const changed = vi.fn();
+    const stop = store.subscribe(subject, changed);
+    doc.getMap('properties').set(name, 'Renamed while disconnected');
+    doc.commit();
+    // SUB does not replay missed changes, and drive reconciliation excludes profiles.
+    const replay = () =>
+      (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+    replay();
+    replay();
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET)).toHaveLength(2),
+    );
+    respond();
+    await vi.waitFor(() =>
+      assert(resource.get(name)).toBe('Renamed while disconnected'),
+    );
+    assert(store.resources.get(store.normalizeSubject(subject))).toBe(resource);
+    assert(changed).toHaveBeenCalled();
+    stop();
+    client.close();
+    doc.free();
+  });
+
+  it.each(['mount', 'dispose', 'unsubscribe', 'reconnect'])(
+    'does not open a foreign socket for an ordinary cached reader on %s',
+    async phase => {
+      localStorage.setItem('ws-disconnected', '1');
+      const { client, store } = await connectedClient();
+      const subject = 'https://vocabulary.example/class/bird';
+      store.setDriveServer(subject, 'https://vocabulary.example', {
+        connect: false,
+      });
+      store.reportServerConnection('https://vocabulary.example', true);
+      const open = vi
+        .spyOn(store, 'openWebSocket')
+        .mockImplementation(() => {});
+      const callback = vi.fn();
+      const stop = store.subscribe(subject, callback);
+      if (phase !== 'mount') open.mockClear();
+      localStorage.removeItem('ws-disconnected');
+      if (phase === 'mount') store.subscribeWebSocket(subject);
+      if (phase === 'dispose') stop();
+      if (phase === 'unsubscribe') store.unsubscribe(subject, callback);
+
+      if (phase === 'reconnect') {
+        (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+      }
+
+      assert(open).not.toHaveBeenCalled();
+      localStorage.setItem('ws-disconnected', '1');
+      client.close();
+    },
+  );
+
+  it('keeps HTTP vocabulary reads on HTTP after learning their drive', async () => {
+    const { client, store } = await connectedClient();
+    const drive = 'https://vocabulary.example/drive';
+    const subject = `${drive}/class/bird`;
+    const requests: string[] = [];
+    store.injectFetch(async input => {
+      requests.push(String(input));
+
+      return new Response(
+        JSON.stringify({
+          '@id': drive,
+          'https://atomicdata.dev/properties/isA': [
+            'https://atomicdata.dev/classes/Drive',
+          ],
+          'https://atomicdata.dev/properties/name': 'Vocabulary',
+        }),
+        { headers: { 'content-type': 'application/ad+json' } },
+      );
+    });
+    const open = vi.spyOn(store, 'openWebSocket').mockImplementation(() => {});
+    localStorage.removeItem('ws-disconnected');
+
+    try {
+      await store.fetchResourceFromServer(drive);
+      store.rememberResourceDrive(subject, drive);
+      await store.fetchResourceFromServer(subject);
+      assert(requests).toEqual([drive, subject]);
+      assert(open).not.toHaveBeenCalled();
+    } finally {
+      localStorage.setItem('ws-disconnected', '1');
+      client.close();
+    }
   });
 
   it('reconciles drives selected after authentication without reopening the socket', async ({
@@ -1255,27 +1543,6 @@ describe('WSClient.fetchMany', () => {
     vi.restoreAllMocks();
   });
 
-  const enc = new TextEncoder();
-
-  /** A complete UPDATE frame carrying a Loro snapshot, as the server builds it. */
-  const updateFrame = (
-    requestId: number,
-    subject: string,
-    loro: Uint8Array,
-  ) => {
-    const s = enc.encode(subject);
-    const buf = new Uint8Array(6 + s.length + loro.length);
-    const view = new DataView(buf.buffer);
-    buf[0] = Tag.UPDATE;
-    buf[1] = Flags.SNAPSHOT;
-    view.setUint16(2, requestId);
-    view.setUint16(4, s.length);
-    buf.set(s, 6);
-    buf.set(loro, 6 + s.length);
-
-    return buf;
-  };
-
   /** `[0x16] [request_id] [count] ([frame_len: u32] [frame])*` */
   const resultFrame = (requestId: number, frames: Uint8Array[]) => {
     const buf = new Uint8Array(
@@ -1298,6 +1565,51 @@ describe('WSClient.fetchMany', () => {
 
   const requestIdOf = (frame: Uint8Array) =>
     new DataView(frame.buffer, frame.byteOffset).getUint16(1);
+
+  it.each(['single', 'batch'])(
+    "rejects a %s GET answer claiming another server's drive",
+    async kind => {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+      socket.receive(encodeAuthOk(['get-many']));
+      store.setDriveServer('atomic:protected', 'https://other.example.com', {
+        connect: false,
+      });
+      await LoroLoader.initializeLoro();
+      const doc = new LoroLoader.Loro.LoroDoc();
+      doc
+        .getMap('properties')
+        .set('https://atomicdata.dev/properties/drive', 'atomic:protected');
+      doc.commit();
+      const subject = 'atomic:cold-forged-child';
+      const result =
+        kind === 'batch'
+          ? client.fetchMany([subject])
+          : client.fetch(subject).then(
+              r => [r],
+              error => [error],
+            );
+      const tag = kind === 'batch' ? Tag.GET_MANY : Tag.GET;
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, tag)).toHaveLength(1),
+      );
+      const id = requestIdOf(framesWithTag(socket, tag)[0]);
+      const update = updateFrame(
+        kind === 'batch' ? 0 : id,
+        subject,
+        doc.export({ mode: 'snapshot' }),
+      );
+      socket.receive(kind === 'batch' ? resultFrame(id, [update]) : update);
+
+      assert((await result)[0]).toBeInstanceOf(Error);
+      assert(store.resources.has(subject)).toBe(false);
+      assert(store.getServerUrlForSubject('atomic:protected')).toBe(
+        'https://other.example.com',
+      );
+      client.close();
+      doc.free();
+    },
+  );
 
   it('sends one GET_MANY and settles every entry in order', async ({
     expect,
@@ -1355,6 +1667,32 @@ describe('WSClient.fetchMany', () => {
     expect(store.resources.get('atomic:found')).toBe(found);
     expect(missing).toMatchObject({ type: ErrorType.NotFound });
     expect(unauthorized).toMatchObject({ type: ErrorType.Unauthorized });
+    client.close();
+  });
+
+  it('does not present cached data as a successful invalid batch response', async () => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+    socket.receive(encodeAuthOk(['get-many']));
+    const subject = 'https://example.com/query?drive=atomic:home';
+    const cached = new Resource(subject);
+    store.addResource(cached);
+    const results = client.fetchMany([subject]);
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET_MANY)).toHaveLength(1),
+    );
+    const requestId = requestIdOf(framesWithTag(socket, Tag.GET_MANY)[0]);
+    socket.receive(
+      resultFrame(requestId, [
+        updateFrame(requestId, subject, new Uint8Array([0])),
+      ]),
+    );
+    const [result] = await results;
+    assert(result).toMatchObject({
+      type: ErrorType.Server,
+      message: `Invalid resource update for ${subject}`,
+    });
+    assert(store.resources.get(subject)).toBe(cached);
     client.close();
   });
 

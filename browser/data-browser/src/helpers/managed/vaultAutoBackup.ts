@@ -178,14 +178,34 @@ const defaultDeps: VaultAutoBackupDeps = {
  * is designed never to hold. A reload recovers it by signing the proof message
  * again, which costs one round trip.
  */
-const enrolled = new Map<
-  string,
-  { drivePseudonym: string; metadata?: string } & DriveKeyHandle
+type EnrolledVault = {
+  drivePseudonym: string;
+  metadata?: string;
+} & DriveKeyHandle;
+let vaultSessions = new WeakMap<
+  Store,
+  {
+    generation: number;
+    enrolled: Map<string, EnrolledVault>;
+    ensuring: Map<string, Promise<EnsureVaultOutcome>>;
+  }
 >();
+
+function vaultSession(store: Store) {
+  const generation = store.getIdentityGeneration();
+  let state = vaultSessions.get(store);
+
+  if (!state || state.generation !== generation) {
+    state = { generation, enrolled: new Map(), ensuring: new Map() };
+    vaultSessions.set(store, state);
+  }
+
+  return state;
+}
 
 /** Only in tests. */
 export function forgetEnrolledVaults(): void {
-  enrolled.clear();
+  vaultSessions = new WeakMap();
 }
 
 export type EnsureVaultOutcome =
@@ -214,6 +234,7 @@ export function ensureVaultBackup(
   // Sign-in and the boot watcher both ask for the same drive within the same
   // second. `runVaultBackup` already shares an in-flight pass, but enrolling
   // and unwrapping the key twice is still two round trips for nothing.
+  const { ensuring } = vaultSession(store);
   const existing = ensuring.get(driveSubject);
 
   if (existing) return existing;
@@ -229,14 +250,12 @@ export function ensureVaultBackup(
       return outcome;
     })
     .finally(() => {
-      ensuring.delete(driveSubject);
+      if (ensuring.get(driveSubject) === pass) ensuring.delete(driveSubject);
     });
   ensuring.set(driveSubject, pass);
 
   return pass;
 }
-
-const ensuring = new Map<string, Promise<EnsureVaultOutcome>>();
 
 /**
  * How long to wait for the ClientDb to attach after sign-in. Deriving the
@@ -289,38 +308,86 @@ async function accountChangedSince(
   }
 }
 
+/** Backup and restore share one lifetime: signing session, managed account,
+ * document, and (once selected) local database. */
+function vaultOperation(store: Store) {
+  const generation = store.getIdentityGeneration();
+  const pageSignal = pageRequestSignal();
+  const controller = new AbortController();
+  const { signal } = controller;
+  const stop = () => controller.abort();
+  const offAgent = store.on(StoreEvents.AgentChanged, () => {
+    if (store.getIdentityGeneration() !== generation) stop();
+  });
+  const offLogout = onManagedLogout(stop);
+  const offSession = onManagedSessionChanged(stop);
+  pageSignal?.addEventListener('abort', stop);
+  let databaseCurrent = () => true;
+  const current = () =>
+    !signal.aborted &&
+    !pageSignal?.aborted &&
+    store.getIdentityGeneration() === generation &&
+    databaseCurrent();
+
+  const assertCurrent = () => {
+    if (!current()) {
+      stop();
+      throw new VaultSessionEndedError();
+    }
+  };
+
+  return {
+    signal,
+    stop,
+    current,
+    captureDatabase() {
+      const database = store.getClientDb();
+      databaseCurrent = () => store.getClientDb() === database;
+    },
+    async check<T>(operation: () => Promise<T>): Promise<T> {
+      assertCurrent();
+      const result = await operation();
+      assertCurrent();
+
+      return result;
+    },
+    close() {
+      offAgent();
+      offLogout();
+      offSession();
+      pageSignal?.removeEventListener('abort', stop);
+    },
+  };
+}
+
 async function ensureVaultBackupOnce(
   store: Store,
   driveSubject: string,
   deps: VaultAutoBackupDeps,
 ): Promise<EnsureVaultOutcome> {
+  const { enrolled } = vaultSession(store);
   const agent = store.getAgent();
 
   if (!agent?.subject) return { status: 'skipped', reason: 'not signed in' };
+
+  const agentSubject = agent.subject;
 
   if (deps.optedOut(driveSubject)) {
     return { status: 'skipped', reason: 'backup switched off for this drive' };
   }
 
-  const controller = new AbortController();
-  const { signal } = controller;
-  const stop = () => controller.abort();
-  const offAgent = store.on(StoreEvents.AgentChanged, next => {
-    if (next?.subject !== agent.subject) stop();
-  });
-  const offLogout = onManagedLogout(stop);
-  if (typeof window !== 'undefined') window.addEventListener('pagehide', stop);
+  const operation = vaultOperation(store);
+  const { signal, check } = operation;
 
   try {
     // Cached keys do not imply that the account session is still valid.
-    if (!(await deps.hasAccount())) {
+    if (!(await check(() => deps.hasAccount()))) {
       return { status: 'skipped', reason: 'no account session' };
     }
 
-    signal.throwIfAborted();
-    const db = await deps.db(store);
-    signal.throwIfAborted();
-    const lane = await deps.laneId();
+    const db = await check(() => deps.db(store));
+    operation.captureDatabase();
+    const lane = await check(() => deps.laneId());
 
     if (!db || !lane) {
       return { status: 'skipped', reason: 'no local database or device id' };
@@ -329,13 +396,15 @@ async function ensureVaultBackupOnce(
     let known = enrolled.get(driveSubject);
 
     // Display metadata is shared with SaaS; read it from the local drive.
-    const metadata = await driveDisplayMetadata(store, driveSubject);
+    const metadata = await check(() =>
+      driveDisplayMetadata(store, driveSubject),
+    );
     const metadataKey = JSON.stringify(metadata);
 
     if (!known || (known.metadata ?? '{}') !== metadataKey) {
       if (
         deps.identityMatches &&
-        !(await deps.identityMatches(agent.subject))
+        !(await check(() => deps.identityMatches!(agentSubject)))
       ) {
         return {
           status: 'skipped',
@@ -343,36 +412,33 @@ async function ensureVaultBackupOnce(
         };
       }
 
-      signal.throwIfAborted();
-
-      if (deps.canEnroll && !(await deps.canEnroll(driveSubject, signal))) {
+      if (
+        deps.canEnroll &&
+        !(await check(() => deps.canEnroll!(driveSubject, signal)))
+      ) {
         return {
           status: 'skipped',
           reason: 'drive backup belongs to another account',
         };
       }
 
-      const keys = await deps.loadKeys();
-      const proof = await agentVaultProof(agent, keys.proofMessage);
+      const keys = await check(() => deps.loadKeys());
+      const proof = await check(() =>
+        agentVaultProof(agent, keys.proofMessage),
+      );
 
-      if (store.getAgent()?.subject !== agent.subject) {
-        return {
-          status: 'skipped',
-          reason: 'identity changed during backup setup',
-        };
-      }
-
-      signal.throwIfAborted();
-      const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
-        signal,
-        keys,
-        driveSubject,
-        metadata,
-        agentSubject: agent.subject,
-        // The agent signs a fixed message; its key is never read. That is what
-        // keeps non-extractable and hardware-backed keys usable here.
-        agentSecret: proof,
-      });
+      const { enrollment, driveKey, keyEpoch } = await check(() =>
+        deps.setUpVaultForDrive({
+          signal,
+          keys,
+          driveSubject,
+          metadata,
+          agentSubject,
+          // The agent signs a fixed message; its key is never read. That is what
+          // keeps non-extractable and hardware-backed keys usable here.
+          agentSecret: proof,
+        }),
+      );
       known = {
         drivePseudonym: enrollment.drive_pseudonym,
         driveKey,
@@ -382,54 +448,49 @@ async function ensureVaultBackupOnce(
       enrolled.set(driveSubject, known);
     }
 
-    if (store.getAgent()?.subject !== agent.subject) {
-      return {
-        status: 'skipped',
-        reason: 'identity changed during backup setup',
-      };
-    }
-
-    signal.throwIfAborted();
     const held = known;
-    const agentSubject = agent.subject;
-    const outcome = await deps.runVaultBackup({
-      signal,
-      db,
-      driveSubject,
-      drivePseudonym: held.drivePseudonym,
-      devicePubkey: lane,
-      driveKey: held.driveKey,
-      driveKeyEpoch: held.keyEpoch,
-      beforeNetworkWrite: async () => {
-        signal.throwIfAborted();
+    const outcome = await check(() =>
+      deps.runVaultBackup({
+        signal,
+        db,
+        driveSubject,
+        drivePseudonym: held.drivePseudonym,
+        devicePubkey: lane,
+        key: { driveKey: held.driveKey, keyEpoch: held.keyEpoch },
 
-        if (
-          !(await deps.hasAccount()) ||
-          (deps.identityMatches && !(await deps.identityMatches(agentSubject)))
-        ) {
-          controller.abort();
-        }
+        beforeNetworkWrite: () =>
+          check(async () => {
+            if (
+              !(await deps.hasAccount()) ||
+              (deps.identityMatches &&
+                !(await deps.identityMatches(agentSubject)))
+            ) {
+              operation.stop();
+            }
+          }),
+        // The drive was re-keyed since this key was cached: fetch the current
+        // envelope, and remember it so the next tick does not refetch.
+        refreshDriveKey: async () => {
+          const keys = await check(() => deps.loadKeys());
+          const proof = await check(() =>
+            agentVaultProof(agent, keys.proofMessage),
+          );
+          const fresh = await check(() =>
+            deps.recoverDriveKey({
+              keys,
+              drivePseudonym: held.drivePseudonym,
+              agentSecret: proof,
+            }),
+          );
+          enrolled.set(driveSubject, {
+            drivePseudonym: held.drivePseudonym,
+            ...fresh,
+          });
 
-        signal.throwIfAborted();
-      },
-      // The drive was re-keyed since this key was cached: fetch the current
-      // envelope, and remember it so the next tick does not refetch.
-      refreshDriveKey: async () => {
-        const keys = await deps.loadKeys();
-        const fresh = await deps.recoverDriveKey({
-          keys,
-          drivePseudonym: held.drivePseudonym,
-          agentSecret: await agentVaultProof(agent, keys.proofMessage),
-        });
-        enrolled.set(driveSubject, {
-          drivePseudonym: held.drivePseudonym,
-          ...fresh,
-        });
-
-        return fresh;
-      },
-    });
-    signal.throwIfAborted();
+          return fresh;
+        },
+      }),
+    );
     notifyVaultChanged(driveSubject);
 
     return outcome;
@@ -439,7 +500,7 @@ async function ensureVaultBackupOnce(
     enrolled.delete(driveSubject);
 
     if (
-      signal.aborted ||
+      !operation.current() ||
       error instanceof VaultSessionEndedError ||
       (await accountChangedSince(store, agent.subject, deps))
     ) {
@@ -456,10 +517,7 @@ async function ensureVaultBackupOnce(
       error: error instanceof Error ? error : new Error(String(error)),
     };
   } finally {
-    offAgent();
-    offLogout();
-    if (typeof window !== 'undefined')
-      window.removeEventListener('pagehide', stop);
+    operation.close();
   }
 }
 
@@ -507,38 +565,15 @@ export async function restoreFromVault(
   driveSubject: string,
   deps: VaultAutoBackupDeps = defaultDeps,
 ): Promise<VaultRestoreOutcome> {
+  const { enrolled } = vaultSession(store);
   const agent = store.getAgent();
 
   if (!agent?.subject)
     return { status: 'unavailable', reason: 'not signed in' };
 
-  // Taken before the first request, so its pagehide listener is registered
-  // while this document is still the live one. The catch reads it.
-  const pageSignal = pageRequestSignal();
   const identityGeneration = store.getIdentityGeneration();
-  let sessionChanged = false;
-  let databaseCaptured = false;
-  let database: ReturnType<Store['getClientDb']>;
-  const unsubscribeSession = onManagedSessionChanged(() => {
-    sessionChanged = true;
-  });
-  const unsubscribeLogout = onManagedLogout(() => {
-    sessionChanged = true;
-  });
-  const isCurrent = () =>
-    !sessionChanged &&
-    !pageSignal?.aborted &&
-    store.getAgent() === agent &&
-    store.getIdentityGeneration() === identityGeneration &&
-    (!databaseCaptured || store.getClientDb() === database);
-
-  const check = async <T>(operation: () => Promise<T>): Promise<T> => {
-    if (!isCurrent()) throw new VaultSessionEndedError();
-    const value = await operation();
-    if (!isCurrent()) throw new VaultSessionEndedError();
-
-    return value;
-  };
+  const operation = vaultOperation(store);
+  const { check, current: isCurrent } = operation;
 
   const absent = (
     reason: 'drive is not backed up' | 'the vault is empty',
@@ -592,14 +627,17 @@ export async function restoreFromVault(
 
     // An empty vault restores zero resources, which on screen is
     // indistinguishable from a failed restore.
-    if (state.confirmed_objects === 0) {
+    if (
+      state.confirmed_objects === 0 &&
+      Object.values(state.lanes).every(head => head === 0) &&
+      state.checkpoints.length === 0
+    ) {
       return absent('the vault is empty');
     }
 
     // Local storage is needed to restore data, not to establish absence.
     const db = await check(() => deps.db(store));
-    database = store.getClientDb();
-    databaseCaptured = true;
+    operation.captureDatabase();
     if (!db) return { status: 'unavailable', reason: 'no local database' };
 
     // This device's lane. A restore records which other lanes it imported, so a
@@ -626,11 +664,11 @@ export async function restoreFromVault(
     );
     const outcome = await check(() =>
       deps.restoreDrive({
+        beforeImport: () => check(async () => undefined),
         db,
         drivePseudonym: enrollment.drive_pseudonym,
         devicePubkey: lane,
-        driveKey,
-        keyEpoch,
+        key: { driveKey: driveKey, keyEpoch: keyEpoch },
       }),
     );
 
@@ -639,6 +677,15 @@ export async function restoreFromVault(
     // A transport failure alone says nothing about where the drive is hosted.
     if (absentFromNode && outcome.resourcesRestored > 0) {
       store.registerLocalOnlyDrive(driveSubject);
+    }
+
+    if (outcome.subjectsRestored || outcome.subjectsDeleted) {
+      await check(() =>
+        store.refreshRestoredResources(
+          outcome.subjectsRestored ?? [],
+          outcome.subjectsDeleted ?? [],
+        ),
+      );
     }
 
     // The import wrote the drive into the local database only. The store
@@ -681,24 +728,14 @@ export async function restoreFromVault(
       return { status: 'cancelled', reason: 'recovery session changed' };
     }
 
-    // A discarded document cancels its own in-flight requests, and they land
-    // here as `TypeError: Failed to fetch`, indistinguishable by type from a
-    // control plane that is really unreachable. The page is already gone, so
-    // there is nobody to warn and the warning reads as a defect on every
-    // navigation that happens to interrupt a restore. `Client
-    // .fetchResourceHTTP` draws the same line for reads, and the backup path
-    // above for its own cancellation.
-    if (!pageSignal?.aborted) {
-      console.warn('[cloud-vault] restore failed', error);
-    }
+    console.warn('[cloud-vault] restore failed', error);
 
     return {
       status: 'failed',
       error: error instanceof Error ? error : new Error(String(error)),
     };
   } finally {
-    unsubscribeSession();
-    unsubscribeLogout();
+    operation.close();
   }
 }
 
@@ -726,6 +763,7 @@ export function watchForVaultBackups(
     window?: Window | null;
   } = {},
 ): () => void {
+  const enrolledForStore = () => vaultSession(store).enrolled;
   const idleMs = options.idleMs ?? AUTO_BACKUP_IDLE_MS;
   const maxWaitMs = options.maxWaitMs ?? AUTO_BACKUP_MAX_WAIT_MS;
   const win =
@@ -739,17 +777,21 @@ export function watchForVaultBackups(
   let stopped = false;
   let generation = 0;
   const pending = new Set<string>();
+  const recovered = new Map<string, string>();
+  let running = false;
 
   const flush = () => {
     clearTimeout(timer);
     clearTimeout(deadline);
     timer = deadline = undefined;
+    if (running) return;
     const drives = [...pending];
     pending.clear();
     const identity = store.getAgent()?.subject;
     const passGeneration = generation;
 
     if (!identity) return;
+    running = true;
 
     void (async () => {
       // Avoid enrollment discovery requests when signed out. Failures keep
@@ -775,13 +817,17 @@ export function watchForVaultBackups(
         // found by the next edit, focus or periodic pass.
         if (!(await deps.hasAccount())) return;
 
-        const remote = drives.filter(
-          drive =>
-            !store.isLocalOnlyDrive(drive) &&
-            !enrolled.has(drive) &&
-            !isEmbeddedVaultDrive(store),
-        );
-        const existing = remote.length ? await deps.listVaultDrives() : [];
+        const existing = await deps.listVaultDrives();
+
+        // Every enrolled drive can receive edits while this device is asleep,
+        // including the private drive that holds its inbox.
+        for (const item of existing) {
+          if (
+            (item.status === 'active' || item.status === 'suspended') &&
+            !drives.includes(item.drive_subject)
+          )
+            drives.push(item.drive_subject);
+        }
 
         for (const drive of drives) {
           if (
@@ -790,11 +836,67 @@ export function watchForVaultBackups(
             store.getAgent()?.subject !== identity
           )
             return;
+          if (deps.optedOut(drive)) continue;
+          const item = existing.find(
+            e =>
+              e.drive_subject === drive &&
+              (e.status === 'active' || e.status === 'suspended'),
+          );
           if (
-            remote.includes(drive) &&
-            !existing.some(item => item.drive_subject === drive)
+            !item &&
+            !store.isLocalOnlyDrive(drive) &&
+            !enrolledForStore().has(drive) &&
+            !isEmbeddedVaultDrive(store)
           )
             continue;
+
+          if (item) {
+            const state = await deps.getVaultState(item.drive_pseudonym);
+            if (
+              stopped ||
+              passGeneration !== generation ||
+              store.getAgent()?.subject !== identity
+            )
+              return;
+            const fingerprint = JSON.stringify([
+              item.drive_pseudonym,
+              state.enrollment,
+              state.confirmed_objects,
+              Object.entries(state.lanes).sort(([a], [b]) =>
+                a.localeCompare(b),
+              ),
+              state.checkpoints,
+            ]);
+
+            if (recovered.get(drive) !== fingerprint) {
+              const restored = await restoreFromVault(store, drive, {
+                ...deps,
+                listVaultDrives: async () => existing,
+                getVaultState: async () => state,
+              });
+              if (
+                stopped ||
+                passGeneration !== generation ||
+                store.getAgent()?.subject !== identity
+              )
+                return;
+
+              if (
+                restored.status === 'restored' ||
+                restored.status === 'no-backup'
+              ) {
+                recovered.set(drive, fingerprint);
+              } else {
+                // Retry partial reads, while retaining local edits in new packs.
+                // Rust only claims pruning coverage for verified imports.
+                retry(drive);
+                if (restored.status !== 'partial') continue;
+              }
+            }
+
+            if (item.status === 'suspended') continue;
+          }
+
           const outcome = await ensureVaultBackup(store, drive, deps);
           if (outcome.status === 'failed' || outcome.status === 'skipped')
             retry(drive);
@@ -802,6 +904,8 @@ export function watchForVaultBackups(
       } catch {
         // Discovery can fail offline; the next bounded retry rechecks it.
         drives.forEach(retry);
+      } finally {
+        running = false;
       }
     })();
   };
@@ -827,7 +931,8 @@ export function watchForVaultBackups(
 
   const reset = () => {
     generation++;
-    enrolled.clear();
+    recovered.clear();
+    vaultSessions.delete(store);
     pending.clear();
     clearTimeout(timer);
     clearTimeout(deadline);

@@ -64,6 +64,14 @@ Computed query answers are an exception: each response replaces the previous
 projection so its member list and count stay consistent. Query answers have no
 shared edit history; the editable resources nested inside them still merge.
 
+Server reads also check placement before applying data. A response cannot claim
+a resource or drive already assigned to another origin, including through nested
+HTTP resources or batched WebSocket reads. An unsolicited update for an unknown
+drive uses the configured bootstrap destination; an unrelated open connection
+cannot claim it. An explicitly requested vanity URL may establish a previously
+unknown drive's origin. This trusts the chosen server; it does not authenticate
+an arbitrary server's claim to host a previously unknown drive.
+
 Offline queue recovery merges the stored snapshot with the live document before
 exporting unsent changes. A cached snapshot cannot replace newer in-memory edits.
 Legacy queues recover their baseline from the signed genesis; normal online
@@ -140,10 +148,19 @@ import call. Download URL batching is not an import boundary. Legacy history wit
 unprovable earlier segments remains unprunable until a covering checkpoint or
 complete prefix establishes safety.
 
-`complete` here describes metadata coverage that the available objects establish.
-It does not prove that an unmentioned tail or entire lane was present, or that
-attachment bytes are available in the separate blob store. Those guarantees need
-a manifest and dependency verification. Keys and epochs still need a shared
-handle across adapters. Notification event identity, read/unread conflicts and
-closed-app delivery also remain open; see `TESTING_COVERAGE.md` and
-`planning/sync-contracts.md`.
+Format 3 packs authenticate their attachment dependencies. Encrypted attachment
+chunks live in separate blob objects and are uploaded before graph backup is
+confirmed. Recovery verifies their hashes before reporting complete. Graph
+recovery can retain readable resources while reporting missing or corrupt files.
+
+Recovery compares the downloaded inventory with independently retained confirmed
+lane/checkpoint heads. This detects an omitted tail that the listing alone cannot
+prove missing. The key and its authenticated epoch travel together through the
+browser, worker and native adapters. A rollback that removes every independent
+recovery witness remains outside this guarantee; legacy backups cannot recover
+attachment bytes that were never uploaded.
+
+Browser notification catch-up and read/unread receipts converge after reconnection,
+including after the receiving browser reopens. Push while every app remains closed
+and packaged native notification activation are separate gaps. See
+`TESTING_COVERAGE.md` for the executed cases and remaining limits.

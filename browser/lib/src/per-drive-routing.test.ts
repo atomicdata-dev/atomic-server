@@ -212,6 +212,58 @@ describe('per-drive destinations', () => {
 });
 
 describe('routing evidence from server reads', () => {
+  it('does not let an unselected origin claim an unknown drive by pushing a snapshot', async () => {
+    const { store } = await testStore({ serverUrl: A });
+    const resource = new Resource('atomic:unsolicited');
+    await resource.set(core.properties.isA, [server.classes.drive], false);
+
+    expect(
+      store.acceptsServerResource(
+        resource.subject,
+        B,
+        resource.getLoroDoc()!.export({ mode: 'snapshot' }),
+      ),
+    ).toBe(false);
+  });
+
+  it.each(['primary', 'nested'])(
+    'rejects a foreign HTTP %s resource claiming a known drive',
+    async kind => {
+      const store = new Store({ serverUrl: A, connect: false });
+      store.setDriveServer(DRIVE_A, A, { connect: false });
+      const forged = {
+        '@id': DRIVE_A,
+        [core.properties.isA]: [server.classes.drive],
+        [core.properties.name]: 'Forged',
+      };
+      store.injectFetch(
+        async () =>
+          new Response(
+            JSON.stringify(
+              kind === 'primary'
+                ? forged
+                : {
+                    '@id': `${B}/resource`,
+                    'https://atomicdata.dev/properties/description': forged,
+                  },
+            ),
+            { headers: { 'Content-Type': 'application/ad+json' } },
+          ),
+      );
+
+      await expect(
+        store.fetchResourceFromServer(
+          kind === 'primary' ? `${B}/` : `${B}/resource`,
+          { noWebSocket: true },
+        ),
+      ).rejects.toThrow(/destination/i);
+      expect(store.getServerUrlForSubject(DRIVE_A)).toBe(A);
+      expect(store.resources.get(DRIVE_A)?.get(core.properties.name)).not.toBe(
+        'Forged',
+      );
+    },
+  );
+
   it('remembers a cold query member on its owning drive through a migration', async () => {
     const store = new Store({ serverUrl: B, connect: false });
     store.setDriveServer(DRIVE_A, A, { connect: false });

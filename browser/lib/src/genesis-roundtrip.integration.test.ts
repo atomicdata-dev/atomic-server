@@ -4,6 +4,7 @@ import { Agent } from './agent.js';
 import { JSCryptoProvider } from './CryptoProvider.js';
 import { server } from './ontologies/server.js';
 import { core } from './ontologies/core.js';
+import { applyImportReferences } from './import-reference-review.js';
 import { identifierBody, isAtomicIdentifier } from './subject.js';
 
 /**
@@ -30,6 +31,85 @@ async function serverUp(): Promise<boolean> {
 }
 
 describe('genesis cert round-trip against a live server', () => {
+  it.each(['http', 'ws'])(
+    'confirms an edited application reference after a %s refresh',
+    async mode => {
+      if (!(await serverUp())) return;
+      const store = new Store({ serverUrl: SERVER });
+      store.setServerConnected(true);
+      const keys = await Agent.generateKeyPair();
+      const agent = new Agent(
+        new JSCryptoProvider(keys.privateKey),
+        `did:ad:agent:${keys.publicKey}`,
+      );
+      store.setAgent(agent);
+      const drive = await store.newResource({
+        noParent: true,
+        isA: server.classes.drive,
+        propVals: {
+          [core.properties.write]: [agent.subject],
+          [core.properties.read]: [agent.subject],
+        },
+      });
+      await drive.save();
+      const prop = await store.newResource({
+        parent: drive.subject,
+        isA: core.classes.property,
+        propVals: {
+          [core.properties.shortname]: 'linked-project',
+          [core.properties.name]: 'Project',
+          [core.properties.description]: 'Project reference',
+          [core.properties.datatype]:
+            'https://atomicdata.dev/datatypes/atomicURL',
+        },
+      });
+      await prop.save();
+      const before = await store.newResource({ parent: drive.subject });
+      const after = await store.newResource({ parent: drive.subject });
+      await before.save();
+      await after.save();
+      const row = await store.newResource({
+        parent: drive.subject,
+        propVals: { [prop.subject]: before.subject },
+      });
+      await row.save();
+
+      if (mode === 'ws') {
+        store.setServerConnected(false);
+        localStorage.removeItem('ws-disconnected');
+        await store.reconnect(10_000);
+      }
+
+      const outcomes = await applyImportReferences(
+        {
+          read: subject => store.readServerSnapshot(subject),
+          write: async (subject, values) => {
+            const resource = await store.fetchResourceFromServer(subject, {
+              noWebSocket: mode === 'http',
+            });
+            for (const [p, v] of Object.entries(values))
+              await resource.set(p, v as never);
+            await resource.save();
+          },
+        },
+        [
+          {
+            subject: row.subject,
+            property: prop.subject,
+            before: before.subject,
+            after: after.subject,
+          },
+        ],
+      );
+      if (mode === 'ws') store.disconnect();
+      expect(outcomes).toEqual([{ subject: row.subject, status: 'confirmed' }]);
+      expect((await store.readServerSnapshot(row.subject))[prop.subject]).toBe(
+        after.subject,
+      );
+    },
+    30_000,
+  );
+
   it('a browser cert-minted drive genesis is accepted by the server', async () => {
     if (!(await serverUp())) {
       console.warn(`[skip] no atomic-server at ${SERVER}`);

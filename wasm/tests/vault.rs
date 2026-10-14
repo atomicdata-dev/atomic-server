@@ -82,7 +82,7 @@ async fn importing_no_objects_is_a_no_op() {
     let key = vault_generate_key();
     let empty = serde_wasm_bindgen::to_value(&Vec::<u8>::new()).unwrap();
     let summary = db
-        .vault_import(&key, 1, PSEUDONYM, DEVICE, empty)
+        .vault_import(&key, 1, PSEUDONYM, DEVICE, empty, JsValue::UNDEFINED)
         .await
         .expect("import of nothing should succeed");
     assert!(!summary.is_null());
@@ -307,7 +307,7 @@ async fn a_current_state_checkpoint_is_smaller_and_restores() {
     .unwrap();
     let objects = js_sys::Array::of1(&object).into();
     fresh
-        .vault_import(&key, 1, PSEUDONYM, DEVICE, objects)
+        .vault_import(&key, 1, PSEUDONYM, DEVICE, objects, JsValue::UNDEFINED)
         .await
         .expect("a shallow checkpoint restores");
     let restored: serde_json::Value = serde_json::from_str(
@@ -320,4 +320,81 @@ async fn a_current_state_checkpoint_is_smaller_and_restores() {
     )
     .unwrap();
     assert_eq!(restored[atomic_lib::urls::NAME], "edit 99");
+}
+
+/// Graph and blob bytes cross JS separately, and both survive cold recovery.
+#[wasm_bindgen_test]
+async fn encrypted_blob_bytes_round_trip_across_the_js_boundary() {
+    use wasm_bindgen::JsCast;
+    let db = ClientDb::new_in_memory(None).await.unwrap();
+    let drive = "did:ad:vaultblobtest";
+    let bytes = vec![0, 1, 128, 255, 42];
+    let hash = blake3::hash(&bytes);
+    db.put_blob(hash.as_bytes(), &bytes).unwrap();
+    db.put_resource(&format!(
+        r#"{{"@id":"{drive}","https://atomicdata.dev/properties/blob":"did:ad:blob:{}"}}"#,
+        hash.to_hex()
+    ))
+    .await
+    .unwrap();
+    let key = vault_generate_key();
+    let out = db
+        .vault_export(
+            drive,
+            &key,
+            2,
+            PSEUDONYM,
+            DEVICE,
+            1,
+            1,
+            false,
+            JsValue::UNDEFINED,
+            None,
+        )
+        .await
+        .unwrap();
+    let blobs: js_sys::Array = js_sys::Reflect::get(&out, &"blobs".into())
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+    assert_eq!(blobs.length(), 1);
+    let sealed = js_sys::Reflect::get(&blobs.get(0), &"sealed".into()).unwrap();
+    assert!(sealed.is_instance_of::<js_sys::Uint8Array>());
+    let objects = js_sys::Array::of1(&out);
+    objects.push(&blobs.get(0));
+    let fresh = ClientDb::new_in_memory(None).await.unwrap();
+    let expected = serde_wasm_bindgen::to_value(&atomic_lib::vault::sync::RecoveryExpectation {
+        lanes: Default::default(),
+        checkpoint_n: 1,
+    })
+    .unwrap();
+    let result = fresh
+        .vault_import(&key, 2, PSEUDONYM, DEVICE, objects.into(), expected)
+        .await
+        .unwrap();
+    assert_eq!(
+        js_sys::Reflect::get(&result, &"blobsRestored".into())
+            .unwrap()
+            .as_f64(),
+        Some(1.0)
+    );
+    assert_eq!(
+        fresh
+            .get_blob(hash.as_bytes())
+            .unwrap()
+            .unchecked_into::<js_sys::Uint8Array>()
+            .to_vec(),
+        bytes
+    );
+    assert!(fresh
+        .vault_import(
+            &key,
+            0,
+            PSEUDONYM,
+            DEVICE,
+            js_sys::Array::new().into(),
+            JsValue::UNDEFINED
+        )
+        .await
+        .is_err());
 }

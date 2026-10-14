@@ -9,17 +9,20 @@
 // Several devices can be open at once and each sees the same message, so
 // recording is "check, then create". Two devices can still both create one
 // (signatures here aren't deterministic, so the subject can't be derived from
-// the message); the list shows one item per source, read when any copy is.
+// the message); the list shows one item per source, with read receipts on the personal drive.
 import {
   core,
   Datatype,
   dataBrowser,
   notifications,
   CollectionBuilder,
+  toLegacyScheme,
+  RequestCancelledError,
   type Resource,
   type Store,
 } from '@tomic/react';
 import { getOrCreateDriveLocation } from '../standardLocations';
+import { notificationSourceId } from './identity';
 
 export type NotificationKind = 'chat' | 'comment' | 'reply';
 
@@ -37,37 +40,31 @@ export interface NotificationRecord {
   read?: boolean;
 }
 
-const inboxRequests = new WeakMap<Store, Map<string, Promise<string>>>();
+function notificationSession(store: Store): () => void {
+  const generation = store.getIdentityGeneration();
+
+  return () => {
+    if (store.getIdentityGeneration() !== generation)
+      throw new RequestCancelledError('Notification session changed');
+  };
+}
 
 /** The Inbox in the private drive, created on first use. */
 export async function getOrCreateInbox(
   store: Store,
   privateDrive: string,
 ): Promise<string> {
-  let requests = inboxRequests.get(store);
-
-  if (!requests) {
-    requests = new Map();
-    inboxRequests.set(store, requests);
-  }
-
-  const pending = requests.get(privateDrive);
-  if (pending) return pending;
-
-  const request = getOrCreateDriveLocation(
+  return getOrCreateDriveLocation(
     store,
     privateDrive,
     notifications.properties.inbox,
     { isA: notifications.classes.inbox, name: 'Inbox' },
   );
-  requests.set(privateDrive, request);
-  // Forget failures, so a later message can try again.
-  request.catch(() => requests.delete(privateDrive));
-
-  return request;
 }
 
-/** The Notifications recorded for a source, in this private drive. */
+/** Known copies of this source in the private drive. Partial discovery is safe:
+ * concurrent/offline creation can already produce copies, and logical identity
+ * plus the read ledger reconciles them. Absence never means deleting data. */
 export async function findNotificationsFor(
   store: Store,
   privateDrive: string,
@@ -99,13 +96,18 @@ export async function recordNotification(
   privateDrive: string,
   record: NotificationRecord,
 ): Promise<string> {
+  const checkSession = notificationSession(store);
   const inbox = await getOrCreateInbox(store, privateDrive);
+  checkSession();
 
-  const [existing] = await findNotificationsFor(
-    store,
-    privateDrive,
-    record.source,
+  const source = notificationSourceId(record.source);
+  const copies = await Promise.all(
+    [...new Set([source, toLegacyScheme(source)])].map(id =>
+      findNotificationsFor(store, privateDrive, id),
+    ),
   );
+  checkSession();
+  const existing = copies.flat()[0];
 
   if (existing) {
     if (record.read) await markRead(store, [existing]);
@@ -117,7 +119,7 @@ export async function recordNotification(
     [core.properties.name]: record.title,
     [core.properties.description]: record.body,
     [dataBrowser.properties.about]: record.about,
-    [notifications.properties.notificationSource]: record.source,
+    [notifications.properties.notificationSource]: source,
     [notifications.properties.notificationKind]: record.kind,
     [notifications.properties.actor]: record.actor,
     [notifications.properties.occurredAt]: record.occurredAt,
@@ -138,35 +140,116 @@ export async function recordNotification(
       [notifications.properties.readAt]: Datatype.TIMESTAMP,
     },
   });
+  checkSession();
   await resource.save();
+  checkSession();
   store.notifyResourceManuallyCreated(resource);
+  if (record.read) await writeReadReceipts(store, [resource], true);
 
   return resource.subject;
 }
 
-export const isUnread = (notification: Resource): boolean =>
-  notification.get(notifications.properties.readAt) === undefined;
+/** Root map keyed by canonical source event. Lives on the personal drive, whose
+ * identity already survives non-extractable signing sessions. Independent event
+ * keys merge without replacing one another; explicit unread is a stored value,
+ * so a late duplicate cannot resurrect an old read receipt. */
+export const RECEIPT_MAP = 'notificationReadState';
+export type NotificationReceipts = Record<
+  string,
+  { read: boolean; at: number }
+>;
 
-/**
- * Marks the given Notifications read, skipping those that already are, and
- * those about something that happened after `upTo`.
- */
+export function readReceipts(home?: Resource): NotificationReceipts {
+  return (home?.getLoroDoc()?.getMap(RECEIPT_MAP).toJSON() ??
+    {}) as NotificationReceipts;
+}
+
+export const isUnread = (
+  notification: Resource,
+  receipts?: NotificationReceipts,
+): boolean => {
+  const source = notification.get(notifications.properties.notificationSource);
+  const receipt =
+    typeof source === 'string'
+      ? receipts?.[notificationSourceId(source)]
+      : undefined;
+
+  return receipt
+    ? !receipt.read
+    : notification.get(notifications.properties.readAt) === undefined;
+};
+
+async function writeReadReceipts(
+  store: Store,
+  items: Resource[],
+  read: boolean,
+): Promise<void> {
+  if (!items.length || !store.getAgent()?.subject) return;
+  const checkSession = notificationSession(store);
+  const home = await store.getResource(await store.privateDriveSubject());
+  checkSession();
+  if (home.error) throw home.error;
+  const map = home.getLoroDoc()?.getMap(RECEIPT_MAP);
+  if (!map) throw new Error('Notification history is not ready');
+  let changed = false;
+
+  for (const item of items) {
+    const source = item.get(notifications.properties.notificationSource);
+    if (typeof source !== 'string') continue;
+    const id = notificationSourceId(source);
+    const previous = map.get(id) as { read?: boolean } | undefined;
+    if (previous?.read === read) continue;
+    map.set(id, { read, at: Date.now() });
+    changed = true;
+  }
+
+  if (changed) {
+    home.markDirty();
+    await home.save();
+  }
+}
+
+/** Explicit unread is causal state shared by every copy of an event. */
+export async function markUnread(
+  store: Store,
+  subjects: string[],
+): Promise<void> {
+  return setReadState(store, subjects, false);
+}
+
+/** Mark notifications read up to the instant the user saw the conversation. */
 export async function markRead(
   store: Store,
   subjects: string[],
   upTo = Number.POSITIVE_INFINITY,
 ): Promise<void> {
+  return setReadState(store, subjects, true, upTo);
+}
+
+async function setReadState(
+  store: Store,
+  subjects: string[],
+  read: boolean,
+  upTo = Number.POSITIVE_INFINITY,
+): Promise<void> {
+  const checkSession = notificationSession(store);
   const now = Date.now();
-
+  const items = (
+    await Promise.all(subjects.map(subject => store.getResource(subject)))
+  ).filter(item => !item.error && occurredAt(item) <= upTo);
+  checkSession();
+  await writeReadReceipts(store, items, read);
   await Promise.all(
-    subjects.map(async subject => {
-      const notification = await store.getResource(subject);
-
-      if (notification.error || !isUnread(notification)) return;
-      if (occurredAt(notification) > upTo) return;
-
-      await notification.set(notifications.properties.readAt, now, false);
-      await notification.save();
+    items.map(async item => {
+      checkSession();
+      if (isUnread(item) !== read) return;
+      await item.set(
+        notifications.properties.readAt,
+        read ? now : undefined,
+        false,
+      );
+      checkSession();
+      await item.save();
     }),
   );
 }
@@ -182,6 +265,7 @@ export async function markReadAbout(
   target: string,
   upTo = Date.now(),
 ): Promise<void> {
+  const checkSession = notificationSession(store);
   const collection = new CollectionBuilder(store)
     .setProperty(dataBrowser.properties.about)
     .setValue(target)
@@ -195,30 +279,32 @@ export async function markReadAbout(
     .setPageSize(100)
     .build();
   await collection.waitForReady();
-
-  await markRead(
-    store,
-    await collection.getAllMembers({ requireComplete: true }),
-    upTo,
-  );
+  const subjects = await collection.getAllMembers();
+  checkSession();
+  await markRead(store, subjects, upTo);
 }
 
 /**
  * The newest Notification per source, newest first. Two devices can both
  * record the same message; the list shows it once, read if either copy is.
  */
-export function dedupeBySource(list: Resource[]): Resource[] {
+export function dedupeBySource(
+  list: Resource[],
+  receipts?: NotificationReceipts,
+): Resource[] {
   const bySource = new Map<string, Resource>();
 
   for (const n of list) {
-    const source =
+    const source = notificationSourceId(
       (n.get(notifications.properties.notificationSource) as
         | string
-        | undefined) ?? n.subject;
+        | undefined) ?? n.subject,
+    );
     const seen = bySource.get(source);
 
     // Prefer a read copy, so reading one device's copy reads the item.
-    if (!seen || (isUnread(seen) && !isUnread(n))) bySource.set(source, n);
+    if (!seen || (isUnread(seen, receipts) && !isUnread(n, receipts)))
+      bySource.set(source, n);
   }
 
   return [...bySource.values()].sort((a, b) => occurredAt(b) - occurredAt(a));
@@ -249,7 +335,10 @@ const dayOf = (ms: number) => new Date(ms).toDateString();
  * day, so history still shows when things happened. Expects the input newest
  * first (as {@link dedupeBySource} returns it) and keeps that order.
  */
-export function groupNotifications(list: Resource[]): NotificationGroup[] {
+export function groupNotifications(
+  list: Resource[],
+  receipts?: NotificationReceipts,
+): NotificationGroup[] {
   const groups = new Map<string, NotificationGroup>();
 
   for (const n of list) {
@@ -257,7 +346,7 @@ export function groupNotifications(list: Resource[]): NotificationGroup[] {
       | string
       | undefined;
     const about = n.get(dataBrowser.properties.about) as string | undefined;
-    const unread = isUnread(n);
+    const unread = isUnread(n, receipts);
     const key = [
       about ?? n.subject,
       kind ?? '',

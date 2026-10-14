@@ -2,7 +2,7 @@ import { beforeAll, describe, expect as assert, it, vi } from 'vitest';
 import { Store, type IncomingChange } from './store.js';
 import { LoroLoader } from './loro-loader.js';
 import { Resource } from './resource.js';
-import { commits, core, collections } from './index.js';
+import { commits, core, collections, server } from './index.js';
 
 /**
  * #1905. A local query hands back JSON-AD, not snapshots, so the resources it
@@ -94,9 +94,123 @@ function storeWith(json: string, local: Uint8Array) {
   return { store, writes, asked };
 }
 
-const settle = () => new Promise(resolve => setTimeout(resolve, 20));
-
 describe('a sync delta for a resource with no local Loro history', () => {
+  it('buffers a computed query while Loro is still starting', async () => {
+    const doc = new LoroLoader.Loro.LoroDoc();
+    doc
+      .getMap('properties')
+      .set(collections.properties.members, ['atomic:chat-log']);
+    doc.getMap('properties').set(collections.properties.totalMembers, 1);
+    doc.commit();
+    const snapshot = doc.export({ mode: 'snapshot' });
+
+    // The shared test setup enables Loro, unlike a cold command-line client.
+    // Fresh modules exercise that real startup state without mocking the codec.
+    vi.resetModules();
+    const { Store: ColdStore } = await import('./store.js');
+    const { LoroLoader: ColdLoro } = await import('./loro-loader.js');
+    assert(ColdLoro.isLoaded()).toBe(false);
+    const store = new ColdStore({
+      serverUrl: 'https://example.com',
+      connect: false,
+    });
+    const subject = 'https://example.com/query?drive=atomic:home';
+    assert(
+      store.applyIncoming({
+        subject,
+        source: 'ws-pending-get',
+        loroBytes: snapshot,
+      }),
+    ).toBe('applied');
+    const resource = store.resources.get(subject)!;
+    assert(resource.loading).toBe(true);
+    await ColdLoro.initializeLoro();
+    assert(resource.loading).toBe(false);
+    assert(resource.get(collections.properties.members)).toEqual([
+      'atomic:chat-log',
+    ]);
+    assert(resource.get(collections.properties.totalMembers)).toBe(1);
+  });
+
+  it.each(['/search', '/vector_search'])(
+    'replaces the computed %s result even when its previous clock was larger',
+    path => {
+      const store = new Store({ serverUrl: 'https://example.com' });
+      const subject = `https://example.com${path}?q=chat`;
+
+      const apply = (members: string[], clock: number) => {
+        const doc = new LoroLoader.Loro.LoroDoc();
+
+        for (let i = 0; i < clock; i++) {
+          doc.getMap('properties').set(server.properties.results, [String(i)]);
+          doc.commit();
+        }
+
+        doc.getMap('properties').set(server.properties.results, members);
+        doc.commit();
+        const resource = new Resource(subject);
+        resource.importLoroUpdate(doc.export({ mode: 'snapshot' }));
+        store.applyIncoming({ subject, source: 'http-fetch', resource });
+      };
+
+      apply([], 20);
+      apply(['atomic:chat-log'], 1);
+      assert(
+        store.resources.get(subject)!.get(server.properties.results),
+      ).toEqual(['atomic:chat-log']);
+    },
+  );
+
+  it.each(['ws-pending-get', 'ws-query-update'] as const)(
+    'replaces independent binary query snapshots from %s',
+    source => {
+      const store = new Store({ serverUrl: 'https://example.com' });
+      const subject = 'https://example.com/query?drive=atomic:home';
+      const old = new LoroLoader.Loro.LoroDoc();
+      old.setPeerId(99n);
+      const oldProps = old.getMap('properties');
+
+      // Computed queries start new documents each time. The earlier answer
+      // may have a higher Lamport clock; merging would let it defeat a later
+      // authoritative answer, leaving a saved chat log invisible on reload.
+      for (let i = 0; i < 20; i++) {
+        oldProps.set(collections.properties.totalMembers, i);
+        old.commit();
+      }
+
+      oldProps.set(collections.properties.members, []);
+      oldProps.set(collections.properties.totalMembers, 0);
+      old.commit();
+      store.applyIncoming({
+        subject,
+        source,
+        loroBytes: old.export({ mode: 'snapshot' }),
+      });
+
+      const fresh = new LoroLoader.Loro.LoroDoc();
+      fresh.setPeerId(1n);
+      fresh
+        .getMap('properties')
+        .set(collections.properties.members, ['atomic:chat-log']);
+      fresh.getMap('properties').set(collections.properties.totalMembers, 1);
+      fresh.commit();
+      store.applyIncoming({
+        subject,
+        source,
+        loroBytes: fresh.export({ mode: 'snapshot' }),
+      });
+
+      const resource = store.resources.get(subject)!;
+      assert(resource.get(collections.properties.members)).toEqual([
+        'atomic:chat-log',
+      ]);
+      assert(resource.get(collections.properties.totalMembers)).toBe(1);
+      assert([
+        ...resource.getLoroDoc()!.oplogVersion().toJSON().keys(),
+      ]).toEqual(['1']);
+    },
+  );
+
   it('replaces computed query results instead of merging their independent histories', async () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     const subject = 'https://example.com/query?drive=atomic:home';
@@ -218,7 +332,7 @@ describe('a sync delta for a resource with no local Loro history', () => {
         });
       }
 
-      await settle();
+      await vi.waitFor(() => assert(writes.length).toBeGreaterThan(0));
       assert(store.resources.get(SUBJECT)!.get(RENDERS)).toEqual([OWN, TXN]);
       const reloaded = new LoroLoader.Loro.LoroDoc();
       reloaded.import(writes.at(-1)!);
@@ -233,7 +347,6 @@ describe('a sync delta for a resource with no local Loro history', () => {
     const { store, writes } = storeWith(json, local);
 
     store.hydrateResourceFromJsonAd(SUBJECT, json);
-    await settle();
 
     expect(writes).toEqual([]);
   });
@@ -253,9 +366,8 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
-
     const resource = store.resources.get(SUBJECT)!;
+    await vi.waitFor(() => expect(resource.isReady()).toBe(true));
     expect(resource.get(RENDERS)).toEqual([OWN, TXN]);
     expect(resource.isReady()).toBe(true);
     expect(asked).toEqual([]);
@@ -272,9 +384,8 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
-
     const resource = store.resources.get(SUBJECT)!;
+    await vi.waitFor(() => expect(resource.isReady()).toBe(true));
     expect(resource.get(RENDERS)).toEqual([OWN, TXN]);
     expect(resource.get(core.properties.name)).toBe('New app');
     expect(resource.isReady()).toBe(true);
@@ -293,9 +404,7 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
-
-    expect(writes.length).toBe(1);
+    await vi.waitFor(() => expect(writes.length).toBe(1));
     const { LoroDoc } = LoroLoader.Loro;
     const written = new LoroDoc();
     written.import(writes[0]);
@@ -316,7 +425,7 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: full,
       source: 'ws-sync-push',
     });
-    await settle();
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
     expect(store.resources.get(SUBJECT)!.get(core.properties.name)).toBe(
       'New app',
     );
@@ -340,6 +449,7 @@ describe('a sync delta for a resource with no local Loro history', () => {
         answer = reject;
       })) as never;
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
     store.hydrateResourceFromJsonAd(SUBJECT, json);
     store.applyIncoming({
@@ -347,14 +457,21 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
     store.removeResource(SUBJECT);
     answer(new Error(`DID Resource ${SUBJECT} not found locally`));
-    await settle();
+    await vi.waitFor(() =>
+      expect(info).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'was deleted while its missing state was being recovered',
+        ),
+      ),
+    );
 
     expect(warn).not.toHaveBeenCalled();
     expect(store.resources.get(SUBJECT)).toBeUndefined();
     warn.mockRestore();
+    info.mockRestore();
   });
 
   it('does not ask the server about a resource already deleted', async ({
@@ -370,8 +487,6 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
-
     expect(asked).toEqual([]);
   });
 
@@ -387,8 +502,6 @@ describe('a sync delta for a resource with no local Loro history', () => {
       loroBytes: delta,
       source: 'ws-sync-push',
     });
-    await settle();
-
-    expect(asked).toEqual([SUBJECT]);
+    await vi.waitFor(() => expect(asked).toEqual([SUBJECT]));
   });
 });

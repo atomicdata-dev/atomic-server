@@ -2133,7 +2133,7 @@ that completes after its deadline. Staging phone restore latency and end-to-end
 WebSocket query delivery remain unverified.
 
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
-responses open to verify concurrent downloads are bounded at four and that
+responses open to verify concurrent downloads are bounded at eight and that
 reverse completion preserves listing order at import. Existing progress and
 failure checks also pass. Actual staging phone restore latency remains unmeasured.
 
@@ -2274,7 +2274,7 @@ that completes after its deadline. Staging phone restore latency and end-to-end
 WebSocket query delivery remain unverified.
 
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
-responses open to verify concurrent downloads are bounded at four and that
+responses open to verify concurrent downloads are bounded at eight and that
 reverse completion preserves listing order at import. Existing progress and
 failure checks also pass. Actual staging phone restore latency remains unmeasured.
 
@@ -2887,13 +2887,11 @@ node lookup from replacing an explicitly local-only agent profile.
 `sync-delta-local-base.test.ts` verifies that a complete server sync snapshot
 after a JSON-only collection read is persisted, so reload keeps the edit.
 
-Remaining gaps: automatic background Vault pull is not implemented, so explicit
-restore is the stale-device acceptance boundary. Newly attached bytes in a
-workspace that has only used Vault stay local: G1 establishes recovery of blobs
-already uploaded to S3, not Vault-only blob upload. Native lifecycle, large
-restore budgets, arbitrary missing segments, notification read-state convergence,
-Cloud Server revoke/regrant and full invitation revocation parity still need
-coverage. Native deletion tests include checkpoint retention and stale lanes;
+The 2026-10-14 follow-up below adds automatic background Vault pull, Vault-only
+blob recovery and notification read-state convergence. G1 still tests the
+separate Cloud Server blob path. Remaining gaps include native lifecycle, large restore budgets, arbitrary
+missing segments, Cloud Server revoke/regrant and full invitation revocation
+parity. Native deletion tests include checkpoint retention and stale lanes;
 browser compaction, pruning and Discard history races remain untested.
 
 
@@ -2928,7 +2926,209 @@ browser compaction, pruning and Discard history races remain untested.
   Automatic recovery checks authoritative absence before needing a local database.
   The managed billing E2E again asserts unpaid 402 and separate hosting consent.
 
-Limits: these checks do not establish automatic Vault pull, blob-only fresh-device
-upload/recovery, arbitrary orphan ID discovery, profile fan-out, multi-process
-control-plane leadership, native runtime parity or complete production incident
-coverage. Validation counts and unresolved runs belong in the active PR evidence.
+Limits of the 2026-10-13 checks: automatic Vault pull and Vault-only attachment
+recovery are covered by the later follow-up below. Arbitrary orphan ID discovery,
+profile fan-out, multi-process control-plane leadership, native runtime parity
+and complete production incident coverage remain unproven. Validation counts and unresolved runs belong in the active PR evidence.
+
+
+### Vault durability and notification convergence (2026-10-14)
+
+- `lib/src/vault/blobs.rs` verifies separate encrypted chunks, exact byte/hash
+  recovery, empty files, corruption and immutable paths across key epochs.
+  `vault::sync` tests cold recovery after dropping the source store, missing
+  dependencies, refusal to back up absent local bytes, and missing expected
+  lane tails/checkpoints even when the listing contains none of them.
+- `wasm/tests/vault.rs` exercises real JS byte representations for both graph
+  and blob objects. `nodeVault.test.ts` checks the native IPC adapter. A native
+  compile and shared Rust tests do not establish packaged-app lifecycle parity.
+- `vault.test.ts` injects failure at every reserve/upload/confirm boundary for
+  blobs and graph packs. No failed pass advances the cursor; retry completes.
+  Key epoch validation refuses malformed records instead of assuming epoch 1.
+- `vaultAutoBackup.test.ts` tests automatic pull on changed remote state,
+  serialized retries, account isolation and partial recovery. Backup and restore
+  share cancellation for the signing session, managed account, document and
+  selected database. Backup regressions replace the database during key loading
+  and replace the signing session with a new agent for the same subject; neither
+  may proceed to enrollment or upload. Library
+  `vault-refresh.test.ts` verifies open resource identity, retained local edits
+  and cancellation of a restore read completed after identity changes.
+- Notification tests use a logical source-event identity and a per-event Loro
+  read/unread ledger on the personal drive. Independent writes converge across
+  three replicas; late duplicate resources cannot reset a read receipt.
+  The browser journey closes the receiving page, sends a message, reopens it,
+  then signs in with a separate profile and marks it read across both profiles.
+- `inbox.test.ts` and `standardLocations.test.ts` cancel delayed notification
+  read/unread decisions and folder creation after an account switch.
+  `standardLocations.driveLocation.test.ts` verifies concurrent first use creates
+  one folder, rejected creation remains retryable, and a new identity session
+  cannot join the previous session's request. Inbox and AI folders use this shared
+  owner. This coalesces one store's callers; independent devices can still race.
+  WebSocket
+  tests reject delayed blob requests after disconnect, account or database
+  changes, and close an unopened connection without authenticating it.
+- `row-dialog.spec.ts` opens an inline draft before collection membership catches
+  up. Expansion follows the same row source as the visible grid. Pairing-dialog
+  tests drain their proxy handlers before closing the page.
+- Paired acceptance C1 now requires automatic reconnect catch-up in both modes.
+  H1 creates a multi-chunk file in a Vault-only workspace, closes its source,
+  blocks Cloud Server blob access, restores on a cold device and verifies exact
+  bytes through the visible Download action. E1 still verifies incomplete
+  recovery and retained readable data for missing/corrupt objects on desktop
+  and narrow viewports. Recovery tests block peers to isolate durability only.
+
+- `client-browser-auth.test.ts` keeps each request bound to its current agent
+  and exact URL even when another origin/account has a fresh ambient cookie.
+  Anonymous reads and conversation capability probes omit ambient cookies.
+- `snapshot-replay.test.ts` replays locally generated public-profile snapshots
+  and their next live update. Reading creation metadata used to poison Loro's
+  snapshot block cache; the test now proves subsequent sync and retained local
+  edits without replacing the live document. The captured failure also occurs
+  with Loro 1.16.4; this fix does not depend on an unverified dependency upgrade.
+- `commit_monitor::event_recovery_tests` overflows a real bounded event queue,
+  requires a reconciliation signal and verifies later deletions still arrive.
+  The monitor closes affected subscribed sockets so normal authenticated
+  reconnect reconciles the missed interval. Previously one overflow silently
+  stopped the listener for the lifetime of the process.
+  `websockets.test.ts` verifies that a service-restart close reauthenticates,
+  restores drive subscriptions, retries an in-flight commit over HTTP and sends
+  a fresh reconciliation probe, including an interrupted closing handshake.
+  Unexpected disconnects retain their warnings. The server actor test checks
+  the actual CLOSE 1012 bytes, keeps the response stream open for the peer's
+  acknowledgement and rejects late application frames during that handshake.
+- `websockets.test.ts` verifies that a retained public profile catches up a
+  rename missed while disconnected, preserving the live Resource. Replaying SUB
+  alone is insufficient because profiles are outside drive reconciliation.
+  `username-live.spec.ts` checks the same recovery in an existing chat after a
+  deliberate disconnect, without reloading. Ordinary cached listeners cannot
+  open foreign WebSockets when mounted, disposed or replayed on reconnect.
+  HTTP vocabulary reads remain HTTP even after their response names a drive;
+  naming a drive does not establish support for the socket protocol.
+- `db::test::external_changes_are_not_evicted_by_commit_or_query_traffic`
+  floods the database event stream with signed commits and query membership
+  changes. The replica-change listener must retain its update and cascade
+  deletion; genuinely overflowing that listener still requests reconciliation.
+  A real commit/direct-write test verifies both publishing paths.
+- `store.test.ts` keeps an authored resource ready through signing and an
+  in-flight genesis POST. Speculative reads and drive subscriptions wait for
+  creation acknowledgement instead of asking the server for an unsaved subject.
+- `save-receipt.test.ts` disconnects between the initial connection check and
+  outbox drain. Offline-capable saves require durable local storage; required
+  online writes still reject. A concurrent account change cancels the save
+  without copying the old resource into the new account's database.
+- `local-outbox-database.test.ts` cancels a write during tab storage handoff.
+  Cancellation retains the queued row without reporting disk failure or claiming
+  durability; a later flush must actually persist it.
+- `genesis-roundtrip.integration.test.ts` confirms reference-review writes by
+  fresh authenticated HTTP reads after saves over HTTP and a real WebSocket.
+  This guards remote confirmation rather than treating the local cache as proof.
+- `FilePage.test.tsx` holds a recovered file's local blob lookup pending on
+  wide and narrow layouts. Download stays disabled until the bytes have a URL,
+  then opens the recovered blob. The paired H1 journey verifies the actual
+  downloaded bytes after the source browser closes; an early click previously
+  did nothing while the button appeared ready.
+- `NetworkIndicator.test.tsx` covers brief reconnects, sustained outages and
+  unmount cancellation. A short retry no longer flashes an offline toast over
+  editing controls; a sustained outage still produces the hint.
+- `clientdb-edit-persistence.spec.ts` uses the selected drive as its parent and
+  requires server receipts for both genesis and edit, then checks OPFS and a
+  successful server read. It cannot pass by inspecting cached values on an
+  errored fetch of an unhosted resource.
+- `VersionTitle.test.tsx` verifies verified, unverified and unclaimed history labels
+  against the selected change token. A local receipt can prove an older version
+  even when the server retains only the latest envelope; the restore E2E no
+  longer assumes all older versions must be unattributed.
+- `ComboBox.test.tsx` moves an open menu's anchor by scrolling a nested container
+  without resizing the control, then changes viewport geometry. The menu must
+  update its opening direction in both cases.
+- `sync-delta-local-base.test.ts` delivers independent computed query snapshots
+  through both binary WebSocket GET and query-update ingress, with the older
+  empty answer given a larger logical clock. The new membership and count must
+  replace it. Earlier coverage exercised HTTP only and missed this transport
+  difference; an actual chat reload then hid a log still intact on the server.
+  The same larger-clock regression covers `/search` and `/vector_search`
+  responses. These computed results replace prior answers; ordinary resource
+  snapshots still preserve causal history and pending local edits.
+  A fresh module instance also tests ingress before Loro starts. The shared
+  unit setup enables Loro and had hidden this cold-client boundary: a decoder
+  readiness check incorrectly rejected snapshots and stalled template clients.
+- `websockets.test.ts` sends invalid binary query snapshots to single and batch
+  GET callers. Each rejects instead of waiting forever after its timeout was
+  cleared, or presenting an older cached resource as a successful response.
+- `collection-completeness.test.ts` moves a drive to another server and back.
+  Completeness must remain invalidated even though the final destination string
+  matches the original. Collection reads now reuse the Store's captured route.
+- Sync ingress regressions in `sync-delta-local-base.test.ts` wait for persistence,
+  readiness or recovery completion instead of assuming work finishes in 20 ms.
+- Paired SaaS recovery tests verify migration table creation and backfill commit
+  atomically, a failed migration remains retryable, subsequent starts skip the
+  object scan, and persisted heads survive missing object rows. Status reads use
+  these heads without constructing a discarded recovery inventory; their existing
+  scan for pending/confirmed/stale counts remains.
+- `vault::sync::restore_preserves_ambiguous_import_copies_without_allowing_new_claims`
+  restores two independently created subjects with the same import identity into
+  empty and populated databases. Both copies survive; new duplicate authoring
+  remains refused. Restore uses the same persistence boundary as peer replicas.
+- `helpers/managed/vault.test.ts` bounds downloads to eight workers, preserves
+  inventory order, starts bodies before later signing batches finish, and retains
+  earlier readable bodies when a later signing request fails.
+- `VaultPanel.test.tsx` opens the usage breakdown during restore while cleanup
+  remains disabled, and distinguishes downloading from applying. The compiled
+  `vault-storage.spec.ts` checks usage totals, per-kind object counts, storage
+  scope explanations and narrow layout at 1200px and 390px. It uses a mocked
+  usage inventory with automatic backup disabled; actual encrypted recovery
+  remains covered by the paired acceptance journeys above.
+- `vaultFile.test.ts` refuses an empty cloud inventory when either checkpoint or
+  lane history is recorded. A genuinely empty manifest still returns no backup.
+- `per-drive-routing.test.ts` rejects unsolicited drive claims from another
+  origin and foreign HTTP claims against pinned drives, including nested resources.
+  `websockets.test.ts` applies the same check to single and batched GET answers.
+  Existing vanity-origin tests keep explicitly requested first reads working;
+  `sync-delta-local-base.test.ts` verifies computed query replacement separately
+  from causal resource merges.
+- `starter.test.ts` executes the shipped app source with overlapping queries and
+  verifies that a late initial answer cannot duplicate or erase newly added rows.
+- `plugin.spec.ts` holds the post-uninstall plugin-list response while navigating
+  to another resource. Completing that refresh must preserve the new page and
+  must not fetch assets from the deleted installation. This reproduces CI's
+  late return to the drive without depending on machine load.
+- `vault::pack::binary_updates_do_not_pay_per_byte_integer_encoding_overhead`
+  bounds encoding overhead for a 64 KiB binary update and checks compatibility
+  with the existing reader and old numeric-array packs.
+
+Remaining limits: notification delivery while every app stays closed still
+requires a push/background service. This change catches up when an app returns;
+OS notification activation in a packaged native app is not covered. Large-Vault
+memory budgets, arbitrary seeded process/network schedules, multi-process
+control-plane leadership and rollback of all independent recovery evidence
+remain separate work. The upload campaign is deterministic boundary coverage,
+not an exhaustive distributed fault simulation. Native lifecycle, browser
+compaction/pruning races and cross-device invitation revocation remain gaps.
+
+### Account Vault storage inspection
+
+- `vaultStorageReport.test.ts` includes workspaces belonging to different linked
+  agents, retains listed bytes on a failed detail read, and refuses cancelled or
+  mixed-account reports. Only owner-scoped metadata endpoints are read.
+- `VaultAccountStorage.test.tsx` rejects a pending result after logout and leaves
+  an unavailable allowance unknown rather than displaying a false zero quota.
+- `vault-storage.spec.ts` compares two workspaces on desktop/mobile, selects
+  diagnostics through the shared size map, downloads and checks the JSON report,
+  and verifies no backup-body download or storage mutation occurred. Invented
+  metadata isolates presentation; real backup recovery has separate acceptance.
+- The same spec exports real documents and an attachment into encrypted WASM
+  checkpoints, then checks desktop/mobile content inspection, file attribution,
+  confirmation/cancellation of retention cleanup and unchanged local resources
+  (including a deleted document that inspection must not resurrect). Storage
+  transport and the cleanup response are mocked; real S3 prune races remain a
+  separate acceptance gap.
+- `vault::inspect` reconciles every sealed byte across legacy/current pack
+  encodings, reads file metadata, and rejects wrong keys, epochs and corrupt or
+  non-pack objects. This path has no database or restore dependency.
+- `vaultContents.test.ts` checks repeated copies, shared blobs counted once,
+  unreadable/unattributed bytes, mismatched accounting and account guards.
+  `VaultContentsView.test.tsx` checks stop/unmount cancellation and late results;
+  `VaultStorage.test.tsx` checks destructive confirmation and changed accounts.
+- `SizeMap` is shared by server resource storage and account Vault storage. The
+  existing `storageMap.test.ts` covers its squarify layout; browser checks keep
+  both maps rendering without translation markers or horizontal overflow.

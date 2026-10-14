@@ -4,12 +4,7 @@ import { server as serverOntology } from './ontologies/server.js';
 // Send requests to the server and receive responses.
 
 import { hasBrowserAPI } from './hasBrowserAPI.js';
-import {
-  checkAuthenticationCookie,
-  setCookieAuthentication,
-  signRequest,
-  legacyAgentForRequest,
-} from './authentication.js';
+import { signRequest, legacyAgentForRequest } from './authentication.js';
 import { AtomicError, ErrorType } from './error.js';
 import { pageRequestSignal } from './page-request-signal.js';
 // Import directly from the modules to avoid a circular dep through `./index.js`
@@ -253,10 +248,6 @@ export class Client {
         url = proxyPathUrl(from, subject);
       }
 
-      // Checks on the requested URL for a proxied fetch, on the subject
-      // otherwise (a DID is still fetched with signature headers).
-      const authTarget = from !== undefined ? url : subject;
-
       // Sign exactly the URL being fetched (not the raw DID subject, nor
       // the external subject behind a proxy): the server verifies the
       // signature against the full HTTP URL of the request.
@@ -280,29 +271,15 @@ export class Client {
           // not CORS-safelisted, so signing forces a preflight, which static
           // hosts refuse (Pages answers 405). Such an origin cannot check our
           // Agent anyway: public data is all it can serve us.
-        } else if (!authTarget.startsWith('https://atomicdata.dev')) {
-          // Cookies only work in browsers for same-origin requests right now
-          // https://github.com/atomicdata-dev/atomic-data-browser/issues/253
-          if (
-            hasBrowserAPI() &&
-            authTarget.startsWith(window.location.origin)
-          ) {
-            if (!checkAuthenticationCookie()) {
-              // Await: the request that follows depends on this cookie.
-              // Without the await, the first call after `setAgent`
-              // race-conditions a 401 because the cookie hasn't been
-              // installed yet (the next request reads
-              // `checkAuthenticationCookie()` and re-installs anyway,
-              // but the first response is already a stale 401).
-              await setCookieAuthentication(signInfo.serverURL, signInfo.agent);
-            }
-          } else {
-            requestHeaders = await signRequest(
-              url,
-              signInfo.agent,
-              requestHeaders,
-            );
-          }
+        } else {
+          // Bind each request to its selected agent and destination. A fresh
+          // ambient cookie can belong to another account or localhost port;
+          // checking/replacing it also races other tabs writing the same cookie.
+          requestHeaders = await signRequest(
+            url,
+            signInfo.agent,
+            requestHeaders,
+          );
         }
       }
 
@@ -319,6 +296,8 @@ export class Client {
           method: method ?? 'GET',
           body: bodyReq,
           signal,
+          // Anonymous calls must remain anonymous after an account switch too.
+          credentials: 'omit',
         });
       } catch (e) {
         throw new AtomicError(

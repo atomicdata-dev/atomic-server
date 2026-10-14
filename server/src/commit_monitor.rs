@@ -156,11 +156,19 @@ impl Actor for CommitMonitor {
             // in `appstate.rs`); what this listener carries is the
             // commit-less change (a peer sync writing straight into the
             // store) that would otherwise never reach a subscriber.
-            let mut events_rx = self.store.subscribe_events();
+            let mut events_rx = self.store.subscribe_external_changes();
             let addr = ctx.address();
             let store_for_listener = self.store.clone();
             tokio::spawn(async move {
-                while let Ok(event) = events_rx.recv().await {
+                while let Some(event) = next_db_event(&mut events_rx, |missed| {
+                    tracing::warn!(
+                        missed,
+                        "WebSocket event stream fell behind; reconnecting subscribers"
+                    );
+                    addr.do_send(ReconcileSubscribers);
+                })
+                .await
+                {
                     // Changes that no commit produced. `handle_commit` — the
                     // usual route from "the store moved" to "tell the clients"
                     // — never runs for these, so without this arm a device that
@@ -1370,4 +1378,76 @@ pub fn create_commit_monitor(
             pending_commit: Arc::new(AtomicBool::new(false)),
         }
     })
+}
+
+/// A slow consumer must keep listening after the bounded queue drops events.
+async fn next_db_event(
+    events: &mut tokio::sync::broadcast::Receiver<DbEvent>,
+    mut on_lag: impl FnMut(u64),
+) -> Option<DbEvent> {
+    loop {
+        match events.recv().await {
+            Ok(event) => return Some(event),
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => on_lag(missed),
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+        }
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+struct ReconcileSubscribers;
+
+impl Handler<ReconcileSubscribers> for CommitMonitor {
+    type Result = ();
+
+    #[allow(clippy::mutable_key_type)]
+    fn handle(&mut self, _: ReconcileSubscribers, _: &mut Context<Self>) {
+        // A connection may hold many resource and drive subscriptions. One
+        // restart covers all of them, including resources deleted in the gap.
+        let connections: HashSet<_> = self
+            .subscriptions
+            .values()
+            .chain(self.drive_subscriptions.values())
+            .flat_map(|subscribers| subscribers.keys())
+            .collect();
+        for connection in connections {
+            connection.do_send(crate::actor_messages::ReconcileConnection);
+        }
+    }
+}
+
+#[cfg(test)]
+mod event_recovery_tests {
+    use super::*;
+
+    fn deletion(subject: &str) -> DbEvent {
+        DbEvent::Destroyed {
+            subject: subject.into(),
+            drive: None,
+            source_id: None,
+            from_commit: false,
+            commit_json: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn queue_overflow_requests_reconciliation_and_keeps_forwarding_deletions() {
+        let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
+        sender.send(deletion("atomic:missed")).unwrap();
+        sender.send(deletion("atomic:retained")).unwrap();
+        let mut missed = 0;
+        let event = next_db_event(&mut receiver, |n| missed += n).await;
+        assert_eq!(missed, 1, "a gap must invalidate the clients' live state");
+        assert!(
+            matches!(event, Some(DbEvent::Destroyed { subject, .. }) if subject.as_str() == "atomic:retained")
+        );
+        sender.send(deletion("atomic:later")).unwrap();
+        assert!(
+            matches!(next_db_event(&mut receiver, |_| panic!("no new gap")).await,
+            Some(DbEvent::Destroyed { subject, .. }) if subject.as_str() == "atomic:later")
+        );
+        drop(sender);
+        assert!(next_db_event(&mut receiver, |_| {}).await.is_none());
+    }
 }

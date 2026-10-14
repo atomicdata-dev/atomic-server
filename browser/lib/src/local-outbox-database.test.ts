@@ -1,3 +1,4 @@
+import { RequestCancelledError } from './error.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClientDbOutboxWrite } from './client-db.js';
 import { commitToJsonADObject, type Commit } from './commit.js';
@@ -368,6 +369,22 @@ describe('LocalOutbox in the client database', () => {
     expect(localStorage.getItem(`atomic.outbox.${AGENT}`)).toContain(
       'did:ad:note',
     );
+  });
+
+  it('retains cancelled writes for a later flush after a leader handoff', async () => {
+    const db = new FakeDatabase();
+    const outbox = await reload(db);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const write = vi.spyOn(db, 'outboxWrite');
+    write.mockRejectedValueOnce(new RequestCancelledError('leader changed'));
+    outbox.markDirty('did:ad:a');
+    await tick();
+    expect(outbox.hasPending('did:ad:a')).toBe(true);
+    expect(db.reopen().subjects()).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+    await outbox.flush();
+    expect(db.reopen().subjects()).toEqual(['did:ad:a']);
+    warn.mockRestore();
   });
 
   it('a flush makes a plain dirty bit durable', async () => {

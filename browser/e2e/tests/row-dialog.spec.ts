@@ -27,6 +27,10 @@ test.describe('row dialog', () => {
     const add = page.getByPlaceholder('What do you need?');
     await add.fill('Milk');
     await add.press('Enter');
+    // Row 1 exists as an empty inline draft before quick-add has finished.
+    await expect(
+      page.getByRole('gridcell', { name: 'Milk', exact: true }),
+    ).toBeVisible();
 
     const rowHeader = page
       .locator('[role="rowheader"]')
@@ -67,5 +71,20 @@ test.describe('row dialog', () => {
       .withRules(['label', 'link-name'])
       .analyze();
     expect(violations.map(v => `${v.id}: ${v.nodes.length}`)).toEqual([]);
+  });
+
+  test('opens an inline draft before it becomes a collection member', async ({
+    page,
+  }) => {
+    await createTableFromDialog(page, { name: 'Inline draft' });
+    await waitForGridInteractive(page);
+    const rowHeader = page
+      .locator('[role="rowheader"]')
+      .filter({ hasText: /^1$/ });
+    await rowHeader.hover();
+    await rowHeader.getByTitle('Open resource').click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('label', { hasText: 'Name' })).toBeVisible();
   });
 });

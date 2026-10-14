@@ -2,7 +2,8 @@
 
 > **Status:** v1 implemented in `lib/src/vault/` (2026-08-04). Phase 2 landed
 > 2026-09-05: incremental per-lane cursors and checkpoints, described below.
-> Compression, blob chunking and per-object signatures remain.
+> Format 3 adds encrypted attachment dependencies and separate blob chunks.
+> Compression and per-object signatures remain.
 >
 > Phase 2 changed two things a third-party implementation must know about:
 > **pack format 2** (a lane pack may be a delta, so it is no longer
@@ -104,7 +105,8 @@ The plaintext inside a `kind = pack` object is MessagePack:
 
 ```rust
 struct Pack {
-    format: u8,            // 2; readers must still accept 1
+    format: u8,            // 3; readers still accept 1 and 2
+    blobs: Vec<BlobDependency>, // format 3; absent in older packs
     entries: Vec<PackEntry>,
     tombstones: Vec<String>,  // deleted subjects, pure_id() form
     coverage: BTreeMap<String, u32>, // checkpoints only; format 2
@@ -162,7 +164,7 @@ vault/<drive-pseudonym>/
   lanes/<device-pubkey>/seg-000001.pack   ← append-only per device
   checkpoints/ckpt-000001.loro            ← self-sufficient anchor
   indexes/ckpt-000001.idx                 ← not yet written
-  blobs/<keyed-hash>/<chunk>              ← not yet written
+  blobs/<content-id>/<chunk>             ← encrypted chunks, 4 MiB maximum
 ```
 
 The drive pseudonym is a salted hash of the drive DID, computed by the control
@@ -313,10 +315,53 @@ valid when written, and re-imposing today's required-property rules on old data
 would make a schema change retroactively unrestorable — precisely when a backup
 matters most.
 
+## Attachment dependencies and recovery evidence
+
+Format 3 keeps file bytes outside graph packs. Each encrypted pack lists the
+plaintext BLAKE3 hash, total byte length, chunk count and opaque content ID for
+its referenced blobs. Chunks use the existing authenticated `Blob` envelope,
+with at most 4 MiB of plaintext each. An empty file has one empty chunk.
+Neither plaintext hashes nor resource identifiers appear in public upload metadata.
+
+The object content ID is BLAKE3 keyed by `DriveVaultKey::blob_id(bytes)`, over
+`atomic-vault-blob-object-v1` followed by the key epoch as four big-endian bytes.
+This makes object paths specific to both the drive key and its epoch. Re-keying
+cannot overwrite older ciphertext or mistake it for an already uploaded new
+object. The first backup after upgrading a lane or changing epoch is a full
+checkpoint, including the live attachment dependencies.
+
+A backup confirms every referenced chunk before publishing its graph object.
+Only confirmation of that graph object can advance the lane cursor. Missing
+local file bytes refuse the backup; they never produce an apparent complete
+backup containing only references. Restore verifies each chunk's envelope and
+length, then the assembled blob's plaintext hash and content ID. Missing or
+corrupt live dependencies produce a partial result while retaining readable data.
+Old packs remain readable; a legacy file reference with no dependency manifest
+is reported as partial until a current client publishes a complete checkpoint.
+
+A storage listing cannot prove that its final object has not disappeared. A
+recovery source can also supply `RecoveryExpectation { lanes, checkpointN }`:
+the highest confirmed segment of each lane and the highest confirmed checkpoint.
+The importer compares those with verified coverage and received objects. This
+evidence must survive normal object pruning and record reconciliation. A new
+inventory can only seed expectations from surviving legacy records; it cannot
+prove the existence of records already lost before migration. A whole-storage
+rollback still requires external versioned backups or an independent witness.
+
+The browser, WASM and native adapters use the same key-plus-epoch and restore
+summary contracts. Cloud restores require a recovery manifest; the matching
+service must be deployed before the new client. Exported backup files preserve
+the expectation alongside their encrypted objects. Legacy files without one
+can detect internal gaps, but cannot establish that an unseen tail exists.
+
+Automatic browser catch-up imports changes on startup, reconnect, focus and a
+periodic check. Imports merge into open resources without replacing their object
+identity or dropping pending local edits. A partial result remains retryable.
+Peer editing continues independently; Vault recovery does not disable peers.
+
 ## What this does not do yet
 
-- **Indexes and blob chunking.** The `kind` byte already reserves their values;
-  nothing writes them.
+- **Indexes.** The `kind` byte reserves their value; nothing writes them.
 - **Per-object signatures.** Integrity today comes from the AEAD tag, which
   proves the object was sealed by someone holding the drive key. Signing
   objects with the agent key is a planned addition for provenance across

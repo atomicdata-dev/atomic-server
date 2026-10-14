@@ -113,7 +113,14 @@ export function CustomViewProvider({ children }: PropsWithChildren) {
   };
 
   const getPluginForClass = (classSubject: string) => {
-    return customViews.get(classSubject);
+    const plugin = customViews.get(classSubject);
+    const installation = plugin && uiPluginDataMap.get(plugin)?.resource;
+
+    // Uninstall removes the Installation before the refreshed plugin list
+    // arrives. Do not mount its deleted assets during that interval.
+    return installation && !store.isDestroyed(installation)
+      ? plugin
+      : undefined;
   };
 
   const getUIPluginData = (plugin: string) => {

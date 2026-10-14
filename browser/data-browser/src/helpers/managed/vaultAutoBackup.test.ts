@@ -195,7 +195,7 @@ describe('ensureVaultBackup', () => {
         driveSubject: DRIVE,
         drivePseudonym: PSEUDONYM,
         devicePubkey: LANE,
-        driveKey: KEY,
+        key: { driveKey: KEY, keyEpoch: 1 },
       }),
     );
   });
@@ -328,6 +328,42 @@ describe('ensureVaultBackup', () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it('does not enroll after its selected database is replaced', async () => {
+    const store = await signedInStore();
+    const getDb = vi.spyOn(store, 'getClientDb').mockReturnValue(undefined);
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        getDb.mockReturnValue({} as never);
+
+        return keys;
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not enroll after the same identity is replaced with a new signing session', async () => {
+    const store = await signedInStore();
+    const pair = await Agent.generateKeyPair();
+    const provider = new JSCryptoProvider(pair.privateKey);
+    const agent = new Agent(provider, `did:ad:agent:${pair.publicKey}`);
+    store.setAgent(agent);
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        store.setAgent(new Agent(provider, agent.subject));
+
+        return keys;
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+  });
+
   it('shares one pass between concurrent callers', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();
@@ -414,6 +450,7 @@ describe('ensureVaultBackup', () => {
     await Promise.resolve();
     expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
 
+    await vi.waitFor(() => expect(attach).toBeTypeOf('function'));
     attach();
     expect((await pass).status).toBe('backed-up');
   });
@@ -540,7 +577,7 @@ describe('restoreFromVault', () => {
       'restored',
     );
     expect(deps.restoreDrive).toHaveBeenCalledWith(
-      expect.objectContaining({ driveKey: KEY, keyEpoch: 3 }),
+      expect.objectContaining({ key: { driveKey: KEY, keyEpoch: 3 } }),
     );
   });
 
@@ -571,7 +608,10 @@ describe('restoreFromVault', () => {
       expect.objectContaining({ drivePseudonym: PSEUDONYM }),
     );
     expect(deps.restoreDrive).toHaveBeenCalledWith(
-      expect.objectContaining({ drivePseudonym: PSEUDONYM, driveKey: KEY }),
+      expect.objectContaining({
+        drivePseudonym: PSEUDONYM,
+        key: { driveKey: KEY, keyEpoch: 1 },
+      }),
     );
   });
 
@@ -747,6 +787,90 @@ describe('restoreFromVault', () => {
 });
 
 describe('watchForVaultBackups', () => {
+  it('pulls a new Vault lane on reconnect without needing a local edit', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    const deps = fakeDeps();
+    const { win, listeners } = fakeWindow();
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 10,
+      retryMs: 1000,
+      window: win,
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    const before = vi.mocked(deps.restoreDrive).mock.calls.length;
+    vi.mocked(deps.getVaultState).mockResolvedValue({
+      enrollment,
+      lanes: { other: 2 },
+      checkpoints: [],
+      pending_uploads: 0,
+      confirmed_objects: 2,
+    });
+    listeners.get('online')?.();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(deps.restoreDrive).toHaveBeenCalledTimes(before + 1);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(deps.restoreDrive).toHaveBeenCalledTimes(before + 1);
+    stop();
+  });
+
+  it('serializes reconnects and retries incomplete recovery without a new edit', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => {
+      finish = resolve;
+    });
+    const deps = fakeDeps();
+    vi.mocked(deps.restoreDrive).mockImplementationOnce(async () => {
+      await gate;
+
+      return {
+        packsRead: 1,
+        resourcesRestored: 1,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 0,
+        objectsMissing: 1,
+        completeness: 'partial',
+      };
+    });
+    const { win, listeners } = fakeWindow();
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 10,
+      retryMs: 100,
+      window: win,
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    for (let i = 0; i < 5; i++) listeners.get('online')?.();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(deps.restoreDrive).toHaveBeenCalledTimes(1);
+    finish();
+    await vi.advanceTimersByTimeAsync(120);
+    expect(deps.restoreDrive).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(deps.restoreDrive).toHaveBeenCalledTimes(2);
+    expect(deps.runVaultBackup).toHaveBeenCalled();
+    stop();
+  });
+
+  it('does not reuse another store instance backup promise', async () => {
+    const a = await signedInStore();
+    const b = await signedInStore();
+    const da = fakeDeps();
+    const db = fakeDeps();
+    await Promise.all([
+      ensureVaultBackup(a, DRIVE, da),
+      ensureVaultBackup(b, DRIVE, db),
+    ]);
+    expect(da.runVaultBackup).toHaveBeenCalledTimes(1);
+    expect(db.runVaultBackup).toHaveBeenCalledTimes(1);
+  });
+
   function fakeWindow() {
     const listeners = new Map<string, () => void>();
     const doc = {

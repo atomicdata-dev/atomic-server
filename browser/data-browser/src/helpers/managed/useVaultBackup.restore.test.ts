@@ -48,8 +48,8 @@ it('manual restore passes the recovered epoch to the importer', async () => {
   expect(restoreDrive).toHaveBeenCalledWith(
     expect.objectContaining({
       db: inputs.db,
-      driveKey,
-      keyEpoch: 4,
+      key: { driveKey: driveKey, keyEpoch: 4 },
+
       drivePseudonym: 'vault',
       devicePubkey: 'device',
     }),
@@ -118,8 +118,7 @@ it('refreshes the key when another device re-keys an already-open panel', async 
   });
   expect(restoreDrive).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      driveKey: newKey,
-      keyEpoch: 5,
+      key: { driveKey: newKey, keyEpoch: 5 },
     }),
   );
 });

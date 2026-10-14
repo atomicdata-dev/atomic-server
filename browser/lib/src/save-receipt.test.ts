@@ -37,6 +37,46 @@ describe('save receipts', () => {
     store.setServerConnected(false);
   });
 
+  it.each([false, true])(
+    'handles a disconnect before the drain attempts the save (online required: %s)',
+    async requireOnlineWrites => {
+      const { store, posted } = await testStore({ requireOnlineWrites });
+      const { records } = attachTestDb(store);
+      const doc = await store.newResource({ noParent: true });
+      vi.spyOn(store, 'syncDirtyResources').mockImplementation(async () => {
+        store.setServerConnected(false);
+      });
+      const saving = doc.saveWithReceipt();
+
+      if (requireOnlineWrites) {
+        await expect(saving).rejects.toThrow('still queued');
+      } else {
+        const receipt = await saving;
+        expect(receipt.status).toBe('offline');
+        expect(receipt.local).toBeDefined();
+        expect(receipt.server).toBeUndefined();
+        expect(records.get(doc.subject)?.snapshot?.length).toBeGreaterThan(0);
+      }
+
+      expect(posted).toHaveLength(0);
+      expect(store.outbox.getEntry(doc.subject)?.signedGenesis).toBeDefined();
+    },
+  );
+
+  it('does not persist an interrupted save into another identity', async () => {
+    const { store } = await testStore();
+    attachTestDb(store);
+    const doc = await store.newResource({ noParent: true });
+    let newer: ReturnType<typeof attachTestDb> | undefined;
+    vi.spyOn(store, 'syncDirtyResources').mockImplementation(async () => {
+      store.setAgent(undefined);
+      newer = attachTestDb(store);
+      store.setServerConnected(false);
+    });
+    await expect(doc.saveWithReceipt()).rejects.toThrow('identity changed');
+    expect(newer!.records.size).toBe(0);
+  });
+
   it('reports a durable local-only copy independently of peer delivery', async () => {
     const { store, posted } = await testStore();
     const { records } = attachTestDb(store);

@@ -171,7 +171,9 @@ export function VaultPanel({
                   tone: 'busy',
                   text: (
                     <span data-testid='vault-restore-progress'>
-                      Restoring… {Math.round(restoreProgress * 100)}%
+                      {restoreProgress >= 1
+                        ? 'Applying backup…'
+                        : `Downloading backup… ${Math.round(restoreProgress * 100)}%`}
                     </span>
                   ),
                 }
@@ -210,6 +212,11 @@ export function VaultPanel({
               backedUp
               facts={[objects]}
             />
+            <IncludedNote data-testid='vault-storage-explanation'>
+              Vault storage includes backup copies and change history from your
+              devices. The workspace storage map measures the current server
+              copy, so these totals can differ.
+            </IncludedNote>
             {!showQuota && (
               <IncludedNote data-testid='vault-included-note'>
                 This backup is part of your Cloud Server plan.
@@ -283,9 +290,8 @@ export function VaultPanel({
               data-testid='vault-manage-storage'
               subtle
               onClick={() => setStorageOpen(open => !open)}
-              disabled={busy}
             >
-              Manage storage
+              View Vault storage
             </Button>
             <Button
               data-testid='vault-disable'

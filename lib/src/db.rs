@@ -436,6 +436,7 @@ pub struct Db {
     on_commit: Option<Arc<HandleCommit>>,
     /// Broadcast channel for all resource mutations.
     db_events: tokio::sync::broadcast::Sender<DbEvent>,
+    external_change_events: tokio::sync::broadcast::Sender<DbEvent>,
     /// Presence arriving from a peer. Deliberately NOT `db_events`: presence is
     /// ephemeral and must never reach the store, and every consumer of
     /// `DbEvent` writes or indexes. Cursor positions merged into the CRDT would
@@ -577,6 +578,7 @@ impl Db {
             class_extenders: Arc::new(RwLock::new(vec![])),
             on_commit: None,
             db_events: tokio::sync::broadcast::channel(64).0,
+            external_change_events: tokio::sync::broadcast::channel(64).0,
             ephemeral_events: tokio::sync::broadcast::channel(32).0,
             watched_queries_by_drive: Arc::new(RwLock::new(HashMap::new())),
             filter_drive_roots: Arc::new(RwLock::new(HashMap::new())),
@@ -849,7 +851,7 @@ impl Db {
         self.apply_transaction(&mut transaction)?;
         for resource in batched {
             self.note_lens_related(resource).await;
-            let _ = self.db_events.send(DbEvent::Changed {
+            self.publish_db_event(DbEvent::Changed {
                 subject: resource.get_subject().without_params(),
                 delta: None,
                 source_id: crate::sync::ws_apply::current_import_source(),
@@ -907,7 +909,7 @@ impl Db {
             self.flush()?;
         }
         self.note_lens_related(resource).await;
-        let _ = self.db_events.send(DbEvent::Changed {
+        self.publish_db_event(DbEvent::Changed {
             subject: resource.get_subject().without_params(),
             delta: None,
             // Attributed here, while the importing write is still on the stack:
@@ -2769,6 +2771,32 @@ impl Db {
         self.db_events.subscribe()
     }
 
+    /// Resource changes that do not run the signed-commit hook: replica
+    /// imports, direct writes and cascade deletions. Query-membership events
+    /// and signed commits have their own delivery paths and do not belong here.
+    ///
+    /// The bounded queue can lag during a large import. Consumers must reconcile
+    /// on `RecvError::Lagged` and then continue listening.
+    pub fn subscribe_external_changes(&self) -> tokio::sync::broadcast::Receiver<DbEvent> {
+        self.external_change_events.subscribe()
+    }
+
+    fn publish_db_event(&self, event: DbEvent) {
+        if matches!(
+            &event,
+            DbEvent::Changed {
+                from_commit: false,
+                ..
+            } | DbEvent::Destroyed {
+                from_commit: false,
+                ..
+            }
+        ) {
+            let _ = self.external_change_events.send(event.clone());
+        }
+        let _ = self.db_events.send(event);
+    }
+
     /// Presence arriving from peers. See [`EphemeralEvent`].
     pub fn subscribe_ephemeral(&self) -> tokio::sync::broadcast::Receiver<EphemeralEvent> {
         self.ephemeral_events.subscribe()
@@ -3754,7 +3782,7 @@ impl Db {
                 continue;
             };
             let added = matches!(op.method, crate::db::trees::Method::Insert);
-            let _ = self.db_events.send(DbEvent::QueryMembershipChanged {
+            self.publish_db_event(DbEvent::QueryMembershipChanged {
                 query_id,
                 subject,
                 added,
@@ -4386,7 +4414,7 @@ impl Db {
     /// not propagated live to peers; see [`DbEvent::Destroyed`].
     fn emit_destroyed<'a>(&self, removed: impl IntoIterator<Item = &'a RemovedSubject>) {
         for r in removed {
-            let _ = self.db_events.send(DbEvent::Destroyed {
+            self.publish_db_event(DbEvent::Destroyed {
                 subject: r.subject.clone(),
                 drive: r.drive.clone(),
                 source_id: None,
@@ -4938,7 +4966,7 @@ impl Storelike for Db {
                 from_commit: true,
             }
         };
-        let _ = store.db_events.send(event);
+        store.publish_db_event(event);
 
         store.handle_commit(&commit_response);
 

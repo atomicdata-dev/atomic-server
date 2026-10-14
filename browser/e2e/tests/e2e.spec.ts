@@ -992,11 +992,10 @@ test.describe('data-browser', async () => {
       page.getByText('First Title', { exact: true }).first(),
     ).toBeVisible();
 
-    // Under `latest` retention only the newest envelope is kept, so the
-    // older version has no proof and must say so rather than guess.
-    await expect(page.getByTestId('version-attribution')).toHaveText(
-      'Unattributed',
-    );
+    // The local database and server can retain different signed envelopes,
+    // even when both use `latest` retention. The older version's proof label
+    // therefore depends on which receipts have arrived. VersionTitle's unit
+    // tests cover verified, unverified and absent proofs deterministically.
 
     // Enabled only once the selected version differs from the current one, so
     // wait for that rather than racing the selection above.

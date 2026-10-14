@@ -8,6 +8,7 @@ import Markdown from '@components/datatypes/Markdown';
 import { JSONEditor } from '@components/JSONEditor';
 import { Column, Row } from '@components/Row';
 import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
+import { useRouter } from '@tanstack/react-router';
 import {
   core,
   publishZipRelease,
@@ -72,6 +73,7 @@ export const InstallationPage: React.FC<
   const store = useStore();
   const canWrite = useCanWrite(resource);
   const navigate = useNavigateWithTransition();
+  const router = useRouter();
   const { refresh: refreshCustomViews } = useCustomViews();
   const [confirm, setConfirm] = useState<'revoke' | 'uninstall'>();
   const [name] = useString(resource, core.properties.name);
@@ -393,10 +395,14 @@ export const InstallationPage: React.FC<
         confirmLabel='Uninstall'
         bindShow={open => !open && setConfirm(undefined)}
         onConfirm={async () => {
+          const location = router.state.location;
           const parent = resource.props.parent;
           await resource.destroy();
           await refreshCustomViews();
-          navigate(constructOpenURL(parent));
+
+          if (router.state.location === location) {
+            navigate(constructOpenURL(parent));
+          }
         }}
         onCancel={() => setConfirm(undefined)}
       >

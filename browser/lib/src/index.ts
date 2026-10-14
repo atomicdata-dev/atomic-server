@@ -414,3 +414,5 @@ export {
   prepareAppPackageImport,
 } from './app-package.js';
 export type { AppPackage } from './app-package.js';
+
+export * from './vault-types.js';

@@ -26,10 +26,15 @@ export function FilePage({ resource }: ResourcePageProps) {
           <StyledEditableTitle resource={resource} />
           <Row center gap='0.5rem' wrapItems>
             {wideScreen && (
-              <DownloadButton downloadFile={downloadFile} fileSize={bytes} />
+              <DownloadButton
+                downloadFile={downloadFile}
+                fileSize={bytes}
+                disabled={loading}
+              />
             )}
             {!wideScreen && (
               <DownloadIconButton
+                disabled={loading}
                 downloadFile={downloadFile}
                 fileSize={bytes}
               />

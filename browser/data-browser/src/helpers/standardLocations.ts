@@ -4,7 +4,32 @@ import {
   decodeB64,
   isNotFound,
   isNotAvailableLocally,
+  RequestCancelledError,
 } from '@tomic/lib';
+
+/** Concurrent first use belongs to the location owner, including Inbox. */
+const locationRequests = new WeakMap<Store, Map<string, Promise<string>>>();
+
+async function locateOnce(
+  store: Store,
+  drive: string,
+  pointer: string,
+  create: () => Promise<string>,
+) {
+  let requests = locationRequests.get(store);
+  if (!requests) locationRequests.set(store, (requests = new Map()));
+  const key = JSON.stringify([store.getIdentityGeneration(), drive, pointer]);
+  const pending = requests.get(key);
+  if (pending) return pending;
+  const request = create();
+  requests.set(key, request);
+
+  try {
+    return await request;
+  } finally {
+    requests.delete(key);
+  }
+}
 
 /**
  * Standard locations are well-known resources inside a Drive (the Comments
@@ -25,7 +50,25 @@ export async function getOrCreateDriveLocation(
   pointerProperty: string,
   create: { isA: string; name: string },
 ): Promise<string> {
-  // A local-only drive has no server to ask and no other device.
+  return locateOnce(store, driveSubject, pointerProperty, () =>
+    createDriveLocation(store, driveSubject, pointerProperty, create),
+  );
+}
+
+async function createDriveLocation(
+  store: Store,
+  driveSubject: string,
+  pointerProperty: string,
+  create: { isA: string; name: string },
+): Promise<string> {
+  const generation = store.getIdentityGeneration();
+
+  const checkSession = () => {
+    if (store.getIdentityGeneration() !== generation)
+      throw new RequestCancelledError('Drive location session changed');
+  };
+
+  // A local-only drive has no authoritative server to ask.
   const isLocalOnly = store.isLocalOnlySubject(driveSubject);
   const askServer = store.serverConnected && !isLocalOnly;
   let drive = await store.getResource(driveSubject);
@@ -60,15 +103,19 @@ export async function getOrCreateDriveLocation(
     }
   }
 
+  checkSession();
   const resource = await store.newResource({
     parent: driveSubject,
     isA: create.isA,
     propVals: { [core.properties.name]: create.name },
   });
+  checkSession();
   await resource.save();
+  checkSession();
   store.notifyResourceManuallyCreated(resource);
 
   await drive.set(pointerProperty, resource.subject);
+  checkSession();
   await drive.save();
 
   return resource.subject;
@@ -112,9 +159,6 @@ export async function getOrCreateTrashFolder(
     { isA: dataBrowser.classes.folder, name: /* @wc-ignore */ 'Trash' },
   );
 }
-
-/** Coalesce first use in one store; independent devices derive the same DID. */
-const aiFolderRequests = new WeakMap<Store, Map<string, Promise<string>>>();
 
 /**
  * How long a drive that cannot be read is asked about before the failure is
@@ -170,24 +214,10 @@ export async function getOrCreateAiChatsFolder(
 ): Promise<string> {
   const agent = store.getAgent();
   if (!agent) throw new Error('Sign in to create an AI chat.');
-  let requests = aiFolderRequests.get(store);
 
-  if (!requests) {
-    requests = new Map();
-    aiFolderRequests.set(store, requests);
-  }
-
-  const key = `${agent.subject}\0${driveSubject}`;
-  const pending = requests.get(key);
-  if (pending) return pending;
-  const request = ensureAiChatsFolder(store, driveSubject);
-  requests.set(key, request);
-
-  try {
-    return await request;
-  } finally {
-    requests.delete(key);
-  }
+  return locateOnce(store, driveSubject, ai.properties.aiChatsFolder, () =>
+    ensureAiChatsFolder(store, driveSubject),
+  );
 }
 
 async function ensureAiChatsFolder(

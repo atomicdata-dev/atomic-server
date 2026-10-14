@@ -6,6 +6,7 @@ export function restoreIsIncomplete(outcome: RestoreOutcome): boolean {
     outcome.completeness === 'partial' ||
     outcome.objectsUnreadable > 0 ||
     (outcome.objectsMissing ?? 0) > 0 ||
+    (outcome.blobsMissing ?? 0) > 0 ||
     outcome.incomplete !== undefined
   );
 }

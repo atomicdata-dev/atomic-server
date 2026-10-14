@@ -1262,7 +1262,11 @@ export class LocalOutbox {
     for (const subject of deletes) this.written.delete(subject);
 
     const write = db.outboxWrite({ agent, puts, deletes }, durable).catch(e => {
-      console.warn('[Outbox] persist failed:', e);
+      // A tab handoff cancels writes with unknown outcomes. Retain them for
+      // the next flush and reject the caller; this is not a disk failure.
+      if (!(e instanceof RequestCancelledError)) {
+        console.warn('[Outbox] persist failed:', e);
+      }
 
       // Unknown what landed: forget it, so the next write repeats these
       // rows (and the deletes) instead of assuming they are stored.

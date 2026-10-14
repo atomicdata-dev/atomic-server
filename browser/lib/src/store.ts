@@ -41,6 +41,7 @@ import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
   RequestCancelledError,
+  ServerRestartError,
   ErrorType,
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
@@ -1481,24 +1482,23 @@ export class Store {
   public acceptsServerResource(
     subject: string,
     origin: string,
-    bytes?: Uint8Array,
+    incoming?: Uint8Array | Resource,
+    requestedSubject?: string,
   ): boolean {
-    let drive = this.driveOf(subject);
-    let expected = this.driveServers.get(drive);
+    const expected = this.driveServers.get(this.driveOf(subject));
+    if (expected && expected !== origin) return false;
+    let declared: unknown;
 
-    if (!expected && bytes && LoroLoader.isLoaded()) {
+    if (incoming instanceof Resource) {
+      declared = incoming.get('https://atomicdata.dev/properties/drive');
+    } else if (incoming && LoroLoader.isLoaded()) {
       const doc = new LoroLoader.Loro.LoroDoc();
 
       try {
-        doc.import(bytes);
-        const declared = doc
+        doc.import(incoming);
+        declared = doc
           .getMap('properties')
           .get('https://atomicdata.dev/properties/drive');
-
-        if (typeof declared === 'string') {
-          drive = this.normalizeSubject(declared);
-          expected = this.driveServers.get(drive);
-        }
       } catch {
         /* A delta may need the cached document; normal ingress handles it. */
       } finally {
@@ -1506,7 +1506,20 @@ export class Store {
       }
     }
 
-    return !expected || expected === origin;
+    const declaredOrigin =
+      typeof declared === 'string'
+        ? this.driveServers.get(this.normalizeSubject(declared))
+        : undefined;
+    if (declaredOrigin && declaredOrigin !== origin) return false;
+
+    // Unknown subjects use the chosen bootstrap route. Only a requested read
+    // can establish a new alias (such as a vanity URL returning its drive).
+    // An unrelated open socket cannot appoint itself as that drive's host.
+    return (
+      (expected ??
+        declaredOrigin ??
+        this.routeForSubject(requestedSubject ?? subject).server) === origin
+    );
   }
 
   private pinSubjectRoute(subject: string): DriveRoute {
@@ -3224,8 +3237,8 @@ export class Store {
   }
 
   /**
-   * Repair a document that has fallen behind: fetch full state and replace the
-   * local doc with it.
+   * Repair a document that has fallen behind by importing the missing causal
+   * history from a local or remote snapshot.
    *
    * The live channel is deltas, and it has no way to say "you are missing
    * something". A receiver that misses one update queues every later one as
@@ -3392,6 +3405,19 @@ export class Store {
     )
       return 'deduped';
 
+    // Computed query and search answers have no shared edit history. Classify the
+    // subject before branching on payload format so HTTP and binary GETs
+    // cannot disagree about whether an earlier answer should be replaced.
+    // Nested editable members of an HTTP response retain their own history.
+    const computedProjection =
+      change.source === 'ws-query-update' ||
+      ((change.source === 'http-fetch' || change.source === 'ws-pending-get') &&
+        /^https?:/.test(change.subject) &&
+        ['/query', '/search', '/vector_search'].includes(
+          new URL(change.subject).pathname,
+        ) &&
+        (!change.resource || change.resource.subject === change.subject));
+
     // Resource-direct path: caller is the authoritative producer.
     if (change.resource) {
       if (
@@ -3409,29 +3435,13 @@ export class Store {
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
 
-      // Computed query answers have no shared edit history. Merging them can
-      // combine yesterday's count with today's members. Editable documents,
-      // including nested query members, still retain their causal history.
-      let queryProjection = change.source === 'ws-query-update';
-
-      if (
-        change.source === 'http-fetch' &&
-        this.serverUrl &&
-        /^https?:/.test(change.subject)
-      ) {
-        const url = new URL(change.subject);
-        queryProjection =
-          url.pathname === '/query' &&
-          change.resource.subject === change.subject;
-      }
-
       const existing = this.resources.get(
         this.normalizeSubject(change.subject),
       );
       const replaceProjection =
-        (change.source === 'http-fetch' || queryProjection) &&
+        (change.source === 'http-fetch' || computedProjection) &&
         existing !== change.resource.__internalObject &&
-        (queryProjection ||
+        (computedProjection ||
           this._withoutLoroHistory.has(
             this.normalizeSubject(change.subject),
           )) &&
@@ -3506,11 +3516,17 @@ export class Store {
     // Preserve pending edits in memory and on disk. A cold local outbox can
     // contain edits that this Resource has not hydrated yet.
     // A full snapshot is not permission to discard another replica's history.
-    // Only a projection rebuilt from JSON lacks a causal base worth merging.
+    // A computed query or a projection rebuilt from JSON has no shared
+    // causal base worth merging.
     // Inspect the payload here so every transport applies the same policy.
     let snapshot = false;
 
-    if (this._withoutLoroHistory.has(subject)) {
+    // Cold clients buffer bytes until Loro is ready. They have no live Loro
+    // history to replace yet, and an unavailable decoder is not invalid data.
+    if (
+      LoroLoader.isLoaded() &&
+      (computedProjection || this._withoutLoroHistory.has(subject))
+    ) {
       try {
         snapshot = LoroLoader.Loro.decodeImportBlobMeta(
           change.loroBytes,
@@ -3523,7 +3539,7 @@ export class Store {
 
     const replace =
       snapshot &&
-      this._withoutLoroHistory.has(subject) &&
+      (computedProjection || this._withoutLoroHistory.has(subject)) &&
       !isCommitSubject(subject) &&
       !resource.hasUnsavedChanges() &&
       !this.outbox.mayHavePending(subject);
@@ -3563,9 +3579,8 @@ export class Store {
       // and every later delta parks behind it. No error, no indicator — the
       // document simply stops being live until someone reloads.
       //
-      // Ask for full state instead. `forceOverride` replaces rather than
-      // merges, which is what closes the gap; `applyIncoming`'s own guards
-      // still refuse to clobber unsaved local edits or a pending outbox.
+      // Ask for full state to supply the missing base. Ingress merges causal
+      // history and preserves unsaved local edits and pending outbox work.
       //
       // Deliberately NOT stamping `lastCommit` here. We did not apply that
       // commit, and claiming it would make the echo-dedup at the top of this
@@ -5243,6 +5258,59 @@ export class Store {
     }
   }
 
+  /** Publish a completed local import into live resources using their causal history.
+   * Reads are fenced to the database and identity that owned the import. */
+  public async refreshRestoredResources(
+    subjects: string[],
+    deleted: string[],
+  ): Promise<void> {
+    const db = this.clientDb;
+    const generation = this.getIdentityGeneration();
+    const current = () =>
+      this.clientDb === db && this.getIdentityGeneration() === generation;
+
+    const check = () => {
+      if (!current())
+        throw new RequestCancelledError('Recovery session changed');
+    };
+
+    if (db) {
+      await db.waitForInit();
+      check();
+      const rows = await db.getResourcesWithSnapshots(subjects);
+      check();
+      subjects.forEach((subject, index) => {
+        const row = rows[index];
+        if (!row?.jsonAd)
+          throw new Error(`Restored resource is missing: ${subject}`);
+        this.hydrateResourceFromJson(
+          this.normalizeSubject(subject),
+          JSON.parse(row.jsonAd),
+          row.snapshot ?? undefined,
+        );
+      });
+    } else {
+      // Native imports write the embedded node, whose normal fetch path
+      // already fences route changes and merges snapshots into open editors.
+      for (const subject of subjects) {
+        check();
+        await this.reloadResource(subject);
+        check();
+        const resource = this.getResolved(subject);
+        if (resource?.error) throw resource.error;
+      }
+    }
+
+    check();
+
+    for (const subject of deleted) {
+      this.markDestroyed(this.resolveSubject(subject));
+      // The importer already durably deleted it. Do not enqueue a second
+      // database delete that could race a subsequent recreation.
+      this.evictResource(subject);
+    }
+  }
+
   private hydrateResourceFromJson(
     subject: string,
     parsed: Record<string, unknown>,
@@ -5298,9 +5366,6 @@ export class Store {
     return true;
   }
 
-  /**
-   * Always fetches the resource from the server then adds it to the store.
-   */
   /** Read authoritative server values without merging optimistic local edits.
    * Use when confirming a reviewed operation, not for ordinary cached reads. */
   public async readServerSnapshot(
@@ -5323,6 +5388,9 @@ export class Store {
     return resource.getPropVals();
   }
 
+  /** Refresh a cached resource from its server. Local-only resources and
+   * creations still awaiting acknowledgement retain their local state. Use
+   * readServerSnapshot when the caller must prove a value exists remotely. */
   public async fetchResourceFromServer<C extends OptionalClass = UnknownClass>(
     /** The resource URL to be fetched */
     subject: string,
@@ -5368,6 +5436,17 @@ export class Store {
       const stored = await this.fetchResourceFromClientDb(normalizedSubject);
       if (stored) return stored as Resource<C>;
       throw new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport);
+    }
+
+    // A freshly signed DID already has its final identity, but no remote
+    // representation yet. Preserve its local handle while creation is queued;
+    // a speculative GET/404 must not replace the draft or its save state.
+    // Remote durability is established by a save receipt/readServerSnapshot,
+    // never by this cache-refresh helper returning a ready Resource.
+    const authored = this.resources.get(normalizedSubject);
+
+    if (opts.method !== 'POST' && authored?.awaitingCreation) {
+      return authored as Resource<C>;
     }
 
     // In-flight dedup. SideBarDrive and DrivePage both call
@@ -5470,7 +5549,16 @@ export class Store {
         ? subject
         : new URL(subject, route.server).toString();
 
-    const ws = this.getWebSocketForSubject(fetchSubject);
+    // Serving JSON-AD over HTTP does not prove this origin speaks our socket
+    // protocol. Reuse a socket opened by a selected drive or live holder, but
+    // do not start one just because a vocabulary response declared a drive.
+    const ws =
+      !opts.fromProxy && !opts.noWebSocket
+        ? this.getWebSocketForSubject(
+            fetchSubject,
+            !this.foreignHttpOrigin(fetchSubject),
+          )
+        : undefined;
 
     if (
       !opts.fromProxy &&
@@ -5590,6 +5678,16 @@ export class Store {
       // The `subject` arg becomes the alias if it differs from the
       // resolved subject (e.g. POST endpoint that returns the
       // canonical resource).
+      if (
+        [resource, ...createdResources].some(
+          r =>
+            !r.error &&
+            !this.acceptsServerResource(r.subject, route.server, r, subject),
+        )
+      ) {
+        throw new RequestCancelledError('Resource destination changed');
+      }
+
       if (!resource.error)
         this.rememberResourceOrigin(resource.subject, route.server);
       this.applyIncoming({
@@ -5659,11 +5757,15 @@ export class Store {
   private warnedSchemeMismatch = new Set<string>();
 
   /** Opens a Websocket for some subject URL, or returns the existing one. */
-  public getWebSocketForSubject(subject: string): WSClient | undefined {
+  public getWebSocketForSubject(
+    subject: string,
+    connect = true,
+  ): WSClient | undefined {
     try {
       const origin = this.getServerUrlForSubject(subject);
 
       if (
+        connect &&
         !this.webSockets.has(origin) &&
         this.driveServers.has(this.driveOf(subject)) &&
         !this.isLocalOnlySubject(subject) &&
@@ -7470,10 +7572,12 @@ export class Store {
       normalized,
       callback,
       () => this.subscribeWebSocket(normalized),
-      () =>
-        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
-          normalized,
-        ),
+      () => {
+        if (isAgentSubject(normalized))
+          this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+            normalized,
+          );
+      },
     );
   }
 
@@ -7514,7 +7618,7 @@ export class Store {
   /** Drive resources use drive-wide fan-out. Mounted agent profiles also need
    * a targeted subscription: another user's profile is outside our drive. */
   public subscribeWebSocket(subject: string): void {
-    if (!this.isServerConnectedFor(subject)) return;
+    if (!isAgentSubject(subject) || !this.isServerConnectedFor(subject)) return;
     const normalized = this.normalizeSubject(subject);
 
     if (
@@ -7818,9 +7922,10 @@ export class Store {
     const filtered = subs.filter(cb => cb !== callback);
     if (filtered.length === 0) {
       this.subscribers.delete(normalized);
-      this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
-        normalized,
-      );
+      if (isAgentSubject(normalized))
+        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+          normalized,
+        );
     } else this.subscribers.set(normalized, filtered);
   }
 
@@ -8409,7 +8514,9 @@ export class Store {
         // Fall through to HTTP — a broken WS shouldn't block saves while
         // the reconnect timer is still backing off. The WS error already
         // surfaced in console; the HTTP path will produce its own.
-        console.warn('[Store.postCommit] WS path failed, using HTTP:', e);
+        if (!(e instanceof ServerRestartError)) {
+          console.warn('[Store.postCommit] WS path failed, using HTTP:', e);
+        }
       }
     }
 

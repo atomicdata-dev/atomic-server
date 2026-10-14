@@ -31,6 +31,13 @@ import {
 const NODE = `did:ad:node:${'a'.repeat(64)}`;
 const VALID_CODE = `atomic://pair?v=1&node=${NODE}&drives=*`;
 
+// The embedded-node proxy can still be fetching a resource when the last UI
+// assertion finishes. Drain handlers before closing the page so teardown does
+// not abort a successful proxy response and fail the following test.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
 /**
  * Make the page believe it is the desktop/mobile app.
  *

@@ -3,8 +3,10 @@ import toast from 'react-hot-toast';
 import { styled } from 'styled-components';
 import {
   core,
+  CollectionBuilder,
   dataBrowser,
   StoreEvents,
+  RequestCancelledError,
   useCurrentAgent,
   useStore,
   type Resource,
@@ -38,17 +40,36 @@ import {
 } from '../../helpers/notifications/inbox';
 import { usePrivateDrive } from '../../hooks/usePrivateDrive';
 import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
+import { demoForDrive } from '../../chunks/Templates/demoSession';
+import { notificationSourceId } from '../../helpers/notifications/identity';
 
 const TEXT_MAX = 140;
 
-/** Messages created before the app started are backlog, not news. */
+/** Only messages created during this app session produce transient alerts. */
 const APP_STARTED = Date.now();
 
 /**
  * Entries announced (or ruled out) in this page load. Outside the component:
  * a remount used to start from an empty set and announce every entry again.
  */
-const handledEntries = new Set<string>();
+const deliveries = new WeakMap<
+  Store,
+  Map<number, { done: Set<string>; pending: Set<string> }>
+>();
+
+function deliveryFor(store: Store) {
+  const generation = store.getIdentityGeneration();
+  let sessions = deliveries.get(store);
+  if (!sessions) deliveries.set(store, (sessions = new Map()));
+  let state = sessions.get(generation);
+
+  if (!state) {
+    sessions.clear();
+    sessions.set(generation, (state = { done: new Set(), pending: new Set() }));
+  }
+
+  return state;
+}
 
 function factsOf(resource: Resource): MessageFacts {
   const stable = resource.stable;
@@ -102,8 +123,8 @@ function headline(
  * Tells you about new chat messages, comments on things you made and replies
  * to you, while the app is open. A toast when you're looking at the app, an
  * OS notification when you aren't (another tab, window or app), and nothing
- * when you're already looking at the conversation. Only messages created
- * after the app started count: the backlog is not news. Renders nothing.
+ * when you're already looking at the conversation. Historical messages are
+ * reconciled into the durable inbox without replaying alerts. Renders nothing.
  */
 export function MessageNotifier(): null {
   const store = useStore();
@@ -137,12 +158,19 @@ export function MessageNotifier(): null {
 
   const readAbout = useEffectEvent((target: string, upTo = Date.now()) => {
     if (!privateDrive) return;
+    const generation = store.getIdentityGeneration();
 
     const pending = recording.current.get(target) ?? Promise.resolve();
 
     void pending
-      .then(() => markReadAbout(store, privateDrive, target, upTo))
-      .catch(e => console.error('Could not mark notifications read:', e));
+      .then(() => {
+        if (store.getIdentityGeneration() === generation)
+          return markReadAbout(store, privateDrive, target, upTo);
+      })
+      .catch(e => {
+        if (!(e instanceof RequestCancelledError))
+          console.error('Could not mark notifications read:', e);
+      });
   });
 
   const open = useEffectEvent((n: MessageNotification) => {
@@ -256,9 +284,10 @@ export function MessageNotifier(): null {
   });
 
   const announce = useEffectEvent(
-    async (facts: MessageFacts, text: string): Promise<void> => {
+    async (facts: MessageFacts, text: string): Promise<boolean> => {
+      const generation = store.getIdentityGeneration();
       const subject = facts.subject;
-      const ctx = { me: agent?.subject, since: APP_STARTED };
+      const ctx = { me: agent?.subject, since: 0 };
 
       // Replies can point at an entry; its author is on the entry's page.
       const replyPage = facts.replyTo && parseEntryId(facts.replyTo)?.page;
@@ -272,7 +301,7 @@ export function MessageNotifier(): null {
         ...ctx,
         classesOf: s =>
           related.get(s)?.get(core.properties.isA) as string[] | undefined,
-        isLocalOnly: s => store.isLocalOnlySubject(s),
+        isLocalOnly: s => !!demoForDrive(store.driveOfSubject(s)),
         creatorOf: s => {
           const entry = parseEntryId(s);
 
@@ -282,14 +311,18 @@ export function MessageNotifier(): null {
         },
       });
 
-      if (!n) return;
+      if (store.getIdentityGeneration() !== generation) return false;
+      if (!related.has(facts.about ?? facts.parent ?? '')) return false;
+      if (!n) return true;
+      const looking = isLookingAt(n);
 
-      if (isLookingAt(n)) {
+      if (looking) {
         // Another open device may still record it; read that copy too.
         const seenAt = Date.now();
-        setTimeout(() => readAbout(n.target, seenAt), 3000);
-
-        return;
+        setTimeout(() => {
+          if (store.getIdentityGeneration() === generation)
+            readAbout(n.target, seenAt);
+        }, 3000);
       }
 
       const authorName = related.get(n.author)?.title ?? 'Someone';
@@ -308,20 +341,29 @@ export function MessageNotifier(): null {
           title,
           body,
           occurredAt: facts.createdAt ?? Date.now(),
-        }).catch(e => console.error('Could not add to the inbox:', e));
+          read: looking,
+        });
         const all = Promise.all([before, record]);
         recording.current.set(n.target, all);
-        void all.then(() => {
-          if (recording.current.get(n.target) === all) {
-            recording.current.delete(n.target);
-          }
-        });
+        void all
+          .finally(() => {
+            if (recording.current.get(n.target) === all) {
+              recording.current.delete(n.target);
+            }
+          })
+          .catch(() => {});
+        await record;
       }
+
+      if (!privateDrive || store.getIdentityGeneration() !== generation)
+        return false;
+      // Catch-up records old messages quietly; replay never creates popup storms.
+      if (looking || (facts.createdAt ?? 0) < APP_STARTED) return true;
 
       if (!document.hidden && document.hasFocus()) {
         // The meeting panel covers or crowds the page and has its own chat
         // open; a bubble over its message box is noise. Still in the Inbox.
-        if (meetingPanelOpen) return;
+        if (meetingPanelOpen) return true;
 
         shown.current.add(bubbleId(n.target));
         toast.custom(
@@ -343,7 +385,7 @@ export function MessageNotifier(): null {
           { duration: 6000, id: bubbleId(n.target) },
         );
 
-        return;
+        return true;
       }
 
       if (shouldOfferOsNotifications()) missed.current += 1;
@@ -354,60 +396,123 @@ export function MessageNotifier(): null {
         tag: bubbleId(n.target),
         onClick: () => open(n),
       });
+
+      return true;
     },
   );
 
   const onUpdate = useEffectEvent(async (resource: Resource) => {
-    const subject = resource.stable.subject;
-    const ctx = { me: agent?.subject, since: APP_STARTED };
+    if (!agent?.subject || !privateDrive) return;
+    const page = resource.stable;
     const classes =
-      (resource.stable.get(core.properties.isA) as string[] | undefined) ?? [];
+      (page.get(core.properties.isA) as string[] | undefined) ?? [];
+    const ctx = { me: agent.subject, since: 0 };
+    if (demoForDrive(store.driveOfSubject(page.subject))) return;
+    const delivery = deliveryFor(store);
+    const candidates = classes.includes(dataBrowser.classes.chatLog)
+      ? page.listChatLogEntries().map(({ key, entry }) => ({
+          facts: entryFacts(page.subject, factsOf(page), key, entry),
+          text: entry.t,
+        }))
+      : [
+          {
+            facts: factsOf(page),
+            text:
+              (page.get(core.properties.description) as string | undefined) ??
+              '',
+          },
+        ];
 
-    // A page of a chat log: its entries are the messages. Every update asks
-    // about all of them; the ones already handled (and edits of those) are
-    // skipped.
-    if (classes.includes(dataBrowser.classes.chatLog)) {
-      const page = resource.stable;
+    for (const { facts, text } of candidates) {
+      const source = notificationSourceId(facts.subject);
+      if (delivery.done.has(source) || delivery.pending.has(source)) continue;
+      const candidate = isCandidate(facts, ctx);
+      if (candidate === undefined) continue;
 
-      // Nobody but you writes in a local-only drive, so whoever speaks there
-      // is the demo's script. Not news, and never the Inbox of a real account.
-      if (store.isLocalOnlySubject(page.subject)) return;
-
-      for (const { key, entry } of page.listChatLogEntries()) {
-        const facts = entryFacts(page.subject, factsOf(page), key, entry);
-
-        if (handledEntries.has(facts.subject)) continue;
-
-        // Not decidable yet: the page's own metadata hasn't arrived.
-        if (isCandidate(facts, ctx) === undefined) continue;
-
-        handledEntries.add(facts.subject);
-
-        if (isCandidate(facts, ctx)) await announce(facts, entry.t);
+      if (!candidate) {
+        delivery.done.add(source);
+        continue;
       }
 
-      return;
+      delivery.pending.add(source);
+      await announce(facts, text)
+        .then(complete => {
+          if (complete) delivery.done.add(source);
+        })
+        .finally(() => {
+          // A failed inbox write remains retryable on resume or another update.
+          delivery.pending.delete(source);
+        });
     }
-
-    if (handledEntries.has(subject)) return;
-
-    const facts = factsOf(resource);
-    const candidate = isCandidate(facts, ctx);
-
-    // Not decidable yet: its genesis hasn't arrived. A later update will ask again.
-    if (candidate === undefined) return;
-
-    handledEntries.add(subject);
-
-    if (!candidate) return;
-
-    await announce(
-      facts,
-      (resource.stable.get(core.properties.description) as
-        | string
-        | undefined) ?? '',
-    );
   });
+
+  useEffect(() => {
+    if (!agent?.subject || !privateDrive) return;
+    let stopped = false;
+    let running = false;
+    const generation = store.getIdentityGeneration();
+
+    const scan = async () => {
+      try {
+        // Include resources loaded before this component mounted, and changes
+        // imported from Vault while another drive is selected.
+        for (const resource of [...store.resources.values()]) {
+          if (stopped || store.getIdentityGeneration() !== generation) return;
+          await onUpdate(resource);
+        }
+
+        const drive = store.getDrive();
+        if (!drive || demoForDrive(drive)) return;
+
+        for (const cls of [
+          dataBrowser.classes.message,
+          dataBrowser.classes.chatLog,
+        ]) {
+          const collection = new CollectionBuilder(store)
+            .setDrive(drive)
+            .setProperty(core.properties.isA)
+            .setValue(cls)
+            .setPageSize(100)
+            .build();
+          await collection.waitForReady();
+          const subjects = await collection.getAllMembers();
+
+          for (const subject of subjects) {
+            if (stopped || store.getIdentityGeneration() !== generation) return;
+            const resource = await store.getResource(subject);
+            if (stopped || store.getIdentityGeneration() !== generation) return;
+            if (!resource.error) await onUpdate(resource);
+          }
+        }
+      } catch (error) {
+        if (!stopped && store.getIdentityGeneration() === generation)
+          console.warn('Notification catch-up will retry:', error);
+      }
+    };
+
+    const resume = () => {
+      if (running || stopped || store.getIdentityGeneration() !== generation)
+        return;
+      running = true;
+      void scan().finally(() => {
+        running = false;
+      });
+    };
+
+    const off = store.on(StoreEvents.DriveChanged, resume);
+    window.addEventListener('online', resume);
+    window.addEventListener('focus', resume);
+    const timer = setInterval(resume, 60_000);
+    resume();
+
+    return () => {
+      stopped = true;
+      off();
+      clearInterval(timer);
+      window.removeEventListener('online', resume);
+      window.removeEventListener('focus', resume);
+    };
+  }, [store, agent?.subject, privateDrive]);
 
   // Things shared with you out of drives you can't open are only delivered to
   // a subscription on the thing itself; the open drive's subscription never
@@ -424,9 +529,10 @@ export function MessageNotifier(): null {
   useEffect(
     () =>
       store.on(StoreEvents.ResourceUpdated, resource => {
-        void onUpdate(resource).catch(e =>
-          console.error('Could not show a notification:', e),
-        );
+        void onUpdate(resource).catch(e => {
+          if (!(e instanceof RequestCancelledError))
+            console.error('Could not show a notification:', e);
+        });
       }),
     [store],
   );

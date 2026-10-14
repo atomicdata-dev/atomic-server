@@ -175,6 +175,14 @@ export class RequestCancelledError extends Error {
   override name = 'RequestCancelledError';
 }
 
+/** The server explicitly requested reconnection; another transport may retry. */
+export class ServerRestartError extends AtomicError {
+  public constructor() {
+    super('Server requested reconnection', ErrorType.Transport);
+    Object.setPrototypeOf(this, ServerRestartError.prototype);
+  }
+}
+
 /**
  * The readable part of a failed HTTP response from an Atomic server.
  *

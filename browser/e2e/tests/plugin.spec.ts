@@ -296,6 +296,23 @@ test.describe('Plugins', () => {
     );
     await expect(saveConfig).toBeDisabled();
 
+    // Hold the post-uninstall view refresh. Navigating while it is pending
+    // must not let its eventual completion send us back to the drive.
+    let releaseViews!: () => void;
+    const viewsHeld = new Promise<void>(resolve => {
+      releaseViews = resolve;
+    });
+    let viewsStarted!: () => void;
+    const viewsRequested = new Promise<void>(resolve => {
+      viewsStarted = resolve;
+    });
+    await page.route('**/plugin-list?*', async route => {
+      const response = await route.fetch();
+      viewsStarted();
+      await viewsHeld;
+      await route.fulfill({ response });
+    });
+
     // Uninstall the plugin
     await page.getByRole('button', { name: 'Uninstall' }).click();
 
@@ -308,6 +325,7 @@ test.describe('Plugins', () => {
 
     // The installation page is gone once the uninstall navigates away.
     await expect(page.getByRole('button', { name: 'Uninstall' })).toBeHidden();
+    await viewsRequested;
 
     // After uninstall the plugin resource is destroyed, so reloading on its
     // URL would 404. Navigate to the drive page first.
@@ -352,10 +370,15 @@ test.describe('Plugins', () => {
     }).toPass({ timeout: 20000 });
 
     // Check if the custom view is gone.
-    await page
+    const duck = page
       .getByTestId('sidebar')
-      .getByRole('button', { name: 'Duck' })
-      .click();
+      .getByRole('button', { name: 'Duck' });
+    const duckSubject = await duck.getAttribute('about');
+    await duck.click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('subject'))
+      .toBe(duckSubject);
+    releaseViews();
     await expect(page.locator('#custom-view')).toHaveCount(0);
     await expect(page.getByTestId('editable-title')).toHaveText('Duck');
   });

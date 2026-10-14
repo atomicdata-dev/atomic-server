@@ -1,165 +1,149 @@
 # Sync contracts
 
-Status: third slice and Critic fixes locally verified, 2026-10-13. Based on the latest recovery
-work in #2242; CI maintenance remains separate. Preserve peer multiplayer and
-independent Vault / hosted capabilities.
+Status: consolidation locally validated, 2026-10-14. Server #2249 / SaaS #220 are
+stacked on #2244 / #219, behind the Vault pair. TrekMeester owns base integration
+and merging. Preserve browser multiplayer, independent Vault/hosting capabilities,
+and separate object storage for encrypted attachments.
 
-## First implementation
+## Owners and contracts
 
-- [x] Reproduce save, recovery and ingress contract counterexamples in unit tests.
-- [x] Separate queued work, required local durability and accepted remote saves;
-  expose revision/destination receipts through the existing save pipeline.
-  Reuse the relevant #1531 durability fixes rather than introduce another outbox.
-- [x] Distinguish unavailable/cancelled recovery from confirmed backup absence,
-  and require callers to carry the outcome instead of a recovery-attempted boolean.
-- [x] Make ingress payloads exclusive and preserve existing causal history; preserve
-  optimistic rendering separately from durable completion.
-- [x] Verify targeted regressions, package tests, type checks and full browser lint.
-- [x] Update the coverage map and public contract documentation.
+The public reference is [Completion and recovery contracts](../docs/src/sync-contracts.md).
+[Test coverage](../TESTING_COVERAGE.md) maps regressions and remaining gaps. The
+private control-plane review is `atomic-saas/planning/SYNC_CONTRACT_REVIEW.md`.
 
-## Full browser validation
+| Owner | Responsibility |
+| --- | --- |
+| Store/outbox | Revision-specific save receipts, per-drive routes, retained retries, causal ingress |
+| Collection | Pagination and scoped completeness; cached partial rows remain readable |
+| Vault core | Authenticated graph/blob dependencies, import coverage and safe pruning |
+| Vault operations | Signing/account/document lifetime and selected database for backup and restore |
+| Standard locations | Concurrent folder creation per store, identity session, drive and pointer |
+| Inbox | Stable event identity and one read/unread persistence path |
+| Managed policy adapter | Epoch-scoped policy installation and acknowledgements |
 
-- [x] Run the unfiltered standalone E2E suite on the current PR build.
-- [x] Run both portal app profiles and the Vault / Cloud Server acceptance matrix.
-- [x] Run browser peer sync between explicit drive members and through an invitation.
-- [x] Diagnose failures, fix regressions and record exact results and exclusions.
+## Current consolidation
 
-## Second implementation
+- [x] Read #2244/#219 feedback and the new #220 complexity review. #2249 has
+  no additional review comments as of this pass.
+- [x] Reproduce stale backup continuation after database/signing-session changes.
+  Backup and restore now share operation cancellation and cleanup.
+- [x] Reproduce duplicate concurrent standard-location creation. Share it in the
+  location owner; remove separate Inbox and AI-folder request maps. Failed calls
+  remain retryable and new identity sessions cannot reuse old work.
+- [x] Combine notification read/unread writes while retaining causal receipts,
+  the read cutoff, legacy fields and cancellation checks.
+- [x] Reuse captured routes for collection completeness instead of keeping
+  another identity/server/route comparison protocol.
+- [x] Replace fixed 20 ms ingress-test waits with observable completion.
+- [x] Remove repeated recovery-head folding and inventory allocation in SaaS
+  status polling; share head serialization and backfill only on table creation.
+- [x] Finish full browser lint, types and client unit suites; compiled
+  notification/onboarding journeys 10/10 and paired recovery acceptance 10/10.
+- [x] Prepare the follow-up commits and current evidence for the existing PRs.
 
-- [x] Reuse #2238 live private-drive subscriptions and the scoped query/pagination
-  changes from #2130 (`8b54bd0c0`), preserving current recovery changes.
-- [x] Make subscription releases idempotent and invalidate old account owners;
-  fence late hosted-route discovery with identity and routing generations.
-- [x] Expose query completeness and require it for operations claiming all members;
-  include drive and query options in React query identity and read every Inbox page.
-- [x] Share the Rust restore result between WASM and desktop. Detect provable lane
-  gaps, keep imported coverage contiguous, and discard old unverified import cursors.
-- [x] Pair this with ordered admission snapshots and installation receipts in the
-  private managed adapter. Reject stale policy and refuse bootstrap before policy loads.
-- [x] Verify package suites, changed browser journeys, formats, types and full lint.
+## Review disposition
 
-## Second-slice validation
+The base review findings were addressed by the existing follow-up commits:
 
-- Library: 1,699 passed / 1 skipped; real-server integrations: 4 passed.
-- Full data-browser after the final fix: 2,132 passed plus 2 stdio checks.
-- Rust Vault core: 41 passed. WASM built; desktop compiled (no native runtime claim).
-- Notifications: 2 browser journeys passed; Inbox screenshot reviewed.
-- Vault-only / Cloud Server acceptance: 9 passed, no retries/skips, including a
-  real managed-node restart. First run: 8 passed / 1 failed. It caught a partial
-  restore whose translated warning was empty, letting the UI reload as success.
-  Reproduced in three panel tests, then fixed using structured status, fallback
-  copy and settled catalogs. Manual and onboarding recovery now share the guard.
-- Full browser lint/types, Rust format/Clippy and paired portal lint/types passed.
-- Paired API: 611 passed / 3 ignored, then the final receipt-reset handler regression
-  passed. Managed policy: 15 passed.
+- Invitations cannot select the signing server at startup. Unrecognized exact
+  origins, including sibling subdomains, require confirmation before invite reads.
+- Backup absence is checked before requiring local storage. A configured account
+  outage stays unavailable; the UI offers recovery/device/skip paths instead of
+  overwriting a missing home. Standalone operation remains independent.
+- Partial SUB/full GET preserves causal history. Computed query/search snapshots
+  replace independent results. Cold Loro startup buffers bytes; rejected GET
+  ingress settles both single and batch callers with errors.
+- Accepted genesis commits cannot be retried because receipt decoding failed.
+  Anonymous subscriptions survive first login; old account holders cannot remove
+  the new account's subscriptions.
+- Offline Inbox rows settle. Local-copy verification uses events and bounded
+  reads. Auxiliary Vault objects do not count as corrupt graph history; import
+  takes the complete inventory. Unproven legacy history remains unprunable.
+- Paid hosting still requires explicit consent; unpaid enrollment returns 402.
 
-The earlier unfiltered browser/portal runs were not repeated in full for this
-slice. The PR descriptions retain their initial failure counts and focused reruns.
-Current acceptance evidence is in
-`/tmp/sync-contracts-contracts-20261013/acceptance-contracts-final-report/summary.md`.
+The completeness API is retained: fetching every cached page does not prove a
+remote index was available. Its ownership bookkeeping is reduced in this pass.
+The emergency recovery warning retains an untranslated fallback so an incomplete
+restore cannot appear successful when a translation is missing.
 
-## Remaining architecture work
+## Validation and remaining work
 
-### Complexity Critic follow-up (merge remains on hold)
+### Critic and CI follow-up (2026-10-14)
 
-- [x] Reproduce accepted-genesis receipt failure and anonymous login subscription loss; fix both.
-- [x] Trace invitation server selection through app bootstrap; require exact-origin confirmation before invite effects.
-- [x] Check authoritative backup absence before requiring local storage; retain recovery failure guards.
-- [x] Test partial SUB followed by full GET and a later local edit; current causal merge passes.
-- [x] Restore explicit hosting consent for paid plans, matching checkout copy.
-- [x] Validate notification offline loading, computed queries, Vault object-kind handling and callers.
-- [x] Finish per-drive routing validation and regression checks; update coverage and PR evidence.
-- [x] Paired review: policy generations, snapshot coherence, restart behavior and consent journey.
+- [x] Reject an empty Vault export inventory when the recovery manifest records history.
+- [x] Confirm computed-query replacement. Close placement-check gaps for unknown
+  unsolicited updates, nested HTTP resources and batched WebSocket reads.
+- [x] Reproduce the app duplicate-row race and plugin uninstall/navigation failure.
+- [x] Measure pack/envelope duplication and retained checkpoint costs; encode byte
+  payloads as binary while retaining compatibility with existing readers.
+- [ ] Attribute the production account's exact 91 MB to its private inventory.
+  The 411 KB server map already includes Loro history. A controlled 40-resource,
+  128-edit run retained 126 packs and 3 checkpoints: about 1.22 MB versus 113 KB
+  of server snapshots, with 905 KB of signed envelopes across those objects.
+  The byte encoding fix reduces a 64 KiB uniform byte fixture from 98,384 to
+  65,616 bytes, but saves only about 1% in that workload. It does not explain or
+  resolve the full production ratio. The default 30-day retention preserves
+  superseded copies, and restore still downloads the full object inventory.
+  Investigate authenticated checkpoint selection and duplicate envelope storage
+  before changing retention or deleting history. Probe source/logs are under
+  `/tmp/sync-durability-20261014/production-restore/storage-probe*`.
+- [x] Complete local review checks and prepare the follow-up for #2249.
+  Base integration and merging remain with TrekMeester; current paired CI is pending.
 
-The working tree includes the third slice below. Existing CI and reviewer comments
-cover the previously pushed revision. Do not retarget or merge here; TrekMeester
-owns integration with the Vault pair. Keep follow-up fixes in separate commits
-so the save/ingress, recovery, routing and managed-policy changes remain reviewable.
+### Production restore follow-up (2026-10-14)
 
-### Third slice: per-drive server routes
+The public app bundle reports `e7ccc6e`; #2249/#220 are still unmerged. The
+reported 411 KB map reads current server resource snapshots and file bytes;
+the 91 MB Vault total counts retained encrypted backup objects (59 MB change
+packs and 32 MB checkpoints in the screenshot). The exact private inventory
+has not been inspected. Production already downloads four objects concurrently,
+but first waits for every batch of signed URLs. Before this follow-up, #2249
+at `4374d5335` retained that barrier and the restore import-identity bug.
 
-- [x] Reproduce cross-drive save/fetch routing and late response failures.
-- [x] Give each drive an account-scoped route; preserve exact origins for
-  subdomains, explicit migrations, HTTP aliases and cold outbox replay.
-- [x] Use that route for reads, commits, queries, blobs, subscriptions and
-  reconciliation; isolate connection state and stale work by destination.
-- [x] Register routes in onboarding, discovery and cloud migration adapters.
-- [x] Verify two live servers and vanity hosts, reconnect/account switches,
-  relevant suites and full lint; update coverage and PR evidence.
+- [x] Reproduce ambiguous import identities in a Vault restore, then use the
+  existing replica persistence boundary while keeping authoring checks intact.
+- [x] Start bounded downloads as URL batches become available; test order,
+  concurrency and partial failures across batches, and measure request latency.
+- [x] Make Vault usage and its distinction from the server storage map clear
+  on Sync; keep usage readable during restore and include object counts.
+- [x] Validate the changed UI in the compiled app, update coverage and prepare
+  the follow-up for the existing PR.
 
-- [ ] Carry a drive key and its epoch as one handle through every adapter; add a
-  manifest proving expected lane tails and resource/blob dependencies. Readable
-  metadata and contiguous listed segments alone do not prove complete recovery.
-- [ ] Vault-only encrypted blob upload and fresh-device recovery through separate
-  blob storage, with an explicit format and key lifecycle.
-- [ ] Stable notification event IDs, read/unread conflict semantics, and closed-app
-  delivery. Pagination/scope fix live inbox gaps without establishing those contracts.
-- [ ] Native runtime parity and seeded network/process fault campaigns across
-  capability combinations. Sharing a result type and compiling adapters is narrower.
+Before this consolidation, the complete app suite passed 362 / 9 skipped; the
+portal passed 122 / 1 staging-email skip; paired acceptance passed 10/10 with no
+retries. Vault and exported-site opt-ins passed separately (2/2 and 1/1).
+These are previous-source results, not validation of subsequent edits. Exact
+revisions and logs: `/tmp/sync-durability-20261014/validation-final14.json`.
+Current results belong in the PR descriptions and coverage map, not a running log.
 
-The private cross-repository review is maintained in
-`atomic-saas/planning/SYNC_CONTRACT_REVIEW.md`. This plan and public documentation
-describe generic runtime guarantees and avoid managed-service implementation details.
+- [ ] Green paired CI and integration with the held base stack.
+- [ ] Packaged native suspend/resume, kill/relaunch and notification activation.
+- [ ] Push/background delivery while every app stays closed.
+- [ ] Large-Vault memory budgets and replayable network/process failure schedules.
+- [ ] Browser compaction/pruning races and cross-device invitation revocation.
+- [ ] Multi-process control-plane leadership and rollback of all recovery witnesses.
+- [ ] Explain the intermittent WebSocket HTTP 408. It recurred in the latest
+  full run: 357 passed, 11 skipped, one notification test failed its strict
+  console check after all delivery/read-state assertions passed. Both notification
+  journeys then passed three repetitions each, including console checks. The
+  cause remains unproven; do not classify the full run as green.
 
-## Critic follow-up evidence
+### Account storage diagnostics (2026-10-14)
 
-- Unknown emailed invite origins are confirmed before any invite reader mounts or
-  bootstrap changes the signing server. Exact origins include scheme, host and
-  port; sibling subdomains do not inherit trust. The compiled warning is visible.
-- Recovery asks whether a backup exists before requiring local storage. Unknown
-  recovery still cannot justify creating a replacement home. The paired default
-  browser suite now includes `identity-recovery.spec.ts`: a fresh profile with an
-  existing identity and no account session offers recovery and a working skip path.
-- Full GET snapshots merge real Loro state after a class-less partial SUB; stale
-  snapshots preserve later local edits. Computed query rows replace projections.
-  Incoming import errors notify the error channel and reject their caller.
-- Accepted genesis cleanup precedes fallible receipt bookkeeping. Anonymous live
-  subscriptions survive login, verified with actual WebSocket delivery.
-- Offline partial Inbox loading settles. Local-copy reconciliation uses event
-  completion and bounded parallel reads. Vault auxiliary objects do not taint
-  graph completeness; whole-inventory import and conservative legacy pruning
-  remain explicit contracts. E2E saves that require persistence check the result.
-- Two real nodes verify independent drive destinations, reconnection and login;
-  a forwarded tenant hostname resolves its canonical drive. Cold query members,
-  new outbox entries and locally recoverable older queued edits keep ownership.
-  An old queue with no surviving ownership metadata cannot reconstruct a lost
-  historical destination; this is not a general historical-route migration.
-
-The same PR pair is retained as requested. No base retarget, rebase, merge or
-intervention in the previously queued run was performed. Updated paired CI and
-Vault-base integration remain prerequisites for removing the hold.
-
-### Third-slice local checks
-
-- Library: 1,720 passed / 1 skipped; all real-server integrations: 26 passed /
-  1 skipped. The anonymous-login case verifies real delivery after login.
-- App: 2,146 passed plus 2 stdio checks. Notification browser journeys: 2 passed;
-  compiled invite guard and storage journeys: 3 passed. Paired identity recovery
-  and paid-hosting consent: 1 each, with visible warning screenshots inspected.
-- Rust server: 392 passed / 4 ignored; Vault core: 42 passed. WASM rebuilt.
-- Full browser build, recursive lint, types, Rust format and all-target Clippy
-  pass. Commits run the repository hooks. Paired API: 611 passed / 3 ignored,
-  managed-node: 27 passed.
-- Two initial Rust build attempts exhausted disk space; the full server suite
-  subsequently passed. A unit integration initially reached an unrelated local
-  node; the full suite passed with the isolated server URL explicitly selected.
-- Billing reruns exposed a stopped ephemeral object store and its missing bucket
-  after restart; after restoring that fixture the full consent journey passed.
-  The first acceptance attempt watched the direct API URL while the browser used
-  the portal proxy; this configuration was corrected before the final matrix.
-
-These are scoped local results. The unfiltered app E2Es and broad portal profiles
-were not repeated for this follow-up, and old CI does not validate the new heads.
-
-The final acceptance run initially exposed two test-fixture problems: G1 required
-an extra pack even when automatic backup already held the uploaded File; D1's
-base-36 marker could trigger rich-text multiplication typography before sync.
-G1 now verifies confirmed encrypted storage and exact cold File recovery, retaining
-missing/corrupt blob and access checks. Typed markers use hexadecimal IDs. The
-pre-correction complete matrix was 8 passed / 1 failed; the marker issue was found
-in a subsequent run and fixed before the final matrix.
-
-Final matrix: **9 passed, zero failures, retries or skips**, including the real
-managed-node restart. Evidence: `/tmp/critic-acceptance-final4.log` and
-`/tmp/critic-acceptance-final4-html/`. The local Critic follow-up is complete;
-remote paired CI and Vault-base integration still own the merge hold.
+- [x] Add an account-wide Vault comparison using existing owner-scoped APIs.
+  Include every enrolled workspace, regardless of the current agent or server.
+  Show independent quotas, backup age, retained objects and accounting gaps.
+- [x] Offer object metadata inspection and a downloadable report without restoring,
+  decrypting, pruning or inferring that old backups are disposable.
+- [x] Verify partial failures and account changes, desktop/mobile views, shared
+  map navigation, translations, app types/compiler and the complete app unit suite.
+  Full recursive browser lint passes; screenshots use invented account metadata.
+- [x] Prepare the account diagnostics follow-up for #2249 with desktop/mobile
+  screenshots. Current paired CI and rollout remain the gates above.
+- [x] Inspect real encrypted pack contents locally: attribute retained Loro
+  updates, signed envelopes, file objects and format overhead without inventing
+  per-resource stored sizes or importing data into the live database.
+- [x] Reuse backup cleanup controls with explicit destructive confirmation;
+  link documents/files to their existing workspace deletion flow.
+- [x] Test byte reconciliation, unreadable objects, cancelled/account-switched
+  scans and cleanup; capture desktop/mobile with actual encrypted test backups.

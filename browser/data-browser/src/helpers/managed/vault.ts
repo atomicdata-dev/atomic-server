@@ -1,4 +1,13 @@
-import { AGENT_VAULT_PROOF_MESSAGE, decodeB64 } from '@tomic/lib';
+import { validateRecoveryExpectation } from '@tomic/lib';
+import {
+  AGENT_VAULT_PROOF_MESSAGE,
+  decodeB64,
+  validateDriveKey,
+  type DriveKeyHandle,
+  type RecoveryExpectation,
+} from '@tomic/lib';
+
+export type { DriveKeyHandle, RecoveryExpectation } from '@tomic/lib';
 import { managedFetch } from './api';
 
 /**
@@ -195,6 +204,13 @@ export type BackupOutcome =
 
 export type SegmentKind = 'pack' | 'checkpoint';
 
+export type SealedBlob = {
+  objectKey: string;
+  contentHash: string;
+  chunkIndex: number;
+  sealed: Uint8Array;
+};
+
 export type RestoreOutcome = {
   packsRead: number;
   resourcesRestored: number;
@@ -209,6 +225,10 @@ export type RestoreOutcome = {
   objectsUnreadable: number;
   /** Optional while older native/WASM adapters remain supported. */
   objectsMissing?: number;
+  blobsRestored?: number;
+  blobsMissing?: number;
+  subjectsRestored?: string[];
+  subjectsDeleted?: string[];
   completeness?: 'empty' | 'complete' | 'partial';
   /**
    * Set when some objects would not open but readable data was still
@@ -237,8 +257,7 @@ export type VaultCheckpoint = {
 export type VaultCapableDb = {
   vaultExport(
     driveSubject: string,
-    key: Uint8Array,
-    keyEpoch: number,
+    key: DriveKeyHandle,
     drivePseudonym: string,
     devicePubkey: string,
     segment: number,
@@ -254,6 +273,7 @@ export type VaultCapableDb = {
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
+    blobs?: SealedBlob[];
     kind: SegmentKind;
     resources: number;
     unchanged: number;
@@ -262,11 +282,11 @@ export type VaultCapableDb = {
     coverage: Record<string, number>;
   } | null>;
   vaultImport(
-    key: Uint8Array,
-    keyEpoch: number,
+    key: DriveKeyHandle,
     drivePseudonym: string,
     devicePubkey: string,
     objects: { objectKey: string; sealed: Uint8Array }[],
+    expectation?: RecoveryExpectation,
   ): Promise<RestoreOutcome>;
   /** Marks a sealed segment as durably stored. See `backupDrive`. */
   vaultCommitSegment(
@@ -380,8 +400,10 @@ export async function enrollVault(
   return created.enrollment;
 }
 
-export async function listVaultDrives(): Promise<VaultEnrollment[]> {
-  return api<VaultEnrollment[]>('/cloud-vault/drives');
+export async function listVaultDrives(
+  signal?: AbortSignal,
+): Promise<VaultEnrollment[]> {
+  return api<VaultEnrollment[]>('/cloud-vault/drives', { signal });
 }
 
 export async function disableVault(drivePseudonym: string): Promise<void> {
@@ -426,17 +448,6 @@ export async function getVaultKeyEnvelope(
   return record?.envelope ?? null;
 }
 
-/** A drive key in hand, and the epoch its envelope wrapped it at. */
-export type DriveKeyHandle = {
-  driveKey: Uint8Array;
-  /**
-   * The drive's key epoch when this key was unwrapped. Compared with the
-   * epoch the drive reports before every upload: a mismatch means someone
-   * re-keyed, and this key must not seal anything new.
-   */
-  keyEpoch: number;
-};
-
 /**
  * The stored envelope together with the epoch it wraps. `key_epoch` is
  * optional on the wire only for a control plane predating epoch tracking; it
@@ -473,10 +484,18 @@ export async function getVaultKeyEnvelopeRecord(
     throw new Error('The stored vault key is malformed.');
   }
 
-  return {
-    envelope: record.envelope,
-    keyEpoch: typeof record.key_epoch === 'number' ? record.key_epoch : 1,
-  };
+  const keyEpoch = record.key_epoch === undefined ? 1 : record.key_epoch;
+
+  if (
+    typeof keyEpoch !== 'number' ||
+    !Number.isInteger(keyEpoch) ||
+    keyEpoch < 1 ||
+    keyEpoch > 0xffffffff
+  ) {
+    throw new Error('The stored vault key epoch is malformed.');
+  }
+
+  return { envelope: record.envelope, keyEpoch };
 }
 
 /** What `GET /api/cloud-vault/{drive}/state` reports. */
@@ -660,8 +679,29 @@ export function nextSegmentFor(
 
 export async function listVaultObjects(
   drivePseudonym: string,
+  signal?: AbortSignal,
 ): Promise<VaultObject[]> {
-  return api<VaultObject[]>(`/cloud-vault/${drivePseudonym}/objects`);
+  return api<VaultObject[]>(`/cloud-vault/${drivePseudonym}/objects`, {
+    signal,
+  });
+}
+
+export type VaultRecoveryManifest = {
+  objects: VaultObject[];
+  expectation: RecoveryExpectation;
+};
+
+export async function getVaultRecoveryManifest(
+  pseudonym: string,
+): Promise<VaultRecoveryManifest> {
+  const manifest = await api<VaultRecoveryManifest>(
+    `/cloud-vault/${pseudonym}/recovery-manifest`,
+  );
+  if (!Array.isArray(manifest.objects))
+    throw new Error('Vault recovery inventory is invalid.');
+  validateRecoveryExpectation(manifest.expectation);
+
+  return manifest;
 }
 
 /**
@@ -686,8 +726,7 @@ export async function backupDrive({
   driveSubject,
   drivePseudonym,
   devicePubkey,
-  driveKey,
-  keyEpoch = 1,
+  key,
   segment,
   checkpointN,
   driveHasCheckpoint,
@@ -704,8 +743,7 @@ export async function backupDrive({
   driveSubject: string;
   drivePseudonym: string;
   devicePubkey: string;
-  driveKey: Uint8Array;
-  keyEpoch?: number;
+  key: DriveKeyHandle;
   segment: number;
   checkpointN: number;
   driveHasCheckpoint: boolean;
@@ -724,11 +762,12 @@ export async function backupDrive({
   currentStateOnly?: boolean;
   observedLanes: Record<string, number>;
 }): Promise<BackupOutcome> {
+  validateDriveKey(key);
+  const { keyEpoch } = key;
   signal?.throwIfAborted();
   const sealedPack = await db.vaultExport(
     driveSubject,
-    driveKey,
-    keyEpoch,
+    key,
     drivePseudonym,
     devicePubkey,
     segment,
@@ -743,6 +782,19 @@ export async function backupDrive({
   // is the ordinary outcome for an idle device rather than a rare one: a pass
   // whose version vectors all match the lane cursor writes no object at all.
   if (!sealedPack) return { status: 'nothing-to-do' };
+
+  // Dependencies become durable before any graph object or cursor can claim
+  // this file is backed up. Retrying immutable blob ids is safe.
+  for (const blob of sealedPack.blobs ?? []) {
+    signal?.throwIfAborted();
+    await uploadVaultBlob(
+      drivePseudonym,
+      keyEpoch,
+      blob,
+      signal,
+      beforeNetworkWrite,
+    );
+  }
 
   const isCheckpoint = sealedPack.kind === 'checkpoint';
 
@@ -805,8 +857,7 @@ export async function backupDrive({
       driveSubject,
       drivePseudonym,
       devicePubkey,
-      driveKey,
-      keyEpoch,
+      key,
       driveHasCheckpoint,
       forceCheckpoint,
       currentStateOnly,
@@ -907,6 +958,75 @@ export async function backupDrive({
   };
 }
 
+async function uploadVaultBlob(
+  pseudonym: string,
+  keyEpoch: number,
+  blob: SealedBlob,
+  signal?: AbortSignal,
+  beforeNetworkWrite?: () => Promise<void>,
+): Promise<void> {
+  if (!(blob.sealed instanceof Uint8Array)) {
+    throw new Error('Vault blob export returned non-binary data.');
+  }
+
+  await beforeNetworkWrite?.();
+  signal?.throwIfAborted();
+  const { uploads } = await api<{ uploads: UploadUrl[] }>(
+    `/cloud-vault/${pseudonym}/upload-urls`,
+    {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({
+        objects: [
+          {
+            kind: 'blob',
+            key_epoch: keyEpoch,
+            size_bytes: blob.sealed.length,
+            content_hash: blob.contentHash,
+            chunk_index: blob.chunkIndex,
+          },
+        ],
+      }),
+    },
+  );
+  const upload = uploads?.[0];
+
+  if (!upload || upload.object_key !== blob.objectKey) {
+    throw new Error(
+      'Vault blob upload location does not match its encrypted dependency.',
+    );
+  }
+
+  if (upload.already_stored) return;
+  const result = await fetch(upload.url, {
+    method: 'PUT',
+    signal,
+    body: blob.sealed as BodyInit,
+    headers: Object.fromEntries(
+      upload.headers.filter(
+        ([name]) => name.toLowerCase() !== 'content-length',
+      ),
+    ),
+  });
+  if (!result.ok)
+    throw new Error(`Vault blob upload failed (${result.status})`);
+  await beforeNetworkWrite?.();
+  signal?.throwIfAborted();
+  await api(`/cloud-vault/${pseudonym}/confirm-upload`, {
+    method: 'POST',
+    signal,
+    body: JSON.stringify({
+      confirmations: [
+        {
+          object_id: upload.object_id,
+          size_bytes: blob.sealed.length,
+          content_hash: blob.contentHash,
+        },
+      ],
+    }),
+  });
+}
+
 /** Matches `MAX_URL_BATCH` in the control plane's vault API. */
 const DOWNLOAD_URL_BATCH = 64;
 
@@ -919,10 +1039,12 @@ export type SealedObject = { objectKey: string; sealed: Uint8Array };
  */
 export type RestoreSource = (
   onProgress?: (done: number, total: number) => void,
-) => Promise<SealedObject[]>;
+) => Promise<
+  SealedObject[] | { objects: SealedObject[]; expectation: RecoveryExpectation }
+>;
 
 /**
- * Download every listed object's body, at most four at a time, in listing order.
+ * Download every listed object's body, at most eight at a time, in listing order.
  *
  * `read` decides what a body becomes: bytes for a restore, a `Blob` for a
  * backup file (the browser may keep those on disk rather than in memory).
@@ -930,31 +1052,43 @@ export type RestoreSource = (
 export async function downloadVaultObjects<T>(
   drivePseudonym: string,
   objects: VaultObject[],
-  read: (response: Response) => Promise<T>,
+  read: (response: Response, object: VaultObject) => Promise<T>,
   onProgress?: (done: number, total: number) => void,
   onError?: (error: unknown, object: VaultObject) => T,
+  signal?: AbortSignal,
 ): Promise<T[]> {
   if (objects.length === 0) return [];
 
-  // The control plane signs at most DOWNLOAD_URL_BATCH objects per request,
-  // and a drive with a longer history refused to restore at all.
-  const downloads: DownloadUrl[] = [];
+  // Share one signing request per batch, when a worker first reaches it. Start
+  // downloading immediately instead of waiting for every URL in a large vault.
+  // The same worker bound limits both signing and object requests.
+  const batches = new Map<number, Promise<Map<string, string>>>();
 
-  for (let i = 0; i < objects.length; i += DOWNLOAD_URL_BATCH) {
-    const batch = objects.slice(i, i + DOWNLOAD_URL_BATCH);
-    const answer = await api<{ downloads: DownloadUrl[] }>(
-      `/cloud-vault/${drivePseudonym}/download-urls`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ object_ids: batch.map(o => o.object_id) }),
-      },
-    );
-    downloads.push(...answer.downloads);
+  function urlsFor(index: number) {
+    const start = Math.floor(index / DOWNLOAD_URL_BATCH) * DOWNLOAD_URL_BATCH;
+    let batch = batches.get(start);
+
+    if (!batch) {
+      batch = api<{ downloads: DownloadUrl[] }>(
+        `/cloud-vault/${drivePseudonym}/download-urls`,
+        {
+          signal,
+          method: 'POST',
+          body: JSON.stringify({
+            object_ids: objects
+              .slice(start, start + DOWNLOAD_URL_BATCH)
+              .map(o => o.object_id),
+          }),
+        },
+      ).then(
+        answer => new Map(answer.downloads.map(d => [d.object_key, d.url])),
+      );
+      batches.set(start, batch);
+    }
+
+    return batch;
   }
 
-  // Preserve the server's ordering: `download-urls` answers per request and is
-  // not required to echo the order back.
-  const urlByKey = new Map(downloads.map(d => [d.object_key, d.url]));
   const fetched = new Array<T>(objects.length);
   let next = 0;
   let completed = 0;
@@ -963,16 +1097,18 @@ export async function downloadVaultObjects<T>(
   // Hide per-object network latency without opening unbounded requests on a
   // phone. Write by listing index, never completion order.
   await Promise.all(
-    Array.from({ length: Math.min(4, objects.length) }, async () => {
+    Array.from({ length: Math.min(8, objects.length) }, async () => {
       while (!failed && next < objects.length) {
+        signal?.throwIfAborted();
         const index = next++;
         const object = objects[index];
 
         try {
+          const urlByKey = await urlsFor(index);
           const url = urlByKey.get(object.object_key);
           if (!url)
             throw new Error(`No download URL issued for ${object.object_key}`);
-          const response = await fetch(url);
+          const response = await fetch(url, { signal });
 
           if (!response.ok) {
             throw new Error(
@@ -980,10 +1116,12 @@ export async function downloadVaultObjects<T>(
             );
           }
 
-          fetched[index] = await read(response);
+          fetched[index] = await read(response, object);
           completed++;
           if (!failed) onProgress?.(completed, objects.length);
         } catch (error) {
+          signal?.throwIfAborted();
+
           if (!onError) {
             failed = true;
             throw error;
@@ -1010,6 +1148,7 @@ class IncompleteVaultDownload extends Error {
   constructor(
     readonly readable: SealedObject[],
     errors: string[],
+    readonly expectation?: RecoveryExpectation,
   ) {
     super(incompleteDownloadMessage(errors), { cause: errors[0] });
   }
@@ -1018,7 +1157,8 @@ class IncompleteVaultDownload extends Error {
 /** The cloud vault as a {@link RestoreSource}. */
 export function cloudRestoreSource(drivePseudonym: string): RestoreSource {
   return async onProgress => {
-    const objects = await listVaultObjects(drivePseudonym);
+    const { objects, expectation } =
+      await getVaultRecoveryManifest(drivePseudonym);
 
     const errors: string[] = [];
     const bodies = await downloadVaultObjects<Uint8Array | null>(
@@ -1037,9 +1177,10 @@ export function cloudRestoreSource(drivePseudonym: string): RestoreSource {
 
       return sealed === null ? [] : [{ objectKey: object.object_key, sealed }];
     });
-    if (errors.length) throw new IncompleteVaultDownload(readable, errors);
+    if (errors.length)
+      throw new IncompleteVaultDownload(readable, errors, expectation);
 
-    return readable;
+    return { objects: readable, expectation };
   };
 }
 
@@ -1061,31 +1202,46 @@ export async function restoreDrive({
   db,
   drivePseudonym,
   devicePubkey,
-  driveKey,
-  keyEpoch = 1,
+  key,
   onProgress,
+  beforeImport,
   source = cloudRestoreSource(drivePseudonym),
 }: {
   db: VaultCapableDb;
   drivePseudonym: string;
   devicePubkey: string;
-  driveKey: Uint8Array;
-  keyEpoch?: number;
+  key: DriveKeyHandle;
   onProgress?: (downloaded: number, total: number) => void;
   source?: RestoreSource;
+  beforeImport?: () => void | Promise<void>;
 }): Promise<RestoreOutcome> {
+  validateDriveKey(key);
   let fetched: SealedObject[];
+  let expectation: RecoveryExpectation | undefined;
   let incomplete: IncompleteVaultDownload | undefined;
 
   try {
-    fetched = await source(onProgress);
+    const inventory = await source(onProgress);
+
+    if (Array.isArray(inventory)) fetched = inventory;
+    else {
+      fetched = inventory.objects;
+      expectation = inventory.expectation;
+    }
   } catch (error) {
     if (!(error instanceof IncompleteVaultDownload)) throw error;
     incomplete = error;
     fetched = error.readable;
+    expectation = error.expectation;
   }
 
-  if (fetched.length === 0) {
+  if (
+    fetched.length === 0 &&
+    !(
+      expectation?.checkpointN ||
+      Object.values(expectation?.lanes ?? {}).some(n => n > 0)
+    )
+  ) {
     if (incomplete) throw incomplete;
 
     return {
@@ -1105,12 +1261,13 @@ export async function restoreDrive({
   // observed maps to decide what to replay and when — see `plan_restore` in
   // `lib/src/vault/sync.rs`. Passing everything and letting it choose is what
   // keeps that decision in one place rather than duplicated here in JS.
+  await beforeImport?.();
   const outcome = await db.vaultImport(
-    driveKey,
-    keyEpoch,
+    key,
     drivePseudonym,
     devicePubkey,
     fetched,
+    expectation,
   );
 
   if (incomplete) throw incomplete;
@@ -1121,9 +1278,10 @@ export async function restoreDrive({
   if (
     outcome.completeness === 'partial' ||
     outcome.objectsUnreadable > 0 ||
-    (outcome.objectsMissing ?? 0) > 0
+    (outcome.objectsMissing ?? 0) > 0 ||
+    (outcome.blobsMissing ?? 0) > 0
   ) {
-    const message = `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable, ${outcome.objectsMissing ?? 0} were missing. Recovered data was kept. Retry with a complete backup and its current key.`;
+    const message = `Restore incomplete: ${outcome.objectsUnreadable} backup objects were unreadable, ${outcome.objectsMissing ?? 0} were missing, ${outcome.blobsMissing ?? 0} files could not be recovered. Recovered data was kept. Retry with a complete backup and its current key.`;
 
     // Nothing opened: the wrong key or a foreign vault, not a partial drive.
     if (outcome.resourcesRestored === 0) throw new Error(message);
@@ -1280,7 +1438,10 @@ export async function recoverDriveKey({
  * writer. Driving backups from individual tabs instead would reintroduce the
  * race across tabs, where an in-process lock cannot see it.
  */
-const inFlight = new Map<string, Promise<BackupOutcome>>();
+const backupsByDb = new WeakMap<
+  VaultCapableDb,
+  Map<string, Promise<BackupOutcome>>
+>();
 
 export function runVaultBackup(args: {
   /** Revalidate the account after encryption or storage I/O. */
@@ -1290,12 +1451,7 @@ export function runVaultBackup(args: {
   driveSubject: string;
   drivePseudonym: string;
   devicePubkey: string;
-  driveKey: Uint8Array;
-  /**
-   * The epoch `driveKey` was unwrapped at. Read as 1 when absent: a drive
-   * that was never re-keyed has only ever had epoch 1.
-   */
-  driveKeyEpoch?: number;
+  key: DriveKeyHandle;
   /**
    * Fetch and unwrap the drive's current envelope. Called when the drive
    * reports an epoch other than `driveKeyEpoch`, which means someone re-keyed
@@ -1310,7 +1466,10 @@ export function runVaultBackup(args: {
   /** Make that checkpoint keep only the current state. See {@link backupDrive}. */
   currentStateOnly?: boolean;
 }): Promise<BackupOutcome> {
-  const existing = inFlight.get(args.drivePseudonym);
+  let inFlight = backupsByDb.get(args.db);
+  if (!inFlight) backupsByDb.set(args.db, (inFlight = new Map()));
+  const passKey = `${args.drivePseudonym}:${args.devicePubkey}`;
+  const existing = inFlight.get(passKey);
 
   if (existing) {
     if (!args.forceCheckpoint) return existing;
@@ -1340,8 +1499,9 @@ export function runVaultBackup(args: {
     // with is exactly the client that would keep sealing under a key someone
     // was just removed from.
     const currentEpoch = state.enrollment.key_epoch ?? 1;
-    let { driveKey } = args;
-    let heldEpoch = args.driveKeyEpoch ?? 1;
+    let key = args.key;
+    validateDriveKey(key);
+    let heldEpoch = key.keyEpoch;
 
     if (heldEpoch !== currentEpoch) {
       if (!args.refreshDriveKey) {
@@ -1350,7 +1510,9 @@ export function runVaultBackup(args: {
         );
       }
 
-      ({ driveKey, keyEpoch: heldEpoch } = await args.refreshDriveKey());
+      key = await args.refreshDriveKey();
+      validateDriveKey(key);
+      heldEpoch = key.keyEpoch;
 
       if (heldEpoch !== currentEpoch) {
         throw new Error(
@@ -1361,8 +1523,7 @@ export function runVaultBackup(args: {
 
     return backupDrive({
       ...args,
-      driveKey,
-      keyEpoch: currentEpoch,
+      key,
       segment: nextSegmentFor(state, args.devicePubkey),
       checkpointN: nextCheckpointFor(state),
       driveHasCheckpoint: state.checkpoints.length > 0,
@@ -1372,10 +1533,10 @@ export function runVaultBackup(args: {
       observedLanes: state.lanes,
     });
   })().finally(() => {
-    inFlight.delete(args.drivePseudonym);
+    if (inFlight.get(passKey) === pass) inFlight.delete(passKey);
   });
 
-  inFlight.set(args.drivePseudonym, pass);
+  inFlight.set(passKey, pass);
 
   return pass;
 }
