@@ -2138,8 +2138,6 @@ msgid "Add tag"
 msgstr "Añadir etiqueta"
 
 #. 0: label
-#. 0: getTitle(resource)
-#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr "Cambiar a {0}"
@@ -4028,10 +4026,6 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
-msgstr ""
-
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
 msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -12939,4 +12933,8 @@ msgstr ""
 
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
+msgstr ""
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "View all drives"
 msgstr ""
