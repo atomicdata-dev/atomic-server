@@ -3650,7 +3650,26 @@ export class Resource<C extends OptionalClass = any> {
   /** The save currently running, so a concurrent `save()` waits for it. */
   private _inflightSave?: Promise<SaveResult>;
 
-  public async save(): Promise<SaveResult> {
+  /**
+   * Save now. A direct call is an explicit user action (Create, dialog
+   * submit, then navigate): the server's soft commit pace does not hold it
+   * back, only a BUSY refusal does (then {@link SaveQueuedError}).
+   * Background saves (`ScheduledSave`, debounced hooks) pass `background` and
+   * are spaced to the pace like the outbox's own drains.
+   */
+  public async save(opts: { background?: boolean } = {}): Promise<SaveResult> {
+    const release = opts.background
+      ? undefined
+      : this.store.outbox.holdExplicit(this.subject);
+
+    try {
+      return await this.saveSerialized();
+    } finally {
+      release?.();
+    }
+  }
+
+  private async saveSerialized(): Promise<SaveResult> {
     // Two saves running at once each sign their own commit from the same
     // state. For a draft that is two genesis certificates, so two subjects
     // for one resource: the second rename evicts the first, and every alias
@@ -3659,7 +3678,7 @@ export class Resource<C extends OptionalClass = any> {
     if (this._inflightSave) {
       await this._inflightSave.catch(() => undefined);
 
-      return this.save();
+      return this.saveSerialized();
     }
 
     this._inflightSave = this.saveOnce();

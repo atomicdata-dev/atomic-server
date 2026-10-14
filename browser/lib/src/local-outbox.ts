@@ -544,6 +544,8 @@ export class LocalOutbox {
   private paceReportedAt = 0;
   /** When each subject last had a commit acknowledged, for pacing. */
   private lastCommitAt = new Map<string, number>();
+  /** Subjects with an explicit save running, with a count. */
+  private explicit = new Map<string, number>();
   private _hydrated = true;
   private hydratedWaiters: Array<() => void> = [];
   /** Set by {@link expectDatabase}: after a {@link rebind}, the new agent's
@@ -1073,6 +1075,22 @@ export class LocalOutbox {
     return now - this.paceReportedAt > PACE_QUIET_MS ? 0 : this.serverPaceMs;
   }
 
+  /** Exempt `subject` from the soft pace while an explicit (non-background)
+   *  save of it runs. BUSY waits still apply. Returns the release function. */
+  holdExplicit(subject: string): () => void {
+    this.explicit.set(subject, (this.explicit.get(subject) ?? 0) + 1);
+    let released = false;
+
+    return () => {
+      if (released) return;
+      released = true;
+      const left = (this.explicit.get(subject) ?? 1) - 1;
+
+      if (left > 0) this.explicit.set(subject, left);
+      else this.explicit.delete(subject);
+    };
+  }
+
   /** Record that a commit of `subject` was acknowledged, which starts its
    *  pacing interval. */
   noteCommitted(subject: string, now: number = Date.now()): void {
@@ -1097,6 +1115,8 @@ export class LocalOutbox {
    *  stretched: callers wait on them, and they carry no accumulated edits. */
   private paceDueAt(e: OutboxEntry, now: number): number {
     if (e.signedGenesis || e.signedDestroy) return 0;
+    // An explicit save is in progress for it: the user is waiting.
+    if (this.explicit.has(e.subject)) return 0;
 
     const pace = this.paceMs(now);
     const last = this.lastCommitAt.get(e.subject);

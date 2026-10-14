@@ -1354,6 +1354,43 @@ describe('LocalOutbox pacing (server write-load signal)', () => {
     expect(outbox.hasPending(SUBJECT)).toBe(false);
   });
 
+  it('an explicit save sends during pace; a background one waits', async ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+    outbox.setServerPace(5000);
+    outbox.noteCommitted(SUBJECT);
+
+    // Background (scheduled, debounced): held until the pace is over.
+    outbox.markDirty(SUBJECT);
+    await outbox.drain(ctxFor(send));
+    expect(send).not.toHaveBeenCalled();
+
+    // The user clicks Create / submits a dialog: goes out at once.
+    const release = outbox.holdExplicit(SUBJECT);
+    expect(outbox.nextDueAt()).toBe(0);
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(1);
+    release();
+
+    // Afterwards the follow-up drain of the next edit is paced again.
+    outbox.markDirty(SUBJECT);
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('an explicit save still waits out a BUSY refusal', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+    outbox.markDirty(SUBJECT);
+    outbox.getEntry(SUBJECT)!.busyUntil = Date.now() + 2000;
+    outbox.holdExplicit(SUBJECT);
+    await outbox.drain(ctxFor(send));
+    expect(send).not.toHaveBeenCalled();
+    expect(outbox.hasPending(SUBJECT)).toBe(true);
+  });
+
   it('paces each subject on its own', async ({ expect }) => {
     const outbox = new LocalOutbox();
     const send = sender(outbox);
