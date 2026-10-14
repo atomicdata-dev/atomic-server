@@ -574,6 +574,12 @@ export class WSClient {
       ws.addEventListener('close', (ev: CloseEvent) => {
         if (this._closed || ws !== this.ws) return;
 
+        // 1012 asks an established client to reconnect, including when the
+        // server needs subscribers to reconcile after missing DB events.
+        // Keep the ordinary retry/auth/SUB/SYNC path without presenting this
+        // completed recovery handshake as a connection failure.
+        const restarting = opened && ev.wasClean && ev.code === 1012;
+
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
         // 1006=abnormal (no close frame seen — usually network drop or
@@ -582,16 +588,18 @@ export class WSClient {
         // tells us if the closing handshake completed. Without this the
         // user-visible "Connection ... closed" line gives no signal of
         // what actually killed the connection.
-        if (!ended) {
+        if (!ended && !restarting) {
           console.warn(
             `[WS] close code=${ev.code} reason=${JSON.stringify(ev.reason)} wasClean=${ev.wasClean} opened=${opened}`,
           );
         }
 
         end(
-          opened
-            ? `Connection to ${wsURL.origin} closed (code=${ev.code}${ev.reason ? `, reason=${ev.reason}` : ''}).`
-            : connectionFailedMessage(wsURL),
+          restarting
+            ? undefined
+            : opened
+              ? `Connection to ${wsURL.origin} closed (code=${ev.code}${ev.reason ? `, reason=${ev.reason}` : ''}).`
+              : connectionFailedMessage(wsURL),
         );
       });
       this.openPromise = new Promise((resolve, reject) => {

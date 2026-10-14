@@ -239,3 +239,9 @@ pub struct ExternalChange {
     /// Source connection id for echo suppression.
     pub source_id: Option<String>,
 }
+
+/// Live events were dropped. Close so the client reauthenticates, resubscribes
+/// and reconciles its durable state instead of trusting an incomplete stream.
+#[derive(Message, Clone)]
+#[rtype(result = "()")]
+pub struct ReconcileConnection;

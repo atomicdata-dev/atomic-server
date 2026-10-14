@@ -462,6 +462,53 @@ describe('WSClient drive sync probe', () => {
     vi.useRealTimers();
   });
 
+  it('reauthenticates, resubscribes and reconciles after a planned server restart', async () => {
+    const { client, socket, store } = await connectedClient();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(store, 'getDrive').mockReturnValue('https://example.com/drive');
+    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+    const compute = vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
+      drive: 'https://example.com/drive',
+      driveHash: 'current',
+      peers: [],
+      resources: {},
+    } as never);
+    socket.receive(encodeChallenge('first'));
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.SYNC)).toHaveLength(1),
+    );
+    compute.mockClear();
+
+    vi.useFakeTimers();
+    socket.close();
+    socket.fire('close', { code: 1012, reason: '', wasClean: true });
+    assert(store.serverConnected).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+    const replacement = socketOf(client);
+    assert(replacement).not.toBe(socket);
+    replacement.open();
+    replacement.receive(encodeChallenge('restart'));
+    await vi.waitFor(() =>
+      assert(framesWithTag(replacement, Tag.AUTH)).toHaveLength(1),
+    );
+    replacement.receive(encodeAuthOk([]));
+    await vi.waitFor(() =>
+      assert(framesWithTag(replacement, Tag.SYNC)).toHaveLength(1),
+    );
+    assert(framesWithTag(replacement, Tag.SUB).length).toBeGreaterThan(0);
+    assert(compute).toHaveBeenCalledWith('https://example.com/drive', {
+      sparse: false,
+    });
+    assert(store.serverConnected).toBe(true);
+    client.close();
+    assert(warning).not.toHaveBeenCalled();
+  });
+
   it('does not send a sync probe computed for a previous identity', async ({
     expect,
   }) => {

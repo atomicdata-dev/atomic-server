@@ -979,3 +979,12 @@ where
         }
     }
 }
+
+impl Handler<crate::actor_messages::ReconcileConnection> for WebSocketConnection {
+    type Result = ();
+
+    fn handle(&mut self, _: crate::actor_messages::ReconcileConnection, ctx: &mut Self::Context) {
+        ctx.close(Some(ws::CloseCode::Restart.into()));
+        ctx.stop();
+    }
+}
