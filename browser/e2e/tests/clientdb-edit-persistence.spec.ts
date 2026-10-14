@@ -9,8 +9,8 @@ test('edit persists to local ClientDb across the drain', async ({ page }) => {
 
   const result = await page.evaluate(async () => {
     const s = window.store;
-    const drive =
-      document.querySelector('main[about]')?.getAttribute('about') ?? undefined;
+    const drive = s.getDrive();
+    if (!drive) throw new Error('No selected drive for the persistence probe');
     const NAME = 'https://atomicdata.dev/properties/name';
     const FOLDER = 'https://atomicdata.dev/classes/Folder';
 
@@ -20,7 +20,9 @@ test('edit persists to local ClientDb across the drain', async ({ page }) => {
       isA: FOLDER,
     });
     await r.set(NAME, 'PersistProbe-A');
-    await r.save();
+    const created = await r.saveWithReceipt();
+    if (!created.server)
+      throw new Error('Probe genesis was not accepted by the server');
     const realSubject = r.subject;
     const db = s.getClientDb();
 
@@ -42,10 +44,13 @@ test('edit persists to local ClientDb across the drain', async ({ page }) => {
 
     const r2 = await s.getResource(realSubject);
     await r2.set(NAME, 'PersistProbe-B-EDITED');
-    await r2.save();
+    const edited = await r2.saveWithReceipt();
+    if (!edited.server)
+      throw new Error('Probe edit was not accepted by the server');
     await db.flush();
     const editNameLocal = await storedName();
     const srv = await s.fetchResourceFromServer(realSubject);
+    if (srv.error) throw srv.error;
 
     return {
       createName,

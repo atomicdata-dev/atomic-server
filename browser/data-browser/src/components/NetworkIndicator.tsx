@@ -31,6 +31,8 @@ export function NetworkIndicator() {
   }, []);
 
   useEffect(() => {
+    let hint: ReturnType<typeof setTimeout> | undefined;
+    let disconnected = false;
     const unsub = store.on(
       StoreEvents.ConnectionChanged,
       (connected: boolean) => {
@@ -40,18 +42,33 @@ export function NetworkIndicator() {
 
         if (connected) {
           wasEverConnected.current = true;
+          disconnected = false;
+          clearTimeout(hint);
+          hint = undefined;
           toast.dismiss('connection-status');
-        } else if (wasEverConnected.current && !userDisconnected) {
-          toast('Working offline — your changes are saved locally', {
-            icon: OFFLINE_ICON,
-            duration: 4000,
-            id: 'connection-status',
-          });
+        } else if (
+          wasEverConnected.current &&
+          !userDisconnected &&
+          !disconnected
+        ) {
+          disconnected = true;
+          // A normal reconnect includes a one-second retry plus authentication.
+          // Do not put a toast over editing controls while that settles.
+          hint = setTimeout(() => {
+            toast('Working offline — your changes are saved locally', {
+              icon: OFFLINE_ICON,
+              duration: 4000,
+              id: 'connection-status',
+            });
+          }, 2_000);
         }
       },
     );
 
-    return unsub;
+    return () => {
+      clearTimeout(hint);
+      unsub();
+    };
   }, [store]);
 
   useEffect(() => {

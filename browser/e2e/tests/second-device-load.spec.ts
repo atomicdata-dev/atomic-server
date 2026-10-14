@@ -1,5 +1,11 @@
 import { test, expect } from './fixtures';
-import { before, getDevDriveSecret, FRONTEND_URL, smoke } from './test-utils';
+import {
+  before,
+  getDevDriveSecret,
+  FRONTEND_URL,
+  smoke,
+  expectPkarrLookupMiss,
+} from './test-utils';
 
 /**
  * A second device (or a fresh/cleared OPFS) must load an existing drive's
@@ -12,7 +18,8 @@ import { before, getDevDriveSecret, FRONTEND_URL, smoke } from './test-utils';
 test(
   'a fresh-OPFS second device loads an existing drive’s contents',
   smoke,
-  async ({ browser }) => {
+  async ({ browser, browserDiagnostics }) => {
+    expectPkarrLookupMiss(browserDiagnostics);
     const ctx1 = await browser.newContext();
     const p1 = await ctx1.newPage();
     await before({ page: p1 });
