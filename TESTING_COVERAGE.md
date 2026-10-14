@@ -2946,7 +2946,11 @@ and complete production incident coverage remain unproven. Validation counts and
   blobs and graph packs. No failed pass advances the cursor; retry completes.
   Key epoch validation refuses malformed records instead of assuming epoch 1.
 - `vaultAutoBackup.test.ts` tests automatic pull on changed remote state,
-  serialized retries, account isolation and partial recovery. Library
+  serialized retries, account isolation and partial recovery. Backup and restore
+  share cancellation for the signing session, managed account, document and
+  selected database. Backup regressions replace the database during key loading
+  and replace the signing session with a new agent for the same subject; neither
+  may proceed to enrollment or upload. Library
   `vault-refresh.test.ts` verifies open resource identity, retained local edits
   and cancellation of a restore read completed after identity changes.
 - Notification tests use a logical source-event identity and a per-event Loro
@@ -2955,7 +2959,12 @@ and complete production incident coverage remain unproven. Validation counts and
   The browser journey closes the receiving page, sends a message, reopens it,
   then signs in with a separate profile and marks it read across both profiles.
 - `inbox.test.ts` and `standardLocations.test.ts` cancel delayed notification
-  read/unread decisions and folder creation after an account switch. WebSocket
+  read/unread decisions and folder creation after an account switch.
+  `standardLocations.driveLocation.test.ts` verifies concurrent first use creates
+  one folder, rejected creation remains retryable, and a new identity session
+  cannot join the previous session's request. Inbox and AI folders use this shared
+  owner. This coalesces one store's callers; independent devices can still race.
+  WebSocket
   tests reject delayed blob requests after disconnect, account or database
   changes, and close an unopened connection without authenticating it.
 - `row-dialog.spec.ts` opens an inline draft before collection membership catches
@@ -3046,6 +3055,16 @@ and complete production incident coverage remain unproven. Validation counts and
 - `websockets.test.ts` sends invalid binary query snapshots to single and batch
   GET callers. Each rejects instead of waiting forever after its timeout was
   cleared, or presenting an older cached resource as a successful response.
+- `collection-completeness.test.ts` moves a drive to another server and back.
+  Completeness must remain invalidated even though the final destination string
+  matches the original. Collection reads now reuse the Store's captured route.
+- Sync ingress regressions in `sync-delta-local-base.test.ts` wait for persistence,
+  readiness or recovery completion instead of assuming work finishes in 20 ms.
+- Paired SaaS recovery tests verify migration table creation and backfill commit
+  atomically, a failed migration remains retryable, subsequent starts skip the
+  object scan, and persisted heads survive missing object rows. Status reads use
+  these heads without constructing a discarded recovery inventory; their existing
+  scan for pending/confirmed/stale counts remains.
 
 Remaining limits: notification delivery while every app stays closed still
 requires a push/background service. This change catches up when an app returns;

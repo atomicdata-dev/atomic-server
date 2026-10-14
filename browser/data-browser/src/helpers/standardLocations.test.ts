@@ -64,6 +64,7 @@ function device() {
   resources.set('did:ad:drive', resource('did:ad:drive'));
   const store = {
     getAgent: () => agent,
+    getIdentityGeneration: () => 0,
     isDestroyed: vi.fn(() => false),
     getResource: vi.fn(
       async (subject: string) =>

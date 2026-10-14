@@ -3225,8 +3225,8 @@ export class Store {
   }
 
   /**
-   * Repair a document that has fallen behind: fetch full state and replace the
-   * local doc with it.
+   * Repair a document that has fallen behind by importing the missing causal
+   * history from a local or remote snapshot.
    *
    * The live channel is deltas, and it has no way to say "you are missing
    * something". A receiver that misses one update queues every later one as
@@ -3567,9 +3567,8 @@ export class Store {
       // and every later delta parks behind it. No error, no indicator — the
       // document simply stops being live until someone reloads.
       //
-      // Ask for full state instead. `forceOverride` replaces rather than
-      // merges, which is what closes the gap; `applyIncoming`'s own guards
-      // still refuse to clobber unsaved local edits or a pending outbox.
+      // Ask for full state to supply the missing base. Ingress merges causal
+      // history and preserves unsaved local edits and pending outbox work.
       //
       // Deliberately NOT stamping `lastCommit` here. We did not apply that
       // commit, and claiming it would make the echo-dedup at the top of this

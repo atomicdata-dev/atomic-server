@@ -75,6 +75,41 @@ const locate = (store: Store) =>
   });
 
 describe('getOrCreateDriveLocation on a device with a partial local copy', () => {
+  it('shares concurrent first use in the location owner', async () => {
+    const { store, created, driveSet } = device({
+      localDrive: {},
+      serverDrive: {},
+    });
+    expect(await Promise.all([locate(store), locate(store)])).toEqual([
+      'did:ad:new-inbox',
+      'did:ad:new-inbox',
+    ]);
+    expect(created).toHaveBeenCalledOnce();
+    expect(driveSet).toHaveBeenCalledOnce();
+  });
+
+  it('retries a failed creation instead of retaining its rejected promise', async () => {
+    const { store, created } = device({ localDrive: {}, serverDrive: {} });
+    created.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(locate(store)).rejects.toThrow('storage unavailable');
+    expect(await locate(store)).toBe('did:ad:new-inbox');
+    expect(created).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not share a pending creation with a new identity session', async () => {
+    const { store, created } = device({ localDrive: {}, serverDrive: {} });
+    let generation = 0;
+    vi.spyOn(store, 'getIdentityGeneration').mockImplementation(
+      () => generation,
+    );
+    const first = locate(store);
+    const rejected = expect(first).rejects.toThrow(/session changed/i);
+    generation++;
+    expect(await locate(store)).toBe('did:ad:new-inbox');
+    await rejected;
+    expect(created).toHaveBeenCalledOnce();
+  });
+
   it('uses the pointer another device set after this one loaded the drive', async () => {
     const { store, created } = device({
       localDrive: {},

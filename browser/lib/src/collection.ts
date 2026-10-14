@@ -346,20 +346,14 @@ export class Collection {
   private readonly identityGeneration: number;
   private completePages = new Map<
     number,
-    {
-      identity: number;
-      database: ReturnType<Store['getClientDb']>;
-      server: string;
-      route: string;
-    }
+    ReturnType<Collection['readScope']>
   >();
 
   private readScope() {
     return {
-      identity: this.store.getIdentityGeneration(),
       database: this.store.getClientDb(),
       server: this.server,
-      route: this.store.captureRoute(this.routingSubject ?? this.server).key,
+      route: this.store.captureRoute(this.routingSubject ?? this.server),
     };
   }
 
@@ -367,19 +361,16 @@ export class Collection {
    * disconnected peers have no newer edits. Cached rows remain usable when
    * partial; operations claiming to cover all members must require complete. */
   public get completeness(): 'complete' | 'partial' | 'unavailable' {
-    const current = this.readScope();
     const pages = Math.max(1, Math.ceil(this.totalMembers / this.pageSize));
 
     for (let page = 0; page < pages; page++) {
       const scope = this.completePages.get(page);
 
       if (
-        !scope ||
-        this.identityGeneration !== current.identity ||
-        scope.identity !== current.identity ||
-        scope.database !== current.database ||
-        scope.server !== current.server ||
-        scope.route !== current.route
+        this.identityGeneration !== this.store.getIdentityGeneration() ||
+        !scope?.route.current() ||
+        scope.database !== this.store.getClientDb() ||
+        scope.server !== this.server
       ) {
         return this.pages.size ? 'partial' : 'unavailable';
       }
@@ -1760,10 +1751,7 @@ export class Collection {
     // is loaded and force-materialize the doc before reading its props.
     await enableLoro();
 
-    if (
-      this.readScope().route !== scope.route ||
-      this.server !== scope.server
-    ) {
+    if (!scope.route.current() || this.server !== scope.server) {
       throw new Error('Collection destination changed while loading');
     }
 

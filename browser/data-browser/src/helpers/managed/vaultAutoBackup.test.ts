@@ -328,6 +328,42 @@ describe('ensureVaultBackup', () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it('does not enroll after its selected database is replaced', async () => {
+    const store = await signedInStore();
+    const getDb = vi.spyOn(store, 'getClientDb').mockReturnValue(undefined);
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        getDb.mockReturnValue({} as never);
+
+        return keys;
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+    expect(deps.runVaultBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not enroll after the same identity is replaced with a new signing session', async () => {
+    const store = await signedInStore();
+    const pair = await Agent.generateKeyPair();
+    const provider = new JSCryptoProvider(pair.privateKey);
+    const agent = new Agent(provider, `did:ad:agent:${pair.publicKey}`);
+    store.setAgent(agent);
+    const deps = fakeDeps({
+      loadKeys: vi.fn(async () => {
+        store.setAgent(new Agent(provider, agent.subject));
+
+        return keys;
+      }),
+    });
+    expect(await ensureVaultBackup(store, DRIVE, deps)).toMatchObject({
+      status: 'skipped',
+    });
+    expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
+  });
+
   it('shares one pass between concurrent callers', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();
@@ -414,6 +450,7 @@ describe('ensureVaultBackup', () => {
     await Promise.resolve();
     expect(deps.setUpVaultForDrive).not.toHaveBeenCalled();
 
+    await vi.waitFor(() => expect(attach).toBeTypeOf('function'));
     attach();
     expect((await pass).status).toBe('backed-up');
   });

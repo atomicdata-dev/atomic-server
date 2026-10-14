@@ -40,8 +40,6 @@ export interface NotificationRecord {
   read?: boolean;
 }
 
-const inboxRequests = new WeakMap<Store, Map<string, Promise<string>>>();
-
 function notificationSession(store: Store): () => void {
   const generation = store.getIdentityGeneration();
 
@@ -56,30 +54,12 @@ export async function getOrCreateInbox(
   store: Store,
   privateDrive: string,
 ): Promise<string> {
-  let requests = inboxRequests.get(store);
-
-  if (!requests) {
-    requests = new Map();
-    inboxRequests.set(store, requests);
-  }
-
-  const requestKey = `${store.getIdentityGeneration()}:${privateDrive}`;
-  const pending = requests.get(requestKey);
-  if (pending) return pending;
-
-  const request = getOrCreateDriveLocation(
+  return getOrCreateDriveLocation(
     store,
     privateDrive,
     notifications.properties.inbox,
     { isA: notifications.classes.inbox, name: 'Inbox' },
   );
-  requests.set(requestKey, request);
-  // Only coalesce concurrent creation. A later session must re-check storage.
-  void request
-    .finally(() => requests.delete(requestKey))
-    .catch(() => undefined);
-
-  return request;
 }
 
 /** Known copies of this source in the private drive. Partial discovery is safe:
@@ -234,50 +214,42 @@ export async function markUnread(
   store: Store,
   subjects: string[],
 ): Promise<void> {
-  const checkSession = notificationSession(store);
-  const items = await Promise.all(
-    subjects.map(subject => store.getResource(subject)),
-  );
-  checkSession();
-  await writeReadReceipts(
-    store,
-    items.filter(item => !item.error),
-    false,
-  );
-
-  for (const item of items) {
-    checkSession();
-    if (item.error || isUnread(item)) continue;
-    await item.set(notifications.properties.readAt, undefined, false);
-    checkSession();
-    await item.save();
-  }
+  return setReadState(store, subjects, false);
 }
 
-/**
- * Marks the given Notifications read, skipping those that already are, and
- * those about something that happened after `upTo`.
- */
+/** Mark notifications read up to the instant the user saw the conversation. */
 export async function markRead(
   store: Store,
   subjects: string[],
   upTo = Number.POSITIVE_INFINITY,
 ): Promise<void> {
+  return setReadState(store, subjects, true, upTo);
+}
+
+async function setReadState(
+  store: Store,
+  subjects: string[],
+  read: boolean,
+  upTo = Number.POSITIVE_INFINITY,
+): Promise<void> {
   const checkSession = notificationSession(store);
   const now = Date.now();
-
   const items = (
     await Promise.all(subjects.map(subject => store.getResource(subject)))
   ).filter(item => !item.error && occurredAt(item) <= upTo);
   checkSession();
-  await writeReadReceipts(store, items, true);
+  await writeReadReceipts(store, items, read);
   await Promise.all(
-    items.map(async notification => {
+    items.map(async item => {
       checkSession();
-      if (!isUnread(notification)) return;
-      await notification.set(notifications.properties.readAt, now, false);
+      if (isUnread(item) !== read) return;
+      await item.set(
+        notifications.properties.readAt,
+        read ? now : undefined,
+        false,
+      );
       checkSession();
-      await notification.save();
+      await item.save();
     }),
   );
 }

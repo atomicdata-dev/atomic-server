@@ -98,6 +98,17 @@ describe('complete collection reads', () => {
     expect(collection.completeness).toBe('complete');
   });
 
+  it('invalidates completeness when placement changes away and back', async () => {
+    const { store, build } = setup([]);
+    store.setDriveServer(drive, 'https://example.com');
+    store.finishDriveSync(drive, 0, Date.now());
+    const collection = await build();
+    expect(collection.completeness).toBe('complete');
+    store.setDriveServer(drive, 'https://other.example.com');
+    store.setDriveServer(drive, 'https://example.com');
+    expect(collection.completeness).toBe('partial');
+  });
+
   it('invalidates completeness when the database is replaced', async () => {
     const { store, build } = setup([]);
     store.finishDriveSync(drive, 0, Date.now());
