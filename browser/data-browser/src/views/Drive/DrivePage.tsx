@@ -60,6 +60,7 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
   const vectorIndexing = useVectorIndexStatus();
 
   const defaultOntologyProp = useProperty(server.properties.defaultOntology);
+  const signalingUrlProp = useProperty(server.properties.signalingUrl);
   const canEdit = useCanWrite(resource);
   const isPrivateDrive = useIsPrivateDrive(resource.subject);
 
@@ -144,6 +145,17 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
                   property={defaultOntologyProp}
                   disabled={!canEdit}
                 />
+              </SettingsSection>
+              <SettingsSection label='Browser sync server'>
+                <Column gap='0.75rem'>
+                  <p>Server members meet through for free browser sync.</p>
+                  <InputSwitcher
+                    commit
+                    resource={resource}
+                    property={signalingUrlProp}
+                    disabled={!canEdit}
+                  />
+                </Column>
               </SettingsSection>
               <SettingsSection label='Plugins'>
                 <Column gap='1rem'>
