@@ -332,7 +332,7 @@ export function NoHostNudge(): JSX.Element {
   const hasCloud = getManagedPortalUrl() !== null;
 
   return (
-    <Row gap='0.5rem' center>
+    <Row gap='0.5rem' center wrapItems>
       <InviteOnlyNote role='note'>
         <strong>Forms need a server to receive answers.</strong>
         <br />
