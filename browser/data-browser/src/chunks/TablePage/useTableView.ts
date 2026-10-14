@@ -759,70 +759,79 @@ export function useTableView(
     [ensureView],
   );
 
-  /** Persist one View property without validating it against its Property. */
-  const setViewProp = useCallback(
-    (prop: string, value: unknown) =>
-      withView(v => v.set(prop, value as never, false)),
+  const setViewColumns = useCallback(
+    (columns: string[]) =>
+      withView(v => v.set(dataBrowser.properties.viewColumns, columns, false)),
     [withView],
   );
 
-  const setViewColumns = useCallback(
-    (columns: string[]) =>
-      setViewProp(dataBrowser.properties.viewColumns, columns),
-    [setViewProp],
-  );
-
   const renameView = useCallback(
-    (name: string) => setViewProp(core.properties.name, name),
-    [setViewProp],
+    (name: string) => withView(v => v.set(core.properties.name, name, false)),
+    [withView],
   );
 
   const setViewGroupBy = useCallback(
     (property: string) =>
-      setViewProp(dataBrowser.properties.viewGroupBy, property),
-    [setViewProp],
+      withView(v => v.set(dataBrowser.properties.viewGroupBy, property, false)),
+    [withView],
   );
 
   const setViewEndProp = useCallback(
     (property: string) =>
-      setViewProp(dataBrowser.properties.viewEndProp, property),
-    [setViewProp],
+      withView(v => v.set(dataBrowser.properties.viewEndProp, property, false)),
+    [withView],
   );
 
   const setViewTimerExclusive = useCallback(
     (exclusive: boolean) =>
-      setViewProp(dataBrowser.properties.viewTimerExclusive, exclusive),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewTimerExclusive, exclusive, false),
+      ),
+    [withView],
   );
 
   const setViewSplitLanguages = useCallback(
     (splitProperties: string[]) =>
-      setViewProp(dataBrowser.properties.viewSplitLanguages, splitProperties),
-    [setViewProp],
+      withView(v =>
+        v.set(
+          dataBrowser.properties.viewSplitLanguages,
+          splitProperties,
+          false,
+        ),
+      ),
+    [withView],
   );
 
   const setViewDerivedColumns = useCallback(
     (specs: DerivedColumnSpec[]) =>
-      setViewProp(dataBrowser.properties.viewDerivedColumns, specs),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewDerivedColumns, specs, false),
+      ),
+    [withView],
   );
 
   const setViewColumnOrder = useCallback(
     (order: string[]) =>
-      setViewProp(dataBrowser.properties.viewColumnOrder, order),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewColumnOrder, order, false),
+      ),
+    [withView],
   );
 
   const setViewAggregates = useCallback(
     (aggregates: TableAggregate[]) =>
-      setViewProp(dataBrowser.properties.viewAggregates, aggregates),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewAggregates, aggregates, false),
+      ),
+    [withView],
   );
 
   const setViewRowActions = useCallback(
     (actions: RowActionSpec[]) =>
-      setViewProp(dataBrowser.properties.viewRowActions, actions),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewRowActions, actions, false),
+      ),
+    [withView],
   );
 
   const setViewQuickAdd = useCallback(
@@ -841,14 +850,18 @@ export function useTableView(
 
   const setViewGroupByColumn = useCallback(
     (property: string) =>
-      setViewProp(dataBrowser.properties.viewGroupByColumn, property),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewGroupByColumn, property, false),
+      ),
+    [withView],
   );
 
   const setViewGroupGranularity = useCallback(
     (granularity: GroupGranularity) =>
-      setViewProp(dataBrowser.properties.viewGroupGranularity, granularity),
-    [setViewProp],
+      withView(v =>
+        v.set(dataBrowser.properties.viewGroupGranularity, granularity, false),
+      ),
+    [withView],
   );
 
   /** Each saved view's type, read as the tabs show it right now. */
