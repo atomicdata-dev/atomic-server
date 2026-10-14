@@ -86,20 +86,10 @@ it('falls back to the default title when the agent cannot be read', async () => 
     localOnly: true,
   });
 });
-it.each(['rejected', 'failed'])(
-  'does not overwrite an unavailable backup with a new default home (%s)',
-  async failure => {
-    if (failure === 'rejected')
-      vi.mocked(restoreFromVault).mockRejectedValue(new Error('offline'));
-    else
-      vi.mocked(restoreFromVault).mockResolvedValue({
-        status: 'failed',
-        error: new Error('offline'),
-      });
-    expect(await openPrivateHome(store, home)).toBeUndefined();
-    expect(ensure).not.toHaveBeenCalled();
-  },
-);
+it('does not require recovery to succeed before providing a place to work', async () => {
+  vi.mocked(restoreFromVault).mockRejectedValue(new Error('offline'));
+  expect(await openPrivateHome(store, home)).toBe('created');
+});
 it('does not create a home after the user switches identity', async () => {
   vi.mocked(restoreFromVault).mockImplementation(async () => {
     agent = { subject: 'did:ad:agent:other' };
