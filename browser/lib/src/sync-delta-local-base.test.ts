@@ -97,6 +97,56 @@ function storeWith(json: string, local: Uint8Array) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
 describe('a sync delta for a resource with no local Loro history', () => {
+  it.each(['ws-pending-get', 'ws-query-update'] as const)(
+    'replaces independent binary query snapshots from %s',
+    source => {
+      const store = new Store({ serverUrl: 'https://example.com' });
+      const subject = 'https://example.com/query?drive=atomic:home';
+      const old = new LoroLoader.Loro.LoroDoc();
+      old.setPeerId(99n);
+      const oldProps = old.getMap('properties');
+
+      // Computed queries start new documents each time. The earlier answer
+      // may have a higher Lamport clock; merging would let it defeat a later
+      // authoritative answer, leaving a saved chat log invisible on reload.
+      for (let i = 0; i < 20; i++) {
+        oldProps.set(collections.properties.totalMembers, i);
+        old.commit();
+      }
+
+      oldProps.set(collections.properties.members, []);
+      oldProps.set(collections.properties.totalMembers, 0);
+      old.commit();
+      store.applyIncoming({
+        subject,
+        source,
+        loroBytes: old.export({ mode: 'snapshot' }),
+      });
+
+      const fresh = new LoroLoader.Loro.LoroDoc();
+      fresh.setPeerId(1n);
+      fresh
+        .getMap('properties')
+        .set(collections.properties.members, ['atomic:chat-log']);
+      fresh.getMap('properties').set(collections.properties.totalMembers, 1);
+      fresh.commit();
+      store.applyIncoming({
+        subject,
+        source,
+        loroBytes: fresh.export({ mode: 'snapshot' }),
+      });
+
+      const resource = store.resources.get(subject)!;
+      assert(resource.get(collections.properties.members)).toEqual([
+        'atomic:chat-log',
+      ]);
+      assert(resource.get(collections.properties.totalMembers)).toBe(1);
+      assert([
+        ...resource.getLoroDoc()!.oplogVersion().toJSON().keys(),
+      ]).toEqual(['1']);
+    },
+  );
+
   it('replaces computed query results instead of merging their independent histories', async () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     const subject = 'https://example.com/query?drive=atomic:home';

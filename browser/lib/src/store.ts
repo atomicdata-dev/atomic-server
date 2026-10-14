@@ -3393,6 +3393,17 @@ export class Store {
     )
       return 'deduped';
 
+    // Computed query answers have no shared edit history. Classify the
+    // subject before branching on payload format so HTTP and binary GETs
+    // cannot disagree about whether an earlier answer should be replaced.
+    // Nested editable members of an HTTP response retain their own history.
+    const queryProjection =
+      change.source === 'ws-query-update' ||
+      ((change.source === 'http-fetch' || change.source === 'ws-pending-get') &&
+        /^https?:/.test(change.subject) &&
+        new URL(change.subject).pathname === '/query' &&
+        (!change.resource || change.resource.subject === change.subject));
+
     // Resource-direct path: caller is the authoritative producer.
     if (change.resource) {
       if (
@@ -3409,22 +3420,6 @@ export class Store {
 
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
-
-      // Computed query answers have no shared edit history. Merging them can
-      // combine yesterday's count with today's members. Editable documents,
-      // including nested query members, still retain their causal history.
-      let queryProjection = change.source === 'ws-query-update';
-
-      if (
-        change.source === 'http-fetch' &&
-        this.serverUrl &&
-        /^https?:/.test(change.subject)
-      ) {
-        const url = new URL(change.subject);
-        queryProjection =
-          url.pathname === '/query' &&
-          change.resource.subject === change.subject;
-      }
 
       const existing = this.resources.get(
         this.normalizeSubject(change.subject),
@@ -3507,11 +3502,12 @@ export class Store {
     // Preserve pending edits in memory and on disk. A cold local outbox can
     // contain edits that this Resource has not hydrated yet.
     // A full snapshot is not permission to discard another replica's history.
-    // Only a projection rebuilt from JSON lacks a causal base worth merging.
+    // A computed query or a projection rebuilt from JSON has no shared
+    // causal base worth merging.
     // Inspect the payload here so every transport applies the same policy.
     let snapshot = false;
 
-    if (this._withoutLoroHistory.has(subject)) {
+    if (queryProjection || this._withoutLoroHistory.has(subject)) {
       try {
         snapshot = LoroLoader.Loro.decodeImportBlobMeta(
           change.loroBytes,
@@ -3524,7 +3520,7 @@ export class Store {
 
     const replace =
       snapshot &&
-      this._withoutLoroHistory.has(subject) &&
+      (queryProjection || this._withoutLoroHistory.has(subject)) &&
       !isCommitSubject(subject) &&
       !resource.hasUnsavedChanges() &&
       !this.outbox.mayHavePending(subject);
