@@ -264,11 +264,9 @@ msgstr "Compacta automáticamente la conversación cuando los tokens de entrada 
 #: src/chunks/AI/MessageContextItem.tsx
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 #: src/chunks/RTE/EditLinkForm.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/QuickAddDialog.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/forms/ResourceSelector/ResourceSelector.tsx
@@ -489,8 +487,7 @@ msgstr "Encabezados HTTP opcionales para enviar al conectarse a este servidor MC
 
 #: src/actions/resourceActions.tsx
 #: src/chunks/AI/AgentConfigItem.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/MetaSetter.tsx
 #: src/routes/EditRoute.tsx
@@ -3130,10 +3127,8 @@ msgstr "Exportar tabla como CSV"
 msgid "Table filters"
 msgstr "Filtros de tabla"
 
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
