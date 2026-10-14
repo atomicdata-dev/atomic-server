@@ -65,6 +65,19 @@ hex = BLAKE3.derive_key("atomic property identity v1", jcs_bytes).to_hex()
 id  = "atomic:prop:" + hex
 ```
 
+## Shared vocabularies and the drive's own ontology
+
+Because the namespace is part of the hash, the same field created in two ontologies is two different Properties. A table template that created its columns in each drive's own ontology would give "Email" a different ID on every drive, and data from two drives would not line up.
+
+Table templates therefore split their schema in two:
+
+- **Generic fields live in a shared vocabulary.** A shared vocabulary is a small, versioned, immutable set of Properties with a fixed namespace, for example `https://atomicdata.dev/work/v1/` (start, end, project, person, billable), `contact/v1` (email, company), `pipeline/v1` (stage) and `money/v1` (amount). Every AtomicServer embeds these definitions, so they resolve on any drive, also offline, without fetching atomicdata.dev. The Time tracker, Expenses, Deals (CRM), Job applications and Guest list templates use them. The Issue Tracker and Project tasks templates use `task/v1` the same way.
+- **The drive keeps its own ontology.** The template's row Class (for example "Deal") and any field that is specific to the template or added later are created in the drive's default ontology. The row Class lists the shared Properties like any other Property.
+
+Constraints are not part of a Property's identity, so they stay on the row Class. A "Stage" column with the options Lead, Contacted and Won on one drive and Wishlist, Applied and Offer on another uses the same `pipeline/v1/stage` Property, and each Class holds its own options.
+
+A shared Property never changes after release. A different shortname or datatype is a new Property in a new version of the vocabulary (`v2`), mapped with a [Lens](lenses.md). Tables created before a template moved to a shared vocabulary keep their drive-local Properties; they are not migrated automatically.
+
 ## What is not hashed
 
 Labels and descriptions are not part of the identity. They stay editable. Fixing a typo in a description does not change the ID.
