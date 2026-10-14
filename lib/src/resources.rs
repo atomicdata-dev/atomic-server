@@ -717,13 +717,9 @@ impl Resource {
             .loro
             .as_ref()
             .ok_or("Versioned state not loaded — call warm_history() first")?;
-        let props = doc.get_properties_at(version)?;
-        let mut propvals = PropVals::new();
-        for (key, loro_val) in &props {
-            if let Some(atomic_val) = crate::loro::loro_value_to_atomic_value(loro_val) {
-                propvals.insert(key.clone(), atomic_val);
-            }
-        }
+        // Same materialisation as the current state (tagged values, rights
+        // dedupe, genesis metadata), applied to the doc as it was at `version`.
+        let propvals = Self::materialize_propvals_from_loro_doc(&doc.fork_at(version)?);
         Ok(Resource {
             propvals,
             subject: self.subject.clone(),
@@ -2627,6 +2623,48 @@ mod test {
 
         assert_eq!(children.len(), 1);
         assert_eq!(children[0].get_subject().to_string(), subject2);
+    }
+
+    /// A historical view must materialise values exactly like the current
+    /// state does: through the `datatypes` tags, not the untagged heuristics.
+    #[tokio::test]
+    async fn view_at_materialises_tagged_values_like_current_state() {
+        let store: crate::Db = init_store().await;
+        let mut resource = Resource::new_generate_subject(&store).unwrap();
+        let p = |n: &str| format!("https://atomicdata.dev/properties/{n}");
+        resource
+            .set_unsafe(p("desc"), Value::Markdown("# Hi".into()))
+            .unwrap();
+        resource
+            .set_unsafe(p("slug"), Value::Slug("my-slug".into()))
+            .unwrap();
+        resource
+            .set_unsafe(p("strokes"), Value::Json(serde_json::json!([{"x": 1}])))
+            .unwrap();
+        resource
+            .set_unsafe(
+                p("oneRef"),
+                Value::ResourceArray(vec!["https://example.com/x".into()]),
+            )
+            .unwrap();
+        resource
+            .set_unsafe(p("text"), Value::String("[not, a, list]".into()))
+            .unwrap();
+        resource.warm_history().unwrap();
+        let version = resource.get_current_version().unwrap();
+
+        let past = resource.view_at(&version).unwrap();
+
+        for key in ["desc", "slug", "strokes", "oneRef", "text"] {
+            let current = resource.get(&p(key)).unwrap();
+            let historical = past.get(&p(key)).unwrap();
+            assert_eq!(
+                std::mem::discriminant(current),
+                std::mem::discriminant(historical),
+                "{key}: current {current:?} vs historical {historical:?}"
+            );
+            assert_eq!(current.to_string(), historical.to_string(), "{key}");
+        }
     }
 }
 
