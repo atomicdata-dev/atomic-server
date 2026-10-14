@@ -2,7 +2,7 @@ import { beforeAll, describe, expect as assert, it, vi } from 'vitest';
 import { Store, type IncomingChange } from './store.js';
 import { LoroLoader } from './loro-loader.js';
 import { Resource } from './resource.js';
-import { commits, core, collections } from './index.js';
+import { commits, core, collections, server } from './index.js';
 
 /**
  * #1905. A local query hands back JSON-AD, not snapshots, so the resources it
@@ -97,6 +97,35 @@ function storeWith(json: string, local: Uint8Array) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
 describe('a sync delta for a resource with no local Loro history', () => {
+  it.each(['/search', '/vector_search'])(
+    'replaces the computed %s result even when its previous clock was larger',
+    path => {
+      const store = new Store({ serverUrl: 'https://example.com' });
+      const subject = `https://example.com${path}?q=chat`;
+
+      const apply = (members: string[], clock: number) => {
+        const doc = new LoroLoader.Loro.LoroDoc();
+
+        for (let i = 0; i < clock; i++) {
+          doc.getMap('properties').set(server.properties.results, [String(i)]);
+          doc.commit();
+        }
+
+        doc.getMap('properties').set(server.properties.results, members);
+        doc.commit();
+        const resource = new Resource(subject);
+        resource.importLoroUpdate(doc.export({ mode: 'snapshot' }));
+        store.applyIncoming({ subject, source: 'http-fetch', resource });
+      };
+
+      apply([], 20);
+      apply(['atomic:chat-log'], 1);
+      assert(
+        store.resources.get(subject)!.get(server.properties.results),
+      ).toEqual(['atomic:chat-log']);
+    },
+  );
+
   it.each(['ws-pending-get', 'ws-query-update'] as const)(
     'replaces independent binary query snapshots from %s',
     source => {

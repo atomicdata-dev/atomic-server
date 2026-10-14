@@ -3393,15 +3393,17 @@ export class Store {
     )
       return 'deduped';
 
-    // Computed query answers have no shared edit history. Classify the
+    // Computed query and search answers have no shared edit history. Classify the
     // subject before branching on payload format so HTTP and binary GETs
     // cannot disagree about whether an earlier answer should be replaced.
     // Nested editable members of an HTTP response retain their own history.
-    const queryProjection =
+    const computedProjection =
       change.source === 'ws-query-update' ||
       ((change.source === 'http-fetch' || change.source === 'ws-pending-get') &&
         /^https?:/.test(change.subject) &&
-        new URL(change.subject).pathname === '/query' &&
+        ['/query', '/search', '/vector_search'].includes(
+          new URL(change.subject).pathname,
+        ) &&
         (!change.resource || change.resource.subject === change.subject));
 
     // Resource-direct path: caller is the authoritative producer.
@@ -3425,9 +3427,9 @@ export class Store {
         this.normalizeSubject(change.subject),
       );
       const replaceProjection =
-        (change.source === 'http-fetch' || queryProjection) &&
+        (change.source === 'http-fetch' || computedProjection) &&
         existing !== change.resource.__internalObject &&
-        (queryProjection ||
+        (computedProjection ||
           this._withoutLoroHistory.has(
             this.normalizeSubject(change.subject),
           )) &&
@@ -3507,7 +3509,7 @@ export class Store {
     // Inspect the payload here so every transport applies the same policy.
     let snapshot = false;
 
-    if (queryProjection || this._withoutLoroHistory.has(subject)) {
+    if (computedProjection || this._withoutLoroHistory.has(subject)) {
       try {
         snapshot = LoroLoader.Loro.decodeImportBlobMeta(
           change.loroBytes,
@@ -3520,7 +3522,7 @@ export class Store {
 
     const replace =
       snapshot &&
-      (queryProjection || this._withoutLoroHistory.has(subject)) &&
+      (computedProjection || this._withoutLoroHistory.has(subject)) &&
       !isCommitSubject(subject) &&
       !resource.hasUnsavedChanges() &&
       !this.outbox.mayHavePending(subject);
