@@ -12948,37 +12948,37 @@ msgstr ""
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Currently on this drive"
-msgstr ""
+msgstr "Actualmente en este drive"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Activity will show up here"
-msgstr ""
+msgstr "La actividad aparecerá aquí"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show less"
-msgstr ""
+msgstr "Mostrar menos"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show all"
-msgstr ""
+msgstr "Mostrar todo"
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Drive settings"
-msgstr ""
+msgstr "Ajustes del drive"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "<0/> Drive settings"
-msgstr ""
+msgstr "<0/> Ajustes del drive"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet. Create something with New, or drop files on this page."
-msgstr ""
+msgstr "Aún no hay nada aquí. Crea algo con Nuevo o suelta archivos en esta página."
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet."
-msgstr ""
+msgstr "Aún no hay nada aquí."
 
 #. 0: toRelativeDateTime(new Date(at), true)
 #: src/views/Drive/DriveHome.tsx
 msgid "Edited {0}"
-msgstr ""
+msgstr "Editado {0}"
