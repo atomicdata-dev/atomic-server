@@ -129,6 +129,7 @@ msgstr "Agents IA"
 #: src/components/AvatarCropper.tsx
 #: src/components/Cloud/DriveAddress.tsx
 #: src/components/ConfirmationDialog.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
@@ -144,8 +145,6 @@ msgstr "Agents IA"
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
 #: src/routes/History/HistoryMobileView.tsx
 #: src/views/Conversation/NewMessageDialog.tsx
 #: src/views/Installation/AssignRights.tsx
@@ -2292,8 +2291,7 @@ msgstr "Autoriser toutes les écritures effectuées par ce plugin"
 msgid "Deny"
 msgstr "Refuser"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/views/PluginView/useRequestPermissionDialog.tsx
 msgid "Allow"
 msgstr "Autoriser"
@@ -12418,28 +12416,23 @@ msgstr ""
 msgid "Sign in first, then open this link again."
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read only"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read and edit"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Connecting"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can reach"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can do"
 msgstr ""
 

@@ -129,6 +129,7 @@ msgstr "AI Agents"
 #: src/components/AvatarCropper.tsx
 #: src/components/Cloud/DriveAddress.tsx
 #: src/components/ConfirmationDialog.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
@@ -144,8 +145,6 @@ msgstr "AI Agents"
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
 #: src/routes/History/HistoryMobileView.tsx
 #: src/views/Conversation/NewMessageDialog.tsx
 #: src/views/Installation/AssignRights.tsx
@@ -2292,8 +2291,7 @@ msgstr "Allow all writes done by this plugin"
 msgid "Deny"
 msgstr "Deny"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/views/PluginView/useRequestPermissionDialog.tsx
 msgid "Allow"
 msgstr "Allow"
@@ -12431,28 +12429,23 @@ msgstr "This link points at {0}, which is not the server you are signed in to, s
 msgid "Sign in first, then open this link again."
 msgstr "Sign in first, then open this link again."
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read only"
 msgstr "Read only"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read and edit"
 msgstr "Read and edit"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Connecting"
 msgstr "Connecting"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can reach"
 msgstr "What it can reach"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can do"
 msgstr "What it can do"
 
