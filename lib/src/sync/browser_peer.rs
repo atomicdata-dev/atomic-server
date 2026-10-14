@@ -167,19 +167,13 @@ impl BrowserPeerSession {
                         {
                             continue;
                         }
-                        if let Ok(blob) = resource.get(crate::urls::BLOB) {
-                            if let Some(hash) = Subject::from(blob.to_string())
-                                .blob_hash_hex()
-                                .and_then(|hex| hex::decode(hex).ok())
-                                .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
-                            {
-                                if !db.has_blob(&hash).await? {
-                                    self.pending_blobs.insert(hash);
-                                    out.frames.push(protocol::encode_blob_request(&hash));
-                                    requested += 1;
-                                    if requested >= 32 {
-                                        break;
-                                    }
+                        if let Some(hash) = resource.blob_hash() {
+                            if !db.has_blob(&hash).await? {
+                                self.pending_blobs.insert(hash);
+                                out.frames.push(protocol::encode_blob_request(&hash));
+                                requested += 1;
+                                if requested >= 32 {
+                                    break;
                                 }
                             }
                         }
@@ -288,16 +282,13 @@ impl BrowserPeerSession {
                 let mut permitted = false;
                 for subject in subjects {
                     let resource = db.get_resource(&subject.as_str().into()).await?;
-                    if let Ok(blob) = resource.get(crate::urls::BLOB) {
-                        if Subject::from(blob.to_string()).blob_hash_hex()
-                            == Some(hex::encode(hash).as_str())
-                            && crate::hierarchy::check_read(db, &resource, &self.agent)
-                                .await
-                                .is_ok()
-                        {
-                            permitted = true;
-                            break;
-                        }
+                    if resource.blob_hash() == Some(hash)
+                        && crate::hierarchy::check_read(db, &resource, &self.agent)
+                            .await
+                            .is_ok()
+                    {
+                        permitted = true;
+                        break;
                     }
                 }
                 if !permitted {

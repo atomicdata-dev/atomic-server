@@ -733,6 +733,13 @@ impl Resource {
         &self.subject
     }
 
+    /// Hash of the blob this resource points at via its `blob` property.
+    /// `None` when it has no blob or the value is not a valid blob DID.
+    pub fn blob_hash(&self) -> Option<[u8; 32]> {
+        let value = self.propvals.get(urls::BLOB)?;
+        Subject::from_raw(&value.to_string(), None).blob_hash()
+    }
+
     /// Get a value by property URL
     pub fn get(&self, property_url: &str) -> AtomicResult<&Value> {
         Ok(self.propvals.get(property_url).ok_or(format!(

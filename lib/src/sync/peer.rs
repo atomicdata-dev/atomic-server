@@ -1446,29 +1446,14 @@ fn register_live_peer(
                                         store.get_base_domain().as_deref(),
                                     );
                                     if let Ok(resource) = store.get_resource(&subject).await {
-                                        if let Ok(value) = resource.get(crate::urls::BLOB) {
-                                            let blob =
-                                                crate::Subject::from_raw(&value.to_string(), None);
-                                            if let Some(hash_hex) = blob.blob_hash_hex() {
-                                                if let Ok(bytes) = hex::decode(hash_hex) {
-                                                    if let Ok(hash) = <[u8; 32]>::try_from(bytes) {
-                                                        if !store
-                                                            .has_blob(&hash)
-                                                            .await
-                                                            .unwrap_or(false)
-                                                        {
-                                                            store.note_pending_blob_request(
-                                                                hash,
-                                                                admitted_drive,
-                                                            );
-                                                            let frame = super::protocol::encode_blob_request(&hash);
-                                                            let _ = tx_for_read
-                                                                .send(frame_with_len(&frame))
-                                                                .await;
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                        if let Some(frame) = super::engine::missing_blob_request(
+                                            &store,
+                                            &resource,
+                                            admitted_drive,
+                                        )
+                                        .await
+                                        {
+                                            let _ = tx_for_read.send(frame_with_len(&frame)).await;
                                         }
                                     }
                                 }
