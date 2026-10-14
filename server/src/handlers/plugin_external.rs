@@ -29,7 +29,7 @@ pub async fn apply(
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
     let account =
-        super::plugin_schedule::authorize(&appstate, &req, &context, &body.plugin).await?;
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
     let release = appstate.store.get_plugin_release(&body.release)?;
     let manifest = Manifest::parse(release.manifest)?.ok_or_else(|| {
         AtomicServerError::bad_request("Remote writes require a versioned release")
@@ -84,7 +84,7 @@ async fn authorize_operation(
     operation: &Operation,
 ) -> AtomicServerResult<String> {
     let account =
-        super::plugin_schedule::authorize(appstate, req, context, &operation.plugin).await?;
+        crate::helpers::authorize_plugin_write(appstate, req, context, &operation.plugin).await?;
     let host = StoreHost {
         db: std::sync::Arc::new(appstate.store.clone()),
         plugin: operation.plugin.clone(),
@@ -156,7 +156,7 @@ pub async fn read(
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
     let account =
-        super::plugin_schedule::authorize(&appstate, &req, &context, &body.plugin).await?;
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
     let release = appstate.store.get_plugin_release(&body.release)?;
     let manifest = Manifest::parse(release.manifest)?
         .ok_or_else(|| AtomicServerError::bad_request("Versioned release required"))?;

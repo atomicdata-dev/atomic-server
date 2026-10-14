@@ -34,7 +34,7 @@ async fn host(
     drive: &str,
     plugin: &str,
 ) -> AtomicServerResult<StoreHost> {
-    let actor = super::plugin_schedule::authorize(app, req, context, plugin).await?;
+    let actor = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
     let host = StoreHost {
         db: std::sync::Arc::new(app.store.clone()),
         drive: drive.into(),

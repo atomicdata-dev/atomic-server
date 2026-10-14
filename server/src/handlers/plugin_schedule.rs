@@ -34,11 +34,6 @@ pub struct ScheduleQuery {
     pub plugin: String,
 }
 
-/// Scheduling a plugin means it will spend that plugin's secrets unattended, so
-/// it takes the same rights as changing it. Other plugin handlers reach this
-/// check by its old name.
-pub(crate) use crate::helpers::authorize_plugin_write as authorize;
-
 #[tracing::instrument(skip(appstate, body, req))]
 pub async fn handle_set_schedule(
     appstate: web::Data<AppState>,

@@ -19,7 +19,8 @@ async fn authorize(
     context: &RequestContext,
     target: &Target,
 ) -> AtomicServerResult<()> {
-    let account = super::plugin_schedule::authorize(appstate, req, context, &target.plugin).await?;
+    let account =
+        crate::helpers::authorize_plugin_write(appstate, req, context, &target.plugin).await?;
     let host = StoreHost {
         db: std::sync::Arc::new(appstate.store.clone()),
         plugin: target.plugin.clone(),

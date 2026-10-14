@@ -31,7 +31,7 @@ async fn host(
     plugin: &str,
     release: Option<&str>,
 ) -> AtomicServerResult<StoreHost> {
-    let account = super::plugin_schedule::authorize(app, req, context, plugin).await?;
+    let account = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
     let manifest = match release {
         Some(id) => Manifest::parse(app.store.get_plugin_release(id)?.manifest)?,
         None => None,
