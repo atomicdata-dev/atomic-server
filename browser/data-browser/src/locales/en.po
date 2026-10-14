@@ -4227,10 +4227,6 @@ msgstr "Skip anyway"
 msgid "Open original"
 msgstr "Open original"
 
-#: src/helpers/draftsFolder.ts
-msgid "Drafts"
-msgstr "Drafts"
-
 #: src/helpers/forksFolder.ts
 msgid "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
 msgstr "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
@@ -4314,10 +4310,6 @@ msgstr "{0} forks propose changes to this:"
 #: src/helpers/forksFolder.ts
 msgid "Forks"
 msgstr "Forks"
-
-#: src/helpers/draftsFolder.ts
-msgid "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
-msgstr "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
 
 #: src/routes/AppSettings.tsx
 msgid "Virtual drive"

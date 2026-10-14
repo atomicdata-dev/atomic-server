@@ -4221,10 +4221,6 @@ msgstr ""
 msgid "Open original"
 msgstr ""
 
-#: src/helpers/draftsFolder.ts
-msgid "Drafts"
-msgstr ""
-
 #: src/helpers/forksFolder.ts
 msgid "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
 msgstr ""
@@ -4307,10 +4303,6 @@ msgstr ""
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
-msgstr ""
-
-#: src/helpers/draftsFolder.ts
-msgid "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
 msgstr ""
 
 #: src/routes/AppSettings.tsx
