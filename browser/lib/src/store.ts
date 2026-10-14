@@ -4476,7 +4476,13 @@ export class Store {
               // The socket is down, the server may not be: ask once over
               // plain HTTP before giving up. A hard failure of that request
               // is the only thing that may be reported as "unreachable".
-              const reason = await this.fetchOverHttpOnce(subject, opts);
+              // Not when the origin is known to run no node: it would answer
+              // with its index.html, logged as an unparseable resource.
+              const reason =
+                isAtomicIdentifier(subject) &&
+                this.serverUrlWithoutSocket === this.serverUrl
+                  ? 'skipped'
+                  : await this.fetchOverHttpOnce(subject, opts);
 
               if (reason !== 'answered') {
                 this.failResource(

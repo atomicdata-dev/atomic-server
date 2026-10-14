@@ -78,4 +78,18 @@ describe('a resource with no local copy and no websocket', () => {
     expect(isNotAvailableLocally(resource.error)).toBe(false);
     expect(resource.error?.message).not.toBe(NOT_AVAILABLE_LOCALLY_MESSAGE);
   });
+
+  it('does not ask an origin that is known to run no node', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response('<!doctype html>', { status: 200 }),
+    ) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const store = offlineStore();
+    store.setServerUrl('https://example.com', { connect: false });
+
+    const resource = await store.getResource(SUBJECT);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(resource.error?.message).toBe(NOT_AVAILABLE_LOCALLY_MESSAGE);
+  });
 });
