@@ -1,5 +1,12 @@
-import { RequestCancelledError } from './error.js';
-import { describe, it, beforeEach, vi, expect as assert } from 'vitest';
+import { AtomicError, ErrorType, RequestCancelledError } from './error.js';
+import {
+  describe,
+  it,
+  beforeEach,
+  afterEach,
+  vi,
+  expect as assert,
+} from 'vitest';
 import {
   LocalOutbox,
   isTerminalCommitErrorMessage,
@@ -9,6 +16,7 @@ import {
   isBenignTerminalCommitError,
   isCommitSubject,
   drainBackoffMs,
+  PACE_QUIET_MS,
   groupTiers,
   runBounded,
   BLOCK_AFTER_FAILURES,
@@ -1293,5 +1301,256 @@ describe('classification is code-first, message text is only a fallback', () => 
   }) => {
     expect(isBenignTerminalCommitError(LEGACY_GENESIS, 0x4322)).toBe(true);
     expect(isBenignTerminalCommitError(UNRELATED, 0x4322)).toBe(false);
+  });
+});
+
+describe('LocalOutbox pacing (server write-load signal)', () => {
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const ctxFor = (drainSubject: (s: string) => Promise<void>) => ({
+    sort: (e: readonly OutboxEntry[]) => [...e],
+    drainSubject,
+  });
+
+  /** A drainSubject that sends: counts the commit and clears the entry like
+   *  the store does after an ack. */
+  const sender = (outbox: LocalOutbox) =>
+    vi.fn(async (subject: string) => {
+      outbox.noteCommitted(subject);
+      outbox.clearDirty(subject);
+    });
+
+  it('sends the first edit at once, then holds later ones for the pace', async ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+    outbox.setServerPace(5000);
+
+    outbox.markDirty(SUBJECT);
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(1);
+
+    // More edits: nothing goes out before the interval has passed, and the
+    // entry stays queued (never dropped).
+    outbox.markDirty(SUBJECT);
+    vi.advanceTimersByTime(4000);
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(outbox.hasPending(SUBJECT)).toBe(true);
+    expect(outbox.nextDueAt()).toBe(1_000_000 + 5000);
+
+    vi.advanceTimersByTime(1001);
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(outbox.hasPending(SUBJECT)).toBe(false);
+  });
+
+  it('paces each subject on its own', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+    outbox.setServerPace(5000);
+
+    outbox.markDirty('did:ad:a');
+    await outbox.drain(ctxFor(send));
+    outbox.markDirty('did:ad:a');
+    outbox.markDirty('did:ad:b');
+    await outbox.drain(ctxFor(send));
+
+    expect(send.mock.calls.map(c => c[0])).toEqual(['did:ad:a', 'did:ad:b']);
+  });
+
+  it('does not delay edits when the server reports no load', async ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+
+    for (let i = 0; i < 3; i++) {
+      outbox.markDirty(SUBJECT);
+      await outbox.drain(ctxFor(send));
+    }
+
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(outbox.paceMs()).toBe(0);
+  });
+
+  it('does not stretch creations or deletions', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    const send = sender(outbox);
+    outbox.setServerPace(5000);
+    outbox.noteCommitted(SUBJECT);
+
+    outbox.setGenesisCommit(SUBJECT, fakeCommit(SUBJECT, 'sig-genesis'));
+    await outbox.drain(ctxFor(send));
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('a higher hint applies at once; a lower one relaxes by half per report', ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    outbox.setServerPace(2000);
+    expect(outbox.paceMs()).toBe(2000);
+    outbox.setServerPace(8000);
+    expect(outbox.paceMs()).toBe(8000);
+    outbox.setServerPace(0);
+    expect(outbox.paceMs()).toBe(4000);
+    outbox.setServerPace(0);
+    expect(outbox.paceMs()).toBe(2000);
+    outbox.setServerPace(3000);
+    expect(outbox.paceMs()).toBe(3000);
+    // A reported value above half the current one is taken as is.
+    outbox.setServerPace(2500);
+    expect(outbox.paceMs()).toBe(2500);
+    outbox.setServerPace(-1);
+    outbox.setServerPace(Number.NaN);
+    expect(outbox.paceMs()).toBe(2500);
+  });
+
+  it('forgets the hint after a quiet period', ({ expect }) => {
+    const outbox = new LocalOutbox();
+    outbox.setServerPace(9000);
+    vi.advanceTimersByTime(PACE_QUIET_MS - 1);
+    expect(outbox.paceMs()).toBe(9000);
+    vi.advanceTimersByTime(2);
+    expect(outbox.paceMs()).toBe(0);
+  });
+
+  it('bounds the memory of last commits', ({ expect }) => {
+    const outbox = new LocalOutbox();
+    outbox.noteCommitted('did:ad:old');
+    vi.advanceTimersByTime(PACE_QUIET_MS + 1);
+    outbox.noteCommitted('did:ad:new');
+    outbox.setServerPace(5000);
+    outbox.markDirty('did:ad:old');
+    outbox.markDirty('did:ad:new');
+    expect(outbox.getEntry('did:ad:old')).toBeDefined();
+    // The old subject's interval is long over; the new one's is running.
+    expect(outbox.nextDueAt()).toBe(0);
+  });
+});
+
+describe('LocalOutbox BUSY handling', () => {
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function busyError(ms: number) {
+    const e = new AtomicError(
+      `Server busy; retry_after_ms=${ms}`,
+      ErrorType.Server,
+      ErrorCode.BUSY,
+    );
+    e.retryAfterMs = ms;
+
+    return e;
+  }
+
+  it('waits the told delay without counting a failure', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    outbox.markDirty(SUBJECT);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onRepeatedFailure = vi.fn();
+    const onBlocked = vi.fn();
+    const drainSubject = vi.fn(async () => {
+      throw busyError(2000);
+    });
+
+    // Far past REPORT_AFTER_FAILURES / BLOCK_AFTER_FAILURES attempts.
+    for (let i = 0; i < BLOCK_AFTER_FAILURES + 3; i++) {
+      await outbox.drain({
+        sort: e => [...e],
+        drainSubject,
+        onRepeatedFailure,
+        onBlocked,
+        isBlockingError: () => true,
+      });
+      vi.advanceTimersByTime(3000);
+    }
+
+    const entry = outbox.getEntry(SUBJECT) as OutboxEntry;
+    expect(entry).toBeDefined();
+    expect(entry.failures ?? 0).toBe(0);
+    expect(entry.blocked).toBeFalsy();
+    expect(entry.lastAttemptFailure).toBeUndefined();
+    expect(onRepeatedFailure).not.toHaveBeenCalled();
+    expect(onBlocked).not.toHaveBeenCalled();
+    expect(drainSubject).toHaveBeenCalledTimes(BLOCK_AFTER_FAILURES + 3);
+    warn.mockRestore();
+  });
+
+  it('does not retry before the delay, adds jitter, then retries once', async ({
+    expect,
+  }) => {
+    const outbox = new LocalOutbox();
+    outbox.markDirty(SUBJECT);
+    vi.spyOn(Math, 'random').mockReturnValue(1);
+    let refuse = true;
+    const drainSubject = vi.fn(async (subject: string) => {
+      if (refuse) throw busyError(2000);
+      outbox.clearDirty(subject);
+    });
+    const ctx = { sort: (e: readonly OutboxEntry[]) => [...e], drainSubject };
+
+    await outbox.drain(ctx);
+    expect(drainSubject).toHaveBeenCalledTimes(1);
+    // 2000 plus jitter of up to a quarter of it.
+    expect(outbox.nextDueAt()).toBe(1_000_000 + 2000 + 500);
+
+    // New edits in the meantime accumulate; no attempt is made early.
+    outbox.markDirty(SUBJECT);
+    vi.advanceTimersByTime(2400);
+    await outbox.drain(ctx);
+    expect(drainSubject).toHaveBeenCalledTimes(1);
+
+    refuse = false;
+    vi.advanceTimersByTime(200);
+    await outbox.drain(ctx);
+    expect(drainSubject).toHaveBeenCalledTimes(2);
+    expect(outbox.hasPending(SUBJECT)).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('slows other subjects down to the told delay', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    outbox.markDirty(SUBJECT);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await outbox.drain({
+      sort: e => [...e],
+      drainSubject: async () => {
+        throw busyError(4000);
+      },
+    });
+    expect(outbox.paceMs()).toBe(4000);
+    vi.restoreAllMocks();
+  });
+
+  it('treats a plain failure as a failure still', async ({ expect }) => {
+    const outbox = new LocalOutbox();
+    outbox.markDirty(SUBJECT);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await outbox.drain({
+      sort: e => [...e],
+      drainSubject: async () => {
+        throw new Error('boom');
+      },
+    });
+    expect(outbox.getEntry(SUBJECT)?.failures).toBe(1);
+    vi.restoreAllMocks();
   });
 });

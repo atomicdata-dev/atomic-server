@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Sync: the outbox honours the server's write-load signal. A resource is sent at most once per `max(debounce, pace_ms)` (from `COMMIT_OK`, or `X-Atomic-Pace-Ms` over HTTP), so edits made meanwhile ride in one merged commit. A `BUSY` refusal (and HTTP 429 or 503 with `Retry-After`) makes the entry wait the told delay: it counts as no failure, is never retried over HTTP, and no edit is dropped. `ErrorCode.BUSY (12)`, `retryAfterMsFromMessage`, `LocalOutbox.setServerPace`.
+
 ## [v0.41.0-beta.8] - 2026-10-10
 
 - Phones: the chat view no longer scrolls sideways by a few pixels, the "more" menu no longer opens the on-screen keyboard, and the Back button closes an open dropdown menu.

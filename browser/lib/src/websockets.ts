@@ -52,6 +52,7 @@ import {
   decodeAuthOk,
   decodeChallenge,
   decodeCommit,
+  busyRetryAfterMs,
   decodeCommitOk,
   decodeSyncResend,
   decodeUpdate,
@@ -1292,6 +1293,9 @@ export class WSClient {
         // immediately on the error frame that already arrived.
         if (msg.requestId !== 0) {
           const err = new AtomicError(msg.message, ErrorType.Server, msg.code);
+          // A refusal that only says "come back later". Carried on the error
+          // so the outbox can wait instead of counting a failure.
+          err.retryAfterMs = busyRetryAfterMs(msg.message, msg.code);
           const pendingGet = this.takePending(msg.requestId);
 
           if (pendingGet) {
@@ -1345,6 +1349,10 @@ export class WSClient {
             new AtomicError('Malformed COMMIT_OK frame', ErrorType.Server),
           );
           break;
+        }
+
+        if (msg.paceMs !== undefined) {
+          this.store.reportServerPace(msg.paceMs);
         }
 
         const pending = this.takePendingCommit(msg.requestId);
