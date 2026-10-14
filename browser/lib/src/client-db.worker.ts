@@ -540,11 +540,13 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
       // does not apply. Flush now; we are already inside the work queue, so
       // this cannot race an in-flight mutation.
 
-      // Keep the retry armed if storage fails, but never acknowledge a
-      // restore that an immediate reload could lose.
-      dirty = true;
-      db!.flush();
-      dirty = false;
+      try {
+        db!.flush();
+      } catch (e) {
+        // Fall back to the tick rather than failing a restore that did land.
+        dirty = true;
+        console.error('[ClientDb] flush after vault import failed:', e);
+      }
 
       return summary;
     }
