@@ -64,6 +64,9 @@ pub enum WsMessage {
         request_id: u16,
         commit_id: String,
         commit_json: Option<String>,
+        /// The node's write-load hint (`commit-pace`): the least number of
+        /// milliseconds to leave between commits of one resource.
+        pace_ms: Option<u32>,
     },
     /// The server's `CHALLENGE` (0x42): the nonce this connection's AUTH
     /// proof binds itself to. Recorded by the client; `authenticate` uses it
@@ -648,6 +651,7 @@ fn parse_binary_message(bin: &[u8]) -> Option<WsMessage> {
                 request_id: decoded.request_id,
                 commit_id: decoded.commit_id,
                 commit_json: decoded.commit_json,
+                pace_ms: decoded.pace_ms,
             })
         }
         tag::CHALLENGE => Some(WsMessage::Challenge {

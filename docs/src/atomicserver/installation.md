@@ -487,6 +487,18 @@ Options:
           [env: ATOMIC_ANONYMOUS_WRITE_RATE_LIMIT=]
           [default: 60]
 
+      --commit-soft-limit <COMMIT_SOFT_LIMIT>
+          How many commits may be in flight (being applied or queued for the single redb writer) before the node starts telling clients to commit less often. Up to this many the `pace_ms` hint is 0. Clients that advertise `commit-pace` (WebSocket) or read `X-Atomic-Pace-Ms` (HTTP) then stretch their commit interval, so each commit carries more edits. The hint rises linearly to 10 s at `--commit-hard-limit`. See `docs/src/websockets.md`
+
+          [env: ATOMIC_COMMIT_SOFT_LIMIT=]
+          [default: 32]
+
+      --commit-hard-limit <COMMIT_HARD_LIMIT>
+          How many commits may be in flight before new ones are refused up front with `BUSY` (WebSocket error code 12) or `503` with `Retry-After` (HTTP). Nothing is lost: the client keeps the edit and retries after the jittered delay. `0` disables both the pace hint and the refusal
+
+          [env: ATOMIC_COMMIT_HARD_LIMIT=]
+          [default: 256]
+
       --domain <DOMAIN>
           The origin domain where the app is hosted, without the port and schema values
 
