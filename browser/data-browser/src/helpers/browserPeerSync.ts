@@ -120,11 +120,13 @@ export const PEER_SIGNALING_SETTING = 'peer-signaling-url';
 export const NO_PEER_SIGNALING =
   'Peer-to-peer sharing needs a signalling service, and none is configured. Nothing is contacted until one is.';
 
-function chosenSignalingUrl(): URL | null {
+/** The part of a Drive resource that names its signalling service. */
+type DriveSignalingSource = { get(property: string): unknown };
+
+/** Only a secure address, or a loopback one for local development. */
+function acceptableSignalingUrl(value: string): URL | null {
   try {
-    const chosen = localStorage.getItem(PEER_SIGNALING_SETTING);
-    if (!chosen) return null;
-    const url = new URL(chosen);
+    const url = new URL(value);
     const secure = url.protocol === 'wss:' || url.protocol === 'https:';
     const loopback =
       (url.protocol === 'ws:' || url.protocol === 'http:') &&
@@ -134,6 +136,45 @@ function chosenSignalingUrl(): URL | null {
   } catch {
     return null;
   }
+}
+
+function websocketUrl(endpoint: URL): string {
+  if (endpoint.protocol === 'https:') endpoint.protocol = 'wss:';
+  if (endpoint.protocol === 'http:') endpoint.protocol = 'ws:';
+
+  return endpoint.toString();
+}
+
+function chosenSignalingUrl(): URL | null {
+  try {
+    const chosen = localStorage.getItem(PEER_SIGNALING_SETTING);
+
+    return chosen ? acceptableSignalingUrl(chosen) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signalling service a drive names for its members (its `signalingUrl`
+ * property), validated like a person's own choice, or null when it has none or
+ * the value is not acceptable. Nothing is dialled for a rejected value.
+ */
+export function driveSignalingUrl(
+  drive: DriveSignalingSource | undefined,
+): string | null {
+  const named = drive?.get(server.properties.signalingUrl);
+  if (typeof named !== 'string' || !named.trim()) return null;
+  const endpoint = acceptableSignalingUrl(named.trim());
+
+  return endpoint ? websocketUrl(endpoint) : null;
+}
+
+/** A drive's own signalling service first, then the global resolution. */
+export function peerSignalingUrlForDrive(
+  drive: DriveSignalingSource | undefined,
+): string | null {
+  return driveSignalingUrl(drive) ?? configuredPeerSignalingUrl();
 }
 
 /**
@@ -164,16 +205,12 @@ export function configuredPeerSignalingUrl(): string | null {
     return null;
   }
 
-  if (!endpoint) return null;
-  if (endpoint.protocol === 'https:') endpoint.protocol = 'wss:';
-  if (endpoint.protocol === 'http:') endpoint.protocol = 'ws:';
-
-  return endpoint.toString();
+  return endpoint ? websocketUrl(endpoint) : null;
 }
 
 /** For actions the person started: refuse instead of quietly dialling nobody. */
-export function requirePeerSignalingUrl(): string {
-  const url = configuredPeerSignalingUrl();
+export function requirePeerSignalingUrl(drive?: DriveSignalingSource): string {
+  const url = peerSignalingUrlForDrive(drive);
   if (!url) throw new Error(NO_PEER_SIGNALING);
 
   return url;
@@ -188,7 +225,7 @@ export function createPeerLink(
   ) ?? {
     drive,
     room: randomPeerToken(),
-    signalingUrl: requirePeerSignalingUrl(),
+    signalingUrl: requirePeerSignalingUrl(store.resources?.get(drive)),
   };
   const invite = { ...link, expectedPeer: store.getAgent()?.subject };
   const url = new URL('/app/sync', window.location.origin);
@@ -265,10 +302,9 @@ export async function driveUsesCloudServer(
 export async function discoverPeerDrives(store: Store): Promise<void> {
   const agent = store.getAgent();
   const db = store.getClientDb();
-  // Automatic discovery is background traffic nobody asked for: with no
-  // configured service it must not reach anywhere at all.
-  const signalingUrl = configuredPeerSignalingUrl();
-  if (!signalingUrl || !agent || !db || discovering.has(store)) return;
+  // Automatic discovery is background traffic nobody asked for: a drive with
+  // neither its own service nor a configured one must not reach anywhere.
+  if (!agent || !db || discovering.has(store)) return;
   discovering.add(store);
   let links = active.get(store);
 
@@ -309,6 +345,9 @@ export async function discoverPeerDrives(store: Store): Promise<void> {
         savedPeerLinks(store).some(link => link.drive === drive)
       )
         continue;
+
+      const signalingUrl = peerSignalingUrlForDrive(resource);
+      if (!signalingUrl) continue;
 
       try {
         // Never bootstrap trust from a discovered stranger's snapshot.

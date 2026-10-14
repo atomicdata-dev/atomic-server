@@ -1094,7 +1094,8 @@
       "https://atomicdata.dev/properties/subresources",
       "https://atomicdata.dev/properties/write",
       "https://atomicdata.dev/properties/name",
-      "https://atomicdata.dev/properties/llm-txt"
+      "https://atomicdata.dev/properties/llm-txt",
+      "https://atomicdata.dev/properties/signaling-url"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/shortname": "drive"
@@ -1597,6 +1598,16 @@
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
     "https://atomicdata.dev/properties/shortname": "llm-txt"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/signaling-url",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The WebRTC signalling server the members of a drive meet through for free browser sync. Must be a wss:// or https:// address (ws:// and http:// only on localhost). When empty, the app falls back to its own configured service.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "signaling-url"
   },
   {
     "@id": "https://atomicdata.dev/classes/PlainText",

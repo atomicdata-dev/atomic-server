@@ -55,6 +55,7 @@ function DriveSettingsBody({
   drive: Resource<Server.Drive>;
 }): JSX.Element {
   const defaultOntologyProp = useProperty(server.properties.defaultOntology);
+  const signalingUrlProp = useProperty(server.properties.signalingUrl);
   const canEdit = useCanWrite(drive);
 
   return (
@@ -81,6 +82,17 @@ function DriveSettingsBody({
           property={defaultOntologyProp}
           disabled={!canEdit}
         />
+      </SettingsSection>
+      <SettingsSection label='Browser sync server' initialState>
+        <Column gap='0.75rem'>
+          <p>Server members meet through for free browser sync.</p>
+          <InputSwitcher
+            commit
+            resource={drive}
+            property={signalingUrlProp}
+            disabled={!canEdit}
+          />
+        </Column>
       </SettingsSection>
       <SettingsSection label='Plugins' initialState>
         <Column gap='1rem'>

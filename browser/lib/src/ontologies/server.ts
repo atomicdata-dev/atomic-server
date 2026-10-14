@@ -62,6 +62,7 @@ export const server = {
     pluginPermissions: 'https://atomicdata.dev/properties/pluginPermissions',
     searchChunks: 'https://atomicdata.dev/properties/search/chunks',
     llmTxt: 'https://atomicdata.dev/properties/llm-txt',
+    signalingUrl: 'https://atomicdata.dev/properties/signaling-url',
     runtime: 'https://atomicdata.dev/properties/runtime',
     world: 'https://atomicdata.dev/properties/world',
     manifest: 'https://atomicdata.dev/properties/manifest',
@@ -89,6 +90,7 @@ export const server = {
       'https://atomicdata.dev/ontology/server/property/default-ontology',
       'https://atomicdata.dev/properties/plugins',
       'https://atomicdata.dev/properties/llm-txt',
+      'https://atomicdata.dev/properties/signaling-url',
     ],
     ['https://atomicdata.dev/classes/Endpoint']: [
       'https://atomicdata.dev/properties/description',
@@ -205,7 +207,8 @@ declare module '../index.js' {
         | 'https://atomicdata.dev/properties/write'
         | typeof server.properties.defaultOntology
         | typeof server.properties.plugins
-        | typeof server.properties.llmTxt;
+        | typeof server.properties.llmTxt
+        | typeof server.properties.signalingUrl;
     };
     [server.classes.endpoint]: {
       requires:
@@ -354,6 +357,7 @@ declare module '../index.js' {
     [server.properties.pluginPermissions]: JSONValue;
     [server.properties.searchChunks]: JSONValue;
     [server.properties.llmTxt]: string;
+    [server.properties.signalingUrl]: string;
     [server.properties.runtime]: string;
     [server.properties.world]: string;
     [server.properties.manifest]: JSONValue;
@@ -411,6 +415,7 @@ declare module '../index.js' {
     [server.properties.pluginPermissions]: 'pluginPermissions';
     [server.properties.searchChunks]: 'searchChunks';
     [server.properties.llmTxt]: 'llmTxt';
+    [server.properties.signalingUrl]: 'signalingUrl';
     [server.properties.runtime]: 'runtime';
     [server.properties.world]: 'world';
     [server.properties.manifest]: 'manifest';

@@ -7,12 +7,37 @@ import {
   stopPeerLinks,
 } from '../helpers/browserPeerSync';
 
+/** A tab hidden this long leaves the room, so it stops taking up a slot. */
+const IDLE_LEAVE_MS = 2 * 60 * 1000;
+
 /** Keep enabled peer links alive across route changes, scoped to this identity. */
 export function BrowserPeerWatcher() {
   const store = useStore();
   const { agent } = useSettings();
   useEffect(() => {
+    let hiddenSince: number | null = null;
+
+    const idle = () => {
+      if (!document.hidden) {
+        hiddenSince = null;
+
+        return false;
+      }
+
+      hiddenSince ??= Date.now();
+
+      return Date.now() - hiddenSince >= IDLE_LEAVE_MS;
+    };
+
     const resume = () => {
+      // A background tab nobody is looking at would otherwise hold one of the
+      // few places in the room. It rejoins as soon as it is visible again.
+      if (idle()) {
+        stopPeerLinks(store);
+
+        return;
+      }
+
       resumePeerLinks(store);
       void discoverPeerDrives(store);
     };
