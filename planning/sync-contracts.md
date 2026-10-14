@@ -68,6 +68,28 @@ restore cannot appear successful when a translation is missing.
 
 ## Validation and remaining work
 
+### Critic and CI follow-up (2026-10-14)
+
+- [x] Reject an empty Vault export inventory when the recovery manifest records history.
+- [x] Confirm computed-query replacement. Close placement-check gaps for unknown
+  unsolicited updates, nested HTTP resources and batched WebSocket reads.
+- [x] Reproduce the app duplicate-row race and plugin uninstall/navigation failure.
+- [x] Measure pack/envelope duplication and retained checkpoint costs; encode byte
+  payloads as binary while retaining compatibility with existing readers.
+- [ ] Attribute the production account's exact 91 MB to its private inventory.
+  The 411 KB server map already includes Loro history. A controlled 40-resource,
+  128-edit run retained 126 packs and 3 checkpoints: about 1.22 MB versus 113 KB
+  of server snapshots, with 905 KB of signed envelopes across those objects.
+  The byte encoding fix reduces a 64 KiB uniform byte fixture from 98,384 to
+  65,616 bytes, but saves only about 1% in that workload. It does not explain or
+  resolve the full production ratio. The default 30-day retention preserves
+  superseded copies, and restore still downloads the full object inventory.
+  Investigate authenticated checkpoint selection and duplicate envelope storage
+  before changing retention or deleting history. Probe source/logs are under
+  `/tmp/sync-durability-20261014/production-restore/storage-probe*`.
+- [x] Complete local review checks and prepare the follow-up for #2249.
+  Base integration and merging remain with TrekMeester; current paired CI is pending.
+
 ### Production restore follow-up (2026-10-14)
 
 The public app bundle reports `e7ccc6e`; #2249/#220 are still unmerged. The
@@ -100,5 +122,8 @@ Current results belong in the PR descriptions and coverage map, not a running lo
 - [ ] Large-Vault memory budgets and replayable network/process failure schedules.
 - [ ] Browser compaction/pruning races and cross-device invitation revocation.
 - [ ] Multi-process control-plane leadership and rollback of all recovery witnesses.
-- [ ] Explain the intermittent WebSocket HTTP 408 seen in an earlier run; the
-  final full run and 20 focused probes passed, but the cause is still unproven.
+- [ ] Explain the intermittent WebSocket HTTP 408. It recurred in the latest
+  full run: 357 passed, 11 skipped, one notification test failed its strict
+  console check after all delivery/read-state assertions passed. Both notification
+  journeys then passed three repetitions each, including console checks. The
+  cause remains unproven; do not classify the full run as green.

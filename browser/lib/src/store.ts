@@ -1482,24 +1482,23 @@ export class Store {
   public acceptsServerResource(
     subject: string,
     origin: string,
-    bytes?: Uint8Array,
+    incoming?: Uint8Array | Resource,
+    requestedSubject?: string,
   ): boolean {
-    let drive = this.driveOf(subject);
-    let expected = this.driveServers.get(drive);
+    const expected = this.driveServers.get(this.driveOf(subject));
+    if (expected && expected !== origin) return false;
+    let declared: unknown;
 
-    if (!expected && bytes && LoroLoader.isLoaded()) {
+    if (incoming instanceof Resource) {
+      declared = incoming.get('https://atomicdata.dev/properties/drive');
+    } else if (incoming && LoroLoader.isLoaded()) {
       const doc = new LoroLoader.Loro.LoroDoc();
 
       try {
-        doc.import(bytes);
-        const declared = doc
+        doc.import(incoming);
+        declared = doc
           .getMap('properties')
           .get('https://atomicdata.dev/properties/drive');
-
-        if (typeof declared === 'string') {
-          drive = this.normalizeSubject(declared);
-          expected = this.driveServers.get(drive);
-        }
       } catch {
         /* A delta may need the cached document; normal ingress handles it. */
       } finally {
@@ -1507,7 +1506,20 @@ export class Store {
       }
     }
 
-    return !expected || expected === origin;
+    const declaredOrigin =
+      typeof declared === 'string'
+        ? this.driveServers.get(this.normalizeSubject(declared))
+        : undefined;
+    if (declaredOrigin && declaredOrigin !== origin) return false;
+
+    // Unknown subjects use the chosen bootstrap route. Only a requested read
+    // can establish a new alias (such as a vanity URL returning its drive).
+    // An unrelated open socket cannot appoint itself as that drive's host.
+    return (
+      (expected ??
+        declaredOrigin ??
+        this.routeForSubject(requestedSubject ?? subject).server) === origin
+    );
   }
 
   private pinSubjectRoute(subject: string): DriveRoute {
@@ -5666,6 +5678,16 @@ export class Store {
       // The `subject` arg becomes the alias if it differs from the
       // resolved subject (e.g. POST endpoint that returns the
       // canonical resource).
+      if (
+        [resource, ...createdResources].some(
+          r =>
+            !r.error &&
+            !this.acceptsServerResource(r.subject, route.server, r, subject),
+        )
+      ) {
+        throw new RequestCancelledError('Resource destination changed');
+      }
+
       if (!resource.error)
         this.rememberResourceOrigin(resource.subject, route.server);
       this.applyIncoming({

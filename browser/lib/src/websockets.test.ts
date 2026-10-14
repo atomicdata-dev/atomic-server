@@ -1566,6 +1566,51 @@ describe('WSClient.fetchMany', () => {
   const requestIdOf = (frame: Uint8Array) =>
     new DataView(frame.buffer, frame.byteOffset).getUint16(1);
 
+  it.each(['single', 'batch'])(
+    "rejects a %s GET answer claiming another server's drive",
+    async kind => {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+      socket.receive(encodeAuthOk(['get-many']));
+      store.setDriveServer('atomic:protected', 'https://other.example.com', {
+        connect: false,
+      });
+      await LoroLoader.initializeLoro();
+      const doc = new LoroLoader.Loro.LoroDoc();
+      doc
+        .getMap('properties')
+        .set('https://atomicdata.dev/properties/drive', 'atomic:protected');
+      doc.commit();
+      const subject = 'atomic:cold-forged-child';
+      const result =
+        kind === 'batch'
+          ? client.fetchMany([subject])
+          : client.fetch(subject).then(
+              r => [r],
+              error => [error],
+            );
+      const tag = kind === 'batch' ? Tag.GET_MANY : Tag.GET;
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, tag)).toHaveLength(1),
+      );
+      const id = requestIdOf(framesWithTag(socket, tag)[0]);
+      const update = updateFrame(
+        kind === 'batch' ? 0 : id,
+        subject,
+        doc.export({ mode: 'snapshot' }),
+      );
+      socket.receive(kind === 'batch' ? resultFrame(id, [update]) : update);
+
+      assert((await result)[0]).toBeInstanceOf(Error);
+      assert(store.resources.has(subject)).toBe(false);
+      assert(store.getServerUrlForSubject('atomic:protected')).toBe(
+        'https://other.example.com',
+      );
+      client.close();
+      doc.free();
+    },
+  );
+
   it('sends one GET_MANY and settles every entry in order', async ({
     expect,
   }) => {

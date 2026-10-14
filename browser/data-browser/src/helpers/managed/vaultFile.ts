@@ -446,7 +446,18 @@ export async function fetchVaultBackupFile(
   const { objects, expectation } =
     await getVaultRecoveryManifest(drivePseudonym);
 
-  if (objects.length === 0) return null;
+  if (objects.length === 0) {
+    if (
+      expectation.checkpointN > 0 ||
+      Object.values(expectation.lanes).some(segment => segment > 0)
+    ) {
+      throw new Error(
+        'Backup is incomplete: its recorded history is missing from Cloud Vault.',
+      );
+    }
+
+    return null;
+  }
 
   const bodies = await downloadVaultObjects(
     drivePseudonym,

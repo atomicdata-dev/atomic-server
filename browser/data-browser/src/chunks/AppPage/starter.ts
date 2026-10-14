@@ -25,16 +25,21 @@ export async function view({ root, store }) {
   add.textContent = 'Add an item';
 
   const list = document.createElement('ul');
+  let refreshId = 0;
 
   async function refresh() {
-    list.textContent = '';
+    const id = ++refreshId;
+    const rows = document.createDocumentFragment();
 
     for (const subject of await store.query({ property: PARENT, value: table })) {
       const row = await store.getResource(subject);
       const item = document.createElement('li');
       item.textContent = row.get(NAME) ?? subject;
-      list.appendChild(item);
+      rows.appendChild(item);
     }
+
+    // A slow earlier query must not overwrite a more recent refresh.
+    if (id === refreshId) list.replaceChildren(rows);
   }
 
   add.onclick = async () => {

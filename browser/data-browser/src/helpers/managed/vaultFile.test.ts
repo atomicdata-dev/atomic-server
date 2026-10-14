@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildVaultFile,
+  fetchVaultBackupFile,
   checkpointNumberFromKey,
   parseVaultFile,
   restoreDriveFromFile,
@@ -57,7 +58,41 @@ const build = (keyEpoch = 1) =>
 
 const asBytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+describe('cloud backup export', () => {
+  it.each([
+    { lanes: { [LANE]: 3 }, checkpointN: 0 },
+    { lanes: {}, checkpointN: 2 },
+  ])(
+    'rejects an empty inventory with recorded history: %j',
+    async expectation => {
+      vi.stubEnv('VITE_MANAGED_PORTAL_URL', 'https://control.test');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ objects: [], expectation })),
+      );
+
+      await expect(fetchVaultBackupFile(P)).rejects.toThrow(/incomplete/i);
+    },
+  );
+
+  it('returns no backup only when the manifest has no recorded history', async () => {
+    vi.stubEnv('VITE_MANAGED_PORTAL_URL', 'https://control.test');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          objects: [],
+          expectation: { lanes: {}, checkpointN: 0 },
+        }),
+      ),
+    );
+
+    await expect(fetchVaultBackupFile(P)).resolves.toBeNull();
+  });
+});
 
 describe('vault file format', () => {
   it('round-trips header and sealed bytes in order', async () => {

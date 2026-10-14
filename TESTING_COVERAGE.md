@@ -3078,6 +3078,23 @@ and complete production incident coverage remain unproven. Validation counts and
   scope explanations and narrow layout at 1200px and 390px. It uses a mocked
   usage inventory with automatic backup disabled; actual encrypted recovery
   remains covered by the paired acceptance journeys above.
+- `vaultFile.test.ts` refuses an empty cloud inventory when either checkpoint or
+  lane history is recorded. A genuinely empty manifest still returns no backup.
+- `per-drive-routing.test.ts` rejects unsolicited drive claims from another
+  origin and foreign HTTP claims against pinned drives, including nested resources.
+  `websockets.test.ts` applies the same check to single and batched GET answers.
+  Existing vanity-origin tests keep explicitly requested first reads working;
+  `sync-delta-local-base.test.ts` verifies computed query replacement separately
+  from causal resource merges.
+- `starter.test.ts` executes the shipped app source with overlapping queries and
+  verifies that a late initial answer cannot duplicate or erase newly added rows.
+- `plugin.spec.ts` holds the post-uninstall plugin-list response while navigating
+  to another resource. Completing that refresh must preserve the new page and
+  must not fetch assets from the deleted installation. This reproduces CI's
+  late return to the drive without depending on machine load.
+- `vault::pack::binary_updates_do_not_pay_per_byte_integer_encoding_overhead`
+  bounds encoding overhead for a 64 KiB binary update and checks compatibility
+  with the existing reader and old numeric-array packs.
 
 Remaining limits: notification delivery while every app stays closed still
 requires a push/background service. This change catches up when an app returns;

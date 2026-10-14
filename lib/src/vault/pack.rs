@@ -130,8 +130,14 @@ impl Pack {
     /// every CRDT update into JSON would inflate the one thing the format
     /// exists to keep small.
     pub fn encode(&self) -> AtomicResult<Vec<u8>> {
-        rmp_serde::to_vec_named(self)
-            .map_err(|e| format!("failed to encode vault pack: {e}").into())
+        let mut bytes = Vec::new();
+        self.serialize(
+            &mut rmp_serde::Serializer::new(&mut bytes)
+                .with_struct_map()
+                .with_bytes(rmp_serde::config::BytesMode::ForceAll),
+        )
+        .map_err(|e| format!("failed to encode vault pack: {e}"))?;
+        Ok(bytes)
     }
 
     pub fn decode(bytes: &[u8]) -> AtomicResult<Self> {
@@ -175,6 +181,30 @@ mod tests {
         let pack = sample();
         let decoded = Pack::decode(&pack.encode().unwrap()).unwrap();
         assert_eq!(decoded, pack);
+    }
+
+    #[test]
+    fn binary_updates_do_not_pay_per_byte_integer_encoding_overhead() {
+        let update: Vec<u8> = (0..65536).map(|i| (i % 256) as u8).collect();
+        let pack = Pack::new(
+            vec![PackEntry {
+                subject: "s".into(),
+                update,
+                envelopes: vec![],
+            }],
+            vec![],
+        );
+        let encoded = pack.encode().unwrap();
+        assert!(
+            encoded.len() < 65536 + 256,
+            "64 KiB update encoded as {} bytes",
+            encoded.len()
+        );
+        // The unchanged Vec<u8> reader accepts both the old array encoding
+        // and the binary encoding, so existing packs and clients stay usable.
+        let legacy = rmp_serde::to_vec_named(&pack).unwrap();
+        assert_eq!(Pack::decode(&legacy).unwrap(), pack);
+        assert_eq!(rmp_serde::from_slice::<Pack>(&encoded).unwrap(), pack);
     }
 
     #[test]

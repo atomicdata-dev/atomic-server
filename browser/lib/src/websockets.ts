@@ -1466,6 +1466,7 @@ export class WSClient {
             msg.subject,
             this.serverOrigin,
             msg.loroBytes,
+            pending?.subject,
           )
         ) {
           pending?.reject(
@@ -1576,6 +1577,17 @@ export class WSClient {
                 `Malformed UPDATE for ${subject}`,
                 ErrorType.Server,
               );
+            }
+
+            if (
+              !this.store.acceptsServerResource(
+                update.subject,
+                this.serverOrigin,
+                update.loroBytes,
+                subject,
+              )
+            ) {
+              return new RequestCancelledError('Resource destination changed');
             }
 
             const outcome = this.store.applyIncoming({

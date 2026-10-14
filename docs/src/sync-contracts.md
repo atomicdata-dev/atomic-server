@@ -64,6 +64,14 @@ Computed query answers are an exception: each response replaces the previous
 projection so its member list and count stay consistent. Query answers have no
 shared edit history; the editable resources nested inside them still merge.
 
+Server reads also check placement before applying data. A response cannot claim
+a resource or drive already assigned to another origin, including through nested
+HTTP resources or batched WebSocket reads. An unsolicited update for an unknown
+drive uses the configured bootstrap destination; an unrelated open connection
+cannot claim it. An explicitly requested vanity URL may establish a previously
+unknown drive's origin. This trusts the chosen server; it does not authenticate
+an arbitrary server's claim to host a previously unknown drive.
+
 Offline queue recovery merges the stored snapshot with the live document before
 exporting unsent changes. A cached snapshot cannot replace newer in-memory edits.
 Legacy queues recover their baseline from the signed genesis; normal online
