@@ -427,15 +427,18 @@ pub async fn handle_plugin_ui(
         .body(content))
 }
 
-/// The CSP of every plugin and app frame. `connect-src 'none'`: a frame holds drive
-/// data, so it may not send it anywhere. The one legitimate request, to the
-/// integration proxy, is made by the host (`proxyFetch`). `allow-modals`
+/// The CSP of every plugin and app frame. A frame holds drive data, so it may
+/// not send it anywhere: `connect-src 'none'`, and images and fonts only from
+/// this server and `data:` (plus `blob:` images): a remote URL can carry data
+/// in its query. The one legitimate request, to the integration proxy, is made by
+/// the host (`proxyFetch`). A frame can still navigate itself to another URL;
+/// no CSP directive stops that, see `planning/host-abi.md`. `allow-modals`
 /// mirrors the iframe's own `sandbox` attribute; the CSP can only narrow it.
 fn frame_csp(nonce: &str) -> String {
     format!(
         "sandbox allow-scripts allow-modals allow-downloads allow-pointer-lock allow-presentation; \
          default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
-         img-src * data:; connect-src 'none'; font-src *; base-uri 'none'; object-src 'none';"
+         img-src 'self' data: blob:; connect-src 'none'; font-src 'self' data:; base-uri 'none'; object-src 'none';"
     )
 }
 
@@ -611,6 +614,8 @@ mod tests {
 
         assert!(csp.contains("connect-src 'none'"));
         assert!(!csp.contains("connect-src *"));
+        assert!(csp.contains("img-src 'self' data: blob:;"));
+        assert!(csp.contains("font-src 'self' data:;"));
         assert!(csp.starts_with("sandbox allow-scripts "));
         assert!(csp.contains("script-src 'nonce-n0nce'"));
     }

