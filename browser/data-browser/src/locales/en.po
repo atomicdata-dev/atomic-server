@@ -9363,19 +9363,26 @@ msgstr "{0} replied to you"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr "{0} commented on {1}"
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
 msgstr "{0} in {1}"
 
 #: src/components/Notifications/MessageNotifier.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "Someone"
 msgstr "Someone"
 
@@ -10535,7 +10542,9 @@ msgid "{0}: {1} comments on {2}"
 msgstr "{0}: {1} comments on {2}"
 
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr "{0} replied to you in {1}"
 
@@ -12953,3 +12962,11 @@ msgstr "Could not move to Trash: {0}"
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
 msgstr "Delete this resource permanently. This cannot be undone."
+
+#: src/views/NotificationPage.tsx
+msgid "Open conversation"
+msgstr "Open conversation"
+
+#: src/views/NotificationPage.tsx
+msgid "All notifications"
+msgstr "All notifications"
