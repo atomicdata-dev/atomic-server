@@ -6,6 +6,7 @@ mod ai_chat_migration;
 mod ai_chat_migration_test;
 pub mod app_agent;
 pub mod blob_backend;
+pub mod blob_gc;
 mod canonical_scheme;
 mod chat_migration;
 #[cfg(test)]

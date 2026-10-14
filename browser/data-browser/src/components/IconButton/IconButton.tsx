@@ -115,9 +115,14 @@ const SimpleIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   border-radius: ${p => p.theme.radius};
 
   &:not([disabled]) {
-    &:hover,
     &:focus-visible {
       background-color: ${p => p.theme.colors.bg1};
+    }
+    /* Touch keeps :hover after a tap; only apply it with a real hover. */
+    @media (hover: hover) {
+      &:hover {
+        background-color: ${p => p.theme.colors.bg1};
+      }
     }
 
     &:active {
@@ -132,12 +137,20 @@ const OutlineIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   border-radius: 50%;
 
   &:not([disabled]) {
-    &:hover,
     &:focus-visible {
       color: ${p => p.theme.colors.main};
       box-shadow:
         0px 0px 0px 1.5px ${p => p.theme.colors.main},
         ${p => p.theme.boxShadowSoft};
+    }
+    /* Touch keeps :hover after a tap; only apply it with a real hover. */
+    @media (hover: hover) {
+      &:hover {
+        color: ${p => p.theme.colors.main};
+        box-shadow:
+          0px 0px 0px 1.5px ${p => p.theme.colors.main},
+          ${p => p.theme.boxShadowSoft};
+      }
     }
   }
 
@@ -154,11 +167,18 @@ const SquareIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   border: 1px solid ${p => p.theme.colors.bg2};
 
   &:not([disabled]) {
-    &:hover,
     &:focus-visible {
       color: ${p => p.theme.colors.main};
       border-color: ${p => p.theme.colors.main};
       box-shadow: ${p => p.theme.boxShadowSoft};
+    }
+    /* Touch keeps :hover after a tap; only apply it with a real hover. */
+    @media (hover: hover) {
+      &:hover {
+        color: ${p => p.theme.colors.main};
+        border-color: ${p => p.theme.colors.main};
+        box-shadow: ${p => p.theme.boxShadowSoft};
+      }
     }
   }
 
@@ -172,11 +192,18 @@ const FillIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   color: ${p => (p.color === 'inherit' ? 'inherit' : p.theme.colors[p.color])};
   background-color: unset;
   border-radius: 50%;
-  &:hover,
   &:focus-visible {
     color: white;
     background-color: ${p => p.theme.colors.main};
     box-shadow: ${p => p.theme.boxShadowSoft};
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      color: white;
+      background-color: ${p => p.theme.colors.main};
+      box-shadow: ${p => p.theme.boxShadowSoft};
+    }
   }
 `;
 
@@ -185,11 +212,18 @@ const ColoredIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   background-color: ${p =>
     p.color === 'inherit' ? 'inherit' : p.theme.colors[p.color]};
   border-radius: 50%;
-  &:hover,
   &:focus-visible {
     color: white;
     filter: brightness(1.3);
     box-shadow: ${p => p.theme.boxShadowSoft};
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      color: white;
+      filter: brightness(1.3);
+      box-shadow: ${p => p.theme.boxShadowSoft};
+    }
   }
 `;
 
@@ -253,7 +287,6 @@ const MagicIconButton = styled(IconButtonBase)<ButtonStyleProps>`
     z-index: -1;
   }
 
-  &:hover,
   &:focus-visible {
     color: ${p => p.theme.colors.text};
     &::before,
@@ -263,6 +296,20 @@ const MagicIconButton = styled(IconButtonBase)<ButtonStyleProps>`
     &::before {
       opacity: 1;
       animation: ${cycle} 3s linear infinite;
+    }
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      color: ${p => p.theme.colors.text};
+      &::before,
+      &::after {
+        transform: scale(1);
+      }
+      &::before {
+        opacity: 1;
+        animation: ${cycle} 3s linear infinite;
+      }
     }
   }
 

@@ -269,8 +269,10 @@ const TitleButton = styled(Button)<{ current?: boolean }>`
     color: ${theme.colors.main};
   `}
 
-  &:hover {
-    background-color: ${props => props.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${props => props.theme.colors.bg1};
+    }
   }
   &:active {
     background-color: ${props => props.theme.colors.bg2};
@@ -287,10 +289,16 @@ const SwitcherButton = styled(IconButton)`
   color: ${p => p.theme.colors.textLight};
   font-size: 0.85rem;
 
-  &:hover,
   &:focus-visible {
     background-color: ${p => p.theme.colors.bg1};
     color: ${p => p.theme.colors.text};
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+      color: ${p => p.theme.colors.text};
+    }
   }
   &:active {
     background-color: ${p => p.theme.colors.bg2};

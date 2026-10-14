@@ -221,7 +221,7 @@ const TagWrapperButton = styled(TagWrapper)`
   transition: ${transition('filter', 'box-shadow', 'transform')};
   animation: ${fadeIn} 0.2s ease-in-out;
   &:hover,
-  &:focus,
+  &:focus-visible,
   &.selected-tag {
     --shadow-color: ${({ theme }) =>
       theme.darkMode ? 'var(--dark-color)' : 'var(--light-color)'};
@@ -243,7 +243,7 @@ const DeleteButton = styled(Button)`
   border: none;
 
   &:hover,
-  &:focus {
+  &:focus-visible {
     background-color: ${p => lighten(0.1, p.theme.colors.alert)} !important;
   }
 `;

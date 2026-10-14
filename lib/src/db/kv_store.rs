@@ -48,6 +48,24 @@ pub trait KvStore: Send + Sync {
         self.range(tree, start, end, false).take(limit).collect()
     }
 
+    /// Keys and value lengths in `[start, end)`, at most `limit`, without
+    /// copying the values where the backend can avoid it. Lets the blob sweep
+    /// list gigabytes of file bytes page by page. Errors are returned, never
+    /// skipped: a listing that silently loses rows is not a listing.
+    fn range_value_sizes(
+        &self,
+        tree: Tree,
+        start: Vec<u8>,
+        end: Vec<u8>,
+        limit: usize,
+    ) -> AtomicResult<Vec<(Vec<u8>, u64)>> {
+        Ok(self
+            .range_page(tree, start, end, limit)?
+            .into_iter()
+            .map(|(key, value)| (key, value.len() as u64))
+            .collect())
+    }
+
     /// Iterate over all entries in a tree, ordered by key.
     fn iter_tree(&self, tree: Tree) -> KvIter;
 

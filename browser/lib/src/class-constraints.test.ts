@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   checkResourceConstraints,
   checkValue,
+  constraintViolations,
   ConstraintError,
   parseConstraint,
   parseConstraints,
@@ -164,5 +165,58 @@ describe('checkResourceConstraints', () => {
         getLocal,
       ),
     ).not.toThrow();
+  });
+
+  it('reports every violation, none for a valid or unknown-class resource', () => {
+    const descProp = 'https://atomicdata.dev/properties/description';
+    const two = new Map(store);
+
+    two.set(classSubject, {
+      'https://atomicdata.dev/properties/shortname': 'task',
+      'https://atomicdata.dev/properties/constraints': {
+        [nameProp]: { maxLength: 3 },
+        [descProp]: { maxLength: 5 },
+      },
+    });
+
+    const getTwo = (subject: string) => {
+      const props = two.get(subject);
+
+      return (
+        props && { subject, getClasses: () => [], get: (p: string) => props[p] }
+      );
+    };
+
+    const withProps = (
+      name: string,
+      description: string,
+      classes = [classSubject],
+    ) => ({
+      subject: 'https://example.com/t1',
+      getClasses: () => classes,
+      get: (p: string) =>
+        p === nameProp ? name : p === descProp ? description : undefined,
+    });
+
+    expect(constraintViolations(getTwo, withProps('abc', 'short'))).toEqual([]);
+
+    const found = constraintViolations(getTwo, withProps('abcd', 'too long'));
+
+    expect(found.map(v => [v.property, v.keyword, v.classSubject])).toEqual([
+      [nameProp, 'maxLength', classSubject],
+      [descProp, 'maxLength', classSubject],
+    ]);
+    expect(found[0].message).toMatch(
+      /^Value for name breaks maxLength on class task: /,
+    );
+    expect(() =>
+      checkResourceConstraints(withProps('abcd', 'too long'), getTwo),
+    ).toThrow(found[0].message);
+    expect(
+      constraintViolations(
+        getTwo,
+        withProps('abcdefgh', 'too long', ['https://example.com/Missing']),
+      ),
+    ).toEqual([]);
   });
 });

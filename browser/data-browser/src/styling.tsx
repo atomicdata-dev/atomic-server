@@ -369,6 +369,13 @@ export const GlobalStyle = createGlobalStyle`
     height: 100%;
   }
 
+  /* Mouse/touch focus on buttons and links must not leave a focus ring;
+     keyboard focus (:focus-visible) keeps its styling. Text inputs,
+     textareas, selects and contenteditable are deliberately not matched. */
+  :is(button, a, summary, [role='button'], [role='menuitem'], [role='tab'], [tabindex]):focus:not(:focus-visible) {
+    outline: none;
+  }
+
   * {
     box-sizing: border-box;
     scrollbar-color: ${p => p.theme.colors.bg2} transparent;

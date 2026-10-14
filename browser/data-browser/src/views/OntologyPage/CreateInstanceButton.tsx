@@ -110,7 +110,7 @@ const InstanceButton = styled.button`
   border-radius: ${p => p.theme.radius};
   color: ${p => p.theme.colors.textLight};
   &:hover,
-  &:focus {
+  &:focus-visible {
     border-color: ${p => p.theme.colors.main};
     color: ${p => p.theme.colors.main};
     background-color: ${p => p.theme.colors.bg};

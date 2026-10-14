@@ -18,10 +18,14 @@ export const SideBarItem = styled('span')<SideBarItemProps>`
   text-decoration: none;
   border-radius: ${p => p.theme.radius};
   overflow: hidden;
-  &:hover,
-  &:focus {
+  &:focus-visible {
     background-color: ${p => p.theme.colors.bg1};
-    // color: ${p => (p.disabled ? p.theme.colors.main : p.theme.colors.text)};
+  }
+  /* Touch devices keep :hover after a tap, so only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+    }
   }
   &:active {
     background-color: ${p => p.theme.colors.bg2};

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
-import { useStore } from '@tomic/react';
+import { isServerUnreachable, useStore } from '@tomic/react';
 import { FaCloud, FaRegWindowMaximize } from 'react-icons/fa6';
 import { Button } from '../components/Button';
 import { ContainerNarrow } from '../components/Containers';
@@ -20,17 +20,25 @@ export const RETRY_EVERY_MS = 10_000;
  * a drive on a server this device cannot reach. Says which, keeps retrying,
  * and offers the vault when there is a backup. Replaces a bare transport
  * error, which read as a crash.
+ *
+ * `vault` is for the agent's own private drive and anything in it: that drive
+ * lives on the person's devices, so it is never "not on this device", only
+ * not arrived yet.
  */
 export function DriveUnavailable({
   subject,
   error,
+  vault = false,
 }: {
   subject: string;
   error: Error;
+  vault?: boolean;
 }): JSX.Element {
   const store = useStore();
   const { agent } = useSettings();
   const localOnly = store.isLocalOnlySubject(subject);
+  // Only a request that really failed may blame the server.
+  const serverFailed = isServerUnreachable(error);
   const [retrying, setRetrying] = useState(false);
 
   const retry = async () => {
@@ -61,46 +69,58 @@ export function DriveUnavailable({
   return (
     <ContainerNarrow>
       <Column gap='1.5rem'>
-        <h1>This drive isn't on this device yet</h1>
+        <h1>
+          {vault
+            ? "This item hasn't reached this device yet"
+            : "This drive isn't on this device yet"}
+        </h1>
         <Lead>
-          {localOnly
-            ? "This drive isn't connected to a server, so it syncs directly between devices. Open it on a device that has it, and it will arrive here."
-            : "This device can't reach the drive's server, and it hasn't kept a copy of it. It will open as soon as the server answers."}
+          {vault
+            ? 'Your private drive is kept on your devices. It will appear here once the server or your other device answers.'
+            : localOnly
+              ? "This drive isn't connected to a server, so it syncs directly between devices. Open it on a device that has it, and it will arrive here."
+              : serverFailed
+                ? "This device can't reach the drive's server, and it hasn't kept a copy of it. It will open as soon as the server answers."
+                : "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."}
         </Lead>
         {/* With a backup, restoring is the way out; offer it first. */}
         {agent && <VaultRestoreAction subject={subject} />}
         <Panel data-testid='drive-unavailable'>
-          <Diagram aria-hidden>
-            <Node $muted={localOnly}>
-              <Circle $dashed={localOnly}>
-                <FaCloud />
-              </Circle>
-              <span>{localOnly ? 'No server' : 'Server'}</span>
-            </Node>
-            <Line />
-            <Devices>
-              <Node>
-                <Circle $active>
-                  <FaRegWindowMaximize />
+          {!vault && (
+            <Diagram aria-hidden>
+              <Node $muted={localOnly}>
+                <Circle $dashed={localOnly}>
+                  <FaCloud />
                 </Circle>
-                <span>This device</span>
+                <span>{localOnly ? 'No server' : 'Server'}</span>
               </Node>
-              <Link />
-              <Node $muted>
-                <Circle>
-                  <FaRegWindowMaximize />
-                </Circle>
-                <span>Your other devices</span>
-              </Node>
-            </Devices>
-          </Diagram>
+              <Line />
+              <Devices>
+                <Node>
+                  <Circle $active>
+                    <FaRegWindowMaximize />
+                  </Circle>
+                  <span>This device</span>
+                </Node>
+                <Link />
+                <Node $muted>
+                  <Circle>
+                    <FaRegWindowMaximize />
+                  </Circle>
+                  <span>Your other devices</span>
+                </Node>
+              </Devices>
+            </Diagram>
+          )}
           <Status role='status'>
             <Dot />
             <p>
               <strong>
-                {localOnly
+                {localOnly && !vault
                   ? 'No device with this drive is reachable.'
-                  : "The server isn't reachable."}
+                  : serverFailed
+                    ? "The server isn't reachable."
+                    : 'Not connected to the server yet.'}
               </strong>{' '}
               Retrying automatically every 10 seconds.
             </p>
@@ -109,7 +129,7 @@ export function DriveUnavailable({
             </Button>
           </Status>
         </Panel>
-        {localOnly && (
+        {localOnly && !vault && (
           <Hint>
             <FaCloud />
             <p>
