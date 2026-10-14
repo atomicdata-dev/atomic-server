@@ -59,7 +59,8 @@ async fn from_draft(
     context: RequestContext,
     public: bool,
 ) -> AtomicServerResult<HttpResponse> {
-    let agent = super::plugin_schedule::authorize(&appstate, &req, &context, &body.plugin).await?;
+    let agent =
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
     let store = &appstate.store;
     let source = crate::plugins::scheduler::plugin_source(store, &body.drive, &body.plugin)
         .await
@@ -133,7 +134,8 @@ pub async fn publish_package(
     req: actix_web::HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    let agent = super::plugin_schedule::authorize(&appstate, &req, &context, &query.drive).await?;
+    let agent =
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &query.drive).await?;
     // The claimed world goes in, so a package that does not match it is
     // refused before its bytes or its release record are stored.
     let (_, release, manifest) =

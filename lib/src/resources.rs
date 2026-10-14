@@ -980,11 +980,6 @@ impl Resource {
         }
     }
 
-    /// Returns all PropVals.
-    pub fn into_propvals(self) -> PropVals {
-        self.propvals
-    }
-
     /// Create a new, empty Resource.
     pub fn new(subject: String) -> Resource {
         let propvals: PropVals = HashMap::new();
@@ -1091,15 +1086,6 @@ impl Resource {
         self.loro().commit();
         let _ = self.record_undo_checkpoint();
         Ok(())
-    }
-
-    /// Alias for `push_list_item` (legacy name).
-    pub fn push_json_item(
-        &mut self,
-        property: &str,
-        item: serde_json::Value,
-    ) -> crate::errors::AtomicResult<()> {
-        self.push_list_item(property, item)
     }
 
     /// Insert a JSON item at a specific index in a Json property.

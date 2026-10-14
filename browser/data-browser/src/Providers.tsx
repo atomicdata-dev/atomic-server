@@ -7,7 +7,6 @@ import { NewResourceUIProvider } from './components/forms/NewForm/useNewResource
 import HotKeysWrapper from './components/HotKeyWrapper';
 import { MetaSetter } from './components/MetaSetter';
 import { NavWrapper } from './components/Navigation';
-import { SearchOverlayContextProvider } from './components/Searchbar/SearchOverlayContext';
 import { NetworkIndicator } from './components/NetworkIndicator';
 import { PopoverContainer } from './components/Popover';
 import { SkipNav } from './components/SkipNav';
@@ -95,13 +94,11 @@ export const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
                                           <ResourceContextMenuProvider>
                                             <NewResourceUIProvider>
                                               <SkipNav />
-                                              <SearchOverlayContextProvider>
-                                                <FollowProvider>
-                                                  <NavWrapper>
-                                                    {children}
-                                                  </NavWrapper>
-                                                </FollowProvider>
-                                              </SearchOverlayContextProvider>
+                                              <FollowProvider>
+                                                <NavWrapper>
+                                                  {children}
+                                                </NavWrapper>
+                                              </FollowProvider>
                                             </NewResourceUIProvider>
                                           </ResourceContextMenuProvider>
                                         </CustomContextItemsProvider>

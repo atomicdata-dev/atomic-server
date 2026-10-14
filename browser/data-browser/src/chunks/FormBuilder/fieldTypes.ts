@@ -26,33 +26,17 @@ import {
   FaTableList,
   FaLocationDot,
 } from 'react-icons/fa6';
+import {
+  CHOICE_FIELD_TYPES,
+  isChoiceField,
+  type FieldType,
+} from '@tomic/form-renderer';
 
 /** Input question types: the must-have set (Phase 2) plus the extended set
- * (Phase 6, `planning/form-field-types.md`). Keep in lockstep with
- * `FieldType` in `@tomic/form-renderer` and the `coerce_value` arms in
- * `server/src/forms.rs`. */
-export type FormFieldType =
-  | 'short-text'
-  | 'long-text'
-  | 'email'
-  | 'number'
-  | 'date'
-  | 'datetime'
-  | 'checkbox'
-  | 'radio'
-  | 'multi-select'
-  | 'phone'
-  | 'country'
-  | 'url'
-  | 'currency'
-  | 'dropdown'
-  | 'dropdown-multi'
-  | 'likert'
-  | 'rating'
-  | 'picture-choice'
-  | 'choice-matrix'
-  | 'table-input'
-  | 'address';
+ * (Phase 6, `planning/form-field-types.md`). An alias of `FieldType` in
+ * `@tomic/form-renderer`, which is the single definition; keep it in lockstep
+ * with the `coerce_value` arms in `server/src/forms.rs`. */
+export type FormFieldType = FieldType;
 
 /** Non-input layout blocks that live in the same `form-fields` array. */
 export type FormLayoutType = 'heading' | 'paragraph' | 'info-box';
@@ -90,19 +74,10 @@ export function isLayoutType(type: AddableFieldType): type is FormLayoutType {
 
 /** The question types whose options are Tag resources in the `enum` of the
  * data class's constraint for the mapped column (the Property's legacy
- * `allowsOnly` as the fallback), making that Property a SelectProperty. Mirrors
- * `CHOICE_FIELD_TYPES` in `server/src/forms.rs`. */
-export const CHOICE_FIELD_TYPES: FormFieldType[] = [
-  'radio',
-  'multi-select',
-  'dropdown',
-  'dropdown-multi',
-  'picture-choice',
-];
-
-export function isChoiceFieldType(type: AddableFieldType): boolean {
-  return (CHOICE_FIELD_TYPES as string[]).includes(type);
-}
+ * `allowsOnly` as the fallback), making that Property a SelectProperty. Re-
+ * exported from `@tomic/form-renderer`, which mirrors `CHOICE_FIELD_TYPES` in
+ * `server/src/forms.rs`. */
+export { CHOICE_FIELD_TYPES, isChoiceField as isChoiceFieldType };
 
 /** The choice types that accept exactly one option. The mapped Property is a
  * SelectProperty either way — always a `resourceArray`, as everywhere else in

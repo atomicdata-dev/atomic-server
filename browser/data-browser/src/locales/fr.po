@@ -641,7 +641,6 @@ msgid "Unable to connect to Ollama server. Check if the server is running and yo
 msgstr "Impossible de se connecter au serveur Ollama. Vérifiez si le serveur est en cours d'exécution et si vous avez configuré l'URL correcte dans les paramètres."
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
 #: src/views/File/FilePreview.tsx
 #: src/views/File/FilePreviewThumbnail.tsx
 #: src/views/ResourceRow.tsx
@@ -721,7 +720,6 @@ msgstr "Vérifiez la console du navigateur pour les détails, ou essayez de reve
 msgid "404 Not found"
 msgstr "404 Non trouvé"
 
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 #: src/views/EndpointPage.tsx
 msgid "No hits"
@@ -746,7 +744,6 @@ msgid "Result"
 msgstr "Résultat"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 msgid "With Tags:"
 msgstr "Avec les étiquettes :"
@@ -1205,13 +1202,11 @@ msgid "Resource is loading..."
 msgstr "La ressource est en cours de chargement..."
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Search for resources..."
 msgstr "Rechercher des ressources..."
 
 #: src/components/OverlayContainer.tsx
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "esc"
 msgstr "échap"
 
@@ -1221,7 +1216,6 @@ msgid "Start AI Chat with \"{0}\""
 msgstr "Lancer une discussion IA avec « {0} »"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0/> <1/> navigate"
 msgstr "<0/> <1/> naviguer"
 
@@ -1230,7 +1224,6 @@ msgid "<0/> chat"
 msgstr "<0/> discuter"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0>esc</0> close"
 msgstr "<0>échap</0> fermer"
 
@@ -3227,35 +3220,9 @@ msgstr "Ouvrir la ressource"
 msgid "Insufficient rights to view resource"
 msgstr "Droits insuffisants pour afficher la ressource"
 
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Search (Cmd+K)"
-msgstr "Rechercher (Cmd+K)"
-
-#. 0: title
-#: src/components/Searchbar/Searchbar.tsx
-msgid "in:{0}"
-msgstr "dans:{0}"
-
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Clear scope"
-msgstr "Effacer la portée"
-
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
-msgid "No tags found"
-msgstr "Aucun tag trouvé"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Caret"
-msgstr "Curseur"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Enter an Atomic URL or search  (press \"/\")"
-msgstr "Entrez une URL Atomique ou recherchez (appuyez sur \"/\")"
-
 #: src/components/MetaSetter.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/components/Searchbar/SearchbarInput.tsx
 msgid "Search"
 msgstr "Rechercher"
 
@@ -3286,13 +3253,8 @@ msgid "(empty)"
 msgstr "(vide)"
 
 #: src/chunks/RTE/SlashMenu/CommandList.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Searching..."
 msgstr "Recherche..."
-
-#: src/routes/Search/SearchOverlay.tsx
-msgid "<0/> open"
-msgstr "<0/> ouvrir"
 
 #: src/chunks/RTE/AIChatInput/AsyncAIChatInput.tsx
 msgid "Ask me anything, / for commands, @ for context"
@@ -4259,10 +4221,6 @@ msgstr ""
 msgid "Open original"
 msgstr ""
 
-#: src/helpers/draftsFolder.ts
-msgid "Drafts"
-msgstr ""
-
 #: src/helpers/forksFolder.ts
 msgid "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
 msgstr ""
@@ -4345,10 +4303,6 @@ msgstr ""
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
-msgstr ""
-
-#: src/helpers/draftsFolder.ts
-msgid "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
 msgstr ""
 
 #: src/routes/AppSettings.tsx
@@ -11537,9 +11491,7 @@ msgid "Merging keeps the fork's version."
 msgstr ""
 
 #. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "{0} result{1}"
 msgstr ""
 
@@ -11807,10 +11759,6 @@ msgstr ""
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Your resource types could not be loaded."
-msgstr ""
-
-#: src/routes/Search/SearchOverlay.tsx
-msgid "Search matches on the names and descriptions of resources. Additionally you can filter by tag using <0/>"
 msgstr ""
 
 #: src/routes/Search/SearchRoute.tsx
