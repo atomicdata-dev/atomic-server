@@ -156,7 +156,7 @@ impl Actor for CommitMonitor {
             // in `appstate.rs`); what this listener carries is the
             // commit-less change (a peer sync writing straight into the
             // store) that would otherwise never reach a subscriber.
-            let mut events_rx = self.store.subscribe_events();
+            let mut events_rx = self.store.subscribe_external_changes();
             let addr = ctx.address();
             let store_for_listener = self.store.clone();
             tokio::spawn(async move {
