@@ -101,7 +101,12 @@ export function StorageView({
   return (
     <Main>
       <ContainerWide>
-        <h1>Where space goes</h1>
+        <h1>Server storage</h1>
+        <Intro data-testid='storage-scope'>
+          This is the current copy on your server, including resource history
+          and attached files. Cloud Vault backup storage is shown separately in
+          sync settings.
+        </Intro>
         <Intro>
           Each tile is an item in this workspace. Bigger tile, more space.
         </Intro>

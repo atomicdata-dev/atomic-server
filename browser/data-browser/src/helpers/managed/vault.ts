@@ -1039,7 +1039,7 @@ export type RestoreSource = (
 >;
 
 /**
- * Download every listed object's body, at most four at a time, in listing order.
+ * Download every listed object's body, at most eight at a time, in listing order.
  *
  * `read` decides what a body becomes: bytes for a restore, a `Blob` for a
  * backup file (the browser may keep those on disk rather than in memory).
@@ -1053,25 +1053,35 @@ export async function downloadVaultObjects<T>(
 ): Promise<T[]> {
   if (objects.length === 0) return [];
 
-  // The control plane signs at most DOWNLOAD_URL_BATCH objects per request,
-  // and a drive with a longer history refused to restore at all.
-  const downloads: DownloadUrl[] = [];
+  // Share one signing request per batch, when a worker first reaches it. Start
+  // downloading immediately instead of waiting for every URL in a large vault.
+  // The same worker bound limits both signing and object requests.
+  const batches = new Map<number, Promise<Map<string, string>>>();
 
-  for (let i = 0; i < objects.length; i += DOWNLOAD_URL_BATCH) {
-    const batch = objects.slice(i, i + DOWNLOAD_URL_BATCH);
-    const answer = await api<{ downloads: DownloadUrl[] }>(
-      `/cloud-vault/${drivePseudonym}/download-urls`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ object_ids: batch.map(o => o.object_id) }),
-      },
-    );
-    downloads.push(...answer.downloads);
+  function urlsFor(index: number) {
+    const start = Math.floor(index / DOWNLOAD_URL_BATCH) * DOWNLOAD_URL_BATCH;
+    let batch = batches.get(start);
+
+    if (!batch) {
+      batch = api<{ downloads: DownloadUrl[] }>(
+        `/cloud-vault/${drivePseudonym}/download-urls`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            object_ids: objects
+              .slice(start, start + DOWNLOAD_URL_BATCH)
+              .map(o => o.object_id),
+          }),
+        },
+      ).then(
+        answer => new Map(answer.downloads.map(d => [d.object_key, d.url])),
+      );
+      batches.set(start, batch);
+    }
+
+    return batch;
   }
 
-  // Preserve the server's ordering: `download-urls` answers per request and is
-  // not required to echo the order back.
-  const urlByKey = new Map(downloads.map(d => [d.object_key, d.url]));
   const fetched = new Array<T>(objects.length);
   let next = 0;
   let completed = 0;
@@ -1080,12 +1090,13 @@ export async function downloadVaultObjects<T>(
   // Hide per-object network latency without opening unbounded requests on a
   // phone. Write by listing index, never completion order.
   await Promise.all(
-    Array.from({ length: Math.min(4, objects.length) }, async () => {
+    Array.from({ length: Math.min(8, objects.length) }, async () => {
       while (!failed && next < objects.length) {
         const index = next++;
         const object = objects[index];
 
         try {
+          const urlByKey = await urlsFor(index);
           const url = urlByKey.get(object.object_key);
           if (!url)
             throw new Error(`No download URL issued for ${object.object_key}`);

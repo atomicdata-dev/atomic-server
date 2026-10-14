@@ -8,6 +8,7 @@ import {
   vaultLaneId,
   backupDrive,
   restoreDrive,
+  downloadVaultObjects,
   setUpVaultForDrive,
   recoverDriveKey,
   nextSegmentFor,
@@ -16,6 +17,7 @@ import {
   type VaultCapableDb,
   type VaultKeyOps,
   type VaultDriveState,
+  type VaultObject,
 } from './vault';
 
 /**
@@ -868,12 +870,96 @@ describe('restoreDrive', () => {
     }
 
     await restoring;
-    expect(peak).toBeLessThanOrEqual(4);
+    expect(peak).toBe(8);
     expect(
       db.vaultImport.mock.calls[0][3].map(
         (o: { objectKey: string }) => o.objectKey,
       ),
     ).toEqual(objects.map(o => o.object_key));
+  });
+
+  it('starts downloading before the next batch of URLs is available', async () => {
+    const objects = Array.from({ length: 70 }, (_, i) => ({
+      object_id: String(i),
+      object_key: `pack-${i}`,
+    })) as VaultObject[];
+    const downloaded: string[] = [];
+    let release!: () => void;
+    const delayed = new Promise<void>(resolve => (release = resolve));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+
+      if (url.endsWith('/download-urls')) {
+        const ids: string[] = JSON.parse(String(init?.body)).object_ids;
+        if (ids.includes('64')) await delayed;
+
+        return new Response(
+          JSON.stringify({
+            downloads: ids.map(id => ({
+              object_key: `pack-${id}`,
+              url: `https://s3.test/${id}`,
+            })),
+          }),
+        );
+      }
+
+      downloaded.push(url);
+
+      return new Response('bytes');
+    });
+    const restoring = downloadVaultObjects(PSEUDONYM, objects, r => r.text());
+
+    try {
+      await vi.waitFor(() => expect(downloaded.length).toBeGreaterThan(0));
+    } finally {
+      release();
+      await restoring;
+    }
+
+    expect(downloaded).toHaveLength(70);
+  });
+
+  it('retains earlier downloads when a later URL batch fails', async () => {
+    const objects = Array.from({ length: 70 }, (_, i) => ({
+      object_id: String(i),
+      object_key: `pack-${i}`,
+    })) as VaultObject[];
+    const failed: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+
+      if (url.endsWith('/download-urls')) {
+        const ids: string[] = JSON.parse(String(init?.body)).object_ids;
+        if (ids.includes('64')) throw new TypeError('network unavailable');
+
+        return new Response(
+          JSON.stringify({
+            downloads: ids.map(id => ({
+              object_key: `pack-${id}`,
+              url: `https://s3.test/${id}`,
+            })),
+          }),
+        );
+      }
+
+      return new Response(url);
+    });
+    const result = await downloadVaultObjects<string | null>(
+      PSEUDONYM,
+      objects,
+      r => r.text(),
+      undefined,
+      (_, object) => {
+        failed.push(object.object_key);
+
+        return null;
+      },
+    );
+    expect(result.slice(0, 64)).toEqual(
+      objects.slice(0, 64).map(o => `https://s3.test/${o.object_id}`),
+    );
+    expect(result.slice(64)).toEqual(Array(6).fill(null));
+    expect(failed).toEqual(objects.slice(64).map(o => o.object_key));
   });
 
   it('reports nothing when the vault is empty', async () => {

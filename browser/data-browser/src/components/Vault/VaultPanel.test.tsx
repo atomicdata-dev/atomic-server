@@ -13,6 +13,24 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { UseVaultBackup } from '../../helpers/managed/useVaultBackup';
 import { VaultPanel } from './VaultPanel';
 import { buildTheme } from '../../styling';
+import { DialogGlobalContextProvider } from '../Dialog/DialogGlobalContextProvider';
+import { RootWelcomeLayoutProvider } from '../../context/RootWelcomeLayoutContext';
+
+vi.mock('../../helpers/managed/vault', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../helpers/managed/vault')>()),
+  getVaultUsage: vi.fn(async () => ({
+    used_bytes: 91 * 1024 ** 2,
+    quota_bytes: 100 * 1024 ** 2,
+    by_kind: [
+      { kind: 'pack', bytes: 59 * 1024 ** 2, objects: 642 },
+      { kind: 'checkpoint', bytes: 32 * 1024 ** 2, objects: 15 },
+    ],
+    pending_bytes: 0,
+    unaccounted_bytes: 0,
+    reclaimable_bytes: 0,
+    undo_window_bytes: 27 * 1024 ** 2,
+  })),
+}));
 
 const theme = buildTheme(false, '#1b50d8');
 const GB = 1024 ** 3;
@@ -56,6 +74,39 @@ const show = (
   );
 
 afterEach(cleanup);
+
+it('keeps storage inspection available while applying a restore', async () => {
+  const vault = {
+    ...vaultWith(91 * 1024 ** 2),
+    busy: true,
+    restoreProgress: 1,
+  };
+  render(
+    <ThemeProvider theme={theme}>
+      <RootWelcomeLayoutProvider>
+        <DialogGlobalContextProvider>
+          <VaultPanel vault={vault} />
+        </DialogGlobalContextProvider>
+      </RootWelcomeLayoutProvider>
+    </ThemeProvider>,
+  );
+  expect(screen.getByTestId('vault-restore-progress').textContent).toContain(
+    'Applying backup',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'View Vault storage' }));
+  expect(
+    (await screen.findByTestId('vault-storage-pack')).textContent,
+  ).toContain('642 objects');
+  expect(screen.getByTestId('vault-storage-checkpoint').textContent).toContain(
+    '15 objects',
+  );
+  expect(screen.getByTestId('vault-storage-explanation').textContent).toContain(
+    'current server copy',
+  );
+  expect(
+    (screen.getByTestId('vault-free-up-undo') as HTMLButtonElement).disabled,
+  ).toBe(true);
+});
 
 it.each([
   { completeness: 'partial', incomplete: '' },

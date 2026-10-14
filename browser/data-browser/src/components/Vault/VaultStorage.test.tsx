@@ -27,7 +27,7 @@ const usage = (over: Partial<VaultUsage> = {}): VaultUsage =>
   ({
     used_bytes: 5_000_000,
     quota_bytes: 50_000_000,
-    by_kind: [{ kind: 'pack', bytes: 2_000_000 }],
+    by_kind: [{ kind: 'pack', bytes: 2_000_000, objects: 18 }],
     pending_bytes: 0,
     unaccounted_bytes: 0,
     reclaimable_bytes: 1_000_000,

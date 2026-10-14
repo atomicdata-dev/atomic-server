@@ -42,7 +42,7 @@ export function VaultStorage({
   onCompact?: (includeUndoWindow: boolean) => Promise<CompactResult | null>;
   /** Called after storage was freed, so the host can refresh its numbers. */
   onChanged?: () => void;
-  /** Closes the panel. The row's "Manage storage" action opens it. */
+  /** Closes the panel. The row's "View Vault storage" action opens it. */
   onClose: () => void;
 }) {
   const [usage, setUsage] = useState<VaultUsage | null>(null);
@@ -142,6 +142,7 @@ export function VaultStorage({
                 <span>
                   {kindLabel(row.kind)}
                   <Muted as='span'> · {kindHint(row.kind)}</Muted>
+                  <Muted as='span'> · {`${row.objects} objects`}</Muted>
                 </span>
                 <span>{formatBytes(row.bytes)}</span>
               </Row>
@@ -240,7 +241,8 @@ export function VaultStorage({
 
           {usage.reclaimable_bytes === 0 && usage.undo_window_bytes === 0 && (
             <Muted data-testid='vault-storage-nothing'>
-              Nothing extra is stored. This is what your workspace needs.
+              No backup objects can be safely removed yet. This total includes
+              retained copies and history, not just your current workspace.
             </Muted>
           )}
         </>
@@ -313,7 +315,7 @@ function kindLabel(kind: string): string {
 function kindHint(kind: string): string {
   switch (kind) {
     case 'pack':
-      return 'every edit since your last snapshot';
+      return 'saved edits from your devices';
     case 'checkpoint':
     case 'checkpoint_image':
       return 'full copies used to restore quickly';
@@ -356,6 +358,11 @@ const Row = styled.div`
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+
+  > span:last-child {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 `;
 
 const Block = styled.div`

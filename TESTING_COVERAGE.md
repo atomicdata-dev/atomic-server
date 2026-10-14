@@ -2133,7 +2133,7 @@ that completes after its deadline. Staging phone restore latency and end-to-end
 WebSocket query delivery remain unverified.
 
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
-responses open to verify concurrent downloads are bounded at four and that
+responses open to verify concurrent downloads are bounded at eight and that
 reverse completion preserves listing order at import. Existing progress and
 failure checks also pass. Actual staging phone restore latency remains unmeasured.
 
@@ -2274,7 +2274,7 @@ that completes after its deadline. Staging phone restore latency and end-to-end
 WebSocket query delivery remain unverified.
 
 Cloud Vault download concurrency: `helpers/managed/vault.test.ts` holds network
-responses open to verify concurrent downloads are bounded at four and that
+responses open to verify concurrent downloads are bounded at eight and that
 reverse completion preserves listing order at import. Existing progress and
 failure checks also pass. Actual staging phone restore latency remains unmeasured.
 
@@ -3065,6 +3065,19 @@ and complete production incident coverage remain unproven. Validation counts and
   object scan, and persisted heads survive missing object rows. Status reads use
   these heads without constructing a discarded recovery inventory; their existing
   scan for pending/confirmed/stale counts remains.
+- `vault::sync::restore_preserves_ambiguous_import_copies_without_allowing_new_claims`
+  restores two independently created subjects with the same import identity into
+  empty and populated databases. Both copies survive; new duplicate authoring
+  remains refused. Restore uses the same persistence boundary as peer replicas.
+- `helpers/managed/vault.test.ts` bounds downloads to eight workers, preserves
+  inventory order, starts bodies before later signing batches finish, and retains
+  earlier readable bodies when a later signing request fails.
+- `VaultPanel.test.tsx` opens the usage breakdown during restore while cleanup
+  remains disabled, and distinguishes downloading from applying. The compiled
+  `vault-storage.spec.ts` checks usage totals, per-kind object counts, storage
+  scope explanations and narrow layout at 1200px and 390px. It uses a mocked
+  usage inventory with automatic backup disabled; actual encrypted recovery
+  remains covered by the paired acceptance journeys above.
 
 Remaining limits: notification delivery while every app stays closed still
 requires a push/background service. This change catches up when an app returns;

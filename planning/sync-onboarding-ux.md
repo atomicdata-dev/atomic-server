@@ -101,6 +101,12 @@ Recovery warnings must follow the structured restore result, never the presence
 of translated text. The browser and Tauri share this guard in `VaultPanel` and
 onboarding. Flutter has no corresponding Cloud Vault restore screen yet.
 
+The browser/Tauri Sync page distinguishes retained encrypted Vault backups from
+the current server copy measured by `/app/storage`. Vault usage stays readable
+while backup/restore runs, while cleanup controls remain disabled. Restore shows
+download progress separately from applying the downloaded history. Flutter has
+neither this Vault panel nor a server storage map to update.
+
 ## 4. Where the logic lives
 
 Keep these in step. A change to one is usually a change to its twin.

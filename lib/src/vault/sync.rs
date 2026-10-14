@@ -1130,13 +1130,10 @@ pub async fn import_vault_batch_expected(
             doc.import_update(&entry.update)?;
             resource.apply_state_doc(doc)?;
 
-            // Validation off: a restore replays history that was already
-            // validated when it was written. Re-imposing today's required-props
-            // rules on old data would make a schema change retroactively
-            // unrestorable, which is precisely when a backup matters most.
-            store
-                .add_resource_opts(&resource, false, true, true)
-                .await?;
+            // Restore is replica ingress, not a new authored import. Preserve
+            // independently created import identities for review, just as peer
+            // sync does, without reapplying today's creation constraints.
+            store.persist_replicated_resource(&resource).await?;
 
             // The envelopes that signed this history, verified before they
             // are kept, so the restored device attributes its own past.
@@ -1318,6 +1315,85 @@ mod tests {
         .unwrap();
         assert_eq!(summary.completeness, RestoreCompleteness::Partial);
         assert_eq!(summary.objects_missing, 3);
+    }
+
+    #[tokio::test]
+    async fn restore_preserves_ambiguous_import_copies_without_allowing_new_claims() {
+        use crate::Value;
+
+        let source = Db::init_temp("vault_import_identity_source").await.unwrap();
+        let (_, drive) = source.setup("alice").await.unwrap();
+        let parent = Subject::from(drive.clone());
+        let mut copies = Vec::new();
+        // Independent offline imports can legitimately converge into two
+        // subjects claiming the same provider ID. A backup must retain both.
+        for name in ["first", "second"] {
+            let mut resource = Resource::new(format!("https://localhost/import-{name}"));
+            resource
+                .set_unsafe(crate::urls::PARENT.into(), Value::AtomicUrl(parent.clone()))
+                .unwrap();
+            resource
+                .set_unsafe(
+                    crate::urls::LOCAL_ID.into(),
+                    Value::String("provider:one".into()),
+                )
+                .unwrap();
+            resource
+                .set_unsafe(crate::urls::NAME.into(), Value::String(name.into()))
+                .unwrap();
+            source.persist_replicated_resource(&resource).await.unwrap();
+            copies.push(resource);
+        }
+        let key = key();
+        let vault = MemoryVaultStore::new();
+        backup(&source, &parent, &key, &vault, DEVICE)
+            .await
+            .unwrap();
+
+        for populated in [true, false] {
+            let target = Db::init_temp("vault_import_identity_target").await.unwrap();
+            if populated {
+                target
+                    .persist_replicated_resource(&source.get_resource(&parent).await.unwrap())
+                    .await
+                    .unwrap();
+                for resource in &copies {
+                    target.persist_replicated_resource(resource).await.unwrap();
+                }
+            }
+            let outcome = import_vault_batch(&target, &key, &vault, &drive_prefix(PSEUDONYM), None)
+                .await
+                .unwrap();
+            assert_eq!(outcome.completeness, RestoreCompleteness::Complete);
+            for resource in &copies {
+                let restored = target.get_resource(resource.get_subject()).await.unwrap();
+                assert_eq!(
+                    restored.get(crate::urls::NAME).unwrap().to_string(),
+                    resource.get(crate::urls::NAME).unwrap().to_string()
+                );
+            }
+            assert!(
+                crate::import_identity::find_existing(&target, &parent, "provider:one")
+                    .await
+                    .unwrap_err()
+                    .to_string()
+                    .contains("Ambiguous import identity")
+            );
+            let mut third = Resource::new("https://localhost/import-third".into());
+            third
+                .set_unsafe(crate::urls::PARENT.into(), Value::AtomicUrl(parent.clone()))
+                .unwrap();
+            third
+                .set_unsafe(
+                    crate::urls::LOCAL_ID.into(),
+                    Value::String("provider:one".into()),
+                )
+                .unwrap();
+            assert!(target
+                .add_resource_opts(&third, false, true, true)
+                .await
+                .is_err());
+        }
     }
 
     #[tokio::test]

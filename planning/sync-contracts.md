@@ -68,6 +68,25 @@ restore cannot appear successful when a translation is missing.
 
 ## Validation and remaining work
 
+### Production restore follow-up (2026-10-14)
+
+The public app bundle reports `e7ccc6e`; #2249/#220 are still unmerged. The
+reported 411 KB map reads current server resource snapshots and file bytes;
+the 91 MB Vault total counts retained encrypted backup objects (59 MB change
+packs and 32 MB checkpoints in the screenshot). The exact private inventory
+has not been inspected. Production already downloads four objects concurrently,
+but first waits for every batch of signed URLs. Before this follow-up, #2249
+at `4374d5335` retained that barrier and the restore import-identity bug.
+
+- [x] Reproduce ambiguous import identities in a Vault restore, then use the
+  existing replica persistence boundary while keeping authoring checks intact.
+- [x] Start bounded downloads as URL batches become available; test order,
+  concurrency and partial failures across batches, and measure request latency.
+- [x] Make Vault usage and its distinction from the server storage map clear
+  on Sync; keep usage readable during restore and include object counts.
+- [x] Validate the changed UI in the compiled app, update coverage and prepare
+  the follow-up for the existing PR.
+
 Before this consolidation, the complete app suite passed 362 / 9 skipped; the
 portal passed 122 / 1 staging-email skip; paired acceptance passed 10/10 with no
 retries. Vault and exported-site opt-ins passed separately (2/2 and 1/1).
