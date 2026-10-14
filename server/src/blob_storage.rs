@@ -28,6 +28,14 @@ impl ObjectBlobBackend {
 #[async_trait]
 impl BlobBackend for ObjectBlobBackend {
     async fn get(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
+        match self.get_unverified(key).await? {
+            Some(bytes) if blake3::hash(&bytes).as_bytes().as_slice() != key => {
+                Err("Blob storage hash mismatch".into())
+            }
+            found => Ok(found),
+        }
+    }
+    async fn get_unverified(&self, key: &[u8]) -> AtomicResult<Option<Vec<u8>>> {
         match self.store.get(&self.path(key)).await {
             Ok(object) => Ok(Some(
                 object.bytes().await.map_err(|e| e.to_string())?.to_vec(),
@@ -294,10 +302,34 @@ mod tests {
     use atomic_lib::{db::trees::Tree, Db};
 
     async fn exercise_remote_storage(backend: Arc<dyn BlobBackend>) {
+        use atomic_lib::vault::{
+            dek::DriveVaultKey,
+            store::MemoryVaultStore,
+            sync::{drive_prefix, export_vault_segment, import_vault_batch, CheckpointPolicy},
+        };
+        use atomic_lib::{urls, Storelike, Subject, Value};
         let mut first = Db::init_redb(None).await.unwrap();
         first.blob_backend = Some(backend.clone());
+        let (_, drive) = first.setup("vault-file-owner").await.unwrap();
         let bytes = b"file contents survive replacement of the server node";
         let hash = blake3::hash(bytes);
+        let file_subject = first
+            .create_resource(urls::FILE, &drive, "recovered.txt", None)
+            .await
+            .unwrap();
+        let mut file = first
+            .get_resource(&Subject::from_raw(&file_subject, None))
+            .await
+            .unwrap();
+        file.set_unsafe(
+            urls::BLOB.into(),
+            Value::AtomicUrl(Subject::from_blob_hash(hash.as_bytes())),
+        )
+        .unwrap();
+        first
+            .add_resource_opts(&file, false, true, true)
+            .await
+            .unwrap();
         first.put_blob(hash.as_bytes(), bytes).await.unwrap();
         first.put_blob(hash.as_bytes(), bytes).await.unwrap();
         assert_eq!(first.kv.len(Tree::Blobs).unwrap(), 0);
@@ -305,15 +337,58 @@ mod tests {
             first.blob_size(hash.as_bytes()).await.unwrap(),
             Some(bytes.len() as u64)
         );
+        let vault = MemoryVaultStore::new();
+        let key = DriveVaultKey::generate(2);
+        export_vault_segment(
+            &first,
+            &Subject::from_raw(&drive, None),
+            &key,
+            &vault,
+            "file-recovery",
+            "device-a",
+            1,
+            1,
+            false,
+            &Default::default(),
+            CheckpointPolicy::default(),
+        )
+        .await
+        .unwrap()
+        .expect("file metadata is backed up");
         drop(first);
         let mut replacement = Db::init_redb(None).await.unwrap();
-        replacement.blob_backend = Some(backend);
+        let summary = import_vault_batch(
+            &replacement,
+            &key,
+            &vault,
+            &drive_prefix("file-recovery"),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary.objects_unreadable, 0);
+        let restored_file = replacement.get_resource(file.get_subject()).await.unwrap();
         assert_eq!(
-            replacement
-                .get_blob(hash.as_bytes())
-                .await
-                .unwrap()
-                .unwrap(),
+            restored_file.get(urls::BLOB).unwrap().to_string(),
+            file.get(urls::BLOB).unwrap().to_string()
+        );
+        assert_eq!(
+            restored_file.get(urls::NAME).unwrap().to_string(),
+            "recovered.txt"
+        );
+        // Graph recovery cannot conjure file bytes. Without the S3 backend,
+        // the restored reference still exists but the file is unavailable.
+        assert!(replacement
+            .get_blob(hash.as_bytes())
+            .await
+            .unwrap()
+            .is_none());
+        replacement.blob_backend = Some(backend);
+        let restored_hash = restored_file.get(urls::BLOB).unwrap().to_string();
+        let restored_hash = Subject::from_raw(&restored_hash, None);
+        let restored_hash = hex::decode(restored_hash.blob_hash_hex().unwrap()).unwrap();
+        assert_eq!(
+            replacement.get_blob(&restored_hash).await.unwrap().unwrap(),
             bytes
         );
         assert_eq!(replacement.kv.len(Tree::Blobs).unwrap(), 0);
@@ -327,6 +402,29 @@ mod tests {
             )
             .unwrap(),
         )
+    }
+
+    #[tokio::test]
+    async fn corrupt_object_is_never_returned_as_valid_blob_bytes() {
+        let objects = Arc::new(object_store::memory::InMemory::new());
+        let backend = ObjectBlobBackend::new(objects.clone(), "blobs").unwrap();
+        let bytes = b"original bytes";
+        let hash = blake3::hash(bytes);
+        backend.put(hash.as_bytes(), bytes).await.unwrap();
+        assert_eq!(backend.get(hash.as_bytes()).await.unwrap().unwrap(), bytes);
+        objects
+            .put(
+                &backend.path(hash.as_bytes()),
+                b"corrupted bytes".to_vec().into(),
+            )
+            .await
+            .unwrap();
+        assert!(backend
+            .get(hash.as_bytes())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("hash mismatch"));
     }
 
     #[tokio::test]

@@ -11,7 +11,9 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ThemeProvider } from 'styled-components';
 import { Agent } from '@tomic/lib';
+import toast from 'react-hot-toast';
 import { buildTheme } from '../../styling';
+import { ensureVaultBackup } from '../../helpers/managed/vaultAutoBackup';
 
 const state = vi.hoisted(() => ({
   portal: 'https://portal.example',
@@ -356,6 +358,59 @@ it('opens its own home without requiring another device', async () => {
   );
   expect(state.navigate).toHaveBeenCalledWith('/app/show?subject=did:ad:home');
   expect(screen.queryByText('Connect device')).toBeNull();
+});
+
+it('does not create a new home over a backup whose restore failed', async () => {
+  state.hasData = false;
+  state.restoreVault.mockResolvedValue({
+    status: 'failed',
+    error: new Error('Backup download failed'),
+  });
+  await show('?step=signin');
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+  expect(state.store.ensurePrivateDrive).not.toHaveBeenCalled();
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
+it('opens a partial restore without backing it up, and says it is partial', async () => {
+  const incomplete =
+    'Restore incomplete: 2 backup objects could not be downloaded.';
+  const toastError = vi.spyOn(toast, 'error').mockImplementation(() => '');
+  state.hasData = false;
+  state.restoreVault.mockImplementation(async () => {
+    state.hasData = true;
+
+    return { status: 'restored', outcome: { incomplete } };
+  });
+  await show('?step=signin');
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+  expect(state.navigate).toHaveBeenCalledWith('/app/show?subject=did:ad:home');
+  expect(ensureVaultBackup).not.toHaveBeenCalled();
+  expect(toastError).toHaveBeenCalledWith(incomplete, expect.anything());
+});
+
+it('backs up a complete restore', async () => {
+  state.hasData = false;
+  state.restoreVault.mockImplementation(async () => {
+    state.hasData = true;
+
+    return { status: 'restored', outcome: {} };
+  });
+  await show('?step=signin');
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+  expect(ensureVaultBackup).toHaveBeenCalled();
 });
 
 const pasteOtherAgentsSecret = async () => {

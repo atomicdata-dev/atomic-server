@@ -121,6 +121,7 @@ export function useVaultBackup({
   proofMessage,
   devicePubkey,
   getDisplayMetadata,
+  afterRestore,
 }: {
   db: VaultCapableDb | null;
   keys: VaultKeyOps | null;
@@ -131,6 +132,13 @@ export function useVaultBackup({
   proofMessage: Uint8Array | null;
   devicePubkey: string | null;
   getDisplayMetadata?: () => Promise<{ name?: string; emoji?: string }>;
+  /**
+   * Runs once a restore has imported data, before the vault stops being busy.
+   * The caller's follow-up (reopening the drive in the store) can take
+   * seconds; if it ran after `busy` cleared, the Restore button would look
+   * idle and finished while the page had not yet reacted.
+   */
+  afterRestore?: () => Promise<void>;
 }): UseVaultBackup {
   const [status, setStatus] = useState<VaultStatus>({ state: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -399,31 +407,56 @@ export function useVaultBackup({
     ],
   );
 
+  /**
+   * A partial restore keeps its data but must still show the error. Then the
+   * caller's follow-up runs, still inside the busy window.
+   */
+  const surfaceIncomplete = useCallback(
+    async (outcome: RestoreOutcome) => {
+      if (outcome.incomplete) setError(outcome.incomplete);
+
+      try {
+        await afterRestore?.();
+      } catch (e) {
+        // The data is imported; a failed refresh must not turn that into a
+        // failed restore.
+        console.warn('[cloud-vault] refreshing after restore failed', e);
+      }
+
+      return outcome;
+    },
+    [afterRestore],
+  );
+
   const restore = useCallback(async () => {
     if (status.state !== 'on') return null;
 
     return run(async () => {
-      const key = await ensureKey(status.enrollment.drive_pseudonym);
+      // Another device may have re-keyed the vault since this panel opened.
+      const key = await refreshKey(status.enrollment.drive_pseudonym);
       setRestoreProgress(0);
 
       try {
-        return await restoreDrive({
-          db: db!,
-          drivePseudonym: status.enrollment.drive_pseudonym,
-          // This device's lane, so the import can record which *other* lanes it
-          // now provably holds. That is what lets a checkpoint published from
-          // here later claim coverage for them — the only way a lane belonging
-          // to a device that is gone ever becomes prunable.
-          devicePubkey: devicePubkey!,
-          driveKey: key.driveKey,
-          onProgress: (done, total) =>
-            setRestoreProgress(total === 0 ? 1 : done / total),
-        });
+        return await surfaceIncomplete(
+          await restoreDrive({
+            db: db!,
+            drivePseudonym: status.enrollment.drive_pseudonym,
+            // This device's lane, so the import can record which *other* lanes it
+            // now provably holds. That is what lets a checkpoint published from
+            // here later claim coverage for them — the only way a lane belonging
+            // to a device that is gone ever becomes prunable.
+            devicePubkey: devicePubkey!,
+            driveKey: key.driveKey,
+            keyEpoch: key.keyEpoch,
+            onProgress: (done, total) =>
+              setRestoreProgress(total === 0 ? 1 : done / total),
+          }),
+        );
       } finally {
         setRestoreProgress(null);
       }
     });
-  }, [run, status, ensureKey, db, devicePubkey]);
+  }, [run, status, refreshKey, db, devicePubkey, surfaceIncomplete]);
 
   const downloadBackup = useCallback(async () => {
     if (status.state !== 'on') return null;
@@ -475,22 +508,24 @@ export function useVaultBackup({
         setRestoreProgress(0);
 
         try {
-          return await restoreDriveFromFile({
-            file,
-            db: db!,
-            drivePseudonym,
-            devicePubkey: devicePubkey!,
-            driveKey: key.driveKey,
-            keyEpoch: key.keyEpoch,
-            onProgress: (done, total) =>
-              setRestoreProgress(total === 0 ? 1 : done / total),
-          });
+          return await surfaceIncomplete(
+            await restoreDriveFromFile({
+              file,
+              db: db!,
+              drivePseudonym,
+              devicePubkey: devicePubkey!,
+              driveKey: key.driveKey,
+              keyEpoch: key.keyEpoch,
+              onProgress: (done, total) =>
+                setRestoreProgress(total === 0 ? 1 : done / total),
+            }),
+          );
         } finally {
           setRestoreProgress(null);
         }
       });
     },
-    [run, status, ensureKey, db, devicePubkey],
+    [run, status, ensureKey, db, devicePubkey, surfaceIncomplete],
   );
 
   return {

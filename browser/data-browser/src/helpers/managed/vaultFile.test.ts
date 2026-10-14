@@ -47,10 +47,10 @@ const payloads = [
   new Uint8Array([6]),
 ];
 
-const build = () =>
+const build = (keyEpoch = 1) =>
   buildVaultFile({
     drivePseudonym: P,
-    objects,
+    objects: objects.map(object => ({ ...object, key_epoch: keyEpoch })),
     bodies: payloads.map(p => new Blob([p as BlobPart])),
     now: 1700000000000,
   });
@@ -179,37 +179,40 @@ describe('restoreDriveFromFile', () => {
       })),
     }) satisfies VaultCapableDb;
 
-  it('hands the objects to vaultImport in file order, without network', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const db = makeDb();
-    const file = vaultFileBlob(await build());
+  it.each([1, 4])(
+    'hands epoch %i objects to vaultImport in file order, without network',
+    async keyEpoch => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const db = makeDb();
+      const file = vaultFileBlob(await build(keyEpoch));
 
-    const outcome = await restoreDriveFromFile({
-      file,
-      db,
-      drivePseudonym: P,
-      devicePubkey: 'me',
-      driveKey: KEY,
-      keyEpoch: 1,
-    });
+      const outcome = await restoreDriveFromFile({
+        file,
+        db,
+        drivePseudonym: P,
+        devicePubkey: 'me',
+        driveKey: KEY,
+        keyEpoch,
+      });
 
-    expect(outcome.resourcesRestored).toBe(1);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(db.vaultImport).toHaveBeenCalledTimes(1);
-    const [key, epoch, pseudonym, device, imported] = db.vaultImport.mock
-      .calls[0] as unknown as [
-      Uint8Array,
-      number,
-      string,
-      string,
-      { objectKey: string; sealed: Uint8Array }[],
-    ];
-    expect([key, epoch, pseudonym, device]).toEqual([KEY, 1, P, 'me']);
-    expect(imported.map(o => o.objectKey)).toEqual(
-      objects.map(o => o.object_key),
-    );
-    expect(imported.map(o => o.sealed)).toEqual(payloads);
-  });
+      expect(outcome.resourcesRestored).toBe(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(db.vaultImport).toHaveBeenCalledTimes(1);
+      const [key, epoch, pseudonym, device, imported] = db.vaultImport.mock
+        .calls[0] as unknown as [
+        Uint8Array,
+        number,
+        string,
+        string,
+        { objectKey: string; sealed: Uint8Array }[],
+      ];
+      expect([key, epoch, pseudonym, device]).toEqual([KEY, keyEpoch, P, 'me']);
+      expect(imported.map(o => o.objectKey)).toEqual(
+        objects.map(o => o.object_key),
+      );
+      expect(imported.map(o => o.sealed)).toEqual(payloads);
+    },
+  );
 
   it('names a mismatch of workspace and imports nothing', async () => {
     const db = makeDb();

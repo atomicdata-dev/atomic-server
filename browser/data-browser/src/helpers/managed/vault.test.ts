@@ -551,6 +551,109 @@ describe('backupDrive', () => {
 });
 
 describe('restoreDrive', () => {
+  it('retains readable objects and rejects recovery when another download is missing', async () => {
+    const objects = ['a', 'missing', 'c'].map(id => ({
+      object_id: id,
+      object_key: id,
+    }));
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 2,
+        resourcesRestored: 2,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 0,
+      }),
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/objects'))
+        return new Response(JSON.stringify(objects));
+      if (url.endsWith('/download-urls'))
+        return new Response(
+          JSON.stringify({
+            downloads: objects.map(o => ({
+              ...o,
+              url: `https://s3.test/${o.object_id}`,
+            })),
+          }),
+        );
+
+      return url.endsWith('/missing')
+        ? new Response('', { status: 404 })
+        : new Response(new Uint8Array([7]));
+    });
+    await expect(
+      restoreDrive({
+        db,
+        drivePseudonym: PSEUDONYM,
+        devicePubkey: DEVICE,
+        driveKey: KEY,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringMatching(/Restore incomplete:/),
+      cause: expect.stringMatching(/404/),
+    });
+    expect(db.vaultImport).toHaveBeenCalledWith(KEY, 1, PSEUDONYM, DEVICE, [
+      { objectKey: 'a', sealed: new Uint8Array([7]) },
+      { objectKey: 'c', sealed: new Uint8Array([7]) },
+    ]);
+  });
+
+  it('returns a flagged outcome when some objects are unreadable but data was restored', async () => {
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 2,
+        resourcesRestored: 5,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 1,
+      }),
+    };
+
+    const outcome = await restoreDrive({
+      db,
+      drivePseudonym: PSEUDONYM,
+      devicePubkey: DEVICE,
+      driveKey: KEY,
+      source: async () => [{ objectKey: 'pack', sealed: new Uint8Array([1]) }],
+    });
+
+    expect(outcome.resourcesRestored).toBe(5);
+    expect(outcome.incomplete).toMatch(/Restore incomplete:.*1.*unreadable/);
+    expect(outcome.incomplete).toContain('Recovered data was kept.');
+  });
+
+  it('still throws when every object is unreadable', async () => {
+    const db = {
+      vaultExport: vi.fn(),
+      vaultCommitSegment: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 0,
+        resourcesRestored: 0,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 2,
+      }),
+    };
+
+    await expect(
+      restoreDrive({
+        db,
+        drivePseudonym: PSEUDONYM,
+        devicePubkey: DEVICE,
+        driveKey: KEY,
+        source: async () => [
+          { objectKey: 'pack', sealed: new Uint8Array([1]) },
+        ],
+      }),
+    ).rejects.toThrow(/incomplete.*2.*unreadable/i);
+  });
+
   it('downloads concurrently with a bound and preserves listing order', async () => {
     const objects = Array.from({ length: 9 }, (_, i) => ({
       object_id: String(i),
@@ -562,7 +665,13 @@ describe('restoreDrive', () => {
     const db = {
       vaultExport: vi.fn(),
       vaultCommitSegment: vi.fn(),
-      vaultImport: vi.fn(),
+      vaultImport: vi.fn().mockResolvedValue({
+        packsRead: 9,
+        resourcesRestored: 9,
+        tombstonesApplied: 0,
+        objectsSkipped: 0,
+        objectsUnreadable: 0,
+      }),
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
@@ -875,7 +984,10 @@ describe('restoreDrive', () => {
         devicePubkey: DEVICE,
         driveKey: KEY,
       }),
-    ).rejects.toThrow(/No download URL/i);
+    ).rejects.toMatchObject({
+      message: expect.stringMatching(/Restore incomplete:/),
+      cause: expect.stringMatching(/No download URL/i),
+    });
   });
 });
 

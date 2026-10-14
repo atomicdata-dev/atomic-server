@@ -63,6 +63,7 @@ it('an anonymous worker finishing initialization cannot reattach after sign-in',
   let attached: unknown;
   const store = {
     expectClientDb() {},
+    clientDbUnavailable() {},
     getAgent: () => agent,
     on: (_: string, callback: typeof listener) => {
       listener = callback;
@@ -106,6 +107,7 @@ it('dev-drive setup can defer the anonymous worker and initialize only its fresh
   let listener: (next: { subject: string } | undefined) => void = () => {};
   const store = {
     expectClientDb: vi.fn(),
+    clientDbUnavailable: vi.fn(),
     getAgent: () => agent,
     on: (_: string, callback: typeof listener) => {
       listener = callback;
@@ -123,7 +125,11 @@ it('dev-drive setup can defer the anonymous worker and initialize only its fresh
   expect(store.expectClientDb).toHaveBeenCalled();
   expect(state.workers).toHaveLength(0);
   agent = { subject: 'did:ad:agent:fresh-test' };
+  store.expectClientDb.mockClear();
   listener(agent);
+  // Synchronously, before the serialized start runs: reads triggered by this
+  // sign-in must wait for the attach rather than fail as offline.
+  expect(store.expectClientDb).toHaveBeenCalledTimes(1);
   await vi.waitFor(() => expect(state.workers).toHaveLength(1));
   expect(store.setClientDb).toHaveBeenLastCalledWith(state.workers[0]);
   state.workers[0].ready.resolve();

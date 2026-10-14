@@ -1075,8 +1075,9 @@ native clients.
   One run timed out at the separate child-cascade store-removal barrier;
   a subsequent run passed, so cascade timing remains an intermittent gap.
 
-- `client-db.worker.test.ts` requires vault cursor commits to flush before the
-  worker acknowledges backup completion, and propagates flush failures. The
+- `client-db.worker.test.ts` requires Vault cursor commits and imports to flush before the
+  worker acknowledges completion, and propagates flush failures without poisoning
+  subsequent requests. The
   SaaS `vault-refresh.spec.ts` checks stored objects and bytes across reloads.
 - `db::compaction::tests::startup_compaction_shrinks_a_bloated_store_and_keeps_every_resource`
   (`cargo test -p atomic_lib --features db-redb --lib`) churns a real redb
@@ -1778,8 +1779,15 @@ bucket; SaaS representative CI supplies MinIO. `server/src/tests.rs` checks
 remote multipart upload/download and image renditions, asserting Tree::Blobs
 stays empty. Standalone local storage still runs through the original tests.
 
+The same blob backend exercise now exports an encrypted epoch-2 Vault checkpoint,
+drops the source database, restores file metadata into an empty database, and
+fetches the referenced bytes from the independent S3 blob backend. It checks
+that the restored database alone cannot supply those bytes and that Tree::Blobs
+stays empty. Both the in-memory object-store test and the real MinIO test run
+this joined recovery drill; attachment bytes are not included in Vault packs.
+
 Not covered here: live Hetzner rollout, arbitrary large-file memory limits,
-or encrypted Vault attachment recovery.
+or a live provider deployment.
 
 ### Blob garbage collection
 
@@ -1810,6 +1818,7 @@ the `atomic-server gc-blobs` subcommand end to end, a sweep against real S3
 (`ObjectBlobBackend::list`/`delete` are only exercised on in-memory and local
 object stores), a very large blob count, and the narrow race where a re-upload
 lands between the pre-delete age check and the delete itself.
+
 
 `shared_files_count_once_per_drive_independently_of_other_owners` proves that
 one physical object shared by two owners counts once in each drive, repeated
@@ -2738,3 +2747,74 @@ managed node, reads a saved child directly over HTTP, queues an edit with WS
 disconnected, reconnects, then signs in on a fresh browser and verifies the
 edited child after reload. It does not certify real billing or a full network
 partition.
+
+
+## Vault recovery contracts (2026-10-13)
+
+Run shared persistence journeys for both Vault and Server. UI-only interactions
+still run once. Passing a Server journey does not establish Vault recovery:
+Vault exports encrypted graph state and resolves file bytes through a separate
+blob store, while Server reconciles graph state over its live connection.
+
+- `lib/src/vault/sync.rs::independent_devices_converge_and_a_stale_device_catches_up`
+  uses independent real databases and device lanes: concurrent edits to different
+  properties, deletion, 105 children, a fresh-device restore, explicit stale-device
+  restore, then another edit converging across all three inventories.
+- `wasm/tests/vault.rs` exercises the actual JS/WASM bindings, including byte
+  arrays, encryption keys, imports and current-state checkpoints. The checkpoint
+  size test uses 100 real Loro commits and checks the final recovered value.
+  SaaS integration CI runs the suite in Node; native Rust builds alone exclude it.
+- `helpers/managed/vaultAutoBackup.test.ts` covers recovered key epochs and
+  read-only recovery while enrollment is suspended. `useVaultBackup.restore.test.ts`
+  exercises the actual hook with service doubles, including refreshing a key
+  rotated by another device while the panel remains open and surfacing import
+  failures instead of reporting restoration complete. `vaultFile.test.ts` also
+  passes an epoch-4 downloaded backup through the file restore boundary.
+- `helpers/managed/vault.test.ts` rejects a partial import with unreadable objects,
+  while retaining recoverable data for a retry. The worker flush barrier is
+  separately covered by `client-db.worker.test.ts`.
+- The companion SaaS `vault_e2e.rs` test joins the real enrollment/key API, ledger,
+  presigned MinIO uploads/downloads and fresh Rust database import after key
+  rotation to epoch 2. Another account cannot obtain its key or download URLs.
+
+- `browser/lib/src/local-read-deadline.test.ts` covers server 404 resources
+  racing a local database attachment, including attachment after the startup
+  grace expires and identity changes before/after that timeout.
+- The companion SaaS `sync-recovery-profiles.spec.ts` runs the same fresh-device,
+  reload, stale-device and another-device edit journey for Server and Vault.
+  It closes each writer before recovery, requires signed S3 reads for Vault,
+  and gives the Server profile no managed-account fallback. The Vault leg also
+  damages one S3 response and checks the real importer's incomplete-restore UI,
+  preserved local data and a successful retry. CI's hosted static-app leg runs
+  the Vault profile as well. This is one shared data contract, not a blanket
+  duplication of all UI tests.
+
+The companion SaaS acceptance matrix additionally covers real OPFS flush
+failure and immediate restart, epoch-2 automatic/manual recovery, admin
+suspension, missing/corrupt objects, independent concurrent writers and
+Cloud Server process restart. Its file journey uploads through Cloud Server
+first, then restores File metadata from Vault and reads separate S3 bytes,
+including denied private metadata access, missing bytes and corrupt bytes.
+Content-addressed blob URLs retain their existing bearer-by-hash contract.
+
+`browser/e2e/scripts/verify-peer-sync.mjs` separately verifies real browser
+multiplayer with server graph access disabled. Both ordinary and invited-agent
+runs cover concurrent edits, presence, attachments, reconnect, OPFS reload and
+deletion. Recovery tests block peers only to establish that backups themselves
+work; production peer sync remains enabled. This harness tests library state,
+not rendered TipTap multiplayer behavior.
+
+`local-read-deadline.test.ts` also checks a restored profile snapshot merging
+with a pending local edit. `store.private-drive.test.ts` prevents an unrelated
+node lookup from replacing an explicitly local-only agent profile.
+`sync-delta-local-base.test.ts` verifies that a complete server sync snapshot
+after a JSON-only collection read is persisted, so reload keeps the edit.
+
+Remaining gaps: automatic background Vault pull is not implemented, so explicit
+restore is the stale-device acceptance boundary. Newly attached bytes in a
+workspace that has only used Vault stay local: G1 establishes recovery of blobs
+already uploaded to S3, not Vault-only blob upload. Native lifecycle, large
+restore budgets, arbitrary missing segments, notification read-state convergence,
+Cloud Server revoke/regrant and full invitation revocation parity still need
+coverage. Native deletion tests include checkpoint retention and stale lanes;
+browser compaction, pruning and Discard history races remain untested.

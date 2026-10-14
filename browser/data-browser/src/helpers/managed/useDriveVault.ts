@@ -63,7 +63,23 @@ export function useDriveVault(driveSubject: string | null): UseVaultBackup {
     [store, driveSubject],
   );
 
+  // A restore writes to the local database, which the store does not watch.
+  // Three screens offer the restore; one of them used to refetch the drive
+  // afterwards and the other two navigated straight into the cached "could
+  // not open" that had brought the user there. Done here, so an offer cannot
+  // forget. It runs inside the restore's busy window: reopening can wait on a
+  // socket for seconds, and a Restore button that looks idle meanwhile reads
+  // as a restore that did nothing.
+  const afterRestore = useCallback(
+    () =>
+      driveSubject
+        ? reopenRestoredDrive(store, driveSubject)
+        : Promise.resolve(),
+    [store, driveSubject],
+  );
+
   const vault = useVaultBackup({
+    afterRestore,
     getDisplayMetadata,
     // Whichever local store this build actually keeps the drive in. A browser
     // has the ClientDb; the desktop and Android apps have the embedded node and
@@ -80,35 +96,5 @@ export function useDriveVault(driveSubject: string | null): UseVaultBackup {
     devicePubkey: laneId,
   });
 
-  // A restore writes to the local database, which the store does not watch.
-  // Three screens offer the restore; one of them used to refetch the drive
-  // afterwards and the other two navigated straight into the cached "could
-  // not open" that had brought the user there. Done here, so an offer cannot
-  // forget.
-  const { restore: importFromVault } = vault;
-  const restore = useCallback(async () => {
-    const outcome = await importFromVault();
-
-    if (outcome && driveSubject) {
-      await reopenRestoredDrive(store, driveSubject);
-    }
-
-    return outcome;
-  }, [importFromVault, driveSubject, store]);
-
-  const { restoreFromFile: importFromFile } = vault;
-  const restoreFromFile = useCallback(
-    async (file: File) => {
-      const outcome = await importFromFile(file);
-
-      if (outcome && driveSubject) {
-        await reopenRestoredDrive(store, driveSubject);
-      }
-
-      return outcome;
-    },
-    [importFromFile, driveSubject, store],
-  );
-
-  return { ...vault, restore, restoreFromFile };
+  return vault;
 }

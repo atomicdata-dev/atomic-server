@@ -472,6 +472,7 @@ export async function restoreDriveFromFile({
   return restoreDrive({
     ...rest,
     drivePseudonym,
+    keyEpoch,
     source: fileRestoreSource(parsed),
   });
 }

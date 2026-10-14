@@ -942,6 +942,17 @@ async fn content_addressed_image_with_storage(remote: bool) {
             .starts_with("attachment"));
         let rendered = test::read_body(resized).await;
         assert_eq!(image::guess_format(&rendered).unwrap(), expected_format);
+        // Second request is served from the rendition cache (a synthetic key,
+        // not the content hash) and must match the first.
+        let again = test::call_service(
+            &app,
+            TestRequest::get()
+                .uri(&format!("{path}?f={format}&w=64&q=60"))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(again.status(), 200, "cached rendition must be readable");
+        assert_eq!(test::read_body(again).await, rendered);
     }
     let missing = "0".repeat(64);
     for suffix in ["", "?f=webp&w=64&q=60"] {

@@ -90,11 +90,20 @@ function scheduleStart(store: Store, agentSubject: string | undefined): void {
   // Detach synchronously on identity change: a caller can save immediately
   // after setAgent(), before the serialized restart has derived the new key.
   // It must not write to the previous identity's worker (or its destroyed RPC).
-  if (currentIdentity !== agentSubject) store.setClientDb(undefined);
+  if (currentIdentity !== agentSubject || !currentWorker) {
+    store.setClientDb(undefined);
+    // An earlier unresolved start told the store no database is coming. Reads
+    // triggered by this sign-in run before the queued start does, so re-arm
+    // now, or they fail at once with "Offline: resource not available".
+    store.expectClientDb();
+  }
+
   restartChain = restartChain
     .then(() => startForIdentity(store, agentSubject))
     .catch(err => {
       console.warn('[ClientDb] Failed to (re)start for identity:', err);
+      // No database is coming: reads must stop waiting for one to attach.
+      if (!store.getClientDb()) store.clientDbUnavailable();
     });
 }
 
@@ -154,6 +163,10 @@ async function startForIdentity(
   if (store.getAgent()?.subject !== agentSubject) return;
   if (currentWorker && currentIdentity === agentSubject) return;
 
+  // An earlier start may have given up (no usable key) and told the store no
+  // database was coming. This one can still attach, so reads wait again.
+  store.expectClientDb();
+
   const isFirstStart = currentIdentity === null;
   currentIdentity = agentSubject;
 
@@ -192,7 +205,13 @@ async function startForIdentity(
     // No key we could use, and the database is not ours to replace. Leave
     // `currentWorker` unset so the next AgentChanged — the sign-in that
     // unwraps the key — comes back through here and starts it properly.
-    if (!resolved) return;
+    // Until then no database is coming, so reads must not wait out the attach
+    // grace for it; that start re-announces itself with `expectClientDb`.
+    if (!resolved) {
+      store.clientDbUnavailable();
+
+      return;
+    }
 
     dbKey = resolved;
     discardUndecryptable = !(await hasWrappedDbKey(agentSubject));
