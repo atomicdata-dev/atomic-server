@@ -43,6 +43,11 @@ export interface HostRequest {
   connectionId?: string;
   /** The frame's own Ed25519 public key, base64url. */
   publicKey?: string;
+  /** `proxyFetch`: the request the frame signed, which this host sends. */
+  url?: string;
+  method?: string;
+  headers?: unknown;
+  body?: string;
   /** `getMany`: the subjects to read, in order. Checked, since the frame sends it. */
   subjects?: unknown;
 }
@@ -278,6 +283,15 @@ export async function handleRequest(
       });
     }
 
+    // The frame's CSP allows no network, so the signed request it built is
+    // sent from here. Only to the proxy this host is configured for.
+    case 'proxyFetch': {
+      if (!proxy)
+        throw new Error('This host cannot reach the integration proxy.');
+
+      return await proxyFetch(proxy.origin, request);
+    }
+
     case 'proxyConnections':
       return proxy
         ? await proxy.connections(required(request.platform, 'platform'))
@@ -452,4 +466,103 @@ function required(value: string | undefined, name: string): string {
   }
 
   return value;
+}
+
+const PROXY_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const PROXY_RESPONSE_HEADERS = ['link', 'retry-after', 'etag', 'content-type'];
+const PROXY_REQUEST_HEADERS = ['authorization', 'content-type', 'if-match'];
+const PROXY_MAX_BODY = 10 * 1024 * 1024;
+const PROXY_TIMEOUT = 30_000;
+
+/** Send a frame's signed proxy request, if it stays within the proxy. */
+async function proxyFetch(
+  origin: string,
+  request: HostRequest,
+): Promise<{ status: number; headers: Record<string, string>; text: string }> {
+  const method = String(request.method ?? '').toUpperCase();
+
+  if (!PROXY_METHODS.includes(method)) throw new Error('Invalid proxy method');
+
+  if (request.body !== undefined && typeof request.body !== 'string')
+    throw new Error('A proxy request body is JSON text');
+
+  if (request.body !== undefined && method === 'GET')
+    throw new Error('A GET proxy request has no body');
+
+  let url: URL;
+
+  try {
+    url = new URL(required(request.url, 'url'));
+  } catch {
+    throw new Error('Invalid proxy URL');
+  }
+
+  if (
+    url.origin !== new URL(origin).origin ||
+    !url.pathname.startsWith('/proxy/')
+  )
+    throw new Error('The frame may only call the integration proxy');
+
+  const headers = new Headers();
+  const given = request.headers;
+
+  if (typeof given !== 'object' || given === null || Array.isArray(given))
+    throw new Error('Invalid proxy headers');
+
+  for (const [name, value] of Object.entries(given)) {
+    const lower = name.toLowerCase();
+
+    if (
+      typeof value !== 'string' ||
+      !(PROXY_REQUEST_HEADERS.includes(lower) || lower.startsWith('x-atomic-'))
+    )
+      throw new Error(`Proxy header not allowed: ${name}`);
+
+    headers.set(lower, value);
+  }
+
+  const response = await fetch(url.href, {
+    method,
+    body: request.body,
+    headers,
+    credentials: 'omit',
+    redirect: 'error',
+    signal: AbortSignal.timeout(PROXY_TIMEOUT),
+  });
+
+  const text = await limitedText(response);
+  const out: Record<string, string> = {};
+
+  for (const name of PROXY_RESPONSE_HEADERS) {
+    const value = response.headers.get(name);
+
+    if (value !== null) out[name] = value;
+  }
+
+  return { status: response.status, headers: out, text };
+}
+
+async function limitedText(response: Response): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = '';
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+      size += value.byteLength;
+
+      if (size > PROXY_MAX_BODY)
+        throw new Error('Proxy response exceeds 10 MB');
+      text += decoder.decode(value, { stream: true });
+    }
+
+    return text + decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }

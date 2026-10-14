@@ -380,11 +380,7 @@ pub async fn handle_plugin_ui(
     if format == "html" {
         let nonce = plugin_nonce();
         let body = render_plugin_ui_html(&nonce);
-        let csp = format!(
-            "sandbox allow-scripts allow-downloads allow-pointer-lock allow-presentation; \
-             default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
-             img-src * data:; connect-src *; font-src *; base-uri 'none'; object-src 'none';"
-        );
+        let csp = frame_csp(&nonce);
 
         return Ok(HttpResponse::Ok()
             .content_type("text/html; charset=utf-8")
@@ -431,6 +427,18 @@ pub async fn handle_plugin_ui(
         .body(content))
 }
 
+/// The CSP of every plugin and app frame. `connect-src 'none'`: a frame holds drive
+/// data, so it may not send it anywhere. The one legitimate request, to the
+/// integration proxy, is made by the host (`proxyFetch`). `allow-modals`
+/// mirrors the iframe's own `sandbox` attribute; the CSP can only narrow it.
+fn frame_csp(nonce: &str) -> String {
+    format!(
+        "sandbox allow-scripts allow-modals allow-downloads allow-pointer-lock allow-presentation; \
+         default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
+         img-src * data:; connect-src 'none'; font-src *; base-uri 'none'; object-src 'none';"
+    )
+}
+
 /// Serves a plugin whose source is a property on a resource.
 ///
 /// The bytes come from the store instead of `plugin_path`; everything else —
@@ -451,10 +459,7 @@ async fn serve_drive_plugin(
         // No stylesheet: a plugin in the drive is one module. Its styles belong
         // in it, next to the markup they describe.
         let body = render_drive_plugin_ui_html_with(query_string, false, &nonce, true);
-        let csp = format!(
-            "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' 'self'; \
-             img-src * data:; connect-src *; font-src *; base-uri 'none'; object-src 'none';"
-        );
+        let csp = frame_csp(&nonce);
 
         return Ok(HttpResponse::Ok()
             .content_type("text/html; charset=utf-8")
@@ -598,6 +603,17 @@ pub async fn handle_plugin_list(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A frame can read drive data, so it must have no way to send it out.
+    #[test]
+    fn frame_csp_forbids_network_and_sandboxes() {
+        let csp = frame_csp("n0nce");
+
+        assert!(csp.contains("connect-src 'none'"));
+        assert!(!csp.contains("connect-src *"));
+        assert!(csp.starts_with("sandbox allow-scripts "));
+        assert!(csp.contains("script-src 'nonce-n0nce'"));
+    }
 
     /// An app's frame is null-origin, so its console is reachable by nobody:
     /// whatever it prints there, the person who could fix the app never sees.
