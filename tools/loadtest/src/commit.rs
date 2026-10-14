@@ -24,7 +24,10 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::sync::{broadcast::error::RecvError, watch, Barrier};
+use tokio::{
+    sync::{broadcast::error::RecvError, watch, Barrier},
+    task::JoinHandle,
+};
 
 /// When each commit left a writer, keyed by commit id, with the latest send
 /// time per subject as a fallback for UPDATE frames that carry no commit id.
@@ -40,6 +43,7 @@ struct Shared {
     ack_ms: Mutex<Vec<f64>>,
     commits_sent: AtomicU64,
     commits_ok: AtomicU64,
+    skipped_ticks: AtomicU64,
     errors: Errors,
     sub_connected: AtomicU64,
     writers_ready: AtomicU64,
@@ -54,14 +58,24 @@ struct SubResult {
     broadcast_lagged: u64,
 }
 
-pub async fn run(
-    common: &Common,
-    writers: usize,
-    subscribers: usize,
-    rate: f64,
-    duration: f64,
-    ramp_secs: f64,
-) -> Res<Json> {
+pub struct Opts {
+    pub writers: usize,
+    pub subscribers: usize,
+    pub rate: f64,
+    pub duration: f64,
+    pub ramp_secs: f64,
+    pub closed_loop: bool,
+}
+
+pub async fn run(common: &Common, opts: Opts) -> Res<Json> {
+    let Opts {
+        writers,
+        subscribers,
+        rate,
+        duration,
+        ramp_secs,
+        closed_loop,
+    } = opts;
     let url = ws_url(&common.server);
     let writer_agents = (0..writers)
         .map(|i| new_agent(&format!("w{i}")))
@@ -106,7 +120,18 @@ pub async fn run(
             barrier.wait().await;
             let _ = go.changed().await;
             if let Some((ws, resource)) = ready {
-                writer_loop(i, ws, agent, resource, client, &shared, rate, load_secs).await;
+                writer_loop(
+                    i,
+                    ws,
+                    agent,
+                    resource,
+                    client,
+                    &shared,
+                    rate,
+                    load_secs,
+                    closed_loop,
+                )
+                .await;
             }
         }));
     }
@@ -139,6 +164,7 @@ pub async fn run(
     let ack = summarize(shared.ack_ms.lock().unwrap().clone());
     let fan = summarize(lag);
     let expected = ok * subs_up;
+    let skipped = shared.skipped_ticks.load(Relaxed);
     println!(
         "commit: sent {sent}, acked {ok}, errors {}",
         shared.errors.total()
@@ -148,6 +174,9 @@ pub async fn run(
         ok as f64 / send_window,
         writers as f64 * rate
     );
+    if closed_loop {
+        println!("  closed loop: {skipped} ticks skipped because the previous commit was unacked");
+    }
     println!("  commit ack latency: {}", line(&ack));
     println!("  fan-out lag:        {}", line(&fan));
     println!(
@@ -160,11 +189,13 @@ pub async fn run(
     Ok(json!({
         "scenario": "commit",
         "config": { "server": common.server, "writers": writers, "subscribers": subscribers,
-                    "rate_per_writer": rate, "duration_secs": duration },
+                    "rate_per_writer": rate, "duration_secs": duration,
+                    "closed_loop": closed_loop },
         "subscribers_connected": subs_up,
         "writers_ready": ready,
         "commits_sent": sent,
         "commits_acked": ok,
+        "skipped_ticks": skipped,
         "send_window_secs": send_window,
         "target_commits_per_sec": writers as f64 * rate,
         "achieved_commits_per_sec": ok as f64 / send_window,
@@ -299,17 +330,26 @@ async fn writer_loop(
     shared: &Arc<Shared>,
     rate: f64,
     load: Duration,
+    closed_loop: bool,
 ) {
     let store = client.store();
     let end = Instant::now() + load;
     let mut tick = tokio::time::interval(Duration::from_secs_f64(1.0 / rate.max(0.001)));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
-    let mut waiters = Vec::new();
+    let mut waiters: Vec<JoinHandle<()>> = Vec::new();
     let mut n: u64 = 0;
     loop {
         tick.tick().await;
         if Instant::now() >= end {
             break;
+        }
+        if closed_loop
+            && waiters
+                .last()
+                .is_some_and(|w: &JoinHandle<()>| !w.is_finished())
+        {
+            shared.skipped_ticks.fetch_add(1, Relaxed);
+            continue;
         }
         n += 1;
         // Sign sequentially: each edit builds on the previous commit.

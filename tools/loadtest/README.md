@@ -69,6 +69,14 @@ versus acked commits x subscribers. A rejected commit leaves that writer's
 local chain ahead of the server, so later edits of that writer usually fail
 too; with limits on, expect a cascade after the first 429.
 
+By default the writer is open loop: it sends edit N+1 on schedule even if
+edit N is not yet acked, so several commits for one subject can be in flight
+on the socket. With `--closed-loop` each writer waits for COMMIT_OK (or an
+error) of its previous commit before sending the next. It still targets
+`--rate`; a tick that arrives while the previous commit is unacked is skipped
+and counted as `skipped_ticks` (summary line and JSON). Achieved rate then
+shows what the server sustains with one commit in flight per resource.
+
 ### storm
 
 ```

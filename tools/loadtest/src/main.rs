@@ -63,6 +63,10 @@ enum Cmd {
         /// Spread the subscriber connections over this many seconds
         #[arg(long, default_value_t = 5.0)]
         ramp_secs: f64,
+        /// Each writer waits for COMMIT_OK (or an error) of its previous
+        /// commit before sending the next; ticks it misses are skipped
+        #[arg(long)]
+        closed_loop: bool,
     },
     /// Reconnect storm: connect N clients, wait for the server to drop, measure recovery
     Storm {
@@ -111,8 +115,20 @@ async fn main() {
             rate,
             duration,
             ramp_secs,
+            closed_loop,
         } => {
-            let r = commit::run(&common, writers, subscribers, rate, duration, ramp_secs).await;
+            let r = commit::run(
+                &common,
+                commit::Opts {
+                    writers,
+                    subscribers,
+                    rate,
+                    duration,
+                    ramp_secs,
+                    closed_loop,
+                },
+            )
+            .await;
             (common, r)
         }
         Cmd::Storm {
