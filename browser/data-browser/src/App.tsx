@@ -155,11 +155,6 @@ const store = new Store({
   requireOnlineWrites: isRunningInTauri(),
 });
 
-// Drive setup below may yield while deriving the private drive. Announce the
-// database before any startup read can mistake that window for server-only
-// operation; initClientDb attaches the worker after bootstrap.
-if (isClientDbEnabled()) store.expectClientDb();
-
 const initialDrive = driveStorage.get();
 
 if (initialDrive) {

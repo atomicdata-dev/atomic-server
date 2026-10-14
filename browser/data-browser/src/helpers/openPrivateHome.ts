@@ -43,15 +43,12 @@ async function prepare(
   if (await deviceHasDriveData(store, subject)) return 'existing';
 
   if (!recoveryAttempted) {
-    const restored = await withDeadline(
+    await withDeadline(
       restoreFromVault(store, subject),
       8_000,
       undefined,
     ).catch(() => undefined);
     if (await deviceHasDriveData(store, subject)) return 'existing';
-    // An unavailable backup is not an empty drive. Defaults written now can
-    // win against the recovered Loro state and replace the original title.
-    if (!restored || restored.status === 'failed') return;
   }
 
   const name = agent.subject
