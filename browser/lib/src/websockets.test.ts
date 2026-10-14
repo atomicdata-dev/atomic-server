@@ -305,6 +305,39 @@ describe('WSClient handshake', () => {
     client.close();
   });
 
+  it('rejects an invalid GET snapshot instead of leaving its caller waiting', async () => {
+    const { client, socket } = await connectedClient();
+    vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+    const settled = vi.fn();
+    const subject = 'https://example.com/query?drive=atomic:home';
+    const result = client.fetch(subject).then(
+      value => settled(value),
+      error => settled(error),
+    );
+
+    try {
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+      );
+      const frame = framesWithTag(socket, Tag.GET)[0];
+      const requestId = new DataView(frame.buffer, frame.byteOffset).getUint16(
+        1,
+      );
+      socket.receive(updateFrame(requestId, subject, new Uint8Array([0])));
+      await vi.waitFor(() =>
+        assert(settled).toHaveBeenCalledWith(
+          assert.objectContaining({
+            type: ErrorType.Server,
+            message: `Invalid resource update for ${subject}`,
+          }),
+        ),
+      );
+      await result;
+    } finally {
+      client.close();
+    }
+  });
+
   it('introduces itself with a HELLO listing its capabilities on open', async ({
     expect,
   }) => {
@@ -1589,6 +1622,32 @@ describe('WSClient.fetchMany', () => {
     expect(store.resources.get('atomic:found')).toBe(found);
     expect(missing).toMatchObject({ type: ErrorType.NotFound });
     expect(unauthorized).toMatchObject({ type: ErrorType.Unauthorized });
+    client.close();
+  });
+
+  it('does not present cached data as a successful invalid batch response', async () => {
+    const { client, socket, store } = await connectedClient();
+    vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
+    socket.receive(encodeAuthOk(['get-many']));
+    const subject = 'https://example.com/query?drive=atomic:home';
+    const cached = new Resource(subject);
+    store.addResource(cached);
+    const results = client.fetchMany([subject]);
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET_MANY)).toHaveLength(1),
+    );
+    const requestId = requestIdOf(framesWithTag(socket, Tag.GET_MANY)[0]);
+    socket.receive(
+      resultFrame(requestId, [
+        updateFrame(requestId, subject, new Uint8Array([0])),
+      ]),
+    );
+    const [result] = await results;
+    assert(result).toMatchObject({
+      type: ErrorType.Server,
+      message: `Invalid resource update for ${subject}`,
+    });
+    assert(store.resources.get(subject)).toBe(cached);
     client.close();
   });
 

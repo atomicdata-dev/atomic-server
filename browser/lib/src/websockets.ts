@@ -1477,12 +1477,23 @@ export class WSClient {
         this.store.rememberResourceOrigin(msg.subject, this.serverOrigin);
 
         if (pending) {
-          this.store.applyIncoming({
+          const outcome = this.store.applyIncoming({
             subject: msg.subject,
             loroBytes: msg.loroBytes,
             commitId: msg.commitId,
             source: 'ws-pending-get',
           });
+
+          if (outcome === 'invalid') {
+            pending.reject(
+              new AtomicError(
+                `Invalid resource update for ${msg.subject}`,
+                ErrorType.Server,
+              ),
+            );
+            break;
+          }
+
           // The resource we just hydrated is what the GET caller is
           // waiting for — read it back from the store map.
           const resource = this.hydratedResource(msg.subject);
@@ -1494,6 +1505,13 @@ export class WSClient {
               pending.subject,
             );
             pending.resolve(resource);
+          } else {
+            pending.reject(
+              new AtomicError(
+                `Could not store ${msg.subject}`,
+                ErrorType.Server,
+              ),
+            );
           }
 
           break;
@@ -1560,12 +1578,20 @@ export class WSClient {
               );
             }
 
-            this.store.applyIncoming({
+            const outcome = this.store.applyIncoming({
               subject: update.subject,
               loroBytes: update.loroBytes,
               commitId: update.commitId,
               source: 'ws-pending-get',
             });
+
+            if (outcome === 'invalid') {
+              return new AtomicError(
+                `Invalid resource update for ${subject}`,
+                ErrorType.Server,
+              );
+            }
+
             const hydrated = this.hydratedResource(update.subject);
 
             return (

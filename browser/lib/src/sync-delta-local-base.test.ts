@@ -97,6 +97,43 @@ function storeWith(json: string, local: Uint8Array) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
 describe('a sync delta for a resource with no local Loro history', () => {
+  it('buffers a computed query while Loro is still starting', async () => {
+    const doc = new LoroLoader.Loro.LoroDoc();
+    doc
+      .getMap('properties')
+      .set(collections.properties.members, ['atomic:chat-log']);
+    doc.getMap('properties').set(collections.properties.totalMembers, 1);
+    doc.commit();
+    const snapshot = doc.export({ mode: 'snapshot' });
+
+    // The shared test setup enables Loro, unlike a cold command-line client.
+    // Fresh modules exercise that real startup state without mocking the codec.
+    vi.resetModules();
+    const { Store: ColdStore } = await import('./store.js');
+    const { LoroLoader: ColdLoro } = await import('./loro-loader.js');
+    assert(ColdLoro.isLoaded()).toBe(false);
+    const store = new ColdStore({
+      serverUrl: 'https://example.com',
+      connect: false,
+    });
+    const subject = 'https://example.com/query?drive=atomic:home';
+    assert(
+      store.applyIncoming({
+        subject,
+        source: 'ws-pending-get',
+        loroBytes: snapshot,
+      }),
+    ).toBe('applied');
+    const resource = store.resources.get(subject)!;
+    assert(resource.loading).toBe(true);
+    await ColdLoro.initializeLoro();
+    assert(resource.loading).toBe(false);
+    assert(resource.get(collections.properties.members)).toEqual([
+      'atomic:chat-log',
+    ]);
+    assert(resource.get(collections.properties.totalMembers)).toBe(1);
+  });
+
   it.each(['/search', '/vector_search'])(
     'replaces the computed %s result even when its previous clock was larger',
     path => {

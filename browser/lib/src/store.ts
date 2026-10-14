@@ -3509,7 +3509,12 @@ export class Store {
     // Inspect the payload here so every transport applies the same policy.
     let snapshot = false;
 
-    if (computedProjection || this._withoutLoroHistory.has(subject)) {
+    // Cold clients buffer bytes until Loro is ready. They have no live Loro
+    // history to replace yet, and an unavailable decoder is not invalid data.
+    if (
+      LoroLoader.isLoaded() &&
+      (computedProjection || this._withoutLoroHistory.has(subject))
+    ) {
       try {
         snapshot = LoroLoader.Loro.decodeImportBlobMeta(
           change.loroBytes,
