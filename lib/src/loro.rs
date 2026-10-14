@@ -493,11 +493,6 @@ impl AtomicLoroDoc {
         self.doc.oplog_vv()
     }
 
-    /// Encode the version vector to bytes (for hashing).
-    pub fn oplog_vv_bytes(&self) -> Vec<u8> {
-        self.doc.oplog_vv().encode()
-    }
-
     /// Build a VersionVector from a map of peer_id_string → counter.
     pub fn vv_from_map(map: &std::collections::HashMap<String, i32>) -> VersionVector {
         map.iter()

@@ -344,10 +344,6 @@ pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
 pub const SUDO_AGENT: &str = "sudo:agent";
 
 // Paths
-pub fn construct_path_import(base: &str) -> String {
-    format!("{base}{PATH_IMPORT}")
-}
-
 pub const PATH_IMPORT: &str = "/import";
 pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
 pub const PATH_QUERY: &str = "/query";

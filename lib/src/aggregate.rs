@@ -30,17 +30,6 @@ impl AggregateFunction {
             AggregateFunction::Max => "max",
         }
     }
-
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "sum" => Some(AggregateFunction::Sum),
-            "count" => Some(AggregateFunction::Count),
-            "avg" | "average" | "mean" => Some(AggregateFunction::Avg),
-            "min" => Some(AggregateFunction::Min),
-            "max" => Some(AggregateFunction::Max),
-            _ => None,
-        }
-    }
 }
 
 /// One requested statistic.

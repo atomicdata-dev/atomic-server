@@ -302,11 +302,6 @@ impl Subject {
         matches!(self, Subject::Internal { .. })
     }
 
-    /// Returns true if this is an external subject (not mapped to the server's base domain).
-    pub fn is_external(&self) -> bool {
-        matches!(self, Subject::External(_))
-    }
-
     /// Returns true if this subject is local to the server (Internal or Did).
     /// External subjects are not considered local.
     pub fn is_local(&self) -> bool {
