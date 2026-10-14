@@ -78,7 +78,8 @@ impl calls::Host for AbiState {
         // TODO(host-abi step 2): handles are scoped capabilities the callee may
         // use for this call only. Until grants have scopes there is nothing to
         // intersect them with, so they are accepted and ignored: the callee
-        // runs with its own Installation's rights and nothing of the caller's.
+        // runs with its own Installation's rights and nothing of the calling
+        // app's, still bounded by whoever made the entry call.
         if !handles.is_empty() {
             tracing::debug!(
                 count = handles.len(),
@@ -92,7 +93,7 @@ impl calls::Host for AbiState {
             &interface,
             &function,
             &args,
-            None,
+            self.host.entry.clone(),
             self.host.depth + 1,
         )
         .await

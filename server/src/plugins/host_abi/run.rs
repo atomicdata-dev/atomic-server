@@ -31,11 +31,16 @@ pub(super) struct AbiHost {
     pub db: Arc<Db>,
     pub app: Arc<LoadedApp>,
     /// Reads, fetches and secrets, under the caller and the Installation's
-    /// agent. The caller is the signed-in agent for an entry call, and for an
-    /// app called by another app that app's own identity, never its caller's.
+    /// agent. The caller is the agent the entry call came from, at every hop;
+    /// a calling app's own rights are never passed on.
     pub core: HostCore,
     /// `calls.call` hops between the entry call and this instance.
     pub depth: usize,
+    /// The agent the entry call came from, if any. Every app down the chain is
+    /// bounded by it too, so going through apps never lets someone do what
+    /// they could not do themselves (no confused deputy). `None` for work
+    /// nobody asked for, which runs as the apps alone.
+    pub entry: Option<ForAgent>,
 }
 
 pub struct AbiState {
@@ -89,6 +94,7 @@ pub(super) async fn build_host(
     caller: Option<ForAgent>,
     depth: usize,
 ) -> Result<AbiHost, HostError> {
+    let entry = caller.clone();
     let caller = match caller {
         Some(caller) => caller,
         None => own_identity(db, app).await,
@@ -109,6 +115,7 @@ pub(super) async fn build_host(
         app: app.clone(),
         core,
         depth,
+        entry,
     })
 }
 
@@ -116,8 +123,9 @@ type Call<'a> = Pin<Box<dyn Future<Output = Result<String, HostError>> + Send + 
 
 /// Calls `interface.function` on the provider the drive has for it.
 ///
-/// `caller` is the signed-in agent for an entry call, bounded by the provider's
-/// own agent; `None` is an app-to-app call, which runs as the provider alone.
+/// `caller` is the agent the entry call came from, bounded by the provider's
+/// own agent, also for apps further down the chain; `None` is work nobody
+/// asked for, which runs as the provider alone.
 /// `depth` is the number of hops so far.
 ///
 /// Boxed because an app can call back into the host, which calls this again.

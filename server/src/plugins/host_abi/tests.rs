@@ -301,6 +301,35 @@ async fn bump_twice_calls_the_counter_twice_through_the_host() {
 }
 
 #[actix_rt::test]
+async fn going_through_apps_never_lets_someone_write_what_they_cannot() {
+    let w = World::new("host_abi_no_confused_deputy").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    // The counter app may write; this agent may only read. Asking the caller
+    // app, which asks the counter, must not turn a read right into a write.
+    let reader = atomic_lib::agents::Agent::new(None).unwrap().subject.to_string();
+    share(db, &subject, &[&counter.agent, &reader], &[&counter.agent]).await;
+
+    let outcome = w
+        .call(
+            CALLER,
+            "bump-twice",
+            json!({"subject": subject, "property": property}),
+            ForAgent::AgentSubject(reader.into()),
+        )
+        .await;
+
+    assert!(outcome.is_err(), "the write is refused: {outcome:?}");
+    assert_eq!(
+        count_of(db, &subject, &property).await,
+        0,
+        "nothing written"
+    );
+}
+
+#[actix_rt::test]
 async fn the_callee_never_gets_the_callers_rights() {
     let w = World::new("host_abi_no_borrowed_rights").await;
     let db = &*w.db;
