@@ -580,3 +580,58 @@ describe('getMany', () => {
     },
   );
 });
+
+describe('call', () => {
+  const call = (extra: Record<string, unknown> = {}) =>
+    handleRequest(
+      fakeStore(),
+      APP,
+      DRIVE,
+      req('call', {
+        interface: 'atomic:example/counter@1',
+        function: 'increment',
+        args: { n: 1 },
+        ...extra,
+      }),
+    );
+  const answer = (status: number, body: unknown) =>
+    vi.mocked(fetch).mockImplementationOnce((async () => ({
+      ok: status < 400,
+      status,
+      text: async () =>
+        typeof body === 'string' ? body : JSON.stringify(body),
+    })) as unknown as typeof fetch);
+
+  it('posts a signed call to the drive server and returns the result', async () => {
+    answer(200, { result: { value: 2 } });
+
+    expect(await call()).toEqual({ value: 2 });
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://node.test/host/call');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      drive: DRIVE,
+      interface: 'atomic:example/counter@1',
+      function: 'increment',
+      args: { n: 1 },
+    });
+  });
+
+  it('turns an error body into a HostError with its code', async () => {
+    answer(403, { error: { code: 'forbidden', message: 'no right' } });
+
+    await expect(call()).rejects.toMatchObject({
+      name: 'HostError',
+      code: 'forbidden',
+      message: 'no right',
+    });
+  });
+
+  it('reports a non-JSON failure as internal, and checks its input', async () => {
+    answer(502, 'Bad gateway');
+
+    await expect(call()).rejects.toMatchObject({ code: 'internal' });
+    await expect(call({ interface: '' })).rejects.toThrow('interface');
+    await expect(call({ args: 'x' })).rejects.toThrow('object');
+  });
+});

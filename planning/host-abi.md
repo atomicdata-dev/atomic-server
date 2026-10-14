@@ -107,7 +107,13 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       multi-intent `apply`. `calls` arguments stay JSON by design.)
 - [ ] Generate Rust bindings and TS types plus the frame client from it.
       *Rust done* (host: `wasmtime::component::bindgen!`; apps: `wit-bindgen`,
-      see `plugin-examples/host-abi-*`). TS types and the frame client are not.
+      see `plugin-examples/host-abi-*`). *TS: calls done*, hand-written rather
+      than generated: `browser/plugin/src/hostAbi.ts` (`AppExport`, `Effect`,
+      `HostError`, error codes; a test checks them against the Rust codes) and
+      `store.call(interface, fn, args)` in `@tomic/plugin`, over a `call` frame
+      op that the host sends as a signed `POST /host/call`. Not done: types for
+      `store`/`net`/`events`, generating them with jco, `call` in packaged
+      views (only drive-app frames), `describe`/`providers` from a frame.
 - [ ] Port the three runtimes (class-extender WIT, plugin-runtime WIT, frame
       `store`) onto it. Legacy RPC, `plugin.json` and `/app-write` go once the
       catalog apps are ported; stored installations stay readable.

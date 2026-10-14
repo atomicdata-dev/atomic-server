@@ -1,4 +1,5 @@
 import type { Intent } from '@tomic/lib';
+import { HostError, toHostErrorCode } from './hostAbi';
 import { viewRequest, type ViewOperation } from './viewProtocol';
 
 /**
@@ -133,7 +134,7 @@ export class ViewResource {
     const propVals = Object.fromEntries(
       [...this.changed].map(p => [p, this.values[p]]),
     );
-    await this.store.call('save', {
+    await this.store.request('save', {
       subject: this.subject,
       propVals,
       ...(remove.length ? { remove } : {}),
@@ -145,7 +146,7 @@ export class ViewResource {
   }
 
   public async destroy(): Promise<void> {
-    await this.store.call('destroy', { subject: this.subject });
+    await this.store.request('destroy', { subject: this.subject });
     this.destroyed = true;
   }
 }
@@ -166,7 +167,7 @@ export class ViewStore {
 
   /** Fetches a resource the host lets this view read. */
   public async getResource(subject: string): Promise<ViewResource> {
-    return this.toResource(await this.call('get', { subject }));
+    return this.toResource(await this.request('get', { subject }));
   }
 
   /**
@@ -183,23 +184,23 @@ export class ViewStore {
     propVals?: Record<string, PropValue>;
   } = {}): Promise<ViewResource> {
     return this.toResource(
-      await this.call('create', { parent, isA, propVals }),
+      await this.request('create', { parent, isA, propVals }),
     );
   }
 
   /** Subjects of a collection, like `CollectionBuilder` builds. */
   public query(args: QueryArgs): Promise<string[]> {
-    return this.call('query', { ...args });
+    return this.request('query', { ...args });
   }
 
   /** Full-text search, as the signed-in person would find things. */
   public search(text: string, args: SearchArgs = {}): Promise<string[]> {
-    return this.call('search', { text, ...args });
+    return this.request('search', { text, ...args });
   }
 
   /** What this view is showing, and who is looking. */
   public async getContext(): Promise<ViewContext> {
-    const context = (await this.call('context', {})) as {
+    const context = (await this.request('context', {})) as {
       subject?: string;
       resource?: { subject: string };
       agent?: string;
@@ -221,7 +222,7 @@ export class ViewStore {
   public apply(
     intents: Intent[],
   ): Promise<{ subjects: Record<string, string> }> {
-    return this.call('apply', { intents });
+    return this.request('apply', { intents });
   }
 
   /**
@@ -229,7 +230,7 @@ export class ViewStore {
    * Rejects, changing nothing, when someone changed those values since.
    */
   public undo(): Promise<boolean> {
-    return this.call('undo', {});
+    return this.request('undo', {});
   }
 
   /**
@@ -246,14 +247,15 @@ export class ViewStore {
     callbacks.add(callback);
     this.watchers.set(subject, callbacks);
 
-    if (first) void this.call('subscribe', { subject }).catch(() => undefined);
+    if (first)
+      void this.request('subscribe', { subject }).catch(() => undefined);
 
     return () => {
       callbacks.delete(callback);
 
       if (callbacks.size === 0) {
         this.watchers.delete(subject);
-        void this.call('unsubscribe', { subject }).catch(() => undefined);
+        void this.request('unsubscribe', { subject }).catch(() => undefined);
       }
     };
   }
@@ -270,13 +272,13 @@ export class ViewStore {
       body?: string;
       confirmLabel?: string;
       danger?: boolean;
-    }): Promise<boolean> => this.call('confirm', { ...args }),
+    }): Promise<boolean> => this.request('confirm', { ...args }),
 
     /** A short notice in the host's corner. */
     toast: (
       text: string,
       { kind = 'info' }: { kind?: 'success' | 'error' | 'info' } = {},
-    ): Promise<true> => this.call('toast', { text, kind }),
+    ): Promise<true> => this.request('toast', { text, kind }),
 
     /**
      * A menu at `at`: a point in this frame, or the MouseEvent of a click.
@@ -286,18 +288,19 @@ export class ViewStore {
       at: MenuPoint;
       items: MenuItem[];
     }): Promise<string | null> =>
-      this.call('menu', { items: args.items, at: toPoint(args.at) }),
+      this.request('menu', { items: args.items, at: toPoint(args.at) }),
 
     /** Atomic's own menu for a resource, at `at`. */
     resourceMenu: (subject: string, { at }: { at: MenuPoint }): Promise<true> =>
-      this.call('resourceMenu', { subject, at: toPoint(at) }),
+      this.request('resourceMenu', { subject, at: toPoint(at) }),
 
     /** Atomic's share dialog. Resolves once it is closed. */
-    share: (subject: string): Promise<true> => this.call('share', { subject }),
+    share: (subject: string): Promise<true> =>
+      this.request('share', { subject }),
 
     /** Opens `subject` in the host, leaving this view. */
     openResource: (subject: string): Promise<true> =>
-      this.call('openResource', { subject }),
+      this.request('openResource', { subject }),
 
     /**
      * Lets the person search for a resource, optionally of class `isA`.
@@ -306,7 +309,7 @@ export class ViewStore {
     pickResource: async (
       args: { isA?: string; title?: string } = {},
     ): Promise<string | null> =>
-      subjectOf(await this.call('pickResource', { ...args })),
+      subjectOf(await this.request('pickResource', { ...args })),
 
     /**
      * Lets the person choose a file, or upload one. `accept` lists MIME types.
@@ -316,7 +319,7 @@ export class ViewStore {
       args: { accept?: string[] } = {},
     ): Promise<string | null> =>
       subjectOf(
-        await this.call('pickFile', {
+        await this.request('pickFile', {
           accept: args.accept,
           // What a packaged host has always read.
           allowedMimes: args.accept,
@@ -332,15 +335,29 @@ export class ViewStore {
       class: string;
       parent?: string;
       propVals?: Record<string, string | number | boolean>;
-    }): Promise<string | null> => this.call('form', { ...args }),
+    }): Promise<string | null> => this.request('form', { ...args }),
 
     /** The person's language, and where this view is placed. */
     environment: (): Promise<{ locale: string; placement: string }> =>
-      this.call('environment', {}),
+      this.request('environment', {}),
   };
 
+  /**
+   * Calls a function another app in this drive exports, as the signed-in
+   * person: `store.call('atomic:example/counter@1', 'increment', { ... })`.
+   * Resolves to the parsed result; rejects with a `HostError` carrying the
+   * host's `code` (`not-found`, `forbidden`, `invalid-argument`, ...).
+   */
+  public call<T = unknown>(
+    iface: string,
+    fn: string,
+    args: Record<string, unknown> = {},
+  ): Promise<T> {
+    return this.request<T>('call', { interface: iface, function: fn, args });
+  }
+
   /** One request to the host. The transport under every method above. */
-  public call<T = never>(
+  public request<T = never>(
     op: ViewOperation,
     args: Record<string, unknown>,
   ): Promise<T> {
@@ -403,7 +420,12 @@ export class ViewStore {
       this.pending.delete(message.id);
       clearTimeout(settle.timer);
 
-      if (message.error !== undefined) settle.reject(new Error(message.error));
+      if (message.error !== undefined)
+        settle.reject(
+          message.code
+            ? new HostError(toHostErrorCode(message.code), message.error)
+            : new Error(message.error),
+        );
       else settle.resolve(message.result);
     });
   }

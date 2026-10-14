@@ -1,4 +1,4 @@
-import { isViewRequest } from '@tomic/plugin';
+import { HostError, isViewRequest } from '@tomic/plugin';
 import { viewSession } from '@helpers/extensions/viewSession';
 import { useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
@@ -467,7 +467,11 @@ async function answer(
       ),
     });
   } catch (e) {
-    post({ id: request.id, error: (e as Error).message });
+    post({
+      id: request.id,
+      error: (e as Error).message,
+      ...(e instanceof HostError ? { code: e.code } : {}),
+    });
   }
 }
 

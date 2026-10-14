@@ -186,6 +186,27 @@ POST /host/call
 
 The request is signed like other plugin routes. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
 
+## From a frame (TypeScript)
+
+A drive app's frame calls an export through its store, with the signed-in person's rights. The host sends the signed `POST /host/call` for it.
+
+```ts
+import { store, HostError } from '@tomic/plugin';
+
+try {
+  const { value } = await store.call('atomic:example/counter@1', 'increment', {
+    subject,
+    property,
+  });
+} catch (e) {
+  if (e instanceof HostError && e.code === 'forbidden') {
+    // e.code is one of the codes above; e.message is for people.
+  }
+}
+```
+
+`store.call` resolves to the parsed result. A drive app served by `/plugin-ui?format=client` has the same `store.call`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
+
 ## Not built yet
 
 - `store.search` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.

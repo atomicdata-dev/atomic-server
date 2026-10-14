@@ -31,7 +31,15 @@ window.addEventListener('message', event => {
   clearTimeout(settle.timer);
 
   if (message.error) {
-    settle.reject(new Error(message.error));
+    const error = new Error(message.error);
+
+    // A failed `call` names why, in the host ABI's codes.
+    if (message.code) {
+      error.name = 'HostError';
+      error.code = message.code;
+    }
+
+    settle.reject(error);
   } else {
     settle.resolve(message.result);
   }
@@ -289,6 +297,16 @@ export const store = {
    */
   async apply(intents) {
     return send('apply', { intents });
+  },
+
+  /**
+   * Calls a function another app in this drive exports, as the signed-in
+   * person: `store.call('atomic:example/counter@1', 'increment', { ... })`.
+   * Resolves to the result; rejects with an error whose `code` is the host's
+   * (`not-found`, `forbidden`, `invalid-argument`, ...).
+   */
+  async call(iface, fn, args = {}) {
+    return send('call', { interface: iface, function: fn, args });
   },
 
   /** Reverts this view's latest `apply`. False when there is nothing to undo. */
