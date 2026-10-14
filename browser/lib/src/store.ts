@@ -41,6 +41,7 @@ import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
   RequestCancelledError,
+  ServerRestartError,
   ErrorType,
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
@@ -7523,10 +7524,12 @@ export class Store {
       normalized,
       callback,
       () => this.subscribeWebSocket(normalized),
-      () =>
-        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
-          normalized,
-        ),
+      () => {
+        if (isAgentSubject(normalized))
+          this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+            normalized,
+          );
+      },
     );
   }
 
@@ -7567,7 +7570,7 @@ export class Store {
   /** Drive resources use drive-wide fan-out. Mounted agent profiles also need
    * a targeted subscription: another user's profile is outside our drive. */
   public subscribeWebSocket(subject: string): void {
-    if (!this.isServerConnectedFor(subject)) return;
+    if (!isAgentSubject(subject) || !this.isServerConnectedFor(subject)) return;
     const normalized = this.normalizeSubject(subject);
 
     if (
@@ -7871,9 +7874,10 @@ export class Store {
     const filtered = subs.filter(cb => cb !== callback);
     if (filtered.length === 0) {
       this.subscribers.delete(normalized);
-      this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
-        normalized,
-      );
+      if (isAgentSubject(normalized))
+        this.getWebSocketForSubject(normalized)?.unsubscribeAgentProfile(
+          normalized,
+        );
     } else this.subscribers.set(normalized, filtered);
   }
 
@@ -8462,7 +8466,9 @@ export class Store {
         // Fall through to HTTP — a broken WS shouldn't block saves while
         // the reconnect timer is still backing off. The WS error already
         // surfaced in console; the HTTP path will produce its own.
-        console.warn('[Store.postCommit] WS path failed, using HTTP:', e);
+        if (!(e instanceof ServerRestartError)) {
+          console.warn('[Store.postCommit] WS path failed, using HTTP:', e);
+        }
       }
     }
 

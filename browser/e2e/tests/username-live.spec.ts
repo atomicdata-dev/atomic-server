@@ -90,4 +90,16 @@ test('remote username change updates existing chat author', async ({
   await page.getByLabel('Your name', { exact: true }).fill('Renamed Again');
   await page.getByLabel('Your name', { exact: true }).press('Enter');
   await expect(message).toContainText('Renamed Again', { timeout: 15000 });
+
+  // A profile lies outside the chat drive's reconciliation inventory. Its
+  // subscription must catch up a missed rename, without reloading the page.
+  await peer.evaluate(() => window.store.disconnect());
+  await page.getByLabel('Your name', { exact: true }).fill('Renamed Offline');
+  await page.getByLabel('Your name', { exact: true }).press('Enter');
+  await page.waitForFunction(
+    () => window.store.getSyncStatus().pendingDirtyCount === 0,
+  );
+  await expect(message).toContainText('Renamed Again');
+  await peer.evaluate(() => window.store.reconnect());
+  await expect(message).toContainText('Renamed Offline', { timeout: 15000 });
 });

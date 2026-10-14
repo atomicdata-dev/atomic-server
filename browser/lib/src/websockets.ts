@@ -24,6 +24,7 @@ import {
   AtomicError,
   ErrorType,
   RequestCancelledError,
+  ServerRestartError,
   isNotFound,
   isUnauthorized,
 } from './error.js';
@@ -295,6 +296,9 @@ export class WSClient {
    *  are removed by `unsubscribeResource`, and the set is cleared when the
    *  socket closes and in `reSubscribeAll` (which resends them). */
   private _liveSent = new Set<string>();
+  /** Profiles are outside drive reconciliation. Refresh each retained profile
+   * once per connection, after SUB closes the gap to subsequent updates. */
+  private _profileSnapshotsRequested = new Set<string>();
   /** Drive-sync state computed for a hash-first probe, kept until the server
    *  either accepts it (`SYNC_OK`) or asks for the full state (`SYNC_RESEND`),
    *  with the guard of the connection and identity that computed it. */
@@ -395,10 +399,13 @@ export class WSClient {
   /** Fail every in-flight GET. Called on WS close so callers don't
    *  hang for REQUEST_TIMEOUT (10 s) when the socket dies mid-flight
    *  — the next reconnect will fetch fresh state anyway. */
-  private rejectAllPending(reason: string, cancellation = false): void {
-    const err = cancellation
-      ? new RequestCancelledError(reason)
-      : new AtomicError(reason, ErrorType.Server);
+  private rejectAllPending(reason: string | Error, cancellation = false): void {
+    const err =
+      reason instanceof Error
+        ? reason
+        : cancellation
+          ? new RequestCancelledError(reason)
+          : new AtomicError(reason, ErrorType.Server);
 
     // Fail any in-flight `waitForTag` calls (e.g. an AUTH_OK that
     // will never arrive because the socket died mid-handshake).
@@ -510,7 +517,7 @@ export class WSClient {
       // there left the client without a retry and `openPromise` pending, so a
       // client whose first attempt hit a server that was not up yet stayed
       // offline for good.
-      const end = (error: string | undefined) => {
+      const end = (error: string | undefined, restarting = false) => {
         if (ended) return;
         ended = true;
         // Explicit close already tears down this client synchronously. Its
@@ -540,12 +547,17 @@ export class WSClient {
         }
 
         this.reportConnected(false, error);
-        this.rejectAllPending('WebSocket closed before response arrived');
+        this.rejectAllPending(
+          restarting
+            ? new ServerRestartError()
+            : 'WebSocket closed before response arrived',
+        );
         this.stopLiveness();
         this._serverCaps = [];
         this._challengeNonce = undefined;
         this._subscribedDrive = undefined;
         this._liveSent.clear();
+        this._profileSnapshotsRequested.clear();
 
         this._retryTimer = setTimeout(() => {
           this.authenticatedWith = undefined;
@@ -577,8 +589,9 @@ export class WSClient {
         // 1012 asks an established client to reconnect, including when the
         // server needs subscribers to reconcile after missing DB events.
         // Keep the ordinary retry/auth/SUB/SYNC path without presenting this
-        // completed recovery handshake as a connection failure.
-        const restarting = opened && ev.wasClean && ev.code === 1012;
+        // recovery request as a connection failure. A received 1012 still
+        // names the server's intent when a proxy loses the close handshake.
+        const restarting = opened && ev.code === 1012;
 
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
@@ -600,6 +613,7 @@ export class WSClient {
             : opened
               ? `Connection to ${wsURL.origin} closed (code=${ev.code}${ev.reason ? `, reason=${ev.reason}` : ''}).`
               : connectionFailedMessage(wsURL),
+          restarting,
         );
       });
       this.openPromise = new Promise((resolve, reject) => {
@@ -785,6 +799,7 @@ export class WSClient {
         signal.throwIfAborted();
 
         this.authenticatedWith = agent.subject;
+        this._profileSnapshotsRequested.clear();
         recordServerVersionFromWsProtocol(
           this.ws.protocol || WS_PROTOCOL,
           this.serverOrigin,
@@ -1860,7 +1875,7 @@ export class WSClient {
   }
 
   /** Agent profiles are public resources outside the reader's active drive. */
-  public subscribeAgentProfile(subject: string): void {
+  public subscribeAgentProfile(subject: string, catchUp = false): void {
     if (!isAgentSubject(subject) || this.readyState !== WebSocket.OPEN) return;
     if (this.store.isLocalOnlySubject(subject)) return;
     if (
@@ -1876,6 +1891,15 @@ export class WSClient {
     )
       return;
     this.sendBinary(encodeSub(this.wireSubject(subject)));
+
+    if (catchUp && !this._profileSnapshotsRequested.has(subject)) {
+      this._profileSnapshotsRequested.add(subject);
+      // GET merges through the normal fenced ingress, preserving the Resource
+      // object and any local edits. SUB alone never replays missed changes.
+      void this.fetch(subject).catch(() => {
+        this._profileSnapshotsRequested.delete(subject);
+      });
+    }
   }
 
   /** A `SUB` for one resource, held via {@link Store.subscribeLive}.
@@ -1932,6 +1956,7 @@ export class WSClient {
   }
 
   public unsubscribeAgentProfile(subject: string): void {
+    this._profileSnapshotsRequested.delete(subject);
     if (!isAgentSubject(subject) || this.readyState !== WebSocket.OPEN) return;
     this.sendBinary(encodeUnsub(this.wireSubject(subject)));
   }
@@ -1942,8 +1967,11 @@ export class WSClient {
     this.subscribeToDrive();
 
     for (const subject of this.store.subscribers.keys()) {
-      if (this.store.getWebSocketForSubject(subject) === this) {
-        this.subscribeAgentProfile(subject);
+      if (
+        isAgentSubject(subject) &&
+        this.store.getWebSocketForSubject(subject) === this
+      ) {
+        this.subscribeAgentProfile(subject, true);
       }
     }
 

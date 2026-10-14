@@ -95,6 +95,23 @@ const socketOf = (client: WSClient): FakeWebSocket =>
 const framesWithTag = (socket: FakeWebSocket, tag: number) =>
   socket.sent.filter(f => f[0] === tag);
 
+const enc = new TextEncoder();
+
+/** A complete UPDATE frame carrying a Loro snapshot, as the server builds it. */
+const updateFrame = (requestId: number, subject: string, loro: Uint8Array) => {
+  const s = enc.encode(subject);
+  const buf = new Uint8Array(6 + s.length + loro.length);
+  const view = new DataView(buf.buffer);
+  buf[0] = Tag.UPDATE;
+  buf[1] = Flags.SNAPSHOT;
+  view.setUint16(2, requestId);
+  view.setUint16(4, s.length);
+  buf.set(s, 6);
+  buf.set(loro, 6 + s.length);
+
+  return buf;
+};
+
 const signedCommit = (): Commit =>
   ({
     subject: 'did:ad:doc',
@@ -462,52 +479,69 @@ describe('WSClient drive sync probe', () => {
     vi.useRealTimers();
   });
 
-  it('reauthenticates, resubscribes and reconciles after a planned server restart', async () => {
-    const { client, socket, store } = await connectedClient();
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(store, 'getDrive').mockReturnValue('https://example.com/drive');
-    vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
-    const compute = vi.spyOn(store, 'computeDriveSyncState').mockResolvedValue({
-      drive: 'https://example.com/drive',
-      driveHash: 'current',
-      peers: [],
-      resources: {},
-    } as never);
-    socket.receive(encodeChallenge('first'));
-    await vi.waitFor(() =>
-      assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
-    );
-    socket.receive(encodeAuthOk([]));
-    await vi.waitFor(() =>
-      assert(framesWithTag(socket, Tag.SYNC)).toHaveLength(1),
-    );
-    compute.mockClear();
+  it.each([true, false])(
+    'recovers a planned restart and an in-flight save (clean=%s)',
+    async wasClean => {
+      const { client, socket, store } = await connectedClient();
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(store, 'getDrive').mockReturnValue('https://example.com/drive');
+      vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+      const compute = vi
+        .spyOn(store, 'computeDriveSyncState')
+        .mockResolvedValue({
+          drive: 'https://example.com/drive',
+          driveHash: 'current',
+          peers: [],
+          resources: {},
+        } as never);
+      socket.receive(encodeChallenge('first'));
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+      );
+      socket.receive(encodeAuthOk([]));
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.SYNC)).toHaveLength(1),
+      );
+      compute.mockClear();
+      vi.spyOn(
+        store as unknown as {
+          getWebSocketForEndpoint(endpoint: string): WSClient;
+        },
+        'getWebSocketForEndpoint',
+      ).mockReturnValue(client);
+      const commit = signedCommit();
+      const saving = store.postCommit(commit, 'https://example.com/commit');
+      await vi.waitFor(() =>
+        assert(framesWithTag(socket, Tag.COMMIT)).toHaveLength(1),
+      );
 
-    vi.useFakeTimers();
-    socket.close();
-    socket.fire('close', { code: 1012, reason: '', wasClean: true });
-    assert(store.serverConnected).toBe(false);
-    await vi.advanceTimersByTimeAsync(1000);
-    vi.useRealTimers();
-    const replacement = socketOf(client);
-    assert(replacement).not.toBe(socket);
-    replacement.open();
-    replacement.receive(encodeChallenge('restart'));
-    await vi.waitFor(() =>
-      assert(framesWithTag(replacement, Tag.AUTH)).toHaveLength(1),
-    );
-    replacement.receive(encodeAuthOk([]));
-    await vi.waitFor(() =>
-      assert(framesWithTag(replacement, Tag.SYNC)).toHaveLength(1),
-    );
-    assert(framesWithTag(replacement, Tag.SUB).length).toBeGreaterThan(0);
-    assert(compute).toHaveBeenCalledWith('https://example.com/drive', {
-      sparse: false,
-    });
-    assert(store.serverConnected).toBe(true);
-    client.close();
-    assert(warning).not.toHaveBeenCalled();
-  });
+      vi.useFakeTimers();
+      socket.close();
+      socket.fire('close', { code: 1012, reason: '', wasClean });
+      assert((await saving).signature).toBe(commit.signature);
+      assert(store.serverConnected).toBe(false);
+      await vi.advanceTimersByTimeAsync(1000);
+      vi.useRealTimers();
+      const replacement = socketOf(client);
+      assert(replacement).not.toBe(socket);
+      replacement.open();
+      replacement.receive(encodeChallenge('restart'));
+      await vi.waitFor(() =>
+        assert(framesWithTag(replacement, Tag.AUTH)).toHaveLength(1),
+      );
+      replacement.receive(encodeAuthOk([]));
+      await vi.waitFor(() =>
+        assert(framesWithTag(replacement, Tag.SYNC)).toHaveLength(1),
+      );
+      assert(framesWithTag(replacement, Tag.SUB).length).toBeGreaterThan(0);
+      assert(compute).toHaveBeenCalledWith('https://example.com/drive', {
+        sparse: false,
+      });
+      assert(store.serverConnected).toBe(true);
+      client.close();
+      assert(warning).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not send a sync probe computed for a previous identity', async ({
     expect,
@@ -835,6 +869,90 @@ describe('WSClient drive subscription', () => {
     expect(subjects(Tag.UNSUB)).toEqual([subject, subject]);
     client.close();
   });
+
+  it('recovers a missed profile edit after reconnect without replacing the live resource', async () => {
+    const { client, socket, store } = await connectedClient();
+    socket.receive(encodeChallenge('profile-catchup'));
+    const auth = client.authenticate();
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.AUTH)).toHaveLength(1),
+    );
+    socket.receive(encodeAuthOk([]));
+    await auth;
+    vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+    store.setServerConnected(true);
+    await LoroLoader.initializeLoro();
+    const doc = new LoroLoader.Loro.LoroDoc();
+    const name = 'https://atomicdata.dev/properties/name';
+    const subject = 'did:ad:agent:missed-profile';
+    doc.getMap('properties').set(name, 'Before disconnect');
+    doc.commit();
+    const initial = client.fetch(subject);
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+    );
+
+    const respond = () => {
+      const get = framesWithTag(socket, Tag.GET).at(-1)!;
+      const requestId = new DataView(get.buffer, get.byteOffset).getUint16(1);
+      socket.receive(
+        updateFrame(requestId, subject, doc.export({ mode: 'snapshot' })),
+      );
+    };
+
+    respond();
+    const resource = await initial;
+    const changed = vi.fn();
+    const stop = store.subscribe(subject, changed);
+    doc.getMap('properties').set(name, 'Renamed while disconnected');
+    doc.commit();
+    // SUB does not replay missed changes, and drive reconciliation excludes profiles.
+    const replay = () =>
+      (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+    replay();
+    replay();
+    await vi.waitFor(() =>
+      assert(framesWithTag(socket, Tag.GET)).toHaveLength(2),
+    );
+    respond();
+    await vi.waitFor(() =>
+      assert(resource.get(name)).toBe('Renamed while disconnected'),
+    );
+    assert(store.resources.get(store.normalizeSubject(subject))).toBe(resource);
+    assert(changed).toHaveBeenCalled();
+    stop();
+    client.close();
+    doc.free();
+  });
+
+  it.each(['mount', 'dispose', 'unsubscribe', 'reconnect'])(
+    'does not open a foreign socket for an ordinary cached reader on %s',
+    async phase => {
+      localStorage.setItem('ws-disconnected', '1');
+      const { client, store } = await connectedClient();
+      const subject = 'https://vocabulary.example/class/bird';
+      store.setDriveServer(subject, 'https://vocabulary.example', false);
+      store.reportServerConnection('https://vocabulary.example', true);
+      const open = vi
+        .spyOn(store, 'openWebSocket')
+        .mockImplementation(() => {});
+      const callback = vi.fn();
+      const stop = store.subscribe(subject, callback);
+      if (phase !== 'mount') open.mockClear();
+      localStorage.removeItem('ws-disconnected');
+      if (phase === 'mount') store.subscribeWebSocket(subject);
+      if (phase === 'dispose') stop();
+      if (phase === 'unsubscribe') store.unsubscribe(subject, callback);
+
+      if (phase === 'reconnect') {
+        (client as unknown as { reSubscribeAll(): void }).reSubscribeAll();
+      }
+
+      assert(open).not.toHaveBeenCalled();
+      localStorage.setItem('ws-disconnected', '1');
+      client.close();
+    },
+  );
 
   it('reconciles drives selected after authentication without reopening the socket', async ({
     expect,
@@ -1352,27 +1470,6 @@ describe('WSClient.fetchMany', () => {
     globalThis.WebSocket = original;
     vi.restoreAllMocks();
   });
-
-  const enc = new TextEncoder();
-
-  /** A complete UPDATE frame carrying a Loro snapshot, as the server builds it. */
-  const updateFrame = (
-    requestId: number,
-    subject: string,
-    loro: Uint8Array,
-  ) => {
-    const s = enc.encode(subject);
-    const buf = new Uint8Array(6 + s.length + loro.length);
-    const view = new DataView(buf.buffer);
-    buf[0] = Tag.UPDATE;
-    buf[1] = Flags.SNAPSHOT;
-    view.setUint16(2, requestId);
-    view.setUint16(4, s.length);
-    buf.set(s, 6);
-    buf.set(loro, 6 + s.length);
-
-    return buf;
-  };
 
   /** `[0x16] [request_id] [count] ([frame_len: u32] [frame])*` */
   const resultFrame = (requestId: number, frames: Uint8Array[]) => {
