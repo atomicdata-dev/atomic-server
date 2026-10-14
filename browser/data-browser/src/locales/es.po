@@ -641,7 +641,6 @@ msgid "Unable to connect to Ollama server. Check if the server is running and yo
 msgstr "No se puede conectar al servidor de Ollama. Comprueba si el servidor se está ejecutando y si has configurado la URL correcta en los ajustes."
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
 #: src/views/File/FilePreview.tsx
 #: src/views/File/FilePreviewThumbnail.tsx
 #: src/views/ResourceRow.tsx
@@ -721,7 +720,6 @@ msgstr "Revisa la consola del navegador para más detalles, o intenta navegar ha
 msgid "404 Not found"
 msgstr "404 No encontrado"
 
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 #: src/views/EndpointPage.tsx
 msgid "No hits"
@@ -746,7 +744,6 @@ msgid "Result"
 msgstr "Resultado"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 msgid "With Tags:"
 msgstr "Con etiquetas:"
@@ -1205,13 +1202,11 @@ msgid "Resource is loading..."
 msgstr "El recurso está cargando..."
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Search for resources..."
 msgstr "Buscar recursos..."
 
 #: src/components/OverlayContainer.tsx
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "esc"
 msgstr "esc"
 
@@ -1221,7 +1216,6 @@ msgid "Start AI Chat with \"{0}\""
 msgstr "Iniciar chat de IA con \"{0}\""
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0/> <1/> navigate"
 msgstr "<0/> <1/> navegar"
 
@@ -1230,7 +1224,6 @@ msgid "<0/> chat"
 msgstr "<0/> chatear"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0>esc</0> close"
 msgstr "<0>esc</0> cerrar"
 
@@ -3227,35 +3220,9 @@ msgstr "Abrir recurso"
 msgid "Insufficient rights to view resource"
 msgstr "Derechos insuficientes para ver el recurso"
 
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Search (Cmd+K)"
-msgstr "Buscar (Cmd+K)"
-
-#. 0: title
-#: src/components/Searchbar/Searchbar.tsx
-msgid "in:{0}"
-msgstr "en:{0}"
-
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Clear scope"
-msgstr "Borrar alcance"
-
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
-msgid "No tags found"
-msgstr "No se encontraron etiquetas"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Caret"
-msgstr "Caret"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Enter an Atomic URL or search  (press \"/\")"
-msgstr "Introduce una URL Atómica o busca (presiona \"/\")"
-
 #: src/components/MetaSetter.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/components/Searchbar/SearchbarInput.tsx
 msgid "Search"
 msgstr "Buscar"
 
@@ -3286,13 +3253,8 @@ msgid "(empty)"
 msgstr "(vacío)"
 
 #: src/chunks/RTE/SlashMenu/CommandList.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Searching..."
 msgstr "Buscando..."
-
-#: src/routes/Search/SearchOverlay.tsx
-msgid "<0/> open"
-msgstr "<0/> abrir"
 
 #: src/chunks/RTE/AIChatInput/AsyncAIChatInput.tsx
 msgid "Ask me anything, / for commands, @ for context"
@@ -11541,9 +11503,7 @@ msgid "Merging keeps the fork's version."
 msgstr ""
 
 #. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "{0} result{1}"
 msgstr ""
 
@@ -11811,10 +11771,6 @@ msgstr ""
 
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Your resource types could not be loaded."
-msgstr ""
-
-#: src/routes/Search/SearchOverlay.tsx
-msgid "Search matches on the names and descriptions of resources. Additionally you can filter by tag using <0/>"
 msgstr ""
 
 #: src/routes/Search/SearchRoute.tsx
