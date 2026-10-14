@@ -19,7 +19,9 @@ const PREFERRED_MENU_WIDTH = 400;
 /** Breathing room kept between the menu and the edge of the window. */
 const MENU_VIEWPORT_MARGIN = 8;
 
+// Guarded so modules that import ComboBox can load in a non-DOM test environment.
 const supportsAnchorPositioning =
+  typeof document !== 'undefined' &&
   'anchorName' in document.documentElement.style;
 
 export type ComboBoxOption = {
