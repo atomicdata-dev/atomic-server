@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LOG_AFTER_PASSES, retryDelayMs } from '@helpers/retryBackoff';
 import {
   findSchema,
   pluginSchema,
@@ -34,19 +35,6 @@ export function useAppClass(drive: string | undefined): string | undefined {
  * re-renders nothing, so a page that asked during render would decide the
  * class does not exist and never look again.
  */
-/** A failed read backs off to at most this while recovery is still likely. */
-const RETRY_CEILING_MS = 5_000;
-/**
- * And to this once it is not. A drive whose schema cannot be read at all would
- * otherwise have every page that might be a plugin or an app polling the server
- * every five seconds for as long as it is open.
- */
-const SLOW_CEILING_MS = 60_000;
-/** After this many failed passes, recovery is no longer the likely case. */
-const SLOW_AFTER_PASSES = 10;
-/** How many failed passes before the give-up trace, which does not stop it. */
-const LOG_AFTER_PASSES = 3;
-
 /**
  * One pass at the drive's schema, looking for the class called `shortname`.
  *
@@ -172,12 +160,9 @@ function useDriveClass(
           );
         }
 
-        const ceiling =
-          failures > SLOW_AFTER_PASSES ? SLOW_CEILING_MS : RETRY_CEILING_MS;
-
         retry = setTimeout(
           () => void resolve().catch(() => undefined),
-          Math.min(150 * 2 ** (failures - 1), ceiling),
+          retryDelayMs(failures),
         );
 
         return;
