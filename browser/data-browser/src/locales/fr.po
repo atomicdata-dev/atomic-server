@@ -11948,11 +11948,6 @@ msgstr ""
 msgid "<0/> Select File"
 msgstr "<0/> Sélectionner un fichier"
 
-#. 0: classType ? classTypeTitle \\: 'new item'; 1: ' '
-#: src/components/forms/ResourceSelector/DropdownInput.tsx
-msgid "Create {0}:{1} <0/>"
-msgstr ""
-
 #. 0: ' '
 #: src/components/forms/SearchBox/SearchBoxWindow.tsx
 msgid "Create{0} <0/>"
