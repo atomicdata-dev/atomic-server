@@ -27,18 +27,9 @@ import {
 } from './websiteExport';
 import type { WebsiteArtifact } from './renderWebsite';
 import { WebsiteHosting } from './WebsiteHosting';
+import { retryDelayMs } from '@helpers/retryBackoff';
 import { WebsitePreview } from './WebsitePreview';
 import { WebsiteInlinePreview } from './WebsiteInlinePreview';
-
-/**
- * A failed read backs off to at most this while recovery is still likely, and
- * to {@link SLOW_RETRY_MS} once it is not. The same shape as `useWebsiteClass`
- * next door, for the same reason: a page that gave up on one read stays wrong
- * until someone reloads it.
- */
-const RETRY_CEILING_MS = 5_000;
-const SLOW_RETRY_MS = 60_000;
-const SLOW_AFTER_ATTEMPTS = 10;
 
 export function WebsitePage({ resource }: { resource: Resource }) {
   const store = useStore();
@@ -128,13 +119,7 @@ export function WebsitePage({ resource }: { resource: Resource }) {
         // to the website never rebuilds the preview, and one failed read used
         // to cost it for as long as the page stayed open.
         attempts += 1;
-        retry = setTimeout(
-          () => void watch(),
-          Math.min(
-            150 * 2 ** (attempts - 1),
-            attempts > SLOW_AFTER_ATTEMPTS ? SLOW_RETRY_MS : RETRY_CEILING_MS,
-          ),
-        );
+        retry = setTimeout(() => void watch(), retryDelayMs(attempts));
       }
     };
 
@@ -202,13 +187,7 @@ export function WebsitePage({ resource }: { resource: Resource }) {
         // from polling the server for as long as its page is open, and the
         // manual Retry stays for the impatient.
         attempts += 1;
-        retry = setTimeout(
-          () => void build(),
-          Math.min(
-            150 * 2 ** (attempts - 1),
-            attempts > SLOW_AFTER_ATTEMPTS ? SLOW_RETRY_MS : RETRY_CEILING_MS,
-          ),
-        );
+        retry = setTimeout(() => void build(), retryDelayMs(attempts));
       }
     };
 

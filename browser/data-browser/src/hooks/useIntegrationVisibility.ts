@@ -22,16 +22,7 @@ import {
   type IntegrationVisibilityKey,
   type IntegrationVisibilityValues,
 } from '@helpers/integrationVisibility';
-
-/** A failed read backs off to at most this while recovery is still likely. */
-const RETRY_CEILING_MS = 5_000;
-/**
- * And to this once it is not, so a drive that cannot be read at all does not
- * leave an open settings page polling the server every five seconds.
- */
-const SLOW_CEILING_MS = 60_000;
-/** After this many failed passes, recovery is no longer the likely case. */
-const SLOW_AFTER_PASSES = 10;
+import { retryDelayMs } from '@helpers/retryBackoff';
 
 /**
  * One pass at the private drive's visibility schema.
@@ -162,13 +153,7 @@ export function useIntegrationVisibility({
       if (!result.ok) {
         failures += 1;
         setError(result.error);
-        retry = setTimeout(
-          () => void resolve(),
-          Math.min(
-            150 * 2 ** (failures - 1),
-            failures > SLOW_AFTER_PASSES ? SLOW_CEILING_MS : RETRY_CEILING_MS,
-          ),
-        );
+        retry = setTimeout(() => void resolve(), retryDelayMs(failures));
 
         return;
       }
