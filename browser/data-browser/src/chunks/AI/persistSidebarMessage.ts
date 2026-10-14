@@ -46,9 +46,17 @@ export type PersistSidebarMessageArgs = {
  * as long as the model takes to produce one. A reload in that window used to
  * take the question, the half-written answer and the chat itself, and since no
  * resource had ever been created, the chat could not even be found afterwards.
+ *
+ * Any later message of a conversation that already holds a question counts
+ * too: if saving the question failed once (a dropped connection, a save that
+ * was only queued), the chat is still a draft, and without this every reply
+ * after it was written local-only until the next question happened to sweep
+ * it up. A conversation with no question in it is still the empty draft.
  */
-export const shouldFinalizeDraftChat = (message: AtomicUIMessage) =>
-  message.role === 'user';
+export const shouldFinalizeDraftChat = (
+  message: AtomicUIMessage,
+  conversation: AtomicUIMessage[] = [],
+) => message.role === 'user' || conversation.some(m => m.role === 'user');
 
 /**
  * Whether this chat still needs a name.
@@ -104,7 +112,7 @@ export const persistSidebarMessage = async ({
   messageToResourceMapRef.current = next;
   setMessageToResourceMap(next);
 
-  if (wasDraft && shouldFinalizeDraftChat(message)) {
+  if (wasDraft && shouldFinalizeDraftChat(message, newMessages)) {
     // On the chat's own write queue, behind every message write already in
     // flight, so that no write can observe the chat as a draft after this
     // has stopped treating it as one.

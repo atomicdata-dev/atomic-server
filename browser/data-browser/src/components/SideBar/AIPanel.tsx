@@ -1,17 +1,11 @@
-import {
-  ai,
-  commits,
-  core,
-  unknownSubject,
-  useCollection,
-  useResource,
-} from '@tomic/react';
-import { useEffect, useState, type JSX } from 'react';
+import { useResource } from '@tomic/react';
+import type { JSX } from 'react';
 import { FaPlus, FaRegComment } from 'react-icons/fa6';
 import { IconButton } from '@components/IconButton/IconButton';
 import { useAISidebar } from '@components/AI/AISidebarContext';
 import { dataBrowser, useTitle } from '@tomic/react';
 import { usePrivateDrive } from '@hooks/usePrivateDrive';
+import { useDriveChats } from '@hooks/useDriveChats';
 import {
   SideBarMenuRow,
   SideBarMenuRowLabel,
@@ -41,62 +35,6 @@ export function AIChatsPanel(): JSX.Element | null {
       ))}
     </SideBarPanel>
   );
-}
-
-/** Live class query, independent of the drive's storage-folder pointer. */
-function useDriveChats(drive: string | undefined): string[] {
-  const [subjects, setSubjects] = useState<string[]>([]);
-
-  const { collection, ready } = useCollection(
-    {
-      property: core.properties.isA,
-      value: ai.classes.aiChat,
-      filters: [
-        {
-          property: 'https://atomicdata.dev/properties/drive',
-          value: drive ?? unknownSubject,
-        },
-      ],
-      drive: drive ?? unknownSubject,
-      sort_by: commits.properties.createdAt,
-      sort_desc: true,
-    },
-    { pageSize: 100 },
-  );
-
-  useEffect(() => {
-    if (!ready || !drive) {
-      setSubjects([]);
-
-      return;
-    }
-
-    let cancelled = false;
-
-    const extract = async () => {
-      const members: string[] = [];
-
-      for (let i = 0; i < collection.totalMembers; i++) {
-        const member = await collection.getMemberWithIndex(i);
-
-        if (member) {
-          members.push(member);
-        }
-      }
-
-      if (!cancelled) {
-        setSubjects(members);
-      }
-    };
-
-    extract();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [collection, ready, drive]);
-
-  return subjects;
 }
 
 export function NewSidebarChatButton() {
