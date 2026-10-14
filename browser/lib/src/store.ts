@@ -1340,6 +1340,21 @@ export class Store {
   }
 
   /**
+   * Whether `drive` can reach a server endpoint at all: it is defined, not
+   * local-only, and the current server URL is not one set with
+   * `connect: false` (known to run no atomic-server). Gate server-only
+   * features (publishing, share links) on this, not on `getServerUrl()`,
+   * which is set even for local-first-only drives.
+   */
+  public hasServerEndpoint(drive: string | undefined = this.drive): boolean {
+    return (
+      drive !== undefined &&
+      !this.isLocalOnlyDrive(drive) &&
+      this.serverUrlWithoutSocket !== this.serverUrl
+    );
+  }
+
+  /**
    * True when `subject` is an HTTP(S) URL whose origin is not this
    * store's home server. Opening that resource must not move the
    * session: fetch it from its own origin, keep `serverUrl` here.

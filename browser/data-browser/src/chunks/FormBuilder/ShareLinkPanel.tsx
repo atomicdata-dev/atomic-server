@@ -337,7 +337,7 @@ export function NoHostNudge(): JSX.Element {
         <strong>Forms need a server to receive answers.</strong>
         <br />
         {hasCloud
-          ? 'Host this workspace on a Cloud Server to share it.'
+          ? 'Upgrade to a Cloud Server to publish and share this form.'
           : 'Connect or self-host a server in Sync settings to share it.'}
       </InviteOnlyNote>
       <Button type='button' subtle onClick={() => navigate(paths.sync)}>

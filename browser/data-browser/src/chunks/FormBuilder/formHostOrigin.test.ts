@@ -54,4 +54,16 @@ describe('resolveFormHostOrigin', () => {
     expect(resolveFormHostOrigin(DRIVE, undefined, [])).toBeUndefined();
     expect(resolveFormHostOrigin(DRIVE, 'not a url', [])).toBeUndefined();
   });
+
+  it('returns undefined for a drive without a server endpoint', () => {
+    expect(
+      resolveFormHostOrigin(DRIVE, 'https://my.node', [], false),
+    ).toBeUndefined();
+  });
+
+  it('still prefers an enrollment node when the drive has no server endpoint', () => {
+    expect(
+      resolveFormHostOrigin(DRIVE, 'https://my.node', [enrollment({})], false),
+    ).toBe('https://node1.example');
+  });
 });

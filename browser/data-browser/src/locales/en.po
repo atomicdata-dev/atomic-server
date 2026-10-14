@@ -10555,10 +10555,6 @@ msgid "Connect {0}"
 msgstr "Connect {0}"
 
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
-msgid "Host this workspace on a Cloud Server to share it."
-msgstr "Host this workspace on a Cloud Server to share it."
-
-#: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Connect or self-host a server in Sync settings to share it."
 msgstr "Connect or self-host a server in Sync settings to share it."
 
@@ -12953,3 +12949,7 @@ msgstr "Could not move to Trash: {0}"
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
 msgstr "Delete this resource permanently. This cannot be undone."
+
+#: src/chunks/FormBuilder/ShareLinkPanel.tsx
+msgid "Upgrade to a Cloud Server to publish and share this form."
+msgstr "Upgrade to a Cloud Server to publish and share this form."
