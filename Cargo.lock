@@ -1338,6 +1338,7 @@ dependencies = [
  "wasmtime-wasi",
  "wasmtime-wasi-http",
  "webp",
+ "wit-parser 0.244.0",
  "zip 8.6.0",
 ]
 
