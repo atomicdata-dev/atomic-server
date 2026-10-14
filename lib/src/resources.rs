@@ -593,6 +593,11 @@ impl Resource {
         None
     }
 
+    /// The open doc, if one is loaded.
+    pub(crate) fn open_doc(&self) -> Option<&crate::loro::AtomicLoroDoc> {
+        self.loro.as_ref()
+    }
+
     /// The open doc's changes since `base`, if a doc is open.
     pub(crate) fn export_open_delta(&self, base: &::loro::VersionVector) -> Option<Vec<u8>> {
         self.loro.as_ref().map(|doc| doc.export_updates_since(base))

@@ -104,7 +104,8 @@ fn key(subject: &str, created_at: i64, signature: &str) -> Vec<u8> {
     key
 }
 
-fn decode(key: &[u8], value: Vec<u8>) -> Option<StoredEnvelope> {
+/// The resource, `createdAt` and signature a row key encodes.
+fn parse_key(key: &[u8]) -> Option<(String, i64, String)> {
     let subject_end = key.iter().position(|b| *b == 0)?;
     let subject = std::str::from_utf8(&key[..subject_end]).ok()?.to_string();
     let rest = &key[subject_end + 1..];
@@ -113,13 +114,321 @@ fn decode(key: &[u8], value: Vec<u8>) -> Option<StoredEnvelope> {
     }
     let created_at = u64::from_be_bytes(rest[..8].try_into().ok()?) as i64;
     let signature = std::str::from_utf8(&rest[9..]).ok()?.to_string();
-    let json = String::from_utf8(value).ok()?;
-    Some(StoredEnvelope {
+    Some((subject, created_at, signature))
+}
+
+/// What a stored row turned into.
+enum Decoded {
+    Row(StoredEnvelope),
+    /// A compact row whose commit could not be rebuilt (the resource's Loro
+    /// doc is missing, or its oplog no longer yields the signed bytes). The
+    /// row is real but there is no honest JSON to show for it.
+    Unreadable,
+}
+
+/// The resource's stored Loro doc, loaded once per scan and only when a
+/// compact row asks for it.
+struct DocCache<'a> {
+    store: &'a Db,
+    subject: &'a str,
+    doc: Option<Option<crate::loro::AtomicLoroDoc>>,
+}
+
+impl<'a> DocCache<'a> {
+    fn new(store: &'a Db, subject: &'a str) -> Self {
+        Self {
+            store,
+            subject,
+            doc: None,
+        }
+    }
+
+    fn get(&mut self) -> Option<&crate::loro::AtomicLoroDoc> {
+        let (store, subject) = (self.store, self.subject);
+        self.doc
+            .get_or_insert_with(|| stored_doc(store, subject))
+            .as_ref()
+    }
+}
+
+fn stored_doc(store: &Db, subject: &str) -> Option<crate::loro::AtomicLoroDoc> {
+    let pure = crate::Subject::from_raw(subject, None).pure_id();
+    let bytes = store
+        .kv
+        .get(Tree::LoroSnapshots, pure.as_bytes())
+        .ok()
+        .flatten()?;
+    crate::loro::AtomicLoroDoc::from_snapshot(&bytes).ok()
+}
+
+fn decode(key: &[u8], value: Vec<u8>, docs: &mut DocCache) -> Option<Decoded> {
+    let (subject, created_at, signature) = parse_key(key)?;
+    let json = match value.first() {
+        Some(&COMPACT_V1) => {
+            match docs
+                .get()
+                .and_then(|doc| rebuild_json(&subject, created_at, &signature, &value, doc))
+            {
+                Some(json) => json,
+                None => return Some(Decoded::Unreadable),
+            }
+        }
+        _ => String::from_utf8(value).ok()?,
+    };
+    Some(Decoded::Row(StoredEnvelope {
         subject,
         created_at,
         signature,
         json,
-    })
+    }))
+}
+
+// A compact row. The key already holds the resource, `createdAt` and the
+// signature, and the Loro oplog holds the update, so what is left to keep is
+// who signed, the optional audit pointer and which ops the commit carried.
+//
+//   0x01 | flags | signer | [previousCommit] | n | n * (peer u64 LE, start, end) | hash[8]
+//
+// `signer` and `previousCommit` are raw bytes when they have the usual
+// `atomic:agent:` / `atomic:commit:` shape and a length-prefixed string
+// otherwise; counters are LEB128 varints. `hash` is the first 8 bytes of
+// blake3 over the rebuilt `Updates` blob. A legacy row is the commit JSON and
+// starts with `{`, so the tag byte tells them apart.
+const COMPACT_V1: u8 = 1;
+const FLAG_PREVIOUS: u8 = 1;
+const FLAG_PREVIOUS_RAW: u8 = 2;
+const FLAG_SIGNER_RAW: u8 = 4;
+const AGENT_PREFIX: &str = "atomic:agent:";
+const COMPACT_KEYS: [&str; 8] = [
+    "@id",
+    crate::urls::CREATED_AT,
+    crate::urls::IS_A,
+    crate::urls::LORO_UPDATE,
+    crate::urls::PREVIOUS_COMMIT,
+    crate::urls::SIGNATURE,
+    crate::urls::SIGNER,
+    crate::urls::SUBJECT,
+];
+
+fn put_varint(out: &mut Vec<u8>, mut n: u64) {
+    while n >= 0x80 {
+        out.push((n as u8) | 0x80);
+        n >>= 7;
+    }
+    out.push(n as u8);
+}
+
+fn take_varint(input: &mut &[u8]) -> Option<u64> {
+    let mut n = 0u64;
+    for shift in (0..64).step_by(7) {
+        let (&byte, rest) = input.split_first()?;
+        *input = rest;
+        n |= u64::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return Some(n);
+        }
+    }
+    None
+}
+
+fn take_bytes<'a>(input: &mut &'a [u8], n: usize) -> Option<&'a [u8]> {
+    if input.len() < n {
+        return None;
+    }
+    let (head, rest) = input.split_at(n);
+    *input = rest;
+    Some(head)
+}
+
+/// `value` as raw bytes when it is `prefix` plus the unpadded base64url form
+/// of `len` bytes, and re-encodes to exactly that.
+fn raw_id(value: &str, prefix: &str, len: usize) -> Option<Vec<u8>> {
+    use base64::Engine;
+    let body = value.strip_prefix(prefix)?;
+    let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(body)
+        .ok()?;
+    (raw.len() == len && base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&raw) == body)
+        .then_some(raw)
+}
+
+fn id_from_raw(prefix: &str, raw: &[u8]) -> String {
+    use base64::Engine;
+    format!(
+        "{prefix}{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(raw)
+    )
+}
+
+/// Appends `value`; `true` when it went in as raw bytes.
+fn put_id(out: &mut Vec<u8>, value: &str, prefix: &str, len: usize) -> bool {
+    match raw_id(value, prefix, len) {
+        Some(raw) => {
+            out.extend_from_slice(&raw);
+            true
+        }
+        None => {
+            put_varint(out, value.len() as u64);
+            out.extend_from_slice(value.as_bytes());
+            false
+        }
+    }
+}
+
+fn take_id(input: &mut &[u8], raw: bool, prefix: &str, len: usize) -> Option<String> {
+    if raw {
+        Some(id_from_raw(prefix, take_bytes(input, len)?))
+    } else {
+        let n = take_varint(input)? as usize;
+        Some(std::str::from_utf8(take_bytes(input, n)?).ok()?.to_string())
+    }
+}
+
+/// The commit JSON-AD for a compact row, in the key order and spelling
+/// `Resource::to_json_ad` writes.
+fn rebuild_json(
+    subject: &str,
+    created_at: i64,
+    signature: &str,
+    row: &[u8],
+    doc: &crate::loro::AtomicLoroDoc,
+) -> Option<String> {
+    use base64::Engine;
+    let mut input = row.strip_prefix(&[COMPACT_V1])?;
+    let flags = take_bytes(&mut input, 1)?[0];
+    let signer = take_id(&mut input, flags & FLAG_SIGNER_RAW != 0, AGENT_PREFIX, 32)?;
+    let previous = if flags & FLAG_PREVIOUS != 0 {
+        Some(take_id(
+            &mut input,
+            flags & FLAG_PREVIOUS_RAW != 0,
+            crate::identifiers::ATOMIC_COMMIT_PREFIX,
+            64,
+        )?)
+    } else {
+        None
+    };
+    let count = take_varint(&mut input)? as usize;
+    let mut spans = Vec::with_capacity(count.min(64));
+    for _ in 0..count {
+        let peer = u64::from_le_bytes(take_bytes(&mut input, 8)?.try_into().ok()?);
+        let start = i32::try_from(take_varint(&mut input)?).ok()?;
+        let end = i32::try_from(take_varint(&mut input)?).ok()?;
+        spans.push((peer, start, end));
+    }
+    let hash = take_bytes(&mut input, 8)?;
+    if !input.is_empty() {
+        return None;
+    }
+
+    let update = doc.export_updates_in_range(&spans)?;
+    if &blake3::hash(&update).as_bytes()[..8] != hash {
+        return None;
+    }
+    let mut map = serde_json::Map::new();
+    map.insert(
+        "@id".into(),
+        crate::identifiers::commit_subject(signature).into(),
+    );
+    map.insert(crate::urls::CREATED_AT.into(), created_at.into());
+    map.insert(
+        crate::urls::IS_A.into(),
+        serde_json::json!([crate::urls::COMMIT]),
+    );
+    map.insert(
+        crate::urls::LORO_UPDATE.into(),
+        base64::engine::general_purpose::STANDARD
+            .encode(&update)
+            .into(),
+    );
+    if let Some(previous) = previous {
+        map.insert(crate::urls::PREVIOUS_COMMIT.into(), previous.into());
+    }
+    map.insert(crate::urls::SIGNATURE.into(), signature.into());
+    map.insert(crate::urls::SIGNER.into(), signer.into());
+    map.insert(crate::urls::SUBJECT.into(), subject.into());
+    serde_json::to_string(&map).ok()
+}
+
+/// The compact row for a commit, when it is a plain delta whose JSON the row
+/// and `doc` rebuild byte for byte. Anything else (a genesis snapshot, a
+/// destroy, an unknown field, a blob the oplog no longer reproduces) is
+/// `None`, and the caller stores the full JSON.
+fn compact_row(
+    subject: &str,
+    created_at: i64,
+    signature: &str,
+    json: &str,
+    doc: &crate::loro::AtomicLoroDoc,
+) -> Option<Vec<u8>> {
+    use base64::Engine;
+    let value: serde_json::Value = serde_json::from_str(json).ok()?;
+    let map = value.as_object()?;
+    if created_at < 0 || map.keys().any(|k| !COMPACT_KEYS.contains(&k.as_str())) {
+        return None;
+    }
+    let text = |key: &str| map.get(key).and_then(|v| v.as_str());
+    let update = base64::engine::general_purpose::STANDARD
+        .decode(text(crate::urls::LORO_UPDATE)?)
+        .ok()?;
+    let meta = ::loro::LoroDoc::decode_import_blob_meta(&update, false).ok()?;
+    if meta.mode != ::loro::EncodedBlobMode::Updates {
+        return None;
+    }
+    let mut spans: Vec<(u64, i32, i32)> = meta
+        .partial_end_vv
+        .iter()
+        .map(|(peer, end)| {
+            (
+                *peer,
+                meta.partial_start_vv.get(peer).copied().unwrap_or(0),
+                *end,
+            )
+        })
+        .collect();
+    spans.sort_unstable();
+
+    let mut row = vec![COMPACT_V1, 0];
+    let mut flags = 0;
+    if put_id(&mut row, text(crate::urls::SIGNER)?, AGENT_PREFIX, 32) {
+        flags |= FLAG_SIGNER_RAW;
+    }
+    if let Some(previous) = text(crate::urls::PREVIOUS_COMMIT) {
+        flags |= FLAG_PREVIOUS;
+        if put_id(
+            &mut row,
+            previous,
+            crate::identifiers::ATOMIC_COMMIT_PREFIX,
+            64,
+        ) {
+            flags |= FLAG_PREVIOUS_RAW;
+        }
+    }
+    row[1] = flags;
+    put_varint(&mut row, spans.len() as u64);
+    for (peer, start, end) in &spans {
+        row.extend_from_slice(&peer.to_le_bytes());
+        put_varint(&mut row, u64::try_from(*start).ok()?);
+        put_varint(&mut row, u64::try_from(*end).ok()?);
+    }
+    row.extend_from_slice(&blake3::hash(&update).as_bytes()[..8]);
+
+    (rebuild_json(subject, created_at, signature, &row, doc).as_deref() == Some(json))
+        .then_some(row)
+}
+
+/// The value to store for a commit envelope: the compact row when `doc`
+/// (the resource's Loro doc including this commit) rebuilds it exactly, the
+/// commit JSON otherwise.
+fn value_for(
+    subject: &str,
+    created_at: i64,
+    signature: &str,
+    json: String,
+    doc: Option<&crate::loro::AtomicLoroDoc>,
+) -> Vec<u8> {
+    let pure = crate::Subject::from_raw(subject, None).pure_id();
+    doc.and_then(|doc| compact_row(&pure, created_at, signature, &json, doc))
+        .unwrap_or_else(|| json.into_bytes())
 }
 
 /// Most ancestors [`resolve_retention`] looks at. A parent chain is a few
@@ -286,27 +595,59 @@ pub fn record_ops(
         }
     }
 
+    // The doc as it stands after this commit: the open one, or the state
+    // the transaction stores.
+    let state_doc;
+    let doc = match response.resource_new.as_ref() {
+        Some(new) => match new.open_doc() {
+            Some(open) => Some(open),
+            None => {
+                state_doc = new
+                    .materialized_state()
+                    .and_then(|bytes| crate::loro::AtomicLoroDoc::from_snapshot(&bytes).ok());
+                state_doc.as_ref()
+            }
+        },
+        None => None,
+    };
+    let val = value_for(subject, response.commit.created_at, signature, json, doc);
     transaction.push(Operation {
         tree: Tree::Envelopes,
         method: Method::Insert,
         key: new_key,
-        val: Some(json.into_bytes()),
+        val: Some(val),
     });
     Ok(())
 }
 
-/// Every retained envelope of a resource, oldest first.
-pub fn envelopes(store: &Db, subject: &str) -> Vec<StoredEnvelope> {
-    let mut rows: Vec<StoredEnvelope> = store
+/// Every retained envelope of a resource, oldest first, and how many rows
+/// could not be turned back into a commit (see [`Decoded::Unreadable`]).
+fn scan(store: &Db, subject: &str) -> (Vec<StoredEnvelope>, usize) {
+    let mut docs = DocCache::new(store, subject);
+    let mut unreadable = 0;
+    let mut rows = Vec::new();
+    for (k, v) in store
         .kv
         .scan_prefix(Tree::Envelopes, &prefix(subject))
         .filter_map(|entry| entry.ok())
-        .filter_map(|(k, v)| decode(&k, v))
-        .collect();
-    if rows.is_empty() {
+    {
+        match decode(&k, v, &mut docs) {
+            Some(Decoded::Row(row)) => rows.push(row),
+            Some(Decoded::Unreadable) => unreadable += 1,
+            None => {}
+        }
+    }
+    if rows.is_empty() && unreadable == 0 {
         rows.extend(genesis_envelope_from_row(store, subject));
     }
-    rows
+    (rows, unreadable)
+}
+
+/// Every retained envelope of a resource, oldest first. A compact row that
+/// cannot be rebuilt is left out rather than guessed; [`attribute_history`]
+/// reports it.
+pub fn envelopes(store: &Db, subject: &str) -> Vec<StoredEnvelope> {
+    scan(store, subject).0
 }
 
 /// The signature that names `subject`, when it is a resource whose id was
@@ -425,11 +766,18 @@ pub async fn import_envelope(store: &Db, expected_subject: &str, json: &str) -> 
             });
         }
     }
+    let doc = stored_doc(store, commit.subject.as_str());
     ops.push(Operation {
         tree: Tree::Envelopes,
         method: Method::Insert,
         key: new_key,
-        val: Some(json.as_bytes().to_vec()),
+        val: Some(value_for(
+            commit.subject.as_str(),
+            commit.created_at,
+            signature,
+            json.to_string(),
+            doc.as_ref(),
+        )),
     });
     store.kv.apply_batch(&ops)
 }
@@ -485,6 +833,11 @@ pub struct HistoryAttribution {
     /// is not counted. `false` while the subject is destroyed or nothing is
     /// retained.
     pub complete: bool,
+    /// Retained envelopes that could not be rebuilt from their compact row
+    /// (the stored Loro doc is gone or no longer reproduces the signed
+    /// update). They are not in `attributions`, and `complete` is `false`
+    /// while any exist.
+    pub unreadable: usize,
 }
 
 /// Verify the retained envelopes of a resource and map them onto its Loro
@@ -514,7 +867,8 @@ pub async fn attribute_history(store: &Db, subject: &str) -> AtomicResult<Histor
         .flatten()
         .and_then(|bytes| crate::loro::AtomicLoroDoc::from_snapshot(&bytes).ok());
 
-    for envelope in envelopes(store, subject) {
+    let (retained, unreadable) = scan(store, subject);
+    for envelope in retained {
         let resource = crate::parse::parse_json_ad_commit_resource(&envelope.json, store).await?;
         let commit = crate::commit::Commit::from_resource(resource)?;
         let verified = commit.validate_signature(store).await.is_ok();
@@ -565,6 +919,7 @@ pub async fn attribute_history(store: &Db, subject: &str) -> AtomicResult<Histor
     let complete = match stored_tokens {
         Some(tokens) => {
             !attributions.is_empty()
+                && unreadable == 0
                 && tokens
                     .iter()
                     .filter(|token| !is_genesis_carrier(token))
@@ -582,6 +937,7 @@ pub async fn attribute_history(store: &Db, subject: &str) -> AtomicResult<Histor
         retention,
         attributions,
         complete,
+        unreadable,
     })
 }
 
@@ -1430,5 +1786,245 @@ mod tests {
         let kept = envelopes(&db, subject.as_str());
         assert_eq!(kept.len(), 2, "genesis and the edit");
         assert_eq!(kept[0].json, written);
+    }
+
+    // ---- compact rows ----
+
+    /// The raw stored values of a resource's envelope rows, key order.
+    fn raw_rows(db: &Db, subject: &crate::Subject) -> Vec<(Vec<u8>, Vec<u8>)> {
+        db.kv
+            .scan_prefix(Tree::Envelopes, &prefix(subject.as_str()))
+            .map(|row| row.unwrap())
+            .collect()
+    }
+
+    fn is_compact(value: &[u8]) -> bool {
+        value.first() == Some(&COMPACT_V1)
+    }
+
+    /// A signed edit through `save_locally`; returns the commit JSON-AD as
+    /// signed.
+    async fn signed_edit_json(db: &Db, subject: &crate::Subject, name: &str) -> String {
+        let mut resource = db.get_resource(subject).await.unwrap();
+        resource
+            .set(urls::NAME.into(), Value::String(name.into()), db)
+            .await
+            .unwrap();
+        let response = resource.save_locally(db).await.unwrap();
+        response.commit_resource.to_json_ad(None).unwrap()
+    }
+
+    #[tokio::test]
+    async fn rust_path_edits_are_stored_compact_and_read_back_byte_identical() {
+        let db = Db::init_temp("envelopes_compact_rust").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let mut written = Vec::new();
+        for name in ["one", "two", "three", "four"] {
+            written.push(signed_edit_json(&db, &subject, name).await);
+        }
+
+        let rows = raw_rows(&db, &subject);
+        let compact = rows.iter().filter(|(_, v)| is_compact(v)).count();
+        assert_eq!(compact, written.len(), "every edit is compact: {rows:?}");
+        let read = envelopes(&db, subject.as_str());
+        let read_edits: Vec<&str> = read
+            .iter()
+            .rev()
+            .take(written.len())
+            .rev()
+            .map(|e| e.json.as_str())
+            .collect();
+        assert_eq!(read_edits, written, "rebuilt JSON is what was signed");
+
+        let report = attribute_history(&db, subject.as_str()).await.unwrap();
+        assert!(report.attributions.iter().all(|a| a.verified), "{report:?}");
+        assert!(report.complete, "{report:?}");
+        assert_eq!(report.unreadable, 0);
+    }
+
+    #[tokio::test]
+    async fn browser_style_delta_is_stored_compact_and_verifies_after_rebuild() {
+        let db = Db::init_temp("envelopes_compact_delta").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        // Something earlier than the delta so the commit carries a
+        // `previousCommit`-free, single-peer range after the genesis.
+        signed_edit(&db, &subject, "before").await;
+
+        let resource = db.get_resource(&subject).await.unwrap();
+        let snapshot = resource.materialized_state().expect("stored state");
+        let base_vv = crate::loro::AtomicLoroDoc::from_snapshot(&snapshot)
+            .unwrap()
+            .oplog_vv();
+        let client_doc = crate::loro::AtomicLoroDoc::from_snapshot(&snapshot).unwrap();
+        client_doc
+            .set_property(urls::NAME, &Value::String("delta edit".into()))
+            .unwrap();
+        client_doc.commit_with_message("c-01test-compact-token");
+        let delta = client_doc.export_updates_since(&base_vv);
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.set_loro_update(delta);
+        let commit = builder.sign(&alice, &db, &resource).await.unwrap();
+        let json = commit
+            .into_resource(&db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap();
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect("the delta applies");
+
+        let rows = raw_rows(&db, &subject);
+        assert!(is_compact(&rows.last().unwrap().1), "the delta is compact");
+        let last = latest_envelope(&db, subject.as_str()).unwrap();
+        assert_eq!(last.json, json, "byte-identical to the signed commit");
+
+        // The rebuilt JSON verifies on its own, through the same path a
+        // receiving peer uses.
+        let resource = crate::parse::parse_json_ad_commit_resource(&last.json, &db)
+            .await
+            .unwrap();
+        let commit = crate::commit::Commit::from_resource(resource).unwrap();
+        commit
+            .validate_signature(&db)
+            .await
+            .expect("signature holds");
+
+        let report = attribute_history(&db, subject.as_str()).await.unwrap();
+        assert_eq!(
+            report.attributions.last().unwrap().tokens,
+            vec!["c-01test-compact-token".to_string()]
+        );
+        assert!(report.complete, "{report:?}");
+    }
+
+    #[tokio::test]
+    async fn a_legacy_json_row_still_reads() {
+        let db = Db::init_temp("envelopes_compact_legacy").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let json = signed_edit_json(&db, &subject, "old era").await;
+        let (key, value) = raw_rows(&db, &subject).pop().unwrap();
+        assert!(is_compact(&value));
+
+        db.kv
+            .insert(Tree::Envelopes, &key, json.as_bytes())
+            .unwrap();
+        assert_eq!(latest_envelope(&db, subject.as_str()).unwrap().json, json);
+        let report = attribute_history(&db, subject.as_str()).await.unwrap();
+        assert!(report.complete, "{report:?}");
+        assert!(report.attributions.iter().all(|a| a.verified));
+    }
+
+    #[tokio::test]
+    async fn import_stores_compact_and_falls_back_to_json_when_the_rebuild_differs() {
+        let db = Db::init_temp("envelopes_compact_import").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let json = signed_edit_json(&db, &subject, "imported").await;
+        let (key, _) = raw_rows(&db, &subject).pop().unwrap();
+
+        // The canonical bytes come back compact.
+        db.kv.remove(Tree::Envelopes, &key).unwrap();
+        import_envelope(&db, subject.as_str(), &json).await.unwrap();
+        let (new_key, value) = raw_rows(&db, &subject).pop().unwrap();
+        assert_eq!(new_key, key);
+        assert!(is_compact(&value), "import stores compact too");
+        assert_eq!(latest_envelope(&db, subject.as_str()).unwrap().json, json);
+
+        // The same commit spelled differently (key order) is still a valid
+        // envelope, but the rebuild would not give these bytes: full JSON.
+        let mut map: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&json).unwrap();
+        let id = map.remove("@id").unwrap();
+        let mut spelled = serde_json::Map::new();
+        spelled.insert("@id".into(), id);
+        for key in map.keys().rev().cloned().collect::<Vec<_>>() {
+            spelled.insert(key.clone(), map.remove(&key).unwrap());
+        }
+        let respelled = serde_json::to_string(&spelled).unwrap();
+        if respelled != json {
+            db.kv.remove(Tree::Envelopes, &key).unwrap();
+            import_envelope(&db, subject.as_str(), &respelled)
+                .await
+                .unwrap();
+            let (_, value) = raw_rows(&db, &subject).pop().unwrap();
+            assert!(!is_compact(&value), "a different spelling is kept whole");
+            assert_eq!(value, respelled.as_bytes());
+        }
+
+        // And with no stored doc to rebuild from, nothing compact is chosen.
+        let doc = stored_doc(&db, subject.as_str()).unwrap();
+        assert!(compact_row(
+            &subject.pure_id(),
+            latest_envelope(&db, subject.as_str()).unwrap().created_at,
+            &latest_envelope(&db, subject.as_str()).unwrap().signature,
+            &json,
+            &crate::loro::AtomicLoroDoc::new(),
+        )
+        .is_none());
+        assert!(doc.oplog_vv().iter().count() > 0);
+    }
+
+    #[tokio::test]
+    async fn a_genesis_snapshot_is_never_compact() {
+        let db = Db::init_temp("envelopes_compact_other").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        signed_edit(&db, &subject, "x").await;
+        let genesis = envelopes(&db, subject.as_str()).remove(0);
+        let doc = stored_doc(&db, subject.as_str()).unwrap();
+        assert!(
+            compact_row(
+                &subject.pure_id(),
+                genesis.created_at,
+                &genesis.signature,
+                &genesis.json,
+                &doc
+            )
+            .is_none(),
+            "a snapshot-mode blob has no range to rebuild it from"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unrebuildable_compact_row_is_unverifiable_not_invented() {
+        let db = Db::init_temp("envelopes_compact_unreadable").await.unwrap();
+        db.set_envelope_retention(EnvelopeRetention::All);
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        signed_edit(&db, &subject, "x").await;
+        assert!(is_compact(&raw_rows(&db, &subject).pop().unwrap().1));
+        let before = attribute_history(&db, subject.as_str()).await.unwrap();
+        assert!(before.complete && before.unreadable == 0, "{before:?}");
+
+        // The oplog the row points into is gone.
+        db.kv
+            .remove(Tree::LoroSnapshots, subject.pure_id().as_bytes())
+            .unwrap();
+        assert!(
+            envelopes(&db, subject.as_str())
+                .iter()
+                .all(|e| !e.json.is_empty() && e.signature.len() > 10),
+            "no row with made-up content"
+        );
+        assert_eq!(
+            envelopes(&db, subject.as_str()).len(),
+            1,
+            "only the whole-JSON genesis row is left readable"
+        );
+        let after = attribute_history(&db, subject.as_str()).await.unwrap();
+        assert_eq!(
+            after.unreadable, 1,
+            "the edit; the genesis row is whole JSON"
+        );
+        assert!(!after.complete);
     }
 }
