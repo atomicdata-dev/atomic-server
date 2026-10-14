@@ -153,6 +153,21 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
   }, [checkMenuPosition]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    // A nested settings panel can scroll without resizing the input. Track
+    // its position too, otherwise the menu keeps opening above an anchor
+    // that has moved to the top of the viewport (or the reverse).
+    window.addEventListener('scroll', checkMenuPosition, true);
+    window.addEventListener('resize', checkMenuPosition);
+
+    return () => {
+      window.removeEventListener('scroll', checkMenuPosition, true);
+      window.removeEventListener('resize', checkMenuPosition);
+    };
+  }, [isOpen, checkMenuPosition]);
+
+  useEffect(() => {
     if (!menuRef || !menuRef.current) return;
 
     if (isOpen) {

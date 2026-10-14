@@ -51,8 +51,8 @@ describe('recovered file download', () => {
       });
       vi.spyOn(store, 'getClientDb').mockReturnValue({
         getBlob: () => pending,
-      } as NonNullable<ReturnType<Store['getClientDb']>>);
-      const resource = new Resource('atomic:recovered-file');
+      } as unknown as NonNullable<ReturnType<Store['getClientDb']>>);
+      const resource = new Resource<never>('atomic:recovered-file');
       const values = new Map<string, string | number>([
         [server.properties.downloadUrl, 'https://example.com/download/file'],
         [server.properties.mimetype, 'application/octet-stream'],
