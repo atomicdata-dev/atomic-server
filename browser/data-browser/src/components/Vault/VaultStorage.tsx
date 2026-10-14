@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { Button } from '../Button';
+import { paths } from '../../routes/paths';
 import { CARD_SUB_FONT } from '../cardSurface';
 import { formatBytes } from '../../helpers/formatBytes';
 import {
@@ -29,6 +30,8 @@ export function VaultStorage({
   busy: parentBusy = false,
   suspended = false,
   onCompact,
+  beforeWrite,
+  showAccountLink = true,
 }: {
   drivePseudonym: string;
   /** A backup, restore or other pass is running somewhere else in the row. */
@@ -40,6 +43,8 @@ export function VaultStorage({
    * when it failed; the host reports why.
    */
   onCompact?: (includeUndoWindow: boolean) => Promise<CompactResult | null>;
+  beforeWrite?: () => Promise<void>;
+  showAccountLink?: boolean;
   /** Called after storage was freed, so the host can refresh its numbers. */
   onChanged?: () => void;
   /** Closes the panel. The row's "View Vault storage" action opens it. */
@@ -49,6 +54,7 @@ export function VaultStorage({
   const [working, setWorking] = useState(false);
   const busy = working || parentBusy;
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Reading can fail for reasons that are nobody's fault (the account does not
@@ -75,23 +81,26 @@ export function VaultStorage({
     setError(null);
 
     try {
+      await beforeWrite?.();
       const result = await freeUpVaultStorage(
         drivePseudonym,
         includeUndoWindow,
       );
 
       setMessage(
-        result.bytes_reclaimed > 0
-          ? `Freed ${formatBytes(result.bytes_reclaimed)}.`
-          : 'Nothing to free.',
+        result.delete_failures > 0
+          ? `Freed ${formatBytes(result.bytes_reclaimed)}. ${result.delete_failures} objects could not be deleted; storage will be checked again automatically.`
+          : result.bytes_reclaimed > 0
+            ? `Freed ${formatBytes(result.bytes_reclaimed)}.`
+            : 'Nothing to free.',
       );
       await load();
       onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not free storage.');
-    } finally {
-      setWorking(false);
     }
+
+    setWorking(false);
   }
 
   async function compact(includeUndoWindow: boolean) {
@@ -102,6 +111,7 @@ export function VaultStorage({
     setError(null);
 
     try {
+      await beforeWrite?.();
       // The host owns the busy state and the error text for this one: it runs
       // a backup pass, which can fail for reasons only it can name.
       const result = await onCompact(includeUndoWindow);
@@ -115,14 +125,21 @@ export function VaultStorage({
       }
 
       await load();
-    } finally {
-      setWorking(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not compress backup.');
     }
+
+    setWorking(false);
   }
 
   return (
     <Wrapper data-testid='vault-storage'>
       <Heading>Storage in Cloud Vault</Heading>
+      {showAccountLink && (
+        <a href={`${paths.storage}?view=vault`}>
+          Compare all workspace backups
+        </a>
+      )}
       {readNote && !usage && (
         <Muted data-testid='vault-storage-note'>{readNote}</Muted>
       )}
@@ -190,7 +207,7 @@ export function VaultStorage({
               <Button
                 data-testid='vault-free-up-undo'
                 subtle
-                onClick={() => free(true)}
+                onClick={() => setConfirmUndo(true)}
                 disabled={busy}
               >
                 Free it anyway
@@ -248,6 +265,24 @@ export function VaultStorage({
         </>
       )}
       {message && <Muted data-testid='vault-storage-message'>{message}</Muted>}
+      <ConfirmationDialog
+        show={confirmUndo}
+        bindShow={setConfirmUndo}
+        title='Remove retained backup copies?'
+        confirmLabel='Remove retained copies'
+        theme={ConfirmationDialogTheme.Alert}
+        onConfirm={() => void free(true)}
+      >
+        <p>
+          Older backup copies and files kept for recently deleted items will be
+          permanently removed. Those items can no longer be recovered from Cloud
+          Vault.
+        </p>
+        <p>
+          The current backup stays recoverable. Documents and files on your
+          devices are unchanged.
+        </p>
+      </ConfirmationDialog>
       {usage && (
         <ConfirmationDialog
           show={confirmDiscard}

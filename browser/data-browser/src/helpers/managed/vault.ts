@@ -400,8 +400,10 @@ export async function enrollVault(
   return created.enrollment;
 }
 
-export async function listVaultDrives(): Promise<VaultEnrollment[]> {
-  return api<VaultEnrollment[]>('/cloud-vault/drives');
+export async function listVaultDrives(
+  signal?: AbortSignal,
+): Promise<VaultEnrollment[]> {
+  return api<VaultEnrollment[]>('/cloud-vault/drives', { signal });
 }
 
 export async function disableVault(drivePseudonym: string): Promise<void> {
@@ -677,8 +679,11 @@ export function nextSegmentFor(
 
 export async function listVaultObjects(
   drivePseudonym: string,
+  signal?: AbortSignal,
 ): Promise<VaultObject[]> {
-  return api<VaultObject[]>(`/cloud-vault/${drivePseudonym}/objects`);
+  return api<VaultObject[]>(`/cloud-vault/${drivePseudonym}/objects`, {
+    signal,
+  });
 }
 
 export type VaultRecoveryManifest = {
@@ -1047,9 +1052,10 @@ export type RestoreSource = (
 export async function downloadVaultObjects<T>(
   drivePseudonym: string,
   objects: VaultObject[],
-  read: (response: Response) => Promise<T>,
+  read: (response: Response, object: VaultObject) => Promise<T>,
   onProgress?: (done: number, total: number) => void,
   onError?: (error: unknown, object: VaultObject) => T,
+  signal?: AbortSignal,
 ): Promise<T[]> {
   if (objects.length === 0) return [];
 
@@ -1066,6 +1072,7 @@ export async function downloadVaultObjects<T>(
       batch = api<{ downloads: DownloadUrl[] }>(
         `/cloud-vault/${drivePseudonym}/download-urls`,
         {
+          signal,
           method: 'POST',
           body: JSON.stringify({
             object_ids: objects
@@ -1092,6 +1099,7 @@ export async function downloadVaultObjects<T>(
   await Promise.all(
     Array.from({ length: Math.min(8, objects.length) }, async () => {
       while (!failed && next < objects.length) {
+        signal?.throwIfAborted();
         const index = next++;
         const object = objects[index];
 
@@ -1100,7 +1108,7 @@ export async function downloadVaultObjects<T>(
           const url = urlByKey.get(object.object_key);
           if (!url)
             throw new Error(`No download URL issued for ${object.object_key}`);
-          const response = await fetch(url);
+          const response = await fetch(url, { signal });
 
           if (!response.ok) {
             throw new Error(
@@ -1108,10 +1116,12 @@ export async function downloadVaultObjects<T>(
             );
           }
 
-          fetched[index] = await read(response);
+          fetched[index] = await read(response, object);
           completed++;
           if (!failed) onProgress?.(completed, objects.length);
         } catch (error) {
+          signal?.throwIfAborted();
+
           if (!onError) {
             failed = true;
             throw error;

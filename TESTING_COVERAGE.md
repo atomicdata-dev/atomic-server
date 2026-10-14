@@ -3104,3 +3104,31 @@ control-plane leadership and rollback of all independent recovery evidence
 remain separate work. The upload campaign is deterministic boundary coverage,
 not an exhaustive distributed fault simulation. Native lifecycle, browser
 compaction/pruning races and cross-device invitation revocation remain gaps.
+
+### Account Vault storage inspection
+
+- `vaultStorageReport.test.ts` includes workspaces belonging to different linked
+  agents, retains listed bytes on a failed detail read, and refuses cancelled or
+  mixed-account reports. Only owner-scoped metadata endpoints are read.
+- `VaultAccountStorage.test.tsx` rejects a pending result after logout and leaves
+  an unavailable allowance unknown rather than displaying a false zero quota.
+- `vault-storage.spec.ts` compares two workspaces on desktop/mobile, selects
+  diagnostics through the shared size map, downloads and checks the JSON report,
+  and verifies no backup-body download or storage mutation occurred. Invented
+  metadata isolates presentation; real backup recovery has separate acceptance.
+- The same spec exports real documents and an attachment into encrypted WASM
+  checkpoints, then checks desktop/mobile content inspection, file attribution,
+  confirmation/cancellation of retention cleanup and unchanged local resources
+  (including a deleted document that inspection must not resurrect). Storage
+  transport and the cleanup response are mocked; real S3 prune races remain a
+  separate acceptance gap.
+- `vault::inspect` reconciles every sealed byte across legacy/current pack
+  encodings, reads file metadata, and rejects wrong keys, epochs and corrupt or
+  non-pack objects. This path has no database or restore dependency.
+- `vaultContents.test.ts` checks repeated copies, shared blobs counted once,
+  unreadable/unattributed bytes, mismatched accounting and account guards.
+  `VaultContentsView.test.tsx` checks stop/unmount cancellation and late results;
+  `VaultStorage.test.tsx` checks destructive confirmation and changed accounts.
+- `SizeMap` is shared by server resource storage and account Vault storage. The
+  existing `storageMap.test.ts` covers its squarify layout; browser checks keep
+  both maps rendering without translation markers or horizontal overflow.

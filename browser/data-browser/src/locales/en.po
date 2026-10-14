@@ -11266,6 +11266,7 @@ msgstr "This workspace"
 msgid "Drive"
 msgstr "Drive"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/routes/StorageRoute.tsx
 msgid "Back to sync settings"
 msgstr "Back to sync settings"
@@ -11311,18 +11312,22 @@ msgstr "Free up space"
 msgid "Change history"
 msgstr "Change history"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Snapshots"
 msgstr "Snapshots"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Files and images"
 msgstr "Files and images"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Search index"
 msgstr "Search index"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Compression data"
 msgstr "Compression data"
@@ -12002,6 +12007,7 @@ msgstr "Required table columns are missing from this form:{0} {1} . Responses ca
 msgid "Reading what is stored…"
 msgstr "Reading what is stored…"
 
+#: src/components/Vault/VaultAccountStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Uploads in progress"
 msgstr "Uploads in progress"
@@ -12986,3 +12992,284 @@ msgstr "{0} objects"
 #: src/components/Vault/VaultStorage.tsx
 msgid "No backup objects can be safely removed yet. This total includes retained copies and history, not just your current workspace."
 msgstr "No backup objects can be safely removed yet. This total includes retained copies and history, not just your current workspace."
+
+#: src/routes/StorageRoute.tsx
+msgid "Loading storage…"
+msgstr "Loading storage…"
+
+#: src/routes/StorageRoute.tsx
+msgid "All workspace backups"
+msgstr "All workspace backups"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Compare all workspace backups"
+msgstr "Compare all workspace backups"
+
+#. 0: item.children.length
+#: src/components/StorageView.tsx
+msgid "{0} inside"
+msgstr "{0} inside"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Sign in to your account to inspect Cloud Vault storage."
+msgstr "Sign in to your account to inspect Cloud Vault storage."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Download diagnostic report"
+msgstr "Download diagnostic report"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Refresh"
+msgstr "Refresh"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Reading storage metadata…"
+msgstr "Reading storage metadata…"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Some details could not be read. Those workspaces keep their last listed usage in the total."
+msgstr "Some details could not be read. Those workspaces keep their last listed usage in the total."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "No workspaces are backed up to this account."
+msgstr "No workspaces are backed up to this account."
+
+#. 0: new Date(row.enrollment.last_backup_at * 1000).toLocaleString()
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Last backup {0}"
+msgstr "Last backup {0}"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "No confirmed backup yet"
+msgstr "No confirmed backup yet"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Paused"
+msgstr "Paused"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Active"
+msgstr "Active"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Workspace storage comparison"
+msgstr "Workspace storage comparison"
+
+#. 0: formatBytes(report.total_bytes); 1: ' '; 2: report.workspaces.length
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} across{1} {2} workspaces"
+msgstr "{0} across{1} {2} workspaces"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Encrypted backup objects, including retained copies and edit history. The server storage map measures a different copy of your data."
+msgstr "Encrypted backup objects, including retained copies and edit history. The server storage map measures a different copy of your data."
+
+#~ msgid "Inspection reads metadata only. It does not restore, decrypt or delete your backups. The report includes workspace names, identifiers and object metadata; it contains no keys or download links."
+#~ msgstr "Inspection reads metadata only. It does not restore, decrypt or delete your backups. The report includes workspace names, identifiers and object metadata; it contains no keys or download links."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Cloud Vault storage"
+msgstr "Cloud Vault storage"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Compare all workspaces backed up to your account. Each workspace has its own storage allowance."
+msgstr "Compare all workspaces backed up to your account. Each workspace has its own storage allowance."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Current server storage"
+msgstr "Current server storage"
+
+#. 0: row.error
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Some details are unavailable: {0}"
+msgstr "Some details are unavailable: {0}"
+
+#. 0: kindName(category.kind); 1: category.objects
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} · {1} objects"
+msgstr "{0} · {1} objects"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Usage outside the object ledger"
+msgstr "Usage outside the object ledger"
+
+#. 0: formatBytes(usage.reclaimable_bytes); 1: ' '; 2: formatBytes(usage.undo_window_bytes)
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} can be freed under the current retention policy. Another{1} {2} is retained for recovery of recent deletions. These amounts are part of the total above."
+msgstr "{0} can be freed under the current retention policy. Another{1} {2} is retained for recovery of recent deletions. These amounts are part of the total above."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Largest backup objects"
+msgstr "Largest backup objects"
+
+#. 0: objects.length; 1: ' '; 2: formatBytes(confirmedBytes ?? 0)
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} confirmed objects ·{1} {2} in the listed inventory"
+msgstr "{0} confirmed objects ·{1} {2} in the listed inventory"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "The list and usage are read separately; a backup or cleanup in progress can make their totals differ. Object metadata cannot establish which content is duplicated or no longer needed."
+msgstr "The list and usage are read separately; a backup or cleanup in progress can make their totals differ. Object metadata cannot establish which content is duplicated or no longer needed."
+
+#~ msgid "{0} of{1} {2} for this workspace"
+#~ msgstr "{0} of{1} {2} for this workspace"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Open this workspace’s sync settings"
+msgstr "Open this workspace’s sync settings"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Selected workspace storage"
+msgstr "Selected workspace storage"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Saved edits"
+msgstr "Saved edits"
+
+#. 0: formatBytes(workspaceBytes(row)); 1: formatBytes(quota)
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} of {1} for this workspace"
+msgstr "{0} of {1} for this workspace"
+
+#. 0: formatBytes(workspaceBytes(row))
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "{0} used · allowance unavailable"
+msgstr "{0} used · allowance unavailable"
+
+#. 0: formatBytes(result.bytes_reclaimed); 1: result.delete_failures
+#: src/components/Vault/VaultStorage.tsx
+msgid "Freed {0}. {1} objects could not be deleted; storage will be checked again automatically."
+msgstr "Freed {0}. {1} objects could not be deleted; storage will be checked again automatically."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not compress backup."
+msgstr "Could not compress backup."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Older backup copies and files kept for recently deleted items will be permanently removed. Those items can no longer be recovered from Cloud Vault."
+msgstr "Older backup copies and files kept for recently deleted items will be permanently removed. Those items can no longer be recovered from Cloud Vault."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "The current backup stays recoverable. Documents and files on your devices are unchanged."
+msgstr "The current backup stays recoverable. Documents and files on your devices are unchanged."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove retained backup copies?"
+msgstr "Remove retained backup copies?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove retained copies"
+msgstr "Remove retained copies"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "The diagnostic report includes workspace names, identifiers and object metadata; it contains no keys or download links. Content inspection decrypts saved copies locally and does not restore them into your workspace."
+msgstr "The diagnostic report includes workspace names, identifiers and object metadata; it contains no keys or download links. Content inspection decrypts saved copies locally and does not restore them into your workspace."
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Manage backup storage"
+msgstr "Manage backup storage"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Remove backup data"
+msgstr "Remove backup data"
+
+#: src/components/Vault/VaultAccountStorage.tsx
+msgid "Backup cleanup removes copies that the current backup no longer needs. To remove a document or file from the workspace itself, open it from the contents map and use its existing delete action."
+msgstr "Backup cleanup removes copies that the current backup no longer needs. To remove a document or file from the workspace itself, open it from the contents map and use its existing delete action."
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Stop inspection"
+msgstr "Stop inspection"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Inspect contents"
+msgstr "Inspect contents"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Unlock your identity to inspect encrypted contents."
+msgstr "Unlock your identity to inspect encrypted contents."
+
+#. 0: scan.done; 1: scan.total
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Inspecting {0} of {1} backup objects…"
+msgstr "Inspecting {0} of {1} backup objects…"
+
+#. 0: contents.unreadable
+#: src/components/Vault/VaultContentsView.tsx
+msgid "{0} objects could not be inspected. Their full sizes remain visible as unreadable objects."
+msgstr "{0} objects could not be inspected. Their full sizes remain visible as unreadable objects."
+
+#. 0: current.copies; 1: ' '; 2: formatBytes(current.updateBytes); 3: ' '; 4: formatBytes(current.envelopeBytes)
+#: src/components/Vault/VaultContentsView.tsx
+msgid "{0} saved entries ·{1} {2} Loro updates ·{3} {4} signed commit records"
+msgstr "{0} saved entries ·{1} {2} Loro updates ·{3} {4} signed commit records"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Open item in workspace"
+msgstr "Open item in workspace"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Use the item’s menu to delete the document or file. That deletion syncs to other devices. Its saved copies stay in the backup until the retention policy or backup cleanup removes them."
+msgstr "Use the item’s menu to delete the document or file. That deletion syncs to other devices. Its saved copies stay in the backup until the retention policy or backup cleanup removes them."
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Selected backup item"
+msgstr "Selected backup item"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "All items by size"
+msgstr "All items by size"
+
+#. 0: formatBytes(contents.storedBytes); 1: contents.objects
+#: src/components/Vault/VaultContentsView.tsx
+msgid "{0} in {1} stored objects"
+msgstr "{0} in {1} stored objects"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Each tile counts actual bytes in retained copies: Loro updates plus signed commit records for a document, or stored file bytes. Repeated copies count each time. Shared format and encryption bytes are shown separately."
+msgstr "Each tile counts actual bytes in retained copies: Loro updates plus signed commit records for a document, or stored file bytes. Repeated copies count each time. Shared format and encryption bytes are shown separately."
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Names and file references come from saved copies. This is not a list of currently live items, and the sizes are not estimates of what deleting an item would free."
+msgstr "Names and file references come from saved copies. This is not a list of currently live items, and the sizes are not estimates of what deleting an item would free."
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "What is inside this backup?"
+msgstr "What is inside this backup?"
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Inspect saved documents and file references on this device. This downloads the encrypted resource packs; attached file bodies are measured from the storage inventory."
+msgstr "Inspect saved documents and file references on this device. This downloads the encrypted resource packs; attached file bodies are measured from the storage inventory."
+
+#: src/components/Vault/VaultContentsView.tsx
+msgid "Backup contents"
+msgstr "Backup contents"
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Inspection stopped."
+msgstr "Inspection stopped."
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Unreadable backup object"
+msgstr "Unreadable backup object"
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Object was not inspected."
+msgstr "Object was not inspected."
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Backup structure and encryption"
+msgstr "Backup structure and encryption"
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Attached file bytes"
+msgstr "Attached file bytes"
+
+#: src/helpers/managed/vaultContents.ts
+msgid "Unattributed file bytes"
+msgstr "Unattributed file bytes"
+
+#. 0: names.get(item.subjects[0]) ?? item.subjects[0]
+#: src/helpers/managed/vaultContents.ts
+msgid "{0} (file bytes)"
+msgstr "{0} (file bytes)"

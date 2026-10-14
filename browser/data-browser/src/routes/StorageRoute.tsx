@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoute, Link } from '@tanstack/react-router';
 import { useStore } from '@tomic/react';
 import { pathNames, paths } from './paths';
@@ -9,10 +9,19 @@ import { fetchDriveBreakdown } from '../helpers/storageMapApi';
 import { buildStorageTree } from '../helpers/storageMap';
 import { StorageView, type Loaded } from '../components/StorageView';
 
+const VaultAccountStorage = lazy(() =>
+  import('../components/Vault/VaultAccountStorage').then(module => ({
+    default: module.VaultAccountStorage,
+  })),
+);
+
 export const StorageRoute = createRoute({
   path: pathNames.storage,
-  validateSearch: (search: Record<string, unknown>): { at?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { at?: string; view?: 'vault' } => ({
     at: typeof search.at === 'string' ? search.at : undefined,
+    view: search.view === 'vault' ? 'vault' : undefined,
   }),
   component: () => <StoragePage />,
   getParentRoute: () => appRoute,
@@ -20,6 +29,18 @@ export const StorageRoute = createRoute({
 
 /** Fetches the drive's per-resource usage and hands it to the size map. */
 function StoragePage() {
+  const { view } = StorageRoute.useSearch();
+  if (view === 'vault')
+    return (
+      <Suspense fallback={<p>Loading storage…</p>}>
+        <VaultAccountStorage />
+      </Suspense>
+    );
+
+  return <ServerStoragePage />;
+}
+
+function ServerStoragePage() {
   const store = useStore();
   const { at } = StorageRoute.useSearch();
   const navigate = useNavigateWithTransition();
@@ -58,7 +79,10 @@ function StoragePage() {
       onOpen={subject => navigate(constructOpenURL(subject))}
       backTo={
         <p>
-          <Link to={paths.sync}>Back to sync settings</Link>
+          <Link to={paths.sync}>Back to sync settings</Link> ·{' '}
+          <Link to={paths.storage} search={{ view: 'vault' }}>
+            All workspace backups
+          </Link>
         </p>
       }
     />

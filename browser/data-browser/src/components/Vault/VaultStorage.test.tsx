@@ -17,10 +17,12 @@ import type { VaultUsage } from '../../helpers/managed/vault';
 
 const theme = buildTheme(false, '#1b50d8');
 const usageMock = vi.hoisted(() => vi.fn());
+const freeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../helpers/managed/vault', async importOriginal => ({
   ...(await importOriginal<typeof import('../../helpers/managed/vault')>()),
   getVaultUsage: usageMock,
+  freeUpVaultStorage: freeMock,
 }));
 
 const usage = (over: Partial<VaultUsage> = {}): VaultUsage =>
@@ -73,6 +75,35 @@ HTMLDialogElement.prototype.close = function close() {
 afterEach(() => {
   cleanup();
   usageMock.mockReset();
+  freeMock.mockReset();
+});
+
+it('confirms removal of retained copies and respects a cancelled dialog', async () => {
+  usageMock.mockResolvedValue(usage());
+  freeMock.mockResolvedValue({ bytes_reclaimed: 500, delete_failures: 0 });
+  show();
+  fireEvent.click(await screen.findByTestId('vault-free-up-undo'));
+  expect(freeMock).not.toHaveBeenCalled();
+  fireEvent.click(await screen.findByText('Cancel'));
+  expect(freeMock).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId('vault-free-up-undo'));
+  fireEvent.click(await screen.findByText('Remove retained copies'));
+  await screen.findByTestId('vault-storage-message');
+  expect(freeMock).toHaveBeenCalledExactlyOnceWith('p', true);
+});
+
+it('refuses cleanup if the account changed before confirmation', async () => {
+  usageMock.mockResolvedValue(usage());
+  show({
+    beforeWrite: async () => {
+      throw new Error('Account changed');
+    },
+  });
+  fireEvent.click(await screen.findByTestId('vault-free-up'));
+  expect((await screen.findByTestId('vault-storage-error')).textContent).toBe(
+    'Account changed',
+  );
+  expect(freeMock).not.toHaveBeenCalled();
 });
 
 it('compresses without touching the undo window', async () => {

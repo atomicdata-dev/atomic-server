@@ -1263,6 +1263,18 @@ pub fn vault_proof_message() -> Vec<u8> {
     atomic_lib::vault::secret_envelope::AGENT_VAULT_PROOF_MESSAGE.to_vec()
 }
 
+/// Inspect retained contents without opening or mutating a client database.
+#[wasm_bindgen(js_name = "vaultInspectPack")]
+pub fn vault_inspect_pack(
+    key_bytes: &[u8],
+    key_epoch: u32,
+    sealed: &[u8],
+) -> Result<JsValue, JsError> {
+    let key = drive_key(key_bytes, key_epoch)?;
+    let report = atomic_lib::vault::inspect::inspect_pack(&key, sealed).map_err(to_js_err)?;
+    serde_wasm_bindgen::to_value(&report).map_err(to_js_err)
+}
+
 /// Wrap a drive vault key so it survives this device.
 ///
 /// This is what makes "clear site data, sign in again, restore" work. The key

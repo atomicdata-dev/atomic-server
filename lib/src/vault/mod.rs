@@ -21,6 +21,8 @@ pub mod dek;
 #[cfg(feature = "db")]
 pub mod envelope;
 #[cfg(feature = "db")]
+pub mod inspect;
+#[cfg(feature = "db")]
 pub mod pack;
 #[cfg(feature = "db")]
 pub mod secret_envelope;

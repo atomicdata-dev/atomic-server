@@ -18,6 +18,8 @@ This document might not be entirely up to date. If you need anything that is not
 - `src/components/NavBarSpacer.tsx` - Spacer that accounts for navbar placement and floating behavior.
 - `src/helpers/containers.ts` - Shared CSS container names such as `LAYOUT_CONTAINER`, `CARD_CONTAINER`, and `DIALOG_CONTENT_CONTAINER`.
 
+- `src/components/SizeMap.tsx` — Area-proportional size map using the shared squarify layout, keyboard-accessible tiles and reduced-motion transitions. Used by server resource storage and account Vault storage.
+
 ## Surfaces And Sections
 
 - `src/components/Card.tsx` - Standard bordered card surface with optional highlight, nested `Card.Content`, `CardRow`, `CardInsideFull`, and `Margin` helpers.

@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { keyframes, styled } from 'styled-components';
+import { styled } from 'styled-components';
+import { SizeMap } from './SizeMap';
+import { formatBytes } from '../helpers/formatBytes';
 import { ContainerWide } from './Containers';
 import { Main } from './Main';
 import {
-  squarify,
   tileKind,
   type StorageNode,
   type TileKind,
@@ -13,9 +14,6 @@ export type Loaded =
   | { state: 'loading' }
   | { state: 'failed' }
   | { state: 'ready'; root: StorageNode };
-
-const MAP_W = 1000;
-const MAP_H = 560;
 
 /**
  * Where a drive's space goes, as a size map (like WizTree or dua): one tile per
@@ -92,11 +90,16 @@ export function StorageView({
     );
   }, [current]);
 
-  const tiles = useMemo(
-    () =>
-      squarify(items, i => i.totalBytes, { x: 0, y: 0, w: MAP_W, h: MAP_H }),
-    [items],
-  );
+  function openItem(item: StorageNode, at = { x: 50, y: 50 }) {
+    if (hasInside(item)) {
+      setMotion({ dir: 'in', ...at });
+      setTrail([...trail, item.subject]);
+
+      return;
+    }
+
+    onOpen(item.subject);
+  }
 
   return (
     <Main>
@@ -145,60 +148,28 @@ export function StorageView({
               <Muted>· {formatBytes(current.node.totalBytes)}</Muted>
             </Crumbs>
 
-            {tiles.length === 0 ? (
+            {items.every(item => item.totalBytes <= 0) ? (
               <p data-testid='storage-empty'>Nothing here takes up space.</p>
             ) : (
-              <MapBox
-                // A new key restarts the animation for every level.
+              <SizeMap
                 key={trail.join('/')}
-                data-testid='storage-map'
-                $dir={motion?.dir}
-                style={{
-                  aspectRatio: `${MAP_W} / ${MAP_H}`,
-                  transformOrigin: `${motion?.x ?? 50}% ${motion?.y ?? 50}%`,
-                }}
-              >
-                {tiles.map(({ item, rect }) => (
-                  <Tile
-                    key={item.subject + item.name}
-                    type='button'
-                    $kind={tileKind(item, hasInside(item))}
-                    $folder={hasInside(item)}
-                    data-testid='storage-tile'
-                    data-folder={hasInside(item) ? 'true' : undefined}
-                    title={
-                      hasInside(item)
-                        ? `${item.name} · ${formatBytes(item.totalBytes)} · click to look inside`
-                        : `${item.name} · ${formatBytes(item.totalBytes)} · click to open`
-                    }
-                    onClick={() =>
-                      openItem(item, {
-                        x: ((rect.x + rect.w / 2) / MAP_W) * 100,
-                        y: ((rect.y + rect.h / 2) / MAP_H) * 100,
-                      })
-                    }
-                    style={{
-                      left: `${(rect.x / MAP_W) * 100}%`,
-                      top: `${(rect.y / MAP_H) * 100}%`,
-                      width: `${(rect.w / MAP_W) * 100}%`,
-                      height: `${(rect.h / MAP_H) * 100}%`,
-                    }}
-                  >
-                    <TileLabel>
-                      <span>
-                        {hasInside(item) && (
-                          <FolderMark aria-hidden>▸</FolderMark>
-                        )}
-                        {item.name}
-                      </span>
-                      <Muted>
-                        {formatBytes(item.totalBytes)}
-                        {hasInside(item) && ` · ${item.children.length} inside`}
-                      </Muted>
-                    </TileLabel>
-                  </Tile>
-                ))}
-              </MapBox>
+                motion={motion}
+                onSelect={openItem}
+                items={items.map(item => ({
+                  id: item.subject + item.name,
+                  value: item,
+                  label: item.name,
+                  bytes: item.totalBytes,
+                  colour: KIND_COLOURS[tileKind(item, hasInside(item))],
+                  folder: hasInside(item),
+                  detail: hasInside(item)
+                    ? `${item.children.length} inside`
+                    : undefined,
+                  title: hasInside(item)
+                    ? `${item.name} · ${formatBytes(item.totalBytes)} · click to look inside`
+                    : `${item.name} · ${formatBytes(item.totalBytes)} · click to open`,
+                }))}
+              />
             )}
 
             <Legend aria-label='Colours'>
@@ -245,17 +216,6 @@ export function StorageView({
       </ContainerWide>
     </Main>
   );
-
-  function openItem(item: StorageNode, at = { x: 50, y: 50 }) {
-    if (hasInside(item)) {
-      setMotion({ dir: 'in', ...at });
-      setTrail([...trail, item.subject]);
-
-      return;
-    }
-
-    onOpen(item.subject);
-  }
 }
 
 /** The subjects from just below `root` down to `target`; empty when it is not in the tree. */
@@ -276,20 +236,6 @@ function pathTo(root: StorageNode, target: string): string[] {
 /** Folders open the map one level deeper; everything else opens the resource. */
 function hasInside(item: StorageNode): boolean {
   return item.children.length > 0 && item.name !== 'This item itself';
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
 const Legend = styled.ul`
@@ -337,87 +283,6 @@ const CrumbButton = styled.button`
   color: ${p => p.theme.colors.main};
   text-decoration: underline;
   cursor: pointer;
-`;
-
-const growIn = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-`;
-
-const shrinkBack = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(1.4);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-`;
-
-const MapBox = styled.div<{ $dir?: 'in' | 'out' }>`
-  position: relative;
-  animation: ${p =>
-      p.$dir === 'in' ? growIn : p.$dir === 'out' ? shrinkBack : 'none'}
-    260ms ease-out;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-
-  width: 100%;
-  min-height: 220px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: ${p => p.theme.colors.bg1};
-`;
-
-const Tile = styled.button<{ $kind: TileKind; $folder: boolean }>`
-  position: absolute;
-  box-sizing: border-box;
-  padding: 4px 6px;
-  border: 1px solid ${p => p.theme.colors.bg};
-  background: ${p => KIND_COLOURS[p.$kind]};
-  color: #fff;
-  text-align: left;
-  cursor: ${p => (p.$folder ? 'zoom-in' : 'pointer')};
-  overflow: hidden;
-  /* A tile with things inside gets an inner frame, like a folder; a leaf is flat. */
-  box-shadow: ${p =>
-    p.$folder ? 'inset 0 0 0 3px rgba(255, 255, 255, 0.28)' : 'none'};
-
-  &:hover,
-  &:focus-visible {
-    filter: brightness(1.12);
-  }
-`;
-
-const FolderMark = styled.span`
-  margin-right: 0.3em;
-  opacity: 0.85;
-`;
-
-const TileLabel = styled.span`
-  display: flex;
-  flex-direction: column;
-  font-size: 0.78rem;
-  line-height: 1.25;
-  overflow: hidden;
-
-  & > span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: inherit;
-  }
 `;
 
 const List = styled.ol`

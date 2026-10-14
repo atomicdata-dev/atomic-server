@@ -127,3 +127,23 @@ Current results belong in the PR descriptions and coverage map, not a running lo
   console check after all delivery/read-state assertions passed. Both notification
   journeys then passed three repetitions each, including console checks. The
   cause remains unproven; do not classify the full run as green.
+
+### Account storage diagnostics (2026-10-14)
+
+- [x] Add an account-wide Vault comparison using existing owner-scoped APIs.
+  Include every enrolled workspace, regardless of the current agent or server.
+  Show independent quotas, backup age, retained objects and accounting gaps.
+- [x] Offer object metadata inspection and a downloadable report without restoring,
+  decrypting, pruning or inferring that old backups are disposable.
+- [x] Verify partial failures and account changes, desktop/mobile views, shared
+  map navigation, translations, app types/compiler and the complete app unit suite.
+  Full recursive browser lint passes; screenshots use invented account metadata.
+- [x] Prepare the account diagnostics follow-up for #2249 with desktop/mobile
+  screenshots. Current paired CI and rollout remain the gates above.
+- [x] Inspect real encrypted pack contents locally: attribute retained Loro
+  updates, signed envelopes, file objects and format overhead without inventing
+  per-resource stored sizes or importing data into the live database.
+- [x] Reuse backup cleanup controls with explicit destructive confirmation;
+  link documents/files to their existing workspace deletion flow.
+- [x] Test byte reconciliation, unreadable objects, cancelled/account-switched
+  scans and cleanup; capture desktop/mobile with actual encrypted test backups.

@@ -107,6 +107,21 @@ while backup/restore runs, while cleanup controls remain disabled. Restore shows
 download progress separately from applying the downloaded history. Flutter has
 neither this Vault panel nor a server storage map to update.
 
+`/app/storage?view=vault` compares every enrolled workspace in the current managed
+account, including workspaces owned through other linked agents. Each allowance
+is per workspace. The overview reads metadata and exports a diagnostic report.
+An explicit contents inspection downloads resource packs and decrypts them in a
+temporary worker, without importing them into the live store. Document updates,
+signed records, shared format bytes and file objects reconcile to the confirmed
+inventory. Names/references describe retained copies, not live-resource status.
+Missing detail reads
+remain visible and preserve the enrollment counter. Returning to the page or
+changing accounts discards the previous report and reads the current account.
+Flutter has no equivalent account Vault inventory screen.
+Backup cleanup reuses `VaultStorage` and the server's retention policy. Giving
+up the recovery window requires confirmation. Document/file deletion stays in
+the existing resource menu, reached through links from inspected contents.
+
 ## 4. Where the logic lives
 
 Keep these in step. A change to one is usually a change to its twin.
