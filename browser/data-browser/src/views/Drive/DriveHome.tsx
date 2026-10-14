@@ -4,18 +4,12 @@ import {
   isUnauthorized,
   useDrivePresence,
   useResource,
+  normalizeLoroChangeTimestampMs,
+  useResources,
   useTitle,
-  useValue,
   type Resource,
 } from '@tomic/react';
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type JSX,
-} from 'react';
+import { memo, useMemo, useState, type JSX } from 'react';
 import {
   FaComment,
   FaFileLines,
@@ -30,16 +24,9 @@ import { AtomicLink } from '@components/AtomicLink';
 import { ResourceGlyph } from '@components/ResourceGlyph';
 import { PresenceAvatarMenu } from '@components/Presence/PresenceAvatarMenu';
 import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
-import { AgentAvatar } from '@components/Presence/AgentAvatar';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
-import {
-  groupActivity,
-  type ActivityGroup,
-  parseActivityLog,
-  type ActivityEntry,
-} from '@helpers/activityLog';
-import { formatCompactDateTime } from '@helpers/dates/compactDateTime';
+import { toRelativeDateTime } from '@helpers/dates/relativeDate';
 
 const MAX_RECENT = 6;
 const MAX_PEOPLE = 6;
@@ -176,54 +163,83 @@ function ResourceTile({ subject }: { subject: string }): JSX.Element {
 }
 
 /**
- * Who did what on this drive lately, read straight from the drive's own
- * bounded activity log (no query). Only the first rows resolve names and
- * titles; "Show all" renders the rest. Renders nothing-but-a-hint when empty.
+ * Millisecond timestamp of the newest change in the resource's own Loro
+ * oplog (one `getChangeAt` per peer, no commit fetch), falling back to its
+ * creation time. `undefined` while nothing is loaded.
  */
-export function ActivityFeed({ drive }: { drive: Resource }): JSX.Element {
-  const [stored] = useValue(drive, dataBrowser.properties.activityLog);
-  const key = JSON.stringify(stored ?? null);
-  // Subjects the viewer cannot read; rows report them so no title leaks.
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const hide = useCallback(
-    (subject: string) => setHidden(prev => new Set(prev).add(subject)),
-    [],
+export function lastEditedAt(resource: Resource): number | undefined {
+  const doc = resource.getLoroDoc();
+  let latest = 0;
+
+  if (doc) {
+    try {
+      for (const [peer, end] of doc.oplogVersion().toJSON()) {
+        if (end > 0) {
+          const { timestamp } = doc.getChangeAt({ peer, counter: end - 1 });
+
+          latest = Math.max(latest, normalizeLoroChangeTimestampMs(timestamp));
+        }
+      }
+    } catch {
+      // Unreadable oplog: fall back to the creation time below.
+    }
+  }
+
+  return latest > 0 ? latest : resource.getCreatedAt();
+}
+
+/**
+ * What changed lately on this drive: its visible children plus the resources
+ * opened here recently, newest edit first. Derived from data that is already
+ * loaded for the tiles, so there is no log to write or query. Only the first
+ * rows render; "Show all" renders the rest.
+ */
+export function ActivityFeed({
+  subjects,
+  drive,
+}: {
+  subjects: string[];
+  drive: string;
+}): JSX.Element {
+  const [recent] = useState(() => getRecentResources(drive));
+  const candidates = useMemo(
+    () => Array.from(new Set([...subjects, ...recent])),
+    [subjects, recent],
   );
-  const groups = useMemo(
-    () =>
-      groupActivity(
-        parseActivityLog(JSON.parse(key)).filter(e => !hidden.has(e.subject)),
-      ),
-    [key, hidden],
-  );
+  const resources = useResources(candidates, { allowIncomplete: true });
+  const items = useMemo(() => {
+    const out: { subject: string; at: number }[] = [];
+
+    for (const [subject, resource] of resources) {
+      const at = lastEditedAt(resource);
+
+      if (
+        at &&
+        !isUnauthorized(resource.error) &&
+        !isNotFound(resource.error)
+      ) {
+        out.push({ subject, at });
+      }
+    }
+
+    return out.sort((a, b) => b.at - a.at);
+  }, [resources]);
   const [showAll, setShowAll] = useState(false);
-  const total = groups.reduce((n, g) => n + g.entries.length, 0);
-  const shownGroups = limitGroups(groups, showAll ? total : ACTIVITY_VISIBLE);
+  const shown = showAll ? items : items.slice(0, ACTIVITY_VISIBLE);
 
   return (
     <section aria-label='Activity'>
       <SectionTitle>Activity</SectionTitle>
-      {total === 0 ? (
+      {items.length === 0 ? (
         <ActivityHint>Activity will show up here</ActivityHint>
       ) : (
         <>
-          {shownGroups.map(group => (
-            <div key={group.label}>
-              <ActivityGroupTitle>
-                <GroupLabel label={group.label} />
-              </ActivityGroupTitle>
-              <ActivityList>
-                {group.entries.map(entry => (
-                  <ActivityRow
-                    key={`${entry.subject}:${entry.agent}:${entry.at}`}
-                    entry={entry}
-                    onUnreadable={hide}
-                  />
-                ))}
-              </ActivityList>
-            </div>
-          ))}
-          {total > ACTIVITY_VISIBLE && (
+          <ActivityList>
+            {shown.map(item => (
+              <ActivityRow key={item.subject} {...item} />
+            ))}
+          </ActivityList>
+          {items.length > ACTIVITY_VISIBLE && (
             <ShowAll type='button' onClick={() => setShowAll(!showAll)}>
               {showAll ? 'Show less' : 'Show all'}
             </ShowAll>
@@ -234,68 +250,26 @@ export function ActivityFeed({ drive }: { drive: Resource }): JSX.Element {
   );
 }
 
-function limitGroups(groups: ActivityGroup[], max: number): ActivityGroup[] {
-  const out: ActivityGroup[] = [];
-  let left = max;
-
-  for (const group of groups) {
-    if (left <= 0) break;
-
-    out.push({ ...group, entries: group.entries.slice(0, left) });
-    left -= group.entries.length;
-  }
-
-  return out;
-}
-
-function ActivityVerb({ kind }: { kind: ActivityEntry['kind'] }): JSX.Element {
-  if (kind === 'created') return <>created</>;
-
-  if (kind === 'deleted') return <>deleted</>;
-
-  return <>edited</>;
-}
-
-function GroupLabel({ label }: { label: ActivityGroup['label'] }): JSX.Element {
-  if (label === 'Today') return <>Today</>;
-
-  if (label === 'This week') return <>This week</>;
-
-  return <>Earlier</>;
-}
-
 const ActivityRow = memo(function ActivityRow({
-  entry,
-  onUnreadable,
+  subject,
+  at,
 }: {
-  entry: ActivityEntry;
-  onUnreadable: (subject: string) => void;
-}): JSX.Element | null {
-  const agent = useResource(entry.agent);
-  const [name] = useTitle(agent);
-  const resource = useResource(entry.subject, { allowIncomplete: true });
+  subject: string;
+  at: number;
+}): JSX.Element {
+  const resource = useResource(subject, { allowIncomplete: true });
   const [title] = useTitle(resource);
-  const unreadable =
-    isUnauthorized(resource.error) || isNotFound(resource.error);
-
-  useEffect(() => {
-    if (unreadable) onUnreadable(entry.subject);
-  }, [unreadable, onUnreadable, entry.subject]);
-
-  if (unreadable) return null;
 
   return (
     <ActivityItem>
-      <AgentAvatar agentSubject={entry.agent} size='1.8rem' />
       <ActivityText>
-        <strong>{name}</strong> <ActivityVerb kind={entry.kind} />{' '}
-        <ActivityChip subject={entry.subject} clean>
+        <ActivityChip subject={subject} clean>
           <ResourceGlyph resource={resource} />
           <span>{title}</span>
         </ActivityChip>
       </ActivityText>
-      <ActivityTime dateTime={new Date(entry.at).toISOString()}>
-        {formatCompactDateTime(new Date(entry.at))}
+      <ActivityTime dateTime={new Date(at).toISOString()}>
+        Edited {toRelativeDateTime(new Date(at), true)}
       </ActivityTime>
     </ActivityItem>
   );
@@ -430,13 +404,6 @@ const More = styled.span`
 
 const ActivityHint = styled.p`
   margin: 0;
-  color: ${p => p.theme.colors.textLight};
-`;
-
-const ActivityGroupTitle = styled.h3`
-  margin: 0.5rem 0 0.25rem;
-  font-size: 0.8rem;
-  font-weight: 600;
   color: ${p => p.theme.colors.textLight};
 `;
 

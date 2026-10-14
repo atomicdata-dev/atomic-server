@@ -46,28 +46,24 @@ export function useVisibleDriveChildren(
     dataBrowser.properties.trashFolder,
   );
 
-  const subjects = useMemo(
-    () =>
-      allSubjects.filter(subject => {
-        const canonical = canonicalizeScheme(subject);
+  const subjects = useMemo(() => {
+    const hidden = new Set(
+      [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder]
+        .filter((subject): subject is string => !!subject)
+        .map(canonicalizeScheme),
+    );
 
-        return (
-          canonical !== canonicalizeScheme(defaultOntology ?? '') &&
-          canonical !== canonicalizeScheme(commentsFolder ?? '') &&
-          canonical !== canonicalizeScheme(aiChatsFolder ?? '') &&
-          canonical !== canonicalizeScheme(inbox ?? '') &&
-          canonical !== canonicalizeScheme(trashFolder ?? '')
-        );
-      }),
-    [
-      allSubjects,
-      defaultOntology,
-      commentsFolder,
-      aiChatsFolder,
-      inbox,
-      trashFolder,
-    ],
-  );
+    return allSubjects.filter(
+      subject => !hidden.has(canonicalizeScheme(subject)),
+    );
+  }, [
+    allSubjects,
+    defaultOntology,
+    commentsFolder,
+    aiChatsFolder,
+    inbox,
+    trashFolder,
+  ]);
 
   return { subjects, allSubjects, loading, total };
 }

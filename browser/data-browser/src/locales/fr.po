@@ -3552,8 +3552,6 @@ msgid "Previous month"
 msgstr ""
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
-#: src/views/Drive/DriveHome.tsx
-#: src/views/Drive/DriveHome.tsx
 msgid "Today"
 msgstr ""
 
@@ -12964,27 +12962,6 @@ msgstr ""
 msgid "Show all"
 msgstr ""
 
-#: src/views/Drive/DriveHome.tsx
-msgid "created"
-msgstr ""
-
-#: src/views/Drive/DriveHome.tsx
-msgid "deleted"
-msgstr ""
-
-#: src/views/Drive/DriveHome.tsx
-msgid "edited"
-msgstr ""
-
-#: src/views/Drive/DriveHome.tsx
-#: src/views/Drive/DriveHome.tsx
-msgid "This week"
-msgstr ""
-
-#: src/views/Drive/DriveHome.tsx
-msgid "Earlier"
-msgstr ""
-
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Drive settings"
 msgstr ""
@@ -12999,4 +12976,9 @@ msgstr ""
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet."
+msgstr ""
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Edited {0}"
 msgstr ""

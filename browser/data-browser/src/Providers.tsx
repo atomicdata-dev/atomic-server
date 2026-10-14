@@ -6,7 +6,6 @@ import { FormValidationContextProvider } from './components/forms/formValidation
 import { NewResourceUIProvider } from './components/forms/NewForm/useNewResourceUI';
 import HotKeysWrapper from './components/HotKeyWrapper';
 import { MetaSetter } from './components/MetaSetter';
-import { DriveActivityRecorder } from './components/DriveActivityRecorder';
 import { NavWrapper } from './components/Navigation';
 import { SearchOverlayContextProvider } from './components/Searchbar/SearchOverlayContext';
 import { NetworkIndicator } from './components/NetworkIndicator';
@@ -87,7 +86,6 @@ export const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
                             <DatabaseUpgradeNotice />
                             <CustomViewProvider>
                               <MetaSetter />
-                              <DriveActivityRecorder />
                               <DropdownContainer>
                                 <DialogGlobalContextProvider>
                                   <LazyAIChangesProvider>

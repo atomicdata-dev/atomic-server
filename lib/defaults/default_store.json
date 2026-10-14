@@ -1347,16 +1347,6 @@
     "https://atomicdata.dev/properties/shortname": "tag-list"
   },
   {
-    "@id": "https://atomicdata.dev/ontology/data-browser/property/activity-log",
-    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
-    "https://atomicdata.dev/properties/description": "Recent activity on a drive, newest first, as a JSON array of { subject, agent, at, kind } (at in ms; kind is created, edited or deleted). Kept small and bounded by the clients that write it; it feeds the drive's Activity panel without a server query.",
-    "https://atomicdata.dev/properties/isA": [
-      "https://atomicdata.dev/classes/Property"
-    ],
-    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
-    "https://atomicdata.dev/properties/shortname": "activity-log"
-  },
-  {
     "@id": "https://atomicdata.dev/classes/DocumentV2",
     "https://atomicdata.dev/properties/description": "A collaborative document containing rich text",
     "https://atomicdata.dev/properties/isA": [

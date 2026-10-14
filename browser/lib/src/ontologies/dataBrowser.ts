@@ -113,8 +113,6 @@ export const dataBrowser = {
     blockQuickAdd: 'https://atomicdata.dev/properties/block-quick-add',
     tags: 'https://atomicdata.dev/properties/tags',
     tagList: 'https://atomicdata.dev/ontology/data-browser/property/tag-list',
-    activityLog:
-      'https://atomicdata.dev/ontology/data-browser/property/activity-log',
     url: 'https://atomicdata.dev/property/url',
     documentContent: 'https://atomicdata.dev/properties/documentContent',
   },
@@ -605,12 +603,6 @@ declare module '../index.js' {
     };
     [dataBrowser.properties.tags]: string[];
     [dataBrowser.properties.tagList]: string[];
-    [dataBrowser.properties.activityLog]: Array<{
-      subject: string;
-      agent: string;
-      at: number;
-      kind: 'created' | 'edited' | 'deleted';
-    }>;
     [dataBrowser.properties.url]: string;
     [dataBrowser.properties.documentContent]: never;
   }
@@ -683,7 +675,6 @@ declare module '../index.js' {
     [dataBrowser.properties.blockQuickAdd]: 'blockQuickAdd';
     [dataBrowser.properties.tags]: 'tags';
     [dataBrowser.properties.tagList]: 'tagList';
-    [dataBrowser.properties.activityLog]: 'activityLog';
     [dataBrowser.properties.url]: 'url';
     [dataBrowser.properties.documentContent]: 'documentContent';
   }
