@@ -37,6 +37,9 @@ const setup = (
   const lookup = vi.fn(toResource);
   const store = {
     isDestroyed: (subject: string) => destroyed.includes(subject),
+    // The drive is read from what is already loaded, never fetched.
+    resources: new Map([[DRIVE, toResource(DRIVE)]]),
+    normalizeSubject: (subject: string) => subject,
     getResourceLoading: lookup,
   } as unknown as Store;
 
@@ -111,8 +114,8 @@ describe('isUnavailableResource', () => {
     lookup.mockClear();
 
     expect(isUnavailableResource(store, DRIVE, resource('a'))).toBe(false);
-    // The drive, then b and c once each; reaching a again ends the walk.
-    expect(lookup).toHaveBeenCalledTimes(3);
+    // b and c once each; reaching a again ends the walk. The drive is peeked.
+    expect(lookup).toHaveBeenCalledTimes(2);
   });
 });
 

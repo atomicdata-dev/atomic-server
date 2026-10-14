@@ -8,6 +8,24 @@ export const readTrashFolder = (drive: Resource): string | undefined =>
   drive.get(dataBrowser.properties.trashFolder) as string | undefined;
 
 /**
+ * The drive's Trash folder as far as the store already knows. Menus ask this
+ * at every render, so it must not start a fetch: a drive that is not loaded
+ * (right after a sign-out, or in an app with no node behind it) has no known
+ * Trash folder, and nothing is lost by saying so.
+ */
+export const peekTrashFolder = (
+  store: Store,
+  drive: string | undefined,
+): string | undefined => {
+  const loaded = drive
+    ? (store.resources.get(drive) ??
+      store.resources.get(store.normalizeSubject(drive)))
+    : undefined;
+
+  return loaded ? readTrashFolder(loaded) : undefined;
+};
+
+/**
  * Whether `resource` sits directly in the drive's Trash folder. With `deep`,
  * also when any ancestor does (a file inside a trashed folder). The deep walk
  * only reads ancestors that are already loaded (`getResourceLoading`), so an
@@ -19,11 +37,7 @@ export const isInTrash = (
   resource: Resource,
   deep = false,
 ): boolean => {
-  if (!drive) {
-    return false;
-  }
-
-  const trash = readTrashFolder(store.getResourceLoading(drive));
+  const trash = peekTrashFolder(store, drive);
 
   if (!trash) {
     return false;

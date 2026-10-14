@@ -11,7 +11,7 @@ const make = (subject: string, parent?: string): ActionContext =>
     drive: DRIVE,
     subject,
     store: {
-      getResourceLoading: () => ({ get: () => TRASH }),
+      resources: new Map([[DRIVE, { get: () => TRASH }]]),
     },
     resource: {
       get: (prop: string) => (prop.endsWith('/parent') ? parent : undefined),

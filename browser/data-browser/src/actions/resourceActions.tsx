@@ -40,7 +40,7 @@ import type { ActionContext, ActionDefinition } from './types';
 import {
   isInTrash,
   moveToTrash,
-  readTrashFolder,
+  peekTrashFolder,
   restoreFromTrash,
 } from '../helpers/trash';
 import { removeRecentResource } from '../helpers/recentResources';
@@ -64,9 +64,7 @@ const isTrashable = (ctx: ActionContext): boolean => {
     return false;
   }
 
-  const trash = readTrashFolder(ctx.store.getResourceLoading(ctx.drive));
-
-  return ctx.subject !== trash;
+  return ctx.subject !== peekTrashFolder(ctx.store, ctx.drive);
 };
 
 /**
