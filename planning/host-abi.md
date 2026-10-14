@@ -1,7 +1,8 @@
 # Host ABI: apps on a typed, real-time, multi-machine host
 
-**Status:** Accepted direction (Joep, 2026-10-14). Step 0 in progress; nothing
-else built. Pre-v1: the ABI may break until it is declared v1.
+**Status:** Accepted direction (Joep, 2026-10-14). Step 0 in progress. The first
+slice of step 1 runs on the server (below). Pre-v1: the ABI may break until it
+is declared v1.
 
 Goal, in Joep's words: the plugin interface should be "a type-safe, real-time,
 decentralized, multi-machine Linux". Plugins are apps. Apps export typed
@@ -93,8 +94,20 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       state (resources under the installation), and calls
       (`call(interface, function, args)`). Interaction is not a kernel op: it
       is `call` on the built-in `atomic:ui/*` apps (principle 7).
-- [ ] Typed records instead of JSON strings; batch operations.
+      *Slice built (2026-10-14):* `atomic-host/wit/host.wit`, implemented for
+      world `sandboxed-app` in `server/src/plugins/host_abi/`: `get`,
+      `get-many`, `query` (class, parent, `eq`/`lt`/`lte`/`gt`/`gte`/`contains`/
+      `exists`, cursor, `complete`), `apply`, `subscribe`, `net.fetch`,
+      `events.next`/`ack`, `calls.providers`/`describe`/`call`. Still
+      `unsupported` or missing: `search`, `undo`, the `ne` filter, subclass
+      matching in `class`, `invoke-action`, state as resources, feeding
+      `events` from triggers/cron/commits, durable proposals, `handles`.
+      Docs: `docs/src/plugins/host-abi.md`.
+- [x] Typed records instead of JSON strings; batch operations. (`get-many`,
+      multi-intent `apply`. `calls` arguments stay JSON by design.)
 - [ ] Generate Rust bindings and TS types plus the frame client from it.
+      *Rust done* (host: `wasmtime::component::bindgen!`; apps: `wit-bindgen`,
+      see `plugin-examples/host-abi-*`). TS types and the frame client are not.
 - [ ] Port the three runtimes (class-extender WIT, plugin-runtime WIT, frame
       `store`) onto it. Legacy RPC, `plugin.json` and `/app-write` go once the
       catalog apps are ported; stored installations stay readable.
@@ -135,6 +148,10 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Every app export (function, stream, view) is a resource under its
       `Release`: name, description, input and output schema, effect
       (`read` / `write` / `external`).
+      *Started:* a `sandboxed-app` manifest declares `exports` (function only,
+      bounded JSON Schema subset) and `calls.describe` / `POST /host/call`
+      serve them. They are not resources yet, and MCP tools, Cmd+K and docs are
+      not derived from them.
 - [ ] MCP tools, Cmd+K actions, in-app AI tools, bindings and docs are all
       derived from those resources (today only manifest `actions` become MCP
       tools, `server/src/plugins/actions.rs`).

@@ -328,7 +328,7 @@ impl ApplyHost for StoreApplyHost {
 /// The planner already refused anything that does not fit, so a failure here
 /// means the two disagree — which is exactly the drift the shared fixture
 /// corpus exists to catch, and worth an error rather than a coercion.
-fn json_to_value(value: Json, datatype: &DataType) -> Result<Value, String> {
+pub(crate) fn json_to_value(value: Json, datatype: &DataType) -> Result<Value, String> {
     match (datatype, value) {
         (DataType::Json | DataType::LocalizedText, value) => Ok(Value::Json(value)),
         (DataType::Integer, Json::Number(n)) => n

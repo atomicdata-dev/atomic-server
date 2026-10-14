@@ -6074,6 +6074,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-abi-caller"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "wit-bindgen 0.48.1",
+]
+
+[[package]]
+name = "host-abi-counter"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "wit-bindgen 0.48.1",
+]
+
+[[package]]
 name = "hostname"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -352,6 +352,11 @@ fn configure_wasm_plugin_routes(app: &mut actix_web::web::ServiceConfig) {
                 .route(web::post().to(handlers::plugin_release::publish_package)),
         )
         .service(
+            // Calls an app's export from outside the sandbox. See the handler.
+            web::resource("/host/call")
+                .route(web::post().to(handlers::host_call::handle_host_call)),
+        )
+        .service(
             web::resource("/plugin-run")
                 // A file handed to an importer travels in the body.
                 .app_data(
