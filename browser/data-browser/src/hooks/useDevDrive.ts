@@ -64,6 +64,12 @@ export function useDevDrive() {
       store.setAgent(newAgent);
       await store.waitForClientDb(10_000);
 
+      // Dev drives are server fixtures. A fresh identity restarts socket auth;
+      // wait for it before creation, including when local storage is disabled.
+      if (!(await store.waitForServerConnected(10_000, resolveDevServer()))) {
+        throw new Error('Dev server did not connect in time.');
+      }
+
       // `agentName` pipes `DEV_DRIVE_AGENT_NAME` into the same
       // agent-resource save that `createDrive` already does (to wire up
       // `privateDrive` + `drives`). The agent shows up as "Dev User"

@@ -5352,9 +5352,6 @@ export class Store {
     return true;
   }
 
-  /**
-   * Always fetches the resource from the server then adds it to the store.
-   */
   /** Read authoritative server values without merging optimistic local edits.
    * Use when confirming a reviewed operation, not for ordinary cached reads. */
   public async readServerSnapshot(
@@ -5377,6 +5374,9 @@ export class Store {
     return resource.getPropVals();
   }
 
+  /** Refresh a cached resource from its server. Local-only resources and
+   * creations still awaiting acknowledgement retain their local state. Use
+   * readServerSnapshot when the caller must prove a value exists remotely. */
   public async fetchResourceFromServer<C extends OptionalClass = UnknownClass>(
     /** The resource URL to be fetched */
     subject: string,
@@ -5422,6 +5422,17 @@ export class Store {
       const stored = await this.fetchResourceFromClientDb(normalizedSubject);
       if (stored) return stored as Resource<C>;
       throw new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport);
+    }
+
+    // A freshly signed DID already has its final identity, but no remote
+    // representation yet. Preserve its local handle while creation is queued;
+    // a speculative GET/404 must not replace the draft or its save state.
+    // Remote durability is established by a save receipt/readServerSnapshot,
+    // never by this cache-refresh helper returning a ready Resource.
+    const authored = this.resources.get(normalizedSubject);
+
+    if (opts.method !== 'POST' && authored?.awaitingCreation) {
+      return authored as Resource<C>;
     }
 
     // In-flight dedup. SideBarDrive and DrivePage both call

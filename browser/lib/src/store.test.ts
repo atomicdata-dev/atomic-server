@@ -325,6 +325,63 @@ describe('Store', () => {
     expect(result.get(core.properties.name)).toBe('Local drive');
   });
 
+  it('keeps an unsent resource local until its creation is acknowledged', async ({
+    expect,
+  }) => {
+    const { store, postCommitSpy } = await testStore();
+    const resource = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Folder',
+      noParent: true,
+      propVals: { [core.properties.name]: 'Not uploaded yet' },
+    });
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '@id': resource.subject,
+            [core.properties.name]: 'Not uploaded yet',
+          }),
+          { headers: { 'Content-Type': 'application/ad+json' } },
+        ),
+    );
+    store.injectFetch(fetch);
+    // Signing a draft assigns its subject and clears .new before save.
+    expect(resource.new).toBe(false);
+    expect(
+      await store.fetchResourceFromServer(resource.subject, {
+        noWebSocket: true,
+        setLoading: true,
+      }),
+    ).toBe(resource);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(resource.isReady()).toBe(true);
+
+    let acknowledge!: () => void;
+    const accepted = new Promise<void>(resolve => {
+      acknowledge = resolve;
+    });
+    const originalPost = postCommitSpy.getMockImplementation()!;
+    postCommitSpy.mockImplementationOnce(async commit => {
+      await accepted;
+
+      return originalPost(commit);
+    });
+    const saved = resource.save();
+    await vi.waitFor(() => expect(postCommitSpy).toHaveBeenCalled());
+    expect(
+      await store.fetchResourceFromServer(resource.subject, {
+        noWebSocket: true,
+      }),
+    ).toBe(resource);
+    expect(fetch).not.toHaveBeenCalled();
+    acknowledge();
+    await saved;
+    await store.fetchResourceFromServer(resource.subject, {
+      noWebSocket: true,
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it('waits for property data after a loading-placeholder notification', async ({
     expect,
   }) => {

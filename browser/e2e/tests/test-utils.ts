@@ -425,6 +425,10 @@ export async function installCommitWatcher(page: Page) {
         // Best-effort — never break the real send.
       }
 
+      if (this.readyState !== WebSocket.OPEN) {
+        console.debug('[e2e closed socket send]', this.url, new Error().stack);
+      }
+
       // eslint-disable-next-line prefer-rest-params
       return origSend.apply(this, arguments as unknown as [data: never]);
     };

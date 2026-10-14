@@ -2148,7 +2148,10 @@ export class WSClient {
   /** A local save can finish before its genesis is acknowledged by the server.
    * ResourceSaved retries subscription after that acknowledgement arrives. */
   private awaitingDriveGenesis(drive: string): boolean {
-    return !!this.store.outbox.getEntry(drive)?.signedGenesis;
+    return (
+      !!this.hydratedResource(drive)?.awaitingCreation ||
+      !!this.store.outbox.getEntry(drive)?.signedGenesis
+    );
   }
 
   private canAutomaticallySyncDrive(drive: string): boolean {

@@ -59,6 +59,9 @@ class FakeWebSocket {
   }
 
   public send(data: Uint8Array | string): void {
+    if (this.readyState !== FakeWebSocket.OPEN)
+      throw new Error('send on closed socket');
+
     if (typeof data === 'string') {
       this.sent.push(new TextEncoder().encode(data));
     } else {
