@@ -83,6 +83,7 @@ pub async fn web_socket_handler(
     let result = WsResponseBuilder::new(
         WebSocketConnection {
             hb: Instant::now(),
+            closing: false,
             request_origin,
             auth_nonce: atomic_lib::sync::protocol::new_challenge_nonce(),
             client_capabilities: Vec::new(),
@@ -127,6 +128,9 @@ pub async fn web_socket_handler(
 
 pub struct WebSocketConnection {
     hb: Instant,
+    /// A server-initiated close waits for the peer's acknowledgement. Do not
+    /// enqueue application frames after the CLOSE frame.
+    closing: bool,
     /// `scheme://host[:port]` the upgrade request arrived on; one of the two
     /// origins an `AUTH.requestedSubject` may name (the other is the
     /// configured server URL).
@@ -226,6 +230,9 @@ impl Actor for WebSocketConnection {
             &self.auth_nonce,
         ));
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
+            if act.closing {
+                return;
+            }
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 tracing::info!("Websocket heartbeat failed, disconnecting");
                 ctx.stop();
@@ -257,6 +264,12 @@ impl Actor for WebSocketConnection {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        if self.closing {
+            if matches!(msg, Ok(ws::Message::Close(_)) | Err(_)) {
+                ctx.stop();
+            }
+            return;
+        }
         match msg {
             Ok(ws::Message::Ping(msg)) => {
                 self.hb = Instant::now();
@@ -449,6 +462,9 @@ impl WebSocketConnection {
                     }
                     .into_actor(self)
                     .map(|(responses, agent), actor, ctx| {
+                        if actor.closing {
+                            return;
+                        }
                         // Subscriptions were admitted under the previous
                         // identity; have the monitor re-check them against
                         // this one (see `Handler<RebindAgent>`).
@@ -520,6 +536,9 @@ impl WebSocketConnection {
                     }
                     .into_actor(self)
                     .map(|out, actor, ctx| {
+                        if actor.closing {
+                            return;
+                        }
                         for response in out.frames {
                             ctx.binary(response);
                         }
@@ -589,33 +608,37 @@ impl WebSocketConnection {
                         (request_id, result)
                     }
                     .into_actor(self)
-                    .map(move |(rid, res), _actor, ctx| match res {
-                        Ok(server_commit_json) => {
-                            // A client that listed `commit-ok-slim` in its
-                            // HELLO only wants the id it must chain the next
-                            // commit on; it already holds the commit it just
-                            // signed.
-                            let slim_id = if slim_ack {
-                                serde_json::from_str::<serde_json::Value>(&server_commit_json)
-                                    .ok()
-                                    .and_then(|v| v.get("@id")?.as_str().map(str::to_owned))
-                            } else {
-                                None
-                            };
-                            match slim_id {
-                                Some(id) => ctx.binary(ws_v2::encode_commit_ok_slim(rid, &id)),
-                                None => {
-                                    ctx.binary(ws_v2::encode_commit_ok(rid, &server_commit_json))
+                    .map(move |(rid, res), actor, ctx| {
+                        if actor.closing {
+                            return;
+                        }
+                        match res {
+                            Ok(server_commit_json) => {
+                                // A client that listed `commit-ok-slim` in its
+                                // HELLO only wants the id it must chain the next
+                                // commit on; it already holds the commit it just
+                                // signed.
+                                let slim_id = if slim_ack {
+                                    serde_json::from_str::<serde_json::Value>(&server_commit_json)
+                                        .ok()
+                                        .and_then(|v| v.get("@id")?.as_str().map(str::to_owned))
+                                } else {
+                                    None
+                                };
+                                match slim_id {
+                                    Some(id) => ctx.binary(ws_v2::encode_commit_ok_slim(rid, &id)),
+                                    None => ctx
+                                        .binary(ws_v2::encode_commit_ok(rid, &server_commit_json)),
                                 }
                             }
-                        }
-                        Err(e) => {
-                            // F5 (planning/unified-sync.md): classify so the
-                            // outbox can switch on a structured code instead
-                            // of pattern-matching this exact message text.
-                            let msg = e.to_string();
-                            let code = ws_v2::classify_commit_error(&msg);
-                            ctx.binary(ws_v2::encode_error(rid, code, &msg));
+                            Err(e) => {
+                                // F5 (planning/unified-sync.md): classify so the
+                                // outbox can switch on a structured code instead
+                                // of pattern-matching this exact message text.
+                                let msg = e.to_string();
+                                let code = ws_v2::classify_commit_error(&msg);
+                                ctx.binary(ws_v2::encode_error(rid, code, &msg));
+                            }
                         }
                     }),
                 );
@@ -833,13 +856,18 @@ impl WebSocketConnection {
                             .map_err(|reason| (req.drive.clone(), reason))
                     }
                     .into_actor(self)
-                    .map(|resp, _actor, ctx| match resp {
-                        Ok(resp) => ctx.text(format!("RBSR_ITEMS {resp}")),
-                        Err((drive, reason)) => ctx.binary(ws_v2::encode_error(
-                            0,
-                            ws_v2::error_code::UNAUTHORIZED_READ,
-                            &format!("RBSR_ITEMS refused for {drive}: {reason}"),
-                        )),
+                    .map(|resp, actor, ctx| {
+                        if actor.closing {
+                            return;
+                        }
+                        match resp {
+                            Ok(resp) => ctx.text(format!("RBSR_ITEMS {resp}")),
+                            Err((drive, reason)) => ctx.binary(ws_v2::encode_error(
+                                0,
+                                ws_v2::error_code::UNAUTHORIZED_READ,
+                                &format!("RBSR_ITEMS refused for {drive}: {reason}"),
+                            )),
+                        }
                     }),
                 );
             }
@@ -867,6 +895,9 @@ impl Handler<SendFrame> for WebSocketConnection {
     /// the `Arc<[u8]>` to `Bytes::from_owner` so actix shares ownership
     /// without copying the bytes.
     fn handle(&mut self, msg: SendFrame, ctx: &mut ws::WebsocketContext<Self>) {
+        if self.closing {
+            return;
+        }
         ctx.binary(actix_web::web::Bytes::from_owner(msg.frame));
     }
 }
@@ -896,6 +927,9 @@ impl Handler<crate::actor_messages::LoroSyncUpdate> for WebSocketConnection {
         msg: crate::actor_messages::LoroSyncUpdate,
         ctx: &mut ws::WebsocketContext<Self>,
     ) {
+        if self.closing {
+            return;
+        }
         send_ephemeral(
             atomic_lib::sync::protocol::ephemeral_kind::DOC,
             &msg.subject,
@@ -914,6 +948,9 @@ impl Handler<crate::actor_messages::LoroEphemeralUpdate> for WebSocketConnection
         msg: crate::actor_messages::LoroEphemeralUpdate,
         ctx: &mut ws::WebsocketContext<Self>,
     ) {
+        if self.closing {
+            return;
+        }
         send_ephemeral(
             atomic_lib::sync::protocol::ephemeral_kind::LORO,
             &msg.subject,
@@ -932,6 +969,9 @@ impl Handler<crate::actor_messages::PresenceUpdate> for WebSocketConnection {
         msg: crate::actor_messages::PresenceUpdate,
         ctx: &mut ws::WebsocketContext<Self>,
     ) {
+        if self.closing {
+            return;
+        }
         send_ephemeral(
             atomic_lib::sync::protocol::ephemeral_kind::PRESENCE,
             &msg.subject,
@@ -946,6 +986,9 @@ impl Handler<IndexStatusPush> for WebSocketConnection {
     type Result = ();
 
     fn handle(&mut self, msg: IndexStatusPush, ctx: &mut ws::WebsocketContext<Self>) {
+        if self.closing {
+            return;
+        }
         let payload = serde_json::json!({
             "drive": msg.drive,
             "indexing": msg.indexing,
@@ -984,7 +1027,78 @@ impl Handler<crate::actor_messages::ReconcileConnection> for WebSocketConnection
     type Result = ();
 
     fn handle(&mut self, _: crate::actor_messages::ReconcileConnection, ctx: &mut Self::Context) {
+        if self.closing {
+            return;
+        }
+        self.closing = true;
         ctx.close(Some(ws::CloseCode::Restart.into()));
-        ctx.stop();
+        // Dropping TCP here races the peer's queued writes and can reset the
+        // connection before it reads 1012. Finish the close handshake, with a
+        // bound for peers that disappeared without acknowledging it.
+        ctx.run_later(Duration::from_secs(5), |_, ctx| ctx.stop());
+    }
+}
+
+#[cfg(test)]
+mod recovery_close_tests {
+    use super::*;
+    use futures::StreamExt;
+
+    #[actix_web::test]
+    async fn restart_close_waits_for_peer_ack_and_ignores_late_frames() {
+        let store = Db::init_temp("ws-recovery-close").await.unwrap();
+        let config = crate::config::build_temp_config("ws-recovery-close").unwrap();
+        let vector_search_state = VectorSearchState::new(&config, None).await.unwrap();
+        let monitor = crate::commit_monitor::create_commit_monitor(
+            store.clone(),
+            vector_search_state.clone(),
+        );
+        let actor = WebSocketConnection {
+            hb: Instant::now(),
+            closing: false,
+            request_origin: None,
+            auth_nonce: "test-close".into(),
+            client_capabilities: Vec::new(),
+            fragments: None,
+            commit_monitor_addr: monitor,
+            agent: ForAgent::Public,
+            store,
+            connection_id: new_connection_id(),
+            vector_search_state,
+            index_status_broadcast: Arc::new(IndexStatusBroadcast::new()),
+            write_rate_limiter: Arc::new(crate::rate_limit::WriteRateLimiter::new(0, 0)),
+            peer_ip: "127.0.0.1".into(),
+            index_status_subscribed: Default::default(),
+            sync_frames: Arc::default(),
+        };
+        let (input, incoming) = futures::channel::mpsc::unbounded();
+        let (addr, outgoing) = ws::WebsocketContext::create_with_addr(actor, incoming);
+        let mut outgoing = Box::pin(outgoing);
+        outgoing.next().await.unwrap().unwrap(); // CHALLENGE
+        addr.do_send(crate::actor_messages::ReconcileConnection);
+        let close = outgoing.next().await.unwrap().unwrap();
+        assert_eq!(&close[..], &[0x88, 2, 0x03, 0xf4]); // CLOSE 1012
+        addr.do_send(crate::actor_messages::ReconcileConnection);
+        addr.do_send(SendFrame {
+            frame: Arc::from([0x11_u8]),
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(25), outgoing.next())
+                .await
+                .is_err(),
+            "keep the transport alive for the close handshake; emit no more data"
+        );
+        // Masked client CLOSE 1012, with a zero mask for deterministic bytes.
+        input
+            .unbounded_send(Ok(web::Bytes::from_static(&[
+                0x88, 0x82, 0, 0, 0, 0, 0x03, 0xf4,
+            ])))
+            .unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), outgoing.next())
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 }
