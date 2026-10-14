@@ -1912,10 +1912,6 @@ msgstr ""
 msgid "Confirm Delete"
 msgstr ""
 
-#: src/actions/resourceActions.tsx
-msgid "Delete this resource."
-msgstr ""
-
 #. 0: ctx.resource.title
 #: src/components/ResourceContextMenu/index.tsx
 msgid "Open {0} menu"
@@ -12705,13 +12701,16 @@ msgid "Move this resource out of the Trash, back to where it was."
 msgstr ""
 
 #: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
 msgid "Delete permanently"
 msgstr ""
 
 #: src/components/SideBar/AccountMenu.tsx
+#: src/components/SideBar/SidebarDropZones.tsx
 msgid "Trash"
 msgstr ""
 
+#: src/actions/resourceActions.tsx
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Moved to Trash"
 msgstr ""
@@ -12736,10 +12735,6 @@ msgstr ""
 #. 0: dragResource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "{0} was dropped on your favorites"
-msgstr ""
-
-#: src/components/SideBar/SidebarDropZones.tsx
-msgid "Delete"
 msgstr ""
 
 #. 0: message.slice(0, 160)
@@ -12899,7 +12894,7 @@ msgstr ""
 msgid "Items you deleted from this drive"
 msgstr ""
 
-#. 0: name
+#. 0: trimmed
 #: src/helpers/syncProblem.ts
 msgid "This server does not have “{0}”"
 msgstr ""
@@ -12927,4 +12922,21 @@ msgstr ""
 
 #: src/views/DriveUnavailable.tsx
 msgid "Not connected to the server yet."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move to Trash"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move this resource to the Trash. You can restore it later."
+msgstr ""
+
+#. 0: error instanceof Error ? error.message \\: 'unknown error'
+#: src/actions/resourceActions.tsx
+msgid "Could not move to Trash: {0}"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Delete this resource permanently. This cannot be undone."
 msgstr ""
