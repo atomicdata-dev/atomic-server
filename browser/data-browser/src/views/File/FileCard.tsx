@@ -35,12 +35,16 @@ function FileCard(props: CardViewProps): JSX.Element {
 export default FileCard;
 
 function FileCardInner({ resource }: CardViewProps): JSX.Element {
-  const { downloadFile, bytes } = useFileInfo(resource);
+  const { downloadFile, bytes, loading } = useFileInfo(resource);
 
   return (
     <Column gap='1rem'>
       <ResourceCardTitle resource={resource}>
-        <DownloadIconButton downloadFile={downloadFile} fileSize={bytes} />
+        <DownloadIconButton
+          downloadFile={downloadFile}
+          fileSize={bytes}
+          disabled={loading}
+        />
       </ResourceCardTitle>
       <SimpleTagBar small resource={resource} />
       <FilePreview resource={resource} hideTypes={['application/pdf']} />
