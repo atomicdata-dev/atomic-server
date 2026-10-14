@@ -513,6 +513,18 @@ export class Resource<C extends OptionalClass = any> {
       this._loroDoc = new LoroDocClass();
       // Match the server (`lib/src/loro.rs`): record per-change Unix seconds on commit.
       this._loroDoc.setRecordTimestamp(true);
+      // Loro stamps a change with the moment its transaction BEGAN, i.e. right
+      // after the previous commit. An editor that commits through a plain
+      // `doc.commit()` (loro-prosemirror) therefore stamps the first keystroke
+      // after an idle spell with the time of the last save, so "last edited"
+      // readers (the drive Activity feed) saw typing as minutes old. Re-stamp
+      // auto-stamped (second-resolution) commits with the real time; commits
+      // with an explicit millisecond timestamp (`signAt`) are left alone.
+      this._loroDoc.subscribePreCommit(({ changeMeta, modifier }) => {
+        if (changeMeta.timestamp < 1_000_000_000_000) {
+          modifier.setTimestamp(Math.floor(Date.now() / 1000));
+        }
+      });
       this._loroMap = this._loroDoc.getMap('properties');
 
       // If the resource has a persisted Loro snapshot, import it.

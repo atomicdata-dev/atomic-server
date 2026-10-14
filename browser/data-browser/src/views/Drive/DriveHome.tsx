@@ -4,10 +4,8 @@ import {
   isUnauthorized,
   useDrivePresence,
   useResource,
-  normalizeLoroChangeTimestampMs,
   useResources,
   useTitle,
-  type Resource,
 } from '@tomic/react';
 import { memo, useMemo, useState, type JSX } from 'react';
 import {
@@ -27,6 +25,9 @@ import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
 import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import { lastEditedAt } from './lastEditedAt';
+
+export { lastEditedAt };
 
 const MAX_RECENT = 6;
 const MAX_PEOPLE = 6;
@@ -160,32 +161,6 @@ function ResourceTile({ subject }: { subject: string }): JSX.Element {
       </TileText>
     </Tile>
   );
-}
-
-/**
- * Millisecond timestamp of the newest change in the resource's own Loro
- * oplog (one `getChangeAt` per peer, no commit fetch), falling back to its
- * creation time. `undefined` while nothing is loaded.
- */
-export function lastEditedAt(resource: Resource): number | undefined {
-  const doc = resource.getLoroDoc();
-  let latest = 0;
-
-  if (doc) {
-    try {
-      for (const [peer, end] of doc.oplogVersion().toJSON()) {
-        if (end > 0) {
-          const { timestamp } = doc.getChangeAt({ peer, counter: end - 1 });
-
-          latest = Math.max(latest, normalizeLoroChangeTimestampMs(timestamp));
-        }
-      }
-    } catch {
-      // Unreadable oplog: fall back to the creation time below.
-    }
-  }
-
-  return latest > 0 ? latest : resource.getCreatedAt();
 }
 
 /**

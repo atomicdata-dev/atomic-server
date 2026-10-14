@@ -111,6 +111,32 @@ describe('resource.ts', () => {
     expect(reloaded.get(prop)).toBe('["a","b"]');
   });
 
+  it('stamps a plain doc.commit() with the time of the commit, not of the last one', async ({
+    expect,
+  }) => {
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const resource = new Resource('https://example.com/stamp-test');
+      await resource.set('https://example.com/p', 'a', false);
+      const doc = resource.getLoroDoc()!;
+      doc.commit();
+
+      // The editor plugin commits like this, long after the previous commit.
+      vi.setSystemTime(new Date('2026-01-01T00:10:00Z'));
+      doc.getMap('properties').set('https://example.com/p', 'b');
+      doc.commit({ origin: 'editor' });
+
+      const [peer, end] = [...doc.oplogVersion().toJSON()][0];
+      const { timestamp } = doc.getChangeAt({ peer, counter: end - 1 });
+
+      expect(timestamp).toBe(Date.parse('2026-01-01T00:10:00Z') / 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reads Null inside nested maps and lists without error', async ({
     expect,
   }) => {
