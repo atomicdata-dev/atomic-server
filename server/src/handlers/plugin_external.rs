@@ -46,14 +46,14 @@ pub async fn apply(
             "The release does not declare this write operation",
         ));
     }
-    let mut host = StoreHost {
-        db: std::sync::Arc::new(appstate.store.clone()),
-        plugin: body.plugin.clone(),
-        drive: body.drive.clone(),
-        for_agent: account,
-        manifest: Some(manifest),
-    };
-    host.validate_binding().await?;
+    let mut host = StoreHost::bound(
+        &appstate.store,
+        &body.drive,
+        &body.plugin,
+        account,
+        Some(manifest),
+    )
+    .await?;
     let connection = serde_json::json!([body.drive, body.plugin]).to_string();
     let receipt = external::execute(
         &appstate.store,
@@ -85,14 +85,14 @@ async fn authorize_operation(
 ) -> AtomicServerResult<String> {
     let account =
         super::plugin_schedule::authorize(appstate, req, context, &operation.plugin).await?;
-    let host = StoreHost {
-        db: std::sync::Arc::new(appstate.store.clone()),
-        plugin: operation.plugin.clone(),
-        drive: operation.drive.clone(),
-        for_agent: account.clone(),
-        manifest: None,
-    };
-    host.validate_binding().await?;
+    StoreHost::bound(
+        &appstate.store,
+        &operation.drive,
+        &operation.plugin,
+        account.clone(),
+        None,
+    )
+    .await?;
     Ok(account.to_string())
 }
 
@@ -160,14 +160,14 @@ pub async fn read(
     let release = appstate.store.get_plugin_release(&body.release)?;
     let manifest = Manifest::parse(release.manifest)?
         .ok_or_else(|| AtomicServerError::bad_request("Versioned release required"))?;
-    let mut host = StoreHost {
-        db: std::sync::Arc::new(appstate.store.clone()),
-        plugin: body.plugin.clone(),
-        drive: body.drive.clone(),
-        for_agent: account,
-        manifest: Some(manifest),
-    };
-    host.validate_binding().await?;
+    let mut host = StoreHost::bound(
+        &appstate.store,
+        &body.drive,
+        &body.plugin,
+        account,
+        Some(manifest),
+    )
+    .await?;
     let response = host
         .request(
             serde_json::to_string(&body.intent)
