@@ -7,7 +7,10 @@ import './helpers/restartDemoOnReload';
 import App from './App';
 import { initSentry } from './helpers/sentry';
 import { reloadOnStaleChunk } from './helpers/staleChunkReload';
-import { afterNextPaint, hideBootSplash } from './helpers/bootSplash';
+import {
+  afterNextPaint,
+  hideBootSplashWhenSettled,
+} from './helpers/bootSplash';
 import { getManagedApiBase, hasManagedApi } from './helpers/managed/api';
 // Side-effect import: installs a global capture-phase `wheel` listener
 // before any route mounts. CanvasPage uses it to ignore momentum-scroll
@@ -84,10 +87,11 @@ root.render(
 );
 
 // The demo keeps the boot splash up until its workspace is ready (DemoRoute).
-// Every other page is ready at its first render, as it was when the splash
-// lived inside #root and React replaced it.
+// Every other page keeps it up until no loader of the app's own is showing,
+// so the one splash covers the whole wait instead of handing over to pane
+// spinners of another size and position.
 if (window.location.pathname !== '/app/demo') {
-  void afterNextPaint().then(() => hideBootSplash());
+  void afterNextPaint().then(() => hideBootSplashWhenSettled());
 }
 
 // The account server is another origin, and the first session check against

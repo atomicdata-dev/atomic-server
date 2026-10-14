@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { dataBrowser } from '@tomic/react';
 import {
+  bubbleId,
   classifyMessage,
   entryFacts,
   isCandidate,
@@ -31,6 +32,18 @@ const msg = (extra: Partial<MessageFacts>): MessageFacts => ({
 });
 
 describe('message notifications', () => {
+  it('does not announce a message in a local-only drive (the demo)', () => {
+    const local = { ...ctx, isLocalOnly: (s: string) => s === ROOM };
+
+    expect(classifyMessage(msg({ parent: ROOM }), ctx)).toBeDefined();
+    expect(classifyMessage(msg({ parent: ROOM }), local)).toBeUndefined();
+  });
+
+  it('gives a burst of messages in one place the same bubble', () => {
+    expect(bubbleId(ROOM)).toBe(bubbleId(ROOM));
+    expect(bubbleId(ROOM)).not.toBe(bubbleId(DOC));
+  });
+
   it('announces a new message in a chat room', () => {
     expect(classifyMessage(msg({ parent: ROOM }), ctx)).toMatchObject({
       kind: 'chat',

@@ -212,11 +212,20 @@ export function ResourceContextMenu({
     return null;
   }
 
-  const availableActions = resourceActions.filter(
-    action =>
-      (!simple || action.section !== 'view') &&
-      (action.available?.(ctx) ?? true),
-  );
+  // A menu that names Delete explicitly (the ontology cards) means the real
+  // delete of an ontology member, not a move to the Trash.
+  const permanentDeleteOnly = !!showOnly?.includes(ContextMenuOptions.Delete);
+  const availableActions = resourceActions.filter(action => {
+    if (simple && action.section === 'view') {
+      return false;
+    }
+
+    if (permanentDeleteOnly && action.id === ContextMenuOptions.Delete) {
+      return ctx.canWrite;
+    }
+
+    return action.available?.(ctx) ?? true;
+  });
 
   const items: DropdownItem[] = [];
   // Reload sits with "Restart app" at the very bottom of the menu.

@@ -288,6 +288,12 @@ export class WSClient {
   private _onlineListener: (() => void) | undefined;
   private _driveUnsub: (() => void) | undefined;
   private _savedDriveUnsub: (() => void) | undefined;
+  private _liveUpdatedUnsub: (() => void) | undefined;
+  private _liveSavedUnsub: (() => void) | undefined;
+  /** Subjects whose live SUB is considered sent on the current socket. Entries
+   *  are removed by `unsubscribeResource`, and the set is cleared when the
+   *  socket closes and in `reSubscribeAll` (which resends them). */
+  private _liveSent = new Set<string>();
   /** Drive-sync state computed for a hash-first probe, kept until the server
    *  either accepts it (`SYNC_OK`) or asks for the full state (`SYNC_RESEND`),
    *  with the guard of the connection and identity that computed it. */
@@ -457,6 +463,16 @@ export class WSClient {
       }
     });
 
+    this._liveUpdatedUnsub = store.on(StoreEvents.ResourceUpdated, resource => {
+      this.retryLiveSubscription(store.normalizeSubject(resource.subject));
+    });
+
+    // A first save clears the genesis before ResourceSaved fires, and
+    // ResourceUpdated is not guaranteed to follow: retry a held SUB here too.
+    this._liveSavedUnsub = store.on(StoreEvents.ResourceSaved, resource => {
+      this.retryLiveSubscription(store.normalizeSubject(resource.subject));
+    });
+
     const wsURL = new URL(url);
     wsURL.protocol = wsURL.protocol === 'http:' ? 'ws' : 'wss';
     wsURL.pathname = '/ws';
@@ -475,14 +491,71 @@ export class WSClient {
       ws.addEventListener('message', event => {
         if (!signal.aborted) this.handleMessage(event);
       });
+      let ended = false;
+      let rejectOpen: (error: AtomicError) => void = () => undefined;
+
+      // Tears this socket down and schedules the next attempt. Runs at most
+      // once per socket: normally from `close`, but also from `error` when the
+      // socket never opened, because Node's WebSocket (undici) fires only
+      // `error` on a refused connection, never `close`. Waiting for `close`
+      // there left the client without a retry and `openPromise` pending, so a
+      // client whose first attempt hit a server that was not up yet stayed
+      // offline for good.
+      const end = (error: string | undefined) => {
+        if (ended) return;
+        ended = true;
+        // Explicit close already tears down this client synchronously. Its
+        // later event must not overwrite a replacement socket's live state.
+        if (this._closed || ws !== this.ws) return;
+        this.connection.abort(new RequestCancelledError('WebSocket closed'));
+
+        if (!opened) {
+          // A socket that dies before opening must REJECT `openPromise`, not
+          // leave it pending forever. `authenticate()` awaits it while
+          // holding `isAuthenticating`, and its `finally` (the only thing
+          // that clears that flag) is downstream of this await. A
+          // never-settling promise therefore pins the flag for the lifetime
+          // of the client: the retry loop reconnects, the new socket opens,
+          // and its `authenticate()` takes the `if (this.isAuthenticating)
+          // await this.authPromise` branch onto the dead promise and waits
+          // forever. Auth never completes, so `reportConnected(true)` never
+          // fires and the app sits on "Offline" next to a server answering
+          // in milliseconds. Reproduced on a cold start where the webview is
+          // ready before the embedded server binds.
+          rejectOpen(
+            new AtomicError(
+              `WebSocket to ${wsURL.origin} closed before it opened`,
+              ErrorType.Server,
+            ),
+          );
+        }
+
+        this.reportConnected(false, error);
+        this.rejectAllPending('WebSocket closed before response arrived');
+        this.stopLiveness();
+        this._serverCaps = [];
+        this._challengeNonce = undefined;
+        this._subscribedDrive = undefined;
+        this._liveSent.clear();
+
+        this._retryTimer = setTimeout(() => {
+          this.authenticatedWith = undefined;
+          createSocket();
+        }, this._retryDelay);
+        this._retryDelay = Math.min(this._retryDelay * 2, 30000);
+      };
+
       ws.addEventListener('error', () => {
         if (this._closed || ws !== this.ws) return;
-        this.connection.abort(new RequestCancelledError('WebSocket error'));
 
         if (!opened) {
           console.warn('[WS] Connection failed');
+          end(connectionFailedMessage(wsURL));
+
+          return;
         }
 
+        this.connection.abort(new RequestCancelledError('WebSocket error'));
         this.reportConnected(false, connectionFailedMessage(wsURL));
         // Some environments fire error without an immediately-following
         // close. Reject anyway — if close does fire later, the second
@@ -490,10 +563,7 @@ export class WSClient {
         this.rejectAllPending('WebSocket error before response arrived');
       });
       ws.addEventListener('close', (ev: CloseEvent) => {
-        // Explicit close already tears down this client synchronously. Its
-        // later event must not overwrite a replacement socket's live state.
         if (this._closed || ws !== this.ws) return;
-        this.connection.abort(new RequestCancelledError('WebSocket closed'));
 
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
@@ -503,59 +573,20 @@ export class WSClient {
         // tells us if the closing handshake completed. Without this the
         // user-visible "Connection ... closed" line gives no signal of
         // what actually killed the connection.
-        if (!this._closed) {
+        if (!ended) {
           console.warn(
             `[WS] close code=${ev.code} reason=${JSON.stringify(ev.reason)} wasClean=${ev.wasClean} opened=${opened}`,
           );
         }
 
-        const error = this._closed
-          ? undefined
-          : opened
+        end(
+          opened
             ? `Connection to ${wsURL.origin} closed (code=${ev.code}${ev.reason ? `, reason=${ev.reason}` : ''}).`
-            : connectionFailedMessage(wsURL);
-
-        this.reportConnected(false, error);
-        this.rejectAllPending('WebSocket closed before response arrived');
-        this.stopLiveness();
-        this._serverCaps = [];
-        this._challengeNonce = undefined;
-        this._subscribedDrive = undefined;
-
-        if (!this._closed) {
-          this._retryTimer = setTimeout(() => {
-            this.authenticatedWith = undefined;
-            createSocket();
-          }, this._retryDelay);
-          this._retryDelay = Math.min(this._retryDelay * 2, 30000);
-        }
+            : connectionFailedMessage(wsURL),
+        );
       });
       this.openPromise = new Promise((resolve, reject) => {
-        // A socket that dies before opening must REJECT this, not leave it
-        // pending forever. `authenticate()` awaits it while holding
-        // `isAuthenticating`, and its `finally` — the only thing that clears
-        // that flag — is downstream of this await. A never-settling promise
-        // therefore pins the flag for the lifetime of the client: the retry
-        // loop reconnects, the new socket opens, and its `authenticate()`
-        // takes the `if (this.isAuthenticating) await this.authPromise` branch
-        // onto the dead promise and waits forever. Auth never completes, so
-        // `reportConnected(true)` never fires and the app sits on "Offline"
-        // next to a server answering in milliseconds, with every `ws.fetch`
-        // hung because `REQUEST_TIMEOUT` only starts after auth.
-        //
-        // Reproduced on a cold start where the webview is ready before the
-        // embedded server binds: one `close code=1006 opened=false`, and no
-        // recovery until a reload builds a fresh client.
-        ws.addEventListener('close', () => {
-          if (!opened) {
-            reject(
-              new AtomicError(
-                `WebSocket to ${wsURL.origin} closed before it opened`,
-                ErrorType.Server,
-              ),
-            );
-          }
-        });
+        rejectOpen = reject;
         ws.addEventListener('open', () => {
           opened = true;
           this._retryDelay = 1000;
@@ -633,6 +664,10 @@ export class WSClient {
     this._driveUnsub = undefined;
     this._savedDriveUnsub?.();
     this._savedDriveUnsub = undefined;
+    this._liveUpdatedUnsub?.();
+    this._liveUpdatedUnsub = undefined;
+    this._liveSavedUnsub?.();
+    this._liveSavedUnsub = undefined;
 
     if (
       this._onlineListener &&
@@ -785,6 +820,17 @@ export class WSClient {
    */
   public unsubscribeFromDrive(drive: string): void {
     if (this.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // A live subscription still holds this subject, and the server keeps one
+    // subscription per (connection, subject): leave it, and record that it is
+    // subscribed so it is neither lost nor sent twice.
+    const held = this.store.normalizeSubject(drive);
+
+    if (this.store.liveSubjects.has(held)) {
+      this._liveSent.add(held);
+
       return;
     }
 
@@ -1768,7 +1814,11 @@ export class WSClient {
     this.sendBinary(encodeSub(this.wireSubject(subject)));
   }
 
-  /** A `SUB` for one resource, held via {@link Store.subscribeLive}. */
+  /** A `SUB` for one resource, held via {@link Store.subscribeLive}.
+   *  The server refuses a SUB for what the reader cannot read yet (a drive not
+   *  created, or whose genesis it has not acknowledged), and that refusal is
+   *  logged as a warning. So the SUB waits until the resource is known to be
+   *  readable; {@link retryLiveSubscription} sends it then. */
   public subscribeResource(subject: string): void {
     if (this.readyState !== WebSocket.OPEN) return;
     if (this.store.isLocalOnlySubject(subject)) return;
@@ -1777,11 +1827,43 @@ export class WSClient {
       this.authenticatedWith !== this.store.getAgent()?.subject
     )
       return;
+    if (!this.store.isLiveSyncedDrive(subject)) return;
+    const resource = this.hydratedResource(subject);
+    if (
+      !resource ||
+      resource.loading ||
+      resource.new ||
+      isNotFound(resource.error) ||
+      isUnauthorized(resource.error) ||
+      this.awaitingDriveGenesis(subject)
+    )
+      return;
+    if (this._liveSent.has(subject)) return;
+    this._liveSent.add(subject);
     this.sendBinary(encodeSub(this.wireSubject(subject)));
   }
 
+  /** Called when a resource changes: sends the held SUB that was waiting for it. */
+  private retryLiveSubscription(subject: string): void {
+    if (
+      this.store.liveSubjects.has(subject) &&
+      !this._liveSent.has(subject) &&
+      this.store.getWebSocketForSubject(subject) === this
+    ) {
+      this.subscribeResource(subject);
+    }
+  }
+
   public unsubscribeResource(subject: string): void {
+    this._liveSent.delete(subject);
     if (this.readyState !== WebSocket.OPEN) return;
+    // The drive-wide SUB owns this subject; UNSUB would cancel it.
+    if (
+      this._subscribedDrive &&
+      this.store.normalizeSubject(subject) ===
+        this.store.normalizeSubject(this._subscribedDrive)
+    )
+      return;
     this.sendBinary(encodeUnsub(this.wireSubject(subject)));
   }
 
@@ -1800,6 +1882,8 @@ export class WSClient {
         this.subscribeAgentProfile(subject);
       }
     }
+
+    this._liveSent.clear();
 
     for (const subject of this.store.liveSubjects.keys()) {
       if (this.store.getWebSocketForSubject(subject) === this) {
@@ -2028,6 +2112,14 @@ export class WSClient {
   }
 
   private async drainBackground(): Promise<void> {
+    // Server-only mode (no OPFS / Web Locks): nothing local to import or index,
+    // and every send would fail with `ClientDb unavailable`.
+    if (this.store.getClientDb()?.initError) {
+      this.pendingEnvelopes = [];
+
+      return;
+    }
+
     await this.drainEnvelopes();
     await this.drainSearchIndex();
   }

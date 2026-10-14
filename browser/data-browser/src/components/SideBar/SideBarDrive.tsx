@@ -29,7 +29,6 @@ import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
 import { LuChevronsUpDown } from 'react-icons/lu';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ScrollArea } from '../ScrollArea';
-import { SidebarTrashLink } from './SidebarTrashLink';
 import { DropEdge } from './ResourceSideBar/DropEdge';
 import { SIDEBAR_CHILD_LIMIT, SideBarMoreRow } from './SideBarMoreRow';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -77,7 +76,7 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
   // And the Inbox (on the personal drive): it opens from Notifications in the
   // app menu.
   const [inbox] = useString(driveResource, notifications.properties.inbox);
-  // And the Trash folder: reached through its own row below the tree.
+  // And the Trash folder: reached from the account menu at the bottom of the sidebar.
   const [trashFolder] = useString(
     driveResource,
     dataBrowser.properties.trashFolder,
@@ -206,9 +205,6 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
                 onClick={onItemClick}
               />
             )}
-            {trashFolder && (
-              <SidebarTrashLink subject={trashFolder} onClick={onItemClick} />
-            )}
             {agentCanWrite && (
               <NewResourceRow gap='0' center>
                 <QuickCreateRow
@@ -273,8 +269,10 @@ const TitleButton = styled(Button)<{ current?: boolean }>`
     color: ${theme.colors.main};
   `}
 
-  &:hover {
-    background-color: ${props => props.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${props => props.theme.colors.bg1};
+    }
   }
   &:active {
     background-color: ${props => props.theme.colors.bg2};
@@ -291,10 +289,16 @@ const SwitcherButton = styled(IconButton)`
   color: ${p => p.theme.colors.textLight};
   font-size: 0.85rem;
 
-  &:hover,
   &:focus-visible {
     background-color: ${p => p.theme.colors.bg1};
     color: ${p => p.theme.colors.text};
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+      color: ${p => p.theme.colors.text};
+    }
   }
   &:active {
     background-color: ${p => p.theme.colors.bg2};

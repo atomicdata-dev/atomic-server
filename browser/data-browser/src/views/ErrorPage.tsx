@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   NOT_AVAILABLE_LOCALLY_MESSAGE,
+  NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
   isNotAvailableLocally,
   isUnauthorized,
   useStore,
@@ -22,6 +23,8 @@ import { RootWelcomeGate } from './RootWelcomeGate';
 import { VaultRestoreAction } from '../components/Vault/VaultRestoreAction';
 import { constructOpenURL } from '../helpers/navigation';
 import { DriveUnavailable } from './DriveUnavailable';
+import { usePrivateDrive } from '../hooks/usePrivateDrive';
+import { isPrivateDrive } from '../helpers/isPrivateDrive';
 
 import type { JSX } from 'react';
 
@@ -32,6 +35,7 @@ import type { JSX } from 'react';
 function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   const { agent, baseURL, drive } = useSettings();
   const store = useStore();
+  const { privateDrive, loading: privateDriveLoading } = usePrivateDrive();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -148,12 +152,23 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   if (
     isNotAvailableLocally(resource.error) &&
     (resource.error!.message === NOT_AVAILABLE_LOCALLY_MESSAGE ||
+      resource.error!.message === NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE ||
       store.isLocalOnlyDrive(resource.subject) ||
       store.normalizeSubject(resource.subject) ===
         (drive && store.normalizeSubject(drive)))
   ) {
+    // The private drive and what is in it is the person's own vault: never
+    // "not on this device", whichever item is open.
+    const vault =
+      isPrivateDrive(drive, privateDrive, privateDriveLoading) ||
+      isPrivateDrive(resource.subject, privateDrive, privateDriveLoading);
+
     return (
-      <DriveUnavailable subject={resource.subject} error={resource.error!} />
+      <DriveUnavailable
+        subject={resource.subject}
+        error={resource.error!}
+        vault={vault}
+      />
     );
   }
 

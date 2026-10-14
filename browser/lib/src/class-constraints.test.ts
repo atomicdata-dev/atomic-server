@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   checkResourceConstraints,
   checkValue,
+  constraintViolations,
   ConstraintError,
   parseConstraint,
   parseConstraints,
@@ -13,6 +14,10 @@ interface FixtureCase {
   value: unknown;
   valid: boolean;
   rule?: string;
+  /** JSON pointer of the failing value, when the case pins it. */
+  path?: string;
+  /** The constraint itself must be refused by the parser. */
+  rejected?: boolean;
 }
 
 const cases = JSON.parse(
@@ -31,6 +36,12 @@ describe('class constraints fixture', () => {
   });
 
   it.each(cases.map((c, i) => [i, c] as const))('case %i', (_i, c) => {
+    if (c.rejected) {
+      expect(() => parseConstraint(c.constraint)).toThrow();
+
+      return;
+    }
+
     const constraint = parseConstraint(c.constraint);
 
     if (c.valid) {
@@ -45,6 +56,9 @@ describe('class constraints fixture', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(ConstraintError);
       expect((e as ConstraintError).keyword).toBe(c.rule);
+
+      if (c.path !== undefined)
+        expect((e as ConstraintError).path).toBe(c.path);
     }
   });
 });
@@ -109,6 +123,41 @@ describe('checkResourceConstraints', () => {
     );
   });
 
+  it('names the nested path in the message', () => {
+    const nested = new Map(store);
+
+    nested.set(classSubject, {
+      'https://atomicdata.dev/properties/shortname': 'task',
+      'https://atomicdata.dev/properties/constraints': {
+        [nameProp]: {
+          type: 'object',
+          properties: { tune: { type: 'number', maximum: 24 } },
+        },
+      },
+    });
+
+    const getNested = (subject: string) => {
+      const props = nested.get(subject);
+
+      return (
+        props && { subject, getClasses: () => [], get: (p: string) => props[p] }
+      );
+    };
+
+    const withValue = (value: unknown) => ({
+      subject: 'https://example.com/t1',
+      getClasses: () => [classSubject],
+      get: (p: string) => (p === nameProp ? value : undefined),
+    });
+
+    expect(() =>
+      checkResourceConstraints(withValue({ tune: 24 }), getNested),
+    ).not.toThrow();
+    expect(() =>
+      checkResourceConstraints(withValue({ tune: 25 }), getNested),
+    ).toThrow(/^Value for name breaks maximum on class task at \/tune: /);
+  });
+
   it('skips classes that are not loaded', () => {
     expect(() =>
       checkResourceConstraints(
@@ -116,5 +165,58 @@ describe('checkResourceConstraints', () => {
         getLocal,
       ),
     ).not.toThrow();
+  });
+
+  it('reports every violation, none for a valid or unknown-class resource', () => {
+    const descProp = 'https://atomicdata.dev/properties/description';
+    const two = new Map(store);
+
+    two.set(classSubject, {
+      'https://atomicdata.dev/properties/shortname': 'task',
+      'https://atomicdata.dev/properties/constraints': {
+        [nameProp]: { maxLength: 3 },
+        [descProp]: { maxLength: 5 },
+      },
+    });
+
+    const getTwo = (subject: string) => {
+      const props = two.get(subject);
+
+      return (
+        props && { subject, getClasses: () => [], get: (p: string) => props[p] }
+      );
+    };
+
+    const withProps = (
+      name: string,
+      description: string,
+      classes = [classSubject],
+    ) => ({
+      subject: 'https://example.com/t1',
+      getClasses: () => classes,
+      get: (p: string) =>
+        p === nameProp ? name : p === descProp ? description : undefined,
+    });
+
+    expect(constraintViolations(getTwo, withProps('abc', 'short'))).toEqual([]);
+
+    const found = constraintViolations(getTwo, withProps('abcd', 'too long'));
+
+    expect(found.map(v => [v.property, v.keyword, v.classSubject])).toEqual([
+      [nameProp, 'maxLength', classSubject],
+      [descProp, 'maxLength', classSubject],
+    ]);
+    expect(found[0].message).toMatch(
+      /^Value for name breaks maxLength on class task: /,
+    );
+    expect(() =>
+      checkResourceConstraints(withProps('abcd', 'too long'), getTwo),
+    ).toThrow(found[0].message);
+    expect(
+      constraintViolations(
+        getTwo,
+        withProps('abcdefgh', 'too long', ['https://example.com/Missing']),
+      ),
+    ).toEqual([]);
   });
 });

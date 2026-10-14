@@ -3,6 +3,7 @@ import {
   expect,
   Browser,
   ConsoleMessage,
+  Request,
   Locator,
   TestInfo,
   test,
@@ -637,10 +638,73 @@ export async function signIn(page: Page, secret?: string) {
  * Returns the agent secret so other pages/contexts can sign in as the same user.
  */
 export async function devDrive(page: Page): Promise<string> {
+  // The route sits on a splash until the drive exists; when it never does, the
+  // timeout alone says nothing, so keep what the page printed to say why.
+  const printed: string[] = [];
+
+  const remember = (m: ConsoleMessage) => {
+    if (['error', 'warning'].includes(m.type()))
+      printed.push(`${m.type()}: ${m.text()}`.slice(0, 300));
+  };
+
+  // Requests the server never answered: a drive that is never created because
+  // a commit or read hangs looks the same as a slow boot until these are named.
+  const open = new Map<Request, number>();
+  const sent = (r: Request) => open.set(r, Date.now());
+  const done = (r: Request) => open.delete(r);
+
+  page.on('console', remember);
+  page.on('pageerror', e => printed.push(`pageerror: ${e}`.slice(0, 300)));
+  page.on('request', sent);
+  page.on('requestfinished', done);
+  page.on('requestfailed', done);
+
   await page.goto(`${FRONTEND_URL}/app/dev-drive`);
-  await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
-    timeout: 30000,
-  });
+
+  try {
+    await page.waitForURL(/(?:did(?:%3A|:)ad|atomic)(?:%3A|:)/, {
+      timeout: 30000,
+    });
+  } catch (e) {
+    const shown = await page
+      .evaluate(() => document.body.innerText.slice(0, 300))
+      .catch(() => '(page unreadable)');
+
+    const trace = await page
+      .evaluate(() => {
+        const snapshot = (
+          window as unknown as {
+            __atomicPerf?: {
+              snapshot?: () => {
+                events: { name: string; t: number; d?: number }[];
+              };
+            };
+          }
+        ).__atomicPerf?.snapshot?.();
+
+        return (snapshot?.events ?? [])
+          .slice(-15)
+          .map(ev => `${Math.round(ev.t)}ms ${ev.name}`);
+      })
+      .catch(() => []);
+    const waiting = [...open]
+      .filter(([r]) => !r.url().includes('/assets/'))
+      .map(
+        ([r, at]) =>
+          `${r.method()} ${r.url().slice(0, 100)} ${Date.now() - at}ms`,
+      );
+
+    throw new Error(
+      `devDrive never reached the drive: ${page.url()} shows ${JSON.stringify(shown)}; page printed ${JSON.stringify(printed.slice(-10))}; requests still open ${JSON.stringify(waiting.slice(0, 8))}; last page events ${JSON.stringify(trace)}`,
+      { cause: e },
+    );
+  } finally {
+    page.off('console', remember);
+    page.off('request', sent);
+    page.off('requestfinished', done);
+    page.off('requestfailed', done);
+  }
+
   await expect(currentDriveTitle(page)).toBeVisible({ timeout: 15000 });
 
   const secret = await page.evaluate(() =>

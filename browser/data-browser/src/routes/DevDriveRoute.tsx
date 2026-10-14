@@ -1,5 +1,5 @@
 import { createLazyRoute } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDevDrive } from '../hooks/useDevDrive';
 
 // Module-level guard: React 19 StrictMode in dev mode mounts effects twice
@@ -13,15 +13,33 @@ let inFlight: Promise<void> | null = null;
 const DevDriveRoute: React.FC = () => {
   const { createDevDrive } = useDevDrive();
   const startedRef = useRef(false);
+  // A dev-only route: say why it is stuck instead of leaving the splash up, so
+  // an e2e run that never reaches the drive shows the reason in its snapshot.
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     if (inFlight) return;
-    inFlight = createDevDrive().finally(() => {
-      inFlight = null;
-    });
+    inFlight = createDevDrive()
+      .catch(e => {
+        console.error('[DevDrive] failed:', e);
+        setFailure(
+          /* @wc-ignore */ `Dev drive failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      })
+      .finally(() => {
+        inFlight = null;
+      });
   }, []);
+
+  if (failure) {
+    return (
+      <p role='alert' style={{ padding: '1rem' }}>
+        {failure}
+      </p>
+    );
+  }
 
   return <p style={{ padding: '1rem' }}>Setting up dev drive...</p>;
 };

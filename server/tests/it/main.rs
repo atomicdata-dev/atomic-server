@@ -6,6 +6,7 @@
 
 mod common;
 
+mod blob_gc;
 mod blob_sync;
 mod conversations;
 mod drive_presence;

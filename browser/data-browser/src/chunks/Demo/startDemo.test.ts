@@ -8,7 +8,8 @@ vi.mock('./demoWorkspace', () => ({
 }));
 vi.mock('./guestAgent', () => ({ ensureAgentForDemo: vi.fn() }));
 
-const { cleanupDemoDrive } = await import('./startDemo');
+const { cleanupDemoDrive, demoOutlivesAgentChange } =
+  await import('./startDemo');
 
 const GUEST = 'atomic:agent:guest';
 const DRIVE = 'atomic:demo-drive';
@@ -45,5 +46,24 @@ describe('cleanupDemoDrive', () => {
     expect(removed.sort()).toEqual([DRIVE, ROW, TEAM].sort());
     expect(removed).not.toContain(GUEST);
     expect(store.unregisterLocalOnlyDrive).toHaveBeenCalledWith(DRIVE);
+  });
+});
+
+describe('demoOutlivesAgentChange', () => {
+  it('keeps playing for the same guest', () => {
+    expect(demoOutlivesAgentChange(GUEST, { subject: GUEST })).toBe(true);
+  });
+
+  it('stops when another identity signs in or the guest becomes an account', () => {
+    expect(demoOutlivesAgentChange(GUEST, { subject: 'atomic:agent:me' })).toBe(
+      false,
+    );
+    expect(
+      demoOutlivesAgentChange(GUEST, {
+        subject: GUEST,
+        privateDrive: 'atomic:home',
+      }),
+    ).toBe(false);
+    expect(demoOutlivesAgentChange(GUEST, undefined)).toBe(false);
   });
 });

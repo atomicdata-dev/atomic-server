@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addRecentResource, getRecentResources } from './recentResources';
+import {
+  addRecentResource,
+  getRecentResources,
+  removeRecentResource,
+} from './recentResources';
 
 const DRIVE = 'did:ad:drive:one';
 const OTHER_DRIVE = 'did:ad:drive:two';
@@ -37,6 +41,18 @@ describe('recentResources', () => {
 
     expect(getRecentResources(DRIVE)).toHaveLength(20);
     expect(getRecentResources(DRIVE)[0]).toBe('did:ad:resource:29');
+  });
+
+  it('forgets a removed resource, in that drive only', () => {
+    addRecentResource(DRIVE, 'did:ad:resource:a');
+    addRecentResource(DRIVE, 'did:ad:resource:b');
+    addRecentResource(OTHER_DRIVE, 'did:ad:resource:a');
+
+    removeRecentResource(DRIVE, 'did:ad:resource:a');
+    removeRecentResource(DRIVE, 'did:ad:resource:unknown');
+
+    expect(getRecentResources(DRIVE)).toEqual(['did:ad:resource:b']);
+    expect(getRecentResources(OTHER_DRIVE)).toEqual(['did:ad:resource:a']);
   });
 
   it('survives corrupt storage', () => {

@@ -8,8 +8,12 @@ export class ManagedReadCache {
     }
   >();
 
+  /** Explicit refreshes (`cache` set) asked for at the same moment. */
+  private pendingRefreshes = new Map<string, Promise<Response>>();
+
   invalidate(): void {
     this.entries.clear();
+    this.pendingRefreshes.clear();
   }
 
   async fetch(url: string, init: RequestInit): Promise<Response> {
@@ -33,14 +37,37 @@ export class ManagedReadCache {
       }
     }
 
+    const metadata = /\/api\/(me|sync-enrollments|recovery-secret)$/.test(url);
+
+    // An explicit refresh never reads what an earlier call left behind, but two
+    // of them asked for in the same moment (two menus mounting together) are
+    // one question: they share the request in flight, and nothing is kept.
+    if (method === 'GET' && !init.signal && init.cache && metadata) {
+      const key = JSON.stringify([
+        url,
+        init.credentials,
+        init.cache,
+        [...new Headers(init.headers).entries()].sort(),
+      ]);
+      const pending = this.pendingRefreshes.get(key);
+
+      if (pending) return (await pending).clone();
+
+      const request = fetch(url, init);
+      this.pendingRefreshes.set(key, request);
+
+      try {
+        return (await request).clone();
+      } finally {
+        if (this.pendingRefreshes.get(key) === request) {
+          this.pendingRefreshes.delete(key);
+        }
+      }
+    }
+
     // Signals belong to individual callers. Requests with special fetch
     // semantics bypass sharing rather than changing another caller's read.
-    if (
-      method !== 'GET' ||
-      init.signal ||
-      init.cache ||
-      !/\/api\/(me|sync-enrollments|recovery-secret)$/.test(url)
-    ) {
+    if (method !== 'GET' || init.signal || init.cache || !metadata) {
       return fetch(url, init);
     }
 

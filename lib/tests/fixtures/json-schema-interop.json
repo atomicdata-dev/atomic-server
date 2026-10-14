@@ -802,6 +802,362 @@
           }
         }
       }
+    },
+    {
+      "name": "audio: nested json ranges, closed objects, unions and nullable",
+      "schema": {
+        "x-atomic-ontology": "audio",
+        "$defs": {
+          "patch": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "pad": {
+                "type": "object",
+                "required": [
+                  "tune"
+                ],
+                "properties": {
+                  "tune": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 24
+                  },
+                  "mode": {
+                    "enum": [
+                      "a",
+                      "b"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 8
+                  }
+                },
+                "additionalProperties": false
+              },
+              "fx": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "mix"
+                  ],
+                  "properties": {
+                    "mix": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "kind": {
+                      "const": "reverb"
+                    }
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "gain": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^s"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              },
+              "curve": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              "tags": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string",
+                  "maxLength": 4
+                }
+              }
+            }
+          }
+        }
+      },
+      "plan": {
+        "shortname": "audio",
+        "classes": [
+          {
+            "shortname": "patch",
+            "name": "patch",
+            "properties": [
+              {
+                "shortname": "name",
+                "datatype": "https://atomicdata.dev/datatypes/string"
+              },
+              {
+                "shortname": "pad",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "fx",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "gain",
+                "datatype": "https://atomicdata.dev/datatypes/float"
+              },
+              {
+                "shortname": "source",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "curve",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              },
+              {
+                "shortname": "tags",
+                "datatype": "https://atomicdata.dev/datatypes/json"
+              }
+            ],
+            "requires": [],
+            "recommends": [
+              "name",
+              "pad",
+              "fx",
+              "gain",
+              "source",
+              "curve",
+              "tags"
+            ],
+            "constraints": {
+              "pad": {
+                "type": "object",
+                "required": [
+                  "tune"
+                ],
+                "properties": {
+                  "tune": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 24
+                  },
+                  "mode": {
+                    "enum": [
+                      "a",
+                      "b"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 8
+                  }
+                },
+                "additionalProperties": false
+              },
+              "fx": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "mix"
+                  ],
+                  "properties": {
+                    "mix": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "kind": {
+                      "const": "reverb"
+                    }
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "gain": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^s"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              },
+              "curve": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              "tags": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string",
+                  "maxLength": 4
+                }
+              }
+            }
+          }
+        ]
+      },
+      "export": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "x-atomic-ontology": "audio",
+        "$defs": {
+          "patch": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "pad": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json",
+                "type": "object",
+                "required": [
+                  "tune"
+                ],
+                "properties": {
+                  "tune": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 24
+                  },
+                  "mode": {
+                    "enum": [
+                      "a",
+                      "b"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 8
+                  }
+                },
+                "additionalProperties": false
+              },
+              "fx": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json",
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "mix"
+                  ],
+                  "properties": {
+                    "mix": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "kind": {
+                      "const": "reverb"
+                    }
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "gain": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "source": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^s"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              },
+              "curve": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json",
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              "tags": {
+                "x-atomic-datatype": "https://atomicdata.dev/datatypes/json",
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string",
+                  "maxLength": 4
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "rejected": [
@@ -954,27 +1310,6 @@
       },
       "pointer": "/$defs/a/properties/x/$ref",
       "message": "does not name an object schema"
-    },
-    {
-      "name": "nullable type array",
-      "schema": {
-        "x-atomic-ontology": "o",
-        "$defs": {
-          "a": {
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            }
-          }
-        }
-      },
-      "pointer": "/$defs/a/properties/x/type",
-      "message": "type arrays"
     },
     {
       "name": "type null",
@@ -1180,51 +1515,6 @@
       "message": "cannot hold two properties"
     },
     {
-      "name": "nested properties",
-      "schema": {
-        "x-atomic-ontology": "o",
-        "$defs": {
-          "a": {
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": "object",
-                "properties": {
-                  "y": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "pointer": "/$defs/a/properties/x/properties",
-      "message": "unsupported keyword 'properties'"
-    },
-    {
-      "name": "items with properties",
-      "schema": {
-        "x-atomic-ontology": "o",
-        "$defs": {
-          "a": {
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          }
-        }
-      },
-      "pointer": "/$defs/a/properties/x/items/properties",
-      "message": "unsupported keyword 'properties'"
-    },
-    {
       "name": "other dialect",
       "schema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1375,6 +1665,398 @@
       },
       "pointer": "/required",
       "message": "root has none"
+    },
+    {
+      "name": "nested: $ref inside properties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "$ref": "#/$defs/a"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y/$ref",
+      "message": "unsupported keyword '$ref'"
+    },
+    {
+      "name": "nested: oneOf inside items",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/items/oneOf",
+      "message": "unsupported keyword 'oneOf'"
+    },
+    {
+      "name": "nested: format inside properties",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y/format",
+      "message": "unsupported keyword 'format'"
+    },
+    {
+      "name": "nested: not inside anyOf",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "anyOf": [
+                  {
+                    "not": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/anyOf/0/not",
+      "message": "unsupported keyword 'not'"
+    },
+    {
+      "name": "nested: unknown type name",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "type": "text"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y/type",
+      "message": "unsupported type"
+    },
+    {
+      "name": "nested: type array with an unknown name",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": [
+                  "string",
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/type",
+      "message": "unsupported type"
+    },
+    {
+      "name": "nested: only null",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": [
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/type",
+      "message": "unsupported type"
+    },
+    {
+      "name": "nested: empty anyOf",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "anyOf": []
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/anyOf",
+      "message": "at least one"
+    },
+    {
+      "name": "nested: tuple items",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/items",
+      "message": "expected a schema object"
+    },
+    {
+      "name": "nested: negative minItems in a nested schema",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "type": "array",
+                    "minItems": -1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y",
+      "message": "non-negative integer"
+    },
+    {
+      "name": "nested: properties on a string",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "string",
+                "properties": {}
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties",
+      "message": "only applies to objects"
+    },
+    {
+      "name": "nested: required that is not a list",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "required": "y"
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/required",
+      "message": "expected an array"
+    },
+    {
+      "name": "nested: enum and const together",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "enum": [
+                      1
+                    ],
+                    "const": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y",
+      "message": "cannot be combined"
+    },
+    {
+      "name": "nested: deeper than 16 levels",
+      "schema": {
+        "x-atomic-ontology": "o",
+        "$defs": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "object",
+                "properties": {
+                  "y": {
+                    "type": "object",
+                    "properties": {
+                      "y": {
+                        "type": "object",
+                        "properties": {
+                          "y": {
+                            "type": "object",
+                            "properties": {
+                              "y": {
+                                "type": "object",
+                                "properties": {
+                                  "y": {
+                                    "type": "object",
+                                    "properties": {
+                                      "y": {
+                                        "type": "object",
+                                        "properties": {
+                                          "y": {
+                                            "type": "object",
+                                            "properties": {
+                                              "y": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "y": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "y": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "y": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "y": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "y": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                      "y": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "y": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "y": {
+                                                                                "type": "object",
+                                                                                "properties": {
+                                                                                  "y": {
+                                                                                    "type": "string"
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "pointer": "/$defs/a/properties/x/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y/properties/y",
+      "message": "deeper than 16"
     }
   ]
 }

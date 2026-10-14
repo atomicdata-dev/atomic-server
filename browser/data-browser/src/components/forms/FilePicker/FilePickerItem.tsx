@@ -81,12 +81,12 @@ const ItemWrapper = styled.button`
   width: 100%;
   aspect-ratio: 1 / 1;
 
-  &:not(:disabled):is(:hover, :focus) ${ItemCard} {
+  &:not(:disabled):is(:hover, :focus-visible) ${ItemCard} {
     --interaction-shadow: 0px 0px 0px 1px ${p => p.theme.colors.main};
     border: 1px solid ${p => p.theme.colors.main};
   }
 
-  &:not(:disabled):is(:hover, :focus) {
+  &:not(:disabled):is(:hover, :focus-visible) {
     cursor: pointer;
     color: ${p => p.theme.colors.main};
   }
