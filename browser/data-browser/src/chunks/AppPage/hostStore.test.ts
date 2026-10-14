@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { core } from '@tomic/react';
 import type { Store } from '@tomic/react';
 import {
@@ -319,6 +319,7 @@ describe('integration-proxy capabilities', () => {
   const proxy = {
     capability: vi.fn(async () => minted),
     connections: vi.fn(async () => [{ connectionId: 'c1', platform: 'pets' }]),
+    origin: 'https://proxy.example',
   };
 
   it('mints a capability for the frame key, never touching the server', async () => {
@@ -410,6 +411,82 @@ describe('integration-proxy capabilities', () => {
         proxy,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('proxyFetch', () => {
+  const proxy = {
+    capability: vi.fn(),
+    connections: vi.fn(),
+    origin: 'https://proxy.example',
+  };
+  const call = (extra: Record<string, unknown>) =>
+    handleRequest(
+      fakeStore(),
+      APP,
+      DRIVE,
+      req('proxyFetch', {
+        url: 'https://proxy.example/proxy/c1/pets/pets',
+        method: 'GET',
+        headers: { Authorization: 'Capability x', 'x-atomic-agent': 'a' },
+        ...extra,
+      }),
+      undefined,
+      proxy,
+    );
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sends to the proxy origin and returns only allowlisted headers', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('{"ok":true}', {
+          status: 200,
+          headers: { etag: '"1"', 'set-cookie': 'x=y', 'x-secret': 's' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await call({});
+
+    expect(result).toEqual({
+      status: 200,
+      headers: { etag: '"1"', 'content-type': 'text/plain;charset=UTF-8' },
+      text: '{"ok":true}',
+    });
+    const init = (
+      fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    )[1];
+    expect(init.credentials).toBe('omit');
+    expect(init.redirect).toBe('error');
+  });
+
+  it('refuses another origin, a non-proxy path and bad methods', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      call({ url: 'https://evil.example/proxy/c1/pets/pets' }),
+    ).rejects.toThrow('only call the integration proxy');
+    await expect(call({ url: 'https://proxy.example/other' })).rejects.toThrow(
+      'only call the integration proxy',
+    );
+    await expect(call({ method: 'TRACE' })).rejects.toThrow(
+      'Invalid proxy method',
+    );
+    await expect(call({ headers: { Cookie: 'a=b' } })).rejects.toThrow(
+      'not allowed',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a response over the size limit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('x'.repeat(10 * 1024 * 1024 + 1))),
+    );
+
+    await expect(call({})).rejects.toThrow('exceeds 10 MB');
   });
 });
 
