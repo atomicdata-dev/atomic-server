@@ -931,7 +931,9 @@ describe('WSClient drive subscription', () => {
       localStorage.setItem('ws-disconnected', '1');
       const { client, store } = await connectedClient();
       const subject = 'https://vocabulary.example/class/bird';
-      store.setDriveServer(subject, 'https://vocabulary.example', false);
+      store.setDriveServer(subject, 'https://vocabulary.example', {
+        connect: false,
+      });
       store.reportServerConnection('https://vocabulary.example', true);
       const open = vi
         .spyOn(store, 'openWebSocket')
@@ -953,6 +955,40 @@ describe('WSClient drive subscription', () => {
       client.close();
     },
   );
+
+  it('keeps HTTP vocabulary reads on HTTP after learning their drive', async () => {
+    const { client, store } = await connectedClient();
+    const drive = 'https://vocabulary.example/drive';
+    const subject = `${drive}/class/bird`;
+    const requests: string[] = [];
+    store.injectFetch(async input => {
+      requests.push(String(input));
+
+      return new Response(
+        JSON.stringify({
+          '@id': drive,
+          'https://atomicdata.dev/properties/isA': [
+            'https://atomicdata.dev/classes/Drive',
+          ],
+          'https://atomicdata.dev/properties/name': 'Vocabulary',
+        }),
+        { headers: { 'content-type': 'application/ad+json' } },
+      );
+    });
+    const open = vi.spyOn(store, 'openWebSocket').mockImplementation(() => {});
+    localStorage.removeItem('ws-disconnected');
+
+    try {
+      await store.fetchResourceFromServer(drive);
+      store.rememberResourceDrive(subject, drive);
+      await store.fetchResourceFromServer(subject);
+      assert(requests).toEqual([drive, subject]);
+      assert(open).not.toHaveBeenCalled();
+    } finally {
+      localStorage.setItem('ws-disconnected', '1');
+      client.close();
+    }
+  });
 
   it('reconciles drives selected after authentication without reopening the socket', async ({
     expect,

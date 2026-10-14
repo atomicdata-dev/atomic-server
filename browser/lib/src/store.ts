@@ -5524,7 +5524,16 @@ export class Store {
         ? subject
         : new URL(subject, route.server).toString();
 
-    const ws = this.getWebSocketForSubject(fetchSubject);
+    // Serving JSON-AD over HTTP does not prove this origin speaks our socket
+    // protocol. Reuse a socket opened by a selected drive or live holder, but
+    // do not start one just because a vocabulary response declared a drive.
+    const ws =
+      !opts.fromProxy && !opts.noWebSocket
+        ? this.getWebSocketForSubject(
+            fetchSubject,
+            !this.foreignHttpOrigin(fetchSubject),
+          )
+        : undefined;
 
     if (
       !opts.fromProxy &&
@@ -5713,11 +5722,15 @@ export class Store {
   private warnedSchemeMismatch = new Set<string>();
 
   /** Opens a Websocket for some subject URL, or returns the existing one. */
-  public getWebSocketForSubject(subject: string): WSClient | undefined {
+  public getWebSocketForSubject(
+    subject: string,
+    connect = true,
+  ): WSClient | undefined {
     try {
       const origin = this.getServerUrlForSubject(subject);
 
       if (
+        connect &&
         !this.webSockets.has(origin) &&
         this.driveServers.has(this.driveOf(subject)) &&
         !this.isLocalOnlySubject(subject) &&
