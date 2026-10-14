@@ -989,27 +989,27 @@ msgstr "Resources"
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Tags"
 msgstr "Tags"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Add LLM instructions"
 msgstr "Add LLM instructions"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "LLM Instructions"
 msgstr "LLM Instructions"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Default Ontology"
 msgstr "Default Ontology"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Plugins"
 msgstr "Plugins"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Remove tag"
 msgstr "Remove tag"
 
@@ -2061,6 +2061,7 @@ msgstr "Shortname"
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewFormDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewOntologyDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Create"
 msgstr "Create"
 
@@ -2197,6 +2198,7 @@ msgstr "<0/> Note"
 #: src/components/NewInstanceButton/QuickCreateRow.tsx
 #: src/routes/IntegrationStore.tsx
 #: src/routes/SettingsAgent.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "New"
 msgstr "New"
 
@@ -3550,6 +3552,8 @@ msgid "Previous month"
 msgstr "Previous month"
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Today"
 msgstr "Today"
 
@@ -3829,7 +3833,7 @@ msgstr "Tap <0>Undo</0> / <1>Redo</1> to step through edits; drag the undo butto
 msgid "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
 msgstr "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
 msgstr "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
 
@@ -7691,6 +7695,8 @@ msgid "Integration sections"
 msgstr "Integration sections"
 
 #: src/chunks/PluginRuns/PluginPage.tsx
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Activity"
 msgstr "Activity"
 
@@ -9502,6 +9508,7 @@ msgid "Searching in {0}"
 msgstr "Searching in {0}"
 
 #: src/components/OverlayContainer.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr "Recently opened"
 
@@ -12953,3 +12960,56 @@ msgstr "Could not move to Trash: {0}"
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
 msgstr "Delete this resource permanently. This cannot be undone."
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Currently on this drive"
+msgstr "Currently on this drive"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Activity will show up here"
+msgstr "Activity will show up here"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show less"
+msgstr "Show less"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show all"
+msgstr "Show all"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "created"
+msgstr "created"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "deleted"
+msgstr "deleted"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "edited"
+msgstr "edited"
+
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
+msgid "This week"
+msgstr "This week"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Earlier"
+msgstr "Earlier"
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Drive settings"
+msgstr "Drive settings"
+
+#: src/views/Drive/DrivePage.tsx
+msgid "<0/> Drive settings"
+msgstr "<0/> Drive settings"
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet. Create something with New, or drop files on this page."
+msgstr "Nothing here yet. Create something with New, or drop files on this page."
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet."
+msgstr "Nothing here yet."
