@@ -8702,7 +8702,7 @@ msgstr ""
 msgid "Workspace sync off"
 msgstr ""
 
-#: src/chunks/RTE/FormattingToolbar.tsx
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Show formatting toolbar"
 msgstr ""
 
@@ -8724,10 +8724,6 @@ msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
 msgid "Mention a resource (@)"
-msgstr ""
-
-#: src/chunks/RTE/FormattingToolbar.tsx
-msgid "Hide toolbar (type / or @ instead)"
 msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
@@ -12939,4 +12935,8 @@ msgstr ""
 
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
+msgstr ""
+
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
+msgid "Hide formatting toolbar"
 msgstr ""

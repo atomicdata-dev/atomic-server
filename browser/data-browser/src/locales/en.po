@@ -8708,7 +8708,7 @@ msgstr "Off stops server sync for this workspace on this browser. The server’s
 msgid "Workspace sync off"
 msgstr "Workspace sync off"
 
-#: src/chunks/RTE/FormattingToolbar.tsx
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Show formatting toolbar"
 msgstr "Show formatting toolbar"
 
@@ -8731,10 +8731,6 @@ msgstr "Insert image"
 #: src/chunks/RTE/FormattingToolbar.tsx
 msgid "Mention a resource (@)"
 msgstr "Mention a resource (@)"
-
-#: src/chunks/RTE/FormattingToolbar.tsx
-msgid "Hide toolbar (type / or @ instead)"
-msgstr "Hide toolbar (type / or @ instead)"
 
 #: src/chunks/RTE/FormattingToolbar.tsx
 msgid "Formatting"
@@ -12953,3 +12949,7 @@ msgstr "Could not move to Trash: {0}"
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
 msgstr "Delete this resource permanently. This cannot be undone."
+
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
+msgid "Hide formatting toolbar"
+msgstr "Hide formatting toolbar"
