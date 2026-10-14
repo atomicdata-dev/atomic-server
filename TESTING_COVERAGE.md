@@ -2968,6 +2968,85 @@ and complete production incident coverage remain unproven. Validation counts and
   recovery and retained readable data for missing/corrupt objects on desktop
   and narrow viewports. Recovery tests block peers to isolate durability only.
 
+- `client-browser-auth.test.ts` keeps each request bound to its current agent
+  and exact URL even when another origin/account has a fresh ambient cookie.
+  Anonymous reads and conversation capability probes omit ambient cookies.
+- `snapshot-replay.test.ts` replays locally generated public-profile snapshots
+  and their next live update. Reading creation metadata used to poison Loro's
+  snapshot block cache; the test now proves subsequent sync and retained local
+  edits without replacing the live document. The captured failure also occurs
+  with Loro 1.16.4; this fix does not depend on an unverified dependency upgrade.
+- `commit_monitor::event_recovery_tests` overflows a real bounded event queue,
+  requires a reconciliation signal and verifies later deletions still arrive.
+  The monitor closes affected subscribed sockets so normal authenticated
+  reconnect reconciles the missed interval. Previously one overflow silently
+  stopped the listener for the lifetime of the process.
+  `websockets.test.ts` verifies that a service-restart close reauthenticates,
+  restores drive subscriptions, retries an in-flight commit over HTTP and sends
+  a fresh reconciliation probe, including an interrupted closing handshake.
+  Unexpected disconnects retain their warnings. The server actor test checks
+  the actual CLOSE 1012 bytes, keeps the response stream open for the peer's
+  acknowledgement and rejects late application frames during that handshake.
+- `websockets.test.ts` verifies that a retained public profile catches up a
+  rename missed while disconnected, preserving the live Resource. Replaying SUB
+  alone is insufficient because profiles are outside drive reconciliation.
+  `username-live.spec.ts` checks the same recovery in an existing chat after a
+  deliberate disconnect, without reloading. Ordinary cached listeners cannot
+  open foreign WebSockets when mounted, disposed or replayed on reconnect.
+  HTTP vocabulary reads remain HTTP even after their response names a drive;
+  naming a drive does not establish support for the socket protocol.
+- `db::test::external_changes_are_not_evicted_by_commit_or_query_traffic`
+  floods the database event stream with signed commits and query membership
+  changes. The replica-change listener must retain its update and cascade
+  deletion; genuinely overflowing that listener still requests reconciliation.
+  A real commit/direct-write test verifies both publishing paths.
+- `store.test.ts` keeps an authored resource ready through signing and an
+  in-flight genesis POST. Speculative reads and drive subscriptions wait for
+  creation acknowledgement instead of asking the server for an unsaved subject.
+- `save-receipt.test.ts` disconnects between the initial connection check and
+  outbox drain. Offline-capable saves require durable local storage; required
+  online writes still reject. A concurrent account change cancels the save
+  without copying the old resource into the new account's database.
+- `local-outbox-database.test.ts` cancels a write during tab storage handoff.
+  Cancellation retains the queued row without reporting disk failure or claiming
+  durability; a later flush must actually persist it.
+- `genesis-roundtrip.integration.test.ts` confirms reference-review writes by
+  fresh authenticated HTTP reads after saves over HTTP and a real WebSocket.
+  This guards remote confirmation rather than treating the local cache as proof.
+- `FilePage.test.tsx` holds a recovered file's local blob lookup pending on
+  wide and narrow layouts. Download stays disabled until the bytes have a URL,
+  then opens the recovered blob. The paired H1 journey verifies the actual
+  downloaded bytes after the source browser closes; an early click previously
+  did nothing while the button appeared ready.
+- `NetworkIndicator.test.tsx` covers brief reconnects, sustained outages and
+  unmount cancellation. A short retry no longer flashes an offline toast over
+  editing controls; a sustained outage still produces the hint.
+- `clientdb-edit-persistence.spec.ts` uses the selected drive as its parent and
+  requires server receipts for both genesis and edit, then checks OPFS and a
+  successful server read. It cannot pass by inspecting cached values on an
+  errored fetch of an unhosted resource.
+- `VersionTitle.test.tsx` verifies verified, unverified and unclaimed history labels
+  against the selected change token. A local receipt can prove an older version
+  even when the server retains only the latest envelope; the restore E2E no
+  longer assumes all older versions must be unattributed.
+- `ComboBox.test.tsx` moves an open menu's anchor by scrolling a nested container
+  without resizing the control, then changes viewport geometry. The menu must
+  update its opening direction in both cases.
+- `sync-delta-local-base.test.ts` delivers independent computed query snapshots
+  through both binary WebSocket GET and query-update ingress, with the older
+  empty answer given a larger logical clock. The new membership and count must
+  replace it. Earlier coverage exercised HTTP only and missed this transport
+  difference; an actual chat reload then hid a log still intact on the server.
+  The same larger-clock regression covers `/search` and `/vector_search`
+  responses. These computed results replace prior answers; ordinary resource
+  snapshots still preserve causal history and pending local edits.
+  A fresh module instance also tests ingress before Loro starts. The shared
+  unit setup enables Loro and had hidden this cold-client boundary: a decoder
+  readiness check incorrectly rejected snapshots and stalled template clients.
+- `websockets.test.ts` sends invalid binary query snapshots to single and batch
+  GET callers. Each rejects instead of waiting forever after its timeout was
+  cleared, or presenting an older cached resource as a successful response.
+
 Remaining limits: notification delivery while every app stays closed still
 requires a push/background service. This change catches up when an app returns;
 OS notification activation in a packaged native app is not covered. Large-Vault
