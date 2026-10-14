@@ -54,7 +54,7 @@ function TrashZone({ subject }: { subject: string }) {
       testId='sidebar-zone-trash'
       danger
     >
-      Delete
+      Trash
     </DropZone>
   );
 }

@@ -28,6 +28,14 @@ export function getRecentResources(drive: string): string[] {
   return Array.isArray(list) ? list : [];
 }
 
+function write(all: RecentResources): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // Storage full or blocked: recents are a convenience, not state.
+  }
+}
+
 export function addRecentResource(drive: string, subject: string): void {
   // The drive itself is always one click away in the sidebar.
   if (subject === drive) return;
@@ -42,9 +50,16 @@ export function addRecentResource(drive: string, subject: string): void {
     MAX_PER_DRIVE,
   );
 
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // Storage full or blocked: recents are a convenience, not state.
-  }
+  write(all);
+}
+
+/** Forgets `subject`, e.g. because it was deleted, trashed or went missing. */
+export function removeRecentResource(drive: string, subject: string): void {
+  const all = read();
+  const current = Array.isArray(all[drive]) ? all[drive] : [];
+
+  if (!current.includes(subject)) return;
+
+  all[drive] = current.filter(s => s !== subject);
+  write(all);
 }

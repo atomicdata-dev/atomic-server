@@ -23,14 +23,17 @@ describe('Spinner', () => {
     expect(queryByRole('status')).toBeNull();
   });
 
-  it('draws the logo sweep around the orb, with no separate dot', () => {
+  it('draws the fading trail with a dot at its head', () => {
     const { container } = renderSpinner({});
-    const path = container.querySelector('svg path');
+    const paths = container.querySelectorAll('svg path');
+    const circles = container.querySelectorAll('svg circle');
 
-    expect(path?.getAttribute('d')).toBe('M74 50 A 24 24 0 1 1 50 26');
-    expect(path?.getAttribute('stroke-linecap')).toBe('round');
-    expect(path?.getAttribute('stroke')).toBe('currentColor');
-    expect(container.querySelectorAll('svg circle')).toHaveLength(0);
+    expect(paths.length).toBeGreaterThan(10);
+    expect(paths[0].getAttribute('stroke-linecap')).toBe('round');
+    expect(paths[0].getAttribute('stroke')).toBe('currentColor');
+    expect(Number(paths[0].getAttribute('stroke-opacity'))).toBeLessThan(0.1);
+    expect(circles).toHaveLength(1);
+    expect(circles[0].getAttribute('cy')).toBe('26');
   });
 
   it('centered fills its parent: stretches in a flex column, never collapses', () => {

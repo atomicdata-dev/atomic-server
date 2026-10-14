@@ -1912,10 +1912,6 @@ msgstr "Importar Datos Atómicos a este recurso"
 msgid "Confirm Delete"
 msgstr "Confirmar eliminación"
 
-#: src/actions/resourceActions.tsx
-msgid "Delete this resource."
-msgstr "Eliminar este recurso."
-
 #. 0: ctx.resource.title
 #: src/components/ResourceContextMenu/index.tsx
 msgid "Open {0} menu"
@@ -9354,20 +9350,20 @@ msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
-#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
-#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
-#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
-#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
+msgstr ""
+
+#: src/components/Notifications/MessageNotifier.tsx
+msgid "Someone"
 msgstr ""
 
 #: src/components/Notifications/NotificationList.tsx
@@ -10526,9 +10522,7 @@ msgid "{0}: {1} comments on {2}"
 msgstr ""
 
 #. 0: who; 1: on
-#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
-#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr ""
 
@@ -12707,13 +12701,16 @@ msgid "Move this resource out of the Trash, back to where it was."
 msgstr ""
 
 #: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
 msgid "Delete permanently"
 msgstr ""
 
 #: src/components/SideBar/AccountMenu.tsx
+#: src/components/SideBar/SidebarDropZones.tsx
 msgid "Trash"
 msgstr ""
 
+#: src/actions/resourceActions.tsx
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Moved to Trash"
 msgstr ""
@@ -12738,10 +12735,6 @@ msgstr ""
 #. 0: dragResource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "{0} was dropped on your favorites"
-msgstr ""
-
-#: src/components/SideBar/SidebarDropZones.tsx
-msgid "Delete"
 msgstr ""
 
 #. 0: message.slice(0, 160)
@@ -12915,17 +12908,35 @@ msgstr ""
 msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
 msgstr ""
 
-#: src/views/NotificationPage.tsx
-msgid "Open conversation"
+#: src/views/DriveUnavailable.tsx
+msgid "This item hasn't reached this device yet"
 msgstr ""
 
-#: src/views/NotificationPage.tsx
-msgid "All notifications"
+#: src/views/DriveUnavailable.tsx
+msgid "Your private drive is kept on your devices. It will appear here once the server or your other device answers."
 msgstr ""
 
-#: src/components/Notifications/MessageNotifier.tsx
-#: src/components/Notifications/NotificationList.tsx
-#: src/components/Notifications/NotificationList.tsx
-#: src/views/NotificationPage.tsx
-msgid "Someone"
+#: src/views/DriveUnavailable.tsx
+msgid "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."
+msgstr ""
+
+#: src/views/DriveUnavailable.tsx
+msgid "Not connected to the server yet."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move to Trash"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move this resource to the Trash. You can restore it later."
+msgstr ""
+
+#. 0: error instanceof Error ? error.message \\: 'unknown error'
+#: src/actions/resourceActions.tsx
+msgid "Could not move to Trash: {0}"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Delete this resource permanently. This cannot be undone."
 msgstr ""

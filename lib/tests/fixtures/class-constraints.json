@@ -815,5 +815,1607 @@
     "value": -6,
     "valid": false,
     "rule": "minimum"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 0
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 24,
+      "name": "abcdefgh",
+      "mode": "b",
+      "label": null
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": -24,
+      "label": "abc"
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 25
+    },
+    "valid": false,
+    "rule": "maximum",
+    "path": "/tune"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": -24.5
+    },
+    "valid": false,
+    "rule": "minimum",
+    "path": "/tune"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": "high"
+    },
+    "valid": false,
+    "rule": "type",
+    "path": "/tune"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {},
+    "valid": false,
+    "rule": "required",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 1,
+      "extra": 1
+    },
+    "valid": false,
+    "rule": "additionalProperties",
+    "path": "/extra"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 1,
+      "name": "abcdefghi"
+    },
+    "valid": false,
+    "rule": "maxLength",
+    "path": "/name"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 1,
+      "mode": "c"
+    },
+    "valid": false,
+    "rule": "enum",
+    "path": "/mode"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 1,
+      "label": "abcd"
+    },
+    "valid": false,
+    "rule": "maxLength",
+    "path": "/label"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "tune": 1,
+      "label": 5
+    },
+    "valid": false,
+    "rule": "type",
+    "path": "/label"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": [
+      1
+    ],
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "required": [
+        "tune"
+      ],
+      "properties": {
+        "tune": {
+          "type": "number",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "mode": {
+          "enum": [
+            "a",
+            "b"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": null,
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [],
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      {
+        "mix": 0
+      },
+      {
+        "mix": 1,
+        "kind": "reverb"
+      },
+      {
+        "mix": 0.5,
+        "extra": true
+      }
+    ],
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      {
+        "mix": 0.2
+      },
+      {
+        "mix": 1.5
+      }
+    ],
+    "valid": false,
+    "rule": "maximum",
+    "path": "/1/mix"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      {
+        "mix": 0.2
+      },
+      {}
+    ],
+    "valid": false,
+    "rule": "required",
+    "path": "/1"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      {
+        "mix": 0.2,
+        "kind": "delay"
+      }
+    ],
+    "valid": false,
+    "rule": "const",
+    "path": "/0/kind"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      "x"
+    ],
+    "valid": false,
+    "rule": "type",
+    "path": "/0"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": [
+      {
+        "mix": 0
+      },
+      {
+        "mix": 0
+      },
+      {
+        "mix": 0
+      },
+      {
+        "mix": 0
+      }
+    ],
+    "valid": false,
+    "rule": "maxItems",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mix"
+        ],
+        "properties": {
+          "mix": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "kind": {
+            "const": "reverb"
+          }
+        }
+      }
+    },
+    "value": {
+      "mix": 0
+    },
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "properties": {
+        "a": {
+          "properties": {
+            "b/c": {
+              "items": {
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "value": {
+      "a": {
+        "b/c": [
+          1,
+          2,
+          -1
+        ]
+      }
+    },
+    "valid": false,
+    "rule": "minimum",
+    "path": "/a/b~1c/2"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "properties": {
+        "a~b": {
+          "maximum": 1
+        }
+      }
+    },
+    "value": {
+      "a~b": 2
+    },
+    "valid": false,
+    "rule": "maximum",
+    "path": "/a~0b"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": 3,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": "xyz",
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": -1,
+    "valid": false,
+    "rule": "anyOf",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": "abc",
+    "valid": false,
+    "rule": "anyOf",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": 1.5,
+    "valid": false,
+    "rule": "anyOf",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^x"
+        }
+      ]
+    },
+    "value": null,
+    "valid": false,
+    "rule": "anyOf",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "pattern": "^x"
+            }
+          ]
+        }
+      }
+    },
+    "value": {
+      "v": "nope"
+    },
+    "valid": false,
+    "rule": "anyOf",
+    "path": "/v"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "maximum": 10
+      }
+    },
+    "value": {},
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "maximum": 10
+      }
+    },
+    "value": {
+      "a": 1,
+      "b": 10
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "maximum": 10
+      }
+    },
+    "value": {
+      "a": 11
+    },
+    "valid": false,
+    "rule": "maximum",
+    "path": "/a"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "maximum": 10
+      }
+    },
+    "value": {
+      "a": "1"
+    },
+    "valid": false,
+    "rule": "type",
+    "path": "/a"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "properties": {
+        "k": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true
+    },
+    "value": {
+      "k": 1,
+      "z": "free"
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "properties": {
+        "k": {
+          "type": "integer"
+        }
+      }
+    },
+    "value": {
+      "k": 1.5
+    },
+    "valid": false,
+    "rule": "type",
+    "path": "/k"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "object",
+      "properties": {
+        "k": {
+          "type": "integer"
+        }
+      }
+    },
+    "value": {
+      "k": 2.0
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "value": null,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "value": 5,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "value": 0,
+    "valid": false,
+    "rule": "minimum",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "value": "5",
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": {
+        "enum": [
+          [
+            1
+          ],
+          [
+            2
+          ]
+        ]
+      }
+    },
+    "value": [
+      [
+        1
+      ],
+      [
+        2
+      ]
+    ],
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": {
+        "enum": [
+          [
+            1
+          ],
+          [
+            2
+          ]
+        ]
+      }
+    },
+    "value": [
+      [
+        1
+      ],
+      [
+        3
+      ]
+    ],
+    "valid": false,
+    "rule": "enum",
+    "path": "/1"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "const": {
+        "a": [
+          1,
+          2
+        ]
+      }
+    },
+    "value": {
+      "a": [
+        1,
+        2.0
+      ]
+    },
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "const": {
+        "a": [
+          1,
+          2
+        ]
+      }
+    },
+    "value": {
+      "a": [
+        2,
+        1
+      ]
+    },
+    "valid": false,
+    "rule": "const",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "const": "x"
+    },
+    "value": "x",
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "const": null
+    },
+    "value": null,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "const": null
+    },
+    "value": 0,
+    "valid": false,
+    "rule": "const",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "boolean"
+    },
+    "value": true,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "boolean"
+    },
+    "value": 1,
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "string",
+        "number"
+      ]
+    },
+    "value": 3,
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "string",
+        "number"
+      ]
+    },
+    "value": [],
+    "valid": false,
+    "rule": "type",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "value": [
+      [
+        1,
+        2
+      ],
+      [
+        3,
+        -4
+      ]
+    ],
+    "valid": false,
+    "rule": "minimum",
+    "path": "/1/1"
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "enum": [
+        "a",
+        "b"
+      ]
+    },
+    "value": [
+      "a",
+      "b"
+    ],
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "enum": [
+        "a",
+        "b"
+      ]
+    },
+    "value": [
+      "a",
+      "c"
+    ],
+    "valid": false,
+    "rule": "enum",
+    "path": ""
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": {
+        "items": {
+          "items": {
+            "items": {
+              "items": {
+                "items": {
+                  "items": {
+                    "items": {
+                      "items": {
+                        "items": {
+                          "items": {
+                            "items": {
+                              "items": {
+                                "items": {
+                                  "items": {
+                                    "items": {}
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "value": [],
+    "valid": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": {
+        "items": {
+          "items": {
+            "items": {
+              "items": {
+                "items": {
+                  "items": {
+                    "items": {
+                      "items": {
+                        "items": {
+                          "items": {
+                            "items": {
+                              "items": {
+                                "items": {
+                                  "items": {
+                                    "items": {
+                                      "items": {}
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "value": [],
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": "text"
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": []
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "type": [
+        "string",
+        1
+      ]
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "properties": []
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "properties": {
+        "a": 1
+      }
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "required": "a"
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "required": [
+        1
+      ]
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "additionalProperties": "no"
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "additionalProperties": {
+        "minimun": 1
+      }
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": []
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "items": {
+        "class": "x"
+      }
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": []
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": {}
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "anyOf": [
+        {
+          "minLength": -1
+        }
+      ]
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
+  },
+  {
+    "note": "nested",
+    "constraint": {
+      "properties": {
+        "a": {
+          "pattern": "("
+        }
+      }
+    },
+    "value": null,
+    "valid": true,
+    "rejected": true
   }
 ]

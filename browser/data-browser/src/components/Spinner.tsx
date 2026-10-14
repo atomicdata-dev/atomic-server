@@ -1,4 +1,11 @@
+import { useEffect } from 'react';
 import { styled } from 'styled-components';
+import { holdBootSplash } from '../helpers/bootSplash';
+import {
+  TRAIL_HEAD,
+  TRAIL_STROKE_WIDTH,
+  trailBands,
+} from '../helpers/orbitTrail';
 
 interface SpinnerProps {
   size?: string;
@@ -18,6 +25,10 @@ export const Spinner = ({
   inheritColor = false,
   centered = false,
 }: SpinnerProps) => {
+  // A pane-level spinner that takes over from the boot splash would be a
+  // second loader at another size and position; the splash waits for it.
+  useEffect(() => (centered ? holdBootSplash() : undefined), [centered]);
+
   const mark = (
     <Mark
       $size={size ?? (centered ? '4rem' : undefined)}
@@ -26,14 +37,19 @@ export const Spinner = ({
     >
       <System>
         <Sweep viewBox='0 0 100 100' fill='none'>
-          {/* The logo's sweep (brand/src/place-mark.svg): 270 degrees,
-              centred on the orb. */}
-          <path
-            d='M74 50 A 24 24 0 1 1 50 26'
-            stroke='currentColor'
-            strokeWidth='14'
-            strokeLinecap='round'
-          />
+          {/* The fading trail from atomic.place's hero, headed by a dot
+              (see helpers/orbitTrail.ts). */}
+          {trailBands().map(band => (
+            <path
+              key={band.d}
+              d={band.d}
+              stroke='currentColor'
+              strokeWidth={TRAIL_STROKE_WIDTH}
+              strokeLinecap={band.cap}
+              strokeOpacity={band.opacity}
+            />
+          ))}
+          <circle {...TRAIL_HEAD} fill='currentColor' />
         </Sweep>
       </System>
       <Orb />

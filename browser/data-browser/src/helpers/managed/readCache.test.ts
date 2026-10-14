@@ -55,6 +55,28 @@ describe('managed metadata reads', () => {
     expect(fetch).toHaveBeenCalledTimes(7);
   });
 
+  it('shares explicit refreshes asked for at the same moment, and nothing else', async () => {
+    const fetch = vi.fn(async () => Response.json([]));
+    vi.stubGlobal('fetch', fetch);
+    const cache = new ManagedReadCache();
+    const refresh = { ...init, cache: 'no-store' } as const;
+    const url2 = 'https://account.example/api/sync-enrollments';
+    const [a, b] = await Promise.all([
+      cache.fetch(url2, refresh),
+      cache.fetch(url2, refresh),
+    ]);
+    expect(await a.json()).toEqual([]);
+    expect(await b.json()).toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    // Once settled, the next refresh asks again.
+    await cache.fetch(url2, refresh);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    // A refresh is not served from, and does not feed, the shared 5 s read.
+    await cache.fetch(url2, init);
+    await cache.fetch(url2, init);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
   it('does not reuse pending reads across logout or a completed mutation', async () => {
     let resolve!: (value: Response) => void;
     const fetch = vi

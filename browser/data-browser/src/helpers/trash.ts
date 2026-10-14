@@ -1,24 +1,67 @@
 import { core, dataBrowser, type Resource, type Store } from '@tomic/react';
 import { isContentAddressed } from './propertyIdentity';
+import { removeRecentResource } from './recentResources';
 import { getOrCreateTrashFolder } from './standardLocations';
 
 /** The drive's Trash folder, if one was ever created. */
 export const readTrashFolder = (drive: Resource): string | undefined =>
   drive.get(dataBrowser.properties.trashFolder) as string | undefined;
 
-/** Whether `resource` sits directly in the drive's Trash folder. */
+/**
+ * The drive's Trash folder as far as the store already knows. Menus ask this
+ * at every render, so it must not start a fetch: a drive that is not loaded
+ * (right after a sign-out, or in an app with no node behind it) has no known
+ * Trash folder, and nothing is lost by saying so.
+ */
+export const peekTrashFolder = (
+  store: Store,
+  drive: string | undefined,
+): string | undefined => {
+  const loaded = drive
+    ? (store.resources.get(drive) ??
+      store.resources.get(store.normalizeSubject(drive)))
+    : undefined;
+
+  return loaded ? readTrashFolder(loaded) : undefined;
+};
+
+/**
+ * Whether `resource` sits directly in the drive's Trash folder. With `deep`,
+ * also when any ancestor does (a file inside a trashed folder). The deep walk
+ * only reads ancestors that are already loaded (`getResourceLoading`), so an
+ * unloaded ancestor ends it with `false`. A visited set ends parent cycles.
+ */
 export const isInTrash = (
   store: Store,
   drive: string | undefined,
   resource: Resource,
+  deep = false,
 ): boolean => {
-  if (!drive) {
+  const trash = peekTrashFolder(store, drive);
+
+  if (!trash) {
     return false;
   }
 
-  const trash = readTrashFolder(store.getResourceLoading(drive));
+  const visited = new Set<string>([resource.subject]);
+  let parent = resource.get(core.properties.parent) as string | undefined;
 
-  return !!trash && resource.get(core.properties.parent) === trash;
+  while (parent && !visited.has(parent)) {
+    if (parent === trash) {
+      return true;
+    }
+
+    if (!deep) {
+      return false;
+    }
+
+    visited.add(parent);
+    parent = store.getResourceLoading(parent).get(core.properties.parent) as
+      | string
+      | undefined;
+  }
+
+  return false;
 };
 
 /**
@@ -51,6 +94,7 @@ export async function moveToTrash(
 
   await resource.set(core.properties.parent, trash);
   await resource.save();
+  removeRecentResource(drive, subject);
 
   return true;
 }

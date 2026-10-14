@@ -8,11 +8,17 @@ import {
   screen,
 } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
+import {
+  AtomicError,
+  ErrorType,
+  NOT_AVAILABLE_LOCALLY_MESSAGE,
+  NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
+} from '@tomic/react';
 import { buildTheme } from '../styling';
 import { DriveUnavailable, RETRY_EVERY_MS } from './DriveUnavailable';
 
 const store = vi.hoisted(() => ({
-  isLocalOnlySubject: () => true,
+  isLocalOnlySubject: vi.fn(() => true),
   fetchResourceFromServer: vi.fn(),
 }));
 
@@ -33,12 +39,13 @@ afterEach(() => {
   store.fetchResourceFromServer.mockReset();
 });
 
-function show() {
+function show(props: { error?: Error; vault?: boolean } = {}) {
   render(
     <ThemeProvider theme={buildTheme(false, '#1b50d8')}>
       <DriveUnavailable
         subject='atomic:local-only-drive'
-        error={new Error('not available locally')}
+        error={props.error ?? new Error('not available locally')}
+        vault={props.vault}
       />
     </ThemeProvider>,
   );
@@ -81,5 +88,53 @@ describe('DriveUnavailable', () => {
         .getByRole('button', { name: 'Retry now' })
         .hasAttribute('disabled'),
     ).toBe(false);
+  });
+});
+
+describe('DriveUnavailable wording', () => {
+  const noRequest = new AtomicError(
+    NOT_AVAILABLE_LOCALLY_MESSAGE,
+    ErrorType.Transport,
+  );
+  const failedRequest = new AtomicError(
+    NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
+    ErrorType.Transport,
+  );
+
+  afterEach(() => {
+    store.isLocalOnlySubject.mockImplementation(() => true);
+  });
+
+  it('only blames the server when a request to it failed', () => {
+    store.isLocalOnlySubject.mockImplementation(() => false);
+    show({ error: noRequest });
+    expect(screen.queryByText(/isn't reachable/)).toBeNull();
+    expect(screen.getByText('Not connected to the server yet.')).toBeTruthy();
+    cleanup();
+
+    show({ error: failedRequest });
+    expect(screen.getByText("The server isn't reachable.")).toBeTruthy();
+  });
+
+  it('never says a private drive is not on this device', () => {
+    store.isLocalOnlySubject.mockImplementation(() => false);
+    show({ error: failedRequest, vault: true });
+
+    expect(screen.queryByText(/isn't on this device/)).toBeNull();
+    expect(
+      screen.getByRole('heading', {
+        name: "This item hasn't reached this device yet",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBeTruthy();
+    expect(screen.getByText('Technical details')).toBeTruthy();
+    expect(screen.queryByText('Your other devices')).toBeNull();
+  });
+
+  it('keeps the vault copy for a local-only private drive', () => {
+    show({ error: noRequest, vault: true });
+
+    expect(screen.queryByText(/isn't on this device/)).toBeNull();
+    expect(screen.queryByText(/No device with this drive/)).toBeNull();
   });
 });

@@ -28,6 +28,15 @@ export const PAGE_EXIT_MS = 150;
 /** Grace added on top of the exit's duration before it is force-completed. */
 export const PAGE_PHASE_GRACE_MS = 250;
 
+/** How long a phase waits for the browser to paint a first frame before its
+ * clock starts regardless. The clocks run from the first painted frame, not
+ * from the state change: a starved renderer (a busy host, a phone) can take
+ * hundreds of milliseconds to show the class change, and a clock started
+ * earlier would end the phase before the visitor ever saw it, taking the
+ * arriving page's fade-in with it. A tab that never paints (hidden) falls
+ * back to this wait, so a page change still lands. */
+export const PAGE_FRAME_WAIT_MS = 1500;
+
 /** The animation-name prefix the *page-level* phases share; `animationend`
  * from anything else (a nested widget, or the staggered children themselves)
  * is ignored. */
