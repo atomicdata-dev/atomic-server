@@ -207,8 +207,11 @@ async function startForIdentity(
     // unwraps the key — comes back through here and starts it properly.
     // Until then no database is coming, so reads must not wait out the attach
     // grace for it; that start re-announces itself with `expectClientDb`.
+    // Deferred, not unavailable: the database is still expected after the
+    // sign-in, so sync and server deliveries must not conclude that memory is
+    // all there is (`Store.clientDbDeferred`).
     if (!resolved) {
-      store.clientDbUnavailable();
+      store.clientDbDeferred();
 
       return;
     }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Store } from '@tomic/lib';
 
 const state = vi.hoisted(() => ({
+  keyless: false,
   seeded: [] as string[][],
   workers: [] as {
     ready: PromiseWithResolvers<void>;
@@ -46,8 +47,10 @@ vi.mock('./wasmUrls', () => ({
 }));
 vi.mock('./localDbKey', () => ({
   agentDbFingerprint: async () => 'agent',
-  getSessionDbKey: async () => new Uint8Array(32),
-  hasWrappedDbKey: async () => false,
+  getSessionDbKey: async () =>
+    state.keyless ? undefined : new Uint8Array(32),
+  hasWrappedDbKey: async () => state.keyless,
+  waitForSessionDbKey: async () => undefined,
   getOrCreateSessionDbKey: async () => new Uint8Array(32),
 }));
 beforeEach(() => {
@@ -64,6 +67,7 @@ it('an anonymous worker finishing initialization cannot reattach after sign-in',
   const store = {
     expectClientDb() {},
     clientDbUnavailable() {},
+    clientDbDeferred() {},
     getAgent: () => agent,
     on: (_: string, callback: typeof listener) => {
       listener = callback;
@@ -108,6 +112,7 @@ it('dev-drive setup can defer the anonymous worker and initialize only its fresh
   const store = {
     expectClientDb: vi.fn(),
     clientDbUnavailable: vi.fn(),
+    clientDbDeferred: vi.fn(),
     getAgent: () => agent,
     on: (_: string, callback: typeof listener) => {
       listener = callback;
@@ -136,4 +141,39 @@ it('dev-drive setup can defer the anonymous worker and initialize only its fresh
   state.workers[0].barrier.resolve();
   await new Promise(resolve => setTimeout(resolve, 0));
   expect(state.seeded).toEqual([]);
+});
+
+it('a start with no usable key defers the database instead of declaring it unavailable', async () => {
+  vi.stubGlobal('Worker', class {});
+  state.keyless = true;
+  let agent: { subject: string } | undefined;
+  let listener: (next: { subject: string } | undefined) => void = () => {};
+  const store = {
+    expectClientDb: vi.fn(),
+    clientDbUnavailable: vi.fn(),
+    clientDbDeferred: vi.fn(),
+    getAgent: () => agent,
+    on: (_: string, callback: typeof listener) => {
+      listener = callback;
+
+      return () => {};
+    },
+    getServerUrl: () => 'http://localhost',
+    resources: new Map(),
+    setClientDb: vi.fn(),
+    notifyError: vi.fn(),
+  };
+  try {
+    const { initClientDb } = await import('./initClientDb');
+    initClientDb(store as unknown as Store, { deferAnonymous: true });
+    agent = { subject: 'did:ad:agent:wrapped' };
+    listener(agent);
+    await vi.waitFor(() => expect(store.clientDbDeferred).toHaveBeenCalled());
+    // A sign-in will still deliver the key, so sync and server deliveries
+    // must keep treating the database as expected.
+    expect(store.clientDbUnavailable).not.toHaveBeenCalled();
+    expect(state.workers).toHaveLength(0);
+  } finally {
+    state.keyless = false;
+  }
 });

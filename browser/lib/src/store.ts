@@ -772,6 +772,10 @@ export class Store {
   private clientDb?: ClientDbWorker;
   /** Whether one is on its way — see {@link expectClientDb}. */
   private clientDbExpected = false;
+  /** The announced database is not coming *yet* (see {@link clientDbDeferred}):
+   *  reads must not park for it, but it is still expected, so nothing may
+   *  treat the in-memory state as the whole story. */
+  private clientDbDeferredUntilExpected = false;
   /** Callbacks parked in {@link waitForClientDb} until the attach happens. */
   private clientDbWaiters = new Set<(attached: boolean) => void>();
   /** Reads whose attachment grace expired; retry against the eventual database. */
@@ -1028,6 +1032,7 @@ export class Store {
    */
   public expectClientDb(): void {
     this.clientDbExpected = true;
+    this.clientDbDeferredUntilExpected = false;
     // The outbox lives in that database: until it attaches, the queue may be
     // missing entries only the database holds.
     this.outbox.expectDatabase();
@@ -1086,7 +1091,9 @@ export class Store {
     timeoutMs: number = CLIENT_DB_ATTACH_GRACE,
   ): Promise<boolean> {
     if (this.clientDb) return Promise.resolve(true);
-    if (!this.clientDbExpected) return Promise.resolve(false);
+    if (!this.clientDbExpected || this.clientDbDeferredUntilExpected) {
+      return Promise.resolve(false);
+    }
 
     return new Promise<boolean>(resolve => {
       const done = (attached: boolean) => {
@@ -1113,6 +1120,21 @@ export class Store {
   public clientDbUnavailable(): void {
     this.clientDbExpected = false;
     this.localReadsAwaitingAttach.clear();
+
+    for (const waiter of [...this.clientDbWaiters]) waiter(false);
+  }
+
+  /**
+   * The announced database cannot start right now but a later sign-in will
+   * start it (`initClientDb` found no usable key). Stop parking reads for the
+   * attach, like {@link clientDbUnavailable}, but unlike it keep the database
+   * *expected*: drive sync still refuses to describe a memory-only state,
+   * server deliveries are still queued for the database
+   * (`pendingClientDbWrites`) and timed-out reads are still retried when it
+   * attaches. Cleared by the next {@link expectClientDb}.
+   */
+  public clientDbDeferred(): void {
+    this.clientDbDeferredUntilExpected = true;
 
     for (const waiter of [...this.clientDbWaiters]) waiter(false);
   }

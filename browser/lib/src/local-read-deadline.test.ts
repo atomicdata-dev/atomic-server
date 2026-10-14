@@ -247,3 +247,40 @@ it('waits for a local database again when one is re-announced after being given 
 
   expect((await loading).error).toBeDefined();
 });
+
+it('stops parking reads for a deferred database but keeps expecting it', async () => {
+  vi.useFakeTimers();
+  const store = new Store({
+    serverUrl: 'https://app.example.com',
+    connect: false,
+  });
+  store.setServerConnected(true);
+  store.expectClientDb();
+  store.clientDbDeferred();
+  store.injectFetch(
+    async () => new Response('Resource not found', { status: 404 }),
+  );
+
+  const loading = store.getResource('atomic:missing-while-deferred');
+  await vi.advanceTimersByTimeAsync(1000);
+
+  // Reads do not wait out the attach grace.
+  expect((await loading).error).toBeDefined();
+  expect(await store.waitForClientDb()).toBe(false);
+  // Drive sync still refuses to describe a memory-only state: unlike
+  // `clientDbUnavailable`, the database is still coming.
+  await expect(store.computeDriveSyncState('atomic:drive')).rejects.toThrow(
+    'Local database not attached yet',
+  );
+
+  // The sign-in that delivers the key re-announces it and reads wait again.
+  store.expectClientDb();
+  const pending = store.waitForClientDb(50);
+  await vi.advanceTimersByTimeAsync(10);
+  store.setClientDb({
+    isReady: true,
+    isInitialized: true,
+    waitForInit: async () => false,
+  } as unknown as ClientDbWorker);
+  expect(await pending).toBe(true);
+});
