@@ -31,10 +31,10 @@ function setVault(over: Record<string, unknown> = {}) {
   };
 }
 
-function show(subject = 'atomic:drive1') {
+function show(subject = 'atomic:drive1', autoStart = true) {
   return render(
     <ThemeProvider theme={buildTheme(false, '#1b50d8')}>
-      <VaultRestoreAction subject={subject} />
+      <VaultRestoreAction subject={subject} autoStart={autoStart} />
     </ThemeProvider>,
   );
 }
@@ -55,8 +55,19 @@ describe('VaultRestoreAction', () => {
 
     rerender(
       <ThemeProvider theme={buildTheme(false, '#1b50d8')}>
-        <VaultRestoreAction subject='atomic:drive1' />
+        <VaultRestoreAction subject='atomic:drive1' autoStart />
       </ThemeProvider>,
+    );
+    expect(restore).toHaveBeenCalledTimes(1);
+  });
+
+  it('without autoStart waits for the manual button', () => {
+    setVault();
+    show('atomic:drive1', false);
+
+    expect(restore).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: /Restore from Cloud Vault/ }),
     );
     expect(restore).toHaveBeenCalledTimes(1);
   });

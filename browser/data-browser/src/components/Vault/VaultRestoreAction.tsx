@@ -17,17 +17,25 @@ import type { JSX } from 'react';
  * offer at sign-in, but not everyone arrives through sign-in — a bookmark, a
  * shared link, or a session that outlived its data all end up here instead.
  *
- * Restores by itself: see the effect below. Shows nothing unless the vault holds a backup of exactly this drive, so on a
+ * With `autoStart` it restores by itself (see the effect below); otherwise the
+ * button waits for a click. Shows nothing unless the vault holds a backup of exactly this drive, so on a
  * self-hosted server or for a subject that is not a backed-up drive the page
  * is unchanged.
  */
 export function VaultRestoreAction({
   subject,
   vault: given,
+  autoStart = false,
 }: {
   subject: string;
   /** The caller's own {@link useDriveVault}, when it needs the state too. */
   vault?: UseVaultBackup;
+  /**
+   * Restore as soon as this renders. Only for a caller that already knows the
+   * drive is unavailable (DriveUnavailable); the generic error page must not,
+   * or any error on a backed-up subject would trigger a restore.
+   */
+  autoStart?: boolean;
 }): JSX.Element | null {
   const store = useStore();
   // A caller that passed its own vault does not need a second one.
@@ -42,13 +50,13 @@ export function VaultRestoreAction({
   // Once per subject: after a failure the button below offers the retry, so a
   // persistent failure cannot become a loop.
   useEffect(() => {
-    if (!canRestore || !signedIn || busy || error) return;
+    if (!autoStart || !canRestore || !signedIn || busy || error) return;
 
     if (startedFor.current === subject) return;
 
     startedFor.current = subject;
     void restore();
-  }, [canRestore, signedIn, busy, error, restore, subject]);
+  }, [autoStart, canRestore, signedIn, busy, error, restore, subject]);
 
   if (!canRestore) return null;
 

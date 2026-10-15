@@ -84,7 +84,7 @@ export function DriveUnavailable({
         </h1>
         {/* With a backup, restoring is the way out and starts by itself. */}
         {hasBackup && (
-          <VaultRestoreAction subject={subject} vault={driveVault} />
+          <VaultRestoreAction subject={subject} vault={driveVault} autoStart />
         )}
         {!hasBackup && (
           <Lead>
