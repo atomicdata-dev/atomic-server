@@ -300,11 +300,18 @@ export function DropdownMenu({
     const visibleHeight =
       viewport?.scale === 1 ? viewport.height : window.innerHeight;
     const visibleBottom = visibleTop + visibleHeight;
+    // Horizontally the same: when the page is wider than the screen, a phone
+    // widens the layout viewport (`innerWidth`) but only shows the visual one.
+    const visibleLeft = viewport?.scale === 1 ? viewport.offsetLeft : 0;
+    const visibleWidth =
+      viewport?.scale === 1 ? viewport.width : window.innerWidth;
+    const visibleRight = visibleLeft + visibleWidth;
 
     // Keyboard animation resizes the visual viewport without necessarily
     // changing CSS viewport units. Keep the menu scrollable inside that area.
     if (!dialog) {
       menu.style.maxHeight = `${Math.max(0, Math.min(window.innerHeight * 0.8, visibleHeight - 16))}px`;
+      menu.style.maxWidth = `${Math.max(0, visibleWidth - 16)}px`;
     }
 
     // Layout size, not getBoundingClientRect: the open transition scales the
@@ -360,7 +367,7 @@ export function DropdownMenu({
 
     // On a narrow screen a menu that opens rightwards from a trigger near the
     // left edge would run off the right edge; keep it inside the viewport.
-    menu.style.left = `${Math.max(8, Math.min(preferredLeft, window.innerWidth - menuRect.width - 8))}px`;
+    menu.style.left = `${Math.max(visibleLeft + 8, Math.min(preferredLeft, visibleRight - menuRect.width - 8))}px`;
   }, [anchorPoint]);
 
   useEffect(() => {
