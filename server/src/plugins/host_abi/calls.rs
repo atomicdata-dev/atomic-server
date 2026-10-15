@@ -86,6 +86,15 @@ impl calls::Host for AbiState {
                 "host ABI: ignoring handles passed to calls.call"
             );
         }
+        // What a call causes is bounded by what the calling app declared, not
+        // only by who asked: an app calls only the interfaces its manifest
+        // lists in `uses`.
+        if !self.host.app.manifest.uses.contains(&interface) {
+            return Err(error(
+                code::FORBIDDEN,
+                format!("this app does not declare that it uses {interface} (manifest `uses`)"),
+            ));
+        }
         call_export(
             &self.host.registry,
             &self.host.db,
@@ -93,8 +102,9 @@ impl calls::Host for AbiState {
             &interface,
             &function,
             &args,
-            self.host.entry.clone(),
+            self.host.core.grant().caller().clone(),
             self.host.depth + 1,
+            self.host.budget.clone(),
         )
         .await
     }

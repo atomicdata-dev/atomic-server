@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { core } from '@tomic/react';
+import { core, signRequest } from '@tomic/react';
 import type { Store } from '@tomic/react';
 import {
   handleRequest,
@@ -16,7 +16,7 @@ vi.mock('@tomic/react', async () => {
   // which requests leave and which are refused before they do.
   return {
     ...actual,
-    signRequest: async () => ({}),
+    signRequest: vi.fn(async () => ({})),
     // Reading an importer's stored config is tested in @tomic/lib
     // (plugin-destination.test.ts); here only what `data` passes on.
     destinationTablesFor: async (
@@ -614,7 +614,27 @@ describe('call', () => {
       interface: 'atomic:example/counter@1',
       function: 'increment',
       args: { n: 1 },
+      allowEffects: ['read'],
     });
+  });
+
+  it('signs the method and the exact body (version 2), and only allows read exports', async () => {
+    answer(200, { result: {} });
+    await call();
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+
+    expect(signRequest).toHaveBeenCalledWith(
+      'https://node.test/host/call',
+      expect.anything(),
+      {},
+      { method: 'POST', body: init.body },
+    );
+    // The frame cannot widen it: its own `allowEffects` is never read.
+    answer(200, { result: {} });
+    await call({ allowEffects: ['write'] });
+    const [, second] = vi.mocked(fetch).mock.calls[1] as [string, RequestInit];
+
+    expect(JSON.parse(second.body as string).allowEffects).toEqual(['read']);
   });
 
   it('turns an error body into a HostError with its code', async () => {

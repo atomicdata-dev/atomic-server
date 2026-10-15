@@ -7,18 +7,31 @@
 //! agent's** (a read or write needs both to be allowed). Nobody gets more than
 //! they have by going through an app.
 //!
-//! Signed like every plugin route: the request is signed over its URL, and an
-//! unsigned request is refused, since the public agent has no business asking
-//! an app to do things.
+//! Signed like the other plugin routes with a body: a version 2 signature, which
+//! covers the method and the body hash, so a captured request cannot be replayed
+//! with other arguments. An unsigned request is refused, since the public agent
+//! has no business asking an app to do things.
+//!
+//! The agent must be able to read the drive, and to write it when the export's
+//! effect is `write` or `external`. A caller that vouches for what it forwards
+//! (the data browser, for a sandboxed frame) can narrow the effects with
+//! `allowEffects`; a frame has no network of its own and cannot set it.
 
 use actix_web::{http::StatusCode, web, HttpResponse};
-use atomic_lib::agents::ForAgent;
+use atomic_lib::{
+    agents::ForAgent,
+    hierarchy::{check_read, check_write},
+    Storelike,
+};
 
 use crate::{
     appstate::AppState,
     errors::{AppErrorType, AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent,
-    plugins::host_abi::{self, code},
+    helpers::get_client_agent_for_request,
+    plugins::{
+        host_abi::{self, code, CallBudget, ENTRY_TIMEOUT},
+        manifest::ExportEffect,
+    },
 };
 
 #[derive(serde::Deserialize, Debug)]
@@ -31,6 +44,10 @@ pub struct HostCallBody {
     /// The arguments, a JSON object checked against the export's `inputSchema`.
     #[serde(default = "empty_object")]
     pub args: serde_json::Value,
+    /// When given, only exports with one of these effects (`read`, `write`,
+    /// `external`, `interactive`) run; others are `forbidden`.
+    #[serde(default)]
+    pub allow_effects: Option<Vec<String>>,
 }
 
 fn empty_object() -> serde_json::Value {
@@ -49,10 +66,26 @@ fn status_of(code: &str) -> StatusCode {
     }
 }
 
-#[tracing::instrument(skip(appstate, body, req))]
+fn effect_name(effect: ExportEffect) -> &'static str {
+    match effect {
+        ExportEffect::Read => "read",
+        ExportEffect::Write => "write",
+        ExportEffect::External => "external",
+        ExportEffect::Interactive => "interactive",
+    }
+}
+
+fn refusal(code: &str, status: StatusCode, message: impl Into<String>) -> HttpResponse {
+    HttpResponse::build(status).json(serde_json::json!({
+        "error": { "code": code, "message": message.into() },
+    }))
+}
+
+#[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_host_call(
     appstate: web::Data<AppState>,
-    body: web::Json<HostCallBody>,
+    // Raw bytes, so the signature covers exactly the body acted on.
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
@@ -65,7 +98,7 @@ pub async fn handle_host_call(
     let signed_subject =
         atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
 
-    let agent = get_client_agent(req.headers(), &appstate, &signed_subject).await?;
+    let agent = get_client_agent_for_request(&req, &raw, &appstate, &signed_subject).await?;
     if agent == ForAgent::Public {
         return Err(AtomicServerError {
             message: "Sign the request: calling an app needs an agent".into(),
@@ -73,10 +106,58 @@ pub async fn handle_host_call(
             error_resource: None,
         });
     }
+    crate::helpers::enforce_write_rate_limit(&appstate, &req, &agent)?;
 
-    let body = body.into_inner();
-    let db = std::sync::Arc::new(appstate.store.clone());
-    let outcome = host_abi::call_as(
+    let body: HostCallBody = serde_json::from_slice(&raw)
+        .map_err(|e| AtomicServerError::bad_request(format!("Invalid JSON body: {e}")))?;
+
+    // Before anything is loaded or run: the caller must see the drive.
+    let store = &appstate.store;
+    let drive = store.get_resource(&body.drive.as_str().into()).await?;
+    if let Err(e) = check_read(store, &drive, &agent).await {
+        return Ok(refusal(
+            code::FORBIDDEN,
+            StatusCode::FORBIDDEN,
+            e.to_string(),
+        ));
+    }
+
+    let db = std::sync::Arc::new(store.clone());
+    appstate.host_abi.refresh(&db, &body.drive).await;
+
+    // What the export does decides what the caller needs on the drive.
+    let effect = appstate
+        .host_abi
+        .provider_of(&body.drive, &body.interface, &body.function)
+        .and_then(|app| {
+            app.export(&body.interface, &body.function)
+                .map(|export| export.effect)
+        });
+    if let Some(effect) = effect {
+        if let Some(allowed) = &body.allow_effects {
+            if !allowed.iter().any(|a| a == effect_name(effect)) {
+                return Ok(refusal(
+                    code::FORBIDDEN,
+                    StatusCode::FORBIDDEN,
+                    format!(
+                        "this caller may not run exports with the effect {}",
+                        effect_name(effect)
+                    ),
+                ));
+            }
+        }
+        if matches!(effect, ExportEffect::Write | ExportEffect::External) {
+            if let Err(e) = check_write(store, &drive, &agent).await {
+                return Ok(refusal(
+                    code::FORBIDDEN,
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                ));
+            }
+        }
+    }
+
+    let outcome = host_abi::call_entry(
         &appstate.host_abi,
         &db,
         &body.drive,
@@ -84,6 +165,8 @@ pub async fn handle_host_call(
         &body.function,
         &body.args.to_string(),
         agent,
+        std::sync::Arc::new(CallBudget::default()),
+        ENTRY_TIMEOUT,
     )
     .await;
 

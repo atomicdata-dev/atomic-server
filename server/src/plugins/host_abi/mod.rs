@@ -41,7 +41,9 @@ pub(crate) mod tests;
 mod wit_tests;
 
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
-pub use run::{call_as, call_export, CallError};
+pub use run::{
+    call_as, call_entry, call_export, CallBudget, CallError, CHAIN_CALLS, CHAIN_FUEL, ENTRY_TIMEOUT,
+};
 
 pub(crate) mod bindings {
     wasmtime::component::bindgen!({
@@ -65,6 +67,19 @@ pub mod code {
     pub const NEEDS_APPROVAL: &str = "needs-approval";
     pub const TRAP: &str = "trap";
     pub const INTERNAL: &str = "internal";
+
+    /// Every code the ABI defines. An app that returns any other code is
+    /// reported as `internal`.
+    pub const ALL: [&str; 8] = [
+        NOT_FOUND,
+        FORBIDDEN,
+        INVALID_ARGUMENT,
+        UNSUPPORTED,
+        DEPTH_EXCEEDED,
+        NEEDS_APPROVAL,
+        TRAP,
+        INTERNAL,
+    ];
 }
 
 pub(crate) fn error(code: &str, message: impl Into<String>) -> HostError {

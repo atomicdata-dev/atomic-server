@@ -25,6 +25,9 @@ use crate::plugins::{
     store_host::StoreApplyHost,
 };
 
+/// Most subjects one `get-many` reads; the same as a frame's `getMany`
+/// (`MAX_GET_MANY` in `hostStore.ts`).
+pub(super) const MAX_GET_MANY: usize = 100;
 /// Most intents in one `apply`.
 const MAX_INTENTS: usize = 500;
 
@@ -112,6 +115,23 @@ async fn touches_protected(db: &Db, plan: &RunPlan) -> Option<String> {
         {
             return Some(change.subject.clone());
         }
+        // A set that turns something into one of them.
+        let becomes_protected = change
+            .properties
+            .iter()
+            .filter(|p| p.property == urls::IS_A)
+            .filter_map(|p| p.to.as_ref())
+            .any(|to| match to {
+                serde_json::Value::String(class) => PROTECTED_CLASSES.contains(&class.as_str()),
+                serde_json::Value::Array(all) => all
+                    .iter()
+                    .filter_map(|c| c.as_str())
+                    .any(|c| PROTECTED_CLASSES.contains(&c)),
+                _ => false,
+            });
+        if becomes_protected {
+            return Some(change.subject.clone());
+        }
     }
     None
 }
@@ -129,7 +149,15 @@ impl store::Host for AbiState {
 
     async fn get_many(&mut self, subjects: Vec<String>) -> Vec<Result<WitResource, HostError>> {
         let mut out = Vec::with_capacity(subjects.len());
-        for subject in subjects {
+        for (i, subject) in subjects.into_iter().enumerate() {
+            // Same bound as a frame's `getMany`; the rest are answered in place.
+            if i >= MAX_GET_MANY {
+                out.push(Err(error(
+                    code::INVALID_ARGUMENT,
+                    format!("get-many reads at most {MAX_GET_MANY} subjects at a time"),
+                )));
+                continue;
+            }
             out.push(store::Host::get(self, subject).await);
         }
         out

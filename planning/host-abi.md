@@ -103,6 +103,16 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       matching in `class`, `invoke-action`, state as resources, feeding
       `events` from triggers/cron/commits, durable proposals, `handles`.
       Docs: `docs/src/plugins/host-abi.md`.
+      *Review hold fixed (2026-10-15):* `/host/call` is v2-signed (method + body),
+      needs read (and write for `write`/`external` exports) on the drive before
+      anything loads, is rate limited, and caches release load failures for 5
+      minutes; manifest `uses` bounds `calls.call`; frames send
+      `allowEffects: ["read"]` (no approval UI yet); one entry call has a shared
+      budget (64 calls, 16G fuel pool with give-back, 30 s deadline);
+      `get-many` is capped at 100; app error codes outside the ABI become
+      `internal`; `apply` refuses a `set` of `isA` to Installation/Plugin/Release.
+      Open: `effect` is author-declared, so approval UI (step 2) must not trust
+      it alone; the fuel pool is per entry call, not per drive or agent.
 - [x] Typed records instead of JSON strings; batch operations. (`get-many`,
       multi-intent `apply`. `calls` arguments stay JSON by design.)
 - [ ] Generate Rust bindings and TS types plus the frame client from it.
@@ -110,7 +120,7 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       see `plugin-examples/host-abi-*`). *TS: calls done*, hand-written rather
       than generated: `browser/plugin/src/hostAbi.ts` (`AppExport`, `Effect`,
       `HostError`, error codes; a test checks them against the Rust codes) and
-      `store.call(interface, fn, args)` in `@tomic/plugin`, over a `call` frame
+      `store.callExport(interface, fn, args)` in `@tomic/plugin` (`store.call(op, args)` stays the transport), over a `call` frame
       op that the host sends as a signed `POST /host/call`. Not done: types for
       `store`/`net`/`events`, generating them with jco, `call` in packaged
       views (only drive-app frames), `describe`/`providers` from a frame.

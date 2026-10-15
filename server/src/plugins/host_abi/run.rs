@@ -5,7 +5,15 @@
 //! the host is built, from two things only: who asked, and what the app's own
 //! Installation holds.
 
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use atomic_lib::{agents::ForAgent, Db};
 use wasmtime::{
@@ -36,11 +44,79 @@ pub(super) struct AbiHost {
     pub core: HostCore,
     /// `calls.call` hops between the entry call and this instance.
     pub depth: usize,
-    /// The agent the entry call came from, if any. Every app down the chain is
-    /// bounded by it too, so going through apps never lets someone do what
-    /// they could not do themselves (no confused deputy). `None` for work
-    /// nobody asked for, which runs as the apps alone.
-    pub entry: Option<ForAgent>,
+    /// What the whole chain of calls, from the entry call down, may still
+    /// spend. Shared by every instance in it.
+    pub budget: Arc<CallBudget>,
+}
+
+/// How many `calls.call` hops, entry call included, one chain may make in
+/// total (depth only bounds one branch; a fan-out is bounded by this).
+pub const CHAIN_CALLS: u64 = 64;
+/// Fuel the whole chain shares. An instance takes up to its own fuel limit
+/// from this pool and gives back what it did not use, so a chain of apps
+/// cannot together run longer than a few apps' worth of work.
+pub const CHAIN_FUEL: u64 = 16_000_000_000;
+/// How long an entry call may take, wall clock, however it is spent.
+pub const ENTRY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The cumulative budget of one entry call. Limits that apply per instance
+/// (fuel, memory, depth) still apply; this is the sum across the chain.
+#[derive(Debug)]
+pub struct CallBudget {
+    calls: AtomicU64,
+    fuel: AtomicU64,
+}
+
+impl Default for CallBudget {
+    fn default() -> Self {
+        Self::new(CHAIN_CALLS, CHAIN_FUEL)
+    }
+}
+
+impl CallBudget {
+    pub fn new(calls: u64, fuel: u64) -> Self {
+        Self {
+            calls: AtomicU64::new(calls),
+            fuel: AtomicU64::new(fuel),
+        }
+    }
+
+    /// Fuel still in the pool.
+    pub fn fuel_left(&self) -> u64 {
+        self.fuel.load(Ordering::SeqCst)
+    }
+
+    fn take_call(&self) -> Result<(), HostError> {
+        self.calls
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .map(|_| ())
+            .map_err(|_| {
+                error(
+                    code::DEPTH_EXCEEDED,
+                    format!("one call may cause at most {CHAIN_CALLS} calls between apps"),
+                )
+            })
+    }
+
+    /// Up to `want` fuel, or an error when the pool is empty.
+    fn take_fuel(&self, want: u64) -> Result<u64, HostError> {
+        let before = self
+            .fuel
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |pool| {
+                (pool > 0).then(|| pool - pool.min(want))
+            })
+            .map_err(|_| {
+                error(
+                    code::DEPTH_EXCEEDED,
+                    "the apps in this call chain used all the work one call may cause",
+                )
+            })?;
+        Ok(before.min(want))
+    }
+
+    fn give_back(&self, fuel: u64) {
+        self.fuel.fetch_add(fuel, Ordering::SeqCst);
+    }
 }
 
 pub struct AbiState {
@@ -75,35 +151,21 @@ impl WasiView for AbiState {
     }
 }
 
-/// The identity an app runs as when another app calls it: its own agent, or
-/// nobody (the public agent) when its Installation has none.
-async fn own_identity(db: &Db, app: &LoadedApp) -> ForAgent {
-    let key = atomic_lib::db::app_agent::AppAgentKey::new(&app.drive, &app.installation);
-    match db.get_app_agent_info(&key) {
-        Ok(Some(info)) => ForAgent::AgentSubject(info.agent.into()),
-        _ => ForAgent::Public,
-    }
-}
-
 /// Builds the host for one invocation, with the Installation resolved now:
 /// a paused or revoked app fails here, on its next call.
 pub(super) async fn build_host(
     registry: &Arc<HostAbiRegistry>,
     db: &Arc<Db>,
     app: &Arc<LoadedApp>,
-    caller: Option<ForAgent>,
+    caller: ForAgent,
     depth: usize,
+    budget: Arc<CallBudget>,
 ) -> Result<AbiHost, HostError> {
-    let entry = caller.clone();
-    let caller = match caller {
-        Some(caller) => caller,
-        None => own_identity(db, app).await,
-    };
     let core = HostCore::for_run(
         db.clone(),
         &app.drive,
         &app.installation,
-        caller.clone(),
+        caller,
         Some(app.manifest.clone()),
     )
     .await
@@ -115,7 +177,7 @@ pub(super) async fn build_host(
         app: app.clone(),
         core,
         depth,
-        entry,
+        budget,
     })
 }
 
@@ -124,9 +186,8 @@ type Call<'a> = Pin<Box<dyn Future<Output = Result<String, HostError>> + Send + 
 /// Calls `interface.function` on the provider the drive has for it.
 ///
 /// `caller` is the agent the entry call came from, bounded by the provider's
-/// own agent, also for apps further down the chain; `None` is work nobody
-/// asked for, which runs as the provider alone.
-/// `depth` is the number of hops so far.
+/// own agent, also for apps further down the chain.
+/// `depth` is the number of hops so far; `budget` is shared by the whole chain.
 ///
 /// Boxed because an app can call back into the host, which calls this again.
 #[allow(clippy::too_many_arguments)]
@@ -137,10 +198,12 @@ pub fn call_export<'a>(
     interface: &'a str,
     function: &'a str,
     args: &'a str,
-    caller: Option<ForAgent>,
+    caller: ForAgent,
     depth: usize,
+    budget: Arc<CallBudget>,
 ) -> Call<'a> {
     Box::pin(async move {
+        budget.take_call()?;
         if depth >= MAX_CALL_DEPTH {
             return Err(error(
                 code::DEPTH_EXCEEDED,
@@ -172,8 +235,9 @@ pub fn call_export<'a>(
             .validate(&parsed)
             .map_err(|e| error(code::INVALID_ARGUMENT, e))?;
 
-        let host = build_host(registry, db, &app, caller, depth).await?;
-        let result = run_invoke(host, interface, function, args).await?;
+        let host = build_host(registry, db, &app, caller, depth, budget).await?;
+        // What the callee gets is what was validated, not the caller's bytes.
+        let result = run_invoke(host, interface, function, &parsed.to_string()).await?;
 
         // The app is trusted to compute, not to describe what it computed.
         let parsed: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
@@ -188,7 +252,7 @@ pub fn call_export<'a>(
                 format!("{interface} {function} returned a result its outputSchema forbids: {e}"),
             )
         })?;
-        Ok(result)
+        Ok(parsed.to_string())
     })
 }
 
@@ -204,17 +268,69 @@ pub async fn call_as(
     caller: ForAgent,
 ) -> Result<String, HostError> {
     registry.refresh(db, drive).await;
-    call_export(
+    call_entry(
         registry,
         db,
         drive,
         interface,
         function,
         args,
-        Some(caller),
-        0,
+        caller,
+        Arc::new(CallBudget::default()),
+        ENTRY_TIMEOUT,
     )
     .await
+}
+
+/// An entry call into apps that are already loaded, under one budget and one
+/// deadline for the whole chain it causes.
+#[allow(clippy::too_many_arguments)]
+pub async fn call_entry(
+    registry: &Arc<HostAbiRegistry>,
+    db: &Arc<Db>,
+    drive: &str,
+    interface: &str,
+    function: &str,
+    args: &str,
+    caller: ForAgent,
+    budget: Arc<CallBudget>,
+    deadline: Duration,
+) -> Result<String, HostError> {
+    with_deadline(
+        deadline,
+        call_export(
+            registry, db, drive, interface, function, args, caller, 0, budget,
+        ),
+    )
+    .await
+}
+
+/// Runs `work`, giving up after `deadline`. The work is dropped, which stops
+/// an app at its next await or fuel yield.
+pub(super) async fn with_deadline<F>(deadline: Duration, work: F) -> Result<String, HostError>
+where
+    F: Future<Output = Result<String, HostError>>,
+{
+    tokio::time::timeout(deadline, work)
+        .await
+        .unwrap_or_else(|_| {
+            Err(error(
+                code::TRAP,
+                format!(
+                    "the call was stopped after {} seconds",
+                    deadline.as_secs_f32()
+                ),
+            ))
+        })
+}
+
+/// An error an app returned, with a code outside the ABI made `internal`.
+pub(super) fn app_error(e: HostError) -> HostError {
+    if code::ALL.contains(&e.code.as_str()) {
+        e
+    } else {
+        error(code::INTERNAL, e.message)
+    }
 }
 
 async fn run_invoke(
@@ -224,6 +340,7 @@ async fn run_invoke(
     args: &str,
 ) -> Result<String, HostError> {
     let app = host.app.clone();
+    let budget = host.budget.clone();
     let grants = host_core::installation_grants(
         &host.db,
         &app.drive,
@@ -244,18 +361,33 @@ async fn run_invoke(
     limits
         .meter(&mut store)
         .map_err(|e| error(code::INTERNAL, e))?;
+    // The instance's fuel comes out of what the whole chain has left.
+    let allowance = budget.take_fuel(limits.fuel)?;
+    store
+        .set_fuel(allowance)
+        .map_err(|e| error(code::INTERNAL, format!("could not meter the app: {e}")))?;
 
-    let instance = SandboxedApp::instantiate_async(&mut store, &app.component, &linker)
-        .await
-        .map_err(|e| error(code::TRAP, format!("could not start the app: {e}")))?;
+    let outcome = async {
+        let instance = SandboxedApp::instantiate_async(&mut store, &app.component, &linker)
+            .await
+            .map_err(|e| error(code::TRAP, format!("could not start the app: {e}")))?;
 
-    match instance
-        .atomic_host_app()
-        .call_invoke(&mut store, interface, function, args)
-        .await
-    {
-        Ok(result) => result,
-        // Out of fuel, out of memory, a panic: the app failed, the host did not.
-        Err(e) => Err(error(code::TRAP, format!("the app was stopped: {e}"))),
+        match instance
+            .atomic_host_app()
+            .call_invoke(&mut store, interface, function, args)
+            .await
+        {
+            // The app's own failure. Only the codes of the ABI mean something
+            // to a caller (and to an HTTP status); an invented one is just
+            // the app failing.
+            Ok(result) => result.map_err(app_error),
+            // Out of fuel, out of memory, a panic: the app failed, the host did not.
+            Err(e) => Err(error(code::TRAP, format!("the app was stopped: {e}"))),
+        }
     }
+    .await;
+
+    // What this instance did not use goes back to the chain.
+    budget.give_back(store.get_fuel().unwrap_or(0));
+    outcome
 }

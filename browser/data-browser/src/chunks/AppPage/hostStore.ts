@@ -299,8 +299,11 @@ export async function handleRequest(
       return await proxyFetch(proxy.origin, request);
     }
 
-    // Another app's export, over the same signed route as MCP uses.
+    // Another app's export, over the same signed route as MCP uses. The
+    // app must be a readable resource here, like any read it makes.
     case 'call':
+      await canViewAccess(store, app, { kind: 'app', root: app }, 'read');
+
       return await callExport(
         store,
         drive,
@@ -491,6 +494,9 @@ const PROXY_REQUEST_HEADERS = ['authorization', 'content-type', 'if-match'];
 const PROXY_MAX_BODY = 10 * 1024 * 1024;
 const PROXY_TIMEOUT = 30_000;
 
+/** The export effects a frame may call, until approval UI exists. */
+export const FRAME_EFFECTS = ['read'];
+
 /**
  * `POST /host/call` as the signed-in person. The server bounds the app by this
  * person's rights, so the frame gets no more than they could do themselves.
@@ -510,16 +516,27 @@ async function callExport(
     throw new Error('call arguments are an object');
 
   const url = `${store.getServerUrl()}/host/call`;
-  const headers = await signRequest(url, agent, {});
+  const payload = JSON.stringify({
+    drive,
+    interface: iface,
+    function: fn,
+    args: args ?? {},
+    // Until the host can ask the person to approve a write, an external
+    // effect or a dialog on a frame's behalf, a frame may only read. The
+    // frame cannot set this: it has no network, and `request` is not read.
+    allowEffects: FRAME_EFFECTS,
+  });
+  // Version 2: the signature covers the method and exactly this body.
+  const headers = await signRequest(
+    url,
+    agent,
+    {},
+    { method: 'POST', body: payload },
+  );
   const response = await fetch(url, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      drive,
-      interface: iface,
-      function: fn,
-      args: args ?? {},
-    }),
+    body: payload,
   });
   const text = await response.text();
   let body: {

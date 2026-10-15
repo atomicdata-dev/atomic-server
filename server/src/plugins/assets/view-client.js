@@ -301,11 +301,11 @@ export const store = {
 
   /**
    * Calls a function another app in this drive exports, as the signed-in
-   * person: `store.call('atomic:example/counter@1', 'increment', { ... })`.
+   * person: `store.callExport('atomic:example/counter@1', 'increment', { ... })`.
    * Resolves to the result; rejects with an error whose `code` is the host's
    * (`not-found`, `forbidden`, `invalid-argument`, ...).
    */
-  async call(iface, fn, args = {}) {
+  async callExport(iface, fn, args = {}) {
     return send('call', { interface: iface, function: fn, args });
   },
 

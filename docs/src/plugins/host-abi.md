@@ -30,6 +30,10 @@ Nothing runs as the server.
   - `refused`: the plan is wrong, or the caller may not write there, or the intents touch an Installation, plugin or Release. Nothing is written; `problems` says why.
 - When an app calls another app, the callee runs with **its own** Installation's rights, not the caller's. `calls.call` accepts a list of `handle`s for scoped capabilities, but they are ignored for now.
 - When a person or tool calls an export over HTTP, the rights are the signed-in agent's **and** the callee's. Calling through an app never gives anyone more than they have.
+- `POST /host/call` first checks the drive: the signed-in agent must be able to read it, and to write it when the export's `effect` is `write` or `external`. A stranger gets `forbidden` before any app is loaded or run.
+- A caller's own manifest bounds what it causes: `calls.call` only reaches interfaces the calling app lists in `uses` (see below). Without it the call is `forbidden`.
+- A host that vouches for its caller can narrow the effects with `allowEffects` on `/host/call`. The data browser sends `["read"]` for a frame, because it cannot yet ask the person to approve a write, an external effect or a dialog. A frame has no network of its own, so it cannot send a wider list.
+- One entry call has a total budget, however the apps fan out: 64 calls between apps and a shared pool of fuel (16G instructions, sixteen apps' default allowance). Each instance takes up to its own fuel limit from the pool and gives back what it did not use. Past either, calls fail with `depth-exceeded`. The entry call itself is stopped after 30 seconds (`trap`).
 
 ## An app: the counter
 
@@ -113,6 +117,7 @@ cargo build --target wasm32-wasip2 --release -p host-abi-counter
 ## The manifest
 
 An app is a release whose manifest has `"runtime": "wasip2/1"` and `"world": "sandboxed-app"`, and lists what it offers in `exports`.
+An app that calls other apps lists the interfaces it will call in `uses` (same form as an export's `interface`, once each, `sandboxed-app` only): `"uses": ["atomic:example/counter@1"]`. An app that lists none calls nobody.
 Each export has an `interface` (`package:name/interface@major`), a `function` (kebab-case), a `description`, an `inputSchema` and an `outputSchema`, and an `effect` (`read`, `write`, `external` or `interactive`).
 The schemas are a bounded JSON Schema subset: a flat object of `string`, `integer` and `boolean` properties, each with a `description`, and `additionalProperties: false`.
 The host validates the arguments before the app runs, and the result before the caller sees it.
@@ -169,7 +174,7 @@ let result = calls::call(
 
 The host finds the app in the same drive that declares `atomic:example/counter@1` `increment`, validates the arguments against its `inputSchema`, runs it in a fresh instance with its own rights, validates the result against its `outputSchema` and returns it.
 A call to an interface nobody provides fails with `not-found`.
-Apps may call each other at most 8 deep (`depth-exceeded`).
+Apps may call each other at most 8 deep, and one entry call may cause at most 64 calls in all (`depth-exceeded`). The interface must be in the calling app's `uses`, or the call is `forbidden`.
 `plugin-examples/host-abi-caller` calls the counter twice (`bump-twice`) and shows the depth limit (`recurse`).
 
 `calls.providers(interface)` lists the installations that provide an interface, and `calls.describe(interface)` returns their exports with the schemas, so an LLM or a UI can discover what is callable.
@@ -184,17 +189,17 @@ POST /host/call
   "function": "increment", "args": { "subject": "...", "property": "..." } }
 ```
 
-The request is signed like other plugin routes. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
+The request is signed with a version 2 signature (`signRequest(url, agent, {}, { method, body })`), which covers the method and the body, so a captured request cannot be replayed with other arguments. It may carry `"allowEffects": ["read", ...]`; an export whose effect is not listed is `forbidden`. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
 
 ## From a frame (TypeScript)
 
-A drive app's frame calls an export through its store, with the signed-in person's rights. The host sends the signed `POST /host/call` for it.
+A drive app's frame calls an export through its store, with the signed-in person's rights. The host sends the signed `POST /host/call` for it, and for now only runs exports whose `effect` is `read`; a `write`, `external` or `interactive` export is `forbidden` from a frame until the host can ask the person to approve it. (`store.call(op, args)` is the transport under every store method, as before.)
 
 ```ts
 import { store, HostError } from '@tomic/plugin';
 
 try {
-  const { value } = await store.call('atomic:example/counter@1', 'increment', {
+  const { value } = await store.callExport('atomic:example/counter@1', 'increment', {
     subject,
     property,
   });
@@ -205,7 +210,7 @@ try {
 }
 ```
 
-`store.call` resolves to the parsed result. A drive app served by `/plugin-ui?format=client` has the same `store.call`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
+`store.callExport` resolves to the parsed result. A drive app served by `/plugin-ui?format=client` has the same `store.callExport`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
 
 ## Not built yet
 
@@ -213,5 +218,6 @@ try {
 - `events` is an in-memory queue per installation. Nothing feeds it from query triggers, cron or commits yet, and the host does not call `on-event` itself.
 - Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
+- A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared; a `read` export that calls a `write` export through `uses` is still bounded by the signed-in agent's rights and the callee's own grant.
 - Publishing a `sandboxed-app` package through `/plugin-release-package` is not wired: the example tests publish a release record and package directly. Activating an Installation of such a release only mints its identity.
 - `net.fetch` reads response bodies as text.

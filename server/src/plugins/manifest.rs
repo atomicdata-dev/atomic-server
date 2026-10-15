@@ -35,6 +35,12 @@ pub struct Manifest {
     /// host ABI (`calls.call`). Only a `sandboxed-app` may declare any.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exports: Vec<Export>,
+    /// Interfaces this app may call through `calls.call`. An app that lists
+    /// none calls nobody: what a call causes is bounded by what the caller
+    /// declared and was granted, not only by who asked. Only a
+    /// `sandboxed-app` may declare any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<String>,
     /// Coarse egress allowance for packages that call the host `fetch` without
     /// an operation id. It never widens what `operations` grant.
     #[serde(default, skip_serializing_if = "Network::is_default")]
@@ -98,6 +104,7 @@ impl From<ManifestV1> for Manifest {
             operations: v1.operations,
             actions: v1.actions,
             exports: Vec::new(),
+            uses: Vec::new(),
             network: Network::default(),
             config: v1.config,
             config_schema: None,
@@ -394,6 +401,44 @@ pub struct Export {
     pub effect: ExportEffect,
 }
 
+/// `atomic:example/counter@1`: a package, an interface and a major version.
+fn check_interface(interface: &str) -> Result<(), String> {
+    let well_formed = interface.len() <= 128
+        && interface
+            .split_once('/')
+            .is_some_and(|(package, rest)| package.contains(':') && rest.contains('@'))
+        && interface
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b":/@-.".contains(&b));
+    if well_formed {
+        Ok(())
+    } else {
+        Err(format!(
+            "interface '{interface}' must look like atomic:example/counter@1"
+        ))
+    }
+}
+
+fn validate_uses(uses: &[String], world: World) -> Result<(), String> {
+    if uses.is_empty() {
+        return Ok(());
+    }
+    if world != World::SandboxedApp {
+        return Err("only world sandboxed-app may declare uses".into());
+    }
+    if uses.len() > 64 {
+        return Err("at most 64 used interfaces per release".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for interface in uses {
+        check_interface(interface)?;
+        if !seen.insert(interface) {
+            return Err("uses lists each interface once".into());
+        }
+    }
+    Ok(())
+}
+
 fn validate_exports(exports: &[Export], world: World) -> Result<(), String> {
     if exports.is_empty() {
         return Ok(());
@@ -406,22 +451,7 @@ fn validate_exports(exports: &[Export], world: World) -> Result<(), String> {
     }
     let mut seen = std::collections::HashSet::new();
     for export in exports {
-        // `atomic:example/counter@1`: a package, an interface and a major version.
-        let well_formed = export.interface.len() <= 128
-            && export
-                .interface
-                .split_once('/')
-                .is_some_and(|(package, rest)| package.contains(':') && rest.contains('@'))
-            && export
-                .interface
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b":/@-.".contains(&b));
-        if !well_formed {
-            return Err(format!(
-                "export interface '{}' must look like atomic:example/counter@1",
-                export.interface
-            ));
-        }
+        check_interface(&export.interface)?;
         if export.function.is_empty()
             || export.function.len() > 128
             || !export
@@ -568,6 +598,7 @@ impl Manifest {
             _ => {}
         }
         validate_exports(&self.exports, self.world)?;
+        validate_uses(&self.uses, self.world)?;
         if let Some(view) = &self.entrypoints.view {
             if view.is_empty()
                 || view.starts_with('/')
@@ -739,6 +770,7 @@ pub fn translate_plugin_json(
         operations: Vec::new(),
         actions: Vec::new(),
         exports: Vec::new(),
+        uses: Vec::new(),
         network: Network {
             origins,
             reason: network_reason,
@@ -1290,6 +1322,36 @@ mod export_tests {
 
         // Two exports of one function.
         assert!(Manifest::parse(app(json!([export(), export()]))).is_err());
+    }
+
+    #[test]
+    fn uses_is_validated_like_exports_and_only_for_a_sandboxed_app() {
+        let with = |uses: serde_json::Value| {
+            let mut raw = app(json!([]));
+            raw["uses"] = uses;
+            Manifest::parse(raw)
+        };
+        let ok = with(json!(["atomic:example/counter@1"])).unwrap().unwrap();
+        assert_eq!(ok.uses, ["atomic:example/counter@1"]);
+        assert_eq!(
+            serde_json::to_value(&ok).unwrap()["uses"],
+            json!(["atomic:example/counter@1"])
+        );
+        assert!(with(json!(["counter"])).is_err());
+        assert!(with(json!([
+            "atomic:example/counter@1",
+            "atomic:example/counter@1"
+        ]))
+        .is_err());
+        assert!(
+            Manifest::parse(json!({"schemaVersion": 2, "uses": ["atomic:example/counter@1"]}))
+                .is_err()
+        );
+        // Nothing declared serializes as it always did.
+        assert!(serde_json::to_value(with(json!([])).unwrap().unwrap())
+            .unwrap()
+            .get("uses")
+            .is_none());
     }
 
     #[test]

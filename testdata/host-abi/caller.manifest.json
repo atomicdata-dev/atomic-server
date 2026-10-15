@@ -6,6 +6,7 @@
   "namespace": "example",
   "version": "0.1.0",
   "description": "Calls the counter app twice through the host.",
+  "uses": ["atomic:example/counter@1", "atomic:example/caller@1"],
   "exports": [
     {
       "interface": "atomic:example/caller@1",

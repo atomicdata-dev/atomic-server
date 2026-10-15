@@ -59,7 +59,7 @@ const methods = (object: object) =>
 
 const shared = [
   'apply',
-  'call',
+  'callExport',
   'undo',
   'getContext',
   'getResource',
@@ -216,7 +216,9 @@ it.each(['packaged', 'drive app'])(
     vi.stubGlobal('window', f.window);
     const store = kind === 'packaged' ? new ViewStore() : driveAppStore(f);
 
-    const ok = store.call('atomic:example/counter@1', 'increment', { n: 1 });
+    const ok = store.callExport('atomic:example/counter@1', 'increment', {
+      n: 1,
+    });
     const request = f.parent.postMessage.mock.calls[0][0];
     expect(isViewRequest(request)).toBe(true);
     expect(request).toMatchObject({
@@ -235,7 +237,7 @@ it.each(['packaged', 'drive app'])(
     });
     expect(await ok).toEqual({ value: 2 });
 
-    const failed = store.call('atomic:nobody/none@1', 'x');
+    const failed = store.callExport('atomic:nobody/none@1', 'x');
     const second = f.parent.postMessage.mock.calls[1][0];
     f.reply({
       type: 'atomic.view.response',

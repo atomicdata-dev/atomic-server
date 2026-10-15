@@ -9,7 +9,11 @@
 
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex, RwLock,
+    },
+    time::{Duration, Instant},
 };
 
 use atomic_lib::{agents::ForAgent, storelike::Query, urls, Db, Storelike, Value};
@@ -32,6 +36,11 @@ const EVENT_QUEUE_CAP: usize = 1000;
 pub(super) const SUBSCRIPTION_CAP: usize = 64;
 /// Proposals kept in memory per installation.
 const PROPOSAL_CAP: usize = 100;
+
+/// How long a release that failed to load is not tried again. Short enough
+/// that a package which was not synced yet is picked up, long enough that a
+/// broken one is not recompiled on every call.
+const LOAD_FAILURE_TTL: Duration = Duration::from_secs(300);
 
 /// One installed app: a compiled component and what its release declares.
 pub struct LoadedApp {
@@ -84,6 +93,10 @@ pub struct HostAbiRegistry {
     events: Mutex<HashMap<AppKey, EventQueue>>,
     subscriptions: Mutex<HashMap<AppKey, BTreeMap<String, QuerySpec>>>,
     proposals: Mutex<HashMap<AppKey, VecDeque<Proposal>>>,
+    /// Releases that failed to load, per installation: (release id, when, why).
+    load_failures: Mutex<HashMap<AppKey, (String, Instant, String)>>,
+    /// How many times a release was actually read and compiled.
+    load_attempts: AtomicUsize,
 }
 
 impl HostAbiRegistry {
@@ -138,6 +151,9 @@ impl HostAbiRegistry {
         }
         if let Ok(mut proposals) = self.proposals.lock() {
             proposals.remove(&key);
+        }
+        if let Ok(mut failures) = self.load_failures.lock() {
+            failures.remove(&key);
         }
     }
 
@@ -230,6 +246,29 @@ impl HostAbiRegistry {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Why this release of this installation could not be loaded, if that was
+    /// found out recently.
+    fn load_failure(&self, drive: &str, installation: &str, release_id: &str) -> Option<String> {
+        let failures = self.load_failures.lock().ok()?;
+        let (id, at, why) = failures.get(&(drive.to_string(), installation.to_string()))?;
+        (id == release_id && at.elapsed() < LOAD_FAILURE_TTL).then(|| why.clone())
+    }
+
+    fn note_load_failure(&self, drive: &str, installation: &str, release_id: &str, why: &str) {
+        if let Ok(mut failures) = self.load_failures.lock() {
+            failures.insert(
+                (drive.to_string(), installation.to_string()),
+                (release_id.to_string(), Instant::now(), why.to_string()),
+            );
+        }
+    }
+
+    /// How many times a release was read and compiled (not served from the
+    /// failure cache).
+    pub fn load_attempts(&self) -> usize {
+        self.load_attempts.load(Ordering::SeqCst)
     }
 
     // -- events -------------------------------------------------------------
@@ -396,8 +435,40 @@ pub async fn load_installation(
         }
     }
 
+    if let Some(why) = registry.load_failure(drive, installation, &pinned) {
+        return Err(format!("{why} (not retried yet)"));
+    }
+    registry.load_attempts.fetch_add(1, Ordering::SeqCst);
+    match load_release(
+        registry,
+        db,
+        drive,
+        installation,
+        &resource,
+        &reference,
+        &pinned,
+    )
+    .await
+    {
+        Ok(loaded) => Ok(loaded),
+        Err(why) => {
+            registry.note_load_failure(drive, installation, &pinned, &why);
+            Err(why)
+        }
+    }
+}
+
+async fn load_release(
+    registry: &HostAbiRegistry,
+    db: &Db,
+    drive: &str,
+    installation: &str,
+    resource: &atomic_lib::Resource,
+    reference: &str,
+    pinned: &str,
+) -> Result<bool, String> {
     // Hash-verified against the pin below, and never shown to an app.
-    let plugin_release = release::resolve(db, &reference, &ForAgent::Sudo)
+    let plugin_release = release::resolve(db, reference, &ForAgent::Sudo)
         .await
         .map_err(|e| e.to_string())?;
     if plugin_release.is_js()
@@ -433,6 +504,12 @@ pub async fn load_installation(
         .map_err(|e| format!("package is not a zip archive: {e}"))?;
     let wasm = crate::plugins::wasm::wasm_bytes_from_zip(&mut zip).map_err(|e| e.to_string())?;
 
-    registry.register(drive, installation, Some(pinned), manifest, &wasm)?;
+    registry.register(
+        drive,
+        installation,
+        Some(pinned.to_string()),
+        manifest,
+        &wasm,
+    )?;
     Ok(true)
 }

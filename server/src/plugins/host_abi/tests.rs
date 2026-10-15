@@ -26,9 +26,9 @@ use super::{
         store::{Host as _, Intent, Outcome, QuerySpec},
         types::{PropVal, Value as WitValue},
     },
-    call_as, code,
-    run::{build_host, AbiState},
-    HostAbiRegistry, HostError, MAX_CALL_DEPTH,
+    call_as, call_entry, code,
+    run::{app_error, build_host, with_deadline, AbiState},
+    CallBudget, HostAbiRegistry, HostError, MAX_CALL_DEPTH,
 };
 use crate::plugins::{
     release,
@@ -217,6 +217,31 @@ impl World {
         .map(|text| serde_json::from_str(&text).unwrap())
     }
 
+    /// An entry call under a budget the test chose.
+    async fn call_within(
+        &self,
+        interface: &str,
+        function: &str,
+        args: Json,
+        caller: ForAgent,
+        budget: Arc<CallBudget>,
+    ) -> Result<Json, HostError> {
+        self.registry.refresh(&self.db, &self.f.drive).await;
+        call_entry(
+            &self.registry,
+            &self.db,
+            &self.f.drive,
+            interface,
+            function,
+            &args.to_string(),
+            caller,
+            budget,
+            super::ENTRY_TIMEOUT,
+        )
+        .await
+        .map(|text| serde_json::from_str(&text).unwrap())
+    }
+
     /// The host state of an installed app, for calling the interfaces directly.
     async fn state(&self, installed: &Installed, caller: ForAgent) -> AbiState {
         self.registry.refresh(&self.db, &self.f.drive).await;
@@ -224,9 +249,16 @@ impl World {
             .registry
             .app(&self.f.drive, &installed.installation)
             .expect("the app is loaded");
-        let host = build_host(&self.registry, &self.db, &app, Some(caller), 0)
-            .await
-            .unwrap();
+        let host = build_host(
+            &self.registry,
+            &self.db,
+            &app,
+            caller,
+            0,
+            Arc::new(CallBudget::default()),
+        )
+        .await
+        .unwrap();
         AbiState::new(host, StoreLimitsBuilder::new().build())
     }
 }
@@ -309,7 +341,10 @@ async fn going_through_apps_never_lets_someone_write_what_they_cannot() {
     let (subject, property) = counter_resource(&w.f).await;
     // The counter app may write; this agent may only read. Asking the caller
     // app, which asks the counter, must not turn a read right into a write.
-    let reader = atomic_lib::agents::Agent::new(None).unwrap().subject.to_string();
+    let reader = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
     share(db, &subject, &[&counter.agent, &reader], &[&counter.agent]).await;
 
     let outcome = w
@@ -835,11 +870,245 @@ async fn providers_are_per_drive_and_calls_do_not_leak_across_apps_without_expor
     let schema: Json = serde_json::from_str(&described[0].input_schema).unwrap();
     assert_eq!(schema["required"], json!(["subject", "property"]));
 
-    // Handles are accepted and ignored (see the TODO in calls.rs): a call that
-    // fails for its arguments fails the same with or without them.
+    // The counter's manifest lists no `uses`, so it calls nobody, itself
+    // included, whatever the arguments are.
     let err = state
         .call(COUNTER.into(), "increment".into(), "{}".into(), vec![])
         .await
         .unwrap_err();
-    assert_eq!(err.code, code::INVALID_ARGUMENT);
+    assert_eq!(err.code, code::FORBIDDEN);
+}
+
+/// The caller example's manifest without the interfaces it uses.
+fn caller_manifest_without_uses() -> String {
+    let mut manifest: Json = serde_json::from_str(CALLER_MANIFEST).unwrap();
+    manifest.as_object_mut().unwrap().remove("uses").unwrap();
+    manifest.to_string()
+}
+
+#[actix_rt::test]
+async fn an_app_calls_only_the_interfaces_its_manifest_uses() {
+    let w = World::new("host_abi_uses").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", &caller_manifest_without_uses(), CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    // The owner may do everything, the counter app may write, and still the
+    // caller app may not reach the counter: it never said it would.
+    let err = w
+        .call(
+            CALLER,
+            "bump-twice",
+            json!({"subject": subject, "property": property}),
+            owner(db),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert!(err.message.contains("uses"), "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+}
+
+#[actix_rt::test]
+async fn one_call_may_cause_only_so_many_calls_between_apps() {
+    let w = World::new("host_abi_call_budget").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let args = json!({"subject": subject, "property": property});
+
+    // bump-twice is three calls: itself and two to the counter. A fan-out
+    // wider than the budget is cut off partway, with the same code as depth.
+    let err = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args.clone(),
+            owner(db),
+            Arc::new(CallBudget::new(2, super::CHAIN_FUEL)),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::DEPTH_EXCEEDED, "{err:?}");
+    assert_eq!(
+        count_of(db, &subject, &property).await,
+        1,
+        "stopped halfway"
+    );
+
+    let ok = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args,
+            owner(db),
+            Arc::new(CallBudget::new(3, super::CHAIN_FUEL)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(ok, json!({"count": 3}));
+
+    // And a deep chain is cut by the budget before the depth limit would be.
+    let err = w
+        .call_within(
+            CALLER,
+            "recurse",
+            json!({"n": 0, "limit": 5}),
+            owner(db),
+            Arc::new(CallBudget::new(3, super::CHAIN_FUEL)),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::DEPTH_EXCEEDED, "{err:?}");
+}
+
+#[actix_rt::test]
+async fn the_apps_in_a_chain_share_one_fuel_pool_and_give_back_what_they_did_not_use() {
+    let w = World::new("host_abi_fuel_pool").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let args = json!({"subject": subject, "property": property});
+
+    // An empty pool: nothing may run.
+    let err = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args.clone(),
+            owner(db),
+            Arc::new(CallBudget::new(64, 0)),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::DEPTH_EXCEEDED, "{err:?}");
+
+    // A pool far too small for any app to finish in: the app is stopped.
+    let err = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args.clone(),
+            owner(db),
+            Arc::new(CallBudget::new(64, 1_000)),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::TRAP, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // A pool that holds one instance's full allowance (the caller's 1G)
+    // and a little more: the two counter calls only fit because the first
+    // returns what it did not use before the second asks.
+    let budget = Arc::new(CallBudget::new(64, 1_500_000_000));
+    let ok = w
+        .call_within(CALLER, "bump-twice", args, owner(db), budget.clone())
+        .await
+        .unwrap();
+    assert_eq!(ok, json!({"count": 2}));
+    assert!(
+        budget.fuel_left() > 1_400_000_000,
+        "unused fuel went back to the pool: {}",
+        budget.fuel_left()
+    );
+}
+
+#[actix_rt::test]
+async fn an_entry_call_has_a_deadline() {
+    let stuck = std::future::pending::<Result<String, HostError>>();
+    let err = with_deadline(std::time::Duration::from_millis(20), stuck)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::TRAP, "{err:?}");
+    assert!(err.message.contains("stopped"));
+
+    let fast = async { Ok::<_, HostError>("{}".to_string()) };
+    assert_eq!(
+        with_deadline(std::time::Duration::from_secs(5), fast)
+            .await
+            .unwrap(),
+        "{}"
+    );
+}
+
+#[test]
+fn an_error_code_the_abi_does_not_define_is_internal() {
+    let kept = app_error(HostError {
+        code: code::FORBIDDEN.into(),
+        message: "no".into(),
+    });
+    assert_eq!(
+        (kept.code.as_str(), kept.message.as_str()),
+        (code::FORBIDDEN, "no")
+    );
+
+    let invented = app_error(HostError {
+        code: "teapot".into(),
+        message: "short and stout".into(),
+    });
+    assert_eq!(invented.code, code::INTERNAL);
+    assert_eq!(invented.message, "short and stout");
+}
+
+#[actix_rt::test]
+async fn a_release_that_cannot_be_loaded_is_not_compiled_again_on_every_call() {
+    let w = World::new("host_abi_load_failure").await;
+    let db = &*w.db;
+    let _broken = install(&w.f, "counter", COUNTER_MANIFEST, b"not a component").await;
+
+    for _ in 0..3 {
+        w.registry.refresh(db, &w.f.drive).await;
+    }
+    assert_eq!(w.registry.load_attempts(), 1);
+    assert!(w.registry.providers(&w.f.drive, COUNTER).is_empty());
+}
+
+#[actix_rt::test]
+async fn get_many_reads_at_most_as_many_as_a_frame_does() {
+    let w = World::new("host_abi_get_many_cap").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, _property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    let mut state = w.state(&counter, owner(db)).await;
+    let asked = super::store::MAX_GET_MANY + 5;
+    let answers = state.get_many(vec![subject.clone(); asked]).await;
+    assert_eq!(answers.len(), asked);
+    assert!(answers[..super::store::MAX_GET_MANY]
+        .iter()
+        .all(|a| a.is_ok()));
+    assert!(answers[super::store::MAX_GET_MANY..]
+        .iter()
+        .all(|a| a.as_ref().unwrap_err().code == code::INVALID_ARGUMENT));
+}
+
+#[actix_rt::test]
+async fn apply_refuses_to_turn_a_resource_into_an_installation_plugin_or_release() {
+    let w = World::new("host_abi_is_a_escalation").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, _property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    let mut state = w.state(&counter, owner(db)).await;
+    for class in [urls::INSTALLATION, urls::PLUGIN, urls::RELEASE] {
+        let applied = state
+            .apply(vec![set(
+                &subject,
+                urls::IS_A,
+                WitValue::ResourceArray(vec![class.to_string()]),
+            )])
+            .await
+            .unwrap();
+        assert_eq!(applied.outcome, Outcome::Refused, "{class}: {applied:?}");
+    }
+    let still = db.get_resource(&subject.as_str().into()).await.unwrap();
+    assert!(!still.has_class(urls::INSTALLATION));
 }
