@@ -12954,9 +12954,14 @@ msgid "View all drives"
 msgstr "View all drives"
 
 #: src/components/Share/ShareDialog.tsx
-msgid "Host it on a Cloud Server to keep it available."
-msgstr "Host it on a Cloud Server to keep it available."
-
-#: src/components/Share/ShareDialog.tsx
 msgid "This drive is not on a server. People you invite can open it only while one of your devices has it open in a browser."
 msgstr "This drive is not on a server. People you invite can open it only while one of your devices has it open in a browser."
+
+#: src/components/Share/ShareDialog.tsx
+msgid "A Cloud Server keeps this drive online for everyone, so nobody has to keep a browser open."
+msgstr "A Cloud Server keeps this drive online for everyone, so nobody has to keep a browser open."
+
+#. 0: CLOUD_SERVER_PRICE
+#: src/components/Share/ShareDialog.tsx
+msgid "Upgrade to Cloud Server from {0}"
+msgstr "Upgrade to Cloud Server from {0}"

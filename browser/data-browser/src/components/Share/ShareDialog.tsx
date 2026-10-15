@@ -38,6 +38,7 @@ import { paths } from '../../routes/paths';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { useIsPrivateDrive } from '@hooks/useIsPrivateDrive';
 import { useInheritedRights } from '../../routes/Share/useInheritedRights';
+import { CLOUD_SERVER_PRICE } from '../../helpers/cloudServerPrice';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
 import {
   accountAddress,
@@ -584,18 +585,18 @@ function UnhostedDriveNotice({
   return (
     <PrivateDriveWarningBox role='note' data-test='unhosted-drive-notice'>
       <FaTriangleExclamation />
-      <span>
+      <UnhostedBody>
         <span>
           This drive is not on a server. People you invite can open it only
           while one of your devices has it open in a browser.
         </span>
-        {isSaas && <HostItLink subject={subject} onDone={onDone} />}
-      </span>
+        {isSaas && <UpgradePitch subject={subject} onDone={onDone} />}
+      </UnhostedBody>
     </PrivateDriveWarningBox>
   );
 }
 
-function HostItLink({
+function UpgradePitch({
   subject,
   onDone,
 }: {
@@ -606,10 +607,13 @@ function HostItLink({
 
   return (
     <>
-      {' '}
-      <HostLink
-        clean
-        type='button'
+      <span>
+        <strong>
+          A Cloud Server keeps this drive online for everyone, so nobody has to
+          keep a browser open.
+        </strong>
+      </span>
+      <UpgradeButton
         onClick={() => {
           onDone();
           void navigate(
@@ -617,8 +621,8 @@ function HostItLink({
           );
         }}
       >
-        Host it on a Cloud Server to keep it available.
-      </HostLink>
+        Upgrade to Cloud Server from {CLOUD_SERVER_PRICE}
+      </UpgradeButton>
     </>
   );
 }
@@ -756,13 +760,18 @@ const LinkText = styled.span<{ $muted: boolean }>`
   user-select: all;
 `;
 
-const HostLink = styled(Button)`
-  display: inline;
-  font: inherit;
-  color: ${p => p.theme.colors.main};
+const UnhostedBody = styled.span`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 0;
+`;
+
+const UpgradeButton = styled(Button)`
+  max-width: 100%;
+  white-space: normal;
   text-align: start;
-  text-decoration: underline;
-  cursor: pointer;
 `;
 
 /**
