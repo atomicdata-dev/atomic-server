@@ -6,6 +6,7 @@ import { core, dataBrowser } from '@tomic/lib';
 import { test, expect, type Page } from './fixtures';
 import {
   before,
+  contextMenuClick,
   devDrive,
   installCommitWatcher,
   openSubject,
@@ -131,6 +132,12 @@ test.describe('agent page', () => {
     await expect(page.getByText('Real name: Robert')).toBeVisible({
       timeout: 30_000,
     });
+
+    // Alice favorites Bob from his page; he shows in her sidebar by name.
+    await contextMenuClick('favorite', page);
+    await expect(
+      page.getByTestId('favorites').getByTestId('favorite-item'),
+    ).toBeVisible({ timeout: 15_000 });
 
     // Bob cannot see the note on his own page.
     await openSubject(bob, bobSubject);

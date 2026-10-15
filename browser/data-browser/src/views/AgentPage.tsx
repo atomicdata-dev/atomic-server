@@ -33,7 +33,8 @@ import {
   useOpenConversation,
 } from '../helpers/conversations/useConversations';
 import { usePrivateDrive } from '../hooks/usePrivateDrive';
-import { ActivityFeed, SectionTitle } from './Drive/DriveHome';
+import { SectionTitle } from './Drive/DriveHome';
+import ResourceRow from './ResourceRow';
 import { defaultHiddenProps, EditResourceButton } from './ResourcePageDefault';
 import type { ResourcePageProps } from './ResourcePage';
 
@@ -215,7 +216,16 @@ function Created({ agent }: { agent: string }): JSX.Element {
   );
   const subjects = useCollectionPage(collection, 0);
 
-  return <ActivityFeed subjects={subjects} title='Created' />;
+  return (
+    <section aria-label='Created'>
+      <SectionTitle>Created</SectionTitle>
+      <Column gap='0.5rem'>
+        {subjects.map(subject => (
+          <ResourceRow key={subject} subject={subject} clickable />
+        ))}
+      </Column>
+    </section>
+  );
 }
 
 export default AgentPage;

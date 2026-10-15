@@ -172,15 +172,11 @@ function ResourceTile({ subject }: { subject: string }): JSX.Element {
 export function ActivityFeed({
   subjects,
   drive,
-  title,
 }: {
   subjects: string[];
-  /** Also lists what was opened on this drive. Leave out for a list of
-   *  subjects from several drives. */
-  drive?: string;
-  title: string;
+  drive: string;
 }): JSX.Element {
-  const [recent] = useState(() => (drive ? getRecentResources(drive) : []));
+  const [recent] = useState(() => getRecentResources(drive));
   const candidates = useMemo(
     () => Array.from(new Set([...subjects, ...recent])),
     [subjects, recent],
@@ -207,8 +203,8 @@ export function ActivityFeed({
   const shown = showAll ? items : items.slice(0, ACTIVITY_VISIBLE);
 
   return (
-    <section aria-label={title}>
-      <SectionTitle>{title}</SectionTitle>
+    <section aria-label='Activity'>
+      <SectionTitle>Activity</SectionTitle>
       {items.length === 0 ? (
         <ActivityHint>Activity will show up here</ActivityHint>
       ) : (

@@ -1745,6 +1745,7 @@ msgid "Class"
 msgstr "Classe"
 
 #: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 #: src/views/FolderPage/ListView.tsx
 msgid "Created"
 msgstr "Créé"
@@ -1839,11 +1840,13 @@ msgstr "Afficher la ressource et ses propriétés dans la Vue de Données."
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Remove from favorites"
 msgstr "Supprimer des favoris"
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Add to favorites"
 msgstr "Ajouter aux favoris"
 
@@ -7629,7 +7632,8 @@ msgid "Integration sections"
 msgstr ""
 
 #: src/chunks/PluginRuns/PluginPage.tsx
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Activity"
 msgstr ""
 
