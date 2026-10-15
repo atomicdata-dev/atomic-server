@@ -10426,10 +10426,6 @@ msgid "Connect {0}"
 msgstr ""
 
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
-msgid "Host this workspace on a Cloud Server to share it."
-msgstr ""
-
-#: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Connect or self-host a server in Sync settings to share it."
 msgstr ""
 
@@ -13090,3 +13086,7 @@ msgstr ""
 #: src/views/Drive/DriveHome.tsx
 msgid "Commented {0}"
 msgstr "Commenté {0}"
+
+#: src/chunks/FormBuilder/ShareLinkPanel.tsx
+msgid "Upgrade to a Cloud Server to publish and share this form."
+msgstr ""
