@@ -20,6 +20,7 @@ import {
   useString,
   useTitle,
   type Resource,
+  includesAgentSubject,
 } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { styled } from 'styled-components';
@@ -539,7 +540,7 @@ function useCurrentAgentDetail(
   }, [isSaas]);
 
   if (email) return email;
-  if (agent && driveWriters.includes(agent)) return 'Owner';
+  if (includesAgentSubject(driveWriters, agent)) return 'Owner';
 
   return undefined;
 }

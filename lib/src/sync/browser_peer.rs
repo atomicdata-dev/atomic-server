@@ -323,7 +323,7 @@ impl BrowserPeerSession {
             }
             protocol::tag::EPHEMERAL => {
                 let message = protocol::decode_ephemeral(payload).ok_or("Invalid EPHEMERAL")?;
-                if message.agent != self.agent.to_string() {
+                if !crate::agents::same_agent(&message.agent, &self.agent.to_string()) {
                     return Err("Spoofed ephemeral identity".into());
                 }
                 let resource = db.get_resource(&message.drive.as_str().into()).await?;

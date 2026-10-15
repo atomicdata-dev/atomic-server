@@ -14,6 +14,8 @@ import {
   isPropertySubject,
   isResourceSubject,
   canonicalIdentifier,
+  sameAgentSubject,
+  includesAgentSubject,
   isAtomicIdentifier,
   isLegacyAtomicLink,
   subjectsReferToSameResource,
@@ -243,5 +245,42 @@ describe('property subjects', () => {
     expect(canonicalIdentifier(`did:ad:prop:${hex}`)).toBe(
       `atomic:prop:${hex}`,
     );
+  });
+
+  describe('sameAgentSubject', () => {
+    it('treats both scheme spellings of an agent as one', () => {
+      expect(sameAgentSubject('atomic:agent:abc', 'did:ad:agent:abc')).toBe(
+        true,
+      );
+      expect(sameAgentSubject('did:ad:agent:abc', 'did:ad:agent:abc')).toBe(
+        true,
+      );
+    });
+
+    it('treats padded and base64url spellings of the key as one', () => {
+      expect(
+        sameAgentSubject('atomic:agent:a+b/c=', 'did:ad:agent:a-b_c'),
+      ).toBe(true);
+    });
+
+    it('tells different agents apart and never matches nothing', () => {
+      expect(sameAgentSubject('atomic:agent:abc', 'did:ad:agent:abd')).toBe(
+        false,
+      );
+      expect(sameAgentSubject(undefined, undefined)).toBe(false);
+      expect(sameAgentSubject('atomic:agent:abc', undefined)).toBe(false);
+    });
+
+    it('finds an agent in a list written in the other spelling', () => {
+      expect(
+        includesAgentSubject(
+          ['did:ad:agent:x', 'did:ad:agent:abc'],
+          'atomic:agent:abc',
+        ),
+      ).toBe(true);
+      expect(includesAgentSubject(['did:ad:agent:x'], 'atomic:agent:abc')).toBe(
+        false,
+      );
+    });
   });
 });

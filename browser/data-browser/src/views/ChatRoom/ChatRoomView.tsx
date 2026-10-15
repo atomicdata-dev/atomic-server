@@ -18,6 +18,7 @@ import {
   useString,
   useSubject,
   useTypingPresence,
+  sameAgentSubject,
 } from '@tomic/react';
 import { memo, useRef, useState, useEffect, useLayoutEffect } from 'react';
 import {
@@ -635,7 +636,7 @@ function LogMessage({
 
   // The server only lets an author change their own entries; moderators can
   // too, but own messages are what the buttons are for.
-  const isMine = !!agent && entry.a === agent.subject;
+  const isMine = !!agent && sameAgentSubject(entry.a, agent.subject);
 
   function handleCopyUrl() {
     navigator.clipboard.writeText(id);

@@ -104,7 +104,13 @@ impl WriteRateLimiter {
         let namespaced = if anonymous {
             format!("anon:{key}")
         } else {
-            format!("agent:{key}")
+            // One bucket per agent, not per spelling of its subject: a signer
+            // could otherwise double its budget by alternating `atomic:` and
+            // `did:ad:`.
+            format!(
+                "agent:{}",
+                atomic_lib::identifiers::canonicalize_scheme(key)
+            )
         };
 
         let mut buckets = self.buckets.lock().unwrap_or_else(|e| e.into_inner());
@@ -152,6 +158,16 @@ impl WriteRateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn both_spellings_of_an_agent_share_one_bucket() {
+        let limiter = WriteRateLimiter::new(2, 0);
+        let t0 = Instant::now();
+        assert_eq!(limiter.check_at("did:ad:agent:a", false, t0), Ok(()));
+        assert_eq!(limiter.check_at("atomic:agent:a", false, t0), Ok(()));
+        assert!(limiter.check_at("did:ad:agent:a", false, t0).is_err());
+        assert!(limiter.check_at("atomic:agent:a", false, t0).is_err());
+    }
 
     #[test]
     fn burst_up_to_the_budget_then_refuse_with_retry_after() {

@@ -360,6 +360,22 @@ pub fn migrate_legacy_agent_subject(subject: &str) -> String {
     subject.to_string()
 }
 
+/// Whether two agent subjects name the same agent, whatever their spelling:
+/// `atomic:agent:{key}`, the legacy `did:ad:agent:{key}`, and the pre-DID
+/// `internal:/agents/{key}` / `https://host/agents/{key}` forms all name one
+/// identity, and a base64 key may be padded or URL-safe. A plain string
+/// comparison of agent subjects is a bug: it fails for data written in one
+/// spelling and read in the other. Use this for any `me`, author, member or
+/// signer check on strings.
+pub fn same_agent(a: &str, b: &str) -> bool {
+    a == b
+        || crate::hierarchy::same_agent_key(
+            &migrate_legacy_agent_subject(a),
+            &migrate_legacy_agent_subject(b),
+        )
+        || crate::identifiers::canonicalize_scheme(a) == crate::identifiers::canonicalize_scheme(b)
+}
+
 /// The public key a legacy HTTP agent subject (`https://host/agents/{pubkey}`
 /// or `internal:/agents/{pubkey}`) names, or `None` for any other subject.
 ///
@@ -464,6 +480,15 @@ mod test {
         let secret = agent.build_secret().unwrap();
         let agent2 = Agent::from_secret(&secret).unwrap();
         assert_eq!(agent2.subject, agent.subject);
+    }
+
+    #[test]
+    fn same_agent_ignores_spelling() {
+        assert!(same_agent("atomic:agent:abc", "did:ad:agent:abc"));
+        assert!(same_agent("did:ad:agent:abc", "did:ad:agent:abc"));
+        assert!(same_agent("internal:/agents/abc", "atomic:agent:abc"));
+        assert!(!same_agent("atomic:agent:abc", "did:ad:agent:abd"));
+        assert!(!same_agent("atomic:agent:abc", "https://example.com/other"));
     }
 
     #[test]

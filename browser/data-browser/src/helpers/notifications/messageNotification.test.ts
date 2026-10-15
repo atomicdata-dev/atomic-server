@@ -57,6 +57,13 @@ describe('message notifications', () => {
     expect(isCandidate(msg({ createdAt: START - 1 }), ctx)).toBe(false);
   });
 
+  it('knows my own messages whichever spelling my subject has', () => {
+    expect(isCandidate(msg({ createdBy: 'atomic:agent:me' }), ctx)).toBe(false);
+    expect(isCandidate(msg({ createdBy: 'atomic:agent:them' }), ctx)).toBe(
+      true,
+    );
+  });
+
   it('waits when the author or time is not known yet', () => {
     expect(isCandidate(msg({ createdAt: undefined }), ctx)).toBeUndefined();
   });

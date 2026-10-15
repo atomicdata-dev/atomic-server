@@ -145,6 +145,13 @@ impl Default for Keyring {
     }
 }
 
+/// Whether two agent subjects name the same agent. `atomic:agent:X` and the
+/// legacy `did:ad:agent:X` are one identity, so a keyring sealed with one
+/// spelling must open for a reader who signs in with the other.
+fn same_agent(a: &str, b: &str) -> bool {
+    crate::agents::same_agent(a, b)
+}
+
 /// What the wrap key and the wrapper's associated data are bound to, so a
 /// wrapper cannot be relabelled for another agent or epoch.
 fn wrapper_binding(agent: &str, epoch: u32) -> Vec<u8> {
@@ -285,7 +292,7 @@ impl Keyring {
     pub fn open(&self, agent: &str, vault_proof: &[u8]) -> AtomicResult<Vec<ConversationKey>> {
         let mut keys = Vec::new();
         for epoch in &self.epochs {
-            if let Some(wrapper) = epoch.wrappers.iter().find(|w| w.agent == agent) {
+            if let Some(wrapper) = epoch.wrappers.iter().find(|w| same_agent(&w.agent, agent)) {
                 keys.push(unwrap(wrapper, epoch.epoch, vault_proof)?);
             }
         }
@@ -508,6 +515,32 @@ mod tests {
             .add_epoch(&[member("alice", 1), member("bob", 2)])
             .unwrap();
         keyring
+    }
+
+    #[test]
+    fn a_keyring_sealed_to_one_scheme_opens_for_the_other() {
+        // Sealed to the legacy spelling, opened by the canonical one.
+        let keyring = two_person_keyring();
+        let alice = keyring
+            .open_current("atomic:agent:alice", &proof(1))
+            .unwrap();
+        let bob = keyring.open("atomic:agent:bob", &proof(2)).unwrap();
+        let sealed = seal_message(&alice, ROOM, b"hi").unwrap();
+        assert_eq!(open_message(&bob, ROOM, &sealed).unwrap(), b"hi");
+
+        // Sealed to the canonical spelling, opened by the legacy one.
+        let mut keyring = Keyring::default();
+        let mut carol = member("carol", 3);
+        carol.agent = "atomic:agent:carol".into();
+        keyring.add_epoch(&[carol, member("dave", 4)]).unwrap();
+        assert!(keyring
+            .open_current("did:ad:agent:carol", &proof(3))
+            .is_ok());
+        assert!(keyring.open_current("did:ad:agent:dave", &proof(4)).is_ok());
+        // A different agent is still not a member.
+        assert!(keyring
+            .open_current("atomic:agent:erin", &proof(3))
+            .is_err());
     }
 
     #[test]

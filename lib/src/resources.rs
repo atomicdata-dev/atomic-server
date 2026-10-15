@@ -1035,9 +1035,12 @@ impl Resource {
             Some(some) => match some {
                 Value::ResourceArray(vec) => {
                     if skip_existing {
-                        let str_val = value.to_string();
+                        // Compared by identity: `atomic:X` and `did:ad:X` are the
+                        // same subject, and an agent granted in one spelling must
+                        // not be added again in the other.
+                        let str_val = crate::identifiers::canonicalize_scheme(&value.to_string());
                         for i in vec {
-                            if i.to_string() == str_val {
+                            if crate::identifiers::canonicalize_scheme(&i.to_string()) == str_val {
                                 // Value already exists
                                 return Ok(self);
                             }
@@ -1842,6 +1845,25 @@ impl From<&Resource> for crate::storelike::ResourceResponse {
 mod test {
     use super::*;
     use crate::{test_utils::init_store, urls};
+
+    #[test]
+    fn push_skip_existing_treats_both_scheme_spellings_as_one_subject() {
+        let mut resource = Resource::new("internal:/push-spelling".into());
+        resource
+            .set_unsafe(
+                urls::READ.into(),
+                Value::ResourceArray(vec!["did:ad:agent:abc".into()]),
+            )
+            .unwrap();
+        resource
+            .push(urls::READ, "atomic:agent:abc".into(), true)
+            .unwrap();
+        resource
+            .push(urls::READ, "atomic:agent:def".into(), true)
+            .unwrap();
+        let read = resource.get(urls::READ).unwrap().to_subjects(None).unwrap();
+        assert_eq!(read, vec!["did:ad:agent:abc", "atomic:agent:def"]);
+    }
 
     mod genesis_signer {
         use super::*;

@@ -6,7 +6,9 @@ import { instances } from './urls.js';
 import {
   agentPublicKey,
   agentSubject as agentSubjectOf,
+  includesAgentSubject,
   isAgentSubject,
+  sameAgentSubject,
 } from './subject.js';
 
 /**
@@ -361,12 +363,12 @@ async function removeFromRights(
 ): Promise<void> {
   const current = (resource.get(property) as string[] | undefined) ?? [];
 
-  if (!current.includes(agentSubject)) {
+  if (!includesAgentSubject(current, agentSubject)) {
     return;
   }
 
   await resource.set(
     property,
-    current.filter(subject => subject !== agentSubject),
+    current.filter(subject => !sameAgentSubject(subject, agentSubject)),
   );
 }

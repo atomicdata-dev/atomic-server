@@ -157,6 +157,38 @@ async fn author_adds_edits_and_deletes_own_entry() {
     assert!(stored_doc(&w, &page).await.list_entries().is_empty());
 }
 
+/// An entry stores its author in whichever spelling the writer used; the
+/// rule compares agents by identity, so the other spelling is still "yours".
+#[tokio::test]
+async fn author_is_matched_whatever_spelling_the_entry_uses() {
+    let w = world("chat_log_spelling").await;
+    let (page, _) = create_page(&w, &w.bob, &[]).await.unwrap();
+
+    let canonical = atomic_lib::identifiers::canonicalize_scheme(&w.bob.subject.to_string());
+    let legacy = atomic_lib::identifiers::to_legacy_scheme(&w.bob.subject.to_string());
+    for (i, spelling) in [canonical.clone(), legacy.clone()].iter().enumerate() {
+        let key = new_key();
+        let mut e = entry(&w.bob, &format!("hi {i}"));
+        e.author = spelling.clone();
+        edit(&w, &w.bob, &page, |d| d.put_entry(&key, &e).unwrap())
+            .await
+            .unwrap();
+        edit(&w, &w.bob, &page, |d| d.remove_entry(&key).unwrap())
+            .await
+            .unwrap();
+    }
+
+    // Someone else's key in either spelling is still refused.
+    let mut forged = entry(&w.bob, "not mine");
+    forged.author = atomic_lib::identifiers::canonicalize_scheme(&w.eve.subject.to_string());
+    let key = new_key();
+    assert!(
+        edit(&w, &w.bob, &page, |d| d.put_entry(&key, &forged).unwrap())
+            .await
+            .is_err()
+    );
+}
+
 fn new_key() -> String {
     atomic_lib::chat_log::new_entry_key(atomic_lib::utils::now())
 }

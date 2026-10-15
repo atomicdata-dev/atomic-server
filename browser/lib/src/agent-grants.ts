@@ -1,5 +1,6 @@
 import { core } from './ontologies/core.js';
 import type { Store } from './store.js';
+import { includesAgentSubject, sameAgentSubject } from './subject.js';
 
 /**
  * Rights a person gives an Agent that holds its own key (an app that made a
@@ -84,10 +85,10 @@ export async function revokeAgent(
       for (const property of [core.properties.read, core.properties.write]) {
         const current = (resource.get(property) as string[] | undefined) ?? [];
 
-        if (current.includes(agent)) {
+        if (includesAgentSubject(current, agent)) {
           await resource.set(
             property,
-            current.filter(s => s !== agent),
+            current.filter(s => !sameAgentSubject(s, agent)),
           );
         }
       }

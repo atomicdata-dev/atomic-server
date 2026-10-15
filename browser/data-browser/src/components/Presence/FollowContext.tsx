@@ -17,6 +17,7 @@ import {
   useStore,
   type PresenceItem,
   type Store,
+  sameAgentSubject,
 } from '@tomic/react';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -177,7 +178,8 @@ export function FollowProvider({
   const isFollowDisabledFor = useCallback(
     (subject: string) =>
       presence.some(
-        item => item.agent === subject && item.allowFollow === false,
+        item =>
+          sameAgentSubject(item.agent, subject) && item.allowFollow === false,
       ),
     [presence],
   );
@@ -190,7 +192,9 @@ export function FollowProvider({
     }
 
     const sessions = presence
-      .filter(item => item.agent === followedAgent && item.resource)
+      .filter(
+        item => sameAgentSubject(item.agent, followedAgent) && item.resource,
+      )
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 
     return sessions[0]?.resource;
@@ -217,7 +221,7 @@ export function FollowProvider({
   useEffect(() => {
     if (
       followedAgent &&
-      (!presence.some(item => item.agent === followedAgent) ||
+      (!presence.some(item => sameAgentSubject(item.agent, followedAgent)) ||
         isFollowDisabledFor(followedAgent))
     ) {
       setFollowedAgent(undefined);
@@ -227,7 +231,9 @@ export function FollowProvider({
   const followers = useMemo(
     () =>
       agentSubject
-        ? presence.filter(item => item.following === agentSubject)
+        ? presence.filter(item =>
+            sameAgentSubject(item.following, agentSubject),
+          )
         : [],
     [presence, agentSubject],
   );
@@ -284,8 +290,9 @@ export function FollowProvider({
       return undefined;
     }
 
-    return presence.find(item => item.agent === followedAgent && item.session)
-      ?.session;
+    return presence.find(
+      item => sameAgentSubject(item.agent, followedAgent) && item.session,
+    )?.session;
   }, [presence, followedAgent]);
 
   // Record join/leave in the meeting chat, mirroring Start/End. The leader is

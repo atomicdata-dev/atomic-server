@@ -5,7 +5,7 @@
 // (the chat room) or an `about` (the resource it comments on), and optionally
 // a `replyTo`. So one rule set covers both. Kept free of the store and React
 // so the rules can be tested as plain data.
-import { dataBrowser } from '@tomic/react';
+import { dataBrowser, sameAgentSubject } from '@tomic/react';
 
 export type MessageNotificationKind = 'reply' | 'comment' | 'chat';
 
@@ -89,7 +89,7 @@ export function isCandidate(
   if (msg.createdAt === undefined || !msg.createdBy) return undefined;
   if (msg.createdAt < ctx.since) return false;
 
-  return msg.createdBy !== ctx.me;
+  return !sameAgentSubject(msg.createdBy, ctx.me);
 }
 
 /** Decides what, if anything, a candidate message should notify about. */
@@ -116,11 +116,11 @@ export function classifyMessage(
     openComments: isComment,
   };
 
-  if (msg.replyTo && ctx.creatorOf(msg.replyTo) === ctx.me) {
+  if (msg.replyTo && sameAgentSubject(ctx.creatorOf(msg.replyTo), ctx.me)) {
     return { ...base, kind: 'reply' };
   }
 
-  if (isComment && ctx.creatorOf(msg.about!) === ctx.me) {
+  if (isComment && sameAgentSubject(ctx.creatorOf(msg.about!), ctx.me)) {
     return { ...base, kind: 'comment' };
   }
 

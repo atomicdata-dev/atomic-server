@@ -1,4 +1,4 @@
-import { useStore } from '@tomic/react';
+import { useStore, includesAgentSubject } from '@tomic/react';
 import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { FaUser } from 'react-icons/fa6';
 import { styled } from 'styled-components';
@@ -56,7 +56,7 @@ export const ChatMentionPicker = ({
       .then(([members, found]) =>
         Promise.all(
           [...new Set([...members, ...found])].map(async subject => ({
-            isMember: members.includes(subject),
+            isMember: includesAgentSubject(members, subject),
             resource: await store.getResource(subject),
           })),
         ),

@@ -1,5 +1,6 @@
 import {
   conversations,
+  canonicalizeScheme,
   core,
   Datatype,
   server,
@@ -87,11 +88,16 @@ async function memberFor(
 export function hasMembers(conversation: Resource, members: string[]): boolean {
   const read = conversation.get(core.properties.read);
 
-  if (!Array.isArray(read) || read.length !== new Set(members).size) {
+  const wanted = new Set(members.map(canonicalizeScheme));
+
+  if (!Array.isArray(read) || read.length !== wanted.size) {
     return false;
   }
 
-  return members.every(member => read.includes(member));
+  // `atomic:agent:X` and `did:ad:agent:X` are one agent.
+  const have = new Set(read.map(canonicalizeScheme));
+
+  return [...wanted].every(member => have.has(member));
 }
 
 /**
@@ -109,7 +115,12 @@ export async function startConversation(
 ): Promise<Resource> {
   const agent = store.getAgent();
   const me = requireSubject(agent);
-  const memberSubjects = [me, ...others.filter(other => other !== me)];
+  const memberSubjects = [
+    me,
+    ...others.filter(
+      other => canonicalizeScheme(other) !== canonicalizeScheme(me),
+    ),
+  ];
   const noteToSelf = others.length === 0;
 
   if (memberSubjects.length < 2 && !noteToSelf) {

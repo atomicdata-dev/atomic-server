@@ -1,4 +1,11 @@
-import { core, useArray, useResource, useStore, useTitle } from '@tomic/react';
+import {
+  canonicalizeScheme,
+  core,
+  useArray,
+  useResource,
+  useStore,
+  useTitle,
+} from '@tomic/react';
 import type { Resource } from '@tomic/react';
 import { Fragment } from 'react';
 
@@ -8,7 +15,9 @@ export function ConversationTitle({ resource }: { resource: Resource }) {
   const store = useStore();
   const [members] = useArray(resource, core.properties.read);
   const me = store.getAgent()?.subject;
-  const others = members.filter(member => member !== me);
+  const others = members.filter(
+    member => !me || canonicalizeScheme(member) !== canonicalizeScheme(me),
+  );
 
   if (others.length === 0) {
     return <>Only you</>;

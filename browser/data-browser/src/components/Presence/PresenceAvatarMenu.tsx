@@ -4,6 +4,7 @@ import {
   useResource,
   useStore,
   useTitle,
+  sameAgentSubject,
 } from '@tomic/react';
 import { FaEnvelope, FaLocationArrow, FaUser } from 'react-icons/fa6';
 import { DropdownMenu, type DropdownItem } from '../Dropdown';
@@ -42,15 +43,15 @@ export function PresenceAvatarMenu({
 }: PresenceAvatarMenuProps): React.JSX.Element {
   const navigate = useNavigateWithTransition();
   const store = useStore();
-  const isMe = store.getAgent()?.subject === agentSubject;
+  const isMe = sameAgentSubject(store.getAgent()?.subject, agentSubject);
   const { followedAgent, follow, unfollow, isFollowDisabledFor } = useFollow();
   const presence = useDrivePresence();
   const agentResource = useResource(agentSubject);
   const [name] = useTitle(agentResource);
-  const isFollowing = followedAgent === agentSubject;
+  const isFollowing = sameAgentSubject(followedAgent, agentSubject);
   const followDisabled = isFollowDisabledFor(agentSubject);
   const online = useMemo(
-    () => presence.some(item => item.agent === agentSubject),
+    () => presence.some(item => sameAgentSubject(item.agent, agentSubject)),
     [presence, agentSubject],
   );
 

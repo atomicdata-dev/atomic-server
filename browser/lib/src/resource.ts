@@ -32,6 +32,8 @@ import {
   commitSubject,
   currentAgentSubject,
   canonicalizeScheme,
+  includesAgentSubject,
+  sameAgentSubject,
 } from './subject.js';
 import { checkResourceConstraints } from './class-constraints.js';
 import { perfSpan } from './perf-trace.js';
@@ -1671,13 +1673,16 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     // Agents can always edit their own resource (e.g. their profile)
-    if (agent === this.subject) {
+    if (sameAgentSubject(agent, this.subject)) {
       return [true, undefined];
     }
 
     const writeArray = this.get(core.properties.write);
 
-    if (writeArray && valToArray(writeArray).includes(agent)) {
+    if (
+      writeArray &&
+      includesAgentSubject(valToArray(writeArray) as string[], agent)
+    ) {
       return [true, undefined];
     }
 
@@ -1692,7 +1697,7 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     // Agents can always edit themselves
-    if (parentSubject === agent) {
+    if (sameAgentSubject(parentSubject, agent)) {
       return [true, undefined];
     }
 

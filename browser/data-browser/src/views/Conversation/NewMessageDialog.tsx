@@ -1,4 +1,5 @@
 import {
+  canonicalizeScheme,
   core,
   isAgentSubject,
   unknownSubject,
@@ -37,7 +38,9 @@ export function NewMessageDialogBody({ onDone }: { onDone: () => void }) {
   // Typing a name or part of an ID narrows the people in this drive; a full
   // pasted ID needs no match.
   const people = useDriveMembers(drive, core.classes.agent, agent).filter(
-    subject => subject !== me?.subject && subject !== trimmed,
+    subject =>
+      canonicalizeScheme(subject) !== canonicalizeScheme(me?.subject ?? '') &&
+      canonicalizeScheme(subject) !== canonicalizeScheme(trimmed),
   );
 
   const start = async (e?: React.FormEvent) => {
