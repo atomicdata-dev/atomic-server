@@ -37,12 +37,7 @@ import {
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
-import {
-  isInTrash,
-  moveToTrash,
-  peekTrashFolder,
-  restoreFromTrash,
-} from '../helpers/trash';
+import { moveToTrash } from '../helpers/trash';
 import { removeRecentResource } from '../helpers/recentResources';
 import { openSearchOverlay } from '../components/overlayState';
 import { openShareDialog } from '../components/Share/shareDialogState';
@@ -56,7 +51,7 @@ const getParent = (ctx: ActionContext): string | undefined =>
 // Trash membership is the direct parent only: items nested deeper in a trashed
 // folder travel with it, so only the folder itself shows Restore.
 const inTrash = (ctx: ActionContext): boolean =>
-  isInTrash(ctx.store, ctx.drive, ctx.resource);
+  ctx.store.isTrashed(ctx.resource, ctx.drive);
 
 /** The drive itself and its Trash folder cannot be moved to the Trash. */
 const isTrashable = (ctx: ActionContext): boolean => {
@@ -64,7 +59,7 @@ const isTrashable = (ctx: ActionContext): boolean => {
     return false;
   }
 
-  return ctx.subject !== peekTrashFolder(ctx.store, ctx.drive);
+  return ctx.subject !== ctx.store.peekTrashFolder(ctx.drive);
 };
 
 /**
@@ -418,7 +413,7 @@ export const resourceActions: ActionDefinition[] = [
     available: ctx => ctx.canWrite && inTrash(ctx),
     run: async ctx => {
       if (ctx.drive) {
-        await restoreFromTrash(ctx.store, ctx.subject, ctx.drive);
+        await ctx.store.restore(ctx.subject, ctx.drive);
       }
     },
   },

@@ -1,128 +1,20 @@
-import { core, dataBrowser, type Resource, type Store } from '@tomic/react';
-import { isContentAddressed } from './propertyIdentity';
+import type { Store } from '@tomic/react';
 import { removeRecentResource } from './recentResources';
-import { getOrCreateTrashFolder } from './standardLocations';
-
-/** The drive's Trash folder, if one was ever created. */
-export const readTrashFolder = (drive: Resource): string | undefined =>
-  drive.get(dataBrowser.properties.trashFolder) as string | undefined;
 
 /**
- * The drive's Trash folder as far as the store already knows. Menus ask this
- * at every render, so it must not start a fetch: a drive that is not loaded
- * (right after a sign-out, or in an app with no node behind it) has no known
- * Trash folder, and nothing is lost by saying so.
- */
-export const peekTrashFolder = (
-  store: Store,
-  drive: string | undefined,
-): string | undefined => {
-  const loaded = drive
-    ? (store.resources.get(drive) ??
-      store.resources.get(store.normalizeSubject(drive)))
-    : undefined;
-
-  return loaded ? readTrashFolder(loaded) : undefined;
-};
-
-/**
- * Whether `resource` sits directly in the drive's Trash folder. With `deep`,
- * also when any ancestor does (a file inside a trashed folder). The deep walk
- * only reads ancestors that are already loaded (`getResourceLoading`), so an
- * unloaded ancestor ends it with `false`. A visited set ends parent cycles.
- */
-export const isInTrash = (
-  store: Store,
-  drive: string | undefined,
-  resource: Resource,
-  deep = false,
-): boolean => {
-  const trash = peekTrashFolder(store, drive);
-
-  if (!trash) {
-    return false;
-  }
-
-  const visited = new Set<string>([resource.subject]);
-  let parent = resource.get(core.properties.parent) as string | undefined;
-
-  while (parent && !visited.has(parent)) {
-    if (parent === trash) {
-      return true;
-    }
-
-    if (!deep) {
-      return false;
-    }
-
-    visited.add(parent);
-    parent = store.getResourceLoading(parent).get(core.properties.parent) as
-      | string
-      | undefined;
-  }
-
-  return false;
-};
-
-/**
- * Parks a resource in the drive's Trash folder (created on first use) and
- * remembers where it came from so {@link restoreFromTrash} can put it back.
- * Nothing is destroyed. Resolves to false when there was nothing to do.
+ * Parks a resource in the drive's Trash (see `store.trash`) and forgets it in
+ * the recents list when something was actually moved.
  */
 export async function moveToTrash(
   store: Store,
   subject: string,
   drive: string,
 ): Promise<boolean> {
-  // A content-addressed property's parent is part of its ID: it cannot move.
-  if (isContentAddressed(subject)) {
-    throw new Error("A property can't be moved to the trash.");
+  const moved = await store.trash(subject, drive);
+
+  if (moved) {
+    removeRecentResource(drive, subject);
   }
 
-  const trash = await getOrCreateTrashFolder(store, drive);
-  const resource = await store.getResource(subject);
-  const parent = resource.get(core.properties.parent) as string | undefined;
-
-  // Already in the trash (or the trash itself): dropping again is a no-op.
-  if (subject === trash || parent === trash) {
-    return false;
-  }
-
-  if (parent) {
-    await resource.set(dataBrowser.properties.trashedFrom, parent);
-  }
-
-  await resource.set(core.properties.parent, trash);
-  await resource.save();
-  removeRecentResource(drive, subject);
-
-  return true;
-}
-
-/**
- * Moves a trashed resource back to the parent it came from. Falls back to the
- * drive root when that parent is gone or itself unreadable.
- */
-export async function restoreFromTrash(
-  store: Store,
-  subject: string,
-  drive: string,
-): Promise<void> {
-  const resource = await store.getResource(subject);
-  const from = resource.get(dataBrowser.properties.trashedFrom) as
-    | string
-    | undefined;
-  let target = drive;
-
-  if (from && !store.isDestroyed(from)) {
-    const candidate = await store.getResource(from);
-
-    if (!candidate.error) {
-      target = from;
-    }
-  }
-
-  await resource.set(core.properties.parent, target);
-  resource.remove(dataBrowser.properties.trashedFrom);
-  await resource.save();
+  return moved;
 }

@@ -4,6 +4,7 @@ import {
   core,
   dataBrowser,
   ErrorType,
+  Store as RealStore,
   NOT_AVAILABLE_LOCALLY_MESSAGE,
   type Resource,
   type Store,
@@ -36,6 +37,8 @@ const setup = (
     }) as unknown as Resource;
   const lookup = vi.fn(toResource);
   const store = {
+    isTrashed: RealStore.prototype.isTrashed,
+    peekTrashFolder: RealStore.prototype.peekTrashFolder,
     isDestroyed: (subject: string) => destroyed.includes(subject),
     // The drive is read from what is already loaded, never fetched.
     resources: new Map([[DRIVE, toResource(DRIVE)]]),
