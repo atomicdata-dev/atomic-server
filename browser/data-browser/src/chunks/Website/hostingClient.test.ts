@@ -28,10 +28,12 @@ describe('hosting control requests', () => {
     const [url, options] = fetch.mock.calls[0] as [URL, RequestInit];
     expect(url.origin).toBe('https://atomic.example');
     expect(url.searchParams.get('drive')).toBe('did:ad:drive');
+    // Version 2: the signature covers the method and the exact body sent.
     expect(signRequest).toHaveBeenCalledWith(
       url.toString(),
       store.getAgent(),
       {},
+      { method: 'POST', body: options.body },
     );
     expect(options.credentials).toBe('omit');
     expect(options.redirect).toBe('error');

@@ -35,13 +35,21 @@ async function assetRequest(
   const url = new URL(`/website-hosting/assets/${hash}`, store.getServerUrl());
   url.searchParams.set('project', project);
   url.searchParams.set('drive', drive);
-  const headers = await signRequest(url.toString(), agent, {});
+  // The signature covers these exact bytes, so read the blob once and send
+  // what was signed.
+  const bytes = body ? new Uint8Array(await body.arrayBuffer()) : undefined;
+  const headers = await signRequest(
+    url.toString(),
+    agent,
+    {},
+    bytes ? { method: 'POST', body: bytes } : undefined,
+  );
   const response = await fetch(url, {
-    method: body ? 'POST' : 'GET',
+    method: bytes ? 'POST' : 'GET',
     headers,
     credentials: 'omit',
     redirect: 'error',
-    body,
+    body: bytes,
   });
   if (!response.ok)
     throw new Error(

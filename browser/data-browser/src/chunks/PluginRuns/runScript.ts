@@ -496,17 +496,18 @@ export async function setPluginSchedule(
   if (!agent) throw new Error('Not signed in');
 
   const url = `${store.getServerUrl()}/plugin-schedule`;
+  const payload = JSON.stringify({
+    drive: target.drive,
+    plugin: target.plugin,
+    intervalSeconds,
+  });
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      ...(await signRequest(url, agent, {})),
+      ...(await signRequest(url, agent, {}, { method: 'POST', body: payload })),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      drive: target.drive,
-      plugin: target.plugin,
-      intervalSeconds,
-    }),
+    body: payload,
   });
 
   if (!response.ok) {
