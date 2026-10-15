@@ -46,7 +46,9 @@ beforeAll(async () => {
   };
   await web.default({ module_or_path: wasm });
   await LoroLoader.initializeLoro();
-});
+  // Compiling the WASM can take well over vitest's 10s hook default on a
+  // loaded CI host.
+}, 60_000);
 
 /** The app as the local database holds it, and the edit the server has
  *  beyond that: the table's class added to what it renders. */
