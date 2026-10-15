@@ -161,6 +161,8 @@ export interface ClientDbQueryOpts {
   /** Constraints on values computed per resource, evaluated by the store over the
    *  set the index narrows to. */
   expressionFilters?: ExpressionFilter[];
+  /** Also return resources in the Trash. Default false, like the server. */
+  includeTrashed?: boolean;
 }
 
 /** Outbox rows to store (`puts`) and subjects whose row goes (`deletes`),
@@ -1076,6 +1078,7 @@ export class ClientDbWorker {
       limit?: number;
       parents?: string | string[];
       filters?: Record<string, string | number | string[]>;
+      includeTrashed?: boolean;
     } = {},
   ): Promise<string[]> {
     const r = await this.send({
@@ -1084,6 +1087,7 @@ export class ClientDbWorker {
       limit: opts.limit,
       parents: opts.parents,
       filters: opts.filters,
+      includeTrashed: opts.includeTrashed,
     });
 
     return (r as string[]) ?? [];

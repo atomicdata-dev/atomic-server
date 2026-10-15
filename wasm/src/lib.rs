@@ -507,6 +507,7 @@ impl ClientDb {
         filters: JsValue,
         aggregation: JsValue,
         expression_filters: JsValue,
+        include_trashed: Option<bool>,
     ) -> Result<JsValue, JsError> {
         // Extra `(property, value)` AND constraints from JS. `null`/`undefined`
         // → none, keeping single-filter callers unchanged.
@@ -600,6 +601,10 @@ impl ClientDb {
             end_val: None,
             include_external: false,
             include_nested: include_resources.unwrap_or(false),
+            // Same rule as `construct_collection_from_params`: hide trashed
+            // items unless asked. The Trash-view exemption lives in
+            // `atomic_lib::trash::filter_for_query`, so it applies here too.
+            exclude_trashed: !include_trashed.unwrap_or(false),
             for_agent: atomic_lib::agents::ForAgent::Sudo,
             // `Subject::from` drops the base domain, leaving a localized drive
             // as an `External` subject that matches no stored drive prefix.
@@ -620,6 +625,7 @@ impl ClientDb {
         limit: Option<u32>,
         parents: JsValue,
         filters: JsValue,
+        include_trashed: Option<bool>,
     ) -> Result<JsValue, JsError> {
         let parents: Option<Vec<String>> = if parents.is_null() || parents.is_undefined() {
             None
@@ -632,6 +638,7 @@ impl ClientDb {
             limit,
             parents,
             filter_pairs: Some(js_to_filter_pairs(filters)),
+            include_trashed: include_trashed.unwrap_or(false),
             ..Default::default()
         };
         let hits = self.node.search(&query, &opts).map_err(to_js_err)?;

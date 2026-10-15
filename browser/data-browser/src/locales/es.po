@@ -1745,6 +1745,8 @@ msgstr "Título"
 msgid "Class"
 msgstr "Clase"
 
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 #: src/views/FolderPage/ListView.tsx
 msgid "Created"
 msgstr "Creado"
@@ -1839,11 +1841,13 @@ msgstr "Ver el recurso y sus propiedades en la Vista de Datos."
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Remove from favorites"
 msgstr "Eliminar de favoritos"
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Add to favorites"
 msgstr "Agregar a favoritos"
 
@@ -3444,7 +3448,6 @@ msgstr ""
 msgid "Enter the recovery password you set for {0}."
 msgstr ""
 
-#: src/components/Vault/VaultRestoreAction.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Restoring…"
@@ -4114,6 +4117,7 @@ msgstr ""
 #: src/chunks/AI/RealAIChat.tsx
 #: src/chunks/PluginRuns/WorkspaceControls.tsx
 #: src/components/SyncProblemBanner.tsx
+#: src/components/Vault/VaultRestoreAction.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 #: src/routes/DemoRoute.tsx
 #: src/routes/SyncRoute.tsx
@@ -5717,10 +5721,6 @@ msgstr ""
 #: src/routes/SettingsAgent.tsx
 #: src/routes/SettingsAgent.tsx
 msgid "Open a drive by URL or DID"
-msgstr ""
-
-#: src/components/Vault/VaultRestoreAction.tsx
-msgid "This workspace has an encrypted backup in Cloud Vault."
 msgstr ""
 
 #: src/components/Vault/VaultRestoreAction.tsx
@@ -9371,7 +9371,6 @@ msgid "Searching in {0}"
 msgstr ""
 
 #: src/components/OverlayContainer.tsx
-#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr ""
 
@@ -10657,6 +10656,7 @@ msgstr ""
 msgid "<0>Sync anytime with a server.</0> Once the drive's owner connects it to a server, it opens on any device, even when the others are closed."
 msgstr ""
 
+#: src/views/AgentPage.tsx
 #: src/views/DriveUnavailable.tsx
 msgid "Technical details"
 msgstr ""
@@ -10987,6 +10987,8 @@ msgid "Included AI isn't reachable right now. Check your connection and sign-in,
 msgstr ""
 
 #: src/components/SideBar/usePanelList.ts
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 msgid "Messages"
 msgstr ""
 
@@ -11323,9 +11325,7 @@ msgstr ""
 
 #. 0: Math.round(restoreProgress * 100)
 #. 0: Math.round(vault.restoreProgress * 100)
-#. 0: Math.round(vault.restoreProgress * 100)
 #: src/components/Vault/VaultPanel.tsx
-#: src/components/Vault/VaultRestoreAction.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Restoring… {0}%"
 msgstr ""
@@ -12714,40 +12714,40 @@ msgstr ""
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Currently on this drive"
-msgstr ""
+msgstr "Actualmente en este drive"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Activity will show up here"
-msgstr ""
+msgstr "La actividad aparecerá aquí"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show less"
-msgstr ""
+msgstr "Mostrar menos"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show all"
-msgstr ""
+msgstr "Mostrar todo"
 
 #. 0: toRelativeDateTime(new Date(at), true)
 #: src/views/Drive/DriveHome.tsx
 msgid "Edited {0}"
-msgstr ""
+msgstr "Editado {0}"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "<0/> Drive settings"
-msgstr ""
+msgstr "<0/> Ajustes del drive"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet. Create something with New, or drop files on this page."
-msgstr ""
+msgstr "Aún no hay nada aquí. Crea algo con Nuevo o suelta archivos en esta página."
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet."
-msgstr ""
+msgstr "Aún no hay nada aquí."
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Drive settings"
-msgstr ""
+msgstr "Ajustes del drive"
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Server members meet through for free browser sync."
@@ -13044,4 +13044,44 @@ msgstr ""
 
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Removed from your messages"
+msgstr ""
+
+#: src/views/DriveUnavailable.tsx
+msgid "Bringing this drive to this device"
+msgstr ""
+
+#. 0: Math.round(vault.restoreProgress * 100)
+#: src/components/Vault/VaultRestoreAction.tsx
+msgid "Restoring this drive… {0}%"
+msgstr ""
+
+#: src/components/Vault/VaultRestoreAction.tsx
+msgid "Restoring this drive…"
+msgstr ""
+
+#: src/components/Vault/VaultRestoreAction.tsx
+msgid "This drive has an encrypted backup in Cloud Vault."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "Opening..."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "<0/> Send message"
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Add a note"
+msgstr ""
+
+#. 0: name
+#: src/views/AgentPage.tsx
+msgid "Only you can see these. {0} cannot."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Your notes"
 msgstr ""

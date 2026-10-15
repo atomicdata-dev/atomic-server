@@ -73,6 +73,7 @@ async fn sort_order_falls_back_to_created_at() {
         sort_by: Some(urls::SORT_ORDER.into()),
         sort_desc: false,
         include_external: false,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: Some(atomic_lib::db::drive_prefix_from_subject(&Subject::from(
@@ -118,6 +119,7 @@ async fn fallback_applies_to_incrementally_indexed_rows() {
         sort_by: Some(urls::SORT_ORDER.into()),
         sort_desc: false,
         include_external: false,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: Some(atomic_lib::db::drive_prefix_from_subject(&Subject::from(

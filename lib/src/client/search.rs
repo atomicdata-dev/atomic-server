@@ -22,6 +22,10 @@ pub struct SearchOpts {
     pub filter_pairs: Option<Vec<(String, String)>>,
     /// The agent to use for authentication
     pub agent: Option<Agent>,
+    /// Also return resources that sit in their drive's Trash folder (directly
+    /// or through an ancestor). Off by default: trashed items are hidden, except
+    /// when `parents` scopes the search to the Trash itself or something in it.
+    pub include_trashed: bool,
 }
 
 // Function to build the base URL for search
@@ -69,6 +73,9 @@ pub fn build_search_subject(server_url: &str, query: &str, opts: SearchOpts) -> 
             url.query_pairs_mut().append_pair("filters", &filter_string);
         }
     }
+    if opts.include_trashed {
+        url.query_pairs_mut().append_pair("include_trashed", "true");
+    }
     if let Some(parents) = opts.parents {
         let parents_string = parents.join(",");
         url.query_pairs_mut()
@@ -115,6 +122,7 @@ mod tests {
             parents: Some(vec!["https://test.com/parent".to_string()]),
             filter_pairs: None,
             agent: None,
+            include_trashed: false,
         };
         let expected_search_url = "https://test.com/search?q=test&include=true&limit=30&filters=age%3A%2210%22&parents=https%3A%2F%2Ftest.com%2Fparent";
         assert_eq!(

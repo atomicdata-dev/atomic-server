@@ -429,7 +429,10 @@ pub fn query_timed(
         let Some(allowed) = filter_set else {
             return Ok((Vec::new(), timings));
         };
-        return Ok((filter_only_hits(store, allowed, &parents, limit)?, timings));
+        return Ok((
+            filter_only_hits(store, allowed, &parents, limit, opts.include_trashed)?,
+            timings,
+        ));
     }
 
     let n_docs = store.kv.len(Tree::SearchDocs).unwrap_or(0) as f32;
@@ -440,7 +443,7 @@ pub fn query_timed(
     let allowed_ids: Option<HashSet<DocId>> = filter_set
         .as_ref()
         .map(|allowed| allowed.iter().map(|s| doc_id(s)).collect());
-    let mut candidates = Candidates::new(store, parents, allowed_ids);
+    let mut candidates = Candidates::new(store, parents, allowed_ids, opts.include_trashed);
 
     // Per query token: document -> best score for that token. Only documents
     // that pass the scope filter are scored (and have their length read); a
@@ -512,12 +515,20 @@ struct Candidates<'a> {
     doc_cache: HashMap<DocId, SearchDoc>,
     /// Outcome of the fallback resource walk, per (drive, parent).
     walk_cache: HashMap<(DocId, DocId), bool>,
+    /// Hides what sits in the Trash; `None` when trashed items are wanted.
+    trash: Option<TrashScreen<'a>>,
     spent: std::time::Duration,
 }
 
 impl<'a> Candidates<'a> {
-    fn new(store: &'a Db, parents: Vec<String>, allowed: Option<HashSet<DocId>>) -> Self {
-        let scope_ids = parents.iter().map(|p| doc_id(p)).collect();
+    fn new(
+        store: &'a Db,
+        parents: Vec<String>,
+        allowed: Option<HashSet<DocId>>,
+        include_trashed: bool,
+    ) -> Self {
+        let scope_ids: HashSet<DocId> = parents.iter().map(|p| doc_id(p)).collect();
+        let trash = (!include_trashed).then(|| TrashScreen::new(store, &parents));
         Self {
             store,
             parents,
@@ -526,6 +537,7 @@ impl<'a> Candidates<'a> {
             seen: HashMap::new(),
             doc_cache: HashMap::new(),
             walk_cache: HashMap::new(),
+            trash,
             spent: std::time::Duration::ZERO,
         }
     }
@@ -567,6 +579,11 @@ impl<'a> Candidates<'a> {
         // otherwise be listed and then fail to open.
         if !self.store.has_resource_locally(&doc.subject) {
             return Ok(None);
+        }
+        if let Some(trash) = &mut self.trash {
+            if trash.hides(&doc, &mut self.doc_cache)? {
+                return Ok(None);
+            }
         }
         let len = doc.field_lens.iter().sum::<u32>();
         Ok(Some(Candidate {
@@ -695,10 +712,12 @@ fn filter_only_hits(
     allowed: HashSet<String>,
     parents: &[String],
     limit: usize,
+    include_trashed: bool,
 ) -> AtomicResult<Vec<SearchHit>> {
     let mut hits = Vec::new();
     let mut doc_cache: HashMap<DocId, SearchDoc> = HashMap::new();
     let scope_ids: HashSet<DocId> = parents.iter().map(|p| doc_id(p)).collect();
+    let mut trash = (!include_trashed).then(|| TrashScreen::new(store, parents));
     let mut subjects: Vec<String> = allowed.into_iter().collect();
     subjects.sort();
     for subject in subjects {
@@ -706,6 +725,19 @@ fn filter_only_hits(
             && !subject_in_parents(store, &subject, parents, &scope_ids, &mut doc_cache)?
         {
             continue;
+        }
+        if let Some(trash) = &mut trash {
+            // A subject without a search row (no searchable text) is judged
+            // from its resource instead.
+            let doc = load_doc(store, doc_id(&subject), &mut doc_cache)?;
+            let hidden = if doc.subject.is_empty() {
+                trash.hides_resource(&subject)
+            } else {
+                trash.hides(&doc, &mut doc_cache)?
+            };
+            if hidden {
+                continue;
+            }
         }
         hits.push(SearchHit {
             subject: Subject::from(subject),
@@ -770,6 +802,151 @@ fn resource_in_parents(store: &Db, subject: &str, parents: &[String]) -> AtomicR
         current = parent;
     }
     Ok(false)
+}
+
+/// Hides search hits that sit in their drive's Trash folder.
+///
+/// Walks the same indexed ancestor rows (`SearchDoc.parent`) as the parent
+/// scoping does, through the shared row cache, so a hit costs no extra reads
+/// once its ancestors are loaded. An ancestor without a row (no searchable
+/// text) sends the walk to the resources instead, as scoping does.
+///
+/// A walk that meets one of the search's own `parents` before the Trash means
+/// the search is scoped inside the Trash (the Trash view): nothing is hidden.
+struct TrashScreen<'a> {
+    store: &'a Db,
+    /// Search scope, as pure ids.
+    scope: Vec<String>,
+    scope_ids: HashSet<DocId>,
+    /// Drive row id -> (Trash folder row id, Trash folder pure id).
+    drive_trash: HashMap<DocId, Option<(DocId, String)>>,
+}
+
+impl<'a> TrashScreen<'a> {
+    fn new(store: &'a Db, parents: &[String]) -> Self {
+        Self {
+            store,
+            scope: parents.to_vec(),
+            scope_ids: parents.iter().map(|p| doc_id(p)).collect(),
+            drive_trash: HashMap::new(),
+        }
+    }
+
+    /// The Trash folder of the drive with row id `drive`, if it has one.
+    fn trash_of(
+        &mut self,
+        drive: DocId,
+        cache: &mut HashMap<DocId, SearchDoc>,
+        fallback_subject: &str,
+    ) -> AtomicResult<Option<(DocId, String)>> {
+        if let Some(known) = self.drive_trash.get(&drive) {
+            return Ok(known.clone());
+        }
+        let mut drive_subject = load_doc(self.store, drive, cache)?.subject;
+        if drive_subject.is_empty() {
+            // A drive with no searchable text has no row: ask the resource.
+            drive_subject = self
+                .store
+                .get_resource_shallow(&fallback_subject.into())
+                .ok()
+                .and_then(|r| r.get_drive())
+                .map(|d| d.pure_id())
+                .unwrap_or_default();
+        }
+        let trash = if drive_subject.is_empty() {
+            None
+        } else {
+            crate::trash::peek_trash_folder(self.store, &drive_subject)
+                .map(|t| Subject::from(t).pure_id())
+                .map(|t| (doc_id(&t), t))
+        };
+        self.drive_trash.insert(drive, trash.clone());
+        Ok(trash)
+    }
+
+    /// Whether the indexed document sits in the Trash (and so is hidden).
+    fn hides(
+        &mut self,
+        doc: &SearchDoc,
+        cache: &mut HashMap<DocId, SearchDoc>,
+    ) -> AtomicResult<bool> {
+        if doc.drive == 0 {
+            return Ok(false);
+        }
+        let Some((trash_id, trash)) = self.trash_of(doc.drive, cache, &doc.subject)? else {
+            return Ok(false);
+        };
+        let mut seen = HashSet::new();
+        let mut node = doc.clone();
+        for _ in 0..MAX_PARENT_WALK {
+            if node.parent == 0 {
+                return Ok(false);
+            }
+            if self.scope_ids.contains(&node.parent) {
+                return Ok(false);
+            }
+            if node.parent == trash_id {
+                return Ok(true);
+            }
+            if !seen.insert(node.parent) {
+                return Ok(false);
+            }
+            let next = load_doc(self.store, node.parent, cache)?;
+            if next.subject.is_empty() {
+                // No row for this ancestor (rare): walk the resources.
+                return Ok(self.resource_walk(&doc.subject, &trash));
+            }
+            node = next;
+        }
+        Ok(false)
+    }
+
+    /// Whether the resource itself (no search row) sits in the Trash.
+    fn hides_resource(&mut self, subject: &str) -> bool {
+        let Some(drive) = self
+            .store
+            .get_resource_shallow(&subject.into())
+            .ok()
+            .and_then(|r| r.get_drive())
+        else {
+            return false;
+        };
+        let Some(trash) = crate::trash::peek_trash_folder(self.store, drive.as_str())
+            .map(|t| Subject::from(t).pure_id())
+        else {
+            return false;
+        };
+        self.resource_walk(subject, &trash)
+    }
+
+    /// Walks the resources' `parent` chain from `subject`.
+    fn resource_walk(&self, subject: &str, trash: &str) -> bool {
+        let mut seen = HashSet::new();
+        let mut current = Subject::from(subject).pure_id();
+        for _ in 0..MAX_PARENT_WALK {
+            if !seen.insert(current.clone()) {
+                return false;
+            }
+            let Ok(resource) = self.store.get_resource_shallow(&current.as_str().into()) else {
+                return false;
+            };
+            let Some(parent) = resource
+                .get(urls::PARENT)
+                .ok()
+                .map(|v| Subject::from(v.to_string()).pure_id())
+            else {
+                return false;
+            };
+            if self.scope.contains(&parent) {
+                return false;
+            }
+            if parent == trash {
+                return true;
+            }
+            current = parent;
+        }
+        false
+    }
 }
 
 fn score_token(

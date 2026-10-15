@@ -43,6 +43,7 @@ async fn seed_watched_queries_with_drive(store: &atomic_lib::Db, count: usize, d
             start_val: None,
             end_val: None,
             include_external: false,
+            exclude_trashed: false,
             include_nested: false,
             for_agent: atomic_lib::agents::ForAgent::Sudo,
             drive: Some(drive.clone()),

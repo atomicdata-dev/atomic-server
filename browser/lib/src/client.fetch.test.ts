@@ -1,6 +1,10 @@
 import { describe, it, vi } from 'vitest';
 import { Client } from './client.js';
 import { core } from './ontologies/core.js';
+import {
+  NOT_AVAILABLE_LOCALLY_MESSAGE,
+  isNotAvailableLocally,
+} from './error.js';
 
 const DID = 'did:ad:ontology123';
 const JSON_AD = {
@@ -86,5 +90,26 @@ describe('Client.fetchResourceHTTP DID subjects', () => {
 
     expect(resource.error).toBeUndefined();
     expect(resource.subject).toBe(httpSubject);
+  });
+});
+
+describe('Client.fetchResourceHTTP origin without a node', () => {
+  it('fails an identifier as "not available" when a 200 answers with HTML', async ({
+    expect,
+  }) => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('<!doctype html><html></html>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+    );
+    const client = new Client(fetchMock);
+    const { resource } = await client.fetchResourceHTTP(DID, {
+      serverURL: 'https://portal.example.com',
+    });
+
+    expect(resource.error?.message).toBe(NOT_AVAILABLE_LOCALLY_MESSAGE);
+    expect(isNotAvailableLocally(resource.error)).toBe(true);
   });
 });
