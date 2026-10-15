@@ -189,7 +189,7 @@ POST /host/call
   "function": "increment", "args": { "subject": "...", "property": "..." } }
 ```
 
-The request is signed with a version 2 signature (`signRequest(url, agent, {}, { method, body })`), which covers the method and the body, so a captured request cannot be replayed with other arguments. It may carry `"allowEffects": ["read", ...]`; an export whose effect is not listed is `forbidden`. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
+The request is signed with a version 2 signature (`signRequest(url, agent, {}, { method, body })`), which covers the method and the body, so a captured request cannot be replayed with other arguments. It may carry `"allowEffects": ["read", ...]`; an export whose effect is not listed is `forbidden`, at every hop of the chain, so an app called with `["read"]` cannot pass the call on to one that writes. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
 
 ## From a frame (TypeScript)
 
@@ -218,6 +218,6 @@ try {
 - `events` is an in-memory queue per installation. Nothing feeds it from query triggers, cron or commits yet, and the host does not call `on-event` itself.
 - Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
-- A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared; a `read` export that calls a `write` export through `uses` is still bounded by the signed-in agent's rights and the callee's own grant.
+- A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared, so an approval UI must not rely on it alone. Every hop is still bounded by the signed-in agent's rights and the callee's own grant.
 - Publishing a `sandboxed-app` package through `/plugin-release-package` is not wired: the example tests publish a release record and package directly. Activating an Installation of such a release only mints its identity.
 - `net.fetch` reads response bodies as text.

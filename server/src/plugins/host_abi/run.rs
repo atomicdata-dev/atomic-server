@@ -28,7 +28,10 @@ use super::{
     registry::{HostAbiRegistry, LoadedApp, MAX_CALL_DEPTH},
     HostError,
 };
-use crate::plugins::host_core::{self, HostCore, Runtime};
+use crate::plugins::{
+    host_core::{self, HostCore, Runtime},
+    manifest::ExportEffect,
+};
 
 /// The failure of a call, as the ABI reports it to a calling app.
 pub type CallError = HostError;
@@ -65,6 +68,10 @@ pub const ENTRY_TIMEOUT: Duration = Duration::from_secs(30);
 pub struct CallBudget {
     calls: AtomicU64,
     fuel: AtomicU64,
+    /// The effects any export in the chain may have; `None` is any. A frame
+    /// may only cause reads, so an app it calls cannot pass its call on to
+    /// one that writes.
+    effects: Option<Vec<ExportEffect>>,
 }
 
 impl Default for CallBudget {
@@ -78,6 +85,23 @@ impl CallBudget {
         Self {
             calls: AtomicU64::new(calls),
             fuel: AtomicU64::new(fuel),
+            effects: None,
+        }
+    }
+
+    /// The same budget, with only these effects allowed anywhere in the chain.
+    pub fn only(mut self, effects: Vec<ExportEffect>) -> Self {
+        self.effects = Some(effects);
+        self
+    }
+
+    fn allows(&self, effect: ExportEffect) -> Result<(), HostError> {
+        match &self.effects {
+            Some(allowed) if !allowed.contains(&effect) => Err(error(
+                code::FORBIDDEN,
+                format!("this call may not cause an export with the effect {effect:?}"),
+            )),
+            _ => Ok(()),
         }
     }
 
@@ -223,6 +247,7 @@ pub fn call_export<'a>(
         let export = app
             .export(interface, function)
             .expect("provider_of found it");
+        budget.allows(export.effect)?;
 
         let parsed: serde_json::Value = serde_json::from_str(args).map_err(|e| {
             error(

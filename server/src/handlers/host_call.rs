@@ -134,18 +134,6 @@ pub async fn handle_host_call(
                 .map(|export| export.effect)
         });
     if let Some(effect) = effect {
-        if let Some(allowed) = &body.allow_effects {
-            if !allowed.iter().any(|a| a == effect_name(effect)) {
-                return Ok(refusal(
-                    code::FORBIDDEN,
-                    StatusCode::FORBIDDEN,
-                    format!(
-                        "this caller may not run exports with the effect {}",
-                        effect_name(effect)
-                    ),
-                ));
-            }
-        }
         if matches!(effect, ExportEffect::Write | ExportEffect::External) {
             if let Err(e) = check_write(store, &drive, &agent).await {
                 return Ok(refusal(
@@ -157,6 +145,23 @@ pub async fn handle_host_call(
         }
     }
 
+    // Checked at every hop, not only here: an app a frame calls cannot hand
+    // the call on to one that writes.
+    let budget = match &body.allow_effects {
+        Some(allowed) => CallBudget::default().only(
+            [
+                ExportEffect::Read,
+                ExportEffect::Write,
+                ExportEffect::External,
+                ExportEffect::Interactive,
+            ]
+            .into_iter()
+            .filter(|e| allowed.iter().any(|a| a == effect_name(*e)))
+            .collect(),
+        ),
+        None => CallBudget::default(),
+    };
+
     let outcome = host_abi::call_entry(
         &appstate.host_abi,
         &db,
@@ -165,7 +170,7 @@ pub async fn handle_host_call(
         &body.function,
         &body.args.to_string(),
         agent,
-        std::sync::Arc::new(CallBudget::default()),
+        std::sync::Arc::new(budget),
         ENTRY_TIMEOUT,
     )
     .await;

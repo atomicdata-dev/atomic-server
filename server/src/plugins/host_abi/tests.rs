@@ -365,6 +365,43 @@ async fn going_through_apps_never_lets_someone_write_what_they_cannot() {
 }
 
 #[actix_rt::test]
+async fn a_chain_limited_to_reads_never_runs_an_export_that_writes() {
+    let w = World::new("host_abi_effects_in_chain").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let reads_only =
+        || Arc::new(CallBudget::default().only(vec![crate::plugins::manifest::ExportEffect::Read]));
+
+    // The check runs in `call_export`, which every hop goes through.
+    let err = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            json!({"subject": subject, "property": property}),
+            owner(db),
+            reads_only(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // Reads that call reads still work.
+    w.call_within(
+        CALLER,
+        "recurse",
+        json!({"n": 0, "limit": 2}),
+        owner(db),
+        reads_only(),
+    )
+    .await
+    .unwrap();
+}
+
+#[actix_rt::test]
 async fn the_callee_never_gets_the_callers_rights() {
     let w = World::new("host_abi_no_borrowed_rights").await;
     let db = &*w.db;
