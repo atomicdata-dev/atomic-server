@@ -12842,20 +12842,6 @@ msgstr "Could not open Trash"
 msgid "Items you deleted from this drive"
 msgstr "Items you deleted from this drive"
 
-#. 0: trimmed
-#: src/helpers/syncProblem.ts
-msgid "This server does not have “{0}”"
-msgstr "This server does not have “{0}”"
-
-#: src/helpers/syncProblem.ts
-msgid "This server does not have another workspace on this device"
-msgstr "This server does not have another workspace on this device"
-
-#. 0: serverName
-#: src/helpers/syncProblem.ts
-msgid "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
-msgstr "That is not the workspace you are viewing. {0} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there."
-
 #: src/views/DriveUnavailable.tsx
 msgid "This item hasn't reached this device yet"
 msgstr "This item hasn't reached this device yet"
@@ -12953,3 +12939,7 @@ msgstr "Browser sync server"
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View all drives"
 msgstr "View all drives"
+
+#: src/components/SyncProblemBanner.tsx
+msgid "Show technical details"
+msgstr "Show technical details"

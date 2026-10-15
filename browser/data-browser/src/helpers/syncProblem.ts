@@ -26,12 +26,6 @@ export type SyncProblem = {
   /** The raw message, for a person who wants to quote it. */
   detail?: string;
   /**
-   * The workspace the problem is about, when it is not the one being viewed.
-   * The banner's "turn off server sync" would act on the viewed workspace, so
-   * a problem with another one does not offer it.
-   */
-  otherDrive?: string;
-  /**
    * Sentry already has this one: the outbox reports a commit that keeps
    * failing by itself, so reporting it again would count it twice.
    */
@@ -73,38 +67,12 @@ function firstEntry(
   return entries.find(e => keep(e) && e.lastAttemptError);
 }
 
-/** The workspace a "not enrolled" refusal names, in any spelling. */
-function driveInMessage(message: string): string | undefined {
-  return /Drive (\S+) is not enrolled/.exec(message)?.[1];
-}
-
-/**
- * Which workspace a problem is about, when it is not the viewed one.
- * The server's message names it; failing that, the entry that was refused.
- */
-function otherDriveOf(
-  input: SyncProblemInput,
-  message: string,
-  entry: Entry | undefined,
-): string | undefined {
+/** Whether an outbox entry belongs to the workspace in view (or to none known). */
+function isViewed(input: SyncProblemInput, entry: Entry): boolean {
   const viewed = input.status.drive && canonicalizeScheme(input.status.drive);
-  const named = driveInMessage(message);
-  const drive = named ?? (entry ? input.driveOf?.(entry.subject) : undefined);
+  const drive = input.driveOf?.(entry.subject);
 
-  if (!drive || !viewed) return undefined;
-
-  const canonical = canonicalizeScheme(drive);
-
-  return canonical === viewed ? undefined : canonical;
-}
-
-/** Title for a refusal about another workspace, named when its title is known. */
-export function notHostedTitle(name?: string | null): string {
-  const trimmed = name?.trim();
-
-  return trimmed
-    ? `This server does not have “${trimmed}”`
-    : 'This server does not have another workspace on this device';
+  return !viewed || !drive || canonicalizeScheme(drive) === viewed;
 }
 
 /** Name the remedy for an error message that retrying cannot fix, or null. */
@@ -112,28 +80,16 @@ function fromMessage(
   input: SyncProblemInput,
   message: string,
   reported: boolean,
-  entry?: Entry,
 ): SyncProblem | null {
   const { serverName } = input;
 
   if (NOT_ENROLLED.test(message) || MISSING_PARENT.test(message)) {
-    const other = otherDriveOf(input, message, entry);
     const shared = {
       key: 'not-hosted',
       cause: 'you',
       detail: message,
       reported,
     } as const;
-
-    if (other) {
-      return {
-        ...shared,
-        title: notHostedTitle(input.driveTitle?.(other)),
-        body: `That is not the workspace you are viewing. ${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there.`,
-        actions: ['connect-device'],
-        otherDrive: other,
-      };
-    }
 
     return {
       ...shared,
@@ -199,7 +155,9 @@ function ours(
 export function describeSyncProblem(
   input: SyncProblemInput,
 ): SyncProblem | null {
-  const { status, refusedByServer, entries, serverName } = input;
+  const { status, refusedByServer, serverName } = input;
+  // Only this workspace: problems of others show once you open them.
+  const entries = input.entries.filter(e => isViewed(input, e));
 
   if (refusedByServer) {
     const refused = fromMessage(
@@ -239,11 +197,12 @@ export function describeSyncProblem(
 
   const blocked = entries.filter(e => e.blocked);
 
-  if (status.blockedCount > 0 || blocked.length > 0) {
+  // Without a way to tell workspaces apart, the status count is all there is.
+  if (blocked.length > 0 || (!input.driveOf && status.blockedCount > 0)) {
     const entry = firstEntry(entries, e => !!e.blocked);
     const message = entry?.lastAttemptError;
     // Parked after the outbox reported them, so Sentry has these already.
-    const known = message ? fromMessage(input, message, true, entry) : null;
+    const known = message ? fromMessage(input, message, true) : null;
 
     return (
       known ?? ours('blocked', 'Some changes could not sync', message, true)
@@ -259,7 +218,7 @@ export function describeSyncProblem(
     const message = entry?.lastAttemptError;
 
     return (
-      (message ? fromMessage(input, message, true, entry) : null) ??
+      (message ? fromMessage(input, message, true) : null) ??
       ours('failing', 'Some changes keep failing to sync', message, true)
     );
   }

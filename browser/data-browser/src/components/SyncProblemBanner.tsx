@@ -71,7 +71,12 @@ export function SyncProblemBanner({
           {problem.body}
           {mine && notified && ' We have been notified.'}
         </Text>
-        {problem.detail && <Detail>{problem.detail}</Detail>}
+        {problem.detail && (
+          <Details>
+            <summary>Show technical details</summary>
+            <Detail>{problem.detail}</Detail>
+          </Details>
+        )}
         {problem.actions.length > 0 && (
           <Actions>
             {problem.actions.map(action => {
@@ -149,7 +154,18 @@ const Text = styled.p`
   color: ${p => p.theme.colors.text};
 `;
 
+const Details = styled.details`
+  font-size: ${CARD_SUB_FONT};
+  color: ${p => p.theme.colors.textLight};
+
+  summary {
+    cursor: pointer;
+  }
+`;
+
 const Detail = styled.code`
+  display: block;
+  margin-top: 0.3rem;
   font-size: 0.75rem;
   color: ${p => p.theme.colors.textLight};
   overflow-wrap: anywhere;
