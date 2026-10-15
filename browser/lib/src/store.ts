@@ -987,6 +987,7 @@ export class Store {
     }
 
     this.client = new Client(this.injectedFetch);
+    this.client.paceListener = ms => this.reportServerPace(ms);
 
     // Rehydrate the commit log from the outbox so the Sync page
     // shows what's queued instead of "No activity recorded" after
@@ -7550,6 +7551,16 @@ export class Store {
     return createdSubjects;
   }
 
+  /**
+   * @Internal
+   * The server's write-load hint (`pace_ms` of a `COMMIT_OK`, or the
+   * `X-Atomic-Pace-Ms` header): the outbox spaces the commits of one
+   * resource at least that far apart, so each carries more edits.
+   */
+  public reportServerPace(paceMs: number): void {
+    this.outbox.setServerPace(paceMs);
+  }
+
   /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
   public async postCommit(commit: Commit, endpoint: string): Promise<Commit> {
     const close = perfSpan('store.postCommit', {
@@ -7558,6 +7569,7 @@ export class Store {
 
     try {
       const created = await this.sendCommit(commit, endpoint);
+      this.outbox.noteCommitted(commit.subject);
       close('ok');
       this.pushCommitLog(
         this.buildCommitLogEntry(commit, 'outgoing', 'sent', {
@@ -7608,6 +7620,12 @@ export class Store {
           isUnrecoverableCommitError(message, code) ||
           isTerminalCommitError(message, code)
         ) {
+          throw e;
+        }
+
+        // "Busy, come back later" is an answer too. HTTP would hit the same
+        // overloaded node, so the outbox waits instead.
+        if (e instanceof AtomicError && e.retryAfterMs !== undefined) {
           throw e;
         }
 

@@ -138,7 +138,44 @@ export const ErrorCode = {
   /** The server rejected a stale Loro write; preserve the local edit and
    *  stop retrying until it can be based on current state. */
   CAUSALITY_CONFLICT: 11,
+  /** The node is overloaded with writes (or this agent spent its write rate
+   *  budget). The commit was refused before any work and nothing landed. The
+   *  message carries `retry_after_ms=<n>` (see `retryAfterMsFromMessage`).
+   *  Not a failure: keep the local state, wait, then send one merged delta. */
+  BUSY: 12,
 } as const;
+
+/** The `retry_after_ms=<n>` hint of a BUSY error message (or an HTTP error
+ *  description). `undefined` when the message carries none. Mirrors
+ *  `retry_after_ms_from_message` in `lib/src/sync/protocol.rs`. */
+export function retryAfterMsFromMessage(message: string): number | undefined {
+  const match = /retry_after_ms=(\d+)/.exec(message);
+
+  return match ? Number(match[1]) : undefined;
+}
+
+/** How long to wait before resending after a refusal that carries no usable
+ *  hint (an HTTP 503 without `Retry-After`). */
+export const DEFAULT_BUSY_RETRY_MS = 1000;
+
+/** The retry delay (ms) a commit refusal asks for, or `undefined` when it is
+ *  not a "busy" refusal. Recognises `ErrorCode.BUSY` and, for servers that
+ *  predate it, the rate limiter's `Too many writes; retry after N seconds`
+ *  text, which arrived with code `UNKNOWN`. */
+export function busyRetryAfterMs(
+  message: string,
+  code?: number,
+): number | undefined {
+  if (code === ErrorCode.BUSY) {
+    return retryAfterMsFromMessage(message) ?? DEFAULT_BUSY_RETRY_MS;
+  }
+
+  const legacy = /Too many writes; retry after (\d+) seconds/.exec(message);
+
+  if (legacy) return Number(legacy[1]) * 1000;
+
+  return undefined;
+}
 
 /** Capability names a server may advertise in its AUTH_OK payload (mirrors
  *  `protocol::CAPABILITIES` in `lib/src/sync/protocol.rs`). A server that
@@ -168,13 +205,17 @@ export type ServerCapability =
    *  it receives `did:ad:` subjects. */
   | 'canonical-scheme'
   | 'ephemeral'
-  | 'get-many';
+  | 'get-many'
+  /** Appends a `pace_ms` load hint to the slim COMMIT_OK of a client whose
+   *  HELLO lists `commit-pace`, and may refuse commits with `BUSY`. */
+  | 'commit-pace';
 
 /** Capability names this client lists in the `HELLO` it sends on open
  *  (mirrors `protocol::CLIENT_CAPABILITIES`). */
 export const CLIENT_CAPABILITIES: readonly string[] = [
   'commit-ok-slim',
   'canonical-scheme',
+  'commit-pace',
 ];
 
 /** What this client calls itself in its `HELLO`. Display only. */
@@ -636,6 +677,10 @@ export interface DecodedCommitOk {
   /** The full commit JSON-AD; only present for the legacy full form, which
    *  a server sends to a client whose HELLO did not list `commit-ok-slim`. */
   commitJson?: string;
+  /** The node's write-load hint: the least number of milliseconds to leave
+   *  between commits of one resource. Absent when the server sent none (an
+   *  older server, or a client that did not list `commit-pace`). */
+  paceMs?: number;
 }
 
 /** A COMMIT_OK payload (after the tag byte) in either form: the legacy full
@@ -662,6 +707,19 @@ export function decodeCommitOk(data: Uint8Array): DecodedCommitOk | undefined {
     } catch {
       return undefined;
     }
+  }
+
+  // Paced slim form: `<commit id> NUL <pace_ms decimal>`.
+  const nul = body.indexOf('\0');
+
+  if (nul >= 0) {
+    const pace = Number(body.slice(nul + 1));
+
+    return {
+      requestId: raw.requestId,
+      commitId: body.slice(0, nul),
+      paceMs: Number.isFinite(pace) && pace >= 0 ? pace : undefined,
+    };
   }
 
   return { requestId: raw.requestId, commitId: body };

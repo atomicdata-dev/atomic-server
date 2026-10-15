@@ -58,6 +58,7 @@ describe('decodeError (F5: planning/unified-sync.md)', () => {
 import { readFileSync } from 'node:fs';
 import {
   decodeAuthOk,
+  retryAfterMsFromMessage,
   decodeChallenge,
   decodeCommit,
   decodeCommitOk,
@@ -95,6 +96,7 @@ import {
   encodeChallenge,
   encodeCommitOk,
   encodeCommitOkSlim,
+  encodeCommitOkPaced,
   encodeError,
   encodeSyncResend,
 } from './test-ws-v2-server.js';
@@ -145,6 +147,8 @@ describe('wire vectors shared with lib/src/sync/protocol.rs', () => {
       'blob_response',
       'keepalive',
       'commit_ok_slim',
+      'commit_ok_paced',
+      'error_busy',
       'challenge',
       'sync_probe',
       'sync_filtered',
@@ -192,6 +196,12 @@ describe('wire vectors shared with lib/src/sync/protocol.rs', () => {
     expect(toHex(encodeCommitOkSlim(9, 'did:ad:commit:abc'))).toBe(
       toHex(vectors.commit_ok_slim),
     );
+    expect(toHex(encodeCommitOkPaced(9, 'did:ad:commit:abc', 2500))).toBe(
+      toHex(vectors.commit_ok_paced),
+    );
+    expect(
+      toHex(encodeError(9, ErrorCode.BUSY, 'Server busy; retry_after_ms=1730')),
+    ).toBe(toHex(vectors.error_busy));
     expect(decodeHelloCaps(payload('hello_caps'))).toEqual(['keepalive']);
     expect(decodeHelloCaps(payload('hello_bare'))).toEqual([]);
     expect(toHex(encodeBlobRequest(new Uint8Array(32).fill(0xab)))).toBe(
@@ -355,6 +365,14 @@ describe('wire vectors shared with lib/src/sync/protocol.rs', () => {
       requestId: 9,
       commitId: 'did:ad:commit:abc',
     });
+    expect(decodeCommitOk(payload('commit_ok_paced'))).toEqual({
+      requestId: 9,
+      commitId: 'did:ad:commit:abc',
+      paceMs: 2500,
+    });
+    const busy = decodeError(payload('error_busy'));
+    expect(busy?.code).toBe(ErrorCode.BUSY);
+    expect(retryAfterMsFromMessage(busy!.message)).toBe(1730);
     const legacy = new TextEncoder().encode(
       '{"@id":"did:ad:commit:full","https://atomicdata.dev/properties/signature":"s"}',
     );

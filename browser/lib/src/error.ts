@@ -130,6 +130,13 @@ export class AtomicError extends Error {
    * `message` text, as before.
    */
   public code?: number;
+  /**
+   * Set when the server answered "busy, come back later" (`ErrorCode.BUSY`,
+   * HTTP 429 or 503 with a retry hint): how long to wait, in ms. The write
+   * was not attempted, so this is neither a failure nor a reason to switch
+   * transport. See `busyRetryAfterMs`.
+   */
+  public retryAfterMs?: number;
 
   /** Creates an AtomicError. The message can be either a plain string, or a JSON-AD Error Resource */
   public constructor(message: string, type = ErrorType.Client, code?: number) {

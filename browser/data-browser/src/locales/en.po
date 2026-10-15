@@ -2128,8 +2128,6 @@ msgid "Add tag"
 msgstr "Add tag"
 
 #. 0: label
-#. 0: getTitle(resource)
-#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr "Switch to {0}"
@@ -12953,5 +12951,5 @@ msgid "Browser sync server"
 msgstr "Browser sync server"
 
 #: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
-msgstr "Manage drives"
+msgid "View all drives"
+msgstr "View all drives"
