@@ -223,7 +223,7 @@ mod installation_hook {
     use atomic_lib::db::{
         app_agent::{AppAgent, AppAgentKey, AppAgentState},
         plugin_meta::PluginMeta,
-        plugin_release::{PluginRelease, WORLD_SANDBOXED_APP, WORLD_SERVER_EXTENSION},
+        plugin_release::{PluginRelease, WORLD_SERVER_EXTENSION},
     };
     use tracing::info;
     use zip::ZipArchive;
@@ -315,12 +315,8 @@ mod installation_hook {
             }
         }
 
-        // 3. Materialize by runtime. A `sandboxed-app` (host ABI) is a wasip2
-        //    component too, but it is no class extender: nothing is extracted
-        //    and no hook is registered. Like a JS installation it has only an
-        //    identity; `host_abi::HostAbiRegistry::refresh` loads the
-        //    component from the pinned release when the app is first called.
-        if release.is_wasip2() && release.world != WORLD_SANDBOXED_APP {
+        // 3. Materialize by runtime.
+        if release.is_wasip2() {
             // The exact release whose code is already on disk, by id: a config
             // change or the legacy migration then extracts and compiles
             // nothing again. Comparing manifests instead would be wrong, since

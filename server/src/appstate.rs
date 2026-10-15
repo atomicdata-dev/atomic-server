@@ -41,9 +41,6 @@ pub struct AppState {
     /// Short-lived capabilities that let a null-origin plugin iframe read the
     /// one plugin's source it was opened for. See `plugins::view_token`.
     pub view_tokens: Arc<crate::plugins::view_token::ViewTokens>,
-    /// Apps loaded on the host ABI (`plugins::host_abi`), by drive.
-    #[cfg(feature = "wasm-plugins")]
-    pub host_abi: Arc<crate::plugins::host_abi::HostAbiRegistry>,
     /// Per-agent and per-peer budgets for the write endpoints; see
     /// `crate::rate_limit`. Sized from `--write-rate-limit` and
     /// `--anonymous-write-rate-limit`.
@@ -294,8 +291,6 @@ impl AppState {
             managed: server_info.managed,
             managed_dashboard_url: server_info.managed_dashboard_url,
             view_tokens: Arc::new(Default::default()),
-            #[cfg(feature = "wasm-plugins")]
-            host_abi: Arc::new(Default::default()),
         })
     }
 

@@ -1,8 +1,7 @@
 # Host ABI: apps on a typed, real-time, multi-machine host
 
-**Status:** Accepted direction (Joep, 2026-10-14). Step 0 done (#2258). The
-first slice of step 1 runs on the server and from frames (below). Pre-v1: the ABI may break until it
-is declared v1.
+**Status:** Accepted direction (Joep, 2026-10-14). Step 0 in progress; nothing
+else built. Pre-v1: the ABI may break until it is declared v1.
 
 Goal, in Joep's words: the plugin interface should be "a type-safe, real-time,
 decentralized, multi-machine Linux". Plugins are apps. Apps export typed
@@ -72,10 +71,10 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 0. Close the frame network hole
 
-- [x] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
+- [ ] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
       and both carry a `sandbox` directive. Today `connect-src *` lets a view
       that may read drive data send it to any host.
-- [x] Integration-proxy requests from frames go through the host (a
+- [ ] Integration-proxy requests from frames go through the host (a
       `proxyFetch` host op restricted to the minted capability's origin)
       instead of a direct `fetch` from the frame.
 - [ ] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote
@@ -94,36 +93,8 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       state (resources under the installation), and calls
       (`call(interface, function, args)`). Interaction is not a kernel op: it
       is `call` on the built-in `atomic:ui/*` apps (principle 7).
-      *Slice built (2026-10-14):* `atomic-host/wit/host.wit`, implemented for
-      world `sandboxed-app` in `server/src/plugins/host_abi/`: `get`,
-      `get-many`, `query` (class, parent, `eq`/`lt`/`lte`/`gt`/`gte`/`contains`/
-      `exists`, cursor, `complete`), `apply`, `subscribe`, `net.fetch`,
-      `events.next`/`ack`, `calls.providers`/`describe`/`call`. Still
-      `unsupported` or missing: `search`, `undo`, the `ne` filter, subclass
-      matching in `class`, `invoke-action`, state as resources, feeding
-      `events` from triggers/cron/commits, durable proposals, `handles`.
-      Docs: `docs/src/plugins/host-abi.md`.
-      *Review hold fixed (2026-10-15):* `/host/call` is v2-signed (method + body),
-      needs read (and write for `write`/`external` exports) on the drive before
-      anything loads, is rate limited, and caches release load failures for 5
-      minutes; manifest `uses` bounds `calls.call`; frames send
-      `allowEffects: ["read"]` (no approval UI yet); one entry call has a shared
-      budget (64 calls, 16G fuel pool with give-back, 30 s deadline);
-      `get-many` is capped at 100; app error codes outside the ABI become
-      `internal`; `apply` refuses a `set` of `isA` to Installation/Plugin/Release.
-      Open: `effect` is author-declared, so approval UI (step 2) must not trust
-      it alone; the fuel pool is per entry call, not per drive or agent.
-- [x] Typed records instead of JSON strings; batch operations. (`get-many`,
-      multi-intent `apply`. `calls` arguments stay JSON by design.)
+- [ ] Typed records instead of JSON strings; batch operations.
 - [ ] Generate Rust bindings and TS types plus the frame client from it.
-      *Rust done* (host: `wasmtime::component::bindgen!`; apps: `wit-bindgen`,
-      see `plugin-examples/host-abi-*`). *TS: calls done*, hand-written rather
-      than generated: `browser/plugin/src/hostAbi.ts` (`AppExport`, `Effect`,
-      `HostError`, error codes; a test checks them against the Rust codes) and
-      `store.callExport(interface, fn, args)` in `@tomic/plugin` (`store.call(op, args)` stays the transport), over a `call` frame
-      op that the host sends as a signed `POST /host/call`. Not done: types for
-      `store`/`net`/`events`, generating them with jco, `call` in packaged
-      views (only drive-app frames), `describe`/`providers` from a frame.
 - [ ] Port the three runtimes (class-extender WIT, plugin-runtime WIT, frame
       `store`) onto it. Legacy RPC, `plugin.json` and `/app-write` go once the
       catalog apps are ported; stored installations stay readable.
@@ -164,10 +135,6 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Every app export (function, stream, view) is a resource under its
       `Release`: name, description, input and output schema, effect
       (`read` / `write` / `external`).
-      *Started:* a `sandboxed-app` manifest declares `exports` (function only,
-      bounded JSON Schema subset) and `calls.describe` / `POST /host/call`
-      serve them. They are not resources yet, and MCP tools, Cmd+K and docs are
-      not derived from them.
 - [ ] MCP tools, Cmd+K actions, in-app AI tools, bindings and docs are all
       derived from those resources (today only manifest `actions` become MCP
       tools, `server/src/plugins/actions.rs`).

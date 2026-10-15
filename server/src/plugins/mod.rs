@@ -51,8 +51,6 @@ pub mod external;
 pub mod files;
 pub mod form;
 #[cfg(feature = "wasm-plugins")]
-pub mod host_abi;
-#[cfg(feature = "wasm-plugins")]
 pub mod host_core;
 pub mod importer;
 #[cfg(feature = "wasm-plugins")]

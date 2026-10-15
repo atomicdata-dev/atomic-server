@@ -54,5 +54,3 @@ export type {
   SearchArgs,
   ViewContext,
 } from './store.js';
-export { HOST_ERROR_CODES, HostError, toHostErrorCode } from './hostAbi.js';
-export type { AppExport, Effect, HostErrorCode } from './hostAbi.js';

@@ -27,7 +27,6 @@
   - [Plugins](plugins.md)
     - [Creating Plugins](plugins/creating-plugins.md)
     - [Custom Views](plugins/custom-views.md)
-    - [Host ABI](plugins/host-abi.md)
   - [Atomic drive skill for coding agents](atomicserver/atomic-drive-skill.md)
   - [API](atomicserver/API.md)
   - [Creating a JSON-AD file](create-json-ad.md)

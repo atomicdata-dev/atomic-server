@@ -276,8 +276,6 @@ fn configure_wasm_plugin_routes(app: &mut actix_web::web::ServiceConfig) {
             get "/plugin-catalog" => handlers::plugin_release::catalog,
             post "/plugin-release" => handlers::plugin_release::publish,
             post "/plugin-release-package" => handlers::plugin_release::publish_package,
-            // Calls an app's export from outside the sandbox. See the handler.
-            post "/host/call" => handlers::host_call::handle_host_call,
         );
         app.service(
             web::resource("/plugin-run")

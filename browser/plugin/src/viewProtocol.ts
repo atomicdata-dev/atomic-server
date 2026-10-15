@@ -32,8 +32,6 @@ export type ViewOperation =
   | 'proxyConnections'
   /** Ask the person, in host UI, to connect a proxy platform for this app. */
   | 'proxyConnect'
-  /** A function another app in the drive exports (`POST /host/call`). */
-  | 'call'
   /**
    * Host UI. The host draws these itself: a frame cannot draw outside its own
    * box, and a share dialog or a confirm should look like the host's own.
@@ -64,8 +62,6 @@ export interface ViewResponse {
   id: string | number;
   result?: unknown;
   error?: string;
-  /** With `error`, on a failed `call`: the host ABI error code. */
-  code?: string;
 }
 export function viewRequest(
   id: string | number,
@@ -110,7 +106,6 @@ export function isViewRequest(value: unknown): value is ViewRequest {
       'proxyFetch',
       'proxyConnections',
       'proxyConnect',
-      'call',
       'confirm',
       'toast',
       'menu',

@@ -59,7 +59,6 @@ const methods = (object: object) =>
 
 const shared = [
   'apply',
-  'callExport',
   'undo',
   'getContext',
   'getResource',
@@ -208,48 +207,3 @@ it('still notifies a drive app when the changed resource cannot be read', async 
 
   expect(calls).toEqual([undefined]);
 });
-
-it.each(['packaged', 'drive app'])(
-  'calls an app export and types its failure: %s',
-  async kind => {
-    const f = frame();
-    vi.stubGlobal('window', f.window);
-    const store = kind === 'packaged' ? new ViewStore() : driveAppStore(f);
-
-    const ok = store.callExport('atomic:example/counter@1', 'increment', {
-      n: 1,
-    });
-    const request = f.parent.postMessage.mock.calls[0][0];
-    expect(isViewRequest(request)).toBe(true);
-    expect(request).toMatchObject({
-      op: 'call',
-      args: {
-        interface: 'atomic:example/counter@1',
-        function: 'increment',
-        args: { n: 1 },
-      },
-    });
-    f.reply({
-      type: 'atomic.view.response',
-      version: 1,
-      id: request.id,
-      result: { value: 2 },
-    });
-    expect(await ok).toEqual({ value: 2 });
-
-    const failed = store.callExport('atomic:nobody/none@1', 'x');
-    const second = f.parent.postMessage.mock.calls[1][0];
-    f.reply({
-      type: 'atomic.view.response',
-      version: 1,
-      id: second.id,
-      error: 'nobody provides it',
-      code: 'not-found',
-    });
-    await expect(failed).rejects.toMatchObject({
-      name: 'HostError',
-      code: 'not-found',
-      message: 'nobody provides it',
-    });
-  },
-);
