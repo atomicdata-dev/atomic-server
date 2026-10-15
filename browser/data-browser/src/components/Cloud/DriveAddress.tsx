@@ -15,7 +15,7 @@ import {
 } from '../../helpers/managed/aliases';
 
 /**
- * A workspace's public web address, such as `ontola.atomic.place`.
+ * A drive's public web address, such as `ontola.atomic.place`.
  *
  * Mirrors the account portal's drive address: a debounced availability check
  * while typing (the portal owns the reserved and taken names), a confirmation

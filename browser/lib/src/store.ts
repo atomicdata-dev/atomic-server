@@ -51,6 +51,7 @@ import { hasBrowserAPI } from './hasBrowserAPI.js';
 import { collections } from './ontologies/collections.js';
 import { commits } from './ontologies/commits.js';
 import { core } from './ontologies/core.js';
+import * as trashOps from './trash.js';
 import { server, type Server } from './ontologies/server.js';
 import { notifications } from './ontologies/notifications.js';
 import { conversations } from './ontologies/conversations.js';
@@ -663,6 +664,9 @@ async function readDriveVersionVectors(
   return all;
 }
 
+/** How long a refused-drive lookup that found nothing is trusted. */
+const REFUSED_DRIVE_RETRY_MS = 30_000;
+
 export class Store {
   /** A list of all functions that need to be called when a certain resource is updated */
   public subscribers: Map<string, ResourceCallback[]>;
@@ -1233,7 +1237,7 @@ export class Store {
     const normalized = this.normalizeSubject(drive);
     const agent = this.getAgent();
 
-    if (!agent) throw new Error('Sign in before disconnecting this workspace.');
+    if (!agent) throw new Error('Sign in before disconnecting this drive.');
 
     // The local database attaches a few hundred ms after boot and again after
     // every agent change, so a click inside that window found no database at
@@ -1291,7 +1295,7 @@ export class Store {
 
     if (!ws)
       throw new AtomicError(
-        'Connect to a server before disconnecting this workspace.',
+        'Connect to a server before disconnecting this drive.',
         ErrorType.Server,
       );
 
@@ -1396,7 +1400,7 @@ export class Store {
 
     if (!this._serverConnected) {
       throw new AtomicError(
-        'Connect to a server before syncing this workspace.',
+        'Connect to a server before syncing this drive.',
         ErrorType.Server,
       );
     }
@@ -1434,7 +1438,7 @@ export class Store {
 
     if (!ws || !db) {
       throw new AtomicError(
-        'Connect to a server before syncing this workspace.',
+        'Connect to a server before syncing this drive.',
         ErrorType.Server,
       );
     }
@@ -1443,7 +1447,7 @@ export class Store {
     this.subscribeWebSocket(normalized);
 
     const deadline = Date.now() + timeoutMs;
-    let lastProblem = 'The server has not received this workspace yet.';
+    let lastProblem = 'The server has not received this drive yet.';
 
     while (Date.now() < deadline) {
       await ws.resyncDrive(normalized);
@@ -1459,7 +1463,7 @@ export class Store {
         const remoteBySubject = new Map(remote.map(i => [i.subject, i.vv]));
 
         if (!remoteBySubject.has(drive)) {
-          lastProblem = 'The server is still missing this workspace root.';
+          lastProblem = 'The server is still missing this drive root.';
         } else {
           const missing = Object.entries(local).filter(([subject, vv]) => {
             const have = remoteBySubject.get(subject);
@@ -1484,7 +1488,7 @@ export class Store {
     }
 
     throw new AtomicError(
-      `Cloud Server did not finish receiving this workspace. ${lastProblem}`,
+      `Cloud Server did not finish receiving this drive. ${lastProblem}`,
       ErrorType.Server,
     );
   }
@@ -5473,9 +5477,15 @@ export class Store {
 
   private refusedDriveHandler: RefusedDriveHandler | undefined;
 
-  /** One attempt per drive per session, so a failing drive is not looked up
-   *  again by every entry that fails for it. */
-  private _refusedDriveAttempts = new Map<string, Promise<boolean>>();
+  /** One attempt per drive, so a failing drive is not looked up again by
+   *  every entry that fails for it. A `true` result and an attempt in flight
+   *  stay for the session; a `false` ("could not find out", often because the
+   *  portal session or drive is not ready yet) expires after
+   *  {@link REFUSED_DRIVE_RETRY_MS}, so a later refusal asks again. */
+  private _refusedDriveAttempts = new Map<
+    string,
+    { promise: Promise<boolean>; resolvedFalseAt?: number }
+  >();
 
   /**
    * Register how the app resolves a drive the server refuses as "not
@@ -5510,21 +5520,34 @@ export class Store {
     const key = this.normalizeSubject(drive);
     const existing = this._refusedDriveAttempts.get(key);
 
-    if (existing) return existing;
+    if (
+      existing &&
+      (existing.resolvedFalseAt === undefined ||
+        Date.now() - existing.resolvedFalseAt < REFUSED_DRIVE_RETRY_MS)
+    ) {
+      return existing.promise;
+    }
 
     const handler = this.refusedDriveHandler;
-    const attempt = (async () => {
+    const entry: { promise: Promise<boolean>; resolvedFalseAt?: number } = {
+      promise: Promise.resolve(false),
+    };
+    entry.promise = (async () => {
+      let healed = false;
+
       try {
-        return !!(await handler?.(drive, message));
+        healed = !!(await handler?.(drive, message));
       } catch (e) {
         console.warn('[Store] refused drive handler failed:', e);
-
-        return false;
       }
-    })();
-    this._refusedDriveAttempts.set(key, attempt);
 
-    return attempt;
+      if (!healed) entry.resolvedFalseAt = Date.now();
+
+      return healed;
+    })();
+    this._refusedDriveAttempts.set(key, entry);
+
+    return entry.promise;
   }
 
   /**
@@ -5543,16 +5566,26 @@ export class Store {
       const drive =
         named ?? this.driveOf(this.normalizeSubject(subject)) ?? subject;
 
-      if (this._notifiedRefusedDrives.has(drive)) return;
+      if (this._notifiedRefusedDrives.has(drive)) {
+        // Already reported, but a lookup that found nothing may be retried
+        // (healRefusedDrive decides); a drive it resolves stops refusing.
+        if (named && this.refusedDriveHandler) {
+          void this.healRefusedDrive(named, message).catch(e =>
+            console.warn('[Store] could not retry refused drive:', e),
+          );
+        }
+
+        return;
+      }
 
       this._notifiedRefusedDrives.add(drive);
 
       const toast = () =>
         this.notifyError(
           new Error(
-            `This server does not host this workspace (${message.trim()}) ` +
+            `This server does not host this drive (${message.trim()}) ` +
               `Your changes are kept on this device and are not being sent. ` +
-              `Ask the server's operator to enrol the workspace, or turn on ` +
+              `Ask the server's operator to enrol the drive, or turn on ` +
               `browser-only sync for it in the sync settings.`,
           ),
         );
@@ -5586,8 +5619,8 @@ export class Store {
       this.notifyError(
         new Error(
           `Some changes could not be sent: the server does not have the ` +
-            `workspace they belong to (${drive.slice(0, 40)}…). They are ` +
-            `kept on this device and are not being retried. Once the workspace ` +
+            `drive they belong to (${drive.slice(0, 40)}…). They are ` +
+            `kept on this device and are not being retried. Once the drive ` +
             `is back on the server, syncing it sends them; if it is gone, ` +
             `discard them on the Sync page.`,
         ),
@@ -5926,6 +5959,41 @@ export class Store {
       lastDriveSync: this._lastDriveSync,
       lastDriveSyncError: this._lastDriveSyncError,
     };
+  }
+
+  /** The drive's Trash folder if the store already knows it. Never fetches. */
+  public peekTrashFolder(drive: string | undefined): string | undefined {
+    return trashOps.peekTrashFolder(this, drive);
+  }
+
+  /** The drive's Trash folder, created on first use. */
+  public getOrCreateTrashFolder(drive: string): Promise<string> {
+    return trashOps.getOrCreateTrashFolder(this, drive);
+  }
+
+  /**
+   * Parks a resource in the drive's Trash and remembers its old parent.
+   * Throws for content-addressed properties; false when nothing was done.
+   */
+  public trash(subject: string, drive: string): Promise<boolean> {
+    return trashOps.moveToTrash(this, subject, drive);
+  }
+
+  /** Moves a trashed resource back to where it came from (or the drive root). */
+  public restore(subject: string, drive: string): Promise<void> {
+    return trashOps.restoreFromTrash(this, subject, drive);
+  }
+
+  /**
+   * Whether a resource is in the drive's Trash: directly, or with `deep` also
+   * under a trashed ancestor (only already-loaded ancestors are read).
+   */
+  public isTrashed(
+    subjectOrResource: string | Resource,
+    drive: string | undefined,
+    opts?: trashOps.IsTrashedOptions,
+  ): boolean {
+    return trashOps.isTrashed(this, subjectOrResource, drive, opts);
   }
 
   public async notifyResourceSaved(resource: Resource): Promise<void> {

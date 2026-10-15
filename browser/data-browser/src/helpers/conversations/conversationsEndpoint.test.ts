@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  fetchMemberOf,
   hasConversationsEndpoint,
   resetConversationsEndpointCache,
 } from './conversationsEndpoint';
@@ -89,5 +90,31 @@ describe('hasConversationsEndpoint', () => {
     expect(
       await hasConversationsEndpoint('http://hang', '/conversations'),
     ).toBe(true);
+  });
+});
+
+describe('fetchMemberOf', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('asks nobody while the browser is offline', async () => {
+    const request = vi.fn();
+    const fetchResourceFromServer = vi.fn();
+
+    vi.stubGlobal('fetch', request);
+    vi.stubGlobal('navigator', { onLine: false });
+
+    const found = await fetchMemberOf({
+      getAgent: () => ({ subject: 'atomic:agent:me' }),
+      isLocalOnlyDrive: () => false,
+      getServerUrl: () => 'http://app',
+      fetchResourceFromServer,
+    } as never);
+
+    expect(found).toEqual([]);
+    expect(request).not.toHaveBeenCalled();
+    expect(fetchResourceFromServer).not.toHaveBeenCalled();
   });
 });

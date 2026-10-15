@@ -25,16 +25,22 @@ export async function handOverAppKey(
   if (!agent) throw new Error('Sign in to give an app its key');
 
   const url = `${store.getServerUrl()}/app-agent`;
-  const headers = await signRequest(url, agent, {});
+  const payload = JSON.stringify({
+    drive: options.drive,
+    app: options.app,
+    secret: options.secret,
+  });
+  const headers = await signRequest(
+    url,
+    agent,
+    {},
+    { method: 'POST', body: payload },
+  );
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      drive: options.drive,
-      app: options.app,
-      secret: options.secret,
-    }),
+    body: payload,
   });
 
   if (!response.ok) {

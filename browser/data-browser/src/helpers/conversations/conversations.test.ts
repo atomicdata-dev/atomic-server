@@ -159,3 +159,26 @@ describe('hasMember', () => {
     expect(hasMember(conversation(undefined), OTHER)).toBe(false);
   });
 });
+
+describe('hasMembers', () => {
+  const resource = (read: string[]) =>
+    ({
+      get: (prop: string) => (prop === core.properties.read ? read : undefined),
+    }) as never;
+
+  it('matches the same agents in either spelling', () => {
+    expect(
+      hasMembers(resource(['atomic:agent:me', 'atomic:agent:other']), [
+        'did:ad:agent:other',
+        'did:ad:agent:me',
+      ]),
+    ).toBe(true);
+  });
+
+  it('does not match other members or another size', () => {
+    expect(hasMembers(resource([ME, OTHER]), [ME, 'did:ad:agent:x'])).toBe(
+      false,
+    );
+    expect(hasMembers(resource([ME, OTHER]), [ME])).toBe(false);
+  });
+});

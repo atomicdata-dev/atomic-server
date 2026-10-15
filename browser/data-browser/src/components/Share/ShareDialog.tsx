@@ -10,6 +10,7 @@ import React, {
 import {
   core,
   dataBrowser,
+  server,
   urls,
   useArray,
   useCanWrite,
@@ -33,8 +34,11 @@ import {
   profileReviewedBefore,
   rememberProfileReviewed,
 } from './profileReviewed';
+import { paths } from '../../routes/paths';
+import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { useIsPrivateDrive } from '@hooks/useIsPrivateDrive';
 import { useInheritedRights } from '../../routes/Share/useInheritedRights';
+import { CLOUD_SERVER_PRICE } from '../../helpers/cloudServerPrice';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
 import {
   accountAddress,
@@ -196,6 +200,11 @@ function ShareOverview({
 }): JSX.Element {
   const isSaas = !!getManagedPortalUrl();
   const isPrivateDrive = useIsPrivateDrive(resource.subject);
+  const store = useStore();
+  const isUnhostedDrive =
+    canWrite &&
+    resource.hasClasses(server.classes.drive) &&
+    store.isLocalOnlyDrive(resource.subject);
   const [agent] = useCurrentAgent();
   const [title] = useTitle(resource);
   const [rights, setRole] = useShareRights(resource);
@@ -277,6 +286,13 @@ function ShareOverview({
       <Dialog.Content>
         <Stack>
           {isPrivateDrive && <PrivateDriveWarning />}
+          {isUnhostedDrive && (
+            <UnhostedDriveNotice
+              subject={resource.subject}
+              isSaas={isSaas}
+              onDone={onDone}
+            />
+          )}
           {canWrite && isSaas && (
             <EmailInviteInput
               emails={emails}
@@ -557,6 +573,60 @@ function PrivateDriveWarning(): JSX.Element {
   );
 }
 
+function UnhostedDriveNotice({
+  subject,
+  isSaas,
+  onDone,
+}: {
+  subject: string;
+  isSaas: boolean;
+  onDone: () => void;
+}): JSX.Element {
+  return (
+    <PrivateDriveWarningBox role='note' data-test='unhosted-drive-notice'>
+      <FaTriangleExclamation />
+      <UnhostedBody>
+        <span>
+          This drive is not on a server. People you invite can open it only
+          while one of your devices has it open in a browser.
+        </span>
+        {isSaas && <UpgradePitch subject={subject} onDone={onDone} />}
+      </UnhostedBody>
+    </PrivateDriveWarningBox>
+  );
+}
+
+function UpgradePitch({
+  subject,
+  onDone,
+}: {
+  subject: string;
+  onDone: () => void;
+}): JSX.Element {
+  const navigate = useNavigateWithTransition();
+
+  return (
+    <>
+      <span>
+        <strong>
+          A Cloud Server keeps this drive online for everyone, so nobody has to
+          keep a browser open.
+        </strong>
+      </span>
+      <UpgradeButton
+        onClick={() => {
+          onDone();
+          void navigate(
+            `${paths.sync}?${new URLSearchParams({ drive: subject })}`,
+          );
+        }}
+      >
+        Upgrade to Cloud Server from {CLOUD_SERVER_PRICE}
+      </UpgradeButton>
+    </>
+  );
+}
+
 /** Long names are cut off, not wrapped, so the close button keeps its place. */
 const ShareTitle = styled.h1`
   margin: 0;
@@ -688,6 +758,20 @@ const LinkText = styled.span<{ $muted: boolean }>`
   white-space: nowrap;
   color: ${p => (p.$muted ? p.theme.colors.textLight : p.theme.colors.text)};
   user-select: all;
+`;
+
+const UnhostedBody = styled.span`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 0;
+`;
+
+const UpgradeButton = styled(Button)`
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
 `;
 
 /**

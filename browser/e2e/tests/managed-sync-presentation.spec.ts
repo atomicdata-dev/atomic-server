@@ -176,7 +176,7 @@ for (const localOnly of [true, false]) {
         }),
       ).toHaveCount(0);
       const workspaceSync = page.getByRole('checkbox', {
-        name: 'Sync this workspace with this server',
+        name: 'Sync this drive with this server',
       });
       await expect(workspaceSync).toBeChecked();
       await workspaceSync.click();

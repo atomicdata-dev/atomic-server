@@ -35,32 +35,34 @@ pub struct Publish {
 /// Publishes a JS draft as a release and lists it in this server's marketplace.
 pub async fn publish(
     appstate: web::Data<AppState>,
-    body: web::Json<Publish>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    from_draft(appstate, body, req, context, true).await
+    from_draft(appstate, raw, req, context, true).await
 }
 
 /// Publishes a JS draft as a private release, so a connection can pin it.
 pub async fn pin(
     appstate: web::Data<AppState>,
-    body: web::Json<Publish>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    from_draft(appstate, body, req, context, false).await
+    from_draft(appstate, raw, req, context, false).await
 }
 
 async fn from_draft(
     appstate: web::Data<AppState>,
-    body: web::Json<Publish>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: RequestContext,
     public: bool,
 ) -> AtomicServerResult<HttpResponse> {
+    let body: Publish = crate::helpers::parse_json(&raw)?;
     let agent =
-        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &raw, &body.plugin)
+            .await?;
     let store = &appstate.store;
     let source = crate::plugins::scheduler::plugin_source(store, &body.drive, &body.plugin)
         .await
@@ -135,7 +137,8 @@ pub async fn publish_package(
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
     let agent =
-        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &query.drive).await?;
+        crate::helpers::authorize_plugin_write(&appstate, &req, &context, &body, &query.drive)
+            .await?;
     // The claimed world goes in, so a package that does not match it is
     // refused before its bytes or its release record are stored.
     let (_, release, manifest) =
@@ -264,15 +267,7 @@ async fn readable_release(
             "This package has not been published",
         ));
     };
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject =
-        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-    let agent = crate::helpers::get_client_agent(req.headers(), appstate, &signed_subject).await?;
+    let agent = crate::helpers::authenticate(req, appstate, context, &[]).await?;
     check_read(store, &resource, &agent).await?;
     Ok(store.get_plugin_release(id)?)
 }

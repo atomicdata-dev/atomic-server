@@ -48,6 +48,15 @@ export interface AccessStore {
   evictResource?(subject: string): void;
 }
 
+export interface InviteAccessOptions {
+  /**
+   * Whether this device holds the target. Given for browser invites, whose
+   * drive only syncs once the join screen made the peer link: then the signer
+   * shortcut and a server read prove nothing, and only a local copy counts.
+   */
+  hasLocalCopy?: (subject: string) => Promise<boolean>;
+}
+
 /**
  * True when `agent` can already do what the invite grants on its target: read
  * it for a view invite, write it for an edit invite. An invite the agent signed
@@ -59,8 +68,18 @@ export async function alreadyHasInviteAccess(
   agent: string | undefined,
   grant: InviteGrant,
   timeoutMs = 4000,
+  options: InviteAccessOptions = {},
 ): Promise<boolean> {
   if (!agent) return false;
+
+  if (options.hasLocalCopy) {
+    try {
+      return await options.hasLocalCopy(grant.target);
+    } catch {
+      return false;
+    }
+  }
+
   if (grant.signer === agent) return true;
 
   let timer: ReturnType<typeof setTimeout> | undefined;

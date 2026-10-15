@@ -268,8 +268,17 @@ Developer.
   (50 GiB, against 100 MB for free Cloud Vault), and quoting it on the vault
   row reads as the vault's own limit. The bar returns at 90% of the quota even
   when included. Cloud Vault adds a **Manage storage**
-  action in its row actions (subtle, like Restore and Turn off) that opens the
-  breakdown inside the row. Cloud Server, once on, shows
+  action in its row actions (subtle, like Restore and Turn off) that opens a
+  **dialog** (`VaultStorage`), not a nested card: one stacked bar (Snapshots,
+  Change history, Files and images, Other) sized by bytes, a legend with count
+  and size per item ("Snapshots · 3 · 21 MB"), and, when the control plane sends
+  the optional `history` field, a short list of why change history remains
+  (newest change pack of each device, changes no snapshot covers yet, the undo
+  window, and what can be freed now). A snapshot counts `checkpoint` objects;
+  `checkpoint_image` objects are chunks of a snapshot and only add to its size.
+  Actions: one primary **Compress history** (fresh snapshot, then free what it
+  covers) and a separate destructive **Discard history…** behind a confirmation.
+  The Flutter app has no storage view yet, so it has no twin for this dialog. Cloud Server, once on, shows
   `CloudServerDetails`: the usage meter with "(see where space goes)", a line
   "N resources · Synced <ago>", and the drive's web address
   (`DriveAddress`, backed by `helpers/managed/aliases.ts` against the portal's

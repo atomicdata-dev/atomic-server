@@ -27,11 +27,12 @@ async fn host(
     app: &AppState,
     req: &HttpRequest,
     context: &RequestContext,
+    raw: &[u8],
     drive: &str,
     plugin: &str,
     release: Option<&str>,
 ) -> AtomicServerResult<StoreHost> {
-    let account = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
+    let account = crate::helpers::authorize_plugin_write(app, req, context, raw, plugin).await?;
     let manifest = match release {
         Some(id) => Manifest::parse(app.store.get_plugin_release(id)?.manifest)?,
         None => None,
@@ -43,14 +44,16 @@ async fn host(
 }
 pub async fn preview(
     app: web::Data<AppState>,
-    body: web::Json<Preview>,
+    raw: web::Bytes,
     req: HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
+    let body: Preview = crate::helpers::parse_json(&raw)?;
     let host = host(
         &app,
         &req,
         &context,
+        &raw,
         &body.drive,
         &body.plugin,
         Some(&body.release),
@@ -70,20 +73,22 @@ pub async fn preview(
 }
 pub async fn status(
     app: web::Data<AppState>,
-    body: web::Json<Target>,
+    raw: web::Bytes,
     req: HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    host(&app, &req, &context, &body.drive, &body.plugin, None).await?;
+    let body: Target = crate::helpers::parse_json(&raw)?;
+    host(&app, &req, &context, &raw, &body.drive, &body.plugin, None).await?;
     Ok(HttpResponse::Ok().json(sync_session::read(&app.store, &body.drive, &body.plugin)?))
 }
 pub async fn apply(
     app: web::Data<AppState>,
-    body: web::Json<Target>,
+    raw: web::Bytes,
     req: HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    host(&app, &req, &context, &body.drive, &body.plugin, None).await?;
+    let body: Target = crate::helpers::parse_json(&raw)?;
+    host(&app, &req, &context, &raw, &body.drive, &body.plugin, None).await?;
     let session =
         sync_session::read(&app.store, &body.drive, &body.plugin)?.ok_or("no preview exists")?;
     let run = body
@@ -94,6 +99,7 @@ pub async fn apply(
         &app,
         &req,
         &context,
+        &raw,
         &body.drive,
         &body.plugin,
         Some(&session.release),
@@ -131,11 +137,12 @@ pub struct ScheduleRequest {
 }
 pub async fn schedule(
     app: web::Data<AppState>,
-    body: web::Json<ScheduleRequest>,
+    raw: web::Bytes,
     req: HttpRequest,
     context: RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    let host = host(&app, &req, &context, &body.drive, &body.plugin, None).await?;
+    let body: ScheduleRequest = crate::helpers::parse_json(&raw)?;
+    let host = host(&app, &req, &context, &raw, &body.drive, &body.plugin, None).await?;
     let state = match body.interval_seconds {
         Some(interval) => {
             crate::plugins::sync_worker::configure(

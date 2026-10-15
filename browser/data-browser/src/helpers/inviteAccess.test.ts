@@ -94,3 +94,21 @@ it('forgets a failed read, so a drive that arrives later can load', async () => 
   ).toBe(false);
   expect(store.evictResource).toHaveBeenCalledWith('atomic:drive');
 });
+
+it('a browser invite opens only when the drive is already on this device', async () => {
+  const store = storeWith({ canWrite: async () => [true, undefined] });
+  const own = grant(true, 'atomic:agent:me');
+
+  expect(
+    await alreadyHasInviteAccess(store, 'atomic:agent:me', own, 4000, {
+      hasLocalCopy: async () => false,
+    }),
+  ).toBe(false);
+  expect(store.getResource).not.toHaveBeenCalled();
+  expect(
+    await alreadyHasInviteAccess(store, 'atomic:agent:me', own, 4000, {
+      hasLocalCopy: async () => true,
+    }),
+  ).toBe(true);
+  expect(store.getResource).not.toHaveBeenCalled();
+});

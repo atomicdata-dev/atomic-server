@@ -4,7 +4,6 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
-import { isInTrash } from './trash';
 
 /**
  * Why `resource` should be left out of lists the user picks from (the command
@@ -24,7 +23,7 @@ export const unavailableReason = (
   if (
     store.isDestroyed(resource.subject) ||
     isNotFound(resource.error) ||
-    isInTrash(store, drive, resource, true)
+    store.isTrashed(resource, drive, { deep: true })
   ) {
     return 'gone';
   }
