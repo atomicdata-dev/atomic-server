@@ -133,7 +133,6 @@ export type SaveResult = 'persisted' | 'offline' | 'noop';
  * differentiate them.
  */
 export const SYSTEM_COMMIT_ORIGIN = 'origin:system';
-/** Pre-rename Loro origin; still excluded from undo. */
 /**
  * Loro change message on every commit that only replays state the server
  * already has (seeding a doc from JSON-AD propvals, healing, applying a
@@ -144,6 +143,7 @@ export const SYSTEM_COMMIT_ORIGIN = 'origin:system';
  */
 export const HYDRATION_COMMIT_MESSAGE = 'c-hydration';
 
+/** Pre-rename Loro origin; still excluded from undo. */
 export const LEGACY_SYSTEM_COMMIT_ORIGIN = 'atomic:system';
 
 /**
