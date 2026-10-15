@@ -12941,3 +12941,7 @@ msgstr ""
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View all drives"
 msgstr ""
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
+msgstr ""

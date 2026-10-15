@@ -1593,7 +1593,12 @@ function SyncPage() {
     details?: ReactNode;
     actions: ReactNode;
   } = (() => {
-    const managePlan = accountPortalUrl && status.drive && (
+    // Hosting belongs to the drive, but the plan belongs to whoever pays for
+    // it. Unknown (not yet loaded, or no session) counts as not paying: a
+    // member should never be offered another account's controls.
+    const paysForDrive =
+      subscriptionStatus !== null && subscriptionStatus !== 'free';
+    const managePlan = paysForDrive && accountPortalUrl && status.drive && (
       <Button
         subtle
         data-testid='cloud-server-manage'
@@ -1629,6 +1634,7 @@ function SyncPage() {
             usage={nodeUsage}
             quotaBytes={quotaBytes}
             signedIn={!!managedAccount}
+            managed={paysForDrive}
           />
         ) : undefined,
         actions: managePlan,
