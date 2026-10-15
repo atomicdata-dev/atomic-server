@@ -24,13 +24,16 @@ function httpOrigin(url: string | null | undefined): string | undefined {
  * to open a form. A Cloud Server enrollment names it (`http_origin`) and wins,
  * because the store's server URL can be the shared static origin of the hosted
  * app, which is no node and answers a form link with a 404. Otherwise the
- * store's server URL counts unless it is known to run no node. `undefined`
+ * store's server URL counts when the drive has a server endpoint
+ * (`serverReachable`, from `store.hasServerEndpoint`) and it is not known to
+ * run no node. `undefined`
  * means nothing hosts this drive.
  */
 export function resolveFormHostOrigin(
   drive: string | undefined,
   serverUrl: string | undefined,
   enrollments: ManagedEnrollmentSummary[],
+  serverReachable = true,
 ): string | undefined {
   const hosted = enrollments.find(
     e =>
@@ -44,6 +47,10 @@ export function resolveFormHostOrigin(
   const hostedOrigin = httpOrigin(hosted?.http_origin);
 
   if (hostedOrigin) return hostedOrigin;
+
+  // A local-only drive (or a server URL known to run no node) has no endpoint
+  // to host a form, whatever the store's server URL says.
+  if (!serverReachable) return undefined;
 
   const origin = httpOrigin(serverUrl);
 
@@ -83,7 +90,12 @@ export function useFormHostOrigin(): {
     };
   }, [hasPortal, drive]);
 
-  const origin = resolveFormHostOrigin(drive, serverUrl, enrollments ?? []);
+  const origin = resolveFormHostOrigin(
+    drive,
+    serverUrl,
+    enrollments ?? [],
+    store.hasServerEndpoint(drive),
+  );
 
   return { origin, pending: hasPortal && !origin && enrollments === undefined };
 }
