@@ -5,10 +5,16 @@ import {
   server,
   useChildren,
   useResource,
+  useResources,
   useString,
 } from '@tomic/react';
 import { canonicalizeScheme } from '@tomic/lib';
 import { useMemo } from 'react';
+
+const HIDDEN_CLASSES: string[] = [
+  ai.classes.aiChat,
+  dataBrowser.classes.meeting,
+];
 
 /**
  * The children of a drive minus its schema plumbing, shared by the sidebar and
@@ -20,7 +26,9 @@ import { useMemo } from 'react';
  * through the Comments panel), the AI Chats folder (chats re-open through the AI
  * sidebar) the Inbox (opens from Notifications in the app menu) and the Trash folder
  * (reached from the account menu at the bottom of the sidebar).
- * Ontologies the user creates themselves still show.
+ * Ontologies the user creates themselves still show. AI chats and Meetings
+ * are hidden by class wherever they sit (the AI sidebar and the meeting UI
+ * reach them), which also covers legacy drives whose chats sit in a folder.
  *
  * `subjects` is the filtered list; `allSubjects` is what `useChildren`
  * returned, so callers can tell "nothing" from "only hidden resources".
@@ -40,6 +48,7 @@ export function useVisibleDriveChildren(
     dataBrowser.properties.commentsFolder,
   );
   const [aiChatsFolder] = useString(driveResource, ai.properties.aiChatsFolder);
+  const children = useResources(allSubjects);
   const [inbox] = useString(driveResource, notifications.properties.inbox);
   const [trashFolder] = useString(
     driveResource,
@@ -54,10 +63,16 @@ export function useVisibleDriveChildren(
     );
 
     return allSubjects.filter(
-      subject => !hidden.has(canonicalizeScheme(subject)),
+      subject =>
+        !hidden.has(canonicalizeScheme(subject)) &&
+        !children
+          .get(subject)
+          ?.getClasses()
+          .some(c => HIDDEN_CLASSES.includes(c)),
     );
   }, [
     allSubjects,
+    children,
     defaultOntology,
     commentsFolder,
     aiChatsFolder,

@@ -23,7 +23,6 @@ import { constructOpenURL } from '../../helpers/navigation';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { sendChatMessage } from '../../views/ChatRoom/ChatRoomView';
-import { getOrCreateMeetingsFolder } from '../../helpers/standardLocations';
 
 interface FollowContextValue {
   /** Agent subject currently being followed, if any. */
@@ -355,13 +354,8 @@ export function FollowProvider({
           minute: '2-digit',
         })}`;
 
-      // Meetings live in the drive's Meetings folder (a standard
-      // location found via the drive's `meetingsFolder` pointer), not
-      // in the drive root.
-      const meetingsFolder = await getOrCreateMeetingsFolder(store, drive);
-
       const meeting = await store.newResource({
-        parent: meetingsFolder,
+        parent: drive,
         isA: dataBrowser.classes.meeting,
         propVals: { [core.properties.name]: meetingName },
       });
