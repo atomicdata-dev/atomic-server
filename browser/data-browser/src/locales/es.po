@@ -11439,10 +11439,6 @@ msgstr ""
 msgid "Saved {0}, identity …{1}"
 msgstr ""
 
-#: src/routes/InviteRoute.tsx
-msgid "Opening invitation..."
-msgstr ""
-
 #. 0: candidates[0]
 #: src/routes/InviteRoute.tsx
 msgid "This invitation cannot be opened here: {0} does not run a server that holds the drive. Ask the person who invited you for a new link."

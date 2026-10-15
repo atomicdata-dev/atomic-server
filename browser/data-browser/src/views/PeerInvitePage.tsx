@@ -167,7 +167,7 @@ export function PeerInvitePage({ token }: { token: string }) {
             ) : ready ? (
               <Button onClick={open}>Open drive</Button>
             ) : ownInvite ? (
-              !error && <Spinner centered />
+              !error && <Spinner size='2.5rem' />
             ) : (
               <Button onClick={join} disabled={joining}>
                 {joining ? 'Connecting…' : 'Join drive'}

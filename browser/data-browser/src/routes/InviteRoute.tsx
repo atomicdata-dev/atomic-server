@@ -181,7 +181,7 @@ function NodeInvite({ token }: { token: string }) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- `candidatesKey` stands for `candidates`
   }, [candidatesKey, store, setServerUrl]);
 
-  if (node === undefined) return <p>Opening invitation...</p>;
+  if (node === undefined) return <Spinner centered />;
 
   if (node === null || isOriginWithoutNode(node)) {
     return (
