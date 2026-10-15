@@ -35,7 +35,15 @@ node can keep it. Kept commits live in a side tree on the node (internally
 and are not indexed: they never appear in queries or collections. A node keeps
 either the commit that produced the current state (`--envelope-retention
 latest`, the default) or every commit (`all`), which turns the Loro history
-into a signed audit log. A kept commit is about 0.9 KB for a small edit.
+into a signed audit log.
+
+The Loro document already holds every change, so a kept commit stores only
+what proves it: the signer, the previous commit, which range of Loro changes
+it introduced, and a hash of them (about 63 bytes for a small edit). When it is
+read, the node rebuilds the exact signed JSON-AD from the Loro history, and the
+signature is checked against that. If a commit cannot be rebuilt byte for byte
+when it is stored, the full JSON is kept instead. A kept commit that can no
+longer be rebuilt is reported as unreadable, never guessed.
 
 A resource can ask for the audit log itself. Set its `retention` property to
 `audit` (the default is `compact`) and the node keeps every commit of that
