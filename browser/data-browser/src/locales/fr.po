@@ -13085,3 +13085,8 @@ msgstr ""
 #: src/views/AgentPage.tsx
 msgid "Your notes"
 msgstr ""
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Commented {0}"
+msgstr "Commenté {0}"

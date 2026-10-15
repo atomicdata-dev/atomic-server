@@ -13098,3 +13098,8 @@ msgstr "Only you can see these. {0} cannot."
 #: src/views/AgentPage.tsx
 msgid "Your notes"
 msgstr "Your notes"
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Commented {0}"
+msgstr "Commented {0}"
