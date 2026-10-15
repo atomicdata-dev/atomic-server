@@ -27,7 +27,10 @@ import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
 import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import { useHiddenDriveSubjects } from '@hooks/useVisibleDriveChildren';
+import { useRecentComments } from '@hooks/useRecentComments';
 import { lastEditedAt } from './lastEditedAt';
+import { mergeActivity, type ActivityRow } from './commentActivity';
 
 export { lastEditedAt };
 
@@ -104,14 +107,10 @@ export function DrivePeople(): JSX.Element | null {
 }
 
 /** One full-width line per resource, with an optional quiet edit time. */
-function ResourceLines({
-  items,
-}: {
-  items: { subject: string; at?: number }[];
-}): JSX.Element {
+function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
   return (
     <Lines>
-      {items.map(({ subject, at }) => (
+      {items.map(({ subject, at, kind }) => (
         <li key={subject}>
           <ResourceRow
             clickable
@@ -123,7 +122,11 @@ function ResourceLines({
                   as='time'
                   dateTime={new Date(at).toISOString()}
                 >
-                  Edited {toRelativeDateTime(new Date(at), true)}
+                  {kind === 'commented' ? (
+                    <>Commented {toRelativeDateTime(new Date(at), true)}</>
+                  ) : (
+                    <>Edited {toRelativeDateTime(new Date(at), true)}</>
+                  )}
                 </ResourceRowDescription>
               ) : undefined
             }
@@ -182,13 +185,26 @@ export function ActivityFeed({
   const store = useStore();
   const recent = useMemo(() => getRecentResources(drive), [drive]);
   const children = useMemo(() => new Set(subjects), [subjects]);
+  const commented = useRecentComments(drive);
+  const hidden = useHiddenDriveSubjects(drive);
+  // Resources that were commented on are candidates too, unless the drive
+  // keeps them out of sight (Comments folder, Trash, ...).
   const candidates = useMemo(
-    () => Array.from(new Set([...subjects, ...recent])),
-    [subjects, recent],
+    () =>
+      Array.from(
+        new Set([
+          ...subjects,
+          ...recent,
+          ...Array.from(commented.keys()).filter(
+            subject => !hidden.has(canonicalizeScheme(subject)),
+          ),
+        ]),
+      ),
+    [subjects, recent, commented, hidden],
   );
   const resources = useResources(candidates, { allowIncomplete: true });
   const items = useMemo(() => {
-    const out: { subject: string; at?: number }[] = [];
+    const edits: { subject: string; at?: number }[] = [];
 
     for (const [subject, resource] of resources) {
       // Only the drive's own children and recents that sit inside it. Recents
@@ -198,6 +214,8 @@ export function ActivityFeed({
         continue;
       }
 
+      // Unreadable resources drop out here, and with them any comment on
+      // them: their title never reaches the list.
       if (
         resource.loading ||
         isUnauthorized(resource.error) ||
@@ -206,13 +224,13 @@ export function ActivityFeed({
         continue;
       }
 
-      out.push({ subject, at: lastEditedAt(resource) });
+      edits.push({ subject, at: lastEditedAt(resource) });
     }
 
     // Unknown edit time (legacy resource never edited here): listed after the
     // dated rows, without a made-up "Edited ..." caption.
-    return out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-  }, [resources, children, store, drive]);
+    return mergeActivity(edits, commented);
+  }, [resources, children, store, drive, commented]);
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, ACTIVITY_VISIBLE);
 
