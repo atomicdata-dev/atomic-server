@@ -120,17 +120,18 @@ export function MessagesPanel({
   );
 }
 
-function ConversationLink({
+/** One conversation as a menu row, titled with who is in it. */
+export function ConversationLink({
   subject,
-  query,
+  query = '',
   onMatch,
   onClick,
 }: {
   subject: string;
   /** Only conversations with a member whose name contains this show. */
-  query: string;
-  onMatch: (match: boolean) => void;
-  onClick: () => void;
+  query?: string;
+  onMatch?: (match: boolean) => void;
+  onClick?: () => void;
 }): JSX.Element | null {
   const resource = useResource(subject);
   const names = useMemberNames(resource);
@@ -138,7 +139,7 @@ function ConversationLink({
   const match =
     needle === '' || names.some(name => name.toLowerCase().includes(needle));
 
-  useEffect(() => onMatch(match), [match, onMatch]);
+  useEffect(() => onMatch?.(match), [match, onMatch]);
 
   if (!match) return null;
 

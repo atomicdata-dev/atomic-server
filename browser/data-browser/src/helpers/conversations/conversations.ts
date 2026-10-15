@@ -1,4 +1,5 @@
 import {
+  canonicalIdentifier,
   conversations,
   core,
   Datatype,
@@ -82,6 +83,13 @@ async function memberFor(
   }
 
   return { agent, encryptionKey: key };
+}
+
+/** Whether `agent` is one of the members of `conversation`, however spelled. */
+export function hasMember(conversation: Resource, agent: string): boolean {
+  const read = membersOf(conversation);
+
+  return !!read && read.includes(canonicalIdentifier(agent));
 }
 
 /** Whether `conversation` has exactly these members, however they are spelled

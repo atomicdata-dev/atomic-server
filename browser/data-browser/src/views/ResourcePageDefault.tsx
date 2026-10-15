@@ -6,6 +6,7 @@ import {
   core,
   server,
   commits,
+  type Resource,
 } from '@tomic/react';
 import { styled } from 'styled-components';
 import AllProps from '../components/AllProps';
@@ -62,8 +63,6 @@ export function ResourcePageDefault({
 }: ResourcePageProps): JSX.Element {
   const createdBy = useCreatedBy(resource);
   const createdAt = useCreatedAt(resource);
-  const canEdit = useCanWrite(resource);
-  const navigate = useNavigateWithTransition();
 
   return (
     <>
@@ -72,14 +71,7 @@ export function ResourcePageDefault({
         <Column>
           <Row justify='space-between' align='flex-start'>
             <EditableTitle resource={resource} withDecorations />
-            {canEdit && (
-              <EditButton
-                ghost
-                onClick={() => navigate(editURL(resource.subject))}
-              >
-                <FaPencil aria-hidden /> Edit
-              </EditButton>
-            )}
+            <EditResourceButton resource={resource} />
           </Row>
           <CompactDetails>
             <ClassDetail resource={resource} />
@@ -98,6 +90,26 @@ export function ResourcePageDefault({
         </Column>
       </ContainerNarrow>
     </>
+  );
+}
+
+/** Opens the edit form of a resource. Renders nothing without write rights. */
+export function EditResourceButton({
+  resource,
+}: {
+  resource: Resource;
+}): JSX.Element | null {
+  const canEdit = useCanWrite(resource);
+  const navigate = useNavigateWithTransition();
+
+  if (!canEdit) {
+    return null;
+  }
+
+  return (
+    <EditButton ghost onClick={() => navigate(editURL(resource.subject))}>
+      <FaPencil aria-hidden /> Edit
+    </EditButton>
   );
 }
 
