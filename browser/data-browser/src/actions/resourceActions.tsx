@@ -1,6 +1,15 @@
 import toast from 'react-hot-toast';
-import { canvas, core, dataBrowser, forks, server } from '@tomic/react';
 import {
+  canvas,
+  conversations,
+  core,
+  dataBrowser,
+  forks,
+  server,
+  type Resource,
+} from '@tomic/react';
+import {
+  FaArrowRightFromBracket,
   FaArrowUpRightFromSquare,
   FaChartPie,
   FaClock,
@@ -37,6 +46,8 @@ import {
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
+import { useMemberNames } from '../views/Conversation/ConversationTitle';
+import { leaveConversation } from '../helpers/conversations/hiddenConversations';
 import { moveToTrash } from '../helpers/trash';
 import { removeRecentResource } from '../helpers/recentResources';
 import { openSearchOverlay } from '../components/overlayState';
@@ -48,6 +59,21 @@ export const OPEN_TAGS_EVENT = 'atomic-open-tags';
 const getParent = (ctx: ActionContext): string | undefined =>
   ctx.resource.get(core.properties.parent) as string | undefined;
 
+function LeaveConversationBody({ resource }: { resource: Resource }) {
+  const names = useMemberNames(resource);
+  const who = names.length > 0 ? names.join(', ') : 'this conversation';
+
+  return (
+    <p>
+      Leave {who}? This only removes it from your list. The other members keep
+      the conversation.
+    </p>
+  );
+}
+
+const isConversation = (ctx: ActionContext): boolean =>
+  ctx.resource.getClasses().includes(conversations.classes.conversation);
+
 // Trash membership is the direct parent only: items nested deeper in a trashed
 // folder travel with it, so only the folder itself shows Restore.
 const inTrash = (ctx: ActionContext): boolean =>
@@ -55,7 +81,12 @@ const inTrash = (ctx: ActionContext): boolean =>
 
 /** The drive itself and its Trash folder cannot be moved to the Trash. */
 const isTrashable = (ctx: ActionContext): boolean => {
-  if (!ctx.drive || ctx.subject === ctx.drive || inTrash(ctx)) {
+  if (
+    isConversation(ctx) ||
+    !ctx.drive ||
+    ctx.subject === ctx.drive ||
+    inTrash(ctx)
+  ) {
     return false;
   }
 
@@ -418,6 +449,34 @@ export const resourceActions: ActionDefinition[] = [
     },
   },
   {
+    id: 'leave-conversation',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Leave conversation',
+    helper: () => 'Remove this conversation from your list.',
+    keywords: ['remove', 'delete', 'hide', 'message'],
+    icon: () => <FaArrowRightFromBracket />,
+    available: isConversation,
+    danger: true,
+    dangerLabel: () => 'Confirm Leave',
+    confirmation: {
+      title: () => 'Leave conversation',
+      confirmLabel: () => 'Leave',
+      body: ctx => <LeaveConversationBody resource={ctx.resource} />,
+    },
+    run: async ctx => {
+      try {
+        await leaveConversation(ctx.store, ctx.subject);
+
+        if (ctx.currentSubject === ctx.subject) ctx.navigate('/');
+      } catch (error) {
+        ctx.store.notifyError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+    },
+  },
+  {
     id: 'trash',
     scope: 'resource',
     section: 'action',
@@ -460,7 +519,8 @@ export const resourceActions: ActionDefinition[] = [
     helper: () => 'Delete this resource permanently. This cannot be undone.',
     keywords: ['remove', 'destroy'],
     icon: () => <FaTrash />,
-    available: ctx => ctx.canWrite && !isTrashable(ctx),
+    // Members of a conversation can't delete it, see `leave-conversation`.
+    available: ctx => ctx.canWrite && !isTrashable(ctx) && !isConversation(ctx),
     asTool: true,
     toolName: 'delete_resource',
     danger: true,
