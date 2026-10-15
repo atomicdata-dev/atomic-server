@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { grantAgent, useStore } from '@tomic/react';
-import { styled } from 'styled-components';
 import { Button } from '../components/Button';
-import { Margin } from '../components/Card';
-import { ConnectDrivePicker } from '../components/ConnectDrivePicker';
-import { ContainerNarrow } from '../components/Containers';
-import { ErrorLook } from '../components/ErrorLook';
-import { Main } from '../components/Main';
-import { Column, Row } from '../components/Row';
-import { RadioInput } from '../components/forms/RadioInput';
+import {
+  ConnectAppForm,
+  ConnectPage,
+  toggleSubject,
+  useConnectableDrives,
+} from '../components/ConnectAppForm';
 import { useSettings } from '../helpers/AppSettings';
 import { rememberConnectedApp } from '../helpers/connectedApps';
 import {
@@ -18,10 +16,7 @@ import {
   requestIssuedAgent,
 } from '../helpers/hostedMcp';
 import { isRunningInTauri } from '../helpers/tauri';
-import { useAccountDriveCatalog } from '../hooks/useAccountDriveCatalog';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
-import { usePrivateDrive } from '../hooks/usePrivateDrive';
-import { useSavedDrives } from '../hooks/useSavedDrives';
 import { pathNames, paths } from './paths';
 import { appRoute } from './RootRoutes';
 
@@ -86,11 +81,7 @@ function AuthorizeMcpPage() {
   const navigate = useNavigateWithTransition();
   const { agent, drive } = useSettings();
   const search = AuthorizeMcpRoute.useSearch();
-  const { privateDrive, loading: homeLoading } = usePrivateDrive();
-  const [savedDrives] = useSavedDrives();
-  const catalog = useAccountDriveCatalog(
-    privateDrive ? [privateDrive, ...savedDrives] : savedDrives,
-  );
+  const { privateDrive, homeLoading, catalog } = useConnectableDrives();
   const [picked, setPicked] = useState<string[] | undefined>();
   const [write, setWrite] = useState<boolean | undefined>();
   const [busy, setBusy] = useState(false);
@@ -119,44 +110,37 @@ function AuthorizeMcpPage() {
 
   if (!complete || !host) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connect an app</h1>
         <p>
           This link is incomplete. Start again from the app that sent you here.
         </p>
-      </Page>
+      </ConnectPage>
     );
   }
 
   if (!trusted) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connect an app</h1>
         <p>
           This link points at {serverHost ?? 'an unknown server'}, which is not
           the server you are signed in to, so nothing was shared. Start again
           from the app that sent you here, using your own server.
         </p>
-      </Page>
+      </ConnectPage>
     );
   }
 
   if (!agent?.subject) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connect an app</h1>
         <p>Sign in first, then open this link again.</p>
         <Button onClick={() => navigate(paths.welcome)}>Sign in</Button>
-      </Page>
+      </ConnectPage>
     );
   }
-
-  const toggle = (subject: string, on: boolean) =>
-    setPicked(
-      on
-        ? [...selected, subject]
-        : selected.filter(existing => existing !== subject),
-    );
 
   async function handleAllow() {
     setBusy(true);
@@ -208,7 +192,7 @@ function AuthorizeMcpPage() {
   }
 
   return (
-    <Page>
+    <ConnectPage>
       <h1>Connect an app that returns to {host}</h1>
       <p>
         <strong data-test='authorize-mcp-name'>{name}</strong> asks to {action}
@@ -221,62 +205,21 @@ function AuthorizeMcpPage() {
         time.
       </p>
 
-      <Column>
-        <Heading>What it can reach</Heading>
-        <ConnectDrivePicker
-          subjects={catalog.subjects}
-          selected={selected}
-          onToggle={toggle}
-        />
-
-        <Heading>What it can do</Heading>
-        <Column gap='0.75rem'>
-          <RadioInput
-            name='access'
-            checked={!canEdit}
-            onChange={() => setWrite(false)}
-          >
-            Read only
-          </RadioInput>
-          <RadioInput
-            name='access'
-            checked={canEdit}
-            onChange={() => setWrite(true)}
-            data-test='authorize-mcp-write'
-          >
-            Read and edit
-          </RadioInput>
-        </Column>
-
-        <Margin />
-        {error && <ErrorLook>{error}</ErrorLook>}
-        <Row>
-          <Button
-            onClick={handleAllow}
-            disabled={busy || homeLoading || selected.length === 0}
-            loading={busy ? 'Connecting' : undefined}
-            data-test='authorize-mcp-allow'
-          >
-            Allow
-          </Button>
-          <Button subtle onClick={() => navigate(paths.agentSettings)}>
-            Cancel
-          </Button>
-        </Row>
-      </Column>
-    </Page>
+      <ConnectAppForm
+        subjects={catalog.subjects}
+        selected={selected}
+        onToggle={(subject, on) =>
+          setPicked(toggleSubject(selected, subject, on))
+        }
+        canEdit={canEdit}
+        onCanEditChange={setWrite}
+        error={error}
+        busy={busy}
+        disabled={homeLoading}
+        onAllow={handleAllow}
+        onCancel={() => navigate(paths.agentSettings)}
+        testId='authorize-mcp'
+      />
+    </ConnectPage>
   );
 }
-
-function Page({ children }: React.PropsWithChildren) {
-  return (
-    <Main>
-      <ContainerNarrow>{children}</ContainerNarrow>
-    </Main>
-  );
-}
-
-const Heading = styled.h2`
-  margin: 0;
-  font-size: 1.1rem;
-`;

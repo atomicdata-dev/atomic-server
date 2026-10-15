@@ -129,17 +129,6 @@ impl ClassExtenderBuilder {
         self
     }
 
-    pub fn before_commit_fn<F>(mut self, handler: F) -> Self
-    where
-        F: for<'a> Fn(CommitExtenderContext<'a>) -> BoxFuture<'a, AtomicResult<()>>
-            + Send
-            + Sync
-            + 'static,
-    {
-        self.before_commit = Some(ClassExtender::wrap_commit_handler(handler));
-        self
-    }
-
     pub fn after_commit(mut self, handler: CommitHandler) -> Self {
         self.after_commit = Some(handler);
         self

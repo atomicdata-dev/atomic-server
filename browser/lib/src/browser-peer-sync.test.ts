@@ -117,6 +117,39 @@ it('backs off repeated failures and does not redial early on discovery refresh',
   await vi.advanceTimersByTimeAsync(1);
   expect(peers).toHaveLength(3);
 });
+
+function markReady(sync: BrowserPeerSync, id: string) {
+  const connections = (sync as unknown as { connections: Map<string, object> })
+    .connections;
+  (connections.get(id) as unknown as { onReady(path: string): void }).onReady(
+    'direct',
+  );
+}
+
+it('keeps backing off when connections die soon after becoming ready', async () => {
+  const socket = SignalSocket.instances[0];
+  socket.message({ type: 'joined', peers: [ids[0]] });
+  let count = 1;
+
+  for (const delay of [3000, 6000, 12000]) {
+    markReady(link, ids[0]);
+    await vi.advanceTimersByTimeAsync(5000);
+    peers[count - 1].reject(new Error('Peer access removed'));
+    await vi.advanceTimersByTimeAsync(delay - 1);
+    expect(peers).toHaveLength(count);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(peers).toHaveLength(++count);
+  }
+  // A connection that stays up for the stable period resets the backoff.
+
+  markReady(link, ids[0]);
+  await vi.advanceTimersByTimeAsync(30_000);
+  peers[count - 1].reject(new Error('remote closed'));
+  await vi.advanceTimersByTimeAsync(2999);
+  expect(peers).toHaveLength(count);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(peers).toHaveLength(count + 1);
+});
 it('removes one departing negotiation without interrupting other peers', () => {
   const socket = SignalSocket.instances[0];
   socket.message({ type: 'joined', peers: ids });

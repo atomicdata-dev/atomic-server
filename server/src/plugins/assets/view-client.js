@@ -465,7 +465,6 @@ export const store = {
 
 const PROXY_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const PROXY_HEADERS = ['link', 'retry-after', 'etag', 'content-type'];
-const PROXY_MAX_BODY = 10 * 1024 * 1024;
 /** Mint a new capability this long before the current one expires. */
 const CAPABILITY_MARGIN_MS = 60_000;
 
@@ -564,28 +563,6 @@ function proxyTarget(aud, connectionId, platform, path, query) {
   return url;
 }
 
-async function limitedText(response) {
-  if (!response.body) return '';
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let size = 0;
-  let text = '';
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > PROXY_MAX_BODY) throw new Error('Proxy response exceeds 10 MB');
-      text += decoder.decode(value, { stream: true });
-    }
-
-    return text + decoder.decode();
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-}
-
 function parseBody(text) {
   if (text === '') return null;
 
@@ -613,33 +590,26 @@ async function proxyRequest({ platform, connectionId, path, method, query, body,
       ...(ifMatch ? { 'If-Match': ifMatch } : {}),
     };
 
-    return fetch(url, {
-      method: verb,
-      body,
-      headers,
-      credentials: 'omit',
-      redirect: 'error',
-      signal: AbortSignal.timeout(30000),
-    });
+    // The frame has no network (CSP `connect-src 'none'`): the host sends the
+    // request we signed, to the proxy only, and hands back the raw response.
+    return send('proxyFetch', { url, method: verb, headers, body });
   };
 
   let response = await attempt(false);
-  let text = await limitedText(response);
-  let parsed = parseBody(text);
+  let parsed = parseBody(response.text);
 
   // The capability ran out between minting and use (a laptop lid, a slow
   // tab): mint a new one once. Any other refusal is the answer.
   if (response.status === 401 && parsed?.error === 'capability_expired') {
     response = await attempt(true);
-    text = await limitedText(response);
-    parsed = parseBody(text);
+    parsed = parseBody(response.text);
   }
 
   const headers = {};
 
   for (const name of PROXY_HEADERS) {
-    const value = response.headers.get(name);
-    if (value !== null) headers[name] = value;
+    const value = response.headers?.[name];
+    if (typeof value === 'string') headers[name] = value;
   }
 
   return { status: response.status, headers, body: parsed };

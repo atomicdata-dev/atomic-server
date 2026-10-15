@@ -1428,6 +1428,10 @@ export class AtomicServer {
         '/lib/defaults/tasks.json',
         this.source.file('lib/defaults/tasks.json'),
       )
+      .withFile(
+        '/lib/defaults/vocabularies.json',
+        this.source.file('lib/defaults/vocabularies.json'),
+      )
       // browser/e2e/tests/apps.spec.ts serves this checkout's embedded app SDK
       // as a fixture, read with a plain `readFileSync` at
       // `../../../server/src/plugins/assets/view-client.js`. From /app/e2e/tests

@@ -1,4 +1,5 @@
-import { canonicalIdentifier } from '@tomic/lib';
+import { canonicalIdentifier, encodeB64 } from '@tomic/lib';
+import { base64ToBytes, randomBytes } from '../bytes';
 import { accountPasskey } from './accountPasskey';
 import { getManagedAccount } from './session';
 import { isRunningInTauri } from '../tauri';
@@ -123,34 +124,6 @@ const RECOVERY_CODE_GROUP_LEN = 5;
 const RECOVERY_CODE_GROUPS = 5;
 const RECOVERY_CODE_CHARS = RECOVERY_CODE_GROUP_LEN * RECOVERY_CODE_GROUPS;
 const RECOVERY_CODE_BYTES = Math.ceil((RECOVERY_CODE_CHARS * 5) / 8);
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
-function randomBytes(length: number): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-
-  return bytes;
-}
 
 /** Generate a machine-strength recovery code, e.g. `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`. */
 export function generateRecoveryCode(): string {
@@ -650,10 +623,10 @@ async function wrapDekWithPasskey(
       wrapper_type: 'webauthn-prf',
       kdf_algorithm: '',
       kdf_params: account ? { rp_id: account.rpId, account_passkey: true } : {},
-      salt: bytesToBase64(prfSalt),
-      wrapped_dek: bytesToBase64(new Uint8Array(wrappedDek)),
-      wrap_nonce: bytesToBase64(wrapNonce),
-      credential_id: bytesToBase64(credentialId),
+      salt: encodeB64(prfSalt),
+      wrapped_dek: encodeB64(new Uint8Array(wrappedDek)),
+      wrap_nonce: encodeB64(wrapNonce),
+      credential_id: encodeB64(credentialId),
       label: `Passkey added ${new Date().toISOString().slice(0, 10)}`,
     },
   };
@@ -680,8 +653,8 @@ async function sealSecret(secret: string): Promise<{
 
   return {
     dek,
-    encryptedSecret: bytesToBase64(new Uint8Array(ciphertext)),
-    nonce: bytesToBase64(secretNonce),
+    encryptedSecret: encodeB64(new Uint8Array(ciphertext)),
+    nonce: encodeB64(secretNonce),
   };
 }
 
@@ -713,9 +686,9 @@ async function wrapDekWithCode(
     wrapper_type: 'recovery-code',
     kdf_algorithm: 'argon2id',
     kdf_params: kdfParams,
-    salt: bytesToBase64(wrapperSalt),
-    wrapped_dek: bytesToBase64(new Uint8Array(wrappedDek)),
-    wrap_nonce: bytesToBase64(wrapNonce),
+    salt: encodeB64(wrapperSalt),
+    wrapped_dek: encodeB64(new Uint8Array(wrappedDek)),
+    wrap_nonce: encodeB64(wrapNonce),
     label: `Recovery code saved ${new Date().toISOString().slice(0, 10)}`,
   };
 }
@@ -916,7 +889,7 @@ async function wrapDekWithAssisted(
   dek: Uint8Array<ArrayBuffer>,
   agentSubject: string,
 ): Promise<RecoveryWrapperInput> {
-  const salt = bytesToBase64(randomBytes(SALT_BYTES));
+  const salt = encodeB64(randomBytes(SALT_BYTES));
   const { key, keyId } = await assistedKey(agentSubject, salt, ['encrypt']);
   const wrapNonce = randomBytes(NONCE_BYTES);
   const wrappedDek = await crypto.subtle.encrypt(
@@ -931,8 +904,8 @@ async function wrapDekWithAssisted(
     // Which service key made it, so it still opens after a rotation.
     kdf_params: keyId ? { key_id: keyId } : {},
     salt,
-    wrapped_dek: bytesToBase64(new Uint8Array(wrappedDek)),
-    wrap_nonce: bytesToBase64(wrapNonce),
+    wrapped_dek: encodeB64(new Uint8Array(wrappedDek)),
+    wrap_nonce: encodeB64(wrapNonce),
     label: `${PRODUCT_NAME} account`,
   };
 }
@@ -1304,7 +1277,7 @@ async function unlockPasskeyGroup(
   const wrapper =
     assertion &&
     wrappers.find(
-      w => w.credential_id === bytesToBase64(new Uint8Array(assertion.rawId)),
+      w => w.credential_id === encodeB64(new Uint8Array(assertion.rawId)),
     );
   const output =
     assertion &&

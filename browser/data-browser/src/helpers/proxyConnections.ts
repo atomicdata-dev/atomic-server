@@ -86,6 +86,8 @@ export interface ProxyHost {
     publicKey: string;
   }): Promise<MintedCapability>;
   connections(platform: string): Promise<ConnectionReference[]>;
+  /** The configured proxy's origin: the only place `proxyFetch` may go. */
+  origin: string;
 }
 
 /** An error the proxy returned: `{error, message}` and the HTTP status. */
@@ -497,6 +499,7 @@ export class ProxyConnections {
   /** What `hostStore` answers one app's frame with. */
   host(appAgent: () => Promise<string>): ProxyHost {
     return {
+      origin: this.origin,
       capability: async request =>
         this.mintCapability({ ...request, appAgent: await appAgent() }),
       connections: async platform => this.delegated(await appAgent(), platform),

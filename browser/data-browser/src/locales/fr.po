@@ -129,6 +129,7 @@ msgstr "Agents IA"
 #: src/components/AvatarCropper.tsx
 #: src/components/Cloud/DriveAddress.tsx
 #: src/components/ConfirmationDialog.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
@@ -144,8 +145,6 @@ msgstr "Agents IA"
 #: src/components/forms/NewForm/NewFormDialog.tsx
 #: src/components/forms/ResourceForm.tsx
 #: src/components/forms/ValueForm/ValueFormEdit.tsx
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
 #: src/routes/History/HistoryMobileView.tsx
 #: src/views/Conversation/NewMessageDialog.tsx
 #: src/views/Installation/AssignRights.tsx
@@ -264,11 +263,9 @@ msgstr "Compacte automatiquement la conversation lorsque les jetons d'entrée d�
 #: src/chunks/AI/MessageContextItem.tsx
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 #: src/chunks/RTE/EditLinkForm.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/QuickAddDialog.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/forms/ResourceSelector/ResourceSelector.tsx
@@ -489,8 +486,7 @@ msgstr "En-têtes HTTP optionnels à envoyer lors de la connexion à ce serveur 
 
 #: src/actions/resourceActions.tsx
 #: src/chunks/AI/AgentConfigItem.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 #: src/components/MetaSetter.tsx
 #: src/routes/EditRoute.tsx
@@ -641,7 +637,6 @@ msgid "Unable to connect to Ollama server. Check if the server is running and yo
 msgstr "Impossible de se connecter au serveur Ollama. Vérifiez si le serveur est en cours d'exécution et si vous avez configuré l'URL correcte dans les paramètres."
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
 #: src/views/File/FilePreview.tsx
 #: src/views/File/FilePreviewThumbnail.tsx
 #: src/views/ResourceRow.tsx
@@ -721,7 +716,6 @@ msgstr "Vérifiez la console du navigateur pour les détails, ou essayez de reve
 msgid "404 Not found"
 msgstr "404 Non trouvé"
 
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 #: src/views/EndpointPage.tsx
 msgid "No hits"
@@ -746,7 +740,6 @@ msgid "Result"
 msgstr "Résultat"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 #: src/routes/Search/SearchRoute.tsx
 msgid "With Tags:"
 msgstr "Avec les étiquettes :"
@@ -989,27 +982,27 @@ msgstr "Ressources"
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Tags"
 msgstr "Tags"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Add LLM instructions"
 msgstr "Ajouter des instructions LLM"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "LLM Instructions"
 msgstr "Instructions LLM"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Default Ontology"
 msgstr "Ontologie par défaut"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Plugins"
 msgstr "Plugins"
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Remove tag"
 msgstr "Supprimer le tag"
 
@@ -1205,13 +1198,11 @@ msgid "Resource is loading..."
 msgstr "La ressource est en cours de chargement..."
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Search for resources..."
 msgstr "Rechercher des ressources..."
 
 #: src/components/OverlayContainer.tsx
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "esc"
 msgstr "échap"
 
@@ -1221,7 +1212,6 @@ msgid "Start AI Chat with \"{0}\""
 msgstr "Lancer une discussion IA avec « {0} »"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0/> <1/> navigate"
 msgstr "<0/> <1/> naviguer"
 
@@ -1230,7 +1220,6 @@ msgid "<0/> chat"
 msgstr "<0/> discuter"
 
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "<0>esc</0> close"
 msgstr "<0>échap</0> fermer"
 
@@ -2061,6 +2050,7 @@ msgstr "Shortname"
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewFormDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewOntologyDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Create"
 msgstr "Créer"
 
@@ -2197,6 +2187,7 @@ msgstr "<0/> Note"
 #: src/components/NewInstanceButton/QuickCreateRow.tsx
 #: src/routes/IntegrationStore.tsx
 #: src/routes/SettingsAgent.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "New"
 msgstr "Nouveau"
 
@@ -2295,8 +2286,7 @@ msgstr "Autoriser toutes les écritures effectuées par ce plugin"
 msgid "Deny"
 msgstr "Refuser"
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 #: src/views/PluginView/useRequestPermissionDialog.tsx
 msgid "Allow"
 msgstr "Autoriser"
@@ -3130,10 +3120,8 @@ msgstr "Exporter le tableau au format CSV"
 msgid "Table filters"
 msgstr "Filtres du tableau"
 
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/DerivedColumnHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
-#: src/chunks/TablePage/RowActionHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
+#: src/chunks/TablePage/ColumnSpecHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
 #: src/chunks/TablePage/TableHeading.tsx
@@ -3227,35 +3215,9 @@ msgstr "Ouvrir la ressource"
 msgid "Insufficient rights to view resource"
 msgstr "Droits insuffisants pour afficher la ressource"
 
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Search (Cmd+K)"
-msgstr "Rechercher (Cmd+K)"
-
-#. 0: title
-#: src/components/Searchbar/Searchbar.tsx
-msgid "in:{0}"
-msgstr "dans:{0}"
-
-#: src/components/Searchbar/Searchbar.tsx
-msgid "Clear scope"
-msgstr "Effacer la portée"
-
-#: src/components/Searchbar/TagSuggestionOverlay.tsx
-msgid "No tags found"
-msgstr "Aucun tag trouvé"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Caret"
-msgstr "Curseur"
-
-#: src/components/Searchbar/SearchbarInput.tsx
-msgid "Enter an Atomic URL or search  (press \"/\")"
-msgstr "Entrez une URL Atomique ou recherchez (appuyez sur \"/\")"
-
 #: src/components/MetaSetter.tsx
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
-#: src/components/Searchbar/SearchbarInput.tsx
 msgid "Search"
 msgstr "Rechercher"
 
@@ -3286,13 +3248,8 @@ msgid "(empty)"
 msgstr "(vide)"
 
 #: src/chunks/RTE/SlashMenu/CommandList.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "Searching..."
 msgstr "Recherche..."
-
-#: src/routes/Search/SearchOverlay.tsx
-msgid "<0/> open"
-msgstr "<0/> ouvrir"
 
 #: src/chunks/RTE/AIChatInput/AsyncAIChatInput.tsx
 msgid "Ask me anything, / for commands, @ for context"
@@ -3823,7 +3780,7 @@ msgstr "Appuyez sur <0>Annuler</0> / <1>Rétablir</1> pour parcourir les modific
 msgid "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
 msgstr ""
 
-#: src/views/Drive/DrivePage.tsx
+#: src/views/Drive/DriveSettingsDialog.tsx
 msgid "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
 msgstr "Une courte description donnée à l'Agent IA, utilisez ceci pour lui dire de quoi il s'agit, lier des ressources importantes, etc."
 
@@ -4028,10 +3985,6 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
-msgstr ""
-
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "Manage drives"
 msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
@@ -4259,10 +4212,6 @@ msgstr ""
 msgid "Open original"
 msgstr ""
 
-#: src/helpers/draftsFolder.ts
-msgid "Drafts"
-msgstr ""
-
 #: src/helpers/forksFolder.ts
 msgid "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
 msgstr ""
@@ -4345,10 +4294,6 @@ msgstr ""
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
-msgstr ""
-
-#: src/helpers/draftsFolder.ts
-msgid "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
 msgstr ""
 
 #: src/routes/AppSettings.tsx
@@ -7685,6 +7630,8 @@ msgid "Integration sections"
 msgstr ""
 
 #: src/chunks/PluginRuns/PluginPage.tsx
+#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Activity"
 msgstr ""
 
@@ -8702,7 +8649,7 @@ msgstr ""
 msgid "Workspace sync off"
 msgstr ""
 
-#: src/chunks/RTE/FormattingToolbar.tsx
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Show formatting toolbar"
 msgstr ""
 
@@ -8724,10 +8671,6 @@ msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
 msgid "Mention a resource (@)"
-msgstr ""
-
-#: src/chunks/RTE/FormattingToolbar.tsx
-msgid "Hide toolbar (type / or @ instead)"
 msgstr ""
 
 #: src/chunks/RTE/FormattingToolbar.tsx
@@ -9350,19 +9293,26 @@ msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} commented on {1}"
 msgstr ""
 
 #. 0: author; 1: on
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/MessageNotifier.tsx
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} in {1}"
 msgstr ""
 
 #: src/components/Notifications/MessageNotifier.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "Someone"
 msgstr ""
 
@@ -9489,6 +9439,7 @@ msgid "Searching in {0}"
 msgstr ""
 
 #: src/components/OverlayContainer.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr ""
 
@@ -10522,7 +10473,9 @@ msgid "{0}: {1} comments on {2}"
 msgstr ""
 
 #. 0: who; 1: on
+#. 0: who; 1: target
 #: src/components/Notifications/NotificationList.tsx
+#: src/views/NotificationPage.tsx
 msgid "{0} replied to you in {1}"
 msgstr ""
 
@@ -11541,9 +11494,7 @@ msgid "Merging keeps the fork's version."
 msgstr ""
 
 #. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
-#: src/routes/Search/SearchOverlay.tsx
 msgid "{0} result{1}"
 msgstr ""
 
@@ -11813,10 +11764,6 @@ msgstr ""
 msgid "Your resource types could not be loaded."
 msgstr ""
 
-#: src/routes/Search/SearchOverlay.tsx
-msgid "Search matches on the names and descriptions of resources. Additionally you can filter by tag using <0/>"
-msgstr ""
-
 #: src/routes/Search/SearchRoute.tsx
 msgid "Searching for <0/>..."
 msgstr ""
@@ -11952,11 +11899,6 @@ msgstr ""
 #: src/components/forms/FilePicker/FilePickerButton.tsx
 msgid "<0/> Select File"
 msgstr "<0/> Sélectionner un fichier"
-
-#. 0: classType ? classTypeTitle \\: 'new item'; 1: ' '
-#: src/components/forms/ResourceSelector/DropdownInput.tsx
-msgid "Create {0}:{1} <0/>"
-msgstr ""
 
 #. 0: ' '
 #: src/components/forms/SearchBox/SearchBoxWindow.tsx
@@ -12428,28 +12370,23 @@ msgstr ""
 msgid "Sign in first, then open this link again."
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read only"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Read and edit"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "Connecting"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can reach"
 msgstr ""
 
-#: src/routes/AuthorizeMcpRoute.tsx
-#: src/routes/ConnectAgentRoute.tsx
+#: src/components/ConnectAppForm.tsx
 msgid "What it can do"
 msgstr ""
 
@@ -12939,4 +12876,69 @@ msgstr ""
 
 #: src/actions/resourceActions.tsx
 msgid "Delete this resource permanently. This cannot be undone."
+msgstr ""
+
+#: src/chunks/RTE/useFormattingToolbarVisible.tsx
+msgid "Hide formatting toolbar"
+msgstr ""
+
+#: src/components/BrowserPeerPanel.tsx
+msgid "Free browser sync is meant for small groups of up to 4 people. For more people, use a Cloud Server on atomic.place."
+msgstr ""
+
+#: src/views/NotificationPage.tsx
+msgid "Open conversation"
+msgstr ""
+
+#: src/views/NotificationPage.tsx
+msgid "All notifications"
+msgstr ""
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Currently on this drive"
+msgstr ""
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Activity will show up here"
+msgstr ""
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show less"
+msgstr ""
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Show all"
+msgstr ""
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Edited {0}"
+msgstr ""
+
+#: src/views/Drive/DrivePage.tsx
+msgid "<0/> Drive settings"
+msgstr ""
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet. Create something with New, or drop files on this page."
+msgstr ""
+
+#: src/views/Drive/DrivePage.tsx
+msgid "Nothing here yet."
+msgstr ""
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Drive settings"
+msgstr ""
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Server members meet through for free browser sync."
+msgstr ""
+
+#: src/views/Drive/DriveSettingsDialog.tsx
+msgid "Browser sync server"
+msgstr ""
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Manage drives"
 msgstr ""

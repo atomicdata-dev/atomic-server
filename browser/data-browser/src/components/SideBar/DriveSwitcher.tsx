@@ -13,6 +13,7 @@ import {
   FaRegCircle,
   FaCloud,
 } from 'react-icons/fa6';
+import { LuChevronsUpDown } from 'react-icons/lu';
 import { useSettings } from '../../helpers/AppSettings';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useDriveHistory } from '../../hooks/useDriveHistory';
@@ -26,6 +27,12 @@ import { useNewResourceUI } from '../forms/NewForm/useNewResourceUI';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 
 const DefaultTrigger = buildDefaultTrigger(<FaCaretDown />, 'Switch Drive');
+
+/** Up/down chevron trigger, for placing the switcher next to a drive title. */
+export const DriveSwitcherChevronTrigger = buildDefaultTrigger(
+  <LuChevronsUpDown />,
+  'Switch Drive',
+);
 
 function getTitle(resource: Resource): string {
   return driveDisplayName(

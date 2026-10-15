@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { styled } from 'styled-components';
 import {
   core,
   dataBrowser,
@@ -23,6 +22,12 @@ import {
   readLogEntry,
 } from '../../helpers/chatLog';
 import { useChatLogEntry } from '../../hooks/useChatLog';
+import {
+  ToastBody,
+  ToastCard,
+  ToastText,
+  ToastTitle,
+} from '../Notifications/toastStyles';
 
 /**
  * Surfaces new meeting-chat messages as toasts when the meeting panel isn't
@@ -165,46 +170,9 @@ function MeetingToast({
     <ToastCard type='button' onClick={onOpen} title='Open the meeting chat'>
       {author && <AgentAvatar agentSubject={author} size='1.8rem' />}
       <ToastBody>
-        <ToastAuthor>{authorName}</ToastAuthor>
+        <ToastTitle>{authorName}</ToastTitle>
         <ToastText>{text}</ToastText>
       </ToastBody>
     </ToastCard>
   );
 }
-
-const ToastCard = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 22rem;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background: ${p => p.theme.colors.bg};
-  box-shadow: ${p => p.theme.boxShadowSoft};
-  cursor: pointer;
-  text-align: left;
-  color: ${p => p.theme.colors.text};
-`;
-
-const ToastBody = styled.span`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const ToastAuthor = styled.span`
-  font-weight: 600;
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const ToastText = styled.span`
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.textLight};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;

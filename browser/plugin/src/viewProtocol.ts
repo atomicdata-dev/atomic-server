@@ -23,6 +23,11 @@ export type ViewOperation =
    * own public key and signed by the user (ontola/atomic-plugins#54).
    */
   | 'proxyCapability'
+  /**
+   * Send a request the frame signed to the integration proxy. Frames have no
+   * network of their own (CSP `connect-src 'none'`), so the host sends it.
+   */
+  | 'proxyFetch'
   /** Connection references (never credentials) delegated to this app. */
   | 'proxyConnections'
   /** Ask the person, in host UI, to connect a proxy platform for this app. */
@@ -98,6 +103,7 @@ export function isViewRequest(value: unknown): value is ViewRequest {
       'subscribe',
       'unsubscribe',
       'proxyCapability',
+      'proxyFetch',
       'proxyConnections',
       'proxyConnect',
       'confirm',

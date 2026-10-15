@@ -12,14 +12,13 @@ use atomic_lib::{
         plugin_trigger::{PluginTrigger, PluginTriggerInfo, PluginTriggerKey},
         PropVal, QueryFilter,
     },
-    hierarchy::check_write,
-    Storelike, Value,
+    Value,
 };
 
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent,
+    helpers::authorize_plugin_write,
 };
 
 #[derive(serde::Deserialize, Debug)]
@@ -52,32 +51,6 @@ pub struct TriggerQuery {
     pub plugin: String,
 }
 
-/// A trigger spends the plugin's secrets whenever the data moves, so it takes
-/// the same rights as changing the plugin.
-async fn authorize(
-    appstate: &AppState,
-    req: &actix_web::HttpRequest,
-    context: &crate::context::RequestContext,
-    plugin: &str,
-) -> AtomicServerResult<ForAgent> {
-    let store = &appstate.store;
-    let resource = store.get_resource(&plugin.into()).await?;
-
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject =
-        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-
-    let agent = get_client_agent(req.headers(), appstate, &signed_subject).await?;
-    check_write(store, &resource, &agent).await?;
-
-    Ok(agent)
-}
-
 #[tracing::instrument(skip(appstate, body, req))]
 pub async fn handle_set_trigger(
     appstate: web::Data<AppState>,
@@ -85,7 +58,7 @@ pub async fn handle_set_trigger(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    let agent = authorize(&appstate, &req, &context, &body.plugin).await?;
+    let agent = authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
     let key = PluginTriggerKey::new(&body.drive, &body.plugin);
 
     let Some(filters) = &body.filters else {
@@ -186,7 +159,7 @@ pub async fn handle_get_trigger(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&appstate, &req, &context, &query.plugin).await?;
+    authorize_plugin_write(&appstate, &req, &context, &query.plugin).await?;
 
     Ok(HttpResponse::Ok().json(read(
         &appstate,

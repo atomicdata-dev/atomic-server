@@ -16,6 +16,8 @@ import {
   requirePeerSignalingUrl,
   PEER_SIGNALING_SETTING,
   NO_PEER_SIGNALING,
+  driveSignalingUrl,
+  peerSignalingUrlForDrive,
 } from './browserPeerSync';
 
 afterEach(() => {
@@ -163,6 +165,7 @@ it('automatically connects stored drives once, without bootstrapping unknown dri
         subject,
         isReady: () => true,
         hasClasses: (cls: string) => cls === server.classes.drive,
+        get: () => undefined,
       },
     ]),
   );
@@ -248,5 +251,95 @@ it('does not dial peers for a drive that syncs through a Cloud Server', async ()
   vi.mocked(BrowserPeerSync).mockClear();
   await discoverPeerDrives(store);
   expect(BrowserPeerSync).not.toHaveBeenCalled();
+  stopPeerLinks(store);
+});
+
+const driveNaming = (value: unknown) => ({
+  get: (property: string) =>
+    property === server.properties.signalingUrl ? value : undefined,
+});
+
+it('accepts a drive signalling URL only over a secure or loopback address, normalised to wss', () => {
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+  expect(driveSignalingUrl(driveNaming('https://drive.example/signal'))).toBe(
+    'wss://drive.example/signal',
+  );
+  expect(driveSignalingUrl(driveNaming('wss://drive.example/signal'))).toBe(
+    'wss://drive.example/signal',
+  );
+  expect(driveSignalingUrl(driveNaming('http://localhost:9000/s'))).toBe(
+    'ws://localhost:9000/s',
+  );
+  expect(
+    driveSignalingUrl(driveNaming('ws://drive.example/signal')),
+  ).toBeNull();
+  expect(driveSignalingUrl(driveNaming('not a url'))).toBeNull();
+  expect(driveSignalingUrl(driveNaming(''))).toBeNull();
+  expect(driveSignalingUrl(driveNaming(42))).toBeNull();
+  expect(driveSignalingUrl(undefined)).toBeNull();
+});
+
+it('prefers the drive signalling URL over the global one, and falls back to it', () => {
+  vi.stubEnv('VITE_ATOMIC_SIGNALING_URL', 'wss://community.example/signal');
+  vi.stubEnv('VITE_MANAGED_PORTAL_URL', '');
+  vi.stubGlobal('localStorage', { getItem: () => null });
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+  expect(
+    peerSignalingUrlForDrive(driveNaming('https://drive.example/signal')),
+  ).toBe('wss://drive.example/signal');
+  // An unacceptable drive value is ignored, not dialled.
+  expect(peerSignalingUrlForDrive(driveNaming('ws://drive.example/s'))).toBe(
+    'wss://community.example/signal',
+  );
+  expect(peerSignalingUrlForDrive(driveNaming(undefined))).toBe(
+    'wss://community.example/signal',
+  );
+  vi.stubEnv('VITE_ATOMIC_SIGNALING_URL', '');
+  expect(peerSignalingUrlForDrive(driveNaming(undefined))).toBeNull();
+});
+
+it('discovers a drive through its own service with no global one, and dials nobody without either', async () => {
+  const { discoverPeerDrives, stopPeerLinks } =
+    await import('./browserPeerSync');
+  vi.stubEnv('VITE_ATOMIC_SIGNALING_URL', '');
+  vi.stubEnv('VITE_MANAGED_PORTAL_URL', '');
+  vi.stubGlobal('localStorage', { getItem: () => null });
+  vi.stubGlobal('window', {
+    location: { hostname: 'localhost' },
+    dispatchEvent: vi.fn(),
+  });
+  const db = {
+    getResourceWithSnapshot: vi.fn(async () => ({ snapshot: 's' })),
+  };
+  const drive = (subject: string, url?: string) => ({
+    subject,
+    isReady: () => true,
+    hasClasses: (cls: string) => cls === server.classes.drive,
+    get: driveNaming(url).get,
+  });
+  const agent = { subject: 'did:ad:agent:test' };
+  const store = {
+    getAgent: () => agent,
+    getClientDb: () => db,
+    getServerUrl: () => '',
+    isLiveSyncedDrive: () => true,
+    resources: new Map([
+      ['did:ad:named', drive('did:ad:named', 'https://drive.example/signal')],
+      ['did:ad:plain', drive('did:ad:plain')],
+    ]),
+  } as unknown as Store;
+  vi.mocked(BrowserPeerSync).mockImplementation(function () {
+    return { close: vi.fn() } as unknown as BrowserPeerSync;
+  });
+  vi.mocked(BrowserPeerSync).mockClear();
+  await discoverPeerDrives(store);
+  expect(BrowserPeerSync).toHaveBeenCalledOnce();
+  expect(BrowserPeerSync).toHaveBeenCalledWith(
+    store,
+    expect.objectContaining({
+      drive: 'did:ad:named',
+      signalingUrl: 'wss://drive.example/signal',
+    }),
+  );
   stopPeerLinks(store);
 });

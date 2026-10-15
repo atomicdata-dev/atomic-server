@@ -256,6 +256,39 @@ pub async fn get_client_agent(
     get_client_agent_checked(headers, None, appstate, requested_subject).await
 }
 
+/// The caller must be allowed to write the plugin: that is what makes it their
+/// schedule, trigger or secret to set, and what lets them spend the plugin's
+/// secrets unattended.
+///
+/// The client signs the request URL, so that is what the signature is checked
+/// against. Passing the plugin subject here made every signed request fail
+/// verification; the rights check is what decides whether this agent may touch
+/// this plugin.
+pub(crate) async fn authorize_plugin_write(
+    appstate: &AppState,
+    req: &actix_web::HttpRequest,
+    context: &crate::context::RequestContext,
+    plugin: &str,
+) -> AtomicServerResult<ForAgent> {
+    use atomic_lib::Storelike;
+    let store = &appstate.store;
+    let resource = store.get_resource(&plugin.into()).await?;
+
+    let path_and_query = req
+        .head()
+        .uri
+        .path_and_query()
+        .ok_or("Path must be given")?
+        .to_string();
+    let signed_subject =
+        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
+
+    let agent = get_client_agent(req.headers(), appstate, &signed_subject).await?;
+    atomic_lib::hierarchy::check_write(store, &resource, &agent).await?;
+
+    Ok(agent)
+}
+
 /// [get_client_agent] for a handler that knows the body it acts on, so it
 /// also accepts a version 2 request signature (`x-atomic-signature-version:
 /// 2`, ontola/atomic-plugins#54), which covers the method and that body.

@@ -60,6 +60,9 @@ pub struct AuthImpact {
     pub parent: bool,
     /// Destroys the resource; the tombstone is authorization-relevant.
     pub destroy: bool,
+    /// Changes `retention`, which decides whether signed history below the
+    /// resource is kept. Kept so that turning audit off stays provable.
+    pub retention: bool,
 }
 
 impl AuthImpact {
@@ -67,7 +70,13 @@ impl AuthImpact {
     /// proof depends on — and so must survive any future content-commit pruning.
     /// A commit that changes only ordinary content is not critical.
     pub fn is_critical(&self) -> bool {
-        self.genesis || self.read || self.write || self.append || self.parent || self.destroy
+        self.genesis
+            || self.read
+            || self.write
+            || self.append
+            || self.parent
+            || self.destroy
+            || self.retention
     }
 }
 
@@ -85,6 +94,7 @@ pub fn classify_auth_impact(
         append: changed_props.contains(urls::APPEND),
         parent: changed_props.contains(urls::PARENT),
         destroy: is_destroy,
+        retention: changed_props.contains(urls::RETENTION),
     }
 }
 
@@ -810,6 +820,12 @@ mod test {
         fn a_reparent_changes_inherited_rights_and_is_critical() {
             let impact = classify_auth_impact(&props(&[urls::PARENT]), false, false);
             assert!(impact.parent && impact.is_critical());
+        }
+
+        #[test]
+        fn a_retention_change_is_critical() {
+            let impact = classify_auth_impact(&props(&[urls::RETENTION]), false, false);
+            assert!(impact.retention && impact.is_critical());
         }
 
         #[test]

@@ -256,6 +256,12 @@ impl Subject {
         }
     }
 
+    /// The raw BLAKE3 hash of a blob subject. `None` for any other subject,
+    /// or when the hex is not exactly 32 bytes.
+    pub fn blob_hash(&self) -> Option<[u8; 32]> {
+        <[u8; 32]>::try_from(hex::decode(self.blob_hash_hex()?).ok()?).ok()
+    }
+
     /// Agent public key, if this is an agent identifier.
     pub fn agent_public_key(&self) -> Option<&str> {
         match self {
@@ -300,11 +306,6 @@ impl Subject {
     /// Returns true if this is an internal subject (mapped to the server's base domain).
     pub fn is_internal(&self) -> bool {
         matches!(self, Subject::Internal { .. })
-    }
-
-    /// Returns true if this is an external subject (not mapped to the server's base domain).
-    pub fn is_external(&self) -> bool {
-        matches!(self, Subject::External(_))
     }
 
     /// Returns true if this subject is local to the server (Internal or Did).

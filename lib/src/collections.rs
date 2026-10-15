@@ -157,15 +157,6 @@ impl CollectionBuilder {
             expression_filters: Vec::new(),
         })
     }
-
-    /// Converts the CollectionBuilder into a collection, with Members
-    pub async fn into_collection(
-        self,
-        store: &impl Storelike,
-        for_agent: &ForAgent,
-    ) -> AtomicResult<Collection> {
-        Collection::collect_members(store, self, for_agent).await
-    }
 }
 
 /// Turns a filter value that arrived over the wire back into the form the

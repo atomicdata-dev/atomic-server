@@ -137,8 +137,21 @@ export const testFilePath = (filename: string) => {
 };
 
 export const timestamp = () => new Date().toLocaleTimeString();
+// Scoped to the sidebar: the drive page header has its own "Switch Drive"
+// chevron next to the title.
 export const sideBarDriveSwitcher = (page: Page) =>
-  page.getByTitle('Switch Drive');
+  page.getByTestId('sidebar').getByTitle('Switch Drive');
+/** Opens the "Drive settings" dialog from the drive page header. */
+export async function openDriveSettings(page: Page) {
+  await page.getByTestId('drive-settings-button').click();
+  const dialog = currentDialog(page);
+  await expect(
+    dialog.getByRole('heading', { name: 'Drive settings' }),
+  ).toBeVisible();
+
+  return dialog;
+}
+
 export const sideBarNewResourceTestId = 'sidebar-new-resource';
 
 /** Sidebar "New" → `/app/new` (scoped so drive/folder QuickCreateRow duplicates do not match). */

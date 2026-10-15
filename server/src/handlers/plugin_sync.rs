@@ -31,7 +31,7 @@ async fn host(
     plugin: &str,
     release: Option<&str>,
 ) -> AtomicServerResult<StoreHost> {
-    let account = super::plugin_schedule::authorize(app, req, context, plugin).await?;
+    let account = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
     let manifest = match release {
         Some(id) => Manifest::parse(app.store.get_plugin_release(id)?.manifest)?,
         None => None,
@@ -39,15 +39,7 @@ async fn host(
     if release.is_some() && manifest.is_none() {
         return Err("sync requires a versioned release".into());
     }
-    let host = StoreHost {
-        db: std::sync::Arc::new(app.store.clone()),
-        plugin: plugin.into(),
-        drive: drive.into(),
-        for_agent: account,
-        manifest,
-    };
-    host.validate_binding().await?;
-    Ok(host)
+    Ok(StoreHost::bound(&app.store, drive, plugin, account, manifest).await?)
 }
 pub async fn preview(
     app: web::Data<AppState>,

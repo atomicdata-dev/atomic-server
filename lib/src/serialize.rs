@@ -261,51 +261,6 @@ pub async fn atoms_to_ntriples(
     Ok(out)
 }
 
-#[cfg(feature = "rdf")]
-/// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub async fn atoms_to_turtle(
-    atoms: Vec<crate::Atom>,
-    store: &impl Storelike,
-) -> AtomicResult<String> {
-    use rio_api::formatter::TriplesFormatter;
-    use rio_api::model::{Literal, NamedNode, Term, Triple};
-    use rio_turtle::TurtleFormatter;
-
-    let mut formatter = TurtleFormatter::new(Vec::default());
-
-    for atom in atoms {
-        let subject = NamedNode {
-            iri: atom.subject.as_str(),
-        }
-        .into();
-        let predicate = NamedNode {
-            iri: &atom.property,
-        };
-        let datatype = store.get_property(&atom.property).await?.data_type;
-        let value = &atom.value.to_string();
-        let datatype_url = datatype.to_string();
-        let object: Term = match &datatype {
-            DataType::AtomicUrl => NamedNode { iri: value }.into(),
-            // Maybe these should be converted to RDF collections / lists?
-            // DataType::ResourceArray => {}
-            DataType::String => Literal::Simple { value }.into(),
-            _dt => Literal::Typed {
-                value,
-                datatype: NamedNode { iri: &datatype_url },
-            }
-            .into(),
-        };
-
-        formatter.format(&Triple {
-            subject,
-            predicate,
-            object,
-        })?
-    }
-    let out = String::from_utf8(formatter.finish()?)?;
-    Ok(out)
-}
-
 /// Should list all the supported serialization formats
 pub enum Format {
     Json,
