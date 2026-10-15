@@ -10,13 +10,17 @@ export async function executeServerPlugin(
   const agent = store.getAgent();
   if (!agent) throw new Error('Not signed in');
   const url = `${store.getServerUrl()}/plugin-run`;
+  const payload = JSON.stringify({
+    ...request,
+    input: JSON.stringify(request.input),
+  });
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      ...(await signRequest(url, agent, {})),
+      ...(await signRequest(url, agent, {}, { method: 'POST', body: payload })),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ...request, input: JSON.stringify(request.input) }),
+    body: payload,
   });
   if (!response.ok)
     throw new Error(

@@ -33,13 +33,20 @@ export async function hostingRequest<T>(
   const url = new URL(`/website-hosting${path}`, store.getServerUrl());
   url.searchParams.set('project', project);
   url.searchParams.set('drive', drive);
-  const headers = await signRequest(url.toString(), agent, {});
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  // A POST is signed over its method and exact body; a GET stays version 1.
+  const headers = await signRequest(
+    url.toString(),
+    agent,
+    {},
+    payload === undefined ? undefined : { method: 'POST', body: payload },
+  );
   const result = await fetch(url, {
-    method: body === undefined ? 'GET' : 'POST',
+    method: payload === undefined ? 'GET' : 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     credentials: 'omit',
     redirect: 'error',
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: payload,
   });
   if (!result.ok)
     throw new Error(

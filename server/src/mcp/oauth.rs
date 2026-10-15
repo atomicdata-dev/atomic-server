@@ -273,13 +273,7 @@ async fn person(
     body: &[u8],
     origin: &str,
 ) -> AtomicServerResult<String> {
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject = atomic_lib::Subject::from_raw(&path_and_query, None).resolve(origin);
+    let signed_subject = crate::helpers::signed_subject(req, origin)?;
     let agent = get_client_agent_for_request(req, body, appstate, &signed_subject).await?;
     crate::helpers::enforce_write_rate_limit(appstate, req, &agent)?;
 

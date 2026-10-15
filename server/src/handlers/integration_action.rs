@@ -31,46 +31,51 @@ async fn host(
     app: &AppState,
     req: &HttpRequest,
     context: &RequestContext,
+    raw: &[u8],
     drive: &str,
     plugin: &str,
 ) -> AtomicServerResult<StoreHost> {
-    let actor = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
+    let actor = crate::helpers::authorize_plugin_write(app, req, context, raw, plugin).await?;
     Ok(StoreHost::bound(&app.store, drive, plugin, actor, None).await?)
 }
 pub async fn list(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Target>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Target = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::list(&h).await?))
 }
 pub async fn invoke(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Invoke>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Invoke = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::invoke(h, body.call.clone()).await?))
 }
 pub async fn proposals(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Target>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Target = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::proposals(&h).await?))
 }
 pub async fn approve(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Approve>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Approve = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::approve(h, &body.id).await?))
 }
 
@@ -86,9 +91,10 @@ pub async fn history(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<HistoryTarget>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: HistoryTarget = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     // Preserve the existing array response for older clients.
     if body.limit.is_none() && body.cursor.is_none() {
         return Ok(HttpResponse::Ok().json(actions::history(&h).await?));
@@ -100,9 +106,10 @@ pub async fn cancel(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Approve>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Approve = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     actions::cancel(&h, &body.id).await?;
     Ok(HttpResponse::Ok().json(true))
 }
@@ -119,9 +126,10 @@ pub async fn grant(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Grant>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Grant = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     actions::set_grant(&h, &body.caller, &body.action, &body.mode).await?;
     Ok(HttpResponse::Ok().json(true))
 }
@@ -129,9 +137,10 @@ pub async fn grants(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Target>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Target = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::grants(&h).await?))
 }
 #[derive(Deserialize)]
@@ -147,9 +156,10 @@ pub async fn inspect_recovery(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Recovery>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Recovery = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok()
         .json(actions::inspect_recovery(h, &body.id, body.call.clone(), &body.evidence).await?))
 }
@@ -157,9 +167,10 @@ pub async fn confirm_recovery(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Approve>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Approve = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     actions::confirm_recovery(&h, &body.id).await?;
     Ok(HttpResponse::Ok().json(true))
 }
@@ -181,9 +192,10 @@ pub async fn compact_history(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<CompactTarget>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: CompactTarget = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(
         actions::compact_history_policy(
             &h,
@@ -200,9 +212,10 @@ pub async fn consumers(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<Approve>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: Approve = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     Ok(HttpResponse::Ok().json(actions::consumers(&h, &body.id).await?))
 }
 #[derive(Deserialize)]
@@ -218,9 +231,10 @@ pub async fn abandon_consumer(
     app: web::Data<AppState>,
     req: HttpRequest,
     context: RequestContext,
-    body: web::Json<AbandonConsumer>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let h = host(&app, &req, &context, &body.drive, &body.plugin).await?;
+    let body: AbandonConsumer = crate::helpers::parse_json(&raw)?;
+    let h = host(&app, &req, &context, &raw, &body.drive, &body.plugin).await?;
     actions::abandon_consumer(&h, &body.id, &body.run, &body.reason).await?;
     Ok(HttpResponse::Ok().json(true))
 }

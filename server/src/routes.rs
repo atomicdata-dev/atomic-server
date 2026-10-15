@@ -233,6 +233,21 @@ macro_rules! plain_routes {
     };
 }
 
+/// Like [plain_routes], for POST handlers that read their JSON body as
+/// `web::Bytes` (so a version 2 request signature can cover it). Bytes are
+/// bounded by `PayloadConfig`, so each route carries the limit `web::Json`
+/// used to enforce.
+#[cfg(feature = "wasm-plugins")]
+macro_rules! json_routes {
+    ($app:expr; $($path:literal => $handler:path),+ $(,)?) => {
+        $( $app.service(
+            web::resource($path)
+                .app_data(web::PayloadConfig::new(crate::helpers::JSON_BODY_LIMIT))
+                .route(web::post().to($handler)),
+        ); )+
+    };
+}
+
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
@@ -242,64 +257,68 @@ fn configure_wasm_plugin_routes(app: &mut actix_web::web::ServiceConfig) {
     #[cfg(feature = "wasm-plugins")]
     {
         app.service(web::resource("/plugin-ui").to(handlers::plugin_ui::handle_plugin_ui));
+        json_routes!(app;
+            "/plugin-release-pin" => handlers::plugin_release::pin,
+            "/plugin-external-read" => handlers::plugin_external::read,
+        );
         plain_routes!(app;
             post "/plugin-view-token" => handlers::plugin_ui::handle_mint_view_token,
-            post "/plugin-release-pin" => handlers::plugin_release::pin,
-            post "/plugin-external-read" => handlers::plugin_external::read,
         );
         app.service(web::resource("/plugin-list").to(handlers::plugin_ui::handle_plugin_list));
+        json_routes!(app;
+            "/integration-action-history-compact" => handlers::integration_action::compact_history,
+            "/integration-action-consumers" => handlers::integration_action::consumers,
+            "/integration-action-consumer-abandon" => handlers::integration_action::abandon_consumer,
+            "/integration-action-history" => handlers::integration_action::history,
+            "/integration-action-cancel" => handlers::integration_action::cancel,
+            "/integration-action-grant" => handlers::integration_action::grant,
+            "/integration-action-grants" => handlers::integration_action::grants,
+            "/integration-action-recovery-inspect" => handlers::integration_action::inspect_recovery,
+            "/integration-action-recovery-confirm" => handlers::integration_action::confirm_recovery,
+            "/integration-actions" => handlers::integration_action::list,
+            "/integration-action-call" => handlers::integration_action::invoke,
+            "/integration-action-proposals" => handlers::integration_action::proposals,
+            "/integration-action-approve" => handlers::integration_action::approve,
+            "/plugin-sync-preview" => handlers::plugin_sync::preview,
+            "/plugin-sync-apply" => handlers::plugin_sync::apply,
+            "/plugin-sync-schedule" => handlers::plugin_sync::schedule,
+            "/plugin-sync-status" => handlers::plugin_sync::status,
+            "/plugin-connection-state" => handlers::plugin_connection::read,
+            "/plugin-connection-checkpoint" => handlers::plugin_connection::checkpoint,
+            "/plugin-external-status" => handlers::plugin_external::status,
+            "/plugin-external-confirm" => handlers::plugin_external::confirm,
+            "/plugin-external-apply" => handlers::plugin_external::apply,
+            "/plugin-release" => handlers::plugin_release::publish,
+        );
         plain_routes!(app;
-            post "/integration-action-history-compact" => handlers::integration_action::compact_history,
-            post "/integration-action-consumers" => handlers::integration_action::consumers,
-            post "/integration-action-consumer-abandon" => handlers::integration_action::abandon_consumer,
-            post "/integration-action-history" => handlers::integration_action::history,
-            post "/integration-action-cancel" => handlers::integration_action::cancel,
-            post "/integration-action-grant" => handlers::integration_action::grant,
-            post "/integration-action-grants" => handlers::integration_action::grants,
-            post "/integration-action-recovery-inspect" => handlers::integration_action::inspect_recovery,
-            post "/integration-action-recovery-confirm" => handlers::integration_action::confirm_recovery,
-            post "/integration-actions" => handlers::integration_action::list,
-            post "/integration-action-call" => handlers::integration_action::invoke,
-            post "/integration-action-proposals" => handlers::integration_action::proposals,
-            post "/integration-action-approve" => handlers::integration_action::approve,
-            post "/plugin-sync-preview" => handlers::plugin_sync::preview,
-            post "/plugin-sync-apply" => handlers::plugin_sync::apply,
-            post "/plugin-sync-schedule" => handlers::plugin_sync::schedule,
-            post "/plugin-sync-status" => handlers::plugin_sync::status,
-            post "/plugin-connection-state" => handlers::plugin_connection::read,
-            post "/plugin-connection-checkpoint" => handlers::plugin_connection::checkpoint,
-            post "/plugin-external-status" => handlers::plugin_external::status,
-            post "/plugin-external-confirm" => handlers::plugin_external::confirm,
-            post "/plugin-external-apply" => handlers::plugin_external::apply,
             get "/plugin-package/{id}" => handlers::plugin_release::package,
             get "/plugin-package/{id}/zip" => handlers::plugin_release::package_zip,
             get "/plugin-catalog" => handlers::plugin_release::catalog,
-            post "/plugin-release" => handlers::plugin_release::publish,
             post "/plugin-release-package" => handlers::plugin_release::publish_package,
         );
         app.service(
             web::resource("/plugin-run")
                 // A file handed to an importer travels in the body.
-                .app_data(
-                    web::JsonConfig::default()
-                        .limit(handlers::plugin_run::RUN_JSON_LIMIT)
-                        .error_handler(crate::jsonerrors::json_error_handler),
-                )
+                .app_data(web::PayloadConfig::new(
+                    handlers::plugin_run::RUN_JSON_LIMIT,
+                ))
                 .route(web::post().to(handlers::plugin_run::handle_plugin_run)),
         );
         app.service(
             web::resource("/plugin-schedule")
+                .app_data(web::PayloadConfig::new(crate::helpers::JSON_BODY_LIMIT))
                 .route(web::post().to(handlers::plugin_schedule::handle_set_schedule))
                 .route(web::get().to(handlers::plugin_schedule::handle_get_schedule))
                 .route(web::delete().to(handlers::plugin_schedule::handle_clear_pending)),
         );
-        plain_routes!(app;
-            post "/plugin-resume" => handlers::plugin_schedule::handle_resume,
-            post "/plugin-auto-apply" => handlers::plugin_schedule::handle_set_auto_apply,
-            post "/app-write" => handlers::app_write::handle_app_write,
+        json_routes!(app;
+            "/plugin-resume" => handlers::plugin_schedule::handle_resume,
+            "/plugin-auto-apply" => handlers::plugin_schedule::handle_set_auto_apply,
+            "/app-write" => handlers::app_write::handle_app_write,
         );
         app.service(
             web::resource("/plugin-trigger")
+                .app_data(web::PayloadConfig::new(crate::helpers::JSON_BODY_LIMIT))
                 .route(web::post().to(handlers::plugin_trigger::handle_set_trigger))
                 .route(web::get().to(handlers::plugin_trigger::handle_get_trigger)),
         );
@@ -382,6 +401,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     )
     .service(
         web::resource("/plugin-secret")
+            .app_data(web::PayloadConfig::new(crate::helpers::JSON_BODY_LIMIT))
             .route(web::post().to(handlers::plugin_secret::handle_set_secret))
             .route(web::get().to(handlers::plugin_secret::handle_list_secrets))
             .route(web::delete().to(handlers::plugin_secret::handle_delete_secret)),

@@ -51,14 +51,15 @@ pub struct TriggerQuery {
     pub plugin: String,
 }
 
-#[tracing::instrument(skip(appstate, body, req))]
+#[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_set_trigger(
     appstate: web::Data<AppState>,
-    body: web::Json<SetTriggerBody>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    let agent = authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
+    let body: SetTriggerBody = crate::helpers::parse_json(&raw)?;
+    let agent = authorize_plugin_write(&appstate, &req, &context, &raw, &body.plugin).await?;
     let key = PluginTriggerKey::new(&body.drive, &body.plugin);
 
     let Some(filters) = &body.filters else {
@@ -159,7 +160,7 @@ pub async fn handle_get_trigger(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize_plugin_write(&appstate, &req, &context, &query.plugin).await?;
+    authorize_plugin_write(&appstate, &req, &context, &[], &query.plugin).await?;
 
     Ok(HttpResponse::Ok().json(read(
         &appstate,
