@@ -50,8 +50,6 @@ import { InlineFormattedResourceList } from './InlineFormattedResourceList';
 import { FaMagnifyingGlass, FaComments } from 'react-icons/fa6';
 import ResourceCard from '../views/Card/ResourceCard';
 import ResourceRow from '@views/ResourceRow';
-import { ChatMatchRow } from '../routes/Search/ChatMatchRow';
-import { useChatMatches } from '../routes/Search/useChatMatches';
 import { DEFAULT_AICHAT_NAME } from './AI/aiContstants';
 import { setPendingFirstMessage } from '@chunks/AI/pendingFirstMessage';
 import {
@@ -344,7 +342,6 @@ function parseSearchTags(
 type PaletteRow =
   | { kind: 'action'; action: ActionDefinition }
   | { kind: 'place'; item: MenuItemMinimial }
-  | { kind: 'chat'; subject: string }
   | { kind: 'result'; subject: string }
   | { kind: 'aiChat' };
 
@@ -425,12 +422,9 @@ function SearchOverlay(): JSX.Element {
   // Nothing typed yet: offer what was opened recently, most recent first,
   // minus the page already open.
   const showRecent = !query.trim() && filterIsEmpty && !scope;
-  // DMs and AI chats are not in the drive, so the server cannot find them.
-  const chatMatches = useChatMatches(searchQuery, !scope && filterIsEmpty);
-  const chatSubjects = new Set(chatMatches.map(match => match.subject));
   const candidates = showRecent
     ? getRecentResources(drive).filter(subject => subject !== currentSubject)
-    : results.filter(subject => !chatSubjects.has(subject));
+    : results;
   // Deleted or trashed resources (possibly from an earlier session or another
   // device) are hidden, and forgotten when they were only a recent.
   const { available, gone } = withoutUnavailable(
@@ -470,16 +464,10 @@ function SearchOverlay(): JSX.Element {
         )
       : [];
   const commandCount = actionHits.length + placeHits.length;
-  // Chats sit between the commands and the drive's results.
-  const chatCount = chatMatches.length;
-  const resultOffset = commandCount + chatCount;
-  const total =
-    results.filter(subject => !chatSubjects.has(subject)).length + chatCount;
   const showAIChatRow = !!privateDrive && query && results.length === 0;
   const rows: PaletteRow[] = [
     ...actionHits.map(action => ({ kind: 'action' as const, action })),
     ...placeHits.map(item => ({ kind: 'place' as const, item })),
-    ...chatMatches.map(({ subject }) => ({ kind: 'chat' as const, subject })),
     ...listed.map(subject => ({ kind: 'result' as const, subject })),
     ...(showAIChatRow ? [{ kind: 'aiChat' as const }] : []),
   ];
@@ -521,7 +509,7 @@ function SearchOverlay(): JSX.Element {
       return;
     }
 
-    if (row.kind === 'result' || row.kind === 'chat') {
+    if (row.kind === 'result') {
       navigate(constructOpenURL(row.subject));
       closeOverlay();
 
@@ -587,12 +575,12 @@ function SearchOverlay(): JSX.Element {
   // previewed — an action at selectedIndex 0 must not show results[0].
   useEffect(() => {
     const resultIndex =
-      selectedIndex >= resultOffset &&
-      selectedIndex < resultOffset + listed.length
-        ? selectedIndex - resultOffset
+      selectedIndex >= commandCount &&
+      selectedIndex < commandCount + listed.length
+        ? selectedIndex - commandCount
         : -1;
     setSearchResults(listed, resultIndex);
-  }, [listed, selectedIndex, resultOffset]);
+  }, [listed, selectedIndex, commandCount]);
 
   return (
     <ErrorBoundary>
@@ -691,34 +679,14 @@ function SearchOverlay(): JSX.Element {
                       </ActionRow>
                     );
                   })}
-                  {chatCount > 0 && <SectionHeading>Chats</SectionHeading>}
-                  {chatMatches.map((match, chatIndex) => {
-                    const index = commandCount + chatIndex;
-
-                    return (
-                      <ChatMatchRow
-                        key={match.subject}
-                        match={match}
-                        index={index}
-                        selected={index === selectedIndex}
-                        onClick={() => {
-                          setSelected(index);
-                          void activateRow({
-                            kind: 'chat',
-                            subject: match.subject,
-                          });
-                        }}
-                      />
-                    );
-                  })}
                   {showRecent && listed.length > 0 && (
                     <SectionHeading>Recently opened</SectionHeading>
                   )}
-                  {!showRecent && listed.length > 0 && resultOffset > 0 && (
+                  {!showRecent && listed.length > 0 && commandCount > 0 && (
                     <SectionHeading>Resources</SectionHeading>
                   )}
                   {listed.map((subject, resultIndex) => {
-                    const index = resultOffset + resultIndex;
+                    const index = commandCount + resultIndex;
 
                     return (
                       <ResultCard
@@ -738,8 +706,8 @@ function SearchOverlay(): JSX.Element {
                   })}
                   {showAIChatRow && (
                     <AIChatRow
-                      data-index={resultOffset + listed.length}
-                      $selected={selectedIndex === resultOffset + listed.length}
+                      data-index={commandCount + listed.length}
+                      $selected={selectedIndex === commandCount + listed.length}
                       onClick={async () => {
                         if (!privateDrive) {
                           return;
@@ -778,9 +746,9 @@ function SearchOverlay(): JSX.Element {
                 <kbd>esc</kbd> close
               </span>
             </FooterHints>
-            {total > 0 && (
+            {results.length > 0 && (
               <span>
-                {total} result{total !== 1 ? 's' : ''}
+                {results.length} result{results.length !== 1 ? 's' : ''}
               </span>
             )}
           </FooterRow>

@@ -5,10 +5,10 @@ import { useRef, useState, type JSX } from 'react';
 import { useResizable } from '@hooks/useResizable';
 import { useLocalStorage } from '@hooks/useLocalStorage';
 import { useLongPress } from '@hooks/useLongPress';
-import { FaCheck } from 'react-icons/fa6';
+import { FaEyeSlash } from 'react-icons/fa6';
 import { DropdownMenu } from '../Dropdown';
 import { AutoOpenTrigger } from '../Dropdown/AutoOpenTrigger';
-import { Panel, panelTitle, usePanelList } from './usePanelList';
+import { Panel, usePanelList } from './usePanelList';
 import { SIDEBAR_BAR_HEIGHT, SIDEBAR_BAR_HEIGHT_TOUCH } from './SidebarCSSVars';
 
 /** Height of one row in a sidebar section; anything shorter shows nothing. */
@@ -25,7 +25,7 @@ export interface SideBarPanelProps {
   actions?: React.ReactNode;
   /** When false, section starts collapsed */
   defaultOpen?: boolean;
-  /** When set, a context menu on the header lists the panels to show or hide. */
+  /** When set, a context menu on the header offers to hide this panel. */
   panel?: Panel;
   /** Tighter padding when nested inside the drive tree (e.g. Shared with me) */
   embedded?: boolean;
@@ -126,7 +126,7 @@ export function SideBarPanel({
     window.addEventListener('pointercancel', end);
   };
 
-  const { enabledPanels, enablePanel, disablePanel } = usePanelList();
+  const { disablePanel } = usePanelList();
   const [menuPoint, setMenuPoint] = useState<{ x: number; y: number }>();
   const longPress = useLongPress(setMenuPoint);
 
@@ -197,21 +197,14 @@ export function SideBarPanel({
           searchable={false}
           anchorPoint={menuPoint}
           bindActive={active => !active && setMenuPoint(undefined)}
-          items={Object.values(Panel).map(item => {
-            const enabled = enabledPanels.has(item);
-
-            return {
-              id: `toggle-${item}`,
-              label: panelTitle(item),
-              icon: (
-                <FaCheck
-                  style={{ visibility: enabled ? 'visible' : 'hidden' }}
-                />
-              ),
-              keepOpen: true,
-              onClick: () => (enabled ? disablePanel(item) : enablePanel(item)),
-            };
-          })}
+          items={[
+            {
+              id: 'hide-panel',
+              label: `Hide ${title}`,
+              icon: <FaEyeSlash />,
+              onClick: () => disablePanel(panel),
+            },
+          ]}
         />
       )}
       <StyledCollapse open={open} $embedded={embedded} $instant={openingDrag}>

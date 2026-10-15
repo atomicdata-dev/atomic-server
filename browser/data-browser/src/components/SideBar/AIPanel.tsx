@@ -19,7 +19,7 @@ import {
   SideBarMenuItemLink,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
-import { Panel, panelTitle } from './usePanelList';
+import { Panel } from './usePanelList';
 
 /** Discover chats throughout the private drive, including legacy duplicate folders. */
 export function AIChatsPanel(): JSX.Element | null {
@@ -30,7 +30,7 @@ export function AIChatsPanel(): JSX.Element | null {
 
   return (
     <SideBarPanel
-      title={panelTitle(Panel.AIChats)}
+      title='AI Chats'
       panel={Panel.AIChats}
       heightStorageKey='aiChatsPanelHeight'
       data-testid='ai-chats-panel'
@@ -44,7 +44,7 @@ export function AIChatsPanel(): JSX.Element | null {
 }
 
 /** Live class query, independent of the drive's storage-folder pointer. */
-export function useDriveChats(drive: string | undefined): string[] {
+function useDriveChats(drive: string | undefined): string[] {
   const [subjects, setSubjects] = useState<string[]>([]);
 
   const { collection, ready } = useCollection(

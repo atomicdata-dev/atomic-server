@@ -1,4 +1,3 @@
-import { conversations } from '@tomic/react';
 import { describe, expect, it } from 'vitest';
 import { Store } from '@tomic/react';
 import { resourceActions } from './resourceActions';
@@ -7,11 +6,7 @@ import type { ActionContext } from './types';
 const DRIVE = 'atomic:drive';
 const TRASH = 'atomic:trash';
 
-const make = (
-  subject: string,
-  parent?: string,
-  classes: string[] = [],
-): ActionContext =>
+const make = (subject: string, parent?: string): ActionContext =>
   ({
     canWrite: true,
     drive: DRIVE,
@@ -22,7 +17,6 @@ const make = (
       resources: new Map([[DRIVE, { get: () => TRASH }]]),
     },
     resource: {
-      getClasses: () => classes,
       get: (prop: string) => (prop.endsWith('/parent') ? parent : undefined),
     },
   }) as unknown as ActionContext;
@@ -52,14 +46,5 @@ describe('trash and delete availability', () => {
       expect(available('trash', ctx)).toBe(false);
       expect(available('delete', ctx)).toBe(true);
     }
-  });
-
-  it('never offers trash or delete for a conversation', () => {
-    const ctx = make('atomic:chat', undefined, [
-      conversations.classes.conversation,
-    ]);
-
-    expect(available('trash', ctx)).toBe(false);
-    expect(available('delete', ctx)).toBe(false);
   });
 });

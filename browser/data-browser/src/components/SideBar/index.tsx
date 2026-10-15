@@ -22,7 +22,7 @@ import { useAndroidBack } from '../../helpers/androidBack';
 import { Column } from '../Row';
 import { OntologiesPanel } from './OntologySideBar/OntologiesPanel';
 import { SideBarPanel } from './SideBarPanel';
-import { Panel, panelTitle, usePanelList } from './usePanelList';
+import { Panel, usePanelList } from './usePanelList';
 import { SIDEBAR_WIDTH_PROP } from './SidebarCSSVars';
 import { useRef, type JSX } from 'react';
 import { CalculatedPageHeight } from '../../globalCssVars';
@@ -160,7 +160,7 @@ export function SideBar(): JSX.Element {
                 )}
                 {enabledPanels.has(Panel.Ontologies) && (
                   <SideBarPanel
-                    title={panelTitle(Panel.Ontologies)}
+                    title='Ontologies'
                     panel={Panel.Ontologies}
                     heightStorageKey='ontologiesPanelHeight'
                     initialHeight={160}
