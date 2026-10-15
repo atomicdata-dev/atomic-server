@@ -1745,6 +1745,8 @@ msgstr ""
 msgid "Class"
 msgstr ""
 
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 #: src/views/FolderPage/ListView.tsx
 msgid "Created"
 msgstr "Erstellt"
@@ -1839,11 +1841,13 @@ msgstr ""
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Remove from favorites"
 msgstr ""
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Add to favorites"
 msgstr ""
 
@@ -10652,6 +10656,7 @@ msgstr ""
 msgid "<0>Sync anytime with a server.</0> Once the drive's owner connects it to a server, it opens on any device, even when the others are closed."
 msgstr ""
 
+#: src/views/AgentPage.tsx
 #: src/views/DriveUnavailable.tsx
 msgid "Technical details"
 msgstr ""
@@ -10982,6 +10987,8 @@ msgid "Included AI isn't reachable right now. Check your connection and sign-in,
 msgstr ""
 
 #: src/components/SideBar/usePanelList.ts
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 msgid "Messages"
 msgstr ""
 
@@ -13054,4 +13061,27 @@ msgstr ""
 
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This drive has an encrypted backup in Cloud Vault."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "Opening..."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "<0/> Send message"
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Add a note"
+msgstr ""
+
+#. 0: name
+#: src/views/AgentPage.tsx
+msgid "Only you can see these. {0} cannot."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Your notes"
 msgstr ""

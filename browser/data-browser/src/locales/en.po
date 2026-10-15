@@ -1745,6 +1745,8 @@ msgstr "Title"
 msgid "Class"
 msgstr "Class"
 
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 #: src/views/FolderPage/ListView.tsx
 msgid "Created"
 msgstr "Created"
@@ -1839,11 +1841,13 @@ msgstr "View the resource and its properties in the Data View."
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Remove from favorites"
 msgstr "Remove from favorites"
 
 #: src/actions/resourceActions.tsx
 #: src/components/Drives/FavoriteButton.tsx
+#: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Add to favorites"
 msgstr "Add to favorites"
 
@@ -10665,6 +10669,7 @@ msgstr "This drive isn't on this device yet"
 msgid "<0>Sync anytime with a server.</0> Once the drive's owner connects it to a server, it opens on any device, even when the others are closed."
 msgstr "<0>Sync anytime with a server.</0> Once the drive's owner connects it to a server, it opens on any device, even when the others are closed."
 
+#: src/views/AgentPage.tsx
 #: src/views/DriveUnavailable.tsx
 msgid "Technical details"
 msgstr "Technical details"
@@ -10995,6 +11000,8 @@ msgid "Included AI isn't reachable right now. Check your connection and sign-in,
 msgstr "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 
 #: src/components/SideBar/usePanelList.ts
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 msgid "Messages"
 msgstr "Messages"
 
@@ -13068,3 +13075,26 @@ msgstr "Restoring this drive…"
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This drive has an encrypted backup in Cloud Vault."
 msgstr "This drive has an encrypted backup in Cloud Vault."
+
+#: src/views/AgentPage.tsx
+msgid "Opening..."
+msgstr "Opening..."
+
+#: src/views/AgentPage.tsx
+msgid "<0/> Send message"
+msgstr "<0/> Send message"
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Add a note"
+msgstr "Add a note"
+
+#. 0: name
+#: src/views/AgentPage.tsx
+msgid "Only you can see these. {0} cannot."
+msgstr "Only you can see these. {0} cannot."
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Your notes"
+msgstr "Your notes"
