@@ -26,8 +26,7 @@ import {
   ActivityFeed,
   DrivePeople,
   QuickCreateCards,
-  RecentlyOpened,
-  ResourceTiles,
+  ResourceList,
   SectionTitle,
 } from './DriveHome';
 
@@ -94,20 +93,18 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
               buttonLabel='Add description'
             />
 
-            <RecentlyOpened drive={resource.subject} />
-
             <ActivityFeed subjects={subResources} drive={resource.subject} />
 
             <section>
               <SectionTitle>Resources</SectionTitle>
               {subResources.length > 0 ? (
-                <ResourceTiles subjects={subResources} />
+                <ResourceList subjects={subResources} />
               ) : (
-                <EmptyHint>
+                <p>
                   {canEdit
                     ? 'Nothing here yet. Create something with New, or drop files on this page.'
                     : 'Nothing here yet.'}
-                </EmptyHint>
+                </p>
               )}
             </section>
 
@@ -132,8 +129,4 @@ const Header = styled.div`
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
-`;
-
-const EmptyHint = styled.p`
-  color: ${p => p.theme.colors.textLight};
 `;

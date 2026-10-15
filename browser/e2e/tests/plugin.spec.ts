@@ -317,7 +317,7 @@ test.describe('Plugins', () => {
 
     // The folder keeps its prefixed name after uninstall: with the
     // after_commit + host.commit model the rename was a real commit, so it
-    // persists. It is a tile in the drive page's Resources grid.
+    // persists. It is a row in the drive page's Resources list.
     await expect(
       page.getByRole('main').getByRole('link', { name: 'My Problem' }).first(),
     ).toBeVisible({ timeout: 30000 });

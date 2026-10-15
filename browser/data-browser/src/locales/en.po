@@ -9450,7 +9450,6 @@ msgid "Searching in {0}"
 msgstr "Searching in {0}"
 
 #: src/components/OverlayContainer.tsx
-#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr "Recently opened"
 

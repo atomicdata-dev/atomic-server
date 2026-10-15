@@ -6,13 +6,17 @@ import { getIconForClass } from '../helpers/iconMap';
 import { constructOpenURL } from '../helpers/navigation';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 
-import type { JSX } from 'react';
+import type { JSX, MouseEvent, ReactNode } from 'react';
 
 type Props = {
   subject: string;
   clickable?: boolean;
   className?: string;
   selected?: boolean;
+  /** Make the title link a tab stop, so the row works from the keyboard. */
+  tabbable?: boolean;
+  /** Quiet content aligned to the right end of the row. */
+  trailing?: ReactNode;
 };
 
 const RootDiv = styled.div<{ $clickable?: boolean }>`
@@ -24,7 +28,13 @@ const RootDiv = styled.div<{ $clickable?: boolean }>`
 `;
 
 /** Renders a Resource in a single row. Each row is clickable. Used in search preview and various cards showing multiple resources. */
-function ResourceRow({ subject, clickable, className }: Props): JSX.Element {
+function ResourceRow({
+  subject,
+  clickable,
+  className,
+  tabbable,
+  trailing,
+}: Props): JSX.Element {
   const resource = useResource(subject);
   const [title] = useTitle(resource);
   let [description] = useString(resource, urls.properties.description);
@@ -50,8 +60,9 @@ function ResourceRow({ subject, clickable, className }: Props): JSX.Element {
   const mainClass = classes[0];
   const ClassIcon = mainClass ? getIconForClass(mainClass) : null;
 
-  const handleClick = () => {
-    if (clickable) {
+  const handleClick = (e: MouseEvent) => {
+    // The title link navigates on its own.
+    if (clickable && !(e.target as Element).closest('a')) {
       navigate(constructOpenURL(subject));
     }
   };
@@ -70,7 +81,7 @@ function ResourceRow({ subject, clickable, className }: Props): JSX.Element {
       )}
       <Content>
         {clickable ? (
-          <ResourceInline untabbable subject={subject} basic />
+          <ResourceInline untabbable={!tabbable} subject={subject} basic />
         ) : (
           <b>{title}</b>
         )}
@@ -78,6 +89,7 @@ function ResourceRow({ subject, clickable, className }: Props): JSX.Element {
           {description ? ` - ${description}` : null}
         </ResourceRowDescription>
       </Content>
+      {trailing}
     </RootDiv>
   );
 }
