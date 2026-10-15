@@ -46,6 +46,29 @@ describe('sidebar drop zones', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('leaves a conversation instead of trashing it', async () => {
+    const d = {
+      ...deps(),
+      isConversation: vi.fn().mockReturnValue(true),
+      leaveConversation: vi.fn().mockResolvedValue(undefined),
+    };
+    await handleZoneDrop('trash', 'chat', d);
+    expect(d.leaveConversation).toHaveBeenCalledWith('chat');
+    expect(d.moveToTrash).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith('Removed from your messages');
+  });
+
+  it('still trashes a resource that is not a conversation', async () => {
+    const d = {
+      ...deps(),
+      isConversation: vi.fn().mockReturnValue(false),
+      leaveConversation: vi.fn(),
+    };
+    await handleZoneDrop('trash', 'a', d);
+    expect(d.moveToTrash).toHaveBeenCalledWith('a');
+    expect(d.leaveConversation).not.toHaveBeenCalled();
+  });
+
   it('stays silent when the item was already in the trash', async () => {
     await handleZoneDrop('trash', 'a', deps([], false));
     expect(toast.success).not.toHaveBeenCalled();

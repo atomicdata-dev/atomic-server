@@ -5,7 +5,7 @@ import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
 import { SideBarPanel } from './SideBarPanel';
 import { SharedWithMeLink } from './SharedWithMeLink';
 import { MessagesPanel } from './MessagesPanel';
-import { Panel, usePanelList } from './usePanelList';
+import { Panel, panelTitle, usePanelList } from './usePanelList';
 
 interface SideBarHomePanelsProps {
   onItemClick: () => void;
@@ -37,7 +37,7 @@ export function SideBarHomePanels({
       )}
       {enabledPanels.has(Panel.Favorites) && favorites.length > 0 && (
         <SideBarPanel
-          title='Favorites'
+          title={panelTitle(Panel.Favorites)}
           panel={Panel.Favorites}
           heightStorageKey='favoritesPanelHeight'
           data-testid='favorites'
@@ -54,7 +54,7 @@ export function SideBarHomePanels({
       )}
       {enabledPanels.has(Panel.SharedWithMe) && sharedWithMe.length > 0 && (
         <SideBarPanel
-          title='Shared with me'
+          title={panelTitle(Panel.SharedWithMe)}
           panel={Panel.SharedWithMe}
           heightStorageKey='sharedWithMePanelHeight'
           data-testid='shared-with-me'

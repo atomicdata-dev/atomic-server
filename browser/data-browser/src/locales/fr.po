@@ -684,11 +684,11 @@ msgstr "Ajoutez une clé API OpenRouter dans les paramètres"
 msgid "{0} /M output tokens"
 msgstr "{0} /M jetons de sortie"
 
-#: src/components/SideBar/AIPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "AI Chats"
 msgstr "Conversations IA"
 
-#: src/components/SideBar/index.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Ontologies"
 msgstr "Ontologies"
 
@@ -822,12 +822,12 @@ msgstr "Non autorisé"
 msgid "This drive is private, sign in to view it"
 msgstr "Ce lecteur est privé, connectez-vous pour le consulter"
 
-#: src/components/SideBar/SideBarHomePanels.tsx
 #: src/components/SideBar/SidebarDropZones.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Favorites"
 msgstr ""
 
-#: src/components/SideBar/SideBarHomePanels.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Shared with me"
 msgstr "Partagé avec moi"
 
@@ -852,6 +852,7 @@ msgstr "Ressource invalide"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Discussion sans titre"
 
@@ -3906,6 +3907,7 @@ msgstr ""
 msgid "End"
 msgstr ""
 
+#: src/actions/resourceActions.tsx
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave"
 msgstr ""
@@ -8203,6 +8205,7 @@ msgid "This is taking longer than it should. The person who invited you needs to
 msgstr ""
 
 #: src/chunks/AI/AISidebar.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "AI chat"
 msgstr ""
 
@@ -8791,6 +8794,7 @@ msgstr ""
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/Search/ChatMatchRow.tsx
 msgid "Message"
 msgstr ""
 
@@ -11052,7 +11056,7 @@ msgstr ""
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr ""
 
-#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/usePanelList.ts
 msgid "Messages"
 msgstr ""
 
@@ -11491,7 +11495,7 @@ msgstr ""
 msgid "Merging keeps the fork's version."
 msgstr ""
 
-#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
+#. 0: total; 1: total !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
 msgid "{0} result{1}"
 msgstr ""
@@ -12530,11 +12534,6 @@ msgstr ""
 msgid "Signed in"
 msgstr ""
 
-#. 0: title
-#: src/components/SideBar/SideBarPanel.tsx
-msgid "Hide {0}"
-msgstr ""
-
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This device's storage isn't responding. Close other atomic.place windows or tabs, then try again."
 msgstr ""
@@ -12939,4 +12938,43 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View all drives"
+msgstr ""
+
+#. 0: who
+#: src/actions/resourceActions.tsx
+msgid "Leave {0}? This only removes it from your list. The other members keep the conversation."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+#: src/actions/resourceActions.tsx
+msgid "Leave conversation"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Remove this conversation from your list."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Confirm Leave"
+msgstr ""
+
+#: src/components/OverlayContainer.tsx
+msgid "Chats"
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search messages"
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "Search by name"
+msgstr ""
+
+#: src/components/SideBar/MessagesPanel.tsx
+msgid "No matches"
+msgstr ""
+
+#: src/components/SideBar/useSidebarDnd.ts
+msgid "Removed from your messages"
 msgstr ""

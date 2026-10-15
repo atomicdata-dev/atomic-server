@@ -18,6 +18,7 @@ import {
 import { sendSealedMessage } from '../../helpers/conversations/conversations';
 import { ChatView, useChatMessages } from '../ChatRoom/ChatRoomView';
 import type { ResourcePageProps } from '../ResourcePage';
+import { ConversationIcon } from './ConversationIcon';
 import { ConversationTitle } from './ConversationTitle';
 import { SealedMessagesContext } from './sealedMessages';
 
@@ -60,9 +61,12 @@ export function ConversationPage({ resource }: ResourcePageProps) {
     <PageWrapper>
       <Column fullHeight>
         <Header>
-          <Title data-testid='conversation-title'>
-            <ConversationTitle resource={resource} />
-          </Title>
+          <TitleRow>
+            <ConversationIcon resource={resource} size='2rem' />
+            <Title data-testid='conversation-title'>
+              <ConversationTitle resource={resource} />
+            </Title>
+          </TitleRow>
           <Encrypted>
             <FaLock />
             <span>
@@ -165,8 +169,16 @@ const Header = styled.div`
   gap: 0.25rem;
 `;
 
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+`;
+
 const Title = styled.h1`
   margin: 0;
+  min-width: 0;
   font-size: 1.6rem;
   overflow: hidden;
   text-overflow: ellipsis;
