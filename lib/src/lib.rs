@@ -122,6 +122,8 @@ pub mod subject;
 pub(crate) mod subject_lock;
 pub mod sync;
 pub mod test_utils;
+#[cfg(feature = "db")]
+pub mod trash;
 pub mod urls;
 pub mod utils;
 pub mod validate;

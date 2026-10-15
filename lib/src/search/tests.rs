@@ -674,3 +674,65 @@ async fn bench_short_query_scoped_to_one_drive() {
         println!("BENCH q={q:?} ({label}) hits={n} avg={:?}", t.elapsed() / 3);
     }
 }
+
+#[tokio::test]
+#[timeout(120000)]
+async fn trashed_items_are_hidden_unless_included_or_searched_inside_the_trash() {
+    let (store, drive) = setup_store("trash").await;
+    let keep = note(&store, &drive, "Zucchini kept").await;
+    let gone = note(&store, &drive, "Zucchini gone").await;
+    let outer = note(&store, &drive, "Zucchini outer").await;
+    let inner = note(&store, &outer, "Zucchini inner").await;
+    crate::trash::trash(&store, &gone, &drive).await.unwrap();
+    crate::trash::trash(&store, &outer, &drive).await.unwrap();
+    let trash_folder = crate::trash::peek_trash_folder(&store, &drive).unwrap();
+
+    // Default: only what is outside the trash. The trash folder is named
+    // "Trash", so it does not match this query either way.
+    let hits = subjects(&query(&store, "zucchini", &opts_parents(&drive)).unwrap());
+    assert_eq!(hits, vec![keep.clone()]);
+
+    // Opted in: everything, including items under a trashed folder.
+    let mut with_trashed = opts_parents(&drive);
+    with_trashed.include_trashed = true;
+    let hits = subjects(&query(&store, "zucchini", &with_trashed).unwrap());
+    for subject in [&keep, &gone, &outer, &inner] {
+        assert!(hits.contains(subject), "{subject} missing from {hits:?}");
+    }
+
+    // Searching within the trash is the Trash view: nothing is hidden.
+    let hits = subjects(&query(&store, "zucchini", &opts_parents(&trash_folder)).unwrap());
+    assert!(
+        hits.contains(&gone) && hits.contains(&outer) && hits.contains(&inner),
+        "{hits:?}"
+    );
+    assert!(!hits.contains(&keep));
+
+    // Same for a search scoped to something inside the trash.
+    let hits = subjects(&query(&store, "zucchini", &opts_parents(&outer)).unwrap());
+    assert!(hits.contains(&inner), "{hits:?}");
+
+    // Restoring brings it back.
+    crate::trash::restore(&store, &gone, &drive).await.unwrap();
+    let hits = subjects(&query(&store, "zucchini", &opts_parents(&drive)).unwrap());
+    assert!(hits.contains(&gone) && hits.contains(&keep), "{hits:?}");
+    assert!(!hits.contains(&outer) && !hits.contains(&inner), "{hits:?}");
+}
+
+#[tokio::test]
+#[timeout(120000)]
+async fn trashed_items_are_hidden_from_filter_only_search_too() {
+    let (store, drive) = setup_store("trash_filter").await;
+    let keep = note(&store, &drive, "Kept").await;
+    let gone = note(&store, &drive, "Gone").await;
+    crate::trash::trash(&store, &gone, &drive).await.unwrap();
+
+    let opts = opts_filter(&drive, urls::IS_A, urls::FOLDER);
+    let hits = subjects(&query(&store, "", &opts).unwrap());
+    assert!(hits.contains(&keep) && !hits.contains(&gone), "{hits:?}");
+
+    let mut opts = opts_filter(&drive, urls::IS_A, urls::FOLDER);
+    opts.include_trashed = true;
+    let hits = subjects(&query(&store, "", &opts).unwrap());
+    assert!(hits.contains(&keep) && hits.contains(&gone), "{hits:?}");
+}

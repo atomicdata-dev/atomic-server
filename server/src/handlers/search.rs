@@ -23,6 +23,8 @@ pub struct SearchQuery {
     /// Filter on exact property-value pairs: `prop:"value" AND prop2:"value2"`.
     pub filters: Option<String>,
     pub include: Option<bool>,
+    /// Also return resources in the drive's Trash folder (hidden by default).
+    pub include_trashed: Option<bool>,
 }
 
 const DEFAULT_RETURN_LIMIT: usize = 30;
@@ -55,6 +57,7 @@ pub async fn search_query(
     let mut opts = SearchOpts {
         limit: Some(fetch_limit),
         parents: params.parents.clone(),
+        include_trashed: params.include_trashed.unwrap_or(false),
         ..Default::default()
     };
     if let Some(filter) = &params.filters {

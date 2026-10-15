@@ -647,6 +647,11 @@ pub async fn list_canvases_json() -> Result<String, String> {
 }
 
 /// Signed destroy commit + WS push + Iroh live/bulk nudge (same path for canvases and folders).
+///
+/// Not used by `delete_canvas` any more, which parks the canvas in the drive's
+/// Trash instead. Kept for a permanent-delete API, which needs the bindings
+/// regenerated (`flutter_rust_bridge_codegen`) before Dart can call it.
+#[allow(dead_code)]
 async fn destroy_resource_and_sync(subject: String) -> Result<(), String> {
     tracing::info!("[destroy_resource] {}", &subject[..subject.len().min(30)]);
     let store = db()?;
@@ -679,9 +684,32 @@ async fn destroy_resource_and_sync(subject: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Delete a canvas (or any resource) with a signed destroy commit.
+/// Delete a canvas (or any resource): move it to the active drive's Trash
+/// folder (created on first use) and remember its old parent in `trashedFrom`.
+/// Nothing is destroyed, so `atomic_lib::trash::restore` can bring it back.
+/// A canvas already in the Trash is left alone. Trashed canvases drop out of
+/// `list_canvases*`, which list the drive's direct children.
 pub async fn delete_canvas(subject: String) -> Result<(), String> {
-    destroy_resource_and_sync(subject).await
+    let store = db()?;
+    let drive = store
+        .get_active_drive()
+        .ok_or("No drive set. Call setup() first.")?;
+    let had_trash = atomic_lib::trash::peek_trash_folder(store.as_ref(), &drive).is_some();
+    let trash = atomic_lib::trash::get_or_create_trash_folder(store.as_ref(), &drive)
+        .await
+        .map_err(err)?;
+    if !had_trash {
+        // The folder and the drive's pointer to it are plain local commits.
+        nudge_peers_after_local_change(store.as_ref()).await;
+    }
+    let mut resource = store
+        .get_resource(&subject.as_str().into())
+        .await
+        .map_err(err)?;
+    if atomic_lib::trash::apply_trash(&mut resource, &trash).map_err(err)? {
+        save_and_push(&mut resource, store.as_ref()).await?;
+    }
+    Ok(())
 }
 
 /// Rename a canvas.

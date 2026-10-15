@@ -3768,6 +3768,7 @@ impl Db {
         subject: &Subject,
         q: &Query,
         rights_cache: &std::sync::Mutex<RightsCache>,
+        trash: Option<&std::sync::Mutex<crate::trash::TrashLookup<'_>>>,
     ) -> Option<Option<Resource>> {
         let mut resource = match self.get_resource_shallow(subject) {
             Ok(resource) => resource,
@@ -3801,6 +3802,17 @@ impl Db {
             .is_err()
         {
             return None;
+        }
+
+        // Parked in the Trash: not a member unless the query asked for it.
+        if let Some(trash) = trash {
+            if trash
+                .lock()
+                .map(|mut lookup| lookup.is_hidden_member(&resource))
+                .unwrap_or(false)
+            {
+                return None;
+            }
         }
 
         if !q.include_nested {
@@ -3874,6 +3886,7 @@ impl Db {
         let mut total_count = 0;
         let mut seen = HashSet::new();
         let rights_cache = std::sync::Mutex::new(RightsCache::default());
+        let trash = crate::trash::filter_for_query(self, q).map(std::sync::Mutex::new);
         let base_domain = self.get_base_domain();
 
         let atoms = self.get_index_iterator_for_query(q);
@@ -3901,12 +3914,15 @@ impl Db {
             // must not hide a later readable row.
             if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
                 // Sudo without nested bodies needs no per-member work at all.
-                if q.for_agent == ForAgent::Sudo && !q.include_nested {
+                if q.for_agent == ForAgent::Sudo && !q.include_nested && trash.is_none() {
                     subjects.push(subject);
                     continue;
                 }
 
-                match self.resolve_query_member(&subject, q, &rights_cache).await {
+                match self
+                    .resolve_query_member(&subject, q, &rights_cache, trash.as_ref())
+                    .await
+                {
                     Some(body) => {
                         subjects.push(subject);
                         if let Some(resource) = body {
@@ -3976,6 +3992,7 @@ impl Db {
             drive: q.drive.clone(),
             aggregation: None,
             expression_filters: Vec::new(),
+            exclude_trashed: q.exclude_trashed,
         };
 
         let subjects = if requires_query_index(&scan) {

@@ -21,6 +21,8 @@ export interface SearchOpts {
   filters?: {
     [subject: string]: string | number | string[];
   };
+  /** Also return trashed resources. Hidden by default, like the server. */
+  includeTrashed?: boolean;
 }
 
 export interface SemanticSearchOpts {
@@ -86,6 +88,7 @@ export function buildSearchSubject(
   if (include) url.searchParams.set('include', include.toString());
   if (limit) url.searchParams.set('limit', limit.toString());
   if (hasFilters) url.searchParams.set('filters', buildFilterString(filters));
+  if (opts.includeTrashed) url.searchParams.set('include_trashed', 'true');
 
   if (parents) {
     if (Array.isArray(parents)) {
