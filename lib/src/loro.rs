@@ -221,18 +221,6 @@ impl AtomicLoroDoc {
             .unwrap_or_else(|_| self.export_shallow_snapshot())
     }
 
-    /// The ops in `(peer, start, end)` counter spans as an `Updates` blob.
-    /// For the spans an earlier `Updates` blob covered this rebuilds that blob
-    /// as long as the oplog still splits its changes the same way; callers
-    /// that rely on the bytes must compare them. `None` when Loro refuses.
-    pub fn export_updates_in_range(&self, spans: &[(u64, i32, i32)]) -> Option<Vec<u8>> {
-        let spans: Vec<loro::IdSpan> = spans
-            .iter()
-            .map(|(peer, start, end)| loro::IdSpan::new(*peer, *start, *end))
-            .collect();
-        self.doc.export(ExportMode::updates_in_range(spans)).ok()
-    }
-
     /// Returns the current version of the document.
     pub fn current_version(&self) -> VersionID {
         VersionID::from_frontiers(&self.doc.state_frontiers())

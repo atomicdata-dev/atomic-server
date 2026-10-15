@@ -37,13 +37,19 @@ either the commit that produced the current state (`--envelope-retention
 latest`, the default) or every commit (`all`), which turns the Loro history
 into a signed audit log.
 
-The Loro document already holds every change, so a kept commit stores only
-what proves it: the signer, the previous commit, which range of Loro changes
-it introduced, and a hash of them (about 63 bytes for a small edit). When it is
-read, the node rebuilds the exact signed JSON-AD from the Loro history, and the
-signature is checked against that. If a commit cannot be rebuilt byte for byte
-when it is stored, the full JSON is kept instead. A kept commit that can no
-longer be rebuilt is reported as unreadable, never guessed.
+A kept commit is stored compactly: the signed `loroUpdate` bytes as raw bytes
+(not base64), the signer and the previous commit as raw 32 and 64 byte values,
+and a flag. The signature, `createdAt` and subject are already in the row's
+key. Reading a row rebuilds the exact signed JSON-AD from the row alone, with
+no access to the Loro document, so the proof does not depend on the Loro
+encoder or on the document's history staying as it is. A small edit costs about
+340 bytes on disk (compressed), against about 660 for the full JSON. A row is
+only stored this way when re-serializing it gives the original JSON byte for
+byte; otherwise the full JSON is kept. Signatures are checked when a commit is
+imported and by `/history-attribution`; a plain read of the rows does not
+verify them. A row that cannot be decoded is never guessed: it is logged,
+reported as `unreadable` (which makes the history incomplete), and never
+stands in for a newer row or gets pruned on a wrong assumption.
 
 A resource can ask for the audit log itself. Set its `retention` property to
 `audit` (the default is `compact`) and the node keeps every commit of that

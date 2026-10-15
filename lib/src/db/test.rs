@@ -5335,9 +5335,17 @@ async fn stored_envelope_bytes_per_small_edit_stay_small() {
         compact, EDITS,
         "every small edit is stored as a compact row"
     );
+    // Measured: median 342 B, 6,848 B for 20 edits (develop's full JSON rows:
+    // 663 B and 13,568 B). The signed `loroUpdate` bytes are kept as signed,
+    // so this is what the proof costs.
     assert!(
-        sorted[sorted.len() / 2] <= 100,
+        sorted[sorted.len() / 2] <= 360,
         "median {} bytes per envelope",
         sorted[sorted.len() / 2]
+    );
+    assert!(
+        edits.iter().sum::<usize>() <= 7_200,
+        "{} bytes for {EDITS} edits",
+        edits.iter().sum::<usize>()
     );
 }
