@@ -2794,7 +2794,6 @@ msgstr "Empty"
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/LoroDocValue.tsx
 #: src/components/Share/PeopleWithAccess.tsx
-#: src/components/Vault/VaultStorage.tsx
 msgid "Hide"
 msgstr "Hide"
 
@@ -4145,6 +4144,7 @@ msgstr "Open workspace"
 #: src/chunks/PluginRuns/RunPluginDialog.tsx
 #: src/chunks/TablePage/Issues/IssueRow.tsx
 #: src/components/SideBar/FeedbackButton.tsx
+#: src/components/Vault/VaultStorage.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 #: src/routes/NewDriveRoute.tsx
 msgid "Close"
@@ -11273,14 +11273,6 @@ msgid "Files and images"
 msgstr "Files and images"
 
 #: src/components/Vault/VaultStorage.tsx
-msgid "Search index"
-msgstr "Search index"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Compression data"
-msgstr "Compression data"
-
-#: src/components/Vault/VaultStorage.tsx
 msgid "Other"
 msgstr "Other"
 
@@ -11946,14 +11938,6 @@ msgstr "Required table columns are missing from this form:{0} {1} . Responses ca
 msgid "Reading what is stored…"
 msgstr "Reading what is stored…"
 
-#: src/components/Vault/VaultStorage.tsx
-msgid "Uploads in progress"
-msgstr "Uploads in progress"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Leftovers <0>· cleaned up automatically</0>"
-msgstr "Leftovers <0>· cleaned up automatically</0>"
-
 #. 0: formatBytes(usage.reclaimable_bytes)
 #: src/components/Vault/VaultStorage.tsx
 msgid "{0} of old history and unused files can be removed. Nothing you can see is lost."
@@ -11971,11 +11955,6 @@ msgstr "Free it anyway"
 #: src/components/Vault/VaultStorage.tsx
 msgid "Nothing extra is stored. This is what your workspace needs."
 msgstr "Nothing extra is stored. This is what your workspace needs."
-
-#. 0: formatBytes(usage.used_bytes); 1: formatBytes(usage.quota_bytes); 2: ' '
-#: src/components/Vault/VaultStorage.tsx
-msgid "{0} of {1}{2} used"
-msgstr "{0} of {1}{2} used"
 
 #. 0: ' '
 #: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
@@ -12727,21 +12706,8 @@ msgid "Wait for the current backup to finish."
 msgstr "Wait for the current backup to finish."
 
 #: src/components/Vault/VaultStorage.tsx
-#: src/components/Vault/VaultStorage.tsx
 msgid "Discard history"
 msgstr "Discard history"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Backup history"
-msgstr "Backup history"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Replace the backup's chain of changes with one fresh snapshot. Your workspace is not touched, and recently deleted items stay recoverable."
-msgstr "Replace the backup's chain of changes with one fresh snapshot. Your workspace is not touched, and recently deleted items stay recoverable."
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Compress now"
-msgstr "Compress now"
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "This cannot be undone."
@@ -12815,11 +12781,6 @@ msgstr "This backup file was sealed under a different encryption key than this w
 #: src/helpers/managed/vaultFile.ts
 msgid "The list of objects and their contents do not match."
 msgstr "The list of objects and their contents do not match."
-
-#. 0: formatBytes(discardGain(usage))
-#: src/components/Vault/VaultStorage.tsx
-msgid "Or remove older backup copies and recently deleted items, about {0}. The backup keeps only the current state of your workspace, without its edit history. This cannot be undone."
-msgstr "Or remove older backup copies and recently deleted items, about {0}. The backup keeps only the current state of your workspace, without its edit history. This cannot be undone."
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older backup copies are removed, and so is the edit history of the backup: it keeps only the current state of every item. Restoring from it brings back your workspace as it is now, without its version history. Items you deleted recently can no longer be recovered from the backup. Your devices keep their own edit history and your workspace is not changed."
@@ -12991,3 +12952,107 @@ msgstr "No matches"
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Removed from your messages"
 msgstr "Removed from your messages"
+
+#. 0: formatBytes(usage.pending_bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "Uploads in progress: {0}. "
+msgstr "Uploads in progress: {0}. "
+
+#. 0: formatBytes(usage.unaccounted_bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "Leftovers, cleaned up automatically: {0}."
+msgstr "Leftovers, cleaned up automatically: {0}."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "What the change history holds"
+msgstr "What the change history holds"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Discard history…"
+msgstr "Discard history…"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Compress history"
+msgstr "Compress history"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Compressing takes a fresh snapshot of the backup and frees the changes it covers. Your workspace is not touched, and recently deleted items stay recoverable."
+msgstr "Compressing takes a fresh snapshot of the backup and frees the changes it covers. Your workspace is not touched, and recently deleted items stay recoverable."
+
+#. 0: formatBytes(usage.used_bytes); 1: ' '; 2: formatBytes(usage.quota_bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "{0} of{1} {2} used"
+msgstr "{0} of{1} {2} used"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Full copies that restore fast"
+msgstr "Full copies that restore fast"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Every edit since a snapshot"
+msgstr "Every edit since a snapshot"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Uploads attached to your pages"
+msgstr "Uploads attached to your pages"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Search index and supporting data"
+msgstr "Search index and supporting data"
+
+#. 0: s.count
+#: src/components/Vault/VaultStorage.tsx
+msgid "{0} pack"
+msgstr "{0} pack"
+
+#. 0: s.count
+#: src/components/Vault/VaultStorage.tsx
+msgid "{0} packs"
+msgstr "{0} packs"
+
+#. 0: s.count
+#: src/components/Vault/VaultStorage.tsx
+msgid "{0} file"
+msgstr "{0} file"
+
+#. 0: s.count
+#: src/components/Vault/VaultStorage.tsx
+msgid "{0} files"
+msgstr "{0} files"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Newest changes of 1 device"
+msgstr "Newest changes of 1 device"
+
+#. 0: h.lanes
+#: src/components/Vault/VaultStorage.tsx
+msgid "Newest changes of each of {0} devices"
+msgstr "Newest changes of each of {0} devices"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Always kept"
+msgstr "Always kept"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Changes not in a snapshot yet"
+msgstr "Changes not in a snapshot yet"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "A backup from that device adds them"
+msgstr "A backup from that device adds them"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Kept so deleted items can be recovered"
+msgstr "Kept so deleted items can be recovered"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Dropped by Discard history"
+msgstr "Dropped by Discard history"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Can be freed now"
+msgstr "Can be freed now"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Compress history removes this"
+msgstr "Compress history removes this"
