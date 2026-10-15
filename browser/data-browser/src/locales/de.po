@@ -10426,10 +10426,6 @@ msgid "Connect {0}"
 msgstr ""
 
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
-msgid "Host this workspace on a Cloud Server to share it."
-msgstr ""
-
-#: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Connect or self-host a server in Sync settings to share it."
 msgstr ""
 
@@ -13084,4 +13080,13 @@ msgstr ""
 #: src/views/AgentPage.tsx
 #: src/views/AgentPage.tsx
 msgid "Your notes"
+msgstr ""
+
+#. 0: toRelativeDateTime(new Date(at), true)
+#: src/views/Drive/DriveHome.tsx
+msgid "Commented {0}"
+msgstr "Kommentiert {0}"
+
+#: src/chunks/FormBuilder/ShareLinkPanel.tsx
+msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr ""

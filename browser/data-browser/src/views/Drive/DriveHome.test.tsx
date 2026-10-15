@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ThemeProvider, type DefaultTheme } from 'styled-components';
+import { canonicalizeScheme } from '@tomic/lib';
 import { ActivityFeed, belongsToDrive } from './DriveHome';
 
 const parents: Record<string, string> = {
@@ -30,6 +31,13 @@ const recents: Record<string, string[]> = {
   'did:ad:drive-b': ['did:ad:a-doc'],
 };
 
+let commentTimes = new Map<string, number>();
+vi.mock('@hooks/useRecentComments', () => ({
+  useRecentComments: () => commentTimes,
+}));
+vi.mock('@hooks/useVisibleDriveChildren', () => ({
+  useHiddenDriveSubjects: () => new Set(['atomic:hidden-doc']),
+}));
 vi.mock('@helpers/recentResources', () => ({
   getRecentResources: (d: string) => recents[d] ?? [],
 }));
@@ -53,7 +61,18 @@ vi.mock('@tomic/react', () => ({
     ),
 }));
 vi.mock('@views/ResourceRow', () => ({
-  ResourceRow: ({ subject }: { subject: string }) => <i>{subject}</i>,
+  ResourceRow: ({
+    subject,
+    trailing,
+  }: {
+    subject: string;
+    trailing?: React.ReactNode;
+  }) => (
+    <i>
+      {subject}
+      {trailing}
+    </i>
+  ),
   ResourceRowDescription: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
@@ -121,7 +140,33 @@ describe('belongsToDrive scheme spellings', () => {
 });
 
 describe('ActivityFeed', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    commentTimes = new Map();
+  });
+
+  it('adds a resource that was only commented on, as Commented', () => {
+    parents['atomic:only-comment'] = 'did:ad:drive-a';
+    parents['atomic:hidden-doc'] = 'did:ad:drive-a';
+    loaded.add('atomic:only-comment');
+    loaded.add('atomic:hidden-doc');
+    commentTimes = new Map([
+      [canonicalizeScheme('did:ad:only-comment'), Date.now() - 60_000],
+      [canonicalizeScheme('did:ad:hidden-doc'), Date.now() - 60_000],
+    ]);
+
+    const html = render('did:ad:drive-a', ['did:ad:a-doc']);
+
+    expect(html).toContain('atomic:only-comment');
+    expect(html).toContain('Commented');
+    expect(html).not.toContain('hidden-doc');
+  });
+
+  it('shows no Commented caption without comments', () => {
+    expect(render('did:ad:drive-a', ['did:ad:a-doc'])).not.toContain(
+      'Commented',
+    );
+  });
 
   it('lists only this drive, and changes when the drive prop changes', () => {
     const a = render('did:ad:drive-a', ['did:ad:a-doc']);

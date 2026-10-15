@@ -29,8 +29,23 @@ export function useVisibleDriveChildren(
   drive: string,
   options?: { limit?: number },
 ) {
-  const driveResource = useResource(drive);
   const { subjects: allSubjects, loading, total } = useChildren(drive, options);
+  const hidden = useHiddenDriveSubjects(drive);
+  const subjects = useMemo(
+    () =>
+      allSubjects.filter(subject => !hidden.has(canonicalizeScheme(subject))),
+    [allSubjects, hidden],
+  );
+
+  return { subjects, allSubjects, loading, total };
+}
+
+/**
+ * The standard locations a drive page leaves out (canonical subjects): the
+ * default ontology, Comments folder, AI Chats folder, Inbox and Trash.
+ */
+export function useHiddenDriveSubjects(drive: string): Set<string> {
+  const driveResource = useResource(drive);
   const [defaultOntology] = useString(
     driveResource,
     server.properties.defaultOntology,
@@ -46,24 +61,13 @@ export function useVisibleDriveChildren(
     dataBrowser.properties.trashFolder,
   );
 
-  const subjects = useMemo(() => {
-    const hidden = new Set(
-      [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder]
-        .filter((subject): subject is string => !!subject)
-        .map(canonicalizeScheme),
-    );
-
-    return allSubjects.filter(
-      subject => !hidden.has(canonicalizeScheme(subject)),
-    );
-  }, [
-    allSubjects,
-    defaultOntology,
-    commentsFolder,
-    aiChatsFolder,
-    inbox,
-    trashFolder,
-  ]);
-
-  return { subjects, allSubjects, loading, total };
+  return useMemo(
+    () =>
+      new Set(
+        [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder]
+          .filter((subject): subject is string => !!subject)
+          .map(canonicalizeScheme),
+      ),
+    [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder],
+  );
 }

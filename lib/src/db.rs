@@ -1765,6 +1765,30 @@ impl Db {
             .flatten()
     }
 
+    /// Give `resource` its derived `lastCommit`. The value the stored row
+    /// carries wins (set when the commit was applied, equal to the newest
+    /// envelope's commit id). Without one, a stamp an old doc still holds
+    /// stands; without that, the newest envelope (a row written from a synced
+    /// doc), then the genesis commit of a resource named after it.
+    pub(crate) fn serve_derived_last_commit(
+        &self,
+        resource: &mut Resource,
+        subject: &str,
+        stored: Option<Value>,
+    ) {
+        let derived = stored.or_else(|| {
+            if resource.get(urls::LAST_COMMIT).is_ok() {
+                return None;
+            }
+            crate::envelopes::latest_commit_id(self, subject)
+                .or_else(|| crate::envelopes::genesis_commit_id(subject))
+                .map(|id| Value::AtomicUrl(id.into()))
+        });
+        if let Some(derived) = derived {
+            resource.set_derived_last_commit(derived);
+        }
+    }
+
     fn get_did_mapping_hint(&self, subject: &str) -> Option<String> {
         let key = crate::identifiers::canonicalize_scheme(subject);
         let bin = self.kv.get(Tree::DidMapping, key.as_bytes()).ok()??;
@@ -5049,6 +5073,10 @@ impl Storelike for Db {
                 }
             }
 
+            // `lastCommit` is derived, not part of the doc: the row carries the
+            // id of the envelope the last signed commit kept. Re-applying the
+            // doc below rebuilds the propvals, so hold it aside.
+            let stored_last_commit = propvals.get(urls::LAST_COMMIT).cloned();
             let mut resource = Resource::from_propvals(propvals, res_subject);
             // Authoritative merged CRDT state (full oplog) lives in LoroSnapshots.
             // Propvals may carry a smaller incremental `loroUpdate` from the last commit.
@@ -5082,6 +5110,7 @@ impl Storelike for Db {
                         "Failed to read stored Loro snapshot; serving the stored propvals instead"
                     ),
                 }
+                self.serve_derived_last_commit(&mut resource, &subject_str, stored_last_commit);
             }
             Ok(resource)
         } else {
