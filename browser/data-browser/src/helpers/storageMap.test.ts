@@ -1,3 +1,4 @@
+import { ai, dataBrowser } from '@tomic/lib';
 import { describe, expect, it } from 'vitest';
 import {
   buildStorageTree,
@@ -19,6 +20,32 @@ const row = (
   isA: null,
   loroBytes,
   blobBytes,
+});
+
+describe('buildStorageTree bundling', () => {
+  const of = (r: ResourceUsage, isA: string) => ({ ...r, isA });
+
+  it('bundles 2+ hidden-class siblings into one node', () => {
+    const tree = buildStorageTree(
+      [
+        row('drive', null, 1),
+        of(row('c1', 'drive', 10, 1), ai.classes.aiChat),
+        of(row('c2', 'drive', 20), ai.classes.aiChat),
+        of(row('m1', 'drive', 5), dataBrowser.classes.meeting),
+        row('note', 'drive', 100),
+      ],
+      'drive',
+    );
+    const bundle = tree.children.find(c => c.name === 'AI chats (2)')!;
+
+    expect(bundle.children.map(c => c.subject)).toEqual(['c2', 'c1']);
+    expect(bundle.totalBytes).toBe(31);
+    expect(bundle.ownBytes).toBe(31);
+    expect(bundle.totalFileBytes).toBe(1);
+    expect(tree.totalBytes).toBe(137);
+    expect(tree.children.map(c => c.subject)).toContain('m1');
+    expect(tree.children.some(c => c.subject === 'c1')).toBe(false);
+  });
 });
 
 describe('buildStorageTree', () => {

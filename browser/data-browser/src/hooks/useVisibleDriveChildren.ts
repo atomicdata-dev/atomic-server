@@ -10,11 +10,7 @@ import {
 } from '@tomic/react';
 import { canonicalizeScheme } from '@tomic/lib';
 import { useMemo } from 'react';
-
-const HIDDEN_CLASSES: string[] = [
-  ai.classes.aiChat,
-  dataBrowser.classes.meeting,
-];
+import { isHiddenFromChildLists } from '../helpers/hiddenFromChildLists';
 
 /**
  * The children of a drive minus its schema plumbing, shared by the sidebar and
@@ -27,7 +23,8 @@ const HIDDEN_CLASSES: string[] = [
  * sidebar) the Inbox (opens from Notifications in the app menu) and the Trash folder
  * (reached from the account menu at the bottom of the sidebar).
  * Ontologies the user creates themselves still show. AI chats and Meetings
- * are hidden by class wherever they sit (the AI sidebar and the meeting UI
+ * are hidden by class, and anything with an `about` (annotations such as
+ * agent notes) is hidden too, wherever they sit (the AI sidebar and the meeting UI
  * reach them), which also covers legacy drives whose chats sit in a folder.
  *
  * `subjects` is the filtered list; `allSubjects` is what `useChildren`
@@ -62,14 +59,19 @@ export function useVisibleDriveChildren(
         .map(canonicalizeScheme),
     );
 
-    return allSubjects.filter(
-      subject =>
-        !hidden.has(canonicalizeScheme(subject)) &&
-        !children
-          .get(subject)
-          ?.getClasses()
-          .some(c => HIDDEN_CLASSES.includes(c)),
-    );
+    return allSubjects.filter(subject => {
+      if (hidden.has(canonicalizeScheme(subject))) return false;
+
+      const child = children.get(subject);
+
+      return !(
+        child &&
+        isHiddenFromChildLists(
+          child.getClasses(),
+          child.get(dataBrowser.properties.about) as string | undefined,
+        )
+      );
+    });
   }, [
     allSubjects,
     children,
