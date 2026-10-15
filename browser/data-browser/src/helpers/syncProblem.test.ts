@@ -30,7 +30,7 @@ describe('describeSyncProblem', () => {
     expect(describeSyncProblem(base)).toBeNull();
   });
 
-  it('asks the person to act when the server refuses the workspace', () => {
+  it('asks the person to act when the server refuses the drive', () => {
     const problem = describeSyncProblem({ ...base, refusedByServer: true });
 
     expect(problem?.cause).toBe('you');
@@ -65,7 +65,7 @@ describe('describeSyncProblem', () => {
     });
   });
 
-  it('ignores a sync error that belongs to another workspace', () => {
+  it('ignores a sync error that belongs to another drive', () => {
     expect(
       describeSyncProblem({
         ...base,
@@ -141,67 +141,78 @@ describe('describeSyncProblem', () => {
     ).toBeNull();
   });
 
-  describe('a refused workspace', () => {
-    const OTHER = 'atomic:otherdrive';
-    const refused = (drive: string) =>
-      `Drive ${drive} is not enrolled for sync on this node`;
-    const blockedEntry = (message: string) => [
+  describe('scoped to the viewed drive', () => {
+    const OTHER = 'did:ad:otherdrive';
+    const entry = (message: string, subject: string) => [
       {
-        subject: 'atomic:somedoc',
+        subject,
         blocked: true,
         failures: 5,
         lastAttemptError: message,
       },
     ];
+    const driveOf = (subject: string) =>
+      subject.startsWith('other:') ? OTHER : DRIVE;
+    const missing = 'Parent of atomic:ktCV (atomic:Xlqr) not found';
 
-    it('keeps the plain wording for the workspace in view', () => {
+    it('ignores changes of another drive', () => {
+      expect(
+        describeSyncProblem({
+          ...base,
+          status: status({ blockedCount: 1 }),
+          entries: entry(missing, 'other:doc'),
+          driveOf,
+        }),
+      ).toBeNull();
+    });
+
+    it('ignores another drive that keeps failing', () => {
+      expect(
+        describeSyncProblem({
+          ...base,
+          entries: [
+            { subject: 'other:doc', failures: 9, lastAttemptError: 'x' },
+          ],
+          driveOf,
+        }),
+      ).toBeNull();
+    });
+
+    it('still reports changes of the viewed drive', () => {
       const problem = describeSyncProblem({
         ...base,
-        entries: blockedEntry(refused(DRIVE)),
-        driveOf: () => DRIVE,
+        entries: [
+          ...entry(missing, 'other:doc'),
+          ...entry(missing, 'mine:doc'),
+        ],
+        driveOf,
       });
 
-      expect(problem?.title).toBe('This server does not have this workspace');
-      expect(problem?.otherDrive).toBeUndefined();
+      expect(problem?.title).toBe('This server does not have this drive');
       expect(problem?.actions).toEqual(['connect-device', 'review-sync']);
+      expect(problem?.detail).toBe(missing);
     });
 
-    it('names another workspace by its title, and is not offered the viewed switch', () => {
+    it('compares spellings of the same drive as equal', () => {
       const problem = describeSyncProblem({
         ...base,
-        entries: blockedEntry(refused('did:ad:otherdrive')),
-        driveTitle: () => 'Team notes',
+        entries: entry('weird', 'mine:doc'),
+        driveOf: () => DRIVE.replace('did:ad:', 'atomic:'),
       });
 
-      expect(problem?.title).toBe('This server does not have “Team notes”');
-      expect(problem?.body).toContain('not the workspace you are viewing');
-      expect(problem?.otherDrive).toBe(OTHER);
-      expect(problem?.actions).toEqual(['connect-device']);
-      expect(problem?.detail).toContain('is not enrolled');
+      expect(problem?.key).toBe('blocked');
     });
 
-    it('falls back to a neutral phrase when the title cannot be loaded', () => {
+    it('scopes the same way when the viewed drive is a top-level resource', () => {
+      const dm = 'did:ad:dm';
       const problem = describeSyncProblem({
         ...base,
-        entries: blockedEntry(refused(OTHER)),
-        driveTitle: () => undefined,
+        status: status({ drive: dm }),
+        entries: [...entry('weird', 'drive:doc'), ...entry(missing, 'dm:doc')],
+        driveOf: s => (s.startsWith('dm:') ? dm : DRIVE),
       });
 
-      expect(problem?.title).toBe(
-        'This server does not have another workspace on this device',
-      );
-      expect(problem?.title).not.toContain(OTHER);
-    });
-
-    it('finds the workspace from the entry when the message names none', () => {
-      const problem = describeSyncProblem({
-        ...base,
-        entries: blockedEntry('Parent of atomic:x not found'),
-        driveOf: () => OTHER,
-        driveTitle: () => 'Team notes',
-      });
-
-      expect(problem?.otherDrive).toBe(OTHER);
+      expect(problem?.key).toBe('not-hosted');
     });
   });
 });
