@@ -12974,3 +12974,7 @@ msgstr ""
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
 msgstr ""
+
+#: src/components/SideBar/useSidebarDnd.ts
+msgid "Removed from your messages"
+msgstr ""

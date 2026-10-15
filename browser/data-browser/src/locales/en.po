@@ -12987,3 +12987,7 @@ msgstr "Search by name"
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
 msgstr "No matches"
+
+#: src/components/SideBar/useSidebarDnd.ts
+msgid "Removed from your messages"
+msgstr "Removed from your messages"
