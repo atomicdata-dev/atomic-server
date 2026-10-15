@@ -412,6 +412,22 @@ server's results, and a pasted URL is still selected directly. The server search
 is mocked. There is no E2E. A class the store has not fetched (after a reload,
 say) is only reachable by its URL.
 
+## Trash (Rust)
+
+`lib/src/trash/tests.rs` (`cargo test -p atomic_lib --features db-redb --lib -- trash::`)
+covers `trash` / `restore` / `is_trashed` against a real `Db`: reparent plus
+`trashedFrom`, restore, the no-op cases (trash folder, drive, already trashed),
+the property-subject refusal, restore falling back to the drive when the old
+parent was destroyed or never recorded, a stale trash pointer being replaced,
+deep versus direct `is_trashed` and parent cycles, and collections hiding
+trashed members (direct and under a trashed folder, Sudo and a normal agent)
+unless `include_trashed` or the query lists the Trash itself.
+`lib/src/search/tests.rs` covers search hiding the same by default, with
+`include_trashed`, scoped to the Trash, and the filter-only path. Not covered:
+the `include_trashed` HTTP query param on `/search` and collections (no server
+integration test), the Flutter `delete_canvas` move-to-trash (the bridge crate
+has no trash test), and concurrent first-use creating two Trash folders.
+
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint

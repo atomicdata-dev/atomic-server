@@ -776,6 +776,15 @@ pub struct Query {
     /// they're a separate field rather than folded into `filters`: nothing else
     /// should silently lose its index.
     pub expression_filters: Vec<crate::expression::ExpressionFilter>,
+    /// Leave out members that sit in their drive's Trash folder (directly or
+    /// through an ancestor, see [crate::trash]). Off by default, so internal
+    /// queries see everything; collections turn it on unless asked otherwise.
+    /// A query that lists the children of the Trash folder itself (a `parent`
+    /// filter) is the Trash view and is never filtered.
+    ///
+    /// Costs one shallow read per member of the returned page; trashed members
+    /// do not count towards `count`, like members the agent cannot read.
+    pub exclude_trashed: bool,
 }
 
 impl Query {
@@ -796,6 +805,7 @@ impl Query {
             for_agent: ForAgent::Sudo,
             drive: None,
             aggregation: None,
+            exclude_trashed: false,
         }
     }
 

@@ -43,6 +43,7 @@ fn low_stock_query(table: &str, max: i64) -> Query {
         sort_by: Some(QUANTITY.into()),
         sort_desc: false,
         include_external: false,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: Some(atomic_lib::db::drive_prefix_from_subject(&Subject::from(

@@ -600,6 +600,7 @@ impl ClientDb {
             end_val: None,
             include_external: false,
             include_nested: include_resources.unwrap_or(false),
+            exclude_trashed: false,
             for_agent: atomic_lib::agents::ForAgent::Sudo,
             // `Subject::from` drops the base domain, leaving a localized drive
             // as an `External` subject that matches no stored drive prefix.

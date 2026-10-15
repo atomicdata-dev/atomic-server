@@ -34,6 +34,7 @@ fn query_for(table: &str) -> Query {
         sort_by: Some(urls::SORT_ORDER.into()),
         sort_desc: false,
         include_external: false,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: Some(atomic_lib::db::drive_prefix_from_subject(&Subject::from(

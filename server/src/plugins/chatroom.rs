@@ -50,6 +50,7 @@ pub fn construct_chatroom<'a>(
             sort_desc: true,
             include_external: false,
             include_nested: true,
+            exclude_trashed: false,
             for_agent: for_agent.clone(),
             drive: Some(drive_prefix_from_subject(resource.get_subject())),
             aggregation: None,
