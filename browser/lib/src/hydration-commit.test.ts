@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { JSONADParser } from './parse.js';
-import { HYDRATION_COMMIT_MESSAGE, SYSTEM_COMMIT_ORIGIN } from './resource.js';
+import {
+  hydrationCommitMessage,
+  isHydrationCommitMessage,
+  SYSTEM_COMMIT_ORIGIN,
+} from './resource.js';
 import { testStore } from './test-store.js';
 import { core } from './ontologies/core.js';
 
@@ -29,9 +33,7 @@ describe('hydrating a legacy (JSON-AD, no snapshot) resource', () => {
     const changes = [...doc.getAllChanges().values()].flat();
 
     expect(changes.length).toBeGreaterThan(0);
-    expect(changes.every(c => c.message === HYDRATION_COMMIT_MESSAGE)).toBe(
-      true,
-    );
+    expect(changes.every(c => isHydrationCommitMessage(c.message))).toBe(true);
     expect(resource.getCreatedAt()).toBeUndefined();
   });
 
@@ -56,7 +58,19 @@ describe('hydrating a legacy (JSON-AD, no snapshot) resource', () => {
       .flat()
       .map(c => c.message);
 
-    expect(messages).toContain(HYDRATION_COMMIT_MESSAGE);
-    expect(messages.some(m => m !== HYDRATION_COMMIT_MESSAGE)).toBe(true);
+    expect(messages.some(m => isHydrationCommitMessage(m))).toBe(true);
+    expect(messages.some(m => !isHydrationCommitMessage(m))).toBe(true);
+  });
+});
+
+describe('hydration change messages', () => {
+  it('are unique per commit, so the server never lumps them under one signer', () => {
+    const a = hydrationCommitMessage();
+    const b = hydrationCommitMessage();
+
+    expect(a).not.toBe(b);
+    expect(isHydrationCommitMessage(a)).toBe(true);
+    expect(isHydrationCommitMessage('c-01abc')).toBe(false);
+    expect(isHydrationCommitMessage(undefined)).toBe(false);
   });
 });

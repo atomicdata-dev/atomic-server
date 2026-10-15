@@ -134,14 +134,30 @@ export type SaveResult = 'persisted' | 'offline' | 'noop';
  */
 export const SYSTEM_COMMIT_ORIGIN = 'origin:system';
 /**
- * Loro change message on every commit that only replays state the server
- * already has (seeding a doc from JSON-AD propvals, healing, applying a
- * response). Unlike the origin, the message is persisted in the oplog, so
- * readers of the oplog ("last edited" feeds, History) can tell hydration
- * from an edit. It has the `c-` token shape on purpose: `getCreatedBy`
+ * Prefix of the Loro change message on every commit that only replays state
+ * the server already has (seeding a doc from JSON-AD propvals, healing,
+ * applying a response). Unlike the origin, the message is persisted in the
+ * oplog, so readers of the oplog ("last edited" feeds) can tell hydration
+ * from an edit.
+ *
+ * Each hydration commit gets its OWN token (`c-hydration-<ulid>`, see
+ * {@link hydrationCommitMessage}), never a shared constant: the server
+ * (`change_messages_in`, `attribute_history`) credits each message to the
+ * first signed commit that carried it, so a shared message would lump every
+ * hydration under one signer. It keeps the `c-` shape so `getCreatedBy`
  * ignores it and History buckets it like any other internal commit.
  */
-export const HYDRATION_COMMIT_MESSAGE = 'c-hydration';
+export const HYDRATION_COMMIT_PREFIX = 'c-hydration-';
+
+/** A fresh, unique change message for one hydration commit. */
+export function hydrationCommitMessage(): string {
+  return `${HYDRATION_COMMIT_PREFIX}${ulid().toLowerCase()}`;
+}
+
+/** True for a change message written by {@link hydrationCommitMessage}. */
+export function isHydrationCommitMessage(message: string | undefined): boolean {
+  return message !== undefined && message.startsWith(HYDRATION_COMMIT_PREFIX);
+}
 
 /** Pre-rename Loro origin; still excluded from undo. */
 export const LEGACY_SYSTEM_COMMIT_ORIGIN = 'atomic:system';
@@ -561,7 +577,7 @@ export class Resource<C extends OptionalClass = any> {
         ) {
           this._loroDoc.commit({
             origin: SYSTEM_COMMIT_ORIGIN,
-            message: HYDRATION_COMMIT_MESSAGE,
+            message: hydrationCommitMessage(),
           });
         }
       }
@@ -603,7 +619,7 @@ export class Resource<C extends OptionalClass = any> {
         if (this._loroDoc.getPendingTxnLength() > 0) {
           this._loroDoc.commit({
             origin: SYSTEM_COMMIT_ORIGIN,
-            message: HYDRATION_COMMIT_MESSAGE,
+            message: hydrationCommitMessage(),
           });
         }
       }
@@ -2307,7 +2323,7 @@ export class Resource<C extends OptionalClass = any> {
     if (
       !genesis ||
       genesis.timestamp <= 0 ||
-      genesis.message === HYDRATION_COMMIT_MESSAGE
+      isHydrationCommitMessage(genesis.message)
     ) {
       return undefined;
     }
@@ -2735,7 +2751,7 @@ export class Resource<C extends OptionalClass = any> {
     if (this._loroDoc && this._loroDoc.getPendingTxnLength() > 0) {
       this._loroDoc.commit({
         origin: SYSTEM_COMMIT_ORIGIN,
-        message: HYDRATION_COMMIT_MESSAGE,
+        message: hydrationCommitMessage(),
       });
     }
   }

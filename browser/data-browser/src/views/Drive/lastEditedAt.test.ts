@@ -40,7 +40,7 @@ describe('lastEditedAt', () => {
 describe('lastEditedAt and hydration', () => {
   const hydrate = (doc: LoroDoc) => {
     doc.getMap('properties').set('a', 1);
-    doc.commit({ timestamp: 1_800_000_000_000, message: 'c-hydration' });
+    doc.commit({ timestamp: 1_800_000_000_000, message: 'c-hydration-01abc' });
   };
 
   it('ignores a hydration-only oplog', () => {
@@ -60,12 +60,21 @@ describe('lastEditedAt and hydration', () => {
     expect(lastEditedAt(fakeResource(doc, 5))).toBe(1_900_000_000_000);
   });
 
+  it('counts a message-less change (a body edit) as an edit', () => {
+    const doc = new LoroDoc();
+    hydrate(doc);
+    doc.getMap('properties').set('a', 2);
+    doc.commit({ timestamp: 1_900_000_000_000 });
+
+    expect(lastEditedAt(fakeResource(doc, 5))).toBe(1_900_000_000_000);
+  });
+
   it('walks back past a trailing hydration to the last real edit', () => {
     const doc = new LoroDoc();
     doc.getMap('properties').set('a', 1);
     doc.commit({ timestamp: 1_700_000_000_000, message: 'c-real' });
     doc.getMap('properties').set('a', 2);
-    doc.commit({ timestamp: 1_800_000_000_000, message: 'c-hydration' });
+    doc.commit({ timestamp: 1_800_000_000_000, message: 'c-hydration-01abc' });
 
     expect(lastEditedAt(fakeResource(doc, 5))).toBe(1_700_000_000_000);
   });

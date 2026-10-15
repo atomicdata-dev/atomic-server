@@ -103,6 +103,23 @@ describe('belongsToDrive', () => {
   });
 });
 
+describe('belongsToDrive scheme spellings', () => {
+  it('treats atomic: and did:ad: spellings of one drive as equal', () => {
+    const spelled = {
+      driveOfSubject: (s: string) =>
+        s === 'atomic:a-doc' ? 'atomic:drive-a' : s,
+      resources: { has: () => true },
+    };
+
+    expect(
+      belongsToDrive(spelled as never, 'atomic:a-doc', 'did:ad:drive-a'),
+    ).toBe(true);
+    expect(
+      belongsToDrive(spelled as never, 'atomic:a-doc', 'did:ad:drive-b'),
+    ).toBe(false);
+  });
+});
+
 describe('ActivityFeed', () => {
   beforeEach(() => vi.clearAllMocks());
 

@@ -7,6 +7,7 @@ import {
   useStore,
   type Store,
 } from '@tomic/react';
+import { canonicalizeScheme } from '@tomic/lib';
 import { useMemo, useState, type JSX } from 'react';
 import {
   FaComment,
@@ -155,7 +156,10 @@ export function belongsToDrive(
 ): boolean {
   const root = store.driveOfSubject(subject);
 
-  if (root === store.driveOfSubject(drive)) {
+  // `atomic:` and legacy `did:ad:` spell the same drive.
+  if (
+    canonicalizeScheme(root) === canonicalizeScheme(store.driveOfSubject(drive))
+  ) {
     return true;
   }
 

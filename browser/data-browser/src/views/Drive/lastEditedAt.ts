@@ -1,5 +1,5 @@
 import {
-  HYDRATION_COMMIT_MESSAGE,
+  isHydrationCommitMessage,
   normalizeLoroChangeTimestampMs,
   type Resource,
 } from '@tomic/react';
@@ -27,7 +27,7 @@ export function lastEditedAt(resource: Resource): number | undefined {
           for (let i = 0; i < MAX_STEPS_PER_PEER && counter >= 0; i++) {
             const change = doc.getChangeAt({ peer, counter });
 
-            if (change.message !== HYDRATION_COMMIT_MESSAGE) {
+            if (!isHydrationCommitMessage(change.message)) {
               latest = Math.max(
                 latest,
                 normalizeLoroChangeTimestampMs(change.timestamp),
