@@ -147,7 +147,7 @@ describe('explicit save acknowledgement', () => {
     store.setServerConnected(false);
   });
 
-  it('reports writes refused for a missing parent once per workspace', async () => {
+  it('reports writes refused for a missing parent once per drive', async () => {
     const { store } = await testStore();
     const drive = await store.newResource({
       isA: 'https://atomicdata.dev/classes/Drive',
@@ -169,7 +169,7 @@ describe('explicit save acknowledgement', () => {
     notify(drive.subject);
 
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('workspace');
+    expect(errors[0]).toContain('drive');
     expect(errors[0]).not.toContain('Not retrying; edit again');
     store.setServerConnected(false);
   });
