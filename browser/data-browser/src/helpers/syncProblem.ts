@@ -9,11 +9,11 @@ export type SyncProblemAction =
   | 'storage';
 
 /**
- * Something that stops this workspace from syncing, in words for the person.
+ * Something that stops this drive from syncing, in words for the person.
  *
  * `cause` decides the voice. `ours` is a failure nothing the person did can
  * explain, so it says we have been told and offers Try again. `you` is
- * something only they can change (a workspace the server does not hold, no
+ * something only they can change (a drive the server does not hold, no
  * write access, a full plan), so it names the remedy instead.
  */
 export type SyncProblem = {
@@ -43,9 +43,9 @@ export type SyncProblemInput = {
   >[];
   /** The server in use, as a person reads it: `atomicserver.eu`. */
   serverName: string;
-  /** `store.driveOfSubject`: the workspace an outbox entry belongs to. */
+  /** `store.driveOfSubject`: the drive an outbox entry belongs to. */
   driveOf?: (subject: string) => string | undefined;
-  /** The workspace's name, or undefined while it cannot be loaded. */
+  /** The drive's name, or undefined while it cannot be loaded. */
   driveTitle?: (drive: string) => string | undefined;
 };
 
@@ -67,7 +67,7 @@ function firstEntry(
   return entries.find(e => keep(e) && e.lastAttemptError);
 }
 
-/** Whether an outbox entry belongs to the workspace in view (or to none known). */
+/** Whether an outbox entry belongs to the drive in view (or to none known). */
 function isViewed(input: SyncProblemInput, entry: Entry): boolean {
   const viewed = input.status.drive && canonicalizeScheme(input.status.drive);
   const drive = input.driveOf?.(entry.subject);
@@ -93,8 +93,8 @@ function fromMessage(
 
     return {
       ...shared,
-      title: 'This server does not have this workspace',
-      body: `${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has this workspace, or turn off server sync for it to keep working here.`,
+      title: 'This server does not have this drive',
+      body: `${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has this drive, or turn off server sync for it to keep working here.`,
       actions: ['connect-device', 'review-sync'],
     };
   }
@@ -115,7 +115,7 @@ function fromMessage(
     return {
       key: 'no-access',
       cause: 'you',
-      title: 'You can’t change this workspace on the server',
+      title: 'You can’t change this drive on the server',
       body: 'Your account has no write access there. Your changes stay on this device. Ask the owner to give you access.',
       actions: [],
       detail: message,
@@ -144,19 +144,19 @@ function ours(
 }
 
 /**
- * The one thing most worth telling the person about why this workspace is not
+ * The one thing most worth telling the person about why this drive is not
  * syncing, or null when nothing is wrong.
  *
  * Reads the same facts as the sidebar's warning icon (parked changes, changes
  * that keep failing) and adds the ones the icon cannot show: a server that
- * refuses the workspace, a refused sync and a lost connection. Most urgent
+ * refuses the drive, a refused sync and a lost connection. Most urgent
  * first.
  */
 export function describeSyncProblem(
   input: SyncProblemInput,
 ): SyncProblem | null {
   const { status, refusedByServer, serverName } = input;
-  // Only this workspace: problems of others show once you open them.
+  // Only this drive: problems of others show once you open them.
   const entries = input.entries.filter(e => isViewed(input, e));
 
   if (refusedByServer) {
@@ -191,13 +191,13 @@ export function describeSyncProblem(
   if (driveError) {
     return (
       fromMessage(input, driveError, false) ??
-      ours('drive-sync', 'This workspace could not sync', driveError, false)
+      ours('drive-sync', 'This drive could not sync', driveError, false)
     );
   }
 
   const blocked = entries.filter(e => e.blocked);
 
-  // Without a way to tell workspaces apart, the status count is all there is.
+  // Without a way to tell drives apart, the status count is all there is.
   if (blocked.length > 0 || (!input.driveOf && status.blockedCount > 0)) {
     const entry = firstEntry(entries, e => !!e.blocked);
     const message = entry?.lastAttemptError;

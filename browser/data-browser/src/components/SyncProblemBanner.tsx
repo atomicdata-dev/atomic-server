@@ -23,7 +23,7 @@ function reviewSync(): void {
 }
 
 /**
- * Why this workspace is not syncing, and what to do about it.
+ * Why this drive is not syncing, and what to do about it.
  *
  * Sits at the top of the Sync page, which is where the sidebar's warning icon
  * leads. It says plainly whose problem it is: ours (we are told, press Try

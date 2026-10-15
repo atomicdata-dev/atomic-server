@@ -4073,16 +4073,8 @@ msgid "Connecting…"
 msgstr "Connecting…"
 
 #: src/routes/SyncRoute.tsx
-msgid "Sync this workspace"
-msgstr "Sync this workspace"
-
-#: src/routes/SyncRoute.tsx
 msgid "Only on this device"
 msgstr "Only on this device"
-
-#: src/routes/SyncRoute.tsx
-msgid "This workspace hasn’t been synced. It’s safe here, but not backed up and not on your other devices."
-msgstr "This workspace hasn’t been synced. It’s safe here, but not backed up and not on your other devices."
 
 #: src/components/ConnectToDeviceForm.tsx
 msgid "Camera access is needed to scan a code."
@@ -5561,14 +5553,6 @@ msgid "Synced just now"
 msgstr "Synced just now"
 
 #: src/routes/SyncRoute.tsx
-msgid "Open a workspace to see whether it can be hosted."
-msgstr "Open a workspace to see whether it can be hosted."
-
-#: src/routes/SyncRoute.tsx
-msgid "This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here."
-msgstr "This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here."
-
-#: src/routes/SyncRoute.tsx
 msgid "This server"
 msgstr "This server"
 
@@ -5576,10 +5560,6 @@ msgstr "This server"
 #: src/routes/SyncRoute.tsx
 msgid "{0} doesn’t offer hosting, so it can’t be switched on from here."
 msgstr "{0} doesn’t offer hosting, so it can’t be switched on from here."
-
-#: src/routes/SyncRoute.tsx
-msgid "Checking whether this workspace is hosted…"
-msgstr "Checking whether this workspace is hosted…"
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Checking this workspace’s backup…"
@@ -5621,11 +5601,6 @@ msgstr "Sign in →"
 #: src/routes/SyncRoute.tsx
 msgid "{0}. We hold your key sealed, so this email gets you back in on a new device."
 msgstr "{0}. We hold your key sealed, so this email gets you back in on a new device."
-
-#. 0: managedAccount.email
-#: src/routes/SyncRoute.tsx
-msgid "{0}. No recovery backup stored, so losing every device loses this workspace."
-msgstr "{0}. No recovery backup stored, so losing every device loses this workspace."
 
 #: src/routes/SyncRoute.tsx
 msgid "Set up email recovery"
@@ -5961,14 +5936,6 @@ msgstr "Sign-in wasn’t completed — hosting setup was cancelled."
 #: src/routes/SyncRoute.tsx
 msgid "Could not set up Cloud Server."
 msgstr "Could not set up Cloud Server."
-
-#: src/routes/SyncRoute.tsx
-msgid "Cloud Server received this workspace. Your source server is still connected."
-msgstr "Cloud Server received this workspace. Your source server is still connected."
-
-#: src/routes/SyncRoute.tsx
-msgid "Connected to Cloud Server. Syncing this workspace…"
-msgstr "Connected to Cloud Server. Syncing this workspace…"
 
 #: src/routes/SyncRoute.tsx
 msgid "Use Cloud Server"
@@ -6373,11 +6340,6 @@ msgstr "Could not unlock with a passkey. Use your recovery code instead."
 #: src/routes/SyncRoute.tsx
 msgid "Error: Sign in before syncing with another device"
 msgstr "Error: Sign in before syncing with another device"
-
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
-msgstr "Sign in to your {0} account to check email recovery. Signing in to this workspace with a passkey or secret does not by itself connect your cloud account."
 
 #: src/routes/SyncRoute.tsx
 msgid "Sign in to check recovery"
@@ -8547,18 +8509,6 @@ msgid "Your home is ready. Have data elsewhere?{0} <0>Connect another device or 
 msgstr "Your home is ready. Have data elsewhere?{0} <0>Connect another device or restore a backup</0>."
 
 #: src/routes/SyncRoute.tsx
-msgid "If another device has this workspace, scan the code below to connect it."
-msgstr "If another device has this workspace, scan the code below to connect it."
-
-#: src/routes/SyncRoute.tsx
-msgid "If another device has this workspace, you can connect it."
-msgstr "If another device has this workspace, you can connect it."
-
-#: src/routes/SyncRoute.tsx
-msgid "This workspace could not be read on this device"
-msgstr "This workspace could not be read on this device"
-
-#: src/routes/SyncRoute.tsx
 msgid "Local copy unavailable"
 msgstr "Local copy unavailable"
 
@@ -8634,24 +8584,8 @@ msgid "Buy AI credits"
 msgstr "Buy AI credits"
 
 #: src/routes/SyncRoute.tsx
-msgid "Could not change workspace sync."
-msgstr "Could not change workspace sync."
-
-#: src/routes/SyncRoute.tsx
 msgid "Starting server sync…"
 msgstr "Starting server sync…"
-
-#: src/routes/SyncRoute.tsx
-msgid "Sync this workspace with this server"
-msgstr "Sync this workspace with this server"
-
-#: src/routes/SyncRoute.tsx
-msgid "Off stops server sync for this workspace on this browser. The server’s existing copy and other devices are unchanged; browser sync can still connect open browsers."
-msgstr "Off stops server sync for this workspace on this browser. The server’s existing copy and other devices are unchanged; browser sync can still connect open browsers."
-
-#: src/routes/SyncRoute.tsx
-msgid "Workspace sync off"
-msgstr "Workspace sync off"
 
 #: src/chunks/RTE/useFormattingToolbarVisible.tsx
 msgid "Show formatting toolbar"
@@ -9218,10 +9152,6 @@ msgstr "Back to the preview"
 #: src/routes/NewDriveRoute.tsx
 msgid "Name your drive"
 msgstr "Name your drive"
-
-#: src/routes/SyncRoute.tsx
-msgid "This server doesn’t host this workspace, so it refuses its changes. Set up Cloud Server to sync it here, or turn off sync to keep it on this device only."
-msgstr "This server doesn’t host this workspace, so it refuses its changes. Set up Cloud Server to sync it here, or turn off sync to keep it on this device only."
 
 #: src/routes/SyncRoute.tsx
 msgid "Not hosted here"
@@ -11384,14 +11314,6 @@ msgid "Manage plan"
 msgstr "Manage plan"
 
 #: src/routes/SyncRoute.tsx
-msgid "This workspace is on Cloud Server. This device still syncs with its old server."
-msgstr "This workspace is on Cloud Server. This device still syncs with its old server."
-
-#: src/routes/SyncRoute.tsx
-msgid "Moving this workspace to Cloud Server. It switches on by itself; you can keep working."
-msgstr "Moving this workspace to Cloud Server. It switches on by itself; you can keep working."
-
-#: src/routes/SyncRoute.tsx
 msgid "Turn on Cloud Server"
 msgstr "Turn on Cloud Server"
 
@@ -11428,19 +11350,6 @@ msgstr "Restoring… {0}%"
 #: src/components/Cloud/ServiceRow.tsx
 msgid "Offered"
 msgstr "Offered"
-
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "{0} added Cloud Server to this workspace. It waits for your consent."
-msgstr "{0} added Cloud Server to this workspace. It waits for your consent."
-
-#: src/routes/SyncRoute.tsx
-msgid "This workspace’s plan includes Cloud Server. It waits for your consent."
-msgstr "This workspace’s plan includes Cloud Server. It waits for your consent."
-
-#: src/routes/SyncRoute.tsx
-msgid "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this workspace on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
-msgstr "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this workspace on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
 
 #. 0: address
 #: src/views/getting-started/GettingStartedFlow.tsx
@@ -11550,10 +11459,6 @@ msgstr "<0/> Show experimental plugins"
 #: src/routes/IntegrationStore.tsx
 msgid "Discover integrations"
 msgstr "Discover integrations"
-
-#: src/routes/SyncRoute.tsx
-msgid "These sync your other drives — not this workspace."
-msgstr "These sync your other drives — not this workspace."
 
 #: src/routes/SyncRoute.tsx
 msgid "No other devices yet — your data is safe on this one."
@@ -12049,15 +11954,6 @@ msgstr "See Cloud Server plans"
 msgid "Browser sync has reached its limit of peer connections. A Cloud Server on atomic.place keeps this workspace in sync for everyone, without peers."
 msgstr "Browser sync has reached its limit of peer connections. A Cloud Server on atomic.place keeps this workspace in sync for everyone, without peers."
 
-#. 0: PRODUCT_NAME
-#: src/routes/SyncRoute.tsx
-msgid "Sign in to {0} to see whether this workspace is hosted."
-msgstr "Sign in to {0} to see whether this workspace is hosted."
-
-#: src/routes/SyncRoute.tsx
-msgid "Everything in Cloud Vault, plus a hosted workspace on atomic.place, always online. Our servers process what you put here."
-msgstr "Everything in Cloud Vault, plus a hosted workspace on atomic.place, always online. Our servers process what you put here."
-
 #: src/hooks/useAddToOntology.ts
 msgid "A property can't be moved to another ontology."
 msgstr "A property can't be moved to another ontology."
@@ -12292,25 +12188,12 @@ msgid "Event repeated {0} times"
 msgstr "Event repeated {0} times"
 
 #: src/helpers/syncProblem.ts
-msgid "This server does not have this workspace"
-msgstr "This server does not have this workspace"
-
-#. 0: serverName
-#: src/helpers/syncProblem.ts
-msgid "{0} refuses changes to it, so they stay on this device for now. Connect a device that has this workspace, or turn off server sync for it to keep working here."
-msgstr "{0} refuses changes to it, so they stay on this device for now. Connect a device that has this workspace, or turn off server sync for it to keep working here."
-
-#: src/helpers/syncProblem.ts
 msgid "Your storage is full"
 msgstr "Your storage is full"
 
 #: src/helpers/syncProblem.ts
 msgid "New changes stay on this device until there is room. Free up space or move to a bigger plan, and they will sync."
 msgstr "New changes stay on this device until there is room. Free up space or move to a bigger plan, and they will sync."
-
-#: src/helpers/syncProblem.ts
-msgid "You can’t change this workspace on the server"
-msgstr "You can’t change this workspace on the server"
 
 #: src/helpers/syncProblem.ts
 msgid "Your account has no write access there. Your changes stay on this device. Ask the owner to give you access."
@@ -12328,10 +12211,6 @@ msgstr "Can’t reach {0}"
 #: src/helpers/syncProblem.ts
 msgid "Your changes are kept on this device and sync when the connection is back."
 msgstr "Your changes are kept on this device and sync when the connection is back."
-
-#: src/helpers/syncProblem.ts
-msgid "This workspace could not sync"
-msgstr "This workspace could not sync"
 
 #: src/helpers/syncProblem.ts
 msgid "Some changes could not sync"
@@ -12943,3 +12822,124 @@ msgstr "View all drives"
 #: src/components/SyncProblemBanner.tsx
 msgid "Show technical details"
 msgstr "Show technical details"
+
+#: src/helpers/syncProblem.ts
+msgid "This server does not have this drive"
+msgstr "This server does not have this drive"
+
+#. 0: serverName
+#: src/helpers/syncProblem.ts
+msgid "{0} refuses changes to it, so they stay on this device for now. Connect a device that has this drive, or turn off server sync for it to keep working here."
+msgstr "{0} refuses changes to it, so they stay on this device for now. Connect a device that has this drive, or turn off server sync for it to keep working here."
+
+#: src/helpers/syncProblem.ts
+msgid "You can’t change this drive on the server"
+msgstr "You can’t change this drive on the server"
+
+#: src/helpers/syncProblem.ts
+msgid "This drive could not sync"
+msgstr "This drive could not sync"
+
+#: src/routes/SyncRoute.tsx
+msgid "Could not change drive sync."
+msgstr "Could not change drive sync."
+
+#: src/routes/SyncRoute.tsx
+msgid "This server doesn’t host this drive, so it refuses its changes. Set up Cloud Server to sync it here, or turn off sync to keep it on this device only."
+msgstr "This server doesn’t host this drive, so it refuses its changes. Set up Cloud Server to sync it here, or turn off sync to keep it on this device only."
+
+#: src/routes/SyncRoute.tsx
+msgid "Sync this drive with this server"
+msgstr "Sync this drive with this server"
+
+#: src/routes/SyncRoute.tsx
+msgid "Off stops server sync for this drive on this browser. The server’s existing copy and other devices are unchanged; browser sync can still connect open browsers."
+msgstr "Off stops server sync for this drive on this browser. The server’s existing copy and other devices are unchanged; browser sync can still connect open browsers."
+
+#: src/routes/SyncRoute.tsx
+msgid "Drive sync off"
+msgstr "Drive sync off"
+
+#: src/routes/SyncRoute.tsx
+msgid "Open a drive to see whether it can be hosted."
+msgstr "Open a drive to see whether it can be hosted."
+
+#: src/routes/SyncRoute.tsx
+msgid "This device doesn’t have this drive yet. Pair the device that does, and you can host it from here."
+msgstr "This device doesn’t have this drive yet. Pair the device that does, and you can host it from here."
+
+#: src/routes/SyncRoute.tsx
+msgid "Checking whether this drive is hosted…"
+msgstr "Checking whether this drive is hosted…"
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to {0} to see whether this drive is hosted."
+msgstr "Sign in to {0} to see whether this drive is hosted."
+
+#: src/routes/SyncRoute.tsx
+msgid "Cloud Server received this drive. Your source server is still connected."
+msgstr "Cloud Server received this drive. Your source server is still connected."
+
+#: src/routes/SyncRoute.tsx
+msgid "Connected to Cloud Server. Syncing this drive…"
+msgstr "Connected to Cloud Server. Syncing this drive…"
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive is on Cloud Server. This device still syncs with its old server."
+msgstr "This drive is on Cloud Server. This device still syncs with its old server."
+
+#: src/routes/SyncRoute.tsx
+msgid "Moving this drive to Cloud Server. It switches on by itself; you can keep working."
+msgstr "Moving this drive to Cloud Server. It switches on by itself; you can keep working."
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "{0} added Cloud Server to this drive. It waits for your consent."
+msgstr "{0} added Cloud Server to this drive. It waits for your consent."
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive’s plan includes Cloud Server. It waits for your consent."
+msgstr "This drive’s plan includes Cloud Server. It waits for your consent."
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Sign in to your {0} account to check email recovery. Signing in to this drive with a passkey or secret does not by itself connect your cloud account."
+msgstr "Sign in to your {0} account to check email recovery. Signing in to this drive with a passkey or secret does not by itself connect your cloud account."
+
+#. 0: managedAccount.email
+#: src/routes/SyncRoute.tsx
+msgid "{0}. No recovery backup stored, so losing every device loses this drive."
+msgstr "{0}. No recovery backup stored, so losing every device loses this drive."
+
+#: src/routes/SyncRoute.tsx
+msgid "Everything in Cloud Vault, plus a hosted drive on atomic.place, always online. Our servers process what you put here."
+msgstr "Everything in Cloud Vault, plus a hosted drive on atomic.place, always online. Our servers process what you put here."
+
+#: src/routes/SyncRoute.tsx
+msgid "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this drive on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
+msgstr "<0>Before you turn it on:</0> unlike Cloud Vault, Cloud Server stores a readable, unencrypted copy of this drive on our servers, so we can run search, shareable links and the API for it. Your sharing permissions still control who else sees it, and you can turn it off at any time."
+
+#: src/routes/SyncRoute.tsx
+msgid "If another device has this drive, scan the code below to connect it."
+msgstr "If another device has this drive, scan the code below to connect it."
+
+#: src/routes/SyncRoute.tsx
+msgid "If another device has this drive, you can connect it."
+msgstr "If another device has this drive, you can connect it."
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive could not be read on this device"
+msgstr "This drive could not be read on this device"
+
+#: src/routes/SyncRoute.tsx
+msgid "Sync this drive"
+msgstr "Sync this drive"
+
+#: src/routes/SyncRoute.tsx
+msgid "This drive hasn’t been synced. It’s safe here, but not backed up and not on your other devices."
+msgstr "This drive hasn’t been synced. It’s safe here, but not backed up and not on your other devices."
+
+#: src/routes/SyncRoute.tsx
+msgid "These sync your other drives — not this drive."
+msgstr "These sync your other drives — not this drive."

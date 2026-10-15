@@ -92,7 +92,7 @@ describe('Cloud Server setup', () => {
   it('does not report success when the node never receives the drive', async () => {
     const { args, store } = setup();
     store.syncDriveToServerAndVerify.mockRejectedValue(
-      new Error('The server is still missing this workspace root.'),
+      new Error('The server is still missing this drive root.'),
     );
     await expect(enableCloudSyncForDrive(args)).rejects.toThrow(/missing/);
   });

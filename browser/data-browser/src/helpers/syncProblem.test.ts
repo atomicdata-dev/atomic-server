@@ -30,7 +30,7 @@ describe('describeSyncProblem', () => {
     expect(describeSyncProblem(base)).toBeNull();
   });
 
-  it('asks the person to act when the server refuses the workspace', () => {
+  it('asks the person to act when the server refuses the drive', () => {
     const problem = describeSyncProblem({ ...base, refusedByServer: true });
 
     expect(problem?.cause).toBe('you');
@@ -65,7 +65,7 @@ describe('describeSyncProblem', () => {
     });
   });
 
-  it('ignores a sync error that belongs to another workspace', () => {
+  it('ignores a sync error that belongs to another drive', () => {
     expect(
       describeSyncProblem({
         ...base,
@@ -141,7 +141,7 @@ describe('describeSyncProblem', () => {
     ).toBeNull();
   });
 
-  describe('scoped to the viewed workspace', () => {
+  describe('scoped to the viewed drive', () => {
     const OTHER = 'did:ad:otherdrive';
     const entry = (message: string, subject: string) => [
       {
@@ -155,7 +155,7 @@ describe('describeSyncProblem', () => {
       subject.startsWith('other:') ? OTHER : DRIVE;
     const missing = 'Parent of atomic:ktCV (atomic:Xlqr) not found';
 
-    it('ignores changes of another workspace', () => {
+    it('ignores changes of another drive', () => {
       expect(
         describeSyncProblem({
           ...base,
@@ -166,7 +166,7 @@ describe('describeSyncProblem', () => {
       ).toBeNull();
     });
 
-    it('ignores another workspace that keeps failing', () => {
+    it('ignores another drive that keeps failing', () => {
       expect(
         describeSyncProblem({
           ...base,
@@ -178,7 +178,7 @@ describe('describeSyncProblem', () => {
       ).toBeNull();
     });
 
-    it('still reports changes of the viewed workspace', () => {
+    it('still reports changes of the viewed drive', () => {
       const problem = describeSyncProblem({
         ...base,
         entries: [
@@ -188,12 +188,12 @@ describe('describeSyncProblem', () => {
         driveOf,
       });
 
-      expect(problem?.title).toBe('This server does not have this workspace');
+      expect(problem?.title).toBe('This server does not have this drive');
       expect(problem?.actions).toEqual(['connect-device', 'review-sync']);
       expect(problem?.detail).toBe(missing);
     });
 
-    it('compares spellings of the same workspace as equal', () => {
+    it('compares spellings of the same drive as equal', () => {
       const problem = describeSyncProblem({
         ...base,
         entries: entry('weird', 'mine:doc'),
@@ -203,7 +203,7 @@ describe('describeSyncProblem', () => {
       expect(problem?.key).toBe('blocked');
     });
 
-    it('scopes the same way when the viewed workspace is a top-level resource', () => {
+    it('scopes the same way when the viewed drive is a top-level resource', () => {
       const dm = 'did:ad:dm';
       const problem = describeSyncProblem({
         ...base,
