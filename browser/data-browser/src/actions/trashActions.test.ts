@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Store } from '@tomic/react';
 import { resourceActions } from './resourceActions';
 import type { ActionContext } from './types';
 
@@ -11,6 +12,8 @@ const make = (subject: string, parent?: string): ActionContext =>
     drive: DRIVE,
     subject,
     store: {
+      isTrashed: Store.prototype.isTrashed,
+      peekTrashFolder: Store.prototype.peekTrashFolder,
       resources: new Map([[DRIVE, { get: () => TRASH }]]),
     },
     resource: {

@@ -59,23 +59,32 @@ export function PluginTrigger({
     setError(undefined);
 
     try {
+      const payload = JSON.stringify({
+        drive,
+        plugin,
+        filters: trigger.query.filters.map(f => ({
+          property: f.property,
+          value: f.value,
+        })),
+        onEnter: trigger.onEnter,
+        onLeave: trigger.onLeave,
+        autoApply: enabled,
+      });
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          ...(await signRequest(endpoint, store.getAgent()!, {})),
+          ...(await signRequest(
+            endpoint,
+            store.getAgent()!,
+            {},
+            {
+              method: 'POST',
+              body: payload,
+            },
+          )),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          drive,
-          plugin,
-          filters: trigger.query.filters.map(f => ({
-            property: f.property,
-            value: f.value,
-          })),
-          onEnter: trigger.onEnter,
-          onLeave: trigger.onLeave,
-          autoApply: enabled,
-        }),
+        body: payload,
       });
       if (!response.ok) throw new Error(await response.text());
       setTrigger(await response.json());

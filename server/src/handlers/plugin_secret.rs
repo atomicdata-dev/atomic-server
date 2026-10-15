@@ -117,14 +117,15 @@ fn normalize_origin(raw: &str) -> AtomicServerResult<String> {
     })
 }
 
-#[tracing::instrument(skip(appstate, body, req))]
+#[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_set_secret(
     appstate: web::Data<AppState>,
-    body: web::Json<SetSecretBody>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize_plugin_write(&appstate, &req, &context, &body.plugin).await?;
+    let body: SetSecretBody = crate::helpers::parse_json(&raw)?;
+    authorize_plugin_write(&appstate, &req, &context, &raw, &body.plugin).await?;
 
     PluginSecretKey::validate_name(&body.name)?;
 
@@ -166,7 +167,7 @@ pub async fn handle_list_secrets(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize_plugin_write(&appstate, &req, &context, &query.plugin).await?;
+    authorize_plugin_write(&appstate, &req, &context, &[], &query.plugin).await?;
 
     Ok(HttpResponse::Ok().json(view(&appstate, &query.drive, &query.plugin).await?))
 }
@@ -178,7 +179,7 @@ pub async fn handle_delete_secret(
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize_plugin_write(&appstate, &req, &context, &query.plugin).await?;
+    authorize_plugin_write(&appstate, &req, &context, &[], &query.plugin).await?;
 
     let name = query.name.as_ref().ok_or("Which secret? Pass `name`.")?;
 

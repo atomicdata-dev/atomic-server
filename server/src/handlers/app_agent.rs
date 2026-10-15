@@ -20,7 +20,6 @@ use atomic_lib::{
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent_for_request,
 };
 
 #[derive(serde::Deserialize)]
@@ -50,8 +49,7 @@ pub async fn handle_set_app_agent(
 ) -> AtomicServerResult<HttpResponse> {
     // Raw bytes rather than `web::Json`: a version 2 request signature covers
     // the SHA-256 of exactly these bytes, which carry a private key.
-    let body: SetAppAgentBody = serde_json::from_slice(&raw)
-        .map_err(|e| AtomicServerError::bad_request(format!("Invalid JSON body: {e}")))?;
+    let body: SetAppAgentBody = crate::helpers::parse_json(&raw)?;
     // Write rights on the app: giving it an identity is changing what it can
     // do, which is at least as consequential as editing it.
     let agent = authorize(&appstate, &req, &raw, &context, &body.app).await?;
@@ -125,16 +123,7 @@ async fn authorize(
     let store = &appstate.store;
     let resource = store.get_resource(&app.into()).await?;
 
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject =
-        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-
-    let agent = get_client_agent_for_request(req, body, appstate, &signed_subject).await?;
+    let agent = crate::helpers::authenticate(req, appstate, context, body).await?;
     check_write(store, &resource, &agent).await?;
 
     Ok(agent)

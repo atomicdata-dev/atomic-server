@@ -3,7 +3,6 @@ use crate::{
     appstate::AppState,
     context::RequestContext,
     errors::{AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent,
 };
 use actix_web::{
     guard,
@@ -82,6 +81,7 @@ async fn authorize(
     state: &AppState,
     req: &HttpRequest,
     ctx: &RequestContext,
+    body: &[u8],
     query: &ProjectQuery,
 ) -> AtomicServerResult<ForAgent> {
     base_origin(state)?;
@@ -94,12 +94,7 @@ async fn authorize(
             "Project and drive subjects are required",
         ));
     }
-    let signed = atomic_lib::Subject::from_raw(
-        req.uri().path_and_query().ok_or("Missing path")?.as_str(),
-        None,
-    )
-    .resolve(&ctx.origin);
-    let agent = get_client_agent(req.headers(), state, &signed).await?;
+    let agent = crate::helpers::authenticate(req, state, ctx, body).await?;
     if matches!(agent, ForAgent::Public) {
         return Err(AtomicServerError::bad_request("Sign in to publish"));
     }
@@ -158,7 +153,7 @@ pub async fn status(
     ctx: RequestContext,
     query: web::Query<ProjectQuery>,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&state, &req, &ctx, &query).await?;
+    authorize(&state, &req, &ctx, &[], &query).await?;
     response(
         &state,
         &query.project,
@@ -170,9 +165,10 @@ pub async fn upload(
     req: HttpRequest,
     ctx: RequestContext,
     query: web::Query<ProjectQuery>,
-    body: web::Json<WebsitePackage>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&state, &req, &ctx, &query).await?;
+    let body: WebsitePackage = crate::helpers::parse_json(&raw)?;
+    authorize(&state, &req, &ctx, &raw, &query).await?;
     body.validate()
         .map_err(|e| AtomicServerError::bad_request(e.to_string()))?;
     let value = state
@@ -189,7 +185,7 @@ pub async fn asset_upload(
     hash: web::Path<String>,
     body: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&state, &req, &ctx, &query).await?;
+    authorize(&state, &req, &ctx, &body, &query).await?;
     state
         .store
         .website_put_asset(&query.project, &hash, &body)
@@ -204,7 +200,7 @@ pub async fn asset_read(
     query: web::Query<ProjectQuery>,
     hash: web::Path<String>,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&state, &req, &ctx, &query).await?;
+    authorize(&state, &req, &ctx, &[], &query).await?;
     let bytes = state
         .store
         .website_asset(&project_id(&query.project), &hash)
@@ -222,9 +218,10 @@ pub async fn activate(
     req: HttpRequest,
     ctx: RequestContext,
     query: web::Query<ProjectQuery>,
-    body: web::Json<Activate>,
+    raw: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
-    let agent = authorize(&state, &req, &ctx, &query).await?;
+    let body: Activate = crate::helpers::parse_json(&raw)?;
+    let agent = authorize(&state, &req, &ctx, &raw, &query).await?;
     let value = state.store.website_activate(
         &project_id(&query.project),
         body.expected_revision,
@@ -244,7 +241,7 @@ pub async fn preview(
     query: web::Query<ProjectQuery>,
     id: web::Path<String>,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&state, &req, &ctx, &query).await?;
+    authorize(&state, &req, &ctx, &[], &query).await?;
     let package = state
         .store
         .website_package(&project_id(&query.project), &id)
@@ -257,13 +254,24 @@ pub async fn preview(
 pub fn control_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/website-hosting")
-            .app_data(web::JsonConfig::default().limit(MAX_BYTES))
             .app_data(web::PayloadConfig::new(2_000_000))
-            .route("/assets/{hash}", web::post().to(asset_upload))
-            .route("/assets/{hash}", web::get().to(asset_read))
+            .service(
+                web::resource("/assets/{hash}")
+                    .route(web::post().to(asset_upload))
+                    .route(web::get().to(asset_read)),
+            )
             .route("", web::get().to(status))
-            .route("/deployments", web::post().to(upload))
-            .route("/activate", web::post().to(activate))
+            // The package is read as `Bytes`, so its limit is a payload limit.
+            .service(
+                web::resource("/deployments")
+                    .app_data(web::PayloadConfig::new(MAX_BYTES))
+                    .route(web::post().to(upload)),
+            )
+            .service(
+                web::resource("/activate")
+                    .app_data(web::PayloadConfig::new(MAX_BYTES))
+                    .route(web::post().to(activate)),
+            )
             .route("/preview/{id}", web::get().to(preview)),
     );
 }
