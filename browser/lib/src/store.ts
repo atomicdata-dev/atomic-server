@@ -3791,6 +3791,7 @@ export class Store {
                 limit,
                 parents: parentScope,
                 filters: opts.filters,
+                includeTrashed: opts.includeTrashed,
               }),
             )
             .then(hits => {

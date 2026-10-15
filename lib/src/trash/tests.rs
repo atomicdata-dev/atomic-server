@@ -309,3 +309,52 @@ async fn collections_hide_trashed_members_unless_asked_or_viewing_the_trash() {
         assert_eq!(inside, vec![gone_child.clone()]);
     }
 }
+
+/// The browser's local DB (`wasm` `ClientDb.query`) builds a bare [`Query`] and
+/// sets `exclude_trashed` from its `includeTrashed` argument, so the rule has
+/// to hold on that path and not only through `Collection::collect_members`.
+/// (The wasm crate has no native test target; this builds the same query.)
+#[tokio::test]
+#[timeout(120000)]
+async fn a_bare_query_hides_trashed_rows_the_way_the_wasm_path_builds_it() {
+    let (store, drive) = setup("bare_query").await;
+    let keep = folder(&store, &drive, "Keep").await;
+    let gone = folder(&store, &drive, "Gone").await;
+    assert!(trash(&store, &gone, &drive).await.unwrap());
+    let trash_folder = peek_trash_folder(&store, &drive).unwrap();
+
+    let run = |exclude_trashed: bool, parent: Option<&str>| {
+        let store = &store;
+        let drive = &drive;
+        let mut q = Query::new_prop_val(urls::IS_A, urls::FOLDER);
+        if let Some(parent) = parent {
+            q = Query::new_prop_val(urls::PARENT, parent);
+        }
+        q.include_nested = false;
+        q.drive = Some(Subject::from(drive.as_str()));
+        q.exclude_trashed = exclude_trashed;
+        async move {
+            let mut found: Vec<String> = store
+                .query(&q)
+                .await
+                .unwrap()
+                .subjects
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            found.sort();
+            found
+        }
+    };
+
+    let hidden = run(true, None).await;
+    assert!(hidden.contains(&keep), "{hidden:?}");
+    assert!(!hidden.contains(&gone), "{hidden:?}");
+
+    let all = run(false, None).await;
+    assert!(all.contains(&keep) && all.contains(&gone), "{all:?}");
+
+    // The Trash view is exempt even when exclusion is on.
+    let view = run(true, Some(&trash_folder)).await;
+    assert_eq!(view, vec![gone.clone()]);
+}
