@@ -537,6 +537,7 @@ msgstr "Not configured"
 #: src/routes/ConnectAgentRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
+#: src/routes/SyncRoute.tsx
 msgid "Connected"
 msgstr "Connected"
 

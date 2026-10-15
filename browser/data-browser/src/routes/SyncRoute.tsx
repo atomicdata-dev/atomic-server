@@ -179,6 +179,14 @@ function StatusIcon({ status }: { status: NodeStatus }) {
   }
 }
 
+/** Connected and answering usage for this drive, but no finished sync is
+ *  recorded here yet: not "In sync", and no longer just "Connecting…". */
+function serverStatusLabel(status: NodeStatus, answersUsage: boolean): string {
+  return status === 'unknown' && answersUsage
+    ? 'Connected'
+    : statusLabel(status);
+}
+
 function statusLabel(status: NodeStatus): string {
   switch (status) {
     case 'synced':
@@ -393,7 +401,10 @@ function ServerCard({
           : refusedByServer
             ? { tone: 'offline', label: 'Not hosted here' }
             : isActive
-              ? { tone: serverStatus, label: statusLabel(serverStatus) }
+              ? {
+                  tone: serverStatus,
+                  label: serverStatusLabel(serverStatus, !!nodeUsage),
+                }
               : { tone: 'unknown', label: 'Not connected' }
       }
       controls={
@@ -1609,7 +1620,7 @@ function SyncPage() {
                 : tone === 'unknown'
                   ? 'muted'
                   : 'busy',
-          text: `${statusLabel(tone)} · ${serverHostname ?? managedServer}`,
+          text: `${serverStatusLabel(tone, !!nodeUsage)} · ${serverHostname ?? managedServer}`,
         },
         details: status.drive ? (
           <CloudServerDetails

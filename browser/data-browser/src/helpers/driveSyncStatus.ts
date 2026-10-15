@@ -78,8 +78,10 @@ export function hasHostedDriveConnection(
  * drive's usage from it. So a drive this device has finished syncing with a
  * managed node, and that holds data there, is hosted for everyone with
  * access, whichever account pays for it and whether or not this person is
- * signed in to the portal. Data alone is not enough (a disabled enrollment
- * leaves it behind), hence the finished sync on a live connection.
+ * signed in to the portal. The evidence is the drive's own usage, read from
+ * the node with this agent's read rights, so another drive's sync proves
+ * nothing. It does not wait for this device's first sync to finish: the node
+ * already answers for the drive. Not-enrolled refusals are excluded.
  */
 export function driveHostedByNode(input: {
   managed: boolean;
@@ -93,7 +95,6 @@ export function driveHostedByNode(input: {
     input.liveSyncedDrive &&
     !input.refusedByServer &&
     input.status.serverConnected &&
-    !!currentDriveSync(input.status) &&
     (input.resourceCount ?? 0) > 0
   );
 }

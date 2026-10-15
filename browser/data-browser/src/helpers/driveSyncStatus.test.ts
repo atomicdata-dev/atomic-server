@@ -77,7 +77,7 @@ describe('driveHostedByNode', () => {
     expect(driveHostedByNode({ ...hosted, managed: false })).toBe(false);
   });
 
-  it('waits for this drive to finish syncing', () => {
+  it('does not wait for this device to finish its first sync', () => {
     expect(
       driveHostedByNode({
         ...hosted,
@@ -86,7 +86,7 @@ describe('driveHostedByNode', () => {
           lastDriveSync: { drive: 'did:ad:other', count: 3, timestamp: 1 },
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('does not count a refused, offline or empty drive', () => {
