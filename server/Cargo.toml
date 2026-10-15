@@ -232,6 +232,8 @@ tokio-tungstenite = { version = "0.29.0", features = [
 ] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 futures-util = "0.3.32"
+# Parses atomic-host/wit in a unit test; already in the tree through wasmtime.
+wit-parser = "0.244"
 
 [features]
 # Embedded builds: cargo build -p atomic-server --no-default-features --features <needed>

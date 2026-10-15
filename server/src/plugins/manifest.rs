@@ -31,6 +31,16 @@ pub struct Manifest {
     pub operations: Vec<Operation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<super::actions::Action>,
+    /// Typed functions this app offers to other apps and callers through the
+    /// host ABI (`calls.call`). Only a `sandboxed-app` may declare any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exports: Vec<Export>,
+    /// Interfaces this app may call through `calls.call`. An app that lists
+    /// none calls nobody: what a call causes is bounded by what the caller
+    /// declared and was granted, not only by who asked. Only a
+    /// `sandboxed-app` may declare any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<String>,
     /// Coarse egress allowance for packages that call the host `fetch` without
     /// an operation id. It never widens what `operations` grant.
     #[serde(default, skip_serializing_if = "Network::is_default")]
@@ -93,6 +103,8 @@ impl From<ManifestV1> for Manifest {
             secrets: v1.secrets,
             operations: v1.operations,
             actions: v1.actions,
+            exports: Vec::new(),
+            uses: Vec::new(),
             network: Network::default(),
             config: v1.config,
             config_schema: None,
@@ -132,6 +144,10 @@ pub enum World {
     Extension,
     /// Exports the class-extender hooks and may write; operator-installed.
     ServerExtension,
+    /// A component on the host ABI (`atomic:host`, world `sandboxed-app`):
+    /// everything through typed host imports, offers `exports` to other apps.
+    /// Writes only as far as its Installation's agent has rights.
+    SandboxedApp,
 }
 
 impl World {
@@ -357,7 +373,127 @@ pub struct Operation {
     pub effect: String,
 }
 
+/// What a call to an export is allowed to do to the world. Shown to whoever
+/// reviews the app and to LLMs choosing a tool; the host does not trust it as a
+/// guard (rights are checked on every read and write regardless).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExportEffect {
+    Read,
+    Write,
+    External,
+    Interactive,
+}
+
+/// One function an app offers: `atomic:example/counter@1` `increment`.
+///
+/// The schemas are the bounded JSON Schema subset of [`super::actions::InputSchema`]:
+/// a flat object of strings, integers and booleans. The host validates call
+/// arguments and results against them.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Export {
+    pub interface: String,
+    pub function: String,
+    pub description: String,
+    pub input_schema: super::actions::InputSchema,
+    pub output_schema: super::actions::InputSchema,
+    pub effect: ExportEffect,
+}
+
+/// `atomic:example/counter@1`: a package, an interface and a major version.
+fn check_interface(interface: &str) -> Result<(), String> {
+    let well_formed = interface.len() <= 128
+        && interface
+            .split_once('/')
+            .is_some_and(|(package, rest)| package.contains(':') && rest.contains('@'))
+        && interface
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b":/@-.".contains(&b));
+    if well_formed {
+        Ok(())
+    } else {
+        Err(format!(
+            "interface '{interface}' must look like atomic:example/counter@1"
+        ))
+    }
+}
+
+fn validate_uses(uses: &[String], world: World) -> Result<(), String> {
+    if uses.is_empty() {
+        return Ok(());
+    }
+    if world != World::SandboxedApp {
+        return Err("only world sandboxed-app may declare uses".into());
+    }
+    if uses.len() > 64 {
+        return Err("at most 64 used interfaces per release".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for interface in uses {
+        check_interface(interface)?;
+        if !seen.insert(interface) {
+            return Err("uses lists each interface once".into());
+        }
+    }
+    Ok(())
+}
+
+fn validate_exports(exports: &[Export], world: World) -> Result<(), String> {
+    if exports.is_empty() {
+        return Ok(());
+    }
+    if world != World::SandboxedApp {
+        return Err("only world sandboxed-app may declare exports".into());
+    }
+    if exports.len() > 64 {
+        return Err("at most 64 exports per release".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for export in exports {
+        check_interface(&export.interface)?;
+        if export.function.is_empty()
+            || export.function.len() > 128
+            || !export
+                .function
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        {
+            return Err("export function names are kebab-case".into());
+        }
+        if export.description.len() > 8192 {
+            return Err("export description is too long".into());
+        }
+        if !seen.insert((&export.interface, &export.function)) {
+            return Err("exports must be unique per interface and function".into());
+        }
+        for schema in [&export.input_schema, &export.output_schema] {
+            if schema.r#type != "object"
+                || schema.additional_properties
+                || schema.properties.len() > 32
+                || schema
+                    .required
+                    .iter()
+                    .any(|p| !schema.properties.contains_key(p))
+                || schema
+                    .properties
+                    .values()
+                    .any(|p| !matches!(p.r#type.as_str(), "string" | "integer" | "boolean"))
+            {
+                return Err("unsupported export schema".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Manifest {
+    pub fn exports_of<'a>(&'a self, interface: &'a str) -> impl Iterator<Item = &'a Export> + 'a {
+        self.exports
+            .iter()
+            .filter(move |e| e.interface == interface)
+    }
+
     pub fn parse(raw: serde_json::Value) -> Result<Option<Self>, String> {
         // Legacy drafts have no version and receive only legacy GET/HEAD access.
         let Some(version) = raw.get("schemaVersion") else {
@@ -451,8 +587,18 @@ impl Manifest {
                         .into(),
                 );
             }
+            World::SandboxedApp => {
+                if self.runtime != Runtime::Wasip2v1 {
+                    return Err("world sandboxed-app requires runtime wasip2/1".into());
+                }
+                if !class_urls.is_empty() {
+                    return Err("world sandboxed-app may not declare classExtender".into());
+                }
+            }
             _ => {}
         }
+        validate_exports(&self.exports, self.world)?;
+        validate_uses(&self.uses, self.world)?;
         if let Some(view) = &self.entrypoints.view {
             if view.is_empty()
                 || view.starts_with('/')
@@ -623,6 +769,8 @@ pub fn translate_plugin_json(
         secrets: Vec::new(),
         operations: Vec::new(),
         actions: Vec::new(),
+        exports: Vec::new(),
+        uses: Vec::new(),
         network: Network {
             origins,
             reason: network_reason,
@@ -1079,5 +1227,143 @@ mod path_tests {
         ] {
             assert!(!matches_path(pattern, path));
         }
+    }
+}
+
+#[cfg(test)]
+mod export_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn export() -> serde_json::Value {
+        json!({
+            "interface": "atomic:example/counter@1",
+            "function": "increment",
+            "description": "Adds one.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"subject": {"type": "string", "description": "What to count on."}},
+                "required": ["subject"],
+                "additionalProperties": false
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {"count": {"type": "integer", "description": "The count."}},
+                "required": ["count"],
+                "additionalProperties": false
+            },
+            "effect": "write"
+        })
+    }
+
+    fn app(exports: serde_json::Value) -> serde_json::Value {
+        json!({
+            "schemaVersion": 2,
+            "runtime": "wasip2/1",
+            "world": "sandboxed-app",
+            "exports": exports,
+        })
+    }
+
+    #[test]
+    fn a_sandboxed_app_declares_typed_exports_and_they_round_trip() {
+        let raw = app(json!([export()]));
+        let manifest = Manifest::parse(raw.clone()).unwrap().unwrap();
+        assert_eq!(manifest.world, World::SandboxedApp);
+        assert_eq!(manifest.exports.len(), 1);
+        assert_eq!(manifest.exports[0].effect, ExportEffect::Write);
+        assert_eq!(
+            manifest
+                .exports_of("atomic:example/counter@1")
+                .map(|e| e.function.as_str())
+                .collect::<Vec<_>>(),
+            ["increment"]
+        );
+        assert_eq!(
+            serde_json::to_value(&manifest).unwrap()["exports"],
+            raw["exports"]
+        );
+    }
+
+    /// Releases are content-addressed over the serialized manifest, so a
+    /// manifest that declares no exports must serialize as it always did.
+    #[test]
+    fn manifests_without_exports_serialize_without_the_field() {
+        for raw in [
+            json!({"schemaVersion": 1}),
+            json!({"schemaVersion": 2, "runtime": "wasip2/1", "world": "server-extension",
+                   "entrypoints": {"classExtender": ["https://example.com/classes/a"]}}),
+        ] {
+            let manifest = Manifest::parse(raw.clone()).unwrap().unwrap();
+            let out = serde_json::to_value(&manifest).unwrap();
+            assert!(out.get("exports").is_none(), "{out}");
+            assert!(out.get("world").is_none_or(|w| w != "sandboxed-app"));
+        }
+    }
+
+    #[test]
+    fn bad_exports_are_refused() {
+        let with = |change: &dyn Fn(&mut serde_json::Value)| {
+            let mut e = export();
+            change(&mut e);
+            Manifest::parse(app(json!([e])))
+        };
+        assert!(with(&|e| e["interface"] = json!("counter")).is_err());
+        assert!(with(&|e| e["interface"] = json!("Atomic:Example/counter@1")).is_err());
+        assert!(with(&|e| e["function"] = json!("Increment")).is_err());
+        assert!(with(&|e| e["effect"] = json!("destroy")).is_err());
+        assert!(with(&|e| e["extra"] = json!(true)).is_err());
+        assert!(with(&|e| e["inputSchema"]["additionalProperties"] = json!(true)).is_err());
+        assert!(
+            with(&|e| e["inputSchema"]["properties"]["subject"]["type"] = json!("array")).is_err()
+        );
+        assert!(with(&|e| e["inputSchema"]["required"] = json!(["missing"])).is_err());
+        assert!(with(&|_| {}).is_ok());
+
+        // Two exports of one function.
+        assert!(Manifest::parse(app(json!([export(), export()]))).is_err());
+    }
+
+    #[test]
+    fn uses_is_validated_like_exports_and_only_for_a_sandboxed_app() {
+        let with = |uses: serde_json::Value| {
+            let mut raw = app(json!([]));
+            raw["uses"] = uses;
+            Manifest::parse(raw)
+        };
+        let ok = with(json!(["atomic:example/counter@1"])).unwrap().unwrap();
+        assert_eq!(ok.uses, ["atomic:example/counter@1"]);
+        assert_eq!(
+            serde_json::to_value(&ok).unwrap()["uses"],
+            json!(["atomic:example/counter@1"])
+        );
+        assert!(with(json!(["counter"])).is_err());
+        assert!(with(json!([
+            "atomic:example/counter@1",
+            "atomic:example/counter@1"
+        ]))
+        .is_err());
+        assert!(
+            Manifest::parse(json!({"schemaVersion": 2, "uses": ["atomic:example/counter@1"]}))
+                .is_err()
+        );
+        // Nothing declared serializes as it always did.
+        assert!(serde_json::to_value(with(json!([])).unwrap().unwrap())
+            .unwrap()
+            .get("uses")
+            .is_none());
+    }
+
+    #[test]
+    fn only_a_wasip2_sandboxed_app_may_export() {
+        for raw in [
+            json!({"schemaVersion": 2, "exports": [export()]}),
+            json!({"schemaVersion": 2, "runtime": "wasip2/1", "exports": [export()]}),
+            json!({"schemaVersion": 2, "world": "sandboxed-app", "exports": []}),
+        ] {
+            assert!(Manifest::parse(raw).is_err());
+        }
+        // No exports is fine for an app that only consumes.
+        assert!(Manifest::parse(app(json!([]))).unwrap().is_some());
     }
 }

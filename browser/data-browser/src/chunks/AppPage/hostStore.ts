@@ -1,5 +1,6 @@
 import { canViewAccess } from '@helpers/extensions/viewPolicy';
 import type { Store } from '@tomic/react';
+import { HostError, toHostErrorCode } from '@tomic/plugin';
 import type { ProxyHost } from '@helpers/proxyConnections';
 import { parseViewQuery, runViewQuery } from '@helpers/extensions/viewQuery';
 import { ViewChanges } from '@helpers/extensions/viewApply';
@@ -48,6 +49,10 @@ export interface HostRequest {
   method?: string;
   headers?: unknown;
   body?: string;
+  /** `call`: the app export to call, and its arguments. */
+  interface?: string;
+  function?: string;
+  args?: unknown;
   /** `getMany`: the subjects to read, in order. Checked, since the frame sends it. */
   subjects?: unknown;
 }
@@ -62,6 +67,8 @@ export interface HostReply {
   id: number | string;
   result?: unknown;
   error?: string;
+  /** With `error`, from a failed `call`: the host ABI error code. */
+  code?: string;
 }
 
 export function isHostRequest(data: unknown): data is HostRequest {
@@ -292,6 +299,19 @@ export async function handleRequest(
       return await proxyFetch(proxy.origin, request);
     }
 
+    // Another app's export, over the same signed route as MCP uses. The
+    // app must be a readable resource here, like any read it makes.
+    case 'call':
+      await canViewAccess(store, app, { kind: 'app', root: app }, 'read');
+
+      return await callExport(
+        store,
+        drive,
+        required(request.interface, 'interface'),
+        required(request.function, 'function'),
+        request.args,
+      );
+
     case 'proxyConnections':
       return proxy
         ? await proxy.connections(required(request.platform, 'platform'))
@@ -473,6 +493,77 @@ const PROXY_RESPONSE_HEADERS = ['link', 'retry-after', 'etag', 'content-type'];
 const PROXY_REQUEST_HEADERS = ['authorization', 'content-type', 'if-match'];
 const PROXY_MAX_BODY = 10 * 1024 * 1024;
 const PROXY_TIMEOUT = 30_000;
+
+/** The export effects a frame may call, until approval UI exists. */
+export const FRAME_EFFECTS = ['read'];
+
+/**
+ * `POST /host/call` as the signed-in person. The server bounds the app by this
+ * person's rights, so the frame gets no more than they could do themselves.
+ */
+async function callExport(
+  store: Store,
+  drive: string,
+  iface: string,
+  fn: string,
+  args: unknown,
+): Promise<unknown> {
+  const agent = store.getAgent();
+
+  if (!agent) throw new Error('Sign in to call an app');
+
+  if (args !== undefined && (typeof args !== 'object' || args === null))
+    throw new Error('call arguments are an object');
+
+  const url = `${store.getServerUrl()}/host/call`;
+  const payload = JSON.stringify({
+    drive,
+    interface: iface,
+    function: fn,
+    args: args ?? {},
+    // Until the host can ask the person to approve a write, an external
+    // effect or a dialog on a frame's behalf, a frame may only read. The
+    // frame cannot set this: it has no network, and `request` is not read.
+    allowEffects: FRAME_EFFECTS,
+  });
+  // Version 2: the signature covers the method and exactly this body.
+  const headers = await signRequest(
+    url,
+    agent,
+    {},
+    { method: 'POST', body: payload },
+  );
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: payload,
+  });
+  const text = await response.text();
+  let body: {
+    result?: unknown;
+    error?: { code?: unknown; message?: unknown };
+  } = {};
+
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Not ours (a proxy's error page, say): reported below.
+  }
+
+  if (response.ok && 'result' in body) return body.result;
+
+  if (body.error) {
+    throw new HostError(
+      toHostErrorCode(body.error.code),
+      String(body.error.message ?? `Call failed (${response.status})`),
+    );
+  }
+
+  throw new HostError(
+    'internal',
+    errorMessageFromResponse(text, response.status),
+  );
+}
 
 /** Send a frame's signed proxy request, if it stays within the proxy. */
 async function proxyFetch(

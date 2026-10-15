@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "runtime": "wasip2/1",
+  "world": "sandboxed-app",
+  "name": "counter",
+  "namespace": "example",
+  "version": "0.1.0",
+  "description": "Counts: reads a number on a resource and writes it plus one.",
+  "exports": [
+    {
+      "interface": "atomic:example/counter@1",
+      "function": "increment",
+      "description": "Adds one to an integer property of a resource and returns the new value.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": { "type": "string", "description": "The resource to count on." },
+          "property": { "type": "string", "description": "The integer property that holds the count." }
+        },
+        "required": ["subject", "property"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "description": "The count after incrementing." }
+        },
+        "required": ["count"],
+        "additionalProperties": false
+      },
+      "effect": "write"
+    }
+  ]
+}

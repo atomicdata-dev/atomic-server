@@ -62,6 +62,9 @@ pub fn engine() -> Result<Arc<Engine>, String> {
 pub enum Runtime {
     ClassExtender,
     Js,
+    /// A component on the host ABI (`host_abi`): one invocation of `invoke`,
+    /// which may compute but is not an interpreter.
+    App,
 }
 
 /// The capabilities that widen a plugin's resource budget.
@@ -156,6 +159,19 @@ pub fn limits(runtime: Runtime, grants: ResourceGrants) -> Limits {
                 256 * MIB
             },
             yield_interval: None,
+        },
+        Runtime::App => Limits {
+            fuel: if grants.extended_fuel {
+                10_000_000_000
+            } else {
+                1_000_000_000
+            },
+            memory_bytes: if grants.extended_memory {
+                2000 * MIB
+            } else {
+                128 * MIB
+            },
+            yield_interval: Some(10_000),
         },
     }
 }

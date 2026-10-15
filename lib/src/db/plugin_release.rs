@@ -21,7 +21,10 @@ pub const RUNTIMES: [&str; 2] = [RUNTIME_JS, RUNTIME_WASIP2];
 pub const WORLD_EXTENSION: &str = "extension";
 /// Class-extender world: may write, operator-installed, never via an Installation.
 pub const WORLD_SERVER_EXTENSION: &str = "server-extension";
-pub const WORLDS: [&str; 2] = [WORLD_EXTENSION, WORLD_SERVER_EXTENSION];
+/// Host-ABI world (`atomic:host` `sandboxed-app`): a component with typed
+/// imports that offers exports to other apps.
+pub const WORLD_SANDBOXED_APP: &str = "sandboxed-app";
+pub const WORLDS: [&str; 3] = [WORLD_EXTENSION, WORLD_SERVER_EXTENSION, WORLD_SANDBOXED_APP];
 
 fn default_world() -> String {
     WORLD_EXTENSION.to_string()
