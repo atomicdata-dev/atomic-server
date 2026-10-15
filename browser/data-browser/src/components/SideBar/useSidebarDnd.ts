@@ -11,7 +11,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { core, dataBrowser, useStore } from '@tomic/react';
+import { conversations, core, dataBrowser, useStore } from '@tomic/react';
 import { useCallback, useRef, useState, type MouseEvent } from 'react';
 import toast from 'react-hot-toast';
 import { isContentAddressed } from '../../helpers/propertyIdentity';
@@ -22,6 +22,7 @@ import {
 import { useSettings } from '../../helpers/AppSettings';
 import { useFavorites } from '../../hooks/useFavorites';
 import { moveToTrash } from '../../helpers/trash';
+import { leaveConversation } from '../../helpers/conversations/hiddenConversations';
 import { useResourceContextMenu } from '../ResourceContextMenu/ResourceContextMenuContext';
 import { HoldMoveTouchSensor } from './holdMoveTouchSensor';
 // Fractional-key math shared with table row insertion.
@@ -89,6 +90,9 @@ interface ZoneDropDeps {
   favorites: string[];
   addFavorite: (subject: string) => void;
   moveToTrash: (subject: string) => Promise<unknown>;
+  /** Whether the subject is a conversation, which is left, never trashed. */
+  isConversation?: (subject: string) => boolean;
+  leaveConversation?: (subject: string) => Promise<unknown>;
 }
 
 /**
@@ -99,10 +103,25 @@ interface ZoneDropDeps {
 export const handleZoneDrop = async (
   zone: SideBarZoneKind,
   subject: string,
-  { favorites, addFavorite, moveToTrash: move }: ZoneDropDeps,
+  {
+    favorites,
+    addFavorite,
+    moveToTrash: move,
+    isConversation,
+    leaveConversation: leave,
+  }: ZoneDropDeps,
 ): Promise<void> => {
   if (zone === 'trash') {
     try {
+      // A conversation can't be trashed: dropping it here removes it from
+      // your messages.
+      if (isConversation?.(subject) && leave) {
+        await leave(subject);
+        toast.success('Removed from your messages');
+
+        return;
+      }
+
       if (await move(subject)) {
         toast.success('Moved to Trash');
       }
@@ -300,6 +319,11 @@ export const useSidebarDnd = (
         favorites,
         addFavorite,
         moveToTrash: s => moveToTrash(store, s, drive),
+        isConversation: s =>
+          store
+            .getResourceLoading(s)
+            .hasClasses(conversations.classes.conversation),
+        leaveConversation: s => leaveConversation(store, s),
       });
 
       waitForSaveRef.current = promise;
