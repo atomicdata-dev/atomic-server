@@ -1216,6 +1216,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-loadtest"
+version = "0.41.0-beta.8"
+dependencies = [
+ "atomic_lib",
+ "clap",
+ "rand 0.8.6",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "atomic-plugin"
 version = "0.1.1"
 dependencies = [

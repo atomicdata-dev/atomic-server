@@ -38,6 +38,33 @@ describe('commit transport fallback', () => {
     },
   );
 
+  it('does not retry a BUSY refusal over HTTP', async () => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    vi.stubGlobal('WebSocket', { OPEN: 1 });
+    const busy = new AtomicError(
+      'Server busy; retry_after_ms=2000',
+      ErrorType.Server,
+      ErrorCode.BUSY,
+    );
+    busy.retryAfterMs = 2000;
+    const internals = store as unknown as {
+      getWebSocketForEndpoint: () => unknown;
+      client: { postCommit: () => Promise<Commit> };
+    };
+    vi.spyOn(internals, 'getWebSocketForEndpoint').mockReturnValue({
+      readyState: 1,
+      postCommit: vi.fn().mockRejectedValue(busy),
+    });
+    const http = vi.spyOn(internals.client, 'postCommit');
+    await expect(
+      store.postCommit(
+        { subject: 'did:ad:edit' } as Commit,
+        'https://example.com/commit',
+      ),
+    ).rejects.toBe(busy);
+    expect(http).not.toHaveBeenCalled();
+  });
+
   it('still uses HTTP when the socket transport fails', async () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     vi.stubGlobal('WebSocket', { OPEN: 1 });

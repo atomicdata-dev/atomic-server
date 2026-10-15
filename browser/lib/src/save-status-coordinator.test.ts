@@ -150,3 +150,15 @@ describe('SaveStatusCoordinator', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('scheduled saves are background saves', () => {
+  it('passes background to Resource.save so the soft pace applies', async () => {
+    const { coordinator } = setup();
+    const resource = new Resource('_new:background');
+    const save = vi.spyOn(resource, 'save').mockResolvedValue('persisted');
+    const scheduler = coordinator.createScheduler(resource);
+    scheduler.schedule(0);
+    await scheduler.flush();
+    expect(save).toHaveBeenCalledWith({ background: true });
+  });
+});

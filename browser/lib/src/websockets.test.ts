@@ -17,6 +17,7 @@ import {
   decodeHelloCaps,
   encodeChallenge,
   encodeCommitOkSlim,
+  encodeCommitOkPaced,
   encodeSyncResend,
   encodeCommitOk,
   encodeError,
@@ -1149,6 +1150,84 @@ describe('WSClient.postCommit', () => {
     expect(created.id).toBe('did:ad:commit:sig-abc');
     expect(created.signature).toBe('sig-abc');
     expect(created.subject).toBe('did:ad:doc');
+    client.close();
+  });
+
+  it('lists commit-pace in its HELLO', async ({ expect }) => {
+    const { client, socket } = await postingClient();
+    const hello = framesWithTag(socket, Tag.HELLO)[0];
+    expect(decodeHelloCaps(hello.subarray(1))).toContain('commit-pace');
+    client.close();
+  });
+
+  it('hands the pace_ms of a paced COMMIT_OK to the store', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await postingClient();
+    const report = vi.spyOn(store, 'reportServerPace');
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    const [rid] = sentRequestIds(socket);
+    socket.receive(encodeCommitOkPaced(rid, 'did:ad:commit:sig-abc', 2500));
+
+    const created = await pending;
+    expect(created.id).toBe('did:ad:commit:sig-abc');
+    expect(report).toHaveBeenCalledWith(2500);
+    client.close();
+  });
+
+  it('does not report pace for an unpaced COMMIT_OK', async ({ expect }) => {
+    const { client, socket, store } = await postingClient();
+    const report = vi.spyOn(store, 'reportServerPace');
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeCommitOkSlim(sentRequestIds(socket)[0], 'did:ad:commit:sig-abc'),
+    );
+    await pending;
+    expect(report).not.toHaveBeenCalled();
+    client.close();
+  });
+
+  it('rejects a BUSY refusal with its retry delay', async ({ expect }) => {
+    const { client, socket } = await postingClient();
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeError(
+        sentRequestIds(socket)[0],
+        ErrorCode.BUSY,
+        'Server busy; retry_after_ms=1730',
+      ),
+    );
+
+    const error = await pending.catch(e => e);
+    expect(error).toBeInstanceOf(AtomicError);
+    expect(error.code).toBe(ErrorCode.BUSY);
+    expect(error.retryAfterMs).toBe(1730);
+    client.close();
+  });
+
+  it('reads the retry delay of a legacy rate-limit refusal', async ({
+    expect,
+  }) => {
+    const { client, socket } = await postingClient();
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeError(
+        sentRequestIds(socket)[0],
+        ErrorCode.UNKNOWN,
+        'Too many writes; retry after 3 seconds',
+      ),
+    );
+
+    const error = await pending.catch(e => e);
+    expect(error.retryAfterMs).toBe(3000);
     client.close();
   });
 

@@ -34,7 +34,7 @@ export class SaveStatusCoordinator {
         if (options.shouldSave?.() === false) return;
 
         try {
-          await target.save();
+          await target.save({ background: true });
         } catch (error) {
           // A queued edit is a normal state, visible through getState.
           if (error instanceof SaveQueuedError) return;

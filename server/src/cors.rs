@@ -38,7 +38,12 @@ use crate::{appstate::AppState, config::Opts};
 /// header has to be on it; `the_v2_signature_header_passes_a_preflight`
 /// guards it.
 pub(crate) fn any_origin() -> Cors {
-    Cors::permissive().expose_headers([crate::serve::SERVER_VERSION_HEADER])
+    Cors::permissive().expose_headers([
+        crate::serve::SERVER_VERSION_HEADER,
+        crate::write_load::PACE_HEADER,
+        crate::write_load::RETRY_AFTER_MS_HEADER,
+        "Retry-After",
+    ])
 }
 
 /// Whether a browser on `origin` (the `Origin` header, `scheme://host[:port]`)
@@ -256,9 +261,27 @@ mod tests {
                 headers
                     .get(header::ACCESS_CONTROL_EXPOSE_HEADERS)
                     .and_then(|v| v.to_str().ok())
-                    .is_some_and(|v| v.eq_ignore_ascii_case(crate::serve::SERVER_VERSION_HEADER)),
+                    .is_some_and(|v| v.split(',').any(|h| h
+                        .trim()
+                        .eq_ignore_ascii_case(crate::serve::SERVER_VERSION_HEADER))),
                 "{origin}: the version header stays exposed"
             );
+            // A cross-origin client reads the load signal from these.
+            for exposed in [
+                crate::write_load::PACE_HEADER,
+                crate::write_load::RETRY_AFTER_MS_HEADER,
+                "Retry-After",
+            ] {
+                assert!(
+                    headers
+                        .get(header::ACCESS_CONTROL_EXPOSE_HEADERS)
+                        .and_then(|v| v.to_str().ok())
+                        .is_some_and(|v| v
+                            .split(',')
+                            .any(|h| h.trim().eq_ignore_ascii_case(exposed))),
+                    "{origin}: {exposed} stays exposed"
+                );
+            }
         }
 
         // Preflights.

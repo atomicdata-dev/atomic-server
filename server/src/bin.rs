@@ -28,6 +28,7 @@ mod rate_limit;
 mod routes;
 pub mod serve;
 pub mod vector_search;
+mod write_load;
 // #[cfg(feature = "search")]
 #[cfg(test)]
 mod tests;
