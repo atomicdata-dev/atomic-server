@@ -23,6 +23,9 @@ import {
  * either way. The attempt keeps running; this is the page admitting it. */
 const PAIRING_DEADLINE = 60_000;
 
+/** How long an automatic join waits for local storage to open. */
+const LOCAL_STORAGE_WAIT = 20_000;
+
 export function PeerInvitePage({ token }: { token: string }) {
   const store = useStore();
   const { agent, setDrive } = useSettings();
@@ -113,19 +116,24 @@ export function PeerInvitePage({ token }: { token: string }) {
   useEffect(() => {
     if (!ownInvite || autoJoined.current) return;
 
-    const tryJoin = () => {
-      if (autoJoined.current || !store.getAgent() || !store.getClientDb())
+    // Once per page, even if the effect runs again.
+    autoJoined.current = true;
+
+    void (async () => {
+      // Local storage can be slow to open on a cold start, but not forever:
+      // say so instead of spinning.
+      if (!(await store.waitForClientDb(LOCAL_STORAGE_WAIT))) {
+        setError(
+          new Error(
+            'Local storage did not open. Reload the page to try again.',
+          ),
+        );
+
         return;
-      autoJoined.current = true;
-      clearInterval(timer);
-      void join();
-    };
+      }
 
-    const timer = setInterval(tryJoin, 500);
-
-    tryJoin();
-
-    return () => clearInterval(timer);
+      await join();
+    })();
     // `join` only reads the token and the store.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [ownInvite, store, token]);

@@ -12948,3 +12948,7 @@ msgstr "Browser sync server"
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View all drives"
 msgstr "View all drives"
+
+#: src/views/PeerInvitePage.tsx
+msgid "Local storage did not open. Reload the page to try again."
+msgstr "Local storage did not open. Reload the page to try again."
