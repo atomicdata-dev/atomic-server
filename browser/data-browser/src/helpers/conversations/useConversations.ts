@@ -1,5 +1,10 @@
-import { conversations, useStore, type Store } from '@tomic/react';
-import { useEffect, useState } from 'react';
+import {
+  conversations,
+  useResources,
+  useStore,
+  type Store,
+} from '@tomic/react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSettings } from '../AppSettings';
 import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -11,9 +16,8 @@ import {
   withoutHidden,
 } from './hiddenConversations';
 import { hasMembers, startConversation } from './conversations';
-import { hasConversationsEndpoint } from './conversationsEndpoint';
-
-const CONVERSATIONS_PATH = '/conversations';
+import { fetchMemberOf } from './conversationsEndpoint';
+import { dedupeByMembers } from './conversationMembers';
 
 /** How often the Messages panel asks the server for conversations someone
  *  else started. Nothing pushes them yet; see `planning/notifications.md`. */
@@ -51,45 +55,15 @@ export function useConversations(): string[] {
     };
   }, [store, agent]);
 
-  return withoutHidden(
-    agent?.subject ? [...new Set([...listed, ...fromServer])] : listed,
-    hidden,
+  const all = useMemo(
+    () => (agent?.subject ? [...new Set([...listed, ...fromServer])] : listed),
+    [agent?.subject, listed, fromServer],
   );
-}
+  const resources = useResources(all);
 
-/** The conversations on this server the signed-in agent is a member of.
- *  Empty when the server can't say, such as one without the endpoint. */
-async function fetchMemberOf(store: Store): Promise<string[]> {
-  try {
-    // A demo guest's identity exists only on this device, so no server has
-    // conversations for it.
-    const agent = store.getAgent();
-
-    if (agent?.subject && store.isLocalOnlyDrive(agent.subject)) {
-      return [];
-    }
-
-    // A server without the endpoint is not worth a store fetch: the client
-    // logs every failed parse as a console error.
-    if (
-      !(await hasConversationsEndpoint(
-        store.getServerUrl(),
-        CONVERSATIONS_PATH,
-      ))
-    ) {
-      return [];
-    }
-
-    // Always from the server: a cached answer predates new conversations.
-    const endpoint = await store.fetchResourceFromServer(
-      `${store.getServerUrl()}${CONVERSATIONS_PATH}`,
-    );
-    const found = endpoint.get(conversations.properties.conversations);
-
-    return Array.isArray(found) ? (found as string[]) : [];
-  } catch {
-    return [];
-  }
+  // Two conversations with the same people show as one. Collapsing comes
+  // before hiding, so leaving the kept one hides its twins too.
+  return withoutHidden(dedupeByMembers(all, resources).subjects, hidden);
 }
 
 /**

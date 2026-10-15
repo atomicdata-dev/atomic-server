@@ -7,6 +7,7 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
+import { membersOf, sameMembers } from './conversationMembers';
 import {
   addEpoch,
   encryptionKeyFor,
@@ -83,15 +84,12 @@ async function memberFor(
   return { agent, encryptionKey: key };
 }
 
-/** Whether `conversation` has exactly these members. */
+/** Whether `conversation` has exactly these members, however they are spelled
+ *  (`did:ad:agent:X` and `atomic:agent:X` are the same agent). */
 export function hasMembers(conversation: Resource, members: string[]): boolean {
-  const read = conversation.get(core.properties.read);
+  const read = membersOf(conversation);
 
-  if (!Array.isArray(read) || read.length !== new Set(members).size) {
-    return false;
-  }
-
-  return members.every(member => read.includes(member));
+  return !!read && sameMembers(read, members);
 }
 
 /**

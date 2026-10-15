@@ -1,6 +1,8 @@
 import { conversations, type Store } from '@tomic/react';
 import { useSyncExternalStore } from 'react';
 import { fetchPrivateDriveSubject } from '../privateDrive';
+import { fetchMemberOf } from './conversationsEndpoint';
+import { membersOf, sameMembers } from './conversationMembers';
 
 const STORAGE_KEY = 'atomic.hidden-conversations';
 const EMPTY: string[] = [];
@@ -106,7 +108,9 @@ function readCached(agent: string): string[] {
 /**
  * Leaves a conversation: drops it from the private drive's list and hides it
  * on this device. Members can't delete it (they only read and append), so it
- * stays on the server for everyone else.
+ * stays on the server for everyone else. Other conversations with the same
+ * members (an older duplicate) are left with it, or they would take its place
+ * in the list.
  */
 export async function leaveConversation(
   store: Store,
@@ -114,22 +118,57 @@ export async function leaveConversation(
 ): Promise<void> {
   const agent = store.getAgent();
 
-  if (!agent?.subject) return;
+  const me = agent?.subject;
 
-  hideConversation(agent.subject, subject);
+  if (!agent || !me) return;
+
+  hideConversation(me, subject);
 
   const privateDriveSubject = await fetchPrivateDriveSubject(store, agent);
+  const privateDrive = privateDriveSubject
+    ? await store.getResource(privateDriveSubject)
+    : undefined;
+  const listedValue = privateDrive?.get(conversations.properties.conversations);
+  const listed = Array.isArray(listedValue) ? (listedValue as string[]) : [];
+  const leaving = [subject, ...(await findTwins(store, subject, listed))];
 
-  if (!privateDriveSubject) return;
+  leaving.forEach(twin => hideConversation(me, twin));
 
-  const privateDrive = await store.getResource(privateDriveSubject);
-  const listed = privateDrive.get(conversations.properties.conversations);
-
-  if (Array.isArray(listed) && listed.includes(subject)) {
+  if (privateDrive && listed.some(s => leaving.includes(s))) {
     await privateDrive.set(
       conversations.properties.conversations,
-      (listed as string[]).filter(s => s !== subject),
+      listed.filter(s => !leaving.includes(s)),
     );
     await privateDrive.save();
+  }
+}
+
+/** The other conversations with the same members as `subject`. */
+async function findTwins(
+  store: Store,
+  subject: string,
+  listed: string[],
+): Promise<string[]> {
+  try {
+    const candidates = [
+      ...new Set([...listed, ...(await fetchMemberOf(store))]),
+    ].filter(candidate => candidate !== subject);
+    const members = membersOf(await store.getResource(subject));
+
+    if (!members) return [];
+
+    const twins: string[] = [];
+
+    for (const candidate of candidates) {
+      const resource = await store.getResource(candidate);
+      const theirs = resource.error ? undefined : membersOf(resource);
+
+      if (theirs && sameMembers(theirs, members)) twins.push(candidate);
+    }
+
+    return twins;
+  } catch {
+    // Finding twins is a courtesy; leaving the one asked for still works.
+    return [];
   }
 }
