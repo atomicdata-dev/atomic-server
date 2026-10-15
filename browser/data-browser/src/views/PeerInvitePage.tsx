@@ -3,6 +3,7 @@ import { decodeBrowserInvite } from '@tomic/lib';
 import { useStore } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
 import { Button } from '../components/Button';
+import { Spinner } from '../components/Spinner';
 import { ContainerNarrow } from '../components/Containers';
 import { Column } from '../components/Row';
 import { ErrorLook } from '../components/ErrorLook';
@@ -31,6 +32,8 @@ export function PeerInvitePage({ token }: { token: string }) {
   const [stalled, setStalled] = useState(false);
   const [error, setError] = useState<Error>();
   const joinedAt = useRef<number>(undefined);
+  const autoJoined = useRef(false);
+  const autoOpened = useRef(false);
   let invite: ReturnType<typeof decodeBrowserInvite> | undefined;
 
   try {
@@ -40,6 +43,8 @@ export function PeerInvitePage({ token }: { token: string }) {
   }
 
   const drive = invite?.drive;
+  // The inviter opening their own link on another device: nothing to accept.
+  const ownInvite = !!agent && !!invite && agent.subject === invite.issuer;
   useEffect(() => {
     const update = () => {
       const current = drive ? peerLinkStatus(drive) : '';
@@ -105,9 +110,38 @@ export function PeerInvitePage({ token }: { token: string }) {
     );
   };
 
+  useEffect(() => {
+    if (!ownInvite || autoJoined.current) return;
+
+    const tryJoin = () => {
+      if (autoJoined.current || !store.getAgent() || !store.getClientDb())
+        return;
+      autoJoined.current = true;
+      clearInterval(timer);
+      void join();
+    };
+
+    const timer = setInterval(tryJoin, 500);
+
+    tryJoin();
+
+    return () => clearInterval(timer);
+    // `join` only reads the token and the store.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownInvite, store, token]);
+
+  useEffect(() => {
+    if (!ownInvite || !ready || autoOpened.current) return;
+    autoOpened.current = true;
+    open();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownInvite, ready]);
+
   const signIn = () => {
     const portal = getManagedPortalUrl();
-    const url = new URL(portal ?? '/app/welcome', window.location.origin);
+    const url = portal
+      ? new URL('/signin', portal)
+      : new URL('/app/welcome', window.location.origin);
     url.searchParams.set('invite', token);
     window.location.assign(url.href);
   };
@@ -132,6 +166,8 @@ export function PeerInvitePage({ token }: { token: string }) {
               <Button onClick={signIn}>Sign in to join</Button>
             ) : ready ? (
               <Button onClick={open}>Open drive</Button>
+            ) : ownInvite ? (
+              !error && <Spinner centered />
             ) : (
               <Button onClick={join} disabled={joining}>
                 {joining ? 'Connecting…' : 'Join drive'}

@@ -11453,7 +11453,6 @@ msgid "Saved {0}, identity …{1}"
 msgstr "Saved {0}, identity …{1}"
 
 #: src/routes/InviteRoute.tsx
-#: src/routes/InviteRoute.tsx
 msgid "Opening invitation..."
 msgstr "Opening invitation..."
 

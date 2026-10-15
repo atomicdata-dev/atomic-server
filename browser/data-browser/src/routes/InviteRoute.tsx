@@ -15,6 +15,7 @@ import {
   originMayLackNode,
   probeOriginForNode,
 } from '../helpers/originNode';
+import { Spinner } from '../components/Spinner';
 import InvitePage from '../views/InvitePage';
 import { appRoute } from './RootRoutes';
 import { pathNames } from './paths';
@@ -51,7 +52,7 @@ function InviteRouteComponent() {
   if (invalid) return <p>Invalid invitation.</p>;
 
   return (
-    <OpenIfAlreadyShared token={token}>
+    <OpenIfAlreadyShared token={token} browserInvite={browserInvite}>
       {browserInvite ? (
         <PeerInvitePage token={token} />
       ) : (
@@ -69,9 +70,11 @@ function InviteRouteComponent() {
  */
 function OpenIfAlreadyShared({
   token,
+  browserInvite,
   children,
 }: {
   token: string;
+  browserInvite: boolean;
   children: JSX.Element;
 }) {
   const store = useStore();
@@ -87,7 +90,24 @@ function OpenIfAlreadyShared({
     let active = true;
 
     void (async () => {
-      const has = await alreadyHasInviteAccess(store, agentSubject, grant);
+      // A browser invite's drive syncs over a peer link that only the join
+      // screen creates, so only a copy already on this device skips it.
+      const hasLocalCopy = browserInvite
+        ? async (subject: string) => {
+            const db = store.getClientDb();
+
+            return (
+              !!db && !!(await db.getResourceWithSnapshot(subject)).snapshot
+            );
+          }
+        : undefined;
+      const has = await alreadyHasInviteAccess(
+        store,
+        agentSubject,
+        grant,
+        undefined,
+        { hasLocalCopy },
+      );
       if (!active) return;
 
       if (!has) {
@@ -106,9 +126,9 @@ function OpenIfAlreadyShared({
     return () => {
       active = false;
     };
-  }, [grant, agentSubject, store, navigate, setDrive]);
+  }, [grant, agentSubject, store, navigate, setDrive, browserInvite]);
 
-  if (!checked) return <p>Opening invitation...</p>;
+  if (!checked) return <Spinner centered />;
 
   return children;
 }
