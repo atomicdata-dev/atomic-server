@@ -353,14 +353,7 @@ export function DropdownMenu({
     menu.style.top = `${Math.max(visibleTop + 8, Math.min(preferredTop, visibleBottom - menuRect.height - 8))}px`;
 
     const leftPos = triggerRect.x - menuRect.width;
-    const preferredLeft =
-      leftPos < 0
-        ? triggerRect.x
-        : triggerRect.x - menuRect.width + triggerRect.width;
-
-    // On a narrow screen a menu that opens rightwards from a trigger near the
-    // left edge would run off the right edge; keep it inside the viewport.
-    menu.style.left = `${Math.max(8, Math.min(preferredLeft, window.innerWidth - menuRect.width - 8))}px`;
+    menu.style.left = `${leftPos < 0 ? triggerRect.x : triggerRect.x - menuRect.width + triggerRect.width}px`;
   }, [anchorPoint]);
 
   useEffect(() => {
