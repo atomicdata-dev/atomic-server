@@ -9371,7 +9371,6 @@ msgid "Searching in {0}"
 msgstr ""
 
 #: src/components/OverlayContainer.tsx
-#: src/views/Drive/DriveHome.tsx
 msgid "Recently opened"
 msgstr ""
 
@@ -12714,40 +12713,40 @@ msgstr ""
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Currently on this drive"
-msgstr ""
+msgstr "Derzeit in diesem Drive"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Activity will show up here"
-msgstr ""
+msgstr "Aktivität erscheint hier"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show less"
-msgstr ""
+msgstr "Weniger anzeigen"
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Show all"
-msgstr ""
+msgstr "Alle anzeigen"
 
 #. 0: toRelativeDateTime(new Date(at), true)
 #: src/views/Drive/DriveHome.tsx
 msgid "Edited {0}"
-msgstr ""
+msgstr "Bearbeitet {0}"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "<0/> Drive settings"
-msgstr ""
+msgstr "<0/> Drive-Einstellungen"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet. Create something with New, or drop files on this page."
-msgstr ""
+msgstr "Noch nichts hier. Erstelle etwas mit Neu oder ziehe Dateien auf diese Seite."
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Nothing here yet."
-msgstr ""
+msgstr "Noch nichts hier."
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Drive settings"
-msgstr ""
+msgstr "Drive-Einstellungen"
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Server members meet through for free browser sync."
