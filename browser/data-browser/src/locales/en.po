@@ -684,11 +684,11 @@ msgstr "Add an OpenRouter API key in settings"
 msgid "{0} /M output tokens"
 msgstr "{0} /M output tokens"
 
-#: src/components/SideBar/usePanelList.ts
+#: src/components/SideBar/AIPanel.tsx
 msgid "AI Chats"
 msgstr "AI Chats"
 
-#: src/components/SideBar/usePanelList.ts
+#: src/components/SideBar/index.tsx
 msgid "Ontologies"
 msgstr "Ontologies"
 
@@ -822,12 +822,12 @@ msgstr "Unauthorized"
 msgid "This drive is private, sign in to view it"
 msgstr "This drive is private, sign in to view it"
 
+#: src/components/SideBar/SideBarHomePanels.tsx
 #: src/components/SideBar/SidebarDropZones.tsx
-#: src/components/SideBar/usePanelList.ts
 msgid "Favorites"
 msgstr "Favorites"
 
-#: src/components/SideBar/usePanelList.ts
+#: src/components/SideBar/SideBarHomePanels.tsx
 msgid "Shared with me"
 msgstr "Shared with me"
 
@@ -852,7 +852,6 @@ msgstr "Invalid Resource"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
-#: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Untitled Chat"
 
@@ -3912,7 +3911,6 @@ msgstr "Chat and the log of resources visited during the meeting."
 msgid "End"
 msgstr "End"
 
-#: src/actions/resourceActions.tsx
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave"
 msgstr "Leave"
@@ -8211,7 +8209,6 @@ msgid "This is taking longer than it should. The person who invited you needs to
 msgstr "This is taking longer than it should. The person who invited you needs to have this drive open in their browser. Try again, or ask them for a new invitation."
 
 #: src/chunks/AI/AISidebar.tsx
-#: src/routes/Search/ChatMatchRow.tsx
 msgid "AI chat"
 msgstr "AI chat"
 
@@ -8800,7 +8797,6 @@ msgstr "Invite sent to {0} people"
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 #: src/components/Share/ShareDialog.tsx
-#: src/routes/Search/ChatMatchRow.tsx
 msgid "Message"
 msgstr "Message"
 
@@ -11069,7 +11065,7 @@ msgstr "Discard upload"
 msgid "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 msgstr "Included AI isn't reachable right now. Check your connection and sign-in, then reload to try again."
 
-#: src/components/SideBar/usePanelList.ts
+#: src/components/SideBar/MessagesPanel.tsx
 msgid "Messages"
 msgstr "Messages"
 
@@ -11500,7 +11496,7 @@ msgstr "{0} conflict{1}"
 msgid "Merging keeps the fork's version."
 msgstr "Merging keeps the fork's version."
 
-#. 0: total; 1: total !== 1 ? 's' \\: ''
+#. 0: results.length; 1: results.length !== 1 ? 's' \\: ''
 #: src/components/OverlayContainer.tsx
 msgid "{0} result{1}"
 msgstr "{0} result{1}"
@@ -12914,45 +12910,6 @@ msgstr "Browser sync server"
 msgid "View all drives"
 msgstr "View all drives"
 
-#. 0: who
-#: src/actions/resourceActions.tsx
-msgid "Leave {0}? This only removes it from your list. The other members keep the conversation."
-msgstr "Leave {0}? This only removes it from your list. The other members keep the conversation."
-
-#: src/actions/resourceActions.tsx
-#: src/actions/resourceActions.tsx
-msgid "Leave conversation"
-msgstr "Leave conversation"
-
-#: src/actions/resourceActions.tsx
-msgid "Remove this conversation from your list."
-msgstr "Remove this conversation from your list."
-
-#: src/actions/resourceActions.tsx
-msgid "Confirm Leave"
-msgstr "Confirm Leave"
-
-#: src/components/OverlayContainer.tsx
-msgid "Chats"
-msgstr "Chats"
-
-#: src/components/SideBar/MessagesPanel.tsx
-#: src/components/SideBar/MessagesPanel.tsx
-msgid "Search messages"
-msgstr "Search messages"
-
-#: src/components/SideBar/MessagesPanel.tsx
-msgid "Search by name"
-msgstr "Search by name"
-
-#: src/components/SideBar/MessagesPanel.tsx
-msgid "No matches"
-msgstr "No matches"
-
-#: src/components/SideBar/useSidebarDnd.ts
-msgid "Removed from your messages"
-msgstr "Removed from your messages"
-
 #. 0: formatBytes(usage.pending_bytes)
 #: src/components/Vault/VaultStorage.tsx
 msgid "Uploads in progress: {0}. "
@@ -13056,3 +13013,8 @@ msgstr "Can be freed now"
 #: src/components/Vault/VaultStorage.tsx
 msgid "Compress history removes this"
 msgstr "Compress history removes this"
+
+#. 0: title
+#: src/components/SideBar/SideBarPanel.tsx
+msgid "Hide {0}"
+msgstr "Hide {0}"
