@@ -51,6 +51,7 @@ import { hasBrowserAPI } from './hasBrowserAPI.js';
 import { collections } from './ontologies/collections.js';
 import { commits } from './ontologies/commits.js';
 import { core } from './ontologies/core.js';
+import * as trashOps from './trash.js';
 import { server, type Server } from './ontologies/server.js';
 import { notifications } from './ontologies/notifications.js';
 import { conversations } from './ontologies/conversations.js';
@@ -5926,6 +5927,41 @@ export class Store {
       lastDriveSync: this._lastDriveSync,
       lastDriveSyncError: this._lastDriveSyncError,
     };
+  }
+
+  /** The drive's Trash folder if the store already knows it. Never fetches. */
+  public peekTrashFolder(drive: string | undefined): string | undefined {
+    return trashOps.peekTrashFolder(this, drive);
+  }
+
+  /** The drive's Trash folder, created on first use. */
+  public getOrCreateTrashFolder(drive: string): Promise<string> {
+    return trashOps.getOrCreateTrashFolder(this, drive);
+  }
+
+  /**
+   * Parks a resource in the drive's Trash and remembers its old parent.
+   * Throws for content-addressed properties; false when nothing was done.
+   */
+  public trash(subject: string, drive: string): Promise<boolean> {
+    return trashOps.moveToTrash(this, subject, drive);
+  }
+
+  /** Moves a trashed resource back to where it came from (or the drive root). */
+  public restore(subject: string, drive: string): Promise<void> {
+    return trashOps.restoreFromTrash(this, subject, drive);
+  }
+
+  /**
+   * Whether a resource is in the drive's Trash: directly, or with `deep` also
+   * under a trashed ancestor (only already-loaded ancestors are read).
+   */
+  public isTrashed(
+    subjectOrResource: string | Resource,
+    drive: string | undefined,
+    opts?: trashOps.IsTrashedOptions,
+  ): boolean {
+    return trashOps.isTrashed(this, subjectOrResource, drive, opts);
   }
 
   public async notifyResourceSaved(resource: Resource): Promise<void> {
