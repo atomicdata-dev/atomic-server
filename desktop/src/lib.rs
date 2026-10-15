@@ -553,7 +553,10 @@ pub fn run() {
   // Bound to loopback rather than the plugin's default `0.0.0.0`: this is an
   // unauthenticated channel that can execute JS in the webview, and on a café
   // network the default would offer that to everyone on the subnet.
-  #[cfg(any(debug_assertions, feature = "account-acceptance"))]
+  #[cfg(all(
+    desktop,
+    any(debug_assertions, feature = "account-acceptance")
+  ))]
   let builder = builder.plugin(
     tauri_plugin_mcp_bridge::Builder::new()
       .bind_address("127.0.0.1")

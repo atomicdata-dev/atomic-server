@@ -146,7 +146,7 @@
   },
   "scripts": {
     "build:website-runtime": "node scripts/build-website-runtime.mjs",
-    "build": "if [ \"$SKIP_WASM_BUILD\" = \"1\" ]; then echo 'SKIP_WASM_BUILD=1, skipping wasm-pack'; else pnpm build:wasm; fi && vite build",
+    "build": "node scripts/build.mjs",
     "build:tauri": "pnpm --filter \"@tomic/lib\" --filter \"@tomic/react\" run build && pnpm build:wasm && TAURI=1 vite build",
     "build:wasm": "cd ../../wasm && export CARGO_TARGET_DIR=../target/wasm-pack CARGO_BUILD_BUILD_DIR=../target/wasm-pack/build && cargo run -q --package cargo-bin -- wasm-pack --version && env -u CARGO_ENCODED_RUSTFLAGS -u RUSTFLAGS cargo run -q --package cargo-bin -- wasm-pack build --target web --out-dir pkg && cp pkg/atomic_wasm.js pkg/atomic_wasm_bg.wasm ../browser/data-browser/public/wasm/",
     "dev": "vite",
