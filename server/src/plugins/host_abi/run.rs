@@ -248,6 +248,18 @@ pub fn call_export<'a>(
             .export(interface, function)
             .expect("provider_of found it");
         budget.allows(export.effect)?;
+        // At every hop, not only the entry: a read export must not let a reader
+        // cause a write, or make another app spend its secrets.
+        if matches!(export.effect, ExportEffect::Write | ExportEffect::External) {
+            use atomic_lib::Storelike;
+            let drive_resource = db
+                .get_resource(&drive.into())
+                .await
+                .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+            atomic_lib::hierarchy::check_write(&**db, &drive_resource, &caller)
+                .await
+                .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+        }
 
         let parsed: serde_json::Value = serde_json::from_str(args).map_err(|e| {
             error(

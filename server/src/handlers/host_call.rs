@@ -18,11 +18,7 @@
 //! `allowEffects`; a frame has no network of its own and cannot set it.
 
 use actix_web::{http::StatusCode, web, HttpResponse};
-use atomic_lib::{
-    agents::ForAgent,
-    hierarchy::{check_read, check_write},
-    Storelike,
-};
+use atomic_lib::{agents::ForAgent, hierarchy::check_read, Storelike};
 
 use crate::{
     appstate::AppState,
@@ -125,26 +121,8 @@ pub async fn handle_host_call(
     let db = std::sync::Arc::new(store.clone());
     appstate.host_abi.refresh(&db, &body.drive).await;
 
-    // What the export does decides what the caller needs on the drive.
-    let effect = appstate
-        .host_abi
-        .provider_of(&body.drive, &body.interface, &body.function)
-        .and_then(|app| {
-            app.export(&body.interface, &body.function)
-                .map(|export| export.effect)
-        });
-    if let Some(effect) = effect {
-        if matches!(effect, ExportEffect::Write | ExportEffect::External) {
-            if let Err(e) = check_write(store, &drive, &agent).await {
-                return Ok(refusal(
-                    code::FORBIDDEN,
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                ));
-            }
-        }
-    }
-
+    // Write and external exports also need write on the drive; `call_export`
+    // checks that at every hop.
     // Checked at every hop, not only here: an app a frame calls cannot hand
     // the call on to one that writes.
     let budget = match &body.allow_effects {

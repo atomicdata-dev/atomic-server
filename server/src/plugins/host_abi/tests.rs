@@ -402,6 +402,40 @@ async fn a_chain_limited_to_reads_never_runs_an_export_that_writes() {
 }
 
 #[actix_rt::test]
+async fn every_hop_that_writes_or_reaches_out_needs_write_on_the_drive() {
+    let w = World::new("host_abi_write_per_hop").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    // The reader may even write this one resource, but not the drive.
+    let reader = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
+    share(
+        db,
+        &subject,
+        &[&counter.agent, &reader],
+        &[&counter.agent, &reader],
+    )
+    .await;
+
+    let err = w
+        .call(
+            CALLER,
+            "bump-twice",
+            json!({"subject": subject, "property": property}),
+            ForAgent::AgentSubject(reader.into()),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+}
+
+#[actix_rt::test]
 async fn the_callee_never_gets_the_callers_rights() {
     let w = World::new("host_abi_no_borrowed_rights").await;
     let db = &*w.db;
