@@ -350,6 +350,14 @@ export {
 export * from './integration-actions.js';
 
 export { taskSchema } from './task-schema.js';
+export {
+  workSchema,
+  contactSchema,
+  pipelineSchema,
+  moneySchema,
+  sharedVocabularyOntologies,
+  sharedVocabularyProperties,
+} from './shared-vocabularies.js';
 
 export { timeTrackingSchema } from './time-tracking-schema.js';
 

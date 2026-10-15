@@ -19,7 +19,9 @@ const PREFERRED_MENU_WIDTH = 400;
 /** Breathing room kept between the menu and the edge of the window. */
 const MENU_VIEWPORT_MARGIN = 8;
 
+// Guarded so modules that import ComboBox can load in a non-DOM test environment.
 const supportsAnchorPositioning =
+  typeof document !== 'undefined' &&
   'anchorName' in document.documentElement.style;
 
 export type ComboBoxOption = {
@@ -38,6 +40,7 @@ type ComboBoxProps = {
   onSelect: (value: string | undefined) => void;
   subtle?: boolean;
   ariaLabel?: string;
+  placeholder?: string;
 };
 
 export const ComboBox: React.FC<ComboBoxProps> = ({
@@ -46,6 +49,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
   onSelect,
   subtle = false,
   ariaLabel,
+  placeholder,
 }) => {
   // Use Combobox does not work with the compiler.
   'use no memo';
@@ -198,6 +202,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
         <InputStyled
           {...getInputProps({
             'aria-label': ariaLabel,
+            placeholder,
             ...(ariaLabel ? { 'aria-labelledby': undefined } : {}),
             onFocus: () => {
               setIsFocused(true);

@@ -1,57 +1,30 @@
 import { useState } from 'react';
 import { styled } from 'styled-components';
-import { transparentize } from 'polished';
 import { useEditorState, type Editor } from '@tiptap/react';
-import {
-  FaAt,
-  FaCheck,
-  FaImage,
-  FaListOl,
-  FaListUl,
-  FaXmark,
-} from 'react-icons/fa6';
-import { MdTextFormat } from 'react-icons/md';
-import { IconButton } from '@components/IconButton/IconButton';
-import { useLocalStorage } from '@hooks/useLocalStorage';
+import { FaAt, FaCheck, FaImage, FaListOl, FaListUl } from 'react-icons/fa6';
+import { useFormattingToolbarVisible } from './useFormattingToolbarVisible';
 import { useTipTapEditor } from './TiptapContext';
 import { NodeSelectMenu } from './NodeSelectMenu';
 import { MarkToggleButtons } from './MarkToggleButtons';
 import { LinkPopoverButton } from './LinkPopoverButton';
 import { ToggleButton } from './ToggleButton';
 
-const SHOW_TOOLBAR_KEY = 'atomic.rte.showToolbar';
-
 /**
  * Formatting toolbar above the document editor, for people who don't know
- * the `/` and `@` commands yet. It can be hidden; that choice is remembered
- * per browser and applies to every document and meeting.
+ * the `/` and `@` commands yet. It is hidden by default; the toggle sits next
+ * to the document title (see `FormattingToolbarToggle`).
  */
-export function FormattingToolbar(): React.JSX.Element {
-  const [showToolbar, setShowToolbar] = useLocalStorage(SHOW_TOOLBAR_KEY, true);
+export function FormattingToolbar(): React.JSX.Element | null {
+  const [visible] = useFormattingToolbarVisible();
 
-  if (!showToolbar) {
-    return (
-      <CollapsedRow>
-        <IconButton
-          title='Show formatting toolbar'
-          size='1.2rem'
-          color='textLight'
-          onClick={() => setShowToolbar(true)}
-        >
-          <MdTextFormat />
-        </IconButton>
-      </CollapsedRow>
-    );
+  if (!visible) {
+    return null;
   }
 
-  return <Toolbar onHide={() => setShowToolbar(false)} />;
+  return <Toolbar />;
 }
 
-interface ToolbarProps {
-  onHide: () => void;
-}
-
-function Toolbar({ onHide }: ToolbarProps): React.JSX.Element {
+function Toolbar(): React.JSX.Element {
   const editor = useTipTapEditor();
   const [linkMenuOpen, setLinkMenuOpen] = useState(false);
 
@@ -136,14 +109,6 @@ function Toolbar({ onHide }: ToolbarProps): React.JSX.Element {
           </ToggleButton>
         </Group>
       </Scroller>
-      <HideButton
-        title='Hide toolbar (type / or @ instead)'
-        $active={false}
-        onClick={onHide}
-        type='button'
-      >
-        <FaXmark />
-      </HideButton>
     </ToolbarWrapper>
   );
 }
@@ -171,17 +136,11 @@ const ToolbarWrapper = styled.div`
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: ${p => p.theme.size(2)};
   margin-bottom: ${p => p.theme.size(3)};
-  padding-block: ${p => p.theme.size(1)};
-  border-bottom: 1px solid ${p => p.theme.colors.bg2};
-  background-color: ${p => p.theme.colors.bg};
+  padding: ${p => p.theme.size(1)} ${p => p.theme.size(2)};
+  border-radius: ${p => p.theme.radius};
+  background-color: ${p => p.theme.colors.bg1};
   cursor: default;
-
-  @supports (backdrop-filter: blur(5px)) {
-    background-color: ${p => transparentize(0.1, p.theme.colors.bg)};
-    backdrop-filter: blur(5px);
-  }
 
   @media print {
     display: none;
@@ -189,14 +148,13 @@ const ToolbarWrapper = styled.div`
 `;
 
 /* Narrow screens scroll the buttons sideways instead of wrapping onto several
- * rows that would push the text down. The hide button stays outside it, so it
- * is always in reach. */
+ * rows that would push the text down. */
 const Scroller = styled.div`
   display: flex;
   align-items: center;
   flex: 1;
   min-width: 0;
-  gap: ${p => p.theme.size(2)};
+  gap: ${p => p.theme.size(4)};
   overflow-x: auto;
   scrollbar-width: none;
 `;
@@ -206,23 +164,4 @@ const Group = styled.div`
   align-items: center;
   flex-shrink: 0;
   gap: 0.25ch;
-
-  & + & {
-    padding-left: ${p => p.theme.size(2)};
-    border-left: 1px solid ${p => p.theme.colors.bg2};
-  }
-`;
-
-const HideButton = styled(ToggleButton)`
-  flex-shrink: 0;
-`;
-
-const CollapsedRow = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  cursor: default;
-
-  @media print {
-    display: none;
-  }
 `;

@@ -167,19 +167,13 @@ impl BrowserPeerSession {
                         {
                             continue;
                         }
-                        if let Ok(blob) = resource.get(crate::urls::BLOB) {
-                            if let Some(hash) = Subject::from(blob.to_string())
-                                .blob_hash_hex()
-                                .and_then(|hex| hex::decode(hex).ok())
-                                .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
-                            {
-                                if !db.has_blob(&hash).await? {
-                                    self.pending_blobs.insert(hash);
-                                    out.frames.push(protocol::encode_blob_request(&hash));
-                                    requested += 1;
-                                    if requested >= 32 {
-                                        break;
-                                    }
+                        if let Some(hash) = resource.blob_hash() {
+                            if !db.has_blob(&hash).await? {
+                                self.pending_blobs.insert(hash);
+                                out.frames.push(protocol::encode_blob_request(&hash));
+                                requested += 1;
+                                if requested >= 32 {
+                                    break;
                                 }
                             }
                         }
@@ -288,16 +282,13 @@ impl BrowserPeerSession {
                 let mut permitted = false;
                 for subject in subjects {
                     let resource = db.get_resource(&subject.as_str().into()).await?;
-                    if let Ok(blob) = resource.get(crate::urls::BLOB) {
-                        if Subject::from(blob.to_string()).blob_hash_hex()
-                            == Some(hex::encode(hash).as_str())
-                            && crate::hierarchy::check_read(db, &resource, &self.agent)
-                                .await
-                                .is_ok()
-                        {
-                            permitted = true;
-                            break;
-                        }
+                    if resource.blob_hash() == Some(hash)
+                        && crate::hierarchy::check_read(db, &resource, &self.agent)
+                            .await
+                            .is_ok()
+                    {
+                        permitted = true;
+                        break;
                     }
                 }
                 if !permitted {
@@ -387,9 +378,20 @@ impl BrowserPeerSession {
             )?;
             self.candidate(db, subject, &bytes).await?;
         }
-        engine::ingest_commit_json(db, json, &engine::CommitIngestOpts::peer()).await?;
-        out.changed.push(subject.into());
-        Ok(())
+        let is_destroy = value[crate::urls::DESTROY].as_bool() == Some(true);
+        match engine::ingest_commit_json(db, json, &engine::CommitIngestOpts::peer()).await {
+            // Reconcile re-sends a signed tombstone for a subject that was
+            // destroyed and then re-created. The core refuses that replay,
+            // which is right, but failing the session makes the link redial
+            // and get the same stale destroy again, forever. The resource is
+            // alive and unchanged here, so the replay is a settled no-op.
+            Err(err) if is_destroy && err.to_string().contains("refusing replay") => Ok(()),
+            result => {
+                result?;
+                out.changed.push(subject.into());
+                Ok(())
+            }
+        }
     }
 }
 
@@ -608,6 +610,39 @@ mod tests {
             &Default::default(),
         );
         assert!(session.handle(&db, &unknown).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn replayed_destroy_of_a_recreated_subject_does_not_fail_the_session() {
+        let (db, agent, drive, mut session) = fixture().await;
+        authenticate(&db, &agent, &mut session).await;
+        let subject = crate::Subject::from_raw(&drive, None);
+        let resource = db.get_resource(&subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.destroy(true);
+        let json = builder
+            .sign(&agent, &db, &resource)
+            .await
+            .unwrap()
+            .into_resource(&db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap();
+        let frame = protocol::encode_commit(1, &json);
+
+        let first = session.handle(&db, &frame).await.unwrap();
+        assert_eq!(first.changed, vec![drive.clone()]);
+        assert!(db.get_resource(&subject).await.is_err());
+
+        // The private drive has a deterministic subject, so a repeat genesis
+        // brings back the very same subject after its destroy.
+        db.ensure_private_drive().await.unwrap();
+        assert!(db.get_resource(&subject).await.is_ok());
+
+        let replay = session.handle(&db, &frame).await.unwrap();
+        assert!(replay.changed.is_empty());
+        assert!(db.get_resource(&subject).await.is_ok());
     }
 
     #[tokio::test]

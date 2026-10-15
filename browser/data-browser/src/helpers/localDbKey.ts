@@ -1,4 +1,6 @@
 import { del, get, keys, set, update } from 'idb-keyval';
+import { encodeB64 } from '@tomic/lib';
+import { base64ToBytes, randomBytes } from './bytes';
 
 /**
  * Per-agent encryption keys for the local OPFS ClientDb cache.
@@ -75,27 +77,6 @@ export interface SignInCredentials {
   vaultProof: string;
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
 /**
  * Decode base64url (RFC 4648 §5: `-` `_`, possibly unpadded) — the encoding of
  * the private key inside a decoded agent secret.
@@ -111,13 +92,6 @@ function base64urlToBytes(value: string): Uint8Array<ArrayBuffer> {
   }
 
   return base64ToBytes(normalized);
-}
-
-function randomBytes(length: number): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-
-  return bytes;
 }
 
 /**
@@ -187,8 +161,8 @@ export async function wrapDbKey(
 
   return {
     version: WRAP_FORMAT_VERSION,
-    iv: bytesToBase64(iv),
-    wrapped: bytesToBase64(new Uint8Array(wrapped)),
+    iv: encodeB64(iv),
+    wrapped: encodeB64(new Uint8Array(wrapped)),
   };
 }
 

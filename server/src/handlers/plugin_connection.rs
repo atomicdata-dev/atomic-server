@@ -19,15 +19,16 @@ async fn authorize(
     context: &RequestContext,
     target: &Target,
 ) -> AtomicServerResult<()> {
-    let account = super::plugin_schedule::authorize(appstate, req, context, &target.plugin).await?;
-    let host = StoreHost {
-        db: std::sync::Arc::new(appstate.store.clone()),
-        plugin: target.plugin.clone(),
-        drive: target.drive.clone(),
-        for_agent: account,
-        manifest: None,
-    };
-    host.validate_binding().await?;
+    let account =
+        crate::helpers::authorize_plugin_write(appstate, req, context, &target.plugin).await?;
+    StoreHost::bound(
+        &appstate.store,
+        &target.drive,
+        &target.plugin,
+        account,
+        None,
+    )
+    .await?;
     Ok(())
 }
 pub async fn read(

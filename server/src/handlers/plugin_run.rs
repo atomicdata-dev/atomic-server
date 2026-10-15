@@ -69,15 +69,8 @@ pub async fn handle_plugin_run(
     let manifest = js_runtime::describe_manifest(&body.source).await?;
     check_upload(manifest.as_ref(), &body.input)?;
 
-    let host = js_runtime::StoreHost {
-        db: std::sync::Arc::new(store.clone()),
-        plugin: body.plugin.clone(),
-        drive: body.drive.clone(),
-        for_agent: agent,
-        manifest,
-    };
-
-    host.validate_binding().await?;
+    let host =
+        js_runtime::StoreHost::bound(store, &body.drive, &body.plugin, agent, manifest).await?;
 
     let outcome = runtime.run(&body.source, &body.input, host).await?;
 

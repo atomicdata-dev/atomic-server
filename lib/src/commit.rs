@@ -1344,6 +1344,9 @@ impl Commit {
         // Check if all required props are there
         if opts.validate_schema {
             applied.resource_new.check_required_props(store).await?;
+            if applied.changed_props.contains(urls::RETENTION) {
+                crate::envelopes::check_retention_value(&applied.resource_new)?;
+            }
         }
         // Value constraints from the resource's classes, and the shape of a
         // Class's own `constraints` map. Reconcile writes snapshots straight

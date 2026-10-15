@@ -203,10 +203,6 @@ pub fn is_commit_id(raw: &str) -> bool {
     identifier_kind(raw) == Some(DidKind::Commit)
 }
 
-pub fn is_blob_id(raw: &str) -> bool {
-    identifier_kind(raw) == Some(DidKind::Blob)
-}
-
 pub fn is_prop_id(raw: &str) -> bool {
     identifier_kind(raw) == Some(DidKind::Property)
 }
@@ -308,10 +304,6 @@ pub fn blob_subject(hash_hex: &str) -> String {
 
 pub fn prop_subject(hash_hex: &str) -> String {
     format!("{ATOMIC_PROP_PREFIX}{hash_hex}")
-}
-
-pub fn lens_subject(hash_hex: &str) -> String {
-    format!("{ATOMIC_LENS_PREFIX}{hash_hex}")
 }
 
 pub fn node_subject(node_id: &str) -> String {

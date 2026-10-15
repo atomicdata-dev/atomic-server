@@ -1,7 +1,7 @@
 //! A value is the part of an Atom that contains the actual information.
 
 use crate::{
-    datatype::{match_datatype, DataType},
+    datatype::DataType,
     errors::AtomicResult,
     resources::PropVals,
     utils::{check_valid_uri, check_valid_url},
@@ -303,11 +303,6 @@ impl Value {
         Ok(Value::LocalizedText(map))
     }
 
-    /// Returns a new Value, accepts a datatype string
-    pub fn new_from_string(value: &str, datatype: &str) -> AtomicResult<Value> {
-        Value::new(value, &match_datatype(datatype))
-    }
-
     /// Turns the value into a Vector of subject strings.
     /// Works for resource arrays with nested resources, full resources, single resources.
     /// Returns a path for for Anonymous Nested Resources, which is why you need to pass a parent_path e.g. `http://example.com/foo/bar https://atomicdata.dev/properties/children`.
@@ -357,14 +352,6 @@ impl Value {
                 format!("Value {} cannot be converted into integer. {}", self, e).into()
             }),
         }
-    }
-
-    /// Returns a PropVals Hashmap, if the Atom is a NestedResource
-    pub fn to_nested(&self) -> AtomicResult<&PropVals> {
-        if let Value::NestedResource(SubResource::Nested(nested)) = self {
-            return Ok(nested);
-        }
-        Err(format!("Value {} is not a Nested Resource", self).into())
     }
 
     /// Returns a Lexicographically sortable string representation of the value

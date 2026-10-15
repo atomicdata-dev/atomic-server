@@ -647,6 +647,16 @@
     "https://atomicdata.dev/properties/shortname": "overwrite-outside"
   },
   {
+    "@id": "https://atomicdata.dev/properties/retention",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How much signed history this Resource and everything below it keeps: `compact` (the default: the current state and the latest signed change) or `audit` (every signed change, so History can prove who changed what and when). Inherited down the parent chain; `audit` on a parent cannot be lowered by a child.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "retention"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/localId",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
     "https://atomicdata.dev/properties/description": "A `localId` is used to derive the Subject (`@id`, the URL) of an imported Resource. This is useful when some data owner has Atomic Data but does not have the technology to host all Resources at their respective URLs. [See docs](https://docs.atomicdata.dev/create-json-ad.html#preventing-duplication-with-localid).",
@@ -1084,7 +1094,8 @@
       "https://atomicdata.dev/properties/subresources",
       "https://atomicdata.dev/properties/write",
       "https://atomicdata.dev/properties/name",
-      "https://atomicdata.dev/properties/llm-txt"
+      "https://atomicdata.dev/properties/llm-txt",
+      "https://atomicdata.dev/properties/signaling-url"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/shortname": "drive"
@@ -1587,6 +1598,16 @@
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
     "https://atomicdata.dev/properties/shortname": "llm-txt"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/signaling-url",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The WebRTC signalling server the members of a drive meet through for free browser sync. Must be a wss:// or https:// address (ws:// and http:// only on localhost). When empty, the app falls back to its own configured service.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "signaling-url"
   },
   {
     "@id": "https://atomicdata.dev/classes/PlainText",

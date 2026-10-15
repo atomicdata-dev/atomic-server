@@ -1,7 +1,14 @@
 import { Datatype } from './datatypes.js';
 import type { SchemaSpec } from './plugin-schema.js';
 
-/** Shared within a drive until frozen schema package distribution lands. */
+/**
+ * Per-drive time tracking schema.
+ *
+ * @deprecated The Time tracker template binds to the shared `workSchema`
+ * vocabulary instead, so its property IDs no longer depend on the drive. This
+ * stays for callers (such as importers) that still allocate these properties in
+ * a drive's own ontology; tables created that way are not migrated.
+ */
 export function timeTrackingSchema(): SchemaSpec {
   return {
     properties: [

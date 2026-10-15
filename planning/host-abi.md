@@ -1,7 +1,7 @@
 # Host ABI: apps on a typed, real-time, multi-machine host
 
-**Status:** Accepted direction (Joep, 2026-10-14). Step 0 in progress. The first
-slice of step 1 runs on the server (below). Pre-v1: the ABI may break until it
+**Status:** Accepted direction (Joep, 2026-10-14). Step 0 done (#2258). The
+first slice of step 1 runs on the server and from frames (below). Pre-v1: the ABI may break until it
 is declared v1.
 
 Goal, in Joep's words: the plugin interface should be "a type-safe, real-time,
@@ -72,10 +72,10 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 0. Close the frame network hole
 
-- [ ] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
+- [x] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
       and both carry a `sandbox` directive. Today `connect-src *` lets a view
       that may read drive data send it to any host.
-- [ ] Integration-proxy requests from frames go through the host (a
+- [x] Integration-proxy requests from frames go through the host (a
       `proxyFetch` host op restricted to the minted capability's origin)
       instead of a direct `fetch` from the frame.
 - [ ] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote

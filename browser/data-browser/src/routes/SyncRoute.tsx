@@ -1,6 +1,11 @@
 import { ServiceGroup, ServiceSection } from '@tomic/service-ui';
 import '@tomic/service-ui/styles.css';
 import { Checkbox } from '../components/forms/Checkbox';
+import {
+  readKnownPeers,
+  writeKnownPeers,
+  type KnownPeer,
+} from '../helpers/knownPeers';
 import { resumePeerLinks } from '../helpers/browserPeerSync';
 import { syncSummary, showSavedServer } from '../helpers/syncPresentation';
 import { driveBillingUrl } from '../helpers/driveBillingUrl';
@@ -149,8 +154,6 @@ export const SyncRoute = createRoute({
   getParentRoute: () => appRoute,
 });
 
-type KnownPeer = { nodeId: string; label: string; lastSync?: string };
-
 function nodeDidToRaw(nodeDid: string): string | undefined {
   const raw = parseNodeId(nodeDid)?.split(':')[0];
 
@@ -159,12 +162,6 @@ function nodeDidToRaw(nodeDid: string): string | undefined {
 
 function rawToNodeDid(raw: string): string {
   return nodeSubject(raw);
-}
-
-function normalizeStoredPeer(peer: KnownPeer): KnownPeer | undefined {
-  if (nodeDidToRaw(peer.nodeId)) return peer;
-
-  return undefined;
 }
 
 function StatusIcon({ status }: { status: NodeStatus }) {
@@ -704,17 +701,7 @@ function SyncPage() {
   // React Compiler memoizes on the proxy identity, so a resource that finishes
   // loading would never re-render this.
   const [driveMissing, setDriveMissing] = useState(false);
-  const [knownPeers, setKnownPeers] = useState<KnownPeer[]>(() => {
-    try {
-      return (
-        JSON.parse(localStorage.getItem('atomic-peers') ?? '[]') as KnownPeer[]
-      )
-        .map(normalizeStoredPeer)
-        .filter((peer): peer is KnownPeer => peer !== undefined);
-    } catch {
-      return [];
-    }
-  });
+  const [knownPeers, setKnownPeers] = useState<KnownPeer[]>(readKnownPeers);
 
   // What the server in use says about itself, read from its `/server` resource:
   // its node id and version, plus whether it is a managed node and where its
@@ -1735,7 +1722,7 @@ function SyncPage() {
 
   function savePeers(peers: KnownPeer[]) {
     setKnownPeers(peers);
-    localStorage.setItem('atomic-peers', JSON.stringify(peers));
+    writeKnownPeers(peers);
   }
 
   async function disconnectServerPeer(nodeId: string) {

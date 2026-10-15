@@ -156,15 +156,6 @@ pub async fn publish_node_id(drive_did: &str, iroh_node_id: &str) -> AtomicResul
     publish_drive_record(drive_did, Some(iroh_node_id), None).await
 }
 
-/// Resolve the public https origins announced for a drive.
-pub async fn resolve_http_origins(drive_did: &str) -> AtomicResult<Vec<String>> {
-    let keypair = drive_did_to_pkarr_keypair(drive_did)?;
-    let client = build_client()?;
-    Ok(resolve_record_raw(&client, &keypair.public_key())
-        .await
-        .http_origins)
-}
-
 /// Resolve Iroh NodeIDs for a drive via the pkarr relay.
 /// Returns the first NodeID that isn't our own.
 pub async fn resolve_node_id(drive_did: &str) -> AtomicResult<String> {

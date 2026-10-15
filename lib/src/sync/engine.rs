@@ -669,6 +669,23 @@ pub async fn handle_frame_full_for_caps(
 /// `SUB <subject>`: parse, `check_read`, and tell the transport to register.
 /// The wire refusal matches `refuse_subscription` in the server so a client
 /// cannot tell the engine path from the monitor's defence-in-depth re-check.
+/// If `resource` points at a blob this store does not hold, record which
+/// (already-admitted) drive the hash belongs to and return the BLOB_REQUEST
+/// frame to send. Recording the drive lets the BLOB_RESPONSE handler gate the
+/// write instead of accepting it unconditionally (planning/unified-sync.md F4).
+pub(crate) async fn missing_blob_request(
+    store: &Db,
+    resource: &crate::Resource,
+    admitted_drive: String,
+) -> Option<Vec<u8>> {
+    let hash = resource.blob_hash()?;
+    if store.has_blob(&hash).await.unwrap_or(false) {
+        return None;
+    }
+    store.note_pending_blob_request(hash, admitted_drive);
+    Some(protocol::encode_blob_request(&hash))
+}
+
 async fn handle_sub(payload: &[u8], store: &Db, agent: &crate::agents::ForAgent) -> HandleOutput {
     let Ok(subject_str) = std::str::from_utf8(payload) else {
         return HandleOutput {
@@ -1525,21 +1542,12 @@ pub async fn handle_sync_vv_reconcile(
 
             // New logic: even if VVs match (or server is ahead), if the server is missing the blob, we must pull it.
             // This handles the case where metadata was pushed via HTTP POST /commit but the blob is still on the client.
-            if let Ok(blob_val) = resource.get(crate::urls::BLOB) {
-                let blob_did = blob_val.to_string();
-                if let Some(hash_hex) = crate::Subject::from_raw(&blob_did, None).blob_hash_hex() {
-                    if let Ok(hash_bytes) = hex::decode(hash_hex) {
-                        if hash_bytes.len() == 32 {
-                            let mut hash = [0u8; 32];
-                            hash.copy_from_slice(&hash_bytes);
-                            if !store.has_blob(&hash).await.unwrap_or(false) {
-                                // If we don't have the blob, add to pull so the server requests it
-                                if !pull.contains(subject) {
-                                    pull.push(subject.clone());
-                                    pull_from.insert(subject.clone(), server_vv.clone());
-                                }
-                            }
-                        }
+            if let Some(hash) = resource.blob_hash() {
+                if !store.has_blob(&hash).await.unwrap_or(false) {
+                    // If we don't have the blob, add to pull so the server requests it
+                    if !pull.contains(subject) {
+                        pull.push(subject.clone());
+                        pull_from.insert(subject.clone(), server_vv.clone());
                     }
                 }
             }
@@ -2028,25 +2036,9 @@ pub async fn import_sync_push(
         imported.insert(snapshot_key.clone());
 
         // Check for missing blobs
-        if let Ok(blob_val) = resource.get(crate::urls::BLOB) {
-            let blob_did = blob_val.to_string();
-            if let Some(hash_hex) = crate::Subject::from_raw(&blob_did, None).blob_hash_hex() {
-                if let Ok(hash_bytes) = hex::decode(hash_hex) {
-                    if hash_bytes.len() == 32 {
-                        let mut hash = [0u8; 32];
-                        hash.copy_from_slice(&hash_bytes);
-                        if !store.has_blob(&hash).await.unwrap_or(false) {
-                            // Record which (already-admitted, see the top of
-                            // this fn) drive this hash belongs to so the
-                            // BLOB_RESPONSE handler can gate the write
-                            // instead of accepting it unconditionally
-                            // (planning/unified-sync.md F4).
-                            store.note_pending_blob_request(hash, push.drive.clone());
-                            blob_requests.push(protocol::encode_blob_request(&hash));
-                        }
-                    }
-                }
-            }
+        // The drive is the (already-admitted, see the top of this fn) one.
+        if let Some(request) = missing_blob_request(store, &resource, push.drive.clone()).await {
+            blob_requests.push(request);
         }
     }
 

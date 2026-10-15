@@ -1,4 +1,10 @@
-import { taskSchema, timeTrackingSchema } from '@tomic/lib';
+import {
+  contactSchema,
+  moneySchema,
+  pipelineSchema,
+  taskSchema,
+  workSchema,
+} from '@tomic/lib';
 import type { IconType } from 'react-icons';
 import {
   FaBook,
@@ -155,17 +161,32 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     rowName: 'Time entry',
     icon: FaStopwatch,
     spec: {
-      schema: timeTrackingSchema(),
       columns: [
-        { name: 'Start', type: 'datetime', schemaProperty: 'work-start' },
-        { name: 'End', type: 'datetime', schemaProperty: 'work-end' },
+        {
+          name: 'Start',
+          type: 'datetime',
+          propertySubject: workSchema.properties.start,
+        },
+        {
+          name: 'End',
+          type: 'datetime',
+          propertySubject: workSchema.properties.end,
+        },
         {
           name: 'Project',
           type: 'relation',
-          schemaProperty: 'work-project',
+          propertySubject: workSchema.properties.project,
         },
-        { name: 'Person', type: 'relation', schemaProperty: 'work-person' },
-        { name: 'Billable', type: 'checkbox', schemaProperty: 'work-billable' },
+        {
+          name: 'Person',
+          type: 'relation',
+          propertySubject: workSchema.properties.person,
+        },
+        {
+          name: 'Billable',
+          type: 'checkbox',
+          propertySubject: workSchema.properties.billable,
+        },
       ],
       views: [
         {
@@ -199,7 +220,11 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: FaReceipt,
     spec: {
       columns: [
-        { name: 'Amount', type: 'decimal' },
+        {
+          name: 'Amount',
+          type: 'decimal',
+          propertySubject: moneySchema.properties.amount,
+        },
         { name: 'Date', type: 'date' },
         {
           name: 'Category',
@@ -249,14 +274,23 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: FaHandshake,
     spec: {
       columns: [
-        { name: 'Company', type: 'text' },
+        {
+          name: 'Company',
+          type: 'text',
+          propertySubject: contactSchema.properties.company,
+        },
         {
           name: 'Stage',
           type: 'select',
+          propertySubject: pipelineSchema.properties.stage,
           options: ['Lead', 'Contacted', 'Proposal', 'Won', 'Lost'],
           default: 'Lead',
         },
-        { name: 'Value', type: 'decimal' },
+        {
+          name: 'Amount',
+          type: 'decimal',
+          propertySubject: moneySchema.properties.amount,
+        },
         { name: 'Last contact', type: 'date' },
         { name: 'Owner', type: 'text' },
         { name: 'Notes', type: 'markdown' },
@@ -281,14 +315,14 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
               args: { from: 'Last contact' },
             },
           ],
-          aggregates: [{ function: 'sum', column: 'Value' }],
+          aggregates: [{ function: 'sum', column: 'Amount' }],
           breakdownColumn: 'Stage',
           breakdownGranularity: 'exact',
           columnOrder: [
             'Name',
             'Company',
             'Stage',
-            'Value',
+            'Amount',
             'Last contact',
             'Days since contact',
             'Owner',
@@ -305,11 +339,16 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: FaBriefcase,
     spec: {
       columns: [
-        { name: 'Company', type: 'text' },
+        {
+          name: 'Company',
+          type: 'text',
+          propertySubject: contactSchema.properties.company,
+        },
         { name: 'Role', type: 'text' },
         {
           name: 'Stage',
           type: 'select',
+          propertySubject: pipelineSchema.properties.stage,
           options: [
             'Wishlist',
             'Applied',
@@ -694,7 +733,11 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           default: 'Invited',
         },
         { name: 'Plus ones', type: 'number' },
-        { name: 'Email', type: 'text' },
+        {
+          name: 'Email',
+          type: 'text',
+          propertySubject: contactSchema.properties.email,
+        },
         { name: 'Dietary needs', type: 'text' },
       ],
       views: [
