@@ -5272,3 +5272,80 @@ async fn index_keys_migration_rebuilds_old_rows_in_slices() {
         .is_some());
     assert!(propvalsub_key(&atom).len() < old_key.len());
 }
+
+/// Stored bytes of a retained envelope after small edits, measured through
+/// the compressed KV the way the row is written to disk.
+#[tokio::test]
+async fn stored_envelope_bytes_per_small_edit_stay_small() {
+    use crate::envelopes::EnvelopeRetention;
+    const EDITS: usize = 20;
+    let store = Db::init_temp("envelope_bytes").await.unwrap();
+    store.set_envelope_retention(EnvelopeRetention::All);
+    let (_agent, drive) = store.setup("Alice").await.unwrap();
+    let subject = store
+        .create_resource(
+            urls::CLASS,
+            &drive,
+            "Doc",
+            Some(vec![
+                (urls::DESCRIPTION, Value::String("d".into())),
+                (urls::SHORTNAME, Value::Slug("doc".into())),
+            ]),
+        )
+        .await
+        .unwrap();
+    let subject = Subject::from_raw(&subject, None);
+    for i in 0..EDITS {
+        let mut resource = store.get_resource(&subject).await.unwrap();
+        resource
+            .set(
+                urls::NAME.into(),
+                Value::String(format!("edit {i}")),
+                &store,
+            )
+            .await
+            .unwrap();
+        resource.save_locally(&store).await.unwrap();
+    }
+    let stored = super::compressed_kv::CompressedKv::new(store.kv.clone());
+    let mut prefix = subject.pure_id().into_bytes();
+    prefix.push(0);
+    let mut sizes: Vec<usize> = Vec::new();
+    let mut plain: Vec<usize> = Vec::new();
+    let mut compact = 0;
+    for kv in store.kv.scan_prefix(Tree::Envelopes, &prefix) {
+        let (key, val) = kv.unwrap();
+        sizes.push(stored.encoded(Tree::Envelopes, &key, &val, &[]).len());
+        plain.push(val.len());
+        compact += usize::from(val.first() == Some(&1));
+    }
+    let edits: Vec<usize> = sizes.iter().rev().take(EDITS).cloned().collect();
+    let mut sorted = edits.clone();
+    sorted.sort();
+    println!(
+        "ENVELOPE BYTES rows={} edits={} median={} total={} plain_total={}",
+        sizes.len(),
+        edits.len(),
+        sorted[sorted.len() / 2],
+        edits.iter().sum::<usize>(),
+        plain.iter().rev().take(EDITS).sum::<usize>()
+    );
+    assert_eq!(edits.len(), EDITS);
+    assert_eq!(
+        compact, EDITS,
+        "every small edit is stored as a compact row"
+    );
+    // Measured: median 342 B, 6,848 B for 20 edits (develop's full JSON rows:
+    // 663 B and 13,568 B). The signed `loroUpdate` bytes are kept as signed,
+    // so this is what the proof costs.
+    assert!(
+        sorted[sorted.len() / 2] <= 360,
+        "median {} bytes per envelope",
+        sorted[sorted.len() / 2]
+    );
+    assert!(
+        edits.iter().sum::<usize>() <= 7_200,
+        "{} bytes for {EDITS} edits",
+        edits.iter().sum::<usize>()
+    );
+}

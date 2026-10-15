@@ -549,7 +549,14 @@ pub async fn export_vault_segment(
                 let stored = if full && policy.history == HistoryKeep::CurrentStateOnly {
                     Vec::new()
                 } else {
-                    crate::envelopes::envelopes(store, subject_str)
+                    let found = crate::envelopes::envelopes_checked(store, subject_str);
+                    if found.unreadable > 0 {
+                        tracing::warn!(
+                            "Vault pack: {subject_str} has {} kept commit row(s) that could not be read; the pack ships without them",
+                            found.unreadable
+                        );
+                    }
+                    found.rows
                 };
                 // `>=`, not `>`: two commits can share a millisecond, and
                 // re-shipping one envelope is cheaper than losing one.
