@@ -25,6 +25,8 @@ The **optional fields** are:
 - `loroUpdate` - A [Loro CRDT](https://loro.dev) binary update, encoded as a base64 string. This is the primary way to carry property changes. The server imports this update into the resource's Loro document, materializes the properties, and computes index diffs.
 - `destroy` - If true, the entire Resource will be removed.
 - `previousCommit` - Optional audit pointer at an earlier envelope. **Not a causal gate** — concurrent edits merge via Loro. Clients may still send it; servers do not require it.
+
+`lastCommit` on a resource is **derived, not stored**: when a resource is read or sent (HTTP JSON-AD, `UPDATE` / `SNAPSHOT` frames with `HAS_COMMIT_ID`, live fan-out) the server serves the id of the newest kept envelope of that resource (`atomic:commit:<signature>`). It is not written into the resource's Loro document, so a commit adds only the author's own change to the oplog. Documents written by older servers may still contain a stamp; the derived value wins. The id is a receipt (it is a refetchable resource only for a genesis commit), and an unsigned internal write keeps the previous value. The wire format is unchanged.
 - `isGenesis` - If true, this is the first commit for a DID resource. The subject DID is derived from either the self-verifying genesis certificate signature (`atomic:<sig_of_cert>`) or, in legacy mode, the signature of the genesis commit itself.
 
 ### Loro CRDT updates
