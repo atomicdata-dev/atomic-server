@@ -10,6 +10,7 @@ import React, {
 import {
   core,
   dataBrowser,
+  server,
   urls,
   useArray,
   useCanWrite,
@@ -33,6 +34,8 @@ import {
   profileReviewedBefore,
   rememberProfileReviewed,
 } from './profileReviewed';
+import { paths } from '../../routes/paths';
+import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { useIsPrivateDrive } from '@hooks/useIsPrivateDrive';
 import { useInheritedRights } from '../../routes/Share/useInheritedRights';
 import { getManagedPortalUrl } from '../../helpers/managed/cloudSync';
@@ -196,6 +199,11 @@ function ShareOverview({
 }): JSX.Element {
   const isSaas = !!getManagedPortalUrl();
   const isPrivateDrive = useIsPrivateDrive(resource.subject);
+  const store = useStore();
+  const isUnhostedDrive =
+    canWrite &&
+    resource.hasClasses(server.classes.drive) &&
+    store.isLocalOnlyDrive(resource.subject);
   const [agent] = useCurrentAgent();
   const [title] = useTitle(resource);
   const [rights, setRole] = useShareRights(resource);
@@ -277,6 +285,13 @@ function ShareOverview({
       <Dialog.Content>
         <Stack>
           {isPrivateDrive && <PrivateDriveWarning />}
+          {isUnhostedDrive && (
+            <UnhostedDriveNotice
+              subject={resource.subject}
+              isSaas={isSaas}
+              onDone={onDone}
+            />
+          )}
           {canWrite && isSaas && (
             <EmailInviteInput
               emails={emails}
@@ -557,6 +572,57 @@ function PrivateDriveWarning(): JSX.Element {
   );
 }
 
+function UnhostedDriveNotice({
+  subject,
+  isSaas,
+  onDone,
+}: {
+  subject: string;
+  isSaas: boolean;
+  onDone: () => void;
+}): JSX.Element {
+  return (
+    <PrivateDriveWarningBox role='note' data-test='unhosted-drive-notice'>
+      <FaTriangleExclamation />
+      <span>
+        <span>
+          This drive is not on a server. People you invite can open it only
+          while one of your devices has it open in a browser.
+        </span>
+        {isSaas && <HostItLink subject={subject} onDone={onDone} />}
+      </span>
+    </PrivateDriveWarningBox>
+  );
+}
+
+function HostItLink({
+  subject,
+  onDone,
+}: {
+  subject: string;
+  onDone: () => void;
+}): JSX.Element {
+  const navigate = useNavigateWithTransition();
+
+  return (
+    <>
+      {' '}
+      <HostLink
+        clean
+        type='button'
+        onClick={() => {
+          onDone();
+          void navigate(
+            `${paths.sync}?${new URLSearchParams({ drive: subject })}`,
+          );
+        }}
+      >
+        Host it on a Cloud Server to keep it available.
+      </HostLink>
+    </>
+  );
+}
+
 /** Long names are cut off, not wrapped, so the close button keeps its place. */
 const ShareTitle = styled.h1`
   margin: 0;
@@ -688,6 +754,15 @@ const LinkText = styled.span<{ $muted: boolean }>`
   white-space: nowrap;
   color: ${p => (p.$muted ? p.theme.colors.textLight : p.theme.colors.text)};
   user-select: all;
+`;
+
+const HostLink = styled(Button)`
+  display: inline;
+  font: inherit;
+  color: ${p => p.theme.colors.main};
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
 `;
 
 /**
