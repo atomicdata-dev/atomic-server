@@ -1,20 +1,15 @@
 import { useState } from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { agentSubjectFromPublicKey, grantAgent, useStore } from '@tomic/react';
-import { styled } from 'styled-components';
 import { Button } from '../components/Button';
-import { Margin } from '../components/Card';
-import { ConnectDrivePicker } from '../components/ConnectDrivePicker';
-import { ContainerNarrow } from '../components/Containers';
-import { ErrorLook } from '../components/ErrorLook';
-import { Main } from '../components/Main';
-import { Column, Row } from '../components/Row';
-import { RadioInput } from '../components/forms/RadioInput';
+import {
+  ConnectAppForm,
+  ConnectPage,
+  toggleSubject,
+  useConnectableDrives,
+} from '../components/ConnectAppForm';
 import { useSettings } from '../helpers/AppSettings';
 import { rememberConnectedApp } from '../helpers/connectedApps';
-import { useAccountDriveCatalog } from '../hooks/useAccountDriveCatalog';
-import { usePrivateDrive } from '../hooks/usePrivateDrive';
-import { useSavedDrives } from '../hooks/useSavedDrives';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { pathNames, paths } from './paths';
 import { appRoute } from './RootRoutes';
@@ -62,11 +57,7 @@ function ConnectAgentPage() {
     write: requestedWrite,
     target: requestedTargets,
   } = ConnectAgentRoute.useSearch();
-  const { privateDrive, loading: homeLoading } = usePrivateDrive();
-  const [savedDrives] = useSavedDrives();
-  const catalog = useAccountDriveCatalog(
-    privateDrive ? [privateDrive, ...savedDrives] : savedDrives,
-  );
+  const { privateDrive, homeLoading, catalog } = useConnectableDrives();
 
   const name = requestedName.trim() || 'An app';
   const [picked, setPicked] = useState<string[] | undefined>();
@@ -98,29 +89,29 @@ function ConnectAgentPage() {
 
   if (!keySubject) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connect an app</h1>
         <p>
           This link is missing the app&apos;s key. Start again from the app that
           sent you here.
         </p>
-      </Page>
+      </ConnectPage>
     );
   }
 
   if (!agent?.subject) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connect an app</h1>
         <p>Sign in first, then open this link again.</p>
         <Button onClick={() => navigate(paths.welcome)}>Sign in</Button>
-      </Page>
+      </ConnectPage>
     );
   }
 
   if (done) {
     return (
-      <Page>
+      <ConnectPage>
         <h1>Connected</h1>
         <p data-test='connect-agent-done'>
           {name} can now {write ? 'read and edit' : 'read'} what you shared. You
@@ -130,16 +121,9 @@ function ConnectAgentPage() {
         <Button subtle onClick={() => navigate(paths.agentSettings)}>
           Account settings
         </Button>
-      </Page>
+      </ConnectPage>
     );
   }
-
-  const toggle = (subject: string, on: boolean) =>
-    setPicked(
-      on
-        ? [...selected, subject]
-        : selected.filter(existing => existing !== subject),
-    );
 
   async function handleAllow() {
     setBusy(true);
@@ -163,7 +147,7 @@ function ConnectAgentPage() {
   }
 
   return (
-    <Page>
+    <ConnectPage>
       <h1>Connect an app</h1>
       <p>
         <strong data-test='connect-agent-name'>{name}</strong> asks to use your
@@ -171,62 +155,21 @@ function ConnectAgentPage() {
         can revoke it at any time.
       </p>
 
-      <Column>
-        <Heading>What it can reach</Heading>
-        <ConnectDrivePicker
-          subjects={catalog.subjects}
-          selected={selected}
-          onToggle={toggle}
-        />
-
-        <Heading>What it can do</Heading>
-        <Column gap='0.75rem'>
-          <RadioInput
-            name='access'
-            checked={!write}
-            onChange={() => setWrite(false)}
-          >
-            Read only
-          </RadioInput>
-          <RadioInput
-            name='access'
-            checked={write}
-            onChange={() => setWrite(true)}
-            data-test='connect-agent-write'
-          >
-            Read and edit
-          </RadioInput>
-        </Column>
-
-        <Margin />
-        {error && <ErrorLook>{error}</ErrorLook>}
-        <Row>
-          <Button
-            onClick={handleAllow}
-            disabled={busy || homeLoading || selected.length === 0}
-            loading={busy ? 'Connecting' : undefined}
-            data-test='connect-agent-allow'
-          >
-            Allow
-          </Button>
-          <Button subtle onClick={() => navigate(paths.agentSettings)}>
-            Cancel
-          </Button>
-        </Row>
-      </Column>
-    </Page>
+      <ConnectAppForm
+        subjects={catalog.subjects}
+        selected={selected}
+        onToggle={(subject, on) =>
+          setPicked(toggleSubject(selected, subject, on))
+        }
+        canEdit={write}
+        onCanEditChange={setWrite}
+        error={error}
+        busy={busy}
+        disabled={homeLoading}
+        onAllow={handleAllow}
+        onCancel={() => navigate(paths.agentSettings)}
+        testId='connect-agent'
+      />
+    </ConnectPage>
   );
 }
-
-function Page({ children }: React.PropsWithChildren) {
-  return (
-    <Main>
-      <ContainerNarrow>{children}</ContainerNarrow>
-    </Main>
-  );
-}
-
-const Heading = styled.h2`
-  margin: 0;
-  font-size: 1.1rem;
-`;

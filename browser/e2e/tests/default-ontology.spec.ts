@@ -1,5 +1,10 @@
 import { test, expect } from './fixtures';
-import { before, createTableFromDialog } from './test-utils';
+import {
+  before,
+  createTableFromDialog,
+  openDriveSettings,
+  openSubject,
+} from './test-utils';
 
 test.describe('default ontology', () => {
   test.beforeEach(before);
@@ -23,11 +28,26 @@ test.describe('default ontology', () => {
       0,
     );
 
-    // It stays reachable via the drive page's (collapsed) resource list.
+    // The drive page's Resources grid hides it as well, but it is still the
+    // drive's "Default Ontology" setting. Read its subject from there and open it.
     await page.getByTestId('sidebar-drive-open').click();
+    const settings = await openDriveSettings(page);
+    await expect(
+      settings.getByText('Default Ontology', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('main').getByRole('link', { name: 'Ontology' }),
+    ).toHaveCount(0);
+    const ontologySubject = await page.evaluate(async () => {
+      const drive = await window.store.getResource(window.store.getDrive()!);
+
+      return drive.get(
+        'https://atomicdata.dev/ontology/server/property/default-ontology',
+      ) as string;
+    });
+    expect(ontologySubject).toBeTruthy();
+    await openSubject(page, ontologySubject);
     const main = page.getByRole('main');
-    await main.getByText('Resources', { exact: true }).click();
-    await main.getByRole('button', { name: 'Ontology' }).click();
 
     // The ontology page lists the table's row class — named after what a
     // single row IS ("Issue", from the template), not a generic "row".

@@ -12,6 +12,7 @@ import {
   core,
   dataBrowser,
   forms,
+  notifications,
   useResource,
   useCanWrite,
   unknownSubject,
@@ -202,6 +203,14 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
     }, [ancestryWhenAncestor]);
 
     if (!subject || subject === unknownSubject) {
+      return null;
+    }
+
+    // App data, not content: reached from Notifications, never the tree.
+    if (
+      classes.includes(notifications.classes.inbox) ||
+      classes.includes(notifications.classes.notification)
+    ) {
       return null;
     }
 

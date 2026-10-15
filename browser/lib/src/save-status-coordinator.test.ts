@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Resource, type SaveResult } from './resource.js';
+import { Resource, SaveQueuedError, type SaveResult } from './resource.js';
 import { SaveStatusCoordinator } from './save-status-coordinator.js';
 
 function setup() {
@@ -82,6 +82,24 @@ describe('SaveStatusCoordinator', () => {
     unsubscribeSecond();
   });
 
+  it('does not report a queued scheduled save as an error', async () => {
+    const { coordinator, onError } = setup();
+    const resource = new Resource('_new:queued');
+    const save = vi.spyOn(resource, 'save');
+    const scheduler = coordinator.createScheduler(resource);
+
+    save.mockRejectedValueOnce(new SaveQueuedError());
+    scheduler.schedule(0);
+    await scheduler.flush();
+    expect(onError).not.toHaveBeenCalled();
+
+    const failure = new Error('boom');
+    save.mockRejectedValueOnce(failure);
+    scheduler.schedule(0);
+    await scheduler.flush();
+    expect(onError).toHaveBeenCalledWith(failure);
+  });
+
   it('derives immutable snapshots from the current outbox entry and connection', () => {
     const { coordinator, entries, connect } = setup();
     const resource = new Resource('_new:status');
@@ -130,5 +148,17 @@ describe('SaveStatusCoordinator', () => {
     expect(save).toHaveBeenCalledTimes(1);
     await vi.runAllTimersAsync();
     expect(save).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('scheduled saves are background saves', () => {
+  it('passes background to Resource.save so the soft pace applies', async () => {
+    const { coordinator } = setup();
+    const resource = new Resource('_new:background');
+    const save = vi.spyOn(resource, 'save').mockResolvedValue('persisted');
+    const scheduler = coordinator.createScheduler(resource);
+    scheduler.schedule(0);
+    await scheduler.flush();
+    expect(save).toHaveBeenCalledWith({ background: true });
   });
 });

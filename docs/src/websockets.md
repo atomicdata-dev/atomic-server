@@ -80,6 +80,7 @@ The current list (`protocol::CAPABILITIES`):
 | `rebind-on-auth` | Re-evaluates the connection's subscriptions against the new identity when an `AUTH` lands, dropping the ones it may no longer read. |
 | `sync-probe` | Reads the `probe` and `subjects` keys of a `SYNC (0x30)` JSON tail and answers a stale probe with `SYNC_RESEND (0x38)`. |
 | `ephemeral` | Reads and writes `EPHEMERAL (0x40)` over WebSocket for edits in progress, cursors and drive presence, in place of the `LORO_SYNC_UPDATE` / `LORO_EPHEMERAL_UPDATE` / `PRESENCE_UPDATE` text frames. |
+| `commit-pace` | Appends the node's write-load hint (`pace_ms`) to the slim `COMMIT_OK` of a client whose `HELLO` lists `commit-pace`, and may refuse a `COMMIT` with `BUSY (12)` when overloaded. See [Write load and pacing](#write-load-and-pacing). |
 | `get-many` | Answers `GET_MANY (0x15)`, a list of subjects, with one `GET_MANY_RESULT (0x16)` holding an `UPDATE` or `ERROR` entry per subject, so a client fetches a whole list in one round trip. |
 
 The list is **additive only**: a name is never renamed or reused once
@@ -92,7 +93,7 @@ too: the browser and `WsClient` send a `HELLO` on open, listing what they
 speak (`protocol::CLIENT_CAPABILITIES`, `CLIENT_CAPABILITIES` in `ws-v2.ts`).
 The server answers nothing (its own list rides on `AUTH_OK`); the list steers
 what that connection is sent from then on. The one name a responder acts on
-today is `commit-ok-slim`. A server that predates `client-hello` drops the
+today are `commit-ok-slim` and `commit-pace`. A server that predates `client-hello` drops the
 frame unread, and the client gets the pre-2026-09 behaviour.
 
 
@@ -147,6 +148,7 @@ the end of the frame.
 [0x13] [request_id: u16] [signed_commit_json_ad_utf8]    // COMMIT
 [0x14] [request_id: u16] [created_commit_json_ad_utf8]   // COMMIT_OK, full form
 [0x14] [request_id: u16] [commit_id_utf8]                 // COMMIT_OK, slim form (client HELLO lists commit-ok-slim)
+[0x14] [request_id: u16] [commit_id_utf8] 0x00 [pace_ms: decimal ascii]   // COMMIT_OK, paced slim form (client HELLO lists commit-ok-slim and commit-pace)
 [0x20] [drive_subject_utf8]                              // SUB
 [0x21] [drive_subject_utf8]                              // UNSUB
 [0x31] [drive_len: u16] [drive_utf8]                     // SYNC_OK
@@ -440,14 +442,59 @@ Everything else is open to an anonymous socket and gated per subject by
 | `8` | `AUTH_FAILED` | An `AUTH` frame was refused. `request_id = 0`. |
 | `9` | `INVALID_SIGNATURE` | A `COMMIT` whose signature does not verify against its signer's key, or that has none. Terminal for that envelope: sign again. |
 | `10` | `IMMUTABLE_COMMIT` | The commit's subject is itself a Commit, which can never be edited. Terminal: drop the entry; nothing is lost. |
+| `11` | `CAUSALITY_CONFLICT` | A new Loro write lost against stored state. Keep the local edit; stop sending the same stale update until it is rebased. |
+| `12` | `BUSY` | The node is overloaded with writes, or the agent spent its write rate budget. Refused **before** any work; nothing landed. The message carries `retry_after_ms=<n>`. Not a failure: keep the edit, wait, send one merged delta, and do not retry over another transport. See [Write load and pacing](#write-load-and-pacing). |
 
-Codes `1` to `4`, `9` and `10` come from `classify_commit_error`, which pattern-matches the
+Codes `1` to `4` and `9` to `12` come from `classify_commit_error`, which pattern-matches the
 underlying error text where the frame is built. Many other engine failures
 are **not** classified and go out as `UNKNOWN` with a descriptive message: an
 invalid frame of any kind, `No state`, a failed `GET` lookup,
 `Blob not found`, `Unsolicited blob response`, `Drive not admitted for sync`.
 Treat an unrecognized code the same as `UNKNOWN` and fall back to the
 message.
+
+## Write load and pacing
+
+The cost of a commit on the node is per commit, not per edit: it rebuilds the
+resource's Loro document, rewrites the full snapshot and takes one write
+transaction on the single writer. Clients are local first (the edit is already
+saved on the device, peers see typing live over `EPHEMERAL`), so when the node
+is busy they can send fewer, fatter commits. The node tells them when.
+
+`POST /commit` and the WebSocket `COMMIT` frame share one counter of commits
+in flight (taken before the signature check, released when the commit is
+answered). Two limits, `--commit-soft-limit` (`ATOMIC_COMMIT_SOFT_LIMIT`,
+default 32) and `--commit-hard-limit` (`ATOMIC_COMMIT_HARD_LIMIT`, default 256,
+`0` switches the whole mechanism off):
+
+- **Soft signal, `pace_ms`.** With `n` commits in flight, `pace_ms` is `0`
+  for `n <= soft` and rises linearly to 10 000 at `n = hard`:
+  `10000 * (n - soft) / (hard - soft)`. It is the least time a client should
+  leave between two commits of one resource. A client that lists both
+  `commit-ok-slim` and `commit-pace` in its `HELLO` gets it on every
+  `COMMIT_OK`, appended to the commit id after a NUL byte as decimal ASCII
+  (`0` when there is no pressure, so the client can relax). Any other client
+  gets the existing `COMMIT_OK` forms, byte for byte. Over HTTP a successful
+  `POST /commit` carries the same number in the `X-Atomic-Pace-Ms` response
+  header.
+- **Hard signal, `BUSY`.** With more than `hard` commits in flight a new
+  `COMMIT` is refused up front with `ERROR` code `BUSY (12)` and the message
+  `Server busy; retry_after_ms=<n>`. Over HTTP the answer is `503` with
+  `Retry-After` (whole seconds, rounded up) and `X-Atomic-Retry-After-Ms`.
+  `n` is the time the node needs to drain its queue (in-flight commits times
+  a moving average of the commit service time), clamped to 250 ms to 10 s and
+  jittered by +-50% so refused clients do not return in one wave. An old
+  client sees an unknown code and retries generically.
+- **Rate limit.** The write rate limiter (`--write-rate-limit`) answers a
+  `COMMIT` with the same `BUSY`; the message is
+  `Too many writes; retry after <s> seconds (retry_after_ms=<s * 1000>)`.
+  Over HTTP it stays `429` with `Retry-After`. Before 2026-10 the WebSocket
+  frame carried code `UNKNOWN (0)` and the delay only in the text.
+
+A client that honours the hints keeps every edit and never drops one: it
+sends a resource at most once per `max(debounce, pace_ms)`, lets edits pile
+up into the next delta, and on `BUSY` waits `retry_after_ms` (plus its own
+jitter), counts no failure and does not fall back to HTTP.
 
 ## Resource fetching
 
@@ -991,6 +1038,13 @@ Tracked in [`planning/unified-sync.md`](https://github.com/ontola/atomic-server/
 - **Loro sync and presence subscriptions are not re-bound on `AUTH`.** The
   commit monitor's resource and drive maps are; the Loro-ephemera and
   presence maps on the same actor still check identity once, at registration.
+
+## Changed in 2026-10
+
+- **`commit-pace` and `BUSY (12)`.** Write-load signalling, see
+  [Write load and pacing](#write-load-and-pacing). The WebSocket rate-limit
+  refusal is now `BUSY` instead of `UNKNOWN`; the message text is unchanged
+  up to a `(retry_after_ms=...)` suffix.
 
 ## Changed in 2026-09
 

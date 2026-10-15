@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { styled } from 'styled-components';
 import {
   core,
   dataBrowser,
@@ -23,6 +22,12 @@ import {
   readLogEntry,
 } from '../../helpers/chatLog';
 import { useChatLogEntry } from '../../hooks/useChatLog';
+import {
+  ToastBody,
+  ToastCard,
+  ToastText,
+  ToastTitle,
+} from '../Notifications/toastStyles';
 
 /**
  * Surfaces new meeting-chat messages as toasts when the meeting panel isn't
@@ -32,24 +37,42 @@ import { useChatLogEntry } from '../../hooks/useChatLog';
  */
 export function MeetingMessageToaster(): null {
   const { followedSession, activeMeeting } = useFollow();
-  const { activePanel, openMeetingPanel } = useRightPanel();
+  const { activePanel, selectedMeeting, openMeetingPanel } = useRightPanel();
   const [agent] = useCurrentAgent();
   const store = useStore();
 
   const meeting = followedSession ?? activeMeeting;
-  const panelOpen = activePanel === 'followSession';
+  // The panel shows `selectedMeeting` when one was picked, else the meeting
+  // we are in (FollowSessionPanelContainer). Only that chat is on screen.
+  const panelOpen =
+    activePanel === 'followSession' && (selectedMeeting ?? meeting) === meeting;
 
   const { messages } = useChatMessages(meeting ?? unknownSubject);
 
   // How many messages we've already accounted for. Never toast the backlog.
   const seenRef = useRef(0);
   const meetingRef = useRef<string | undefined>(undefined);
+  // When we started watching this meeting. A list that loads in batches would
+  // otherwise pass its backlog off as new messages, so only entries made after
+  // this count.
+  const sinceRef = useRef(0);
+  // The toasts on screen, so opening the panel can take them away: the
+  // messages they show are in the panel now.
+  const shownRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!panelOpen) return;
+
+    for (const id of shownRef.current) toast.dismiss(id);
+    shownRef.current.clear();
+  }, [panelOpen]);
 
   useEffect(() => {
     // Meeting changed (joined a new one, or left) → catch up silently.
     if (meeting !== meetingRef.current) {
       meetingRef.current = meeting;
       seenRef.current = messages.length;
+      sinceRef.current = Date.now();
 
       return;
     }
@@ -76,18 +99,10 @@ export function MeetingMessageToaster(): null {
         // System lines ("Viewing …", "Started/ended") and my own messages.
         if (isFollowEntry(logged) || logged?.a === agent?.subject) continue;
 
-        toast.custom(
-          t => (
-            <MeetingToast
-              subject={subject}
-              onOpen={() => {
-                openMeetingPanel(meeting);
-                toast.dismiss(t.id);
-              }}
-            />
-          ),
-          { duration: 5000 },
-        );
+        // Written before we started watching: backlog that loaded late.
+        if (logged && logged.c < sinceRef.current) continue;
+
+        show(subject, meeting);
         continue;
       }
 
@@ -106,18 +121,27 @@ export function MeetingMessageToaster(): null {
         continue;
       }
 
-      toast.custom(
+      const createdAt = res.getCreatedAt();
+
+      if (createdAt !== undefined && createdAt < sinceRef.current) continue;
+
+      show(subject, meeting);
+    }
+
+    function show(subject: string, room: string) {
+      const id = toast.custom(
         t => (
           <MeetingToast
             subject={subject}
             onOpen={() => {
-              openMeetingPanel(meeting);
+              openMeetingPanel(room);
               toast.dismiss(t.id);
             }}
           />
         ),
         { duration: 5000 },
       );
+      shownRef.current.add(id);
     }
   }, [messages, panelOpen, meeting, agent, store, openMeetingPanel]);
 
@@ -146,46 +170,9 @@ function MeetingToast({
     <ToastCard type='button' onClick={onOpen} title='Open the meeting chat'>
       {author && <AgentAvatar agentSubject={author} size='1.8rem' />}
       <ToastBody>
-        <ToastAuthor>{authorName}</ToastAuthor>
+        <ToastTitle>{authorName}</ToastTitle>
         <ToastText>{text}</ToastText>
       </ToastBody>
     </ToastCard>
   );
 }
-
-const ToastCard = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 22rem;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background: ${p => p.theme.colors.bg};
-  box-shadow: ${p => p.theme.boxShadowSoft};
-  cursor: pointer;
-  text-align: left;
-  color: ${p => p.theme.colors.text};
-`;
-
-const ToastBody = styled.span`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const ToastAuthor = styled.span`
-  font-weight: 600;
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const ToastText = styled.span`
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.textLight};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;

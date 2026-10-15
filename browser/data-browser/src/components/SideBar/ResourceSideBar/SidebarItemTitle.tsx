@@ -35,6 +35,10 @@ interface SidebarItemTitleProps {
 const NavResourceLink = styled(StyledLink)`
   display: flex;
   align-self: stretch;
+  /* A held touch is ours (menu or drag): no native callout or selection. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 `;
 
 export const SidebarItemTitle = memo(
@@ -281,8 +285,10 @@ const ExpandToggleButton = styled.button`
   cursor: pointer;
   color: ${p => p.theme.colors.main};
 
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+    }
   }
 
   &:active {
@@ -404,7 +410,9 @@ const ActionWrapper = styled.div<{ isDragging?: boolean }>`
     }
   }
 
-  ${ExpandToggleButton}:hover ${CaretBadge} {
-    transform: scale(1.6);
+  @media (hover: hover) {
+    ${ExpandToggleButton}:hover ${CaretBadge} {
+      transform: scale(1.6);
+    }
   }
 `;

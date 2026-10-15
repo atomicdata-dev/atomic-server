@@ -197,6 +197,20 @@ export function normalizeLoroChangeTimestampMs(timestamp: number): number {
 }
 
 /**
+ * Thrown by an explicit save when the commit is only queued in the outbox
+ * (offline or retrying). The queued state is normal and visible through
+ * `Store.getSaveState`; callers that merely schedule saves can ignore it.
+ */
+export class SaveQueuedError extends Error {
+  constructor(
+    message = 'Save is still queued; the server has not acknowledged it.',
+  ) {
+    super(message);
+    this.name = 'SaveQueuedError';
+  }
+}
+
+/**
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
  * / Value combinations.
  *
@@ -499,6 +513,18 @@ export class Resource<C extends OptionalClass = any> {
       this._loroDoc = new LoroDocClass();
       // Match the server (`lib/src/loro.rs`): record per-change Unix seconds on commit.
       this._loroDoc.setRecordTimestamp(true);
+      // Loro stamps a change with the moment its transaction BEGAN, i.e. right
+      // after the previous commit. An editor that commits through a plain
+      // `doc.commit()` (loro-prosemirror) therefore stamps the first keystroke
+      // after an idle spell with the time of the last save, so "last edited"
+      // readers (the drive Activity feed) saw typing as minutes old. Re-stamp
+      // auto-stamped (second-resolution) commits with the real time; commits
+      // with an explicit millisecond timestamp (`signAt`) are left alone.
+      this._loroDoc.subscribePreCommit(({ changeMeta, modifier }) => {
+        if (changeMeta.timestamp < 1_000_000_000_000) {
+          modifier.setTimestamp(Math.floor(Date.now() / 1000));
+        }
+      });
       this._loroMap = this._loroDoc.getMap('properties');
 
       // If the resource has a persisted Loro snapshot, import it.
@@ -3636,7 +3662,26 @@ export class Resource<C extends OptionalClass = any> {
   /** The save currently running, so a concurrent `save()` waits for it. */
   private _inflightSave?: Promise<SaveResult>;
 
-  public async save(): Promise<SaveResult> {
+  /**
+   * Save now. A direct call is an explicit user action (Create, dialog
+   * submit, then navigate): the server's soft commit pace does not hold it
+   * back, only a BUSY refusal does (then {@link SaveQueuedError}).
+   * Background saves (`ScheduledSave`, debounced hooks) pass `background` and
+   * are spaced to the pace like the outbox's own drains.
+   */
+  public async save(opts: { background?: boolean } = {}): Promise<SaveResult> {
+    const release = opts.background
+      ? undefined
+      : this.store.outbox.holdExplicit(this.subject);
+
+    try {
+      return await this.saveSerialized();
+    } finally {
+      release?.();
+    }
+  }
+
+  private async saveSerialized(): Promise<SaveResult> {
     // Two saves running at once each sign their own commit from the same
     // state. For a draft that is two genesis certificates, so two subjects
     // for one resource: the second rename evicts the first, and every alias
@@ -3645,7 +3690,7 @@ export class Resource<C extends OptionalClass = any> {
     if (this._inflightSave) {
       await this._inflightSave.catch(() => undefined);
 
-      return this.save();
+      return this.saveSerialized();
     }
 
     this._inflightSave = this.saveOnce();
@@ -3810,9 +3855,7 @@ export class Resource<C extends OptionalClass = any> {
           );
 
         if (!acknowledged) {
-          throw new Error(
-            'Save is still queued; the server has not acknowledged it.',
-          );
+          throw new SaveQueuedError();
         }
       }
 

@@ -278,8 +278,13 @@ const HeaderButton = styled.button<{ $dragging: boolean }>`
     cursor: row-resize;
   }
 
-  &:hover ${Caret}, &:focus-visible ${Caret} {
+  &:focus-visible ${Caret} {
     opacity: 1;
+  }
+  @media (hover: hover) {
+    &:hover ${Caret} {
+      opacity: 1;
+    }
   }
 
   /* Callout and text selection would fight the long-press menu. */
@@ -293,12 +298,14 @@ const HeaderButton = styled.button<{ $dragging: boolean }>`
     }
   }
 
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
-  }
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+    }
 
-  &:hover ${PanelTitle} {
-    color: ${p => p.theme.colors.text};
+    &:hover ${PanelTitle} {
+      color: ${p => p.theme.colors.text};
+    }
   }
 
   &:focus-visible {

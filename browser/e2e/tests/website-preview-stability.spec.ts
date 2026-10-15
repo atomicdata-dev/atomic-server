@@ -35,14 +35,14 @@ test('opening Edit with AI preserves the preview document', async ({
   // straight after the click caught whichever half had rendered. Wait for
   // both ends to be present before reading the order.
   await expect(page.getByTestId('menu-item-website-download')).toBeVisible();
-  await expect(page.getByTestId('menu-item-delete')).toBeVisible();
+  await expect(page.getByTestId('menu-item-trash')).toBeVisible();
   const actionIds = await page
     .getByRole('menuitem')
     .evaluateAll(items => items.map(item => item.getAttribute('data-testid')));
   expect(
     actionIds.slice(0, 7).every(id => id?.startsWith('menu-item-website-')),
   ).toBe(true);
-  expect(actionIds.slice(7).some(id => id === 'menu-item-delete')).toBe(true);
+  expect(actionIds.slice(7).some(id => id === 'menu-item-trash')).toBe(true);
   await expect(page.getByTestId('menu-item-view')).toHaveCount(0);
   await expect(page.getByTestId('menu-item-data').locator('svg')).toHaveCount(
     1,

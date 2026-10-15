@@ -142,39 +142,6 @@ impl ResourceResponse {
             }
         }
     }
-
-    /// Takes a vector of resources and returns a ResourceResponse::ResourceWithReferenced
-    /// If the main subject is not found it will Error
-    pub fn from_vec(main_subject: &str, vec: Vec<Resource>) -> AtomicResult<Self> {
-        if vec.is_empty() {
-            return Err("No resources found".into());
-        }
-        if vec.len() == 1 {
-            return Ok(ResourceResponse::Resource(vec[0].clone()));
-        }
-
-        let mut resource: Option<Resource> = None;
-        let mut referenced = Vec::new();
-
-        for r in vec {
-            if r.get_subject().as_str() == main_subject {
-                resource = Some(r);
-            } else {
-                referenced.push(r);
-            }
-        }
-
-        let Some(resource) = resource else {
-            return Err(AtomicError::not_found(format!(
-                "Resource with subject {} not found",
-                main_subject
-            )));
-        };
-
-        Ok(ResourceResponse::ResourceWithReferenced(
-            resource, referenced,
-        ))
-    }
 }
 
 pub type ResourceCollection = Vec<Resource>;

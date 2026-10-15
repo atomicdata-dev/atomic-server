@@ -268,6 +268,27 @@ pub async fn describe_manifest(source: &str) -> Result<Option<super::manifest::M
 }
 
 impl StoreHost {
+    /// A host for `plugin` installed in `drive`, running as `for_agent`, with
+    /// the binding already validated (plugin exists, installed in the drive,
+    /// agent may write the plugin).
+    pub async fn bound(
+        db: &Db,
+        drive: &str,
+        plugin: &str,
+        for_agent: ForAgent,
+        manifest: Option<super::manifest::Manifest>,
+    ) -> Result<Self, String> {
+        let host = StoreHost {
+            db: Arc::new(db.clone()),
+            plugin: plugin.into(),
+            drive: drive.into(),
+            for_agent,
+            manifest,
+        };
+        host.validate_binding().await?;
+        Ok(host)
+    }
+
     pub async fn validate_binding(&self) -> Result<(), String> {
         use atomic_lib::{hierarchy::check_write, Storelike};
         let resource = self

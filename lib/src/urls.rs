@@ -100,6 +100,9 @@ pub const CREATED_BY: &str = "https://atomicdata.dev/properties/createdBy";
 pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
 pub const PREVIOUS_COMMIT: &str = "https://atomicdata.dev/properties/previousCommit";
 pub const LAST_COMMIT: &str = "https://atomicdata.dev/properties/lastCommit";
+/// How much signed history a resource keeps: `compact` or `audit`. Inherited
+/// down the parent chain; see `envelopes::effective_retention`.
+pub const RETENTION: &str = "https://atomicdata.dev/properties/retention";
 pub const IS_GENESIS: &str = "https://atomicdata.dev/properties/isGenesis";
 /// Inline, immutable self-verifying genesis certificate (binary; base64 in
 /// JSON-AD). Carries signer/createdAt/nonce/parent/drive; the DID is
@@ -344,10 +347,6 @@ pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
 pub const SUDO_AGENT: &str = "sudo:agent";
 
 // Paths
-pub fn construct_path_import(base: &str) -> String {
-    format!("{base}{PATH_IMPORT}")
-}
-
 pub const PATH_IMPORT: &str = "/import";
 pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
 pub const PATH_QUERY: &str = "/query";

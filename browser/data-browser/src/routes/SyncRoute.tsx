@@ -1,6 +1,11 @@
 import { ServiceGroup, ServiceSection } from '@tomic/service-ui';
 import '@tomic/service-ui/styles.css';
 import { Checkbox } from '../components/forms/Checkbox';
+import {
+  readKnownPeers,
+  writeKnownPeers,
+  type KnownPeer,
+} from '../helpers/knownPeers';
 import { resumePeerLinks } from '../helpers/browserPeerSync';
 import { syncSummary, showSavedServer } from '../helpers/syncPresentation';
 import { driveBillingUrl } from '../helpers/driveBillingUrl';
@@ -34,6 +39,9 @@ import {
   type StoreSyncStatus,
   type CommitLogEntry,
   useStore,
+  useResource,
+  useString,
+  core,
   useProperty,
   truncateUrl,
   Datatype,
@@ -73,7 +81,7 @@ import {
 } from '../components/Cloud/ServiceRow';
 import { CloudServerDetails } from '../components/Cloud/CloudServerDetails';
 import { SyncProblemBanner } from '../components/SyncProblemBanner';
-import { describeSyncProblem } from '../helpers/syncProblem';
+import { describeSyncProblem, notHostedTitle } from '../helpers/syncProblem';
 import { isErrorReportingEnabled, reportSyncProblem } from '../helpers/sentry';
 import { LinkProviderPanel } from '../components/Vault/LinkProviderPanel';
 import { isDeviceLinked } from '../helpers/managed/deviceLink';
@@ -146,8 +154,6 @@ export const SyncRoute = createRoute({
   getParentRoute: () => appRoute,
 });
 
-type KnownPeer = { nodeId: string; label: string; lastSync?: string };
-
 function nodeDidToRaw(nodeDid: string): string | undefined {
   const raw = parseNodeId(nodeDid)?.split(':')[0];
 
@@ -156,12 +162,6 @@ function nodeDidToRaw(nodeDid: string): string | undefined {
 
 function rawToNodeDid(raw: string): string {
   return nodeSubject(raw);
-}
-
-function normalizeStoredPeer(peer: KnownPeer): KnownPeer | undefined {
-  if (nodeDidToRaw(peer.nodeId)) return peer;
-
-  return undefined;
 }
 
 function StatusIcon({ status }: { status: NodeStatus }) {
@@ -701,17 +701,7 @@ function SyncPage() {
   // React Compiler memoizes on the proxy identity, so a resource that finishes
   // loading would never re-render this.
   const [driveMissing, setDriveMissing] = useState(false);
-  const [knownPeers, setKnownPeers] = useState<KnownPeer[]>(() => {
-    try {
-      return (
-        JSON.parse(localStorage.getItem('atomic-peers') ?? '[]') as KnownPeer[]
-      )
-        .map(normalizeStoredPeer)
-        .filter((peer): peer is KnownPeer => peer !== undefined);
-    } catch {
-      return [];
-    }
-  });
+  const [knownPeers, setKnownPeers] = useState<KnownPeer[]>(readKnownPeers);
 
   // What the server in use says about itself, read from its `/server` resource:
   // its node id and version, plus whether it is a managed node and where its
@@ -1732,7 +1722,7 @@ function SyncPage() {
 
   function savePeers(peers: KnownPeer[]) {
     setKnownPeers(peers);
-    localStorage.setItem('atomic-peers', JSON.stringify(peers));
+    writeKnownPeers(peers);
   }
 
   async function disconnectServerPeer(nodeId: string) {
@@ -1873,14 +1863,27 @@ function SyncPage() {
 
   // Why this workspace is not syncing, if it is not. A local-only workspace is
   // not supposed to be, so it has nothing to explain.
-  const syncProblem = localOnlyDrive
+  const syncProblemInput = {
+    status,
+    refusedByServer: store.isDriveRefusedByServer(status.drive),
+    entries: store.outbox.pending(),
+    serverName: serverLabel(status.serverUrl ?? ''),
+    driveOf: (subject: string) => store.driveOfSubject(subject),
+  };
+  const described = localOnlyDrive
     ? null
-    : describeSyncProblem({
-        status,
-        refusedByServer: store.isDriveRefusedByServer(status.drive),
-        entries: store.outbox.pending(),
-        serverName: serverLabel(status.serverUrl ?? ''),
-      });
+    : describeSyncProblem(syncProblemInput);
+  // A problem can be about another workspace than the one in view; name it by
+  // its title, which can only be loaded once the problem says which one it is.
+  const problemDriveResource = useResource(described?.otherDrive);
+  const [problemDriveName] = useString(
+    problemDriveResource,
+    core.properties.name,
+  );
+  const syncProblem =
+    described?.otherDrive && problemDriveName
+      ? { ...described, title: notHostedTitle(problemDriveName) }
+      : described;
   const syncProblemKey = syncProblem?.key;
   const syncProblemOurs = syncProblem?.cause === 'ours';
   const syncProblemReported = syncProblem?.reported ?? true;

@@ -73,10 +73,17 @@ export const LabelButton = styled.button<{ $active?: boolean }>`
   }
 
   &:not([disabled]) {
-    &:hover,
     &:focus-visible {
       background: ${p => p.theme.colors.bg1};
       color: ${p => (p.$active ? p.theme.colors.main : p.theme.colors.text)};
+    }
+
+    /* Touch devices keep :hover after a tap, so only apply it with a real hover. */
+    @media (hover: hover) {
+      &:hover {
+        background: ${p => p.theme.colors.bg1};
+        color: ${p => (p.$active ? p.theme.colors.main : p.theme.colors.text)};
+      }
     }
 
     &:active {

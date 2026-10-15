@@ -45,6 +45,9 @@ pub struct AppState {
     /// `crate::rate_limit`. Sized from `--write-rate-limit` and
     /// `--anonymous-write-rate-limit`.
     pub write_rate_limiter: Arc<crate::rate_limit::WriteRateLimiter>,
+    /// In-flight commit counter and load signal, shared by `POST /commit`
+    /// and the WebSocket `COMMIT` frame. See `crate::write_load`.
+    pub write_load: Arc<crate::write_load::WriteLoad>,
 }
 
 impl AppState {
@@ -270,12 +273,17 @@ impl AppState {
             config.opts.write_rate_limit,
             config.opts.anonymous_write_rate_limit,
         ));
+        let write_load = crate::write_load::WriteLoad::new(
+            config.opts.commit_soft_limit,
+            config.opts.commit_hard_limit,
+        );
         let captcha = Arc::new(crate::captcha::AltchaVerifier::from_store(&store));
 
         Ok(AppState {
             store,
             config,
             write_rate_limiter,
+            write_load,
             commit_monitor,
             captcha,
             vector_search_state,

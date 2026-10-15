@@ -67,6 +67,9 @@ export async function browserPeerId(
   return prefix + randomPeerToken().slice(BROWSER_PREFIX_LENGTH);
 }
 
+/** How long a connection must stay ready before its retry backoff resets. */
+const STABLE_CONNECTION_MS = 30_000;
+
 /** A bounded full mesh: each remote browser has its own authenticated session.
  * Received frames are never rebroadcast; reconciliation catches up persisted state. */
 export class BrowserPeerSync {
@@ -75,6 +78,7 @@ export class BrowserPeerSync {
   private readonly members = new Set<string>();
   private readonly retries = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly retryDelays = new Map<string, number>();
+  private readonly readyAt = new Map<string, number>();
   private reconnect?: ReturnType<typeof setTimeout>;
   private stopped = false;
   private iceServers: RTCIceServer[] = [];
@@ -113,6 +117,7 @@ export class BrowserPeerSync {
     for (const timer of this.retries.values()) clearTimeout(timer);
     this.retries.clear();
     this.retryDelays.clear();
+    this.readyAt.clear();
     for (const connection of this.connections.values()) connection.close();
     this.connections.clear();
     // Closing during the handshake emits a browser network warning. The open
@@ -291,7 +296,7 @@ export class BrowserPeerSync {
       this.db,
       { ...this.options, onStatus: undefined, iceServers: this.iceServers },
       () => {
-        this.retryDelays.delete(id);
+        this.readyAt.set(id, Date.now());
         this.status();
       },
       error => this.failed(id, connection, error),
@@ -304,6 +309,12 @@ export class BrowserPeerSync {
   private remove(id: string, connection: BrowserPeerConnection): void {
     if (this.connections.get(id) !== connection) return;
     this.connections.delete(id);
+    // Only a connection that stayed up resets the backoff; one that
+    // authenticates and dies within seconds keeps backing off.
+    const since = this.readyAt.get(id);
+    this.readyAt.delete(id);
+    if (since !== undefined && Date.now() - since >= STABLE_CONNECTION_MS)
+      this.retryDelays.delete(id);
     connection.close();
     this.status();
   }

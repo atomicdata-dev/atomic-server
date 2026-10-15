@@ -1,18 +1,13 @@
 import { driveDisplayName } from '../../helpers/driveDisplayName';
 import {
-  ai,
   dataBrowser,
-  notifications,
-  server,
   useCanWrite,
-  useChildren,
   useResource,
   useStore,
   useString,
   useSubject,
   useTitle,
 } from '@tomic/react';
-import { canonicalizeScheme } from '@tomic/lib';
 import { Fragment, useEffect, useMemo, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
@@ -29,7 +24,6 @@ import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
 import { LuChevronsUpDown } from 'react-icons/lu';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ScrollArea } from '../ScrollArea';
-import { SidebarTrashLink } from './SidebarTrashLink';
 import { DropEdge } from './ResourceSideBar/DropEdge';
 import { SIDEBAR_CHILD_LIMIT, SideBarMoreRow } from './SideBarMoreRow';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
@@ -37,6 +31,7 @@ import { LoaderInline } from '../Loader';
 import { QuickCreateRow } from '../NewInstanceButton';
 import { ResourceGlyph } from '../ResourceGlyph';
 import { useIsPrivateDrive } from '../../hooks/useIsPrivateDrive';
+import { useVisibleDriveChildren } from '../../hooks/useVisibleDriveChildren';
 
 interface SideBarDriveProps {
   onItemClick: () => unknown;
@@ -51,59 +46,11 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
   const { drive, agent } = useSettings();
   const driveResource = useResource(drive);
   const {
-    subjects: allChildren,
+    subjects: subResources,
+    allSubjects: allChildren,
     loading: childrenLoading,
     total: totalChildren,
-  } = useChildren(drive, { limit: SIDEBAR_CHILD_LIMIT });
-
-  // The drive's default ontology is schema plumbing (auto-created by
-  // `createDrive`) — hide it from the tree so users aren't confronted with an
-  // "Ontology" they never made. It stays reachable via the drive page and
-  // class/property links. Ontologies the user creates themselves still show.
-  const [defaultOntology] = useString(
-    driveResource,
-    server.properties.defaultOntology,
-  );
-  // Same for the Comments folder (the standard location holding comment
-  // Messages, created lazily on the first comment): comments are reached
-  // through the Comments panel, not by browsing the folder.
-  const [commentsFolder] = useString(
-    driveResource,
-    dataBrowser.properties.commentsFolder,
-  );
-  // And the AI Chats folder (on the personal drive): chats re-open through
-  // the AI sidebar on the resource they were started on.
-  const [aiChatsFolder] = useString(driveResource, ai.properties.aiChatsFolder);
-  // And the Inbox (on the personal drive): it opens from Notifications in the
-  // app menu.
-  const [inbox] = useString(driveResource, notifications.properties.inbox);
-  // And the Trash folder: reached through its own row below the tree.
-  const [trashFolder] = useString(
-    driveResource,
-    dataBrowser.properties.trashFolder,
-  );
-  const subResources = useMemo(
-    () =>
-      allChildren.filter(subject => {
-        const canonical = canonicalizeScheme(subject);
-
-        return (
-          canonical !== canonicalizeScheme(defaultOntology ?? '') &&
-          canonical !== canonicalizeScheme(commentsFolder ?? '') &&
-          canonical !== canonicalizeScheme(aiChatsFolder ?? '') &&
-          canonical !== canonicalizeScheme(inbox ?? '') &&
-          canonical !== canonicalizeScheme(trashFolder ?? '')
-        );
-      }),
-    [
-      allChildren,
-      defaultOntology,
-      commentsFolder,
-      aiChatsFolder,
-      inbox,
-      trashFolder,
-    ],
-  );
+  } = useVisibleDriveChildren(drive, { limit: SIDEBAR_CHILD_LIMIT });
   const [title] = useTitle(driveResource);
   const isPrivateDrive = useIsPrivateDrive(drive);
   // A drive with its own emoji or icon shows that; the private drive is
@@ -206,9 +153,6 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
                 onClick={onItemClick}
               />
             )}
-            {trashFolder && (
-              <SidebarTrashLink subject={trashFolder} onClick={onItemClick} />
-            )}
             {agentCanWrite && (
               <NewResourceRow gap='0' center>
                 <QuickCreateRow
@@ -273,8 +217,10 @@ const TitleButton = styled(Button)<{ current?: boolean }>`
     color: ${theme.colors.main};
   `}
 
-  &:hover {
-    background-color: ${props => props.theme.colors.bg1};
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${props => props.theme.colors.bg1};
+    }
   }
   &:active {
     background-color: ${props => props.theme.colors.bg2};
@@ -291,10 +237,16 @@ const SwitcherButton = styled(IconButton)`
   color: ${p => p.theme.colors.textLight};
   font-size: 0.85rem;
 
-  &:hover,
   &:focus-visible {
     background-color: ${p => p.theme.colors.bg1};
     color: ${p => p.theme.colors.text};
+  }
+  /* Touch keeps :hover after a tap; only apply it with a real hover. */
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${p => p.theme.colors.bg1};
+      color: ${p => p.theme.colors.text};
+    }
   }
   &:active {
     background-color: ${p => p.theme.colors.bg2};

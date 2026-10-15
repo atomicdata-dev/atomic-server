@@ -42,7 +42,14 @@ const MESSAGE_PREFIX: &str = "Too many writes; retry after ";
 
 impl std::fmt::Display for RateLimited {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{MESSAGE_PREFIX}{} seconds", self.retry_after_secs)
+        // The `retry_after_ms=` tail is the machine-readable form shared with
+        // `BUSY` (see `atomic_lib::sync::protocol::retry_after_ms_from_message`).
+        write!(
+            f,
+            "{MESSAGE_PREFIX}{} seconds (retry_after_ms={})",
+            self.retry_after_secs,
+            self.retry_after_secs * 1000
+        )
     }
 }
 

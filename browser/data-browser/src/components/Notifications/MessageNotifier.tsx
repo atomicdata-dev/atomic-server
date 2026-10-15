@@ -12,11 +12,13 @@ import {
 } from '@tomic/react';
 import { AgentAvatar } from '../Presence/AgentAvatar';
 import { useRightPanel } from '../RightPanel/RightPanelContext';
+import { useFollow } from '../Presence/FollowContext';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
 import { parseEntryId } from '../../helpers/chatLog';
 import {
+  bubbleId,
   classifyMessage,
   entryFacts,
   isCandidate,
@@ -30,10 +32,12 @@ import {
   turnOnOsNotifications,
 } from '../../helpers/notifications/osNotifications';
 import { Button } from '../Button';
+import { ToastBody, ToastCard, ToastText, ToastTitle } from './toastStyles';
 import {
   markReadAbout,
   recordNotification,
 } from '../../helpers/notifications/inbox';
+import { actorName } from '../../helpers/notifications/actorName';
 import { usePrivateDrive } from '../../hooks/usePrivateDrive';
 import { usePrivateDriveList } from '../../hooks/usePrivateDriveList';
 
@@ -41,6 +45,12 @@ const TEXT_MAX = 140;
 
 /** Messages created before the app started are backlog, not news. */
 const APP_STARTED = Date.now();
+
+/**
+ * Entries announced (or ruled out) in this page load. Outside the component:
+ * a remount used to start from an empty set and announce every entry again.
+ */
+const handledEntries = new Set<string>();
 
 function factsOf(resource: Resource): MessageFacts {
   const stable = resource.stable;
@@ -101,12 +111,27 @@ export function MessageNotifier(): null {
   const store = useStore();
   const [agent] = useCurrentAgent();
   const [currentSubject] = useCurrentSubject();
-  const { activePanel, setPanelOpen } = useRightPanel();
+  const { activePanel, selectedMeeting, setPanelOpen } = useRightPanel();
+  const { followedSession, activeMeeting } = useFollow();
+  // The meeting chat in the right panel, when it is open (as the panel picks it).
+  const panelChat =
+    activePanel === 'followSession'
+      ? (selectedMeeting ?? followedSession ?? activeMeeting)
+      : undefined;
   const navigate = useNavigateWithTransition();
   const { privateDrive } = usePrivateDrive();
   const [sharedWithMe] = usePrivateDriveList(core.properties.sharedWithMe);
 
-  const handled = useRef(new Set<string>());
+  // Toasts on screen, so opening the meeting panel can take them away.
+  const shown = useRef(new Set<string>());
+  const meetingPanelOpen = activePanel === 'followSession';
+
+  useEffect(() => {
+    if (!meetingPanelOpen) return;
+
+    shown.current.forEach(id => toast.dismiss(id));
+    shown.current.clear();
+  }, [meetingPanelOpen]);
   // Announced while away, with system notifications not decided yet.
   const missed = useRef(0);
   // Inbox writes still in flight, per target, so reading waits for them.
@@ -210,6 +235,16 @@ export function MessageNotifier(): null {
 
   const isLookingAt = useEffectEvent((n: MessageNotification) => {
     if (document.hidden || !document.hasFocus()) return false;
+
+    // The meeting chat is open beside the page: its messages are on screen
+    // whatever the page is.
+    if (
+      panelChat &&
+      store.normalizeSubject(panelChat) === store.normalizeSubject(n.target)
+    ) {
+      return true;
+    }
+
     if (!currentSubject) return false;
 
     if (
@@ -239,6 +274,7 @@ export function MessageNotifier(): null {
         ...ctx,
         classesOf: s =>
           related.get(s)?.get(core.properties.isA) as string[] | undefined,
+        isLocalOnly: s => store.isLocalOnlySubject(s),
         creatorOf: s => {
           const entry = parseEntryId(s);
 
@@ -258,7 +294,8 @@ export function MessageNotifier(): null {
         return;
       }
 
-      const authorName = related.get(n.author)?.title ?? 'Someone';
+      const authorName =
+        actorName(related.get(n.author)?.title, n.author) ?? 'Someone';
       const targetTitle = related.get(n.target)?.title ?? '';
       const title = headline(n.kind, authorName, targetTitle);
       const body =
@@ -285,6 +322,11 @@ export function MessageNotifier(): null {
       }
 
       if (!document.hidden && document.hasFocus()) {
+        // The meeting panel covers or crowds the page and has its own chat
+        // open; a bubble over its message box is noise. Still in the Inbox.
+        if (meetingPanelOpen) return;
+
+        shown.current.add(bubbleId(n.target));
         toast.custom(
           t => (
             <ToastCard
@@ -301,7 +343,7 @@ export function MessageNotifier(): null {
               </ToastBody>
             </ToastCard>
           ),
-          { duration: 6000, id: subject },
+          { duration: 6000, id: bubbleId(n.target) },
         );
 
         return;
@@ -309,7 +351,12 @@ export function MessageNotifier(): null {
 
       if (shouldOfferOsNotifications()) missed.current += 1;
 
-      showOsNotification({ title, body, tag: subject, onClick: () => open(n) });
+      showOsNotification({
+        title,
+        body,
+        tag: bubbleId(n.target),
+        onClick: () => open(n),
+      });
     },
   );
 
@@ -325,15 +372,19 @@ export function MessageNotifier(): null {
     if (classes.includes(dataBrowser.classes.chatLog)) {
       const page = resource.stable;
 
+      // Nobody but you writes in a local-only drive, so whoever speaks there
+      // is the demo's script. Not news, and never the Inbox of a real account.
+      if (store.isLocalOnlySubject(page.subject)) return;
+
       for (const { key, entry } of page.listChatLogEntries()) {
         const facts = entryFacts(page.subject, factsOf(page), key, entry);
 
-        if (handled.current.has(facts.subject)) continue;
+        if (handledEntries.has(facts.subject)) continue;
 
         // Not decidable yet: the page's own metadata hasn't arrived.
         if (isCandidate(facts, ctx) === undefined) continue;
 
-        handled.current.add(facts.subject);
+        handledEntries.add(facts.subject);
 
         if (isCandidate(facts, ctx)) await announce(facts, entry.t);
       }
@@ -341,7 +392,7 @@ export function MessageNotifier(): null {
       return;
     }
 
-    if (handled.current.has(subject)) return;
+    if (handledEntries.has(subject)) return;
 
     const facts = factsOf(resource);
     const candidate = isCandidate(facts, ctx);
@@ -349,7 +400,7 @@ export function MessageNotifier(): null {
     // Not decidable yet: its genesis hasn't arrived. A later update will ask again.
     if (candidate === undefined) return;
 
-    handled.current.add(subject);
+    handledEntries.add(subject);
 
     if (!candidate) return;
 
@@ -386,21 +437,6 @@ export function MessageNotifier(): null {
   return null;
 }
 
-const ToastCard = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 22rem;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background: ${p => p.theme.colors.bg};
-  box-shadow: ${p => p.theme.boxShadowSoft};
-  cursor: pointer;
-  text-align: left;
-  color: ${p => p.theme.colors.text};
-`;
-
 const OfferCard = styled.div`
   display: flex;
   flex-direction: column;
@@ -423,26 +459,4 @@ const OfferButtons = styled.div`
   display: flex;
   gap: 0.5rem;
   margin-top: 0.2rem;
-`;
-
-const ToastBody = styled.span`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const ToastTitle = styled.span`
-  font-weight: 600;
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const ToastText = styled.span`
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.textLight};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 `;

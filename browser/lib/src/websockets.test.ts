@@ -17,6 +17,7 @@ import {
   decodeHelloCaps,
   encodeChallenge,
   encodeCommitOkSlim,
+  encodeCommitOkPaced,
   encodeSyncResend,
   encodeCommitOk,
   encodeError,
@@ -429,6 +430,29 @@ describe('WSClient drive sync probe', () => {
       client as unknown as { startVVSync: (drive: string) => Promise<void> }
     ).startVVSync('did:ad:drive');
     expect(framesWithTag(socket, Tag.SYNC)).toHaveLength(0);
+    client.close();
+  });
+
+  it('does not import or index in the background in server-only mode', async ({
+    expect,
+  }) => {
+    const { client, store } = await connectedClient();
+    const indexPendingSearch = vi.fn();
+    const importEnvelopes = vi.fn();
+    vi.spyOn(store, 'getClientDb').mockReturnValue({
+      initError: new Error('no Web Locks'),
+      indexPendingSearch,
+      importEnvelopes,
+    } as never);
+    const internals = client as unknown as {
+      pendingEnvelopes: Array<{ subject: string; json: string }>;
+      drainBackground: () => Promise<void>;
+    };
+    internals.pendingEnvelopes = [{ subject: 'did:ad:x', json: '{}' }];
+    await internals.drainBackground();
+    expect(indexPendingSearch).not.toHaveBeenCalled();
+    expect(importEnvelopes).not.toHaveBeenCalled();
+    expect(internals.pendingEnvelopes).toHaveLength(0);
     client.close();
   });
 
@@ -847,6 +871,177 @@ describe('WSClient drive subscription', () => {
     client.close();
   });
 
+  describe('a held subscription on a resource the reader cannot read yet', () => {
+    const PRIVATE = 'did:ad:private-home';
+
+    async function liveClient() {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+      const resource = new Resource(PRIVATE);
+      store.resources.set(store.normalizeSubject(PRIVATE), resource);
+
+      return { client, socket, store, resource };
+    }
+
+    it.each([ErrorType.NotFound, ErrorType.Unauthorized])(
+      'sends no SUB while the resource is known to be %s',
+      async errorType => {
+        const { client, socket, store, resource } = await liveClient();
+        resource.setError(new AtomicError('Not readable', errorType));
+        store.subscribeLive(PRIVATE);
+        assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+        client.close();
+      },
+    );
+
+    it('sends no SUB for an unsaved resource or one awaiting its genesis', async () => {
+      const { client, socket, store, resource } = await liveClient();
+      resource.new = true;
+      store.outbox.setGenesisCommit(PRIVATE, signedCommit());
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      client.close();
+    });
+
+    it('sends no SUB for a resource that is not in the store yet, and sends it once it loads', async () => {
+      const { client, socket, store } = await liveClient();
+      store.resources.delete(store.normalizeSubject(PRIVATE));
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      const loaded = new Resource(PRIVATE);
+      loaded.new = false;
+      store.resources.set(store.normalizeSubject(PRIVATE), loaded);
+      store.notifyResourceUpdated(loaded);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      // Further updates do not repeat it.
+      store.notifyResourceUpdated(loaded);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+
+    it('sends the SUB once an errored resource loads without error', async () => {
+      const { client, socket, store, resource } = await liveClient();
+      resource.setError(new AtomicError('Not found', ErrorType.NotFound));
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      resource.setError(undefined as never);
+      resource.new = false;
+      store.notifyResourceUpdated(resource);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+  });
+
+  describe('a subject owned by both a live subscription and the drive SUB', () => {
+    const PRIVATE = 'did:ad:private-home';
+    const TEAM = 'did:ad:team-drive';
+
+    async function setup() {
+      const { client, socket, store } = await connectedClient();
+      vi.spyOn(store, 'getAgent').mockReturnValue(undefined);
+      vi.spyOn(store, 'getWebSocketForSubject').mockReturnValue(client);
+      vi.spyOn(store, 'isLiveSyncedDrive').mockReturnValue(true);
+
+      for (const subject of [PRIVATE, TEAM]) {
+        const resource = new Resource(subject);
+        resource.new = false;
+        store.resources.set(store.normalizeSubject(subject), resource);
+      }
+
+      const subjects = (tag: number) =>
+        framesWithTag(socket, tag).map(frame =>
+          new TextDecoder().decode(frame.subarray(1)),
+        );
+      const internal = client as unknown as {
+        subscribeToDrive(): void;
+        reSubscribeAll(): void;
+      };
+
+      return { client, socket, store, subjects, internal };
+    }
+
+    it('sends the held SUB after ResourceSaved once the genesis is cleared', async () => {
+      const { client, socket, store } = await setup();
+      const resource = store.resources.get(store.normalizeSubject(PRIVATE))!;
+      resource.new = true;
+      store.outbox.setGenesisCommit(PRIVATE, signedCommit());
+      store.subscribeLive(PRIVATE);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(0);
+      store.outbox.clearGenesis(PRIVATE);
+      resource.new = false;
+      // No ResourceUpdated fires, only ResourceSaved.
+      await store.notifyResourceSaved(resource);
+      assert(framesWithTag(socket, Tag.SUB)).toHaveLength(1);
+      client.close();
+    });
+
+    it('does not UNSUB the private drive when the hook releases after the drive switch', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      const release = store.subscribeLive(PRIVATE);
+      expect(subjects(Tag.SUB)).toEqual([TEAM, PRIVATE]);
+      // DriveChanged handler runs first, then the hook cleanup.
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      // Team drive is released; the private one is held by the live SUB.
+      expect(subjects(Tag.UNSUB)).toEqual([TEAM]);
+      release();
+      expect(subjects(Tag.UNSUB)).toEqual([TEAM]);
+      client.close();
+    });
+
+    it('UNSUBs the old drive on a switch only when no live subscription holds it', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      const release = store.subscribeLive(PRIVATE);
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      expect(subjects(Tag.UNSUB)).toEqual([]);
+      // The live SUB still works for reconnects and is not sent twice.
+      const before = subjects(Tag.SUB).length;
+      release();
+      expect(subjects(Tag.UNSUB)).toEqual([PRIVATE]);
+      expect(subjects(Tag.SUB)).toHaveLength(before);
+      // Without a live holder the switch away UNSUBs.
+      vi.mocked(store.getDrive).mockReturnValue(PRIVATE);
+      internal.subscribeToDrive();
+      vi.mocked(store.getDrive).mockReturnValue(TEAM);
+      internal.subscribeToDrive();
+      expect(subjects(Tag.UNSUB)).toEqual([PRIVATE, TEAM, PRIVATE]);
+      client.close();
+    });
+
+    it('resends a held SUB once and a sent one once after a reconnect', async ({
+      expect,
+    }) => {
+      const { client, store, subjects, internal } = await setup();
+      store.subscribeLive(PRIVATE);
+      const held = store.resources.get(store.normalizeSubject(TEAM))!;
+      held.new = true;
+      store.subscribeLive(TEAM);
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE]);
+      internal.reSubscribeAll();
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE, PRIVATE]);
+      held.new = false;
+      store.notifyResourceUpdated(held);
+      expect(subjects(Tag.SUB)).toEqual([PRIVATE, PRIVATE, TEAM]);
+      store.notifyResourceUpdated(held);
+      expect(subjects(Tag.SUB)).toHaveLength(3);
+      internal.reSubscribeAll();
+      expect(subjects(Tag.SUB).sort()).toEqual(
+        [PRIVATE, PRIVATE, TEAM, PRIVATE, TEAM].sort(),
+      );
+      client.close();
+    });
+  });
+
   it.each([ErrorType.NotFound, ErrorType.Unauthorized])(
     'does not automatically sync an unreadable drive under its legacy alias (%s)',
     async errorType => {
@@ -955,6 +1150,84 @@ describe('WSClient.postCommit', () => {
     expect(created.id).toBe('did:ad:commit:sig-abc');
     expect(created.signature).toBe('sig-abc');
     expect(created.subject).toBe('did:ad:doc');
+    client.close();
+  });
+
+  it('lists commit-pace in its HELLO', async ({ expect }) => {
+    const { client, socket } = await postingClient();
+    const hello = framesWithTag(socket, Tag.HELLO)[0];
+    expect(decodeHelloCaps(hello.subarray(1))).toContain('commit-pace');
+    client.close();
+  });
+
+  it('hands the pace_ms of a paced COMMIT_OK to the store', async ({
+    expect,
+  }) => {
+    const { client, socket, store } = await postingClient();
+    const report = vi.spyOn(store, 'reportServerPace');
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    const [rid] = sentRequestIds(socket);
+    socket.receive(encodeCommitOkPaced(rid, 'did:ad:commit:sig-abc', 2500));
+
+    const created = await pending;
+    expect(created.id).toBe('did:ad:commit:sig-abc');
+    expect(report).toHaveBeenCalledWith(2500);
+    client.close();
+  });
+
+  it('does not report pace for an unpaced COMMIT_OK', async ({ expect }) => {
+    const { client, socket, store } = await postingClient();
+    const report = vi.spyOn(store, 'reportServerPace');
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeCommitOkSlim(sentRequestIds(socket)[0], 'did:ad:commit:sig-abc'),
+    );
+    await pending;
+    expect(report).not.toHaveBeenCalled();
+    client.close();
+  });
+
+  it('rejects a BUSY refusal with its retry delay', async ({ expect }) => {
+    const { client, socket } = await postingClient();
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeError(
+        sentRequestIds(socket)[0],
+        ErrorCode.BUSY,
+        'Server busy; retry_after_ms=1730',
+      ),
+    );
+
+    const error = await pending.catch(e => e);
+    expect(error).toBeInstanceOf(AtomicError);
+    expect(error.code).toBe(ErrorCode.BUSY);
+    expect(error.retryAfterMs).toBe(1730);
+    client.close();
+  });
+
+  it('reads the retry delay of a legacy rate-limit refusal', async ({
+    expect,
+  }) => {
+    const { client, socket } = await postingClient();
+
+    const pending = client.postCommit(signedCommit());
+    await vi.waitFor(() => expect(sentRequestIds(socket)).toHaveLength(1));
+    socket.receive(
+      encodeError(
+        sentRequestIds(socket)[0],
+        ErrorCode.UNKNOWN,
+        'Too many writes; retry after 3 seconds',
+      ),
+    );
+
+    const error = await pending.catch(e => e);
+    expect(error.retryAfterMs).toBe(3000);
     client.close();
   });
 

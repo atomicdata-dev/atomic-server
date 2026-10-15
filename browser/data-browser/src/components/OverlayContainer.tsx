@@ -64,7 +64,11 @@ import {
   pendingSearchOverlayScope,
   type OverlayType,
 } from './overlayState';
-import { getRecentResources } from '../helpers/recentResources';
+import {
+  getRecentResources,
+  removeRecentResource,
+} from '../helpers/recentResources';
+import { withoutUnavailable } from '../helpers/unavailableResources';
 import { useDocumentText } from '../hooks/useDocumentText';
 import { getSearchResultHint } from '../helpers/searchResultHint';
 
@@ -424,11 +428,29 @@ function SearchOverlay(): JSX.Element {
   // DMs and AI chats are not in the drive, so the server cannot find them.
   const chatMatches = useChatMatches(searchQuery, !scope && filterIsEmpty);
   const chatSubjects = new Set(chatMatches.map(match => match.subject));
-  const listed = showRecent
-    ? getRecentResources(drive)
-        .filter(subject => subject !== currentSubject)
-        .slice(0, 8)
+  const candidates = showRecent
+    ? getRecentResources(drive).filter(subject => subject !== currentSubject)
     : results.filter(subject => !chatSubjects.has(subject));
+  // Deleted or trashed resources (possibly from an earlier session or another
+  // device) are hidden, and forgotten when they were only a recent.
+  const { available, gone } = withoutUnavailable(
+    store,
+    drive,
+    candidates,
+    useResources(candidates),
+  );
+  const listed = showRecent ? available.slice(0, 8) : available;
+  // `gone` is a new array every render; this key keeps the effect from
+  // re-running until the set of gone recents actually changes.
+  const goneKey = showRecent ? gone.join('\n') : '';
+
+  useEffect(() => {
+    if (goneKey) {
+      goneKey
+        .split('\n')
+        .forEach(subject => removeRecentResource(drive, subject));
+    }
+  }, [drive, goneKey]);
 
   const actionHits = currentSubject
     ? matchActionsForPalette(query, resourceActions, actionCtx)

@@ -60,5 +60,14 @@ export function BrowserPeerPanel({ drive }: { drive?: string }) {
     );
   }
 
-  return <small role='status'>Browser sync · {status}</small>;
+  return (
+    <small role='status'>
+      <span>Browser sync · {status}</span>
+      <br />
+      <span>
+        Free browser sync is meant for small groups of up to 4 people. For more
+        people, use a Cloud Server on atomic.place.
+      </span>
+    </small>
+  );
 }

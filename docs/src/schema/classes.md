@@ -122,6 +122,13 @@ Each value is an object of the keywords below.
 | `minItems` | integer `>= 0` | arrays | fewer items than the bound |
 | `maxItems` | integer `>= 0` | arrays | more items than the bound |
 | `pattern` | regex string | strings | the string has no match (unanchored, like JSON Schema) |
+| `const` | any JSON value | any value | the value is not equal to it |
+| `type` | `string`, `number`, `integer`, `boolean`, `null`, `object`, `array`, or an array of them | any value | the value has none of the types. `["string", "null"]` is a nullable string |
+| `properties` | object of constraints | objects | a listed key holds a value that breaks its constraint |
+| `required` | array of keys | objects | a listed key is missing |
+| `additionalProperties` | `false`, `true` or a constraint | objects | `false`: a key not in `properties` is present. A constraint: such a value breaks it |
+| `items` | constraint | arrays | an item breaks the constraint |
+| `anyOf` | non-empty array of constraints | any value | the value breaks every alternative |
 | `class` | class subject | links | never checked, see below |
 
 These are JSON Schema keywords with the same meaning, except that `class` stands in for `$ref` and `enum` also accepts a list of subjects.
@@ -135,12 +142,54 @@ Avoid lookaround and backreferences (Rust rejects them) and write `[0-9]` instea
 `class` names the class a link should point to.
 It is for pickers and forms, like `classtype` on a Property, and is **not** enforced when a value is written.
 
+### Nested values
+
+A `json` property (or an array) can hold structure, and the same constraint language describes it.
+`properties`, `items`, `additionalProperties` and the branches of `anyOf` are themselves constraints, so every keyword above works at every level.
+That is JSON Schema, minus `$ref`, `oneOf`, `allOf`, `not`, `format` and the other keywords not listed here.
+`class` is only allowed at the top level of a property's entry.
+
+```json
+{
+  "https://example.com/properties/pad": {
+    "type": "object",
+    "required": ["tune"],
+    "additionalProperties": false,
+    "properties": {
+      "tune": { "type": "number", "minimum": -24, "maximum": 24 },
+      "label": { "type": ["string", "null"], "maxLength": 8 }
+    }
+  },
+  "https://example.com/properties/fx": {
+    "type": "array",
+    "maxItems": 8,
+    "items": {
+      "type": "object",
+      "required": ["mix"],
+      "properties": { "mix": { "type": "number", "minimum": 0, "maximum": 1 } }
+    }
+  },
+  "https://example.com/properties/source": {
+    "anyOf": [{ "type": "string", "pattern": "^s" }, { "type": "integer", "minimum": 0 }]
+  }
+}
+```
+
+- `type` is checked first, so `{ "tune": "high" }` breaks `type` before any `minimum` is looked at. As elsewhere, a keyword that does not apply to the value (a `minimum` on a string) is ignored.
+- `integer` accepts any number without a fractional part (`2.0`). `null` is a value like any other: a `null` only passes when `type` allows it, and a property that is absent is not checked at all.
+- Below the top level, `enum` and `const` compare the value as a whole (as in JSON Schema). Only at the top level does `enum` on an array apply to every item. Objects and arrays compare deeply and numbers by value.
+- Keys of an object are checked in alphabetical order, so the reported error is the same in every implementation. `required` is checked before `properties`.
+- A schema may nest at most 16 levels deep. A deeper one is rejected when the Class is written.
+- When two classes both constrain a property, nested keywords cannot be combined: the first class wins (as for `pattern`).
+- Errors name the failing value by JSON pointer: `Value for pad breaks maximum on class patch at /tune: 25 is above 24`. The keyword for a failed alternative list is `anyOf`, and its detail lists why each alternative failed. Pointers escape `~` as `~0` and `/` as `~1`.
+
 ### Enforcement
 
 - **Commit time.** The server checks every value of a resource against the constraints of each class in its `isA`, next to the check for `requires`, and rejects the commit with `Value for <shortname> breaks <keyword> on class <class shortname>: <detail>`.
-  A Class commit is rejected when its own `constraints` map has an unknown keyword or a wrong type.
-- **Never on sync.** Reconciling drives and importing peer data does not run these checks, and neither do commits received over a peer connection. A replica keeps what another node already accepted.
+  A Class commit is rejected when its own `constraints` map has an unknown keyword or a wrong type, at any level.
+- **Never on sync.** Reconciling drives and importing peer data does not run these checks, and neither do commits received over a peer connection. A replica keeps what another node already accepted. Sync keeps what peers send, so a resource can break its class; apps find these on read with `violations` (Rust, `atomic_lib::class_constraints`) or `constraintViolations` (`@tomic/lib`), which list every broken property, and then decide: clamp, show or ignore.
 - **Unloaded classes are skipped in the client.** Before signing, `@tomic/lib` runs the same checks for classes already in the local store and throws the same message. It never fetches a class for this, so the server stays the authority.
+- **Older nodes.** A node from before nested constraints (v0.41.0-beta.8 and earlier) knows only the flat keywords. Its server refuses a commit that writes `type`, `const`, `properties`, `required`, `additionalProperties`, `items` or `anyOf` into a class's `constraints`, with "Unknown constraint keyword". When such a class reaches it anyway (by sync, or written elsewhere), it cannot parse the map and skips the whole class: none of that class's constraints are enforced there, the flat ones (`minimum`, `pattern`, ...) included. Other classes are unaffected.
 - **Legacy.** A Property's own `allowsOnly` and `max` keep working as before and are still not enforced.
 
 Both implementations (`atomic_lib` and `@tomic/lib`) run the same cases from `lib/tests/fixtures/class-constraints.json`.

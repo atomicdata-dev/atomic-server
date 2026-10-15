@@ -55,6 +55,14 @@ export const NOT_AVAILABLE_LOCALLY_MESSAGE =
   'Offline: resource not available locally. Reconnect to fetch.';
 
 /**
+ * Same as {@link NOT_AVAILABLE_LOCALLY_MESSAGE}, but a plain HTTP request to
+ * the server really was made and failed. Only this one may say the server is
+ * unreachable; the other means nothing was asked.
+ */
+export const NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE =
+  'Offline: resource not available locally and the server could not be reached.';
+
+/**
  * The same situation for a drive this device registered as local-only: no
  * server will ever be asked, and the local database has no copy. Signing out
  * leaves that registration in place while the (per-agent) database goes, so a
@@ -69,7 +77,16 @@ export function isNotAvailableLocally(error?: Error): boolean {
   return (
     isTransportError(error) &&
     (error!.message === NOT_AVAILABLE_LOCALLY_MESSAGE ||
+      error!.message === NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE ||
       error!.message === LOCAL_ONLY_NOT_FOUND_MESSAGE)
+  );
+}
+
+/** True when a request to the server was made for this resource and failed. */
+export function isServerUnreachable(error?: Error): boolean {
+  return (
+    isTransportError(error) &&
+    error!.message === NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE
   );
 }
 
@@ -113,6 +130,13 @@ export class AtomicError extends Error {
    * `message` text, as before.
    */
   public code?: number;
+  /**
+   * Set when the server answered "busy, come back later" (`ErrorCode.BUSY`,
+   * HTTP 429 or 503 with a retry hint): how long to wait, in ms. The write
+   * was not attempted, so this is neither a failure nor a reason to switch
+   * transport. See `busyRetryAfterMs`.
+   */
+  public retryAfterMs?: number;
 
   /** Creates an AtomicError. The message can be either a plain string, or a JSON-AD Error Resource */
   public constructor(message: string, type = ErrorType.Client, code?: number) {

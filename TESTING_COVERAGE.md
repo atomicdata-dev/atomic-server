@@ -551,6 +551,7 @@ Two things worth knowing about the runners:
 | Iroh accept side refuses any frame before `AUTH` (ERROR + closed stream), binds `AUTH.requestedSubject` to the handshake drive | `peer.rs` (`accept_gate_tests`, raw QUIC stream) |
 | Rejected `SYNC_PUSH` answers `ERROR SYNC_REJECTED`, never `SYNC_OK` | `peer.rs` (`accept_gate_tests`), `server/tests/it/ws_auth_gate.rs` |
 | WS: writes and identity-bearing subscriptions need `AUTH`; anonymous `SUB` on a public drive still works; unreadable subscriptions answer `ERROR UNAUTHORIZED_READ` | `server/tests/it/ws_auth_gate.rs` |
+| Write-load signal (2026-10): `pace_ms` rides on `COMMIT_OK` only for a client listing `commit-ok-slim` + `commit-pace` (legacy and slim forms stay byte-identical), `BUSY (12)` above the hard limit before any work, HTTP `503` + `Retry-After` and `X-Atomic-Pace-Ms`, the WS rate limit answers `BUSY` not `UNKNOWN`, `--commit-hard-limit 0` switches it off; the TS outbox paces a subject to `max(debounce, pace_ms)`, waits out `BUSY`/429/503 without counting a failure or falling back to HTTP, and never drops an edit. Not covered: the real browser under load (no e2e), pace decay over a long quiet period in a live app, and `atomic-loadtest commit --edit-rate` is a manual measurement, not a test | `write_load.rs` (unit: pace formula, retry-after, guard), `lib/src/sync/protocol.rs` (`wire_vectors`), `server/tests/it/commit_pacing.rs`, `browser/lib/src/local-outbox.test.ts`, `store-commit-fallback.test.ts`, `client-commit-pace.test.ts`, `websockets.test.ts`, `ws-v2.test.ts` |
 | Rejected cross-drive sync entry leaves no snapshot; later valid import cannot inherit rejected properties | `engine.rs` (`rejected_sync_entry_does_not_persist_snapshot`) |
 | Legacy `set`/`push`/`remove` commit rejection is on the parsed commit's properties: a signed commit carrying `set` is refused under hub and peer policy, a value quoting the deprecated URLs applies, a commit *on* the `set` Property reaches the ownership gate | `lib/src/sync/tests.rs` (`ingest_commit_rejects_legacy_field_commits`, `ingest_commit_accepts_values_that_mention_legacy_fields`) |
 | A fresh server store gets the core models without `--initialize` (`Db` open seeds them) | `server/src/tests.rs` (`fresh_store_gets_core_models_without_initialize`) |
@@ -1779,7 +1780,37 @@ remote multipart upload/download and image renditions, asserting Tree::Blobs
 stays empty. Standalone local storage still runs through the original tests.
 
 Not covered here: live Hetzner rollout, arbitrary large-file memory limits,
-blob garbage collection, or encrypted Vault attachment recovery.
+or encrypted Vault attachment recovery.
+
+### Blob garbage collection
+
+`lib/src/db/blob_gc.rs` unit tests cover the mark phase (`blob`, `internalId`,
+every chunk, website assets and deployment manifests, plugin release packages;
+commit rows and unrelated `PluginMeta` rows are not scanned),
+the grace period, a blob referenced between the first and the second mark
+surviving, a failing second mark deleting nothing, a re-put restarting it, a hash shared by two Files surviving
+until the last one is destroyed, an unreadable resource aborting the pass before
+any delete, a backend that cannot list never being swept, the dry run changing
+nothing (not even the first-seen stamp), legacy unstamped blobs getting a full
+grace period, `keep` hashes, and backend delete errors being skipped.
+`server/src/blob_storage.rs` also covers the `ATOMIC_BLOB_GC_S3_EXCLUSIVE`
+guard (an object store refuses a deleting pass without it, a dry run and the
+local store do not need it). It runs the same sweep against an `object_store`
+in-memory and a local-filesystem store (foreign object names and the readiness
+probe untouched, deleting a missing object is fine) and parses the interval and
+grace settings. `server/tests/it/blob_gc.rs` uploads two Files over HTTP,
+removes one server-side (`store.remove_resource`), and checks the dry run, the grace period, and that
+`/download/files/<hash>` goes from 200 to 404 for the destroyed one only.
+
+Not covered: destroying an uploaded File through a signed WebSocket destroy
+commit (it failed with "not found in the store" in the test; cause not yet
+established), destroy followed by undo (policy: the bytes are gone after the
+grace period, the File resource comes back without them) and hashes that live
+only in a rich-text body (not scanned by design), the background timer itself (`spawn_gc`; the pass it runs is),
+the `atomic-server gc-blobs` subcommand end to end, a sweep against real S3
+(`ObjectBlobBackend::list`/`delete` are only exercised on in-memory and local
+object stores), a very large blob count, and the narrow race where a re-upload
+lands between the pre-delete age check and the delete itself.
 
 `shared_files_count_once_per_drive_independently_of_other_owners` proves that
 one physical object shared by two owners counts once in each drive, repeated

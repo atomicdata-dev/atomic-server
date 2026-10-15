@@ -269,6 +269,9 @@ test.describe('documents', async () => {
     const editor = page.getByLabel('Rich Text Editor');
     await expect(editor).toBeVisible({ timeout: 30000 });
     const toolbar = page.getByRole('toolbar', { name: 'Formatting' });
+    // Hidden by default; the toggle sits next to the title.
+    await expect(toolbar).not.toBeVisible();
+    await page.getByTitle('Show formatting toolbar').click();
     await expect(toolbar).toBeVisible();
 
     await editor.click();
@@ -280,15 +283,13 @@ test.describe('documents', async () => {
     await toolbar.getByTitle('Bullet list').click();
     await expect(editor.locator('ul li')).toHaveText('Toolbar text');
 
-    // Hiding is remembered across page loads.
-    await toolbar.getByTitle(/^Hide toolbar/).click();
-    await expect(toolbar).not.toBeVisible();
+    // Showing is remembered across page loads.
     await page.reload();
     await expect(editor).toBeVisible({ timeout: 30000 });
-    await expect(toolbar).not.toBeVisible();
-
-    await page.getByTitle('Show formatting toolbar').click();
     await expect(toolbar).toBeVisible();
+
+    await page.getByTitle('Hide formatting toolbar').click();
+    await expect(toolbar).not.toBeVisible();
   });
 
   test('opens a v1 document and migrates it silently into the editor', async ({

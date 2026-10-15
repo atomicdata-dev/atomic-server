@@ -1,0 +1,213 @@
+[
+  {
+    "@id": "https://atomicdata.dev/work/v1/start",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Start",
+    "https://atomicdata.dev/properties/shortname": "start",
+    "https://atomicdata.dev/properties/description": "Start instant of a work interval, milliseconds since Unix epoch.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1/end",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "End",
+    "https://atomicdata.dev/properties/shortname": "end",
+    "https://atomicdata.dev/properties/description": "End instant of a completed work interval, milliseconds since Unix epoch.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1/project",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Project",
+    "https://atomicdata.dev/properties/shortname": "project",
+    "https://atomicdata.dev/properties/description": "Project this work interval belongs to.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1/person",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Person",
+    "https://atomicdata.dev/properties/shortname": "person",
+    "https://atomicdata.dev/properties/description": "Person who performed this work. Not an Atomic authentication agent.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1/billable",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Billable",
+    "https://atomicdata.dev/properties/shortname": "billable",
+    "https://atomicdata.dev/properties/description": "Whether this work interval is marked billable. Does not imply invoicing or payment.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1/source-id",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Source identity",
+    "https://atomicdata.dev/properties/shortname": "source-id",
+    "https://atomicdata.dev/properties/description": "Provider-qualified record identity used to avoid duplicate imports. Not a display name.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/work/v1",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/name": "Work vocabulary v1",
+    "https://atomicdata.dev/properties/shortname": "work-v1",
+    "https://atomicdata.dev/properties/description": "Experimental shared properties for intervals of work. No external standard conformance is claimed.",
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/work/v1/start",
+      "https://atomicdata.dev/work/v1/end",
+      "https://atomicdata.dev/work/v1/project",
+      "https://atomicdata.dev/work/v1/person",
+      "https://atomicdata.dev/work/v1/billable",
+      "https://atomicdata.dev/work/v1/source-id"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/contact/v1/email",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Email",
+    "https://atomicdata.dev/properties/shortname": "email",
+    "https://atomicdata.dev/properties/description": "Email address, as free text. Not validated.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/contact/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/contact/v1/company",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/name": "Company",
+    "https://atomicdata.dev/properties/shortname": "company",
+    "https://atomicdata.dev/properties/description": "Name of the company or organization, as free text. Not a relation.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/contact/v1",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/contact/v1",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/name": "Contact vocabulary v1",
+    "https://atomicdata.dev/properties/shortname": "contact-v1",
+    "https://atomicdata.dev/properties/description": "Experimental shared properties for people and organizations in a table. No external standard conformance is claimed.",
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/contact/v1/email",
+      "https://atomicdata.dev/contact/v1/company"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/pipeline/v1/stage",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property",
+      "https://atomicdata.dev/classes/SelectProperty"
+    ],
+    "https://atomicdata.dev/properties/name": "Stage",
+    "https://atomicdata.dev/properties/shortname": "stage",
+    "https://atomicdata.dev/properties/description": "Where a record stands in a pipeline. The options belong to the Class that uses this property.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/pipeline/v1",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Tag",
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/pipeline/v1",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/name": "Pipeline vocabulary v1",
+    "https://atomicdata.dev/properties/shortname": "pipeline-v1",
+    "https://atomicdata.dev/properties/description": "Experimental shared properties for records that move through stages. No external standard conformance is claimed.",
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/pipeline/v1/stage"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/money/v1/amount",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property",
+      "https://atomicdata.dev/classes/FormattedNumber"
+    ],
+    "https://atomicdata.dev/properties/name": "Amount",
+    "https://atomicdata.dev/properties/shortname": "amount",
+    "https://atomicdata.dev/properties/description": "A monetary amount as a decimal number. The currency is not part of the value.",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/money/v1",
+    "https://atomicdata.dev/properties/numberFormatting": "https://atomicdata.dev/classes/NumberFormat/number",
+    "https://atomicdata.dev/properties/decimalPlaces": 2,
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  },
+  {
+    "@id": "https://atomicdata.dev/money/v1",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/name": "Money vocabulary v1",
+    "https://atomicdata.dev/properties/shortname": "money-v1",
+    "https://atomicdata.dev/properties/description": "Experimental shared properties for amounts of money. No external standard conformance is claimed.",
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/money/v1/amount"
+    ],
+    "https://atomicdata.dev/properties/read": [
+      "https://atomicdata.dev/agents/publicAgent"
+    ]
+  }
+]

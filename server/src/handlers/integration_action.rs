@@ -34,16 +34,8 @@ async fn host(
     drive: &str,
     plugin: &str,
 ) -> AtomicServerResult<StoreHost> {
-    let actor = super::plugin_schedule::authorize(app, req, context, plugin).await?;
-    let host = StoreHost {
-        db: std::sync::Arc::new(app.store.clone()),
-        drive: drive.into(),
-        plugin: plugin.into(),
-        for_agent: actor,
-        manifest: None,
-    };
-    host.validate_binding().await?;
-    Ok(host)
+    let actor = crate::helpers::authorize_plugin_write(app, req, context, plugin).await?;
+    Ok(StoreHost::bound(&app.store, drive, plugin, actor, None).await?)
 }
 pub async fn list(
     app: web::Data<AppState>,

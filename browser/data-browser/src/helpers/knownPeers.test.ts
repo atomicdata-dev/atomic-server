@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readKnownPeers, upsertKnownPeer } from './knownPeers';
+import { readKnownPeers, upsertKnownPeer, writeKnownPeers } from './knownPeers';
 
 // The default vitest environment here is `node`, so there is no localStorage.
 // A tiny in-memory stand-in keeps this dependency-free and lets a test drive
@@ -85,6 +85,15 @@ describe('knownPeers', () => {
     upsertKnownPeer(NODE_B, 'Tablet');
 
     expect(readKnownPeers().map(p => p.label)).toEqual(['Phone', 'Tablet']);
+  });
+
+  it('writeKnownPeers stores the list under atomic-peers as plain JSON', () => {
+    const peers = [{ nodeId: NODE_A, label: 'Phone', lastSync: 'x' }];
+
+    writeKnownPeers(peers);
+
+    expect(JSON.parse(store.get('atomic-peers')!)).toEqual(peers);
+    expect(readKnownPeers()).toEqual(peers);
   });
 
   it('reads back nothing from corrupt storage instead of throwing', () => {

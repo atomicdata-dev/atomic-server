@@ -25,6 +25,15 @@ export function readKnownPeers(): KnownPeer[] {
   }
 }
 
+/** Replace the stored list. Swallows storage errors (quota, private mode). */
+export function writeKnownPeers(peers: KnownPeer[]): void {
+  try {
+    localStorage.setItem(KNOWN_PEERS_KEY, JSON.stringify(peers));
+  } catch {
+    // Quota / private mode — the records are re-creatable by pairing again.
+  }
+}
+
 /** Add or refresh a peer record. Existing labels win over generic fallbacks. */
 export function upsertKnownPeer(nodeDid: string, label?: string): void {
   const peers = readKnownPeers();
@@ -43,9 +52,5 @@ export function upsertKnownPeer(nodeDid: string, label?: string): void {
     });
   }
 
-  try {
-    localStorage.setItem(KNOWN_PEERS_KEY, JSON.stringify(peers));
-  } catch {
-    // Quota / private mode — the record is re-creatable by pairing again.
-  }
+  writeKnownPeers(peers);
 }

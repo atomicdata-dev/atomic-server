@@ -17,6 +17,9 @@ pub enum AppErrorType {
     BadRequest,
     /// A write refused by `crate::rate_limit`; rendered as `429` with `Retry-After`.
     TooManyRequests,
+    /// The node is over its hard commit limit; rendered as `503` with
+    /// `Retry-After`. See `crate::write_load`.
+    Busy,
     Other,
 }
 
@@ -29,6 +32,15 @@ pub struct AtomicServerError {
 }
 
 impl AtomicServerError {
+    /// The node is overloaded with writes: `503` plus `Retry-After`.
+    pub fn busy(busy: crate::write_load::Busy) -> Self {
+        Self {
+            message: busy.message(),
+            error_type: AppErrorType::Busy,
+            error_resource: None,
+        }
+    }
+
     /// A refusal the caller can act on, answered as 400 rather than 500.
     pub fn bad_request(message: impl Into<String>) -> Self {
         Self {
@@ -69,6 +81,7 @@ impl ResponseError for AtomicServerError {
             AppErrorType::Other => StatusCode::INTERNAL_SERVER_ERROR,
             AppErrorType::Unauthorized => StatusCode::UNAUTHORIZED,
             AppErrorType::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+            AppErrorType::Busy => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
     fn error_response(&self) -> HttpResponse {
@@ -109,7 +122,10 @@ impl ResponseError for AtomicServerError {
         let body = r.to_json_ad_with_url("").unwrap();
         tracing::info!("Error response: {}", self.message);
         let mut response = HttpResponse::build(self.status_code());
-        if let Some(secs) = crate::rate_limit::retry_after_from_message(&self.message) {
+        if let Some(ms) = atomic_lib::sync::protocol::retry_after_ms_from_message(&self.message) {
+            response.insert_header(("Retry-After", ms.div_ceil(1000).max(1).to_string()));
+            response.insert_header((crate::write_load::RETRY_AFTER_MS_HEADER, ms.to_string()));
+        } else if let Some(secs) = crate::rate_limit::retry_after_from_message(&self.message) {
             response.insert_header(("Retry-After", secs.to_string()));
         }
         response.content_type(JSON_AD_MIME).body(body)
@@ -171,38 +187,33 @@ impl From<String> for AtomicServerError {
     }
 }
 
-impl From<std::boxed::Box<dyn std::error::Error>> for AtomicServerError {
-    fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-            error_resource: None,
-        }
-    }
+/// Implements `From<$source> for AtomicServerError` as an `Other` error
+/// carrying the source's `Display` text.
+macro_rules! other_error_from_display {
+    ($($source:ty),+ $(,)?) => {
+        $(
+            impl From<$source> for AtomicServerError {
+                fn from(error: $source) -> Self {
+                    AtomicServerError {
+                        message: error.to_string(),
+                        error_type: AppErrorType::Other,
+                        error_resource: None,
+                    }
+                }
+            }
+        )+
+    };
 }
 
+other_error_from_display!(
+    std::boxed::Box<dyn std::error::Error>,
+    std::io::Error,
+    actix_web::Error,
+);
+
+// Generic over the guard type, which the macro above does not cover.
 impl<T> From<std::sync::PoisonError<T>> for AtomicServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-            error_resource: None,
-        }
-    }
-}
-
-impl From<std::io::Error> for AtomicServerError {
-    fn from(error: std::io::Error) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-            error_resource: None,
-        }
-    }
-}
-
-impl From<actix_web::Error> for AtomicServerError {
-    fn from(error: actix_web::Error) -> Self {
         AtomicServerError {
             message: error.to_string(),
             error_type: AppErrorType::Other,

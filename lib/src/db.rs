@@ -6,6 +6,7 @@ mod ai_chat_migration;
 mod ai_chat_migration_test;
 pub mod app_agent;
 pub mod blob_backend;
+pub mod blob_gc;
 mod canonical_scheme;
 mod chat_migration;
 #[cfg(test)]
@@ -1848,19 +1849,10 @@ impl Db {
             let Some(blob_val) = propvals.get(urls::BLOB) else {
                 continue;
             };
-            let blob_did = blob_val.to_string();
-            let blob_subject = crate::Subject::from_raw(&blob_did, None);
-            let Some(hash_hex) = blob_subject.blob_hash_hex() else {
+            let Some(hash) = crate::Subject::from_raw(&blob_val.to_string(), None).blob_hash()
+            else {
                 continue;
             };
-            let Ok(hash_bytes) = hex::decode(hash_hex) else {
-                continue;
-            };
-            if hash_bytes.len() != 32 {
-                continue;
-            }
-            let mut hash = [0u8; 32];
-            hash.copy_from_slice(&hash_bytes);
             if !seen_blobs.insert((drive.as_str(), hash)) {
                 continue;
             }
@@ -1910,14 +1902,9 @@ impl Db {
 
             let mut blob_bytes = 0;
             if let Some(blob_val) = propvals.get(urls::BLOB) {
-                let blob_subject = crate::Subject::from_raw(&blob_val.to_string(), None);
-                if let Some(hash_bytes) = blob_subject
-                    .blob_hash_hex()
-                    .and_then(|h| hex::decode(h).ok())
-                    .filter(|b| b.len() == 32)
+                if let Some(hash) =
+                    crate::Subject::from_raw(&blob_val.to_string(), None).blob_hash()
                 {
-                    let mut hash = [0u8; 32];
-                    hash.copy_from_slice(&hash_bytes);
                     if seen_blobs.insert(hash) {
                         blob_bytes = self.blob_size(&hash).await?.unwrap_or(0);
                     }

@@ -4,6 +4,7 @@ import { del, get, set } from 'idb-keyval';
 import { blobHashHex, isBlobSubject } from '@tomic/react';
 import type { VaultCapableDb } from './vault';
 import { sameAgent } from './recovery';
+import { randomBytes } from '../bytes';
 
 /**
  * Carrying local-only drives from a replaced identity into the account's.
@@ -93,10 +94,6 @@ export async function readDriveCarryOver(): Promise<
     Array.isArray(value.drives)
     ? value
     : undefined;
-}
-
-function randomBytes(length: number): Uint8Array {
-  return crypto.getRandomValues(new Uint8Array(length));
 }
 
 function hex(bytes: Uint8Array): string {

@@ -14,6 +14,10 @@ import { Spinner } from '../../components/Spinner';
 import { Row, Column } from '../../components/Row';
 import { useFollow } from '../../components/Presence/FollowContext';
 import { useRightPanel } from '../../components/RightPanel/RightPanelContext';
+import {
+  FormattingToolbarToggle,
+  TitleRow,
+} from '../../chunks/RTE/useFormattingToolbarVisible';
 import { getMeetingPhase } from './meetingLifecycle';
 
 const CollaborativeEditor = lazy(
@@ -59,11 +63,14 @@ export function MeetingPage({
         <MeetingHeader>
           <Column gap='0.4rem'>
             <Phase>{phase}</Phase>
-            <EditableTitle
-              resource={resource}
-              onCommit={focusEditor}
-              withDecorations
-            />
+            <TitleRow>
+              <EditableTitle
+                resource={resource}
+                onCommit={focusEditor}
+                withDecorations
+              />
+              <FormattingToolbarToggle />
+            </TitleRow>
           </Column>
           <MeetingActions gap='0.5rem' center>
             <Button subtle onClick={() => openMeetingPanel(resource.subject)}>

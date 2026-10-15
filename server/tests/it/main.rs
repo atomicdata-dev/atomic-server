@@ -6,7 +6,9 @@
 
 mod common;
 
+mod blob_gc;
 mod blob_sync;
+mod commit_pacing;
 mod conversations;
 mod drive_presence;
 mod drive_presence_shared;

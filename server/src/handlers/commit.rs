@@ -1,4 +1,7 @@
-use crate::{appstate::AppState, errors::AtomicServerResult};
+use crate::{
+    appstate::AppState,
+    errors::{AtomicServerError, AtomicServerResult},
+};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
     sync::engine::{ingest_commit_json, CommitIngestOpts},
@@ -21,6 +24,13 @@ pub async fn post_commit(
         tokio::time::sleep(tokio::time::Duration::from_millis(random_number)).await;
     }
     let store = &appstate.store;
+    // Refuse before the expensive work (signature check, Loro merge, redb
+    // write) when the node is overloaded. The guard is held until the
+    // response is built, so it counts as in flight for everyone else.
+    let guard = appstate
+        .write_load
+        .try_begin()
+        .map_err(AtomicServerError::busy)?;
     // Spend the write budget of the identity the commit *proves*, not the
     // one it claims. The `signer` field is attacker-controlled until the
     // signature over the body checks out, and keying the limiter on the
@@ -48,6 +58,7 @@ pub async fn post_commit(
     let message = apply_commit_json(store, &context.origin, &body, None).await?;
 
     Ok(HttpResponse::Ok()
+        .insert_header((crate::write_load::PACE_HEADER, guard.pace_ms().to_string()))
         .content_type("application/ad+json")
         .body(message))
 }

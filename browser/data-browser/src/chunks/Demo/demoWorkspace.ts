@@ -148,6 +148,9 @@ const CHECKLIST_ROWS: Array<Record<string, JSONValue>> = [
   { name: 'Make the workspace your own', Status: 'Todo', Owner: 'You' },
 ];
 
+/** Gap between the team chat's seeded lines, which end shortly before arrival. */
+const SEED_SPACING_MS = 4 * 60_000;
+
 const TEAM_CHAT_SEED: Array<{ author: PersonaKey; text: string }> = [
   {
     author: 'mara',
@@ -173,12 +176,15 @@ export async function createDemoMessage(
     author: string;
     text: string;
     extraClasses?: string[];
+    /** When it was said (ms); now when absent. */
+    at?: number;
   },
 ): Promise<void> {
   await sendLogEntry(store, {
     parent: opts.parent,
     text: opts.text,
     author: opts.author,
+    at: opts.at,
     kind: opts.extraClasses?.includes(dataBrowser.classes.followEvent)
       ? dataBrowser.classes.followEvent
       : undefined,
@@ -464,11 +470,17 @@ export async function createDemoWorkspace(
   });
   await teamChat.save();
 
-  for (const seed of TEAM_CHAT_SEED) {
+  // Said before the visitor arrived: dated in the past, so the notifier takes
+  // them for the backlog they are and does not announce each one as a bubble
+  // while the workspace is still being built.
+  const arrived = Date.now();
+
+  for (const [index, seed] of TEAM_CHAT_SEED.entries()) {
     await createDemoMessage(store, {
       parent: teamChat.subject,
       author: personas[seed.author],
       text: seed.text,
+      at: arrived - (TEAM_CHAT_SEED.length - index) * SEED_SPACING_MS,
     });
   }
 

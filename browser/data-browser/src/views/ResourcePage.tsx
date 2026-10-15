@@ -30,6 +30,7 @@ import { Spinner } from '../components/Spinner';
 import { ChatRoomPage } from './ChatRoomPage';
 import { ConversationPage } from './Conversation/ConversationPage';
 import { InboxPage } from './InboxPage';
+import { NotificationPage } from './NotificationPage';
 import { MessagePage } from './MessagePage';
 import { ChatLogPage } from './ChatLogPage';
 import { BookmarkPage } from './BookmarkPage/BookmarkPage';
@@ -341,6 +342,8 @@ function selectComponent(klass: string | undefined) {
       return FormBuilderPage;
     case notifications.classes.inbox:
       return InboxPage;
+    case notifications.classes.notification:
+      return NotificationPage;
     case server.classes.installation:
       return InstallationPage;
     default:

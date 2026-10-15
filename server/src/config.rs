@@ -37,6 +37,38 @@ pub struct Opts {
     #[clap(long, default_value = "latest", env = "ATOMIC_ENVELOPE_RETENTION")]
     pub envelope_retention: String,
 
+    /// How often the server deletes file blobs that no resource references any
+    /// more (for example after a File was destroyed). A duration such as `24h`,
+    /// `90m` or `7d`; a bare number is seconds. `0` or `off` disables the
+    /// background sweep; `atomic-server gc-blobs` still works by hand.
+    /// Only current state counts as a reference, not history: the bytes of a
+    /// destroyed File are removed after `--blob-gc-grace`, and undoing the
+    /// destroy later restores the File resource but not its bytes. On S3 the
+    /// sweep only runs with `--blob-gc-s3-exclusive`.
+    #[clap(long, default_value = "24h", env = "ATOMIC_BLOB_GC_INTERVAL")]
+    pub blob_gc_interval: String,
+
+    /// A blob written more recently than this is never garbage collected, so an
+    /// upload whose File resource has not been committed yet survives. Same
+    /// format as `--blob-gc-interval`; `0` removes the protection.
+    #[clap(long, default_value = "72h", env = "ATOMIC_BLOB_GC_GRACE")]
+    pub blob_gc_grace: String,
+
+    /// Allow blob garbage collection to delete from S3-compatible storage. Set
+    /// this to `true` only when the bucket and prefix belong to this node alone:
+    /// the sweep only knows this node's database, so a second node sharing the
+    /// bucket and prefix would have its files deleted. Without it the
+    /// background sweep stays off (a warning is logged once) and
+    /// `atomic-server gc-blobs` only accepts `--dry-run`. The local blob store
+    /// is not affected.
+    #[clap(
+        long,
+        default_value_t = false,
+        action = clap::ArgAction::Set,
+        env = "ATOMIC_BLOB_GC_S3_EXCLUSIVE"
+    )]
+    pub blob_gc_s3_exclusive: bool,
+
     /// Compact the store file at startup when it is at least
     /// `--auto-compact-min-mb` and at least `--auto-compact-min-reclaimable-percent`
     /// of it is dead space (pages freed by overwrites and deletes that redb
@@ -77,6 +109,23 @@ pub struct Opts {
     /// the connecting peer address. `0` disables the limit.
     #[clap(long, default_value = "60", env = "ATOMIC_ANONYMOUS_WRITE_RATE_LIMIT")]
     pub anonymous_write_rate_limit: u32,
+
+    /// How many commits may be in flight (being applied or queued for the
+    /// single redb writer) before the node starts telling clients to commit
+    /// less often. Up to this many the `pace_ms` hint is 0. Clients that
+    /// advertise `commit-pace` (WebSocket) or read `X-Atomic-Pace-Ms` (HTTP)
+    /// then stretch their commit interval, so each commit carries more edits.
+    /// The hint rises linearly to 10 s at `--commit-hard-limit`. See
+    /// `docs/src/websockets.md`.
+    #[clap(long, default_value_t = crate::write_load::DEFAULT_SOFT_LIMIT, env = "ATOMIC_COMMIT_SOFT_LIMIT")]
+    pub commit_soft_limit: u32,
+
+    /// How many commits may be in flight before new ones are refused up front
+    /// with `BUSY` (WebSocket error code 12) or `503` with `Retry-After`
+    /// (HTTP). Nothing is lost: the client keeps the edit and retries after the
+    /// jittered delay. `0` disables both the pace hint and the refusal.
+    #[clap(long, default_value_t = crate::write_load::DEFAULT_HARD_LIMIT, env = "ATOMIC_COMMIT_HARD_LIMIT")]
+    pub commit_hard_limit: u32,
 
     /// The origin domain where the app is hosted, without the port and schema values.
     #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
@@ -342,6 +391,21 @@ pub enum Command {
     /// redb takes an exclusive file lock and will fail otherwise.
     #[clap(name = "compact")]
     Compact,
+    /// Delete file blobs that no resource references any more and are older
+    /// than `--blob-gc-grace`. Frees disk or bucket space that destroying a
+    /// File does not. With `--dry-run` it only reports what it would delete.
+    /// With the local blob store the server MUST be stopped (redb takes an
+    /// exclusive file lock); the running server also does this on its own every
+    /// `--blob-gc-interval`.
+    #[clap(name = "gc-blobs")]
+    GcBlobs(GcBlobsOpts),
+}
+
+#[derive(Parser, Clone, Debug)]
+pub struct GcBlobsOpts {
+    /// Report the blobs and bytes that would be deleted; delete nothing.
+    #[clap(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

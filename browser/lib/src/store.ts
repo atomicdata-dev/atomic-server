@@ -10,6 +10,10 @@ import {
 import { serializeDeterministically as serializePeerCommit } from './commit.js';
 import { taskSchema } from './task-schema.js';
 import {
+  sharedVocabularyOntologies,
+  sharedVocabularyProperties,
+} from './shared-vocabularies.js';
+import {
   mergeHistoryAttributions,
   parseHistoryAttribution,
   type HistoryAttribution,
@@ -40,6 +44,7 @@ import {
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
   NOT_AVAILABLE_LOCALLY_MESSAGE,
+  NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
 } from './error.js';
 import { EventManager } from './EventManager.js';
 import { hasBrowserAPI } from './hasBrowserAPI.js';
@@ -549,13 +554,15 @@ function isProxyWorthyError(error?: Error): boolean {
 export function isEmbeddedVocabulary(subject: string): boolean {
   return (
     embeddedVocabulary.has(subject) ||
-    subject === 'https://atomicdata.dev/task/v1'
+    subject === 'https://atomicdata.dev/task/v1' ||
+    (sharedVocabularyOntologies as readonly string[]).includes(subject)
   );
 }
 
 const embeddedVocabulary = new Set<string>([
   ...Object.values(taskSchema.properties),
   ...Object.values(taskSchema.tags),
+  ...sharedVocabularyProperties,
   // These classes ship in lib/defaults/plugins.json on every host. Their
   // public atomicdata.dev URLs are not published on the catalog yet.
   server.classes.plugin,
@@ -836,6 +843,12 @@ export class Store {
    * Driven by WebSocket open/close events. When false, commits are stored
    * locally and synced when the connection is restored.
    */
+  /** Pages of unsynced drives' collections the server has answered. Its
+   * members were written to the local DB as they loaded and live updates keep
+   * it current while connected, so the local answer is whole from then on.
+   * Cleared on reconnect, as what happened during a drop never arrived. Lives
+   * here so `collection.ts` needs no runtime import of the store. */
+  readonly collectionPagesAnsweredByServer = new Set<string>();
   private _serverConnected = false;
   private _serverConnectionError: string | undefined;
   private _driveSyncInProgress = false;
@@ -974,6 +987,7 @@ export class Store {
     }
 
     this.client = new Client(this.injectedFetch);
+    this.client.paceListener = ms => this.reportServerPace(ms);
 
     // Rehydrate the commit log from the outbox so the Sync page
     // shows what's queued instead of "No activity recorded" after
@@ -1167,6 +1181,11 @@ export class Store {
     }
 
     this.localOnlyDrives.add(normalized);
+  }
+
+  /** The drive a subject belongs to, for naming it to the person. */
+  public driveOfSubject(subject: string): string {
+    return this.driveOf(this.normalizeSubject(subject));
   }
 
   /**
@@ -2506,6 +2525,33 @@ export class Store {
   /** Resolve a (possibly aliased) subject to its cached Resource. */
   private getResolved(subject: string): Resource | undefined {
     return this.resources.get(this.resolveSubject(subject));
+  }
+
+  /**
+   * One HTTP GET for a subject whose socket is down. `answered`: the server
+   * replied (with the resource or a real error such as 404/401, which stays on
+   * the resource). `unreachable`: the request failed in transport. `skipped`:
+   * it was cancelled or threw, so nothing is known about the server.
+   */
+  private async fetchOverHttpOnce(
+    subject: string,
+    opts: FetchOpts,
+  ): Promise<'answered' | 'unreachable' | 'skipped'> {
+    try {
+      await this.fetchResourceFromServer(subject, {
+        ...opts,
+        noWebSocket: true,
+      });
+    } catch (e) {
+      return isTransportError(e) ? 'unreachable' : 'skipped';
+    }
+
+    const got = this.getResolved(subject);
+
+    if (!got || got.loading) return 'skipped';
+    if (!got.error) return 'answered';
+
+    return isTransportError(got.error) ? 'unreachable' : 'answered';
   }
 
   /** Mark a resource as errored + not-loading + notify. No-op if
@@ -4434,13 +4480,28 @@ export class Store {
             if (hasLocalData) return;
 
             if (!alreadyResolved) {
-              this.failResource(
-                subject,
-                new AtomicError(
-                  NOT_AVAILABLE_LOCALLY_MESSAGE,
-                  ErrorType.Transport,
-                ),
-              );
+              // The socket is down, the server may not be: ask once over
+              // plain HTTP before giving up. A hard failure of that request
+              // is the only thing that may be reported as "unreachable".
+              // Not when the origin is known to run no node: it would answer
+              // with its index.html, logged as an unparseable resource.
+              const reason =
+                isAtomicIdentifier(subject) &&
+                this.serverUrlWithoutSocket === this.serverUrl
+                  ? 'skipped'
+                  : await this.fetchOverHttpOnce(subject, opts);
+
+              if (reason !== 'answered') {
+                this.failResource(
+                  subject,
+                  new AtomicError(
+                    reason === 'unreachable'
+                      ? NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE
+                      : NOT_AVAILABLE_LOCALLY_MESSAGE,
+                    ErrorType.Transport,
+                  ),
+                );
+              }
             }
           }
         }
@@ -5577,6 +5638,10 @@ export class Store {
 
     this._serverConnected = connected;
     this._serverConnectionError = nextError;
+
+    if (connected) {
+      this.collectionPagesAnsweredByServer.clear();
+    }
 
     if (!connected) {
       this._driveSyncInProgress = false;
@@ -7486,6 +7551,16 @@ export class Store {
     return createdSubjects;
   }
 
+  /**
+   * @Internal
+   * The server's write-load hint (`pace_ms` of a `COMMIT_OK`, or the
+   * `X-Atomic-Pace-Ms` header): the outbox spaces the commits of one
+   * resource at least that far apart, so each carries more edits.
+   */
+  public reportServerPace(paceMs: number): void {
+    this.outbox.setServerPace(paceMs);
+  }
+
   /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
   public async postCommit(commit: Commit, endpoint: string): Promise<Commit> {
     const close = perfSpan('store.postCommit', {
@@ -7494,6 +7569,7 @@ export class Store {
 
     try {
       const created = await this.sendCommit(commit, endpoint);
+      this.outbox.noteCommitted(commit.subject);
       close('ok');
       this.pushCommitLog(
         this.buildCommitLogEntry(commit, 'outgoing', 'sent', {
@@ -7544,6 +7620,12 @@ export class Store {
           isUnrecoverableCommitError(message, code) ||
           isTerminalCommitError(message, code)
         ) {
+          throw e;
+        }
+
+        // "Busy, come back later" is an answer too. HTTP would hit the same
+        // overloaded node, so the outbox waits instead.
+        if (e instanceof AtomicError && e.retryAfterMs !== undefined) {
           throw e;
         }
 

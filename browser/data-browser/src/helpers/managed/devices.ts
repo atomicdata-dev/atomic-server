@@ -17,10 +17,10 @@ import { managedFetch } from './api';
 import { getManagedAccount } from './session';
 import { getLocalServerOrigin, isRunningInTauri } from '../tauri';
 import { pairAndSync } from '../pairing';
+import { readKnownPeers, writeKnownPeers } from '../knownPeers';
 import { nodeId as parseNodeId, type Agent } from '@tomic/lib';
 
 const DEVICE_ID_KEY = 'atomic-device-id';
-const KNOWN_PEERS_KEY = 'atomic-peers';
 
 export type DeviceRecord = {
   device_id: string;
@@ -156,8 +156,6 @@ async function upsertOwnDeviceRecord(): Promise<void> {
   }
 }
 
-type KnownPeer = { nodeId: string; label: string; lastSync?: string };
-
 /**
  * Merge the account's other devices into the local `KnownPeer` list (the same
  * localStorage records the QR pairing flow writes — the sync engine can't tell
@@ -175,15 +173,7 @@ async function seedKnownPeersFromDirectory(): Promise<string[]> {
   const ownDeviceId = getOrCreateDeviceId();
   const ownNodeDid = await fetchOwnNodeDid();
 
-  let peers: KnownPeer[] = [];
-
-  try {
-    peers = JSON.parse(
-      localStorage.getItem(KNOWN_PEERS_KEY) ?? '[]',
-    ) as KnownPeer[];
-  } catch {
-    peers = [];
-  }
+  const peers = readKnownPeers();
 
   const known = new Set(peers.map(peer => peer.nodeId.toLowerCase()));
   const otherDevices: string[] = [];
@@ -206,11 +196,8 @@ async function seedKnownPeersFromDirectory(): Promise<string[]> {
   }
 
   if (added) {
-    try {
-      localStorage.setItem(KNOWN_PEERS_KEY, JSON.stringify(peers));
-    } catch {
-      // Quota / private mode — the seed is an optimization.
-    }
+    // A failed write is fine: the seed is an optimization.
+    writeKnownPeers(peers);
   }
 
   return otherDevices;

@@ -94,6 +94,7 @@ pub async fn web_socket_handler(
             vector_search_state: appstate.vector_search_state.clone(),
             index_status_broadcast: appstate.index_status_broadcast.clone(),
             write_rate_limiter: appstate.write_rate_limiter.clone(),
+            write_load: appstate.write_load.clone(),
             peer_ip: crate::helpers::peer_ip(&req),
             index_status_subscribed: std::collections::HashSet::new(),
             sync_frames: Arc::default(),
@@ -154,6 +155,8 @@ pub struct WebSocketConnection {
     /// Shared with the HTTP handlers: a `COMMIT` frame spends the same
     /// per-agent (or, before `AUTH`, per-peer) write token as `POST /commit`.
     write_rate_limiter: Arc<crate::rate_limit::WriteRateLimiter>,
+    /// Shared in-flight commit counter; see `crate::write_load`.
+    write_load: Arc<crate::write_load::WriteLoad>,
     /// Socket peer address of the upgrade request; the anonymous rate key.
     peer_ip: String,
     /// Held while a `SYNC` or `SYNC_PUSH` runs off the worker thread, so this
@@ -566,6 +569,18 @@ impl WebSocketConnection {
                     ctx.binary(ws_v2::encode_error(request_id, code, &msg));
                     return;
                 }
+                // Overloaded: refuse before any work, with a jittered delay.
+                let guard = match self.write_load.try_begin() {
+                    Ok(guard) => guard,
+                    Err(busy) => {
+                        ctx.binary(ws_v2::encode_error(
+                            request_id,
+                            ws_v2::error_code::BUSY,
+                            &busy.message(),
+                        ));
+                        return;
+                    }
+                };
                 let body = decoded.commit_json.to_string();
                 let store = self.store.clone();
                 let source_id = self.connection_id.clone();
@@ -577,6 +592,13 @@ impl WebSocketConnection {
                     .client_capabilities
                     .iter()
                     .any(|c| c == atomic_lib::sync::protocol::CAP_COMMIT_OK_SLIM);
+                // Only a slim-ack client that also listed `commit-pace` gets
+                // the load hint; every other format stays byte-identical.
+                let paced_ack = slim_ack
+                    && self
+                        .client_capabilities
+                        .iter()
+                        .any(|c| c == atomic_lib::sync::protocol::CAP_COMMIT_PACE);
                 ctx.spawn(
                     async move {
                         let result = crate::handlers::commit::apply_commit_json(
@@ -586,10 +608,14 @@ impl WebSocketConnection {
                             Some(source_id),
                         )
                         .await;
-                        (request_id, result)
+                        // Read the hint while this commit still counts as in
+                        // flight, then free the slot.
+                        let pace_ms = guard.pace_ms();
+                        drop(guard);
+                        (request_id, result, pace_ms)
                     }
                     .into_actor(self)
-                    .map(move |(rid, res), _actor, ctx| match res {
+                    .map(move |(rid, res, pace_ms), _actor, ctx| match res {
                         Ok(server_commit_json) => {
                             // A client that listed `commit-ok-slim` in its
                             // HELLO only wants the id it must chain the next
@@ -603,6 +629,9 @@ impl WebSocketConnection {
                                 None
                             };
                             match slim_id {
+                                Some(id) if paced_ack => {
+                                    ctx.binary(ws_v2::encode_commit_ok_paced(rid, &id, pace_ms))
+                                }
                                 Some(id) => ctx.binary(ws_v2::encode_commit_ok_slim(rid, &id)),
                                 None => {
                                     ctx.binary(ws_v2::encode_commit_ok(rid, &server_commit_json))

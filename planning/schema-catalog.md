@@ -315,6 +315,13 @@ states it supports; Blocked must not silently map to Doing. Local class/view
 configuration stays separate from shared properties. No external standard
 conformance is claimed.
 
+## Shared template vocabularies (#2243, 2026-10-13)
+
+- [x] Time tracker, Expenses, Deals, Job applications and Guest list bind generic columns to embedded `work/v1`, `money/v1`, `pipeline/v1` and `contact/v1` (`lib/defaults/vocabularies.json`, `browser/lib/src/shared-vocabularies.ts`), the same mechanism as `task/v1`. Row classes stay in the drive ontology.
+- [ ] Existing tables keep drive-local properties; reviewed Lens mappings only.
+- [ ] Clockify import (atomic-plugins) still allocates `timeTrackingSchema()` in the drive; move it to `workSchema`.
+- [ ] Same frozen-package caveat as the task pilot.
+
 ## Time Tracker / Clockify pilot (2026-09-07)
 
 - [x] Time Tracker and Clockify import use the same per-drive time interval, Project, Person, Billable and source-identity properties through `timeTrackingSchema()` and table schema bindings.

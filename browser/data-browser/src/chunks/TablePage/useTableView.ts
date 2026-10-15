@@ -211,6 +211,20 @@ export interface UseTableViewResult {
  * is lazily created on the first change (writers only) — until then a table
  * behaves exactly as before.
  */
+/**
+ * Parse a stored JSON value into a value-stable result: it only changes when
+ * the stored shape does. Parsing hands back a fresh array/object every render,
+ * so keying the memo on the serialized form stops downstream consumers (grid
+ * context, collection queries, rendered bars) from re-rendering or re-querying
+ * on every render of the table.
+ */
+function useStableParsed<P, T>(stored: unknown, parse: (raw: P) => T): T {
+  const key = JSON.stringify(stored ?? null);
+
+  // `parse` is a module-level function at every call site, so it is stable.
+  return useMemo(() => parse(JSON.parse(key) as P), [key, parse]);
+}
+
 export function useTableView(
   table: Resource,
   /**
@@ -314,43 +328,26 @@ export function useTableView(
   // Parsing JSON hands back a fresh array every render, and this one reaches the
   // grid's context — so key it on the stored shape instead. Without it every
   // render of the table re-renders every cell.
-  const derivedColumnsKey = JSON.stringify(storedDerivedColumns ?? null);
-  const viewDerivedColumns = useMemo(
-    () => parseDerivedColumnSpecs(JSON.parse(derivedColumnsKey)),
-    [derivedColumnsKey],
+  const viewDerivedColumns = useStableParsed(
+    storedDerivedColumns,
+    parseDerivedColumnSpecs,
   );
 
   // Value-stable for the same reason as the derived columns: this one is a
   // dependency of the rendered column list.
-  const columnOrderKey = JSON.stringify(storedColumnOrder ?? null);
-  const viewColumnOrder = useMemo(
-    () => parseColumnOrder(JSON.parse(columnOrderKey)),
-    [columnOrderKey],
-  );
+  const viewColumnOrder = useStableParsed(storedColumnOrder, parseColumnOrder);
 
   // Same reason: this feeds the collection query, and a fresh array every render
   // would rebuild the collection (and re-query) on every render.
-  const aggregatesKey = JSON.stringify(storedAggregates ?? null);
-  const viewAggregates = useMemo(
-    () => parseAggregates(JSON.parse(aggregatesKey)),
-    [aggregatesKey],
-  );
+  const viewAggregates = useStableParsed(storedAggregates, parseAggregates);
 
   // Same reason as the aggregates: this reaches the rendered column list, and a
   // fresh array every render would remount every action button.
-  const rowActionsKey = JSON.stringify(storedRowActions ?? null);
-  const viewRowActions = useMemo(
-    () => parseRowActions(JSON.parse(rowActionsKey)),
-    [rowActionsKey],
-  );
+  const viewRowActions = useStableParsed(storedRowActions, parseRowActions);
 
   // Serialized dep, like the rest of the JSON config: this reaches the rendered
   // bar, and a fresh object every render would remount it.
-  const quickAddKey = JSON.stringify(storedQuickAdd ?? null);
-  const viewQuickAdd = useMemo(
-    () => parseQuickAdd(JSON.parse(quickAddKey)),
-    [quickAddKey],
-  );
+  const viewQuickAdd = useStableParsed(storedQuickAdd, parseQuickAdd);
 
   const [filters, setFilters] = useState<TableFilter[]>([]);
   const [sorting, dispatchSort] = useReducer(sortReducer, DEFAULT_SORT);
@@ -742,8 +739,12 @@ export function useTableView(
 
   // --- Column order/visibility + name. Persisted immediately (discrete
   // actions), lazy-creating the View like the filter/sort path. ---
-  const setViewColumns = useCallback(
-    (columns: string[]) => {
+  /**
+   * Run `write` against the active View (lazy-creating it) and save. Fire and
+   * forget: a failure leaves the local state as the user last saw it.
+   */
+  const withView = useCallback(
+    (write: (view: Resource) => void | Promise<void>) => {
       void (async () => {
         const v = await ensureView();
 
@@ -751,174 +752,91 @@ export function useTableView(
           return;
         }
 
-        await v.set(dataBrowser.properties.viewColumns, columns, false);
+        await write(v);
         await v.save();
       })().catch(() => undefined);
     },
     [ensureView],
+  );
+
+  const setViewColumns = useCallback(
+    (columns: string[]) =>
+      withView(v => v.set(dataBrowser.properties.viewColumns, columns, false)),
+    [withView],
   );
 
   const renameView = useCallback(
-    (name: string) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(core.properties.name, name, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (name: string) => withView(v => v.set(core.properties.name, name, false)),
+    [withView],
   );
 
   const setViewGroupBy = useCallback(
-    (property: string) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewGroupBy, property, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (property: string) =>
+      withView(v => v.set(dataBrowser.properties.viewGroupBy, property, false)),
+    [withView],
   );
 
   const setViewEndProp = useCallback(
-    (property: string) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewEndProp, property, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (property: string) =>
+      withView(v => v.set(dataBrowser.properties.viewEndProp, property, false)),
+    [withView],
   );
 
   const setViewTimerExclusive = useCallback(
-    (exclusive: boolean) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(
-          dataBrowser.properties.viewTimerExclusive,
-          exclusive,
-          false,
-        );
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (exclusive: boolean) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewTimerExclusive, exclusive, false),
+      ),
+    [withView],
   );
 
   const setViewSplitLanguages = useCallback(
-    (splitProperties: string[]) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(
+    (splitProperties: string[]) =>
+      withView(v =>
+        v.set(
           dataBrowser.properties.viewSplitLanguages,
           splitProperties,
           false,
-        );
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+        ),
+      ),
+    [withView],
   );
 
   const setViewDerivedColumns = useCallback(
-    (specs: DerivedColumnSpec[]) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewDerivedColumns, specs, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (specs: DerivedColumnSpec[]) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewDerivedColumns, specs, false),
+      ),
+    [withView],
   );
 
   const setViewColumnOrder = useCallback(
-    (order: string[]) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewColumnOrder, order, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (order: string[]) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewColumnOrder, order, false),
+      ),
+    [withView],
   );
 
   const setViewAggregates = useCallback(
-    (aggregates: TableAggregate[]) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewAggregates, aggregates, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (aggregates: TableAggregate[]) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewAggregates, aggregates, false),
+      ),
+    [withView],
   );
 
   const setViewRowActions = useCallback(
-    (actions: RowActionSpec[]) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewRowActions, actions, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (actions: RowActionSpec[]) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewRowActions, actions, false),
+      ),
+    [withView],
   );
 
   const setViewQuickAdd = useCallback(
-    (spec: QuickAddSpec | undefined) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
+    (spec: QuickAddSpec | undefined) =>
+      withView(async v => {
         if (spec === undefined) {
           v.remove(dataBrowser.properties.viewQuickAdd);
         } else {
@@ -926,47 +844,24 @@ export function useTableView(
           // datatype tag, without which a plain object is stored as a string.
           await v.set(dataBrowser.properties.viewQuickAdd, spec as never);
         }
-
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+      }),
+    [withView],
   );
 
   const setViewGroupByColumn = useCallback(
-    (property: string) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(dataBrowser.properties.viewGroupByColumn, property, false);
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (property: string) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewGroupByColumn, property, false),
+      ),
+    [withView],
   );
 
   const setViewGroupGranularity = useCallback(
-    (granularity: GroupGranularity) => {
-      void (async () => {
-        const v = await ensureView();
-
-        if (!v) {
-          return;
-        }
-
-        await v.set(
-          dataBrowser.properties.viewGroupGranularity,
-          granularity,
-          false,
-        );
-        await v.save();
-      })().catch(() => undefined);
-    },
-    [ensureView],
+    (granularity: GroupGranularity) =>
+      withView(v =>
+        v.set(dataBrowser.properties.viewGroupGranularity, granularity, false),
+      ),
+    [withView],
   );
 
   /** Each saved view's type, read as the tabs show it right now. */
