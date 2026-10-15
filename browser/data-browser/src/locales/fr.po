@@ -12939,3 +12939,16 @@ msgstr ""
 #: src/views/PeerInvitePage.tsx
 msgid "Local storage did not open. Reload the page to try again."
 msgstr ""
+
+#: src/components/Share/ShareDialog.tsx
+msgid "This drive is not on a server. People you invite can open it only while one of your devices has it open in a browser."
+msgstr ""
+
+#: src/components/Share/ShareDialog.tsx
+msgid "A Cloud Server keeps this drive online for everyone, so nobody has to keep a browser open."
+msgstr ""
+
+#. 0: CLOUD_SERVER_PRICE
+#: src/components/Share/ShareDialog.tsx
+msgid "Upgrade to Cloud Server from {0}"
+msgstr ""
