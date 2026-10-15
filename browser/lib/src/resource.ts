@@ -134,6 +134,16 @@ export type SaveResult = 'persisted' | 'offline' | 'noop';
  */
 export const SYSTEM_COMMIT_ORIGIN = 'origin:system';
 /** Pre-rename Loro origin; still excluded from undo. */
+/**
+ * Loro change message on every commit that only replays state the server
+ * already has (seeding a doc from JSON-AD propvals, healing, applying a
+ * response). Unlike the origin, the message is persisted in the oplog, so
+ * readers of the oplog ("last edited" feeds, History) can tell hydration
+ * from an edit. It has the `c-` token shape on purpose: `getCreatedBy`
+ * ignores it and History buckets it like any other internal commit.
+ */
+export const HYDRATION_COMMIT_MESSAGE = 'c-hydration';
+
 export const LEGACY_SYSTEM_COMMIT_ORIGIN = 'atomic:system';
 
 /**
@@ -549,7 +559,10 @@ export class Resource<C extends OptionalClass = any> {
           !this._dirty &&
           this._loroDoc.getPendingTxnLength() > 0
         ) {
-          this._loroDoc.commit({ origin: SYSTEM_COMMIT_ORIGIN });
+          this._loroDoc.commit({
+            origin: SYSTEM_COMMIT_ORIGIN,
+            message: HYDRATION_COMMIT_MESSAGE,
+          });
         }
       }
 
@@ -588,7 +601,10 @@ export class Resource<C extends OptionalClass = any> {
         // because `setRecordTimestamp(true)` makes even an empty commit
         // write a commit-point op and advance `oplogVersion`.
         if (this._loroDoc.getPendingTxnLength() > 0) {
-          this._loroDoc.commit({ origin: SYSTEM_COMMIT_ORIGIN });
+          this._loroDoc.commit({
+            origin: SYSTEM_COMMIT_ORIGIN,
+            message: HYDRATION_COMMIT_MESSAGE,
+          });
         }
       }
 
@@ -2286,7 +2302,13 @@ export class Resource<C extends OptionalClass = any> {
 
     const genesis = this.getGenesisChange();
 
-    if (!genesis || genesis.timestamp <= 0) {
+    // The earliest change may be local hydration of a legacy resource, which
+    // is stamped with the import time, not the creation time.
+    if (
+      !genesis ||
+      genesis.timestamp <= 0 ||
+      genesis.message === HYDRATION_COMMIT_MESSAGE
+    ) {
       return undefined;
     }
 
@@ -2711,7 +2733,10 @@ export class Resource<C extends OptionalClass = any> {
     // server rejects as unauthorized, forever.
     // Re-read `_loroDoc`: a `loroUpdate: undefined` value above resets it.
     if (this._loroDoc && this._loroDoc.getPendingTxnLength() > 0) {
-      this._loroDoc.commit({ origin: SYSTEM_COMMIT_ORIGIN });
+      this._loroDoc.commit({
+        origin: SYSTEM_COMMIT_ORIGIN,
+        message: HYDRATION_COMMIT_MESSAGE,
+      });
     }
   }
 

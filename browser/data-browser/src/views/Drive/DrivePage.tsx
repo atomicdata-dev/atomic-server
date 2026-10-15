@@ -93,12 +93,16 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
               buttonLabel='Add description'
             />
 
-            <ActivityFeed subjects={subResources} drive={resource.subject} />
+            <ActivityFeed
+              key={resource.subject}
+              subjects={subResources}
+              drive={resource.subject}
+            />
 
             <section>
               <SectionTitle>Resources</SectionTitle>
               {subResources.length > 0 ? (
-                <ResourceList subjects={subResources} />
+                <ResourceList key={resource.subject} subjects={subResources} />
               ) : (
                 <p>
                   {canEdit

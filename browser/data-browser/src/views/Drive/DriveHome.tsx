@@ -4,6 +4,8 @@ import {
   isUnauthorized,
   useDrivePresence,
   useResources,
+  useStore,
+  type Store,
 } from '@tomic/react';
 import { useMemo, useState, type JSX } from 'react';
 import {
@@ -140,6 +142,27 @@ export function ResourceList({
 }
 
 /**
+ * Whether `subject` sits inside `drive`, judged from what is already in
+ * memory (the root of its parent chain), so it costs no fetch. A chain that
+ * ends at a resource we have not loaded is given the benefit of the doubt;
+ * one that ends at a loaded, different root (another drive, an ontology's
+ * Property or Class) is not part of this drive.
+ */
+export function belongsToDrive(
+  store: Pick<Store, 'driveOfSubject' | 'resources'>,
+  subject: string,
+  drive: string,
+): boolean {
+  const root = store.driveOfSubject(subject);
+
+  if (root === store.driveOfSubject(drive)) {
+    return true;
+  }
+
+  return !store.resources.has(root);
+}
+
+/**
  * What changed lately on this drive: its visible children plus the resources
  * opened here recently, newest edit first. Derived from data that is already
  * loaded for the tiles, so there is no log to write or query. Only the first
@@ -152,29 +175,40 @@ export function ActivityFeed({
   subjects: string[];
   drive: string;
 }): JSX.Element {
-  const [recent] = useState(() => getRecentResources(drive));
+  const store = useStore();
+  const recent = useMemo(() => getRecentResources(drive), [drive]);
+  const children = useMemo(() => new Set(subjects), [subjects]);
   const candidates = useMemo(
     () => Array.from(new Set([...subjects, ...recent])),
     [subjects, recent],
   );
   const resources = useResources(candidates, { allowIncomplete: true });
   const items = useMemo(() => {
-    const out: { subject: string; at: number }[] = [];
+    const out: { subject: string; at?: number }[] = [];
 
     for (const [subject, resource] of resources) {
-      const at = lastEditedAt(resource);
+      // Only the drive's own children and recents that sit inside it. Recents
+      // are recorded per current drive, but also hold whatever was opened
+      // from elsewhere (other drives, ontology Properties and Classes).
+      if (!children.has(subject) && !belongsToDrive(store, subject, drive)) {
+        continue;
+      }
 
       if (
-        at &&
-        !isUnauthorized(resource.error) &&
-        !isNotFound(resource.error)
+        resource.loading ||
+        isUnauthorized(resource.error) ||
+        isNotFound(resource.error)
       ) {
-        out.push({ subject, at });
+        continue;
       }
+
+      out.push({ subject, at: lastEditedAt(resource) });
     }
 
-    return out.sort((a, b) => b.at - a.at);
-  }, [resources]);
+    // Unknown edit time (legacy resource never edited here): listed after the
+    // dated rows, without a made-up "Edited ..." caption.
+    return out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  }, [resources, children, store, drive]);
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, ACTIVITY_VISIBLE);
 
