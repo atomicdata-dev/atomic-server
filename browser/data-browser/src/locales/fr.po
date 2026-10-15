@@ -2128,6 +2128,8 @@ msgid "Add tag"
 msgstr "Ajouter une étiquette"
 
 #. 0: label
+#. 0: getTitle(resource)
+#: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
 msgstr "Basculer vers {0}"
@@ -12892,10 +12894,6 @@ msgstr ""
 msgid "All notifications"
 msgstr ""
 
-#: src/components/SideBar/DriveSwitcher.tsx
-msgid "View all drives"
-msgstr ""
-
 #: src/views/Drive/DriveHome.tsx
 msgid "Currently on this drive"
 msgstr ""
@@ -12939,4 +12937,8 @@ msgstr ""
 
 #: src/views/Drive/DriveSettingsDialog.tsx
 msgid "Browser sync server"
+msgstr ""
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Manage drives"
 msgstr ""
