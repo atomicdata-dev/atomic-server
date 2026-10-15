@@ -47,11 +47,13 @@ export function useConversations(): string[] {
     refresh();
     const timer = setInterval(refresh, REFRESH_MS);
     window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
 
     return () => {
       cancelled = true;
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
     };
   }, [store, agent]);
 

@@ -59,6 +59,12 @@ export function resetConversationsEndpointCache(): void {
 /** The conversations on this server the signed-in agent is a member of.
  *  Empty when the server can't say, such as one without the endpoint. */
 export async function fetchMemberOf(store: Store): Promise<string[]> {
+  // Offline there is nothing to ask. A request would fail and log two console
+  // errors, which a page that is meant to work offline counts as a failure.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return [];
+  }
+
   try {
     // A demo guest's identity exists only on this device, so no server has
     // conversations for it.
