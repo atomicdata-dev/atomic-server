@@ -549,6 +549,32 @@ export type VaultUsage = {
   undo_window_objects: number;
   pending_bytes: number;
   unaccounted_bytes: number;
+  /**
+   * Where the change packs stand. Optional: older control planes do not send
+   * it. The pack categories below are disjoint.
+   */
+  history?: VaultHistoryUsage;
+};
+
+export type VaultHistoryUsage = {
+  /** Devices that have written changes to this backup. */
+  lanes: number;
+  pack_objects: number;
+  pack_bytes: number;
+  /** The newest change pack of each device. Never freed. */
+  tip_objects: number;
+  tip_bytes: number;
+  /** Changes no snapshot includes yet; freeable once a snapshot covers them. */
+  uncovered_objects: number;
+  uncovered_bytes: number;
+  /** Covered by a snapshot, kept so recently deleted items can be recovered. */
+  in_undo_window_objects: number;
+  in_undo_window_bytes: number;
+  /** Can be removed right now. */
+  freeable_objects: number;
+  freeable_bytes: number;
+  checkpoint_objects: number;
+  anchor_covers_lanes: number;
 };
 
 export type VaultFreeUpResult = {
