@@ -2739,3 +2739,7 @@ managed node, reads a saved child directly over HTTP, queues an edit with WS
 disconnected, reconnects, then signs in on a fresh browser and verifies the
 edited child after reload. It does not certify real billing or a full network
 partition.
+
+## Agent page
+
+`browser/e2e/tests/agent-page.spec.ts` (full suite, not `@smoke`) opens another agent's page: the conversation started from its Send message button is listed, a private note typed there survives a reload and is not on the other agent's own page, and a resource that agent created in a shared folder shows under Created. Your own agent page has no messages and no notes. `hasMember` is unit tested in `conversations.test.ts`. Not covered: the Created list is by creator, not by last editor (no index of who edited what, see `planning/auditability-loro-history.md` "Secondary indexes"), and the note's `PlainText` also shows in the private drive's resource list.

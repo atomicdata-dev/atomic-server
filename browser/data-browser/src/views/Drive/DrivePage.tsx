@@ -96,7 +96,11 @@ function DrivePage({ resource }: ResourcePageProps<Server.Drive>): JSX.Element {
 
             <RecentlyOpened drive={resource.subject} />
 
-            <ActivityFeed subjects={subResources} drive={resource.subject} />
+            <ActivityFeed
+              subjects={subResources}
+              drive={resource.subject}
+              title='Activity'
+            />
 
             <section>
               <SectionTitle>Resources</SectionTitle>

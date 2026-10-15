@@ -66,12 +66,13 @@ export function MessagesPanel({
   );
 }
 
-function ConversationLink({
+/** One conversation as a menu row, titled with who is in it. */
+export function ConversationLink({
   subject,
   onClick,
 }: {
   subject: string;
-  onClick: () => void;
+  onClick?: () => void;
 }): JSX.Element {
   const resource = useResource(subject);
 

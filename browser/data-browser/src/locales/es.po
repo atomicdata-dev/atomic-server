@@ -1744,6 +1744,7 @@ msgstr "Título"
 msgid "Class"
 msgstr "Clase"
 
+#: src/views/AgentPage.tsx
 #: src/views/FolderPage/ListView.tsx
 msgid "Created"
 msgstr "Creado"
@@ -7628,8 +7629,7 @@ msgid "Integration sections"
 msgstr ""
 
 #: src/chunks/PluginRuns/PluginPage.tsx
-#: src/views/Drive/DriveHome.tsx
-#: src/views/Drive/DriveHome.tsx
+#: src/views/Drive/DrivePage.tsx
 msgid "Activity"
 msgstr ""
 
@@ -10723,6 +10723,7 @@ msgstr ""
 msgid "<0>Sync anytime with a server.</0> Once the drive's owner connects it to a server, it opens on any device, even when the others are closed."
 msgstr ""
 
+#: src/views/AgentPage.tsx
 #: src/views/DriveUnavailable.tsx
 msgid "Technical details"
 msgstr ""
@@ -11053,6 +11054,8 @@ msgid "Included AI isn't reachable right now. Check your connection and sign-in,
 msgstr ""
 
 #: src/components/SideBar/MessagesPanel.tsx
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
 msgid "Messages"
 msgstr ""
 
@@ -12939,4 +12942,27 @@ msgstr ""
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View all drives"
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "Opening..."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+msgid "<0/> Send message"
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Add a note"
+msgstr ""
+
+#. 0: name
+#: src/views/AgentPage.tsx
+msgid "Only you can see these. {0} cannot."
+msgstr ""
+
+#: src/views/AgentPage.tsx
+#: src/views/AgentPage.tsx
+msgid "Your notes"
 msgstr ""

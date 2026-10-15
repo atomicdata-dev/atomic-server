@@ -83,6 +83,13 @@ async function memberFor(
   return { agent, encryptionKey: key };
 }
 
+/** Whether `agent` is one of the members of `conversation`. */
+export function hasMember(conversation: Resource, agent: string): boolean {
+  const read = conversation.get(core.properties.read);
+
+  return Array.isArray(read) && read.includes(agent);
+}
+
 /** Whether `conversation` has exactly these members. */
 export function hasMembers(conversation: Resource, members: string[]): boolean {
   const read = conversation.get(core.properties.read);
