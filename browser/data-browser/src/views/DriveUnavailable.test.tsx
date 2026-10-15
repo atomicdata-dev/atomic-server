@@ -20,14 +20,30 @@ import { DriveUnavailable, RETRY_EVERY_MS } from './DriveUnavailable';
 const store = vi.hoisted(() => ({
   isLocalOnlySubject: vi.fn(() => true),
   fetchResourceFromServer: vi.fn(),
+  getAgent: vi.fn(() => ({ subject: 'did:ad:agent:x' })),
+}));
+const vaultState = vi.hoisted(() => ({
+  current: {
+    status: { state: 'unavailable' },
+    busy: false,
+    error: null,
+    restoreProgress: null,
+    restore: vi.fn(),
+  } as Record<string, unknown>,
+}));
+
+vi.mock('../helpers/managed/useDriveVault', () => ({
+  useDriveVault: () => vaultState.current,
 }));
 
 vi.mock('@tomic/react', async importOriginal => ({
   ...(await importOriginal<typeof import('@tomic/react')>()),
   useStore: () => store,
 }));
+const settings = vi.hoisted(() => ({ agent: undefined as unknown }));
+
 vi.mock('../helpers/AppSettings', () => ({
-  useSettings: () => ({ agent: undefined }),
+  useSettings: () => ({ agent: settings.agent }),
 }));
 vi.mock('../helpers/browserPeerSync', () => ({
   resumePeerLinks: vi.fn(),
@@ -35,6 +51,11 @@ vi.mock('../helpers/browserPeerSync', () => ({
 
 afterEach(() => {
   cleanup();
+  settings.agent = undefined;
+  vaultState.current = {
+    ...vaultState.current,
+    status: { state: 'unavailable' },
+  };
   vi.useRealTimers();
   store.fetchResourceFromServer.mockReset();
 });
@@ -136,5 +157,28 @@ describe('DriveUnavailable wording', () => {
 
     expect(screen.queryByText(/isn't on this device/)).toBeNull();
     expect(screen.queryByText(/No device with this drive/)).toBeNull();
+  });
+});
+
+describe('DriveUnavailable with a vault backup', () => {
+  it('shows the restore, not the retry panel', () => {
+    settings.agent = { subject: 'did:ad:agent:x' };
+    vaultState.current = {
+      status: { state: 'on', details: { confirmed_objects: 3 } },
+      busy: true,
+      error: null,
+      restoreProgress: 0.4,
+      restore: vi.fn(),
+    };
+    show({
+      error: new AtomicError(
+        NOT_AVAILABLE_LOCALLY_MESSAGE,
+        ErrorType.Transport,
+      ),
+    });
+
+    expect(screen.getByText('Restoring this drive… 40%')).toBeTruthy();
+    expect(screen.queryByTestId('drive-unavailable')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry now' })).toBeNull();
   });
 });

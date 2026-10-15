@@ -8,7 +8,11 @@ import {
   signRequest,
   legacyAgentForRequest,
 } from './authentication.js';
-import { AtomicError, ErrorType } from './error.js';
+import {
+  AtomicError,
+  ErrorType,
+  NOT_AVAILABLE_LOCALLY_MESSAGE,
+} from './error.js';
 import { busyRetryAfterMs, DEFAULT_BUSY_RETRY_MS, ErrorCode } from './ws-v2.js';
 import { pageRequestSignal } from './page-request-signal.js';
 // Import directly from the modules to avoid a circular dep through `./index.js`
@@ -356,6 +360,17 @@ export class Client {
       const body = await response.text();
 
       if (response.status === 200) {
+        // An origin that runs no node (a portal, a static host) answers every
+        // path with its index.html. For an identifier that means "nothing
+        // here", not "a broken resource": say so, so the UI can offer the
+        // vault instead of a JSON parse error.
+        if (isAtomicIdentifier(subject) && /^\s*</.test(body)) {
+          throw new AtomicError(
+            NOT_AVAILABLE_LOCALLY_MESSAGE,
+            ErrorType.Transport,
+          );
+        }
+
         try {
           const json = JSON.parse(body);
 
