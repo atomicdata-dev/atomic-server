@@ -3,6 +3,7 @@ import { decodeBrowserInvite } from '@tomic/lib';
 import { useStore } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
 import { Button } from '../components/Button';
+import { Spinner } from '../components/Spinner';
 import { ContainerNarrow } from '../components/Containers';
 import { Column } from '../components/Row';
 import { ErrorLook } from '../components/ErrorLook';
@@ -22,6 +23,9 @@ import {
  * either way. The attempt keeps running; this is the page admitting it. */
 const PAIRING_DEADLINE = 60_000;
 
+/** How long an automatic join waits for local storage to open. */
+const LOCAL_STORAGE_WAIT = 20_000;
+
 export function PeerInvitePage({ token }: { token: string }) {
   const store = useStore();
   const { agent, setDrive } = useSettings();
@@ -31,6 +35,8 @@ export function PeerInvitePage({ token }: { token: string }) {
   const [stalled, setStalled] = useState(false);
   const [error, setError] = useState<Error>();
   const joinedAt = useRef<number>(undefined);
+  const autoJoined = useRef(false);
+  const autoOpened = useRef(false);
   let invite: ReturnType<typeof decodeBrowserInvite> | undefined;
 
   try {
@@ -40,6 +46,8 @@ export function PeerInvitePage({ token }: { token: string }) {
   }
 
   const drive = invite?.drive;
+  // The inviter opening their own link on another device: nothing to accept.
+  const ownInvite = !!agent && !!invite && agent.subject === invite.issuer;
   useEffect(() => {
     const update = () => {
       const current = drive ? peerLinkStatus(drive) : '';
@@ -105,9 +113,43 @@ export function PeerInvitePage({ token }: { token: string }) {
     );
   };
 
+  useEffect(() => {
+    if (!ownInvite || autoJoined.current) return;
+
+    // Once per page, even if the effect runs again.
+    autoJoined.current = true;
+
+    void (async () => {
+      // Local storage can be slow to open on a cold start, but not forever:
+      // say so instead of spinning.
+      if (!(await store.waitForClientDb(LOCAL_STORAGE_WAIT))) {
+        setError(
+          new Error(
+            'Local storage did not open. Reload the page to try again.',
+          ),
+        );
+
+        return;
+      }
+
+      await join();
+    })();
+    // `join` only reads the token and the store.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownInvite, store, token]);
+
+  useEffect(() => {
+    if (!ownInvite || !ready || autoOpened.current) return;
+    autoOpened.current = true;
+    open();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownInvite, ready]);
+
   const signIn = () => {
     const portal = getManagedPortalUrl();
-    const url = new URL(portal ?? '/app/welcome', window.location.origin);
+    const url = portal
+      ? new URL('/signin', portal)
+      : new URL('/app/welcome', window.location.origin);
     url.searchParams.set('invite', token);
     window.location.assign(url.href);
   };
@@ -132,6 +174,8 @@ export function PeerInvitePage({ token }: { token: string }) {
               <Button onClick={signIn}>Sign in to join</Button>
             ) : ready ? (
               <Button onClick={open}>Open drive</Button>
+            ) : ownInvite ? (
+              !error && <Spinner size='2.5rem' />
             ) : (
               <Button onClick={join} disabled={joining}>
                 {joining ? 'Connecting…' : 'Join drive'}
