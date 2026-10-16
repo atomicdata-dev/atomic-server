@@ -64,7 +64,12 @@ impl Scopes {
         let mut scopes = Self {
             read: subtrees(urls::READ_SCOPE),
             write: subtrees(urls::WRITE_SCOPE),
-            calls: json_names(installation, urls::CALL_SCOPE),
+            // A value that is there but cannot be read is a limit nobody could
+            // read, not the absence of one: it allows no call.
+            calls: match json_names(installation, urls::CALL_SCOPE) {
+                None if installation.get(urls::CALL_SCOPE).is_ok() => Some(Vec::new()),
+                names => names,
+            },
         };
         let wide = json_names(installation, urls::GRANTS)
             .is_some_and(|names| names.iter().any(|n| n == "full-drive-access"));
@@ -280,6 +285,18 @@ mod tests {
         };
         assert_eq!(installation(vec![]), Scopes::default());
         assert!(Scopes::default().allows_call("atomic:any/thing@1"));
+
+        // A call scope that is stored but unreadable allows no call. It must
+        // not read as "no scope", which allows all of them.
+        for broken in [
+            Value::String("not json".into()),
+            Value::Json(serde_json::json!(42)),
+            Value::Integer(7),
+        ] {
+            let scopes = installation(vec![(urls::CALL_SCOPE, broken)]);
+            assert_eq!(scopes.calls, Some(Vec::new()));
+            assert!(!scopes.allows_call("atomic:any/thing@1"));
+        }
 
         let wide = installation(vec![(
             urls::GRANTS,
