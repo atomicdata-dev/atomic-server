@@ -213,7 +213,10 @@ impl crate::Db {
         key: &PluginTriggerKey,
         trigger: &PluginTrigger,
     ) -> crate::errors::AtomicResult<Option<QueuedEvent>> {
-        if let Some(saved) = self.kv.get(super::trees::Tree::PluginMeta, &head_key(key))? {
+        if let Some(saved) = self
+            .kv
+            .get(super::trees::Tree::PluginMeta, &head_key(key))?
+        {
             return Ok(Some(serde_json::from_slice(&saved)?));
         }
         let name = consumer(key);

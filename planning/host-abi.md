@@ -266,12 +266,20 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       exactly once. Delivery checks the caller's and the Installation agent's
       read rights and `readScope` per event; tombstones (destroy events) exist.
       Replaces the in-memory per-installation queue.
-      *Not done:* the producers other than commits (query edges, cron, field
-      timers, webhooks, connection-needed) and the consumers `triggers.rs`
-      (query-edge delivery queue with its own guard), module `after-commit`
-      (synchronous, in-commit) and the WS commit notifications still run on
-      their own paths. Query edges are not commits, so `triggers.rs` needs
-      edge events in the log first. The host does not call `on-event`; apps
+      *Done too:* `triggers.rs` consumes the log. Query edges are not a second
+      producer: `apply_transaction` already sees the `QueryMembers` writes, so
+      the commit's own event row lists the edges of watched trigger queries
+      (`DriveEvent.edges`). Each trigger has a cursor (`trigger/<plugin>`) and
+      one saved in-flight record; the old `plugin-event/v1` queue, its dedup
+      window and the id-keyed check are gone. Kept: the self-echo skip and the
+      30-per-minute rate limit, which the stream does not cover. Old
+      `plugin-event/v1` rows are not migrated.
+      *Not done:* the producers other than commits (cron, field timers,
+      webhooks, connection-needed). Module `after-commit` stays synchronous: it
+      is handed the resource as the commit left it, runs under the commit's
+      locks-released window and its failures are logged against that call, none
+      of which an event row carries. The WS commit notifications still run on
+      their own path. The host does not call `on-event`; apps
       pull. Event rows hold no per-subscriber state, so no fan-out cost.
 - [ ] Untriggered verdicts become stored proposals, not discarded ones.
 - [ ] Replace the three webhook proposals (#77, #976, atomic-plugins#369).

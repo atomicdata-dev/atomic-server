@@ -3693,7 +3693,11 @@ impl Db {
                 {
                     if let Some((query, _)) = query_index::parse_members_key_id_subject(&op.key) {
                         *edges.entry(query).or_insert(0i32) +=
-                            if matches!(op.method, Method::Insert) { 1 } else { -1 };
+                            if matches!(op.method, Method::Insert) {
+                                1
+                            } else {
+                                -1
+                            };
                     }
                 }
                 let mut watched = None;

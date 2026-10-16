@@ -303,11 +303,12 @@ Every applied commit appends one row to its drive's event log, in the same batch
 - `next(cursor, max)` returns events after `cursor`, oldest first. With no cursor it starts at the app's checkpoint. Reading does not consume.
 - `ack(cursor)` moves the checkpoint forward and never back. Filters and checkpoint are stored in the db, so after a restart the app gets what it missed exactly once.
 - Delivery is rights-checked at read time: an event is only returned when the caller and the Installation's agent may read the resource (and its `readScope`). For a destroyed resource the parent is asked. The log keeps seven days.
+- Query triggers read the same log. A commit that moves a resource into or out of a query a trigger watches records that edge in its event row, and each trigger keeps a cursor like an app's checkpoint, advanced only when the edge is handled. A restart resumes at the edge it was on. A new trigger starts at the end of the log. The module `after-commit` hook still runs inside the commit, because it needs the resource as the commit left it and its failure handling is tied to that call.
 
 ## Not built yet
 
 - `store.search` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.
-- `events` carries one event per applied commit. Query-edge triggers, cron, field timers, inbound webhooks and tombstones do not feed it yet, and the host does not call `on-event` itself: an app pulls.
+- `events` carries one event per applied commit, and a destroy is one. Cron, field timers and inbound webhooks do not feed it yet, and the host does not call `on-event` itself: an app pulls.
 - Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
 - A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared, so an approval UI must not rely on it alone. Every hop is still bounded by the signed-in agent's rights and the callee's own grant.

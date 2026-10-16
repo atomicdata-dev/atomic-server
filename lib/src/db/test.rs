@@ -5363,12 +5363,24 @@ async fn a_trigger_misses_no_edge_across_a_reopen() {
     let _ = std::fs::remove_dir_all(dir);
     std::fs::create_dir_all(format!("{dir}/uploads")).unwrap();
     let uploads = format!("{dir}/uploads");
-    let open = || {
-        Db::init_redb_file(
-            std::path::Path::new(dir),
-            Some("https://localhost".into()),
-            std::path::Path::new(&uploads),
-        )
+    // redb's lock outlives a dropped handle for a moment.
+    let open = || async {
+        let mut tries = 0;
+        loop {
+            match Db::init_redb_file(
+                std::path::Path::new(dir),
+                Some("https://localhost".into()),
+                std::path::Path::new(&uploads),
+            )
+            .await
+            {
+                Err(_) if tries < 50 => {
+                    tries += 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+                result => break result,
+            }
+        }
     };
     let store = open().await.unwrap();
     let agent = store.create_agent(None).await.unwrap();
@@ -5400,7 +5412,10 @@ async fn a_trigger_misses_no_edge_across_a_reopen() {
     let store = open().await.unwrap();
     store.set_default_agent(agent.clone());
     let first = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
-    assert_eq!((first.subject.as_str(), first.edge), (a.as_str(), Edge::Enter));
+    assert_eq!(
+        (first.subject.as_str(), first.edge),
+        (a.as_str(), Edge::Enter)
+    );
     assert_ne!(first.subject, before.as_str(), "older than the trigger");
     assert_eq!(store.pending_trigger_events(&key, &trigger).unwrap(), 2);
     store.acknowledge_plugin_event(&first).unwrap();
