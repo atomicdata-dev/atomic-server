@@ -193,3 +193,117 @@ async fn test_ws_push_chatroom() {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use atomic_lib::{agents::ForAgent, storelike::ResourceResponse, Db, Resource, Storelike};
+
+    async fn room_with_messages(id: &str, n: usize) -> (Db, Resource, Vec<String>) {
+        let store = Db::init_temp(id).await.unwrap();
+        store.add_class_extender(build_chatroom_extender()).unwrap();
+        store.add_class_extender(build_message_extender()).unwrap();
+        let mut room = Resource::new_instance(urls::CHATROOM, &store)
+            .await
+            .unwrap();
+        room.set(urls::NAME.into(), Value::String("room".into()), &store)
+            .await
+            .unwrap();
+        room.save_locally(&store).await.unwrap();
+
+        let mut subjects = Vec::new();
+        for i in 0..n {
+            let mut message = Resource::new_instance(urls::MESSAGE, &store).await.unwrap();
+            message
+                .set(
+                    urls::PARENT.into(),
+                    Value::AtomicUrl(room.get_subject().to_string().into()),
+                    &store,
+                )
+                .await
+                .unwrap();
+            message
+                .set(
+                    urls::DESCRIPTION.into(),
+                    Value::Markdown(format!("message {i}")),
+                    &store,
+                )
+                .await
+                .unwrap();
+            message
+                .set(
+                    urls::CREATED_AT.into(),
+                    Value::Timestamp(1_000 + i as i64),
+                    &store,
+                )
+                .await
+                .unwrap();
+            message.save_locally(&store).await.unwrap();
+            subjects.push(message.get_subject().to_string());
+        }
+        (store, room, subjects)
+    }
+
+    async fn get(store: &Db, subject: &str, agent: &ForAgent) -> (Resource, Vec<Resource>) {
+        let subject = atomic_lib::Subject::from_raw(subject, None);
+        match store
+            .get_resource_extended(&subject, false, agent)
+            .await
+            .unwrap()
+        {
+            ResourceResponse::ResourceWithReferenced(r, refs) => (r, refs),
+            ResourceResponse::Resource(r) => (r, Vec::new()),
+            ResourceResponse::Redirect(_) => panic!("unexpected redirect"),
+        }
+    }
+
+    fn messages_of(room: &Resource) -> Vec<String> {
+        room.get(urls::MESSAGES).unwrap().to_subjects(None).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_chatroom_lists_its_messages_old_to_new_with_their_bodies() {
+        let (store, room, sent) = room_with_messages("chatroom-short", 3).await;
+        let (served, referenced) = get(&store, room.get_subject().as_str(), &ForAgent::Sudo).await;
+
+        assert_eq!(messages_of(&served), sent);
+        assert!(served.get(urls::NEXT_PAGE).is_err(), "one page, no next");
+        let mut bodies: Vec<_> = referenced
+            .iter()
+            .map(|r| r.get_subject().to_string())
+            .collect();
+        bodies.sort();
+        let mut want = sent.clone();
+        want.sort();
+        assert_eq!(bodies, want);
+    }
+
+    #[tokio::test]
+    async fn a_long_chatroom_pages_backwards_with_before_timestamp() {
+        let (store, room, sent) = room_with_messages("chatroom-long", 60).await;
+        let (page1, _) = get(&store, room.get_subject().as_str(), &ForAgent::Sudo).await;
+
+        // The newest 51 (one more than a page, to find the boundary), old to new.
+        assert_eq!(messages_of(&page1), sent[9..].to_vec());
+        let next = page1.get(urls::NEXT_PAGE).unwrap().to_string();
+        assert!(next.contains("before-timestamp=1009"), "{next}");
+
+        let (page2, _) = get(&store, &next, &ForAgent::Sudo).await;
+        assert_eq!(messages_of(&page2), sent[..10].to_vec());
+        assert!(page2.get(urls::NEXT_PAGE).is_err());
+    }
+
+    #[tokio::test]
+    async fn the_public_cannot_read_a_private_chatroom() {
+        let (store, room, _) = room_with_messages("chatroom-rights", 2).await;
+        // The room is not public: the public agent is refused before any extender runs.
+        let result = store
+            .get_resource_extended(
+                &atomic_lib::Subject::from_raw(room.get_subject().as_str(), None),
+                false,
+                &ForAgent::Public,
+            )
+            .await;
+        assert!(result.is_err());
+    }
+}
