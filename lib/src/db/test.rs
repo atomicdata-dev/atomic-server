@@ -5296,6 +5296,13 @@ async fn drive_events_survive_a_restart_exactly_once() {
     store.set_default_agent(agent);
     store.populate().await.unwrap();
     let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    // A drive without an app writes nothing.
+    let quiet = genesis_child(&store, &drive).await;
+    assert!(
+        store.drive_events(drive.as_str(), 0, 100).is_empty(),
+        "{quiet}"
+    );
+    store.enable_drive_events(drive.as_str()).unwrap();
     let before = store.drive_events(drive.as_str(), 0, 100).len();
 
     let a = genesis_child(&store, &drive).await;
@@ -5308,16 +5315,22 @@ async fn drive_events_survive_a_restart_exactly_once() {
         (a.as_str(), b.as_str())
     );
     assert!(ea.seq < eb.seq);
-    assert_eq!(
-        ea.ancestors.first().map(String::as_str),
-        Some(drive.as_str())
-    );
+    assert_eq!(ea.parent.as_deref(), Some(drive.as_str()));
 
     let only_b = EventFilter {
         subtree: Some(b.to_string()),
         ..Default::default()
     };
-    assert!(!only_b.matches(ea) && only_b.matches(eb));
+    assert!(!only_b.matches(ea, None) && only_b.matches(eb, None));
+    let under_drive = EventFilter {
+        subtree: Some(drive.to_string()),
+        ..Default::default()
+    };
+    let chain = store.event_ancestors(eb.parent.as_deref()).await;
+    assert!(under_drive.matches(eb, chain.as_deref()));
+    assert!(!under_drive.matches(eb, None));
+    let row = serde_json::to_vec(eb).unwrap().len();
+    println!("event row: {row} B");
 
     store.ack_events(drive.as_str(), "app", ea.seq).unwrap();
     // The checkpoint never moves back.

@@ -31,16 +31,17 @@ pub struct DriveEvent {
     pub destroyed: bool,
     /// The classes the resource had (before the commit, for a destroy).
     pub classes: Vec<String>,
-    /// Parent first, up to the drive. Kept because a destroyed resource can no
-    /// longer be asked.
-    pub ancestors: Vec<String>,
+    /// The resource's parent. The chain above it is resolved when the event is
+    /// read ([`Db::event_ancestors`]), so the row stays small.
+    pub parent: Option<String>,
     /// The properties the commit changed.
     pub props: BTreeSet<String>,
-    pub signer: String,
     pub at_ms: i64,
 }
 
 /// Which events a consumer wants. Every field that is set must match.
+/// `ancestors` are the event's [`Db::event_ancestors`]; None when the walk
+/// failed, which never matches a subtree filter above the resource itself.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventFilter {
     pub class: Option<String>,
@@ -50,13 +51,13 @@ pub struct EventFilter {
 }
 
 impl EventFilter {
-    pub fn matches(&self, event: &DriveEvent) -> bool {
+    pub fn matches(&self, event: &DriveEvent, ancestors: Option<&[String]>) -> bool {
         self.class
             .as_ref()
             .is_none_or(|c| event.classes.contains(c))
             && self.subtree.as_ref().is_none_or(|s| {
                 let s = pure(s);
-                pure(&event.subject) == s || event.ancestors.contains(&s)
+                pure(&event.subject) == s || ancestors.is_some_and(|a| a.contains(&s))
             })
             && self
                 .property
@@ -85,40 +86,33 @@ pub(crate) struct PendingEvent {
 }
 
 impl PendingEvent {
+    /// None when the drive has no app that reads events.
     pub(crate) async fn new(
         store: &Db,
         resource: &Resource,
         destroyed: bool,
         props: BTreeSet<String>,
-        signer: &str,
     ) -> Option<Self> {
-        let classes = resource
+        let classes: Vec<String> = resource
             .get(crate::urls::IS_A)
             .ok()
             .and_then(|v| v.to_subjects(None).ok())
             .unwrap_or_default();
-        let mut ancestors: Vec<String> = Vec::new();
-        let mut next = resource
+        let parent = resource
             .get(crate::urls::PARENT)
             .ok()
-            .map(|v| v.to_string());
-        while let Some(parent) = next.filter(|_| ancestors.len() < 64) {
-            let parent = pure(&parent);
-            if ancestors.contains(&parent) {
-                break;
-            }
-            next = match store.get_resource(&Subject::from(parent.clone())).await {
-                Ok(p) => p.get(crate::urls::PARENT).ok().map(|v| v.to_string()),
-                Err(_) => None,
-            };
-            ancestors.push(parent);
-        }
+            .map(|v| pure(&v.to_string()));
         // A resource written without rights checks carries no `drive`; the top
         // of its parent chain is the drive then.
         let drive = match resource.get_drive() {
             Some(drive) => drive.pure_id(),
-            None => ancestors.last()?.clone(),
+            None => store.event_ancestors(parent.as_deref()).await?.pop()?,
         };
+        if classes.iter().any(|c| c == crate::urls::INSTALLATION) {
+            store.enable_drive_events(&drive).ok()?;
+        } else if !store.drive_events_enabled(&drive) {
+            return None;
+        }
         Some(Self {
             drive,
             event: DriveEvent {
@@ -126,9 +120,8 @@ impl PendingEvent {
                 subject: resource.get_subject().to_string(),
                 destroyed,
                 classes,
-                ancestors,
+                parent,
                 props,
-                signer: signer.to_string(),
                 at_ms: crate::utils::now(),
             },
         })
@@ -136,6 +129,66 @@ impl PendingEvent {
 }
 
 impl Db {
+    /// The parents above `parent`, nearest first, up to the drive. None if a
+    /// link cannot be read.
+    pub async fn event_ancestors(&self, parent: Option<&str>) -> Option<Vec<String>> {
+        let mut chain: Vec<String> = Vec::new();
+        let mut next = parent.map(pure);
+        while let Some(p) = next {
+            if chain.len() >= 64 || chain.contains(&p) {
+                break;
+            }
+            let up = match self.get_resource(&Subject::from(p.clone())).await {
+                Ok(r) => r
+                    .get(crate::urls::PARENT)
+                    .ok()
+                    .map(|v| pure(&v.to_string())),
+                Err(_) if chain.is_empty() => None,
+                Err(_) => return None,
+            };
+            chain.push(p);
+            next = up;
+        }
+        Some(chain)
+    }
+
+    /// Whether commits on this drive are logged: only drives with an app.
+    pub fn drive_events_enabled(&self, drive: &str) -> bool {
+        let drive = pure(drive);
+        if self
+            .drive_events_on
+            .read()
+            .is_ok_and(|s| s.contains(&drive))
+        {
+            return true;
+        }
+        let on = self
+            .kv
+            .get(Tree::PluginMeta, &consumer_key("event-on", &drive, ""))
+            .ok()
+            .flatten()
+            .is_some();
+        if on {
+            if let Ok(mut s) = self.drive_events_on.write() {
+                s.insert(drive);
+            }
+        }
+        on
+    }
+
+    /// Starts logging this drive (an Installation was written, or an app read).
+    pub fn enable_drive_events(&self, drive: &str) -> AtomicResult<()> {
+        if self.drive_events_enabled(drive) {
+            return Ok(());
+        }
+        self.kv
+            .insert(Tree::PluginMeta, &consumer_key("event-on", drive, ""), b"1")?;
+        if let Ok(mut s) = self.drive_events_on.write() {
+            s.insert(pure(drive));
+        }
+        Ok(())
+    }
+
     /// Gives `pending` the next sequence number of its drive and queues its
     /// row. The caller holds `drive_event_seq` (the guard) until the batch has
     /// landed, so rows become visible in sequence order.
@@ -216,6 +269,7 @@ impl Db {
             &consumer_key("event-sub", drive, consumer),
             &serde_json::to_vec(filters)?,
         )?;
+        self.enable_drive_events(drive)?;
         self.flush()
     }
 

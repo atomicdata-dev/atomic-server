@@ -471,6 +471,8 @@ pub struct Db {
     /// Last sequence number given per drive, held while a commit's batch
     /// lands so the stream stays in order. See [`drive_events`].
     drive_event_seq: Arc<std::sync::Mutex<HashMap<String, u64>>>,
+    /// Drives that log events (they have an app). See [`drive_events`].
+    drive_events_on: Arc<RwLock<std::collections::HashSet<String>>>,
     /// Where the DB is stored on disk.
     #[allow(dead_code)]
     path: std::path::PathBuf,
@@ -587,6 +589,7 @@ impl Db {
             subject_locks: Default::default(),
             plugin_locks: Default::default(),
             drive_event_seq: Default::default(),
+            drive_events_on: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -4891,7 +4894,6 @@ impl Storelike for Db {
                     resource,
                     commit_response.commit.destroy.unwrap_or(false),
                     commit_response.changed_props.iter().cloned().collect(),
-                    &commit_response.commit.signer.to_string(),
                 )
                 .await
             }

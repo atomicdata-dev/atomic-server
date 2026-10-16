@@ -40,7 +40,7 @@ async fn may_see(host: &AbiHost, event: &DriveEvent) -> bool {
         let db = &host.db;
         let candidates = std::iter::once(&event.subject)
             .filter(|_| !event.destroyed)
-            .chain(event.ancestors.first());
+            .chain(event.parent.as_ref());
         for subject in candidates {
             if let Ok(resource) = db.get_resource(&Subject::from(subject.clone())).await {
                 return host.core.grant().check_read(db, &resource).await.is_ok();
@@ -82,14 +82,25 @@ impl events::Host for AbiState {
             Some(c) => parse_cursor(&c)?,
             None => db.event_checkpoint(drive, &app),
         };
+        // Commits are logged from the first read of an app on the drive.
+        db.enable_drive_events(drive)
+            .map_err(|e| error(code::INTERNAL, e.to_string()))?;
         let filters = db.event_filters(drive, &app);
+        let needs_ancestors = filters
+            .as_ref()
+            .is_some_and(|fs| fs.iter().any(|f| f.subtree.is_some()));
         let max = max.clamp(1, MAX_EVENTS) as usize;
 
         let mut out = Vec::new();
         for event in db.drive_events(drive, after, MAX_SCAN) {
+            let ancestors = if needs_ancestors {
+                db.event_ancestors(event.parent.as_deref()).await
+            } else {
+                None
+            };
             let wanted = filters
                 .as_ref()
-                .is_none_or(|fs| fs.iter().any(|f| f.matches(&event)));
+                .is_none_or(|fs| fs.iter().any(|f| f.matches(&event, ancestors.as_deref())));
             if wanted && may_see(&self.host, &event).await {
                 out.push(Event {
                     cursor: event.seq.to_string(),
