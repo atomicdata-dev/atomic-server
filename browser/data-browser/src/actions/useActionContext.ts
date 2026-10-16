@@ -17,6 +17,7 @@ import {
   useAISidebar,
 } from '../components/AI/AISidebarContext';
 import { type AIAtomicResourceMessageContext } from '@chunks/AI/types';
+import { useRightPanel } from '../components/RightPanel/RightPanelContext';
 import type { ActionContext } from './types';
 
 /** Capabilities and callbacks the consuming surface provides. */
@@ -42,6 +43,7 @@ export interface BuildActionContextInput {
   currentSubject?: string;
   drive?: string;
   addToChat?: () => void;
+  openComments?: () => void;
   enableScope?: () => void;
   addChild?: () => void;
   toggleSidebar?: () => void;
@@ -82,6 +84,7 @@ export async function buildActionContext(
     addFavorite: input.addFavorite,
     removeFavorite: input.removeFavorite,
     addToChat: input.addToChat ?? (() => undefined),
+    openComments: input.openComments ?? (() => undefined),
     enableScope: input.enableScope ?? (() => undefined),
     addChild: input.addChild ?? (() => undefined),
     drive: input.drive,
@@ -109,6 +112,7 @@ export function useActionContext(
   const { setContextItems, isOpen, setIsOpen } = useAISidebar();
   const [drive] = useDrive();
   const titleAffordancesInline = useInlineTitleAffordances();
+  const { setPanelOpen } = useRightPanel();
 
   const addToChat = () => {
     setContextItems(prev => [
@@ -126,6 +130,14 @@ export function useActionContext(
     }
   };
 
+  // The page's own thread has no target subject; anything else does.
+  const openComments = () =>
+    setPanelOpen(
+      'comments',
+      true,
+      subject === currentSubject ? undefined : subject,
+    );
+
   return {
     store,
     navigate,
@@ -138,6 +150,7 @@ export function useActionContext(
     addFavorite,
     removeFavorite,
     addToChat,
+    openComments,
     enableScope,
     addChild,
     drive,

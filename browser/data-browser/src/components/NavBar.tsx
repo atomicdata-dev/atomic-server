@@ -494,7 +494,10 @@ function CommentsButton({ subject }: { subject: string }): JSX.Element {
           : /* @wc-ignore */ 'Comments'
       }
     >
-      {count > 0 ? <CommentCount>{count}</CommentCount> : <FaComments />}
+      <IconWithBadge>
+        <FaComments />
+        {count > 0 && <CommentCount>{count}</CommentCount>}
+      </IconWithBadge>
       <span>Comments</span>
     </CommentsLabelButton>
   );
@@ -642,18 +645,36 @@ const MenuSlot = styled.div<{ $iconOnly: boolean }>`
     `}
 `;
 
+/** Positioning context for the count badge; keeps the icon's 1em footprint. */
+const IconWithBadge = styled.b`
+  position: relative;
+  display: inline-flex;
+  font-weight: inherit;
+`;
+
 /**
- * Rendered in place of the comment icon, matching its 1em footprint so the
- * navbar doesn't shift. Uses <b>: ButtonArea's icon-only rule hides <span>s
- * on narrow screens, but the count must stay visible.
+ * Count badge floating over the comment icon's top-right corner. Uses <b>:
+ * ButtonArea's icon-only rule hides <span>s on narrow screens, but the count
+ * must stay visible.
  */
 const CommentCount = styled.b`
+  position: absolute;
+  top: -0.6em;
+  right: -0.45em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1em;
-  font-weight: inherit;
+  box-sizing: border-box;
+  min-width: 15px;
+  height: 15px;
+  padding-inline: 3px;
+  border-radius: 8px;
+  background: ${p => p.theme.colors.main};
+  color: ${p => p.theme.colors.bg};
+  font-size: 10px;
+  font-weight: 600;
   line-height: 1;
+  pointer-events: none;
 `;
 
 /** Tag chips row — visible on wide, hidden on narrow */
