@@ -45,7 +45,7 @@ test.describe('row dialog', () => {
 
     // A label is not a way off the table.
     const url = page.url();
-    await dialog.locator('label', { hasText: 'Aisle' }).click();
+    await dialog.locator('label', { hasText: 'Price' }).click();
     expect(page.url()).toBe(url);
     await expect(dialog).toBeVisible();
     await expect(

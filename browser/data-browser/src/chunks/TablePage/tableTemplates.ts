@@ -432,26 +432,12 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
   {
     id: 'grocery-list',
     title: 'Grocery list',
-    description: 'Quick add, tick off what you bought, totals per aisle.',
+    description: 'Quick add, tick off what you bought.',
     rowName: 'Item',
     icon: FaCartShopping,
     spec: {
       columns: [
         { name: 'Quantity', type: 'number' },
-        {
-          name: 'Aisle',
-          type: 'select',
-          options: [
-            'Produce',
-            'Bakery',
-            'Dairy',
-            'Meat & fish',
-            'Frozen',
-            'Pantry',
-            'Drinks',
-            'Household',
-          ],
-        },
         { name: 'Price', type: 'decimal', description: 'Per item' },
         { name: 'Bought', type: 'checkbox' },
       ],
@@ -460,13 +446,10 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           name: 'List',
           kind: 'table',
           default: true,
-          aggregates: [{ function: 'sum', column: 'Quantity' }],
-          breakdownColumn: 'Aisle',
-          breakdownGranularity: 'exact',
           // One tap: the tick is the first, always visible control (a narrow
           // column, so it stays on screen on a phone). Bought, Price stay as columns.
-          columns: ['Name', 'Quantity', 'Aisle'],
-          columnOrder: ['Got it', 'Name', 'Quantity', 'Aisle'],
+          columns: ['Name', 'Quantity'],
+          columnOrder: ['Got it', 'Name', 'Quantity'],
           rowActions: [{ label: 'Got it', kind: 'toggle', column: 'Bought' }],
           // The bar you actually use a shopping list through.
           quickAdd: {

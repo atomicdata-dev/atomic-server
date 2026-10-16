@@ -94,14 +94,12 @@ function RowActionCell({
 
   const active = ROW_ACTION_GENERATORS[spec.kind]?.isActive?.(current) ?? false;
 
-  if (!isRowActionComplete(spec)) {
-    return null;
-  }
-
   // The trailing row of the grid is a purely local draft that has never been
-  // committed, so there is nothing to patch yet.
-  if (isDraft) {
-    return null;
+  // committed, so there is nothing to patch yet. The cell itself still renders:
+  // the grid lays out one element per column, and the cell is what draws the
+  // row borders.
+  if (!isRowActionComplete(spec) || isDraft) {
+    return <CellBox />;
   }
 
   const run = () => {
@@ -120,32 +118,41 @@ function RowActionCell({
   };
 
   return (
-    <Button
-      type='button'
-      title={spec.label}
-      aria-label={spec.label}
-      data-kind={spec.kind}
-      data-testid={`row-action-${spec.id}`}
-      data-active={active}
-      aria-pressed={
-        ROW_ACTION_GENERATORS[spec.kind].isActive ? active : undefined
-      }
-      disabled={busy}
-      $active={active}
-      $confirming={justRan}
-      onClick={run}
-    >
-      {spec.kind === 'toggle' ? <FaCheck size='0.75em' /> : spec.label}
-    </Button>
+    <CellBox>
+      <Button
+        type='button'
+        title={spec.label}
+        aria-label={spec.label}
+        data-kind={spec.kind}
+        data-testid={`row-action-${spec.id}`}
+        data-active={active}
+        aria-pressed={
+          ROW_ACTION_GENERATORS[spec.kind].isActive ? active : undefined
+        }
+        disabled={busy}
+        $active={active}
+        $confirming={justRan}
+        onClick={run}
+      >
+        {spec.kind === 'toggle' ? <FaCheck size='0.75em' /> : spec.label}
+      </Button>
+    </CellBox>
   );
 }
+
+/* The grid cell: a real element per column, so it gets the row borders. */
+const CellBox = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+`;
 
 /* Ghost pill (the shared `ghostButtonStyles`) centred in its cell, so it never
  * touches the row borders. A toggle is a round tick control instead. */
 const Button = styled.button<{ $active: boolean; $confirming: boolean }>`
   ${ghostButtonStyles}
   display: flex;
-  margin: auto;
   max-width: calc(100% - 0.5rem);
   white-space: nowrap;
   overflow: hidden;
