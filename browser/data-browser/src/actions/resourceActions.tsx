@@ -20,7 +20,7 @@ import {
   FaFaceSmile,
   FaImage,
   FaMagnifyingGlass,
-  FaMessage,
+  FaComments,
   FaPencil,
   FaPlay,
   FaPlus,
@@ -51,6 +51,7 @@ import { leaveConversation } from '../helpers/conversations/hiddenConversations'
 import { moveToTrash } from '../helpers/trash';
 import { removeRecentResource } from '../helpers/recentResources';
 import { openSearchOverlay } from '../components/overlayState';
+import { AIIcon } from '../components/AI/AIIcon';
 import { openShareDialog } from '../components/Share/shareDialogState';
 
 /** Asks the resource bar to open its tag picker for `detail` (a subject). */
@@ -322,11 +323,21 @@ export const resourceActions: ActionDefinition[] = [
     id: 'addToChat',
     scope: 'resource',
     section: 'action',
-    label: () => 'Add to chat',
-    helper: () => 'Add the resource as context to the AI sidebar',
-    keywords: ['ai', 'assistant', 'context'],
-    icon: () => <FaMessage />,
+    label: () => 'Start AI Chat',
+    helper: () => 'Chat with AI about this resource',
+    keywords: ['ai', 'assistant', 'context', 'chat', 'start', 'new'],
+    icon: () => <AIIcon />,
     run: ctx => ctx.addToChat(),
+  },
+  {
+    id: 'comment',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Add a comment',
+    helper: () => 'Open the comments for this resource',
+    keywords: ['comments', 'discuss', 'reply'],
+    icon: () => <FaComments />,
+    run: ctx => ctx.openComments(),
   },
   {
     id: 'scope',

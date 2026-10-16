@@ -34,6 +34,7 @@ export interface ActionContext {
   addFavorite: (subject: string) => void;
   removeFavorite: (subject: string) => void;
   addToChat: () => void;
+  openComments: () => void;
   enableScope: () => void;
   addChild: () => void;
   /** Current drive subject, if any. */

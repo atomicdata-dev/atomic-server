@@ -495,7 +495,7 @@ test.describe('kanban', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    // "Add to chat" opens the AI sidebar — proves the menu is mounted inside
+    // "Start AI Chat" opens the AI sidebar — proves the menu is mounted inside
     // the AI-sidebar provider (it wasn't before, so this action no-oped).
     await cardIn(todo, 'Action card').click({ button: 'right' });
     await page.getByTestId('menu-item-addToChat').click();
