@@ -23,17 +23,34 @@ An app runs as its Installation's own [agent](../agents.md).
 That agent can read and write exactly what the drive's rights give it (see [Access Rights](creating-plugins.md#access-rights)).
 Nothing runs as the server.
 
-- A read needs both the caller and the app's agent to be allowed to read.
+- A read needs both the caller and the app's agent to be allowed to read, and the resource to be inside the Installation's [read scope](#scopes).
 - `store.apply` plans the intents with the same planner as every other plugin write, then checks write rights on every target before it writes anything. The outcome tells the app what happened:
   - `committed`: written, signed by the app's agent.
-  - `proposed`: the caller may write there but the app's agent may not (or it has no identity). Nothing is written. The host keeps the intents as a proposal for review.
+  - `proposed`: the caller may write there but the app's agent may not, or the target is outside the Installation's write scope (or it has no identity). Nothing is written. The host keeps the intents as a proposal for review.
   - `refused`: the plan is wrong, or the caller may not write there, or the intents touch an Installation, plugin or Release. Nothing is written; `problems` says why.
-- When an app calls another app, the callee runs with **its own** Installation's rights, not the caller's. `calls.call` accepts a list of `handle`s for scoped capabilities, but they are ignored for now.
+- When an app calls another app, the callee runs with **its own** Installation's rights and scopes, not the caller's. `calls.call` accepts a list of `handle`s for per-call capabilities, but they are ignored for now.
 - When a person or tool calls an export over HTTP, the rights are the signed-in agent's **and** the callee's. Calling through an app never gives anyone more than they have.
 - `POST /host/call` first checks the drive: the signed-in agent must be able to read it, and to write it when the export's `effect` is `write` or `external`, or when the providing app declares any `secrets` in its manifest. Running a plugin can spend its secrets, so it takes the same rights as changing it (as for `/plugin-run`); a reader can call a `read` export of an app without secrets, not of one with. This is checked at every hop of a chain, not only the first. A stranger gets `forbidden` before any app is loaded or run.
-- A caller's own manifest bounds what it causes: `calls.call` only reaches interfaces the calling app lists in `uses` (see below). Without it the call is `forbidden`.
+- A caller's own manifest bounds what it causes: `calls.call` only reaches interfaces the calling app lists in `uses` (see below), and its Installation's call scope. Without it the call is `forbidden`.
 - A host that vouches for its caller can narrow the effects with `allowEffects` on `/host/call`. The data browser sends `["read"]` for a frame, because it cannot yet ask the person to approve a write, an external effect or a dialog. A frame has no network of its own, so it cannot send a wider list.
 - One entry call has a total budget, however the apps fan out: 64 calls between apps and a shared pool of fuel (16G instructions, sixteen apps' default allowance). Each instance takes up to its own fuel limit from the pool and gives back what it did not use. Past either, calls fail with `depth-exceeded`. The entry call itself is stopped after 30 seconds (`trap`).
+
+### Scopes
+
+What an app may reach is an explicit list on its Installation, set by whoever installs it, in three ordinary properties:
+
+| Property | Value | Limits |
+| --- | --- | --- |
+| `readScope` | resources | Reads: each listed resource and everything below it |
+| `writeScope` | resources | Writes (`store.apply` targets), the same way |
+| `callScope` | JSON array of interface names | `calls.call`, on top of the manifest's `uses` |
+
+`full-drive-access` is the widest scope: the whole drive, for reads and writes.
+
+- A property that is not set does not limit that kind of access; the agent's own rights still do. A set property is the complete list: `readScope: []` reads nothing.
+- Scopes are rights and limits at once. Activating the Installation puts the app's agent on the read or write list of every listed resource (the normal [access rights](creating-plugins.md#access-rights), so anything inheriting from there is covered), and the host refuses anything outside the lists even if the agent was given more by hand. The same code runs for every runtime, so a scope holds for a component, a module and a run plugin alike.
+- The person who installs can only hand out what they hold: every listed resource must be in the drive and writable by them, or the Installation is refused and nothing is installed.
+- A scope that shrinks makes the earlier rights inert for the host, but does not remove the agent from the old lists.
 
 ## An app: the counter
 
@@ -255,7 +272,7 @@ One import is new, because a module has no caller to ask:
 | --- | --- |
 | `context.get` | The Installation, the agent the module acts as (`none` for a module in the operator's `global` folder, which reads as the public and writes nothing) and the Installation's config as JSON text. The user can edit the config at any time |
 
-A module runs as its Installation's agent, which is the only identity it has: reads are checked against that agent, `store.apply` is signed by it and gets the same `committed`, `proposed` and `refused` outcomes as for an app, and an Installation, plugin or Release cannot be changed through it. There is no separate rights code and no way to read or write as someone else. A module reads only what its agent was given (`full-drive-access`, or access granted on the Installation page).
+A module runs as its Installation's agent, which is the only identity it has: reads are checked against that agent, `store.apply` is signed by it and gets the same `committed`, `proposed` and `refused` outcomes as for an app, and an Installation, plugin or Release cannot be changed through it. There is no separate rights code and no way to read or write as someone else. A module reads only what its agent was given (its scopes or `full-drive-access`, or access granted on the Installation page), and its scopes limit it the same way as an app.
 
 Two things differ from an app, both because a module runs inside the server's own path and nobody is there to approve:
 

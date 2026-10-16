@@ -311,10 +311,15 @@ impl store::Host for AbiState {
         //    the work is kept as a proposal and nothing is written.
         let why_not = match &app_agent {
             None => Some("this installation has no identity of its own to write as".to_string()),
-            Some(agent) => {
+            Some(_) => {
                 let mut first = None;
                 for target in &targets {
-                    if let Err(e) = may_write(&host.db, target, agent).await {
+                    if let Err(e) = host
+                        .core
+                        .grant()
+                        .check_installation_write(&host.db, target)
+                        .await
+                    {
                         first = Some(format!("the installation may not write {target}: {e}"));
                         break;
                     }

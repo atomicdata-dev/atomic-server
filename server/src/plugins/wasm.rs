@@ -29,7 +29,7 @@ use atomic_lib::db::plugin_meta::PluginMetaKey;
 
 use super::host_abi::{HostAbiRegistry, ModuleParts, ServerModule};
 use super::host_core;
-use super::manifest::{CapabilityName, Manifest};
+use super::manifest::Manifest;
 
 const CLASS_EXTENDER_DIR_NAME: &str = "class-extenders"; // Relative to the store path.
 
@@ -950,21 +950,6 @@ async fn create_plugin_meta(
 
         new_agent
     };
-
-    if manifest.has_capability(CapabilityName::FullDriveAccess) {
-        let mut drive = store.get_resource(&drive_subject.into()).await?;
-        drive.push(
-            urls::WRITE,
-            atomic_lib::values::SubResource::Subject(agent.subject.clone()),
-            true,
-        )?;
-        drive.push(
-            urls::READ,
-            atomic_lib::values::SubResource::Subject(agent.subject.clone()),
-            true,
-        )?;
-        drive.save(store).await?;
-    }
 
     store.set_plugin_meta(
         &key,

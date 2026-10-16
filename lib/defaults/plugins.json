@@ -235,6 +235,36 @@
     "https://atomicdata.dev/properties/shortname": "grants"
   },
   {
+    "@id": "https://atomicdata.dev/properties/readScope",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Subtrees an Installation's agent may read: each listed resource and everything below it. Absent means the scope does not limit reads; the agent's own rights still do.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "read-scope"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/writeScope",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Subtrees an Installation's agent may write, as for `readScope`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "write-scope"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/callScope",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Interfaces an Installation may call through the host ABI, as a JSON array of names. Absent means the scope does not limit calls; the manifest's `uses` still does.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "call-scope"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/installationStatus",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
     "https://atomicdata.dev/properties/description": "Lifecycle of an Installation: `draft`, `active`, `paused` or `revoked`. Committing `active` installs; `revoked` or destroying uninstalls.",
@@ -320,6 +350,9 @@
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/config",
       "https://atomicdata.dev/properties/grants",
+      "https://atomicdata.dev/properties/readScope",
+      "https://atomicdata.dev/properties/writeScope",
+      "https://atomicdata.dev/properties/callScope",
       "https://atomicdata.dev/properties/name",
       "https://atomicdata.dev/properties/namespace",
       "https://atomicdata.dev/properties/description",

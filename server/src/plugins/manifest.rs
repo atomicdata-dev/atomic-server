@@ -1347,7 +1347,9 @@ mod export_tests {
         );
         assert!(Manifest::parse(json!({
             "schemaVersion": 2,
+            "runtime": "wasip2/1",
             "world": "server-extension",
+            "entrypoints": {"classExtender": ["https://atomicdata.dev/classes/Folder"]},
             "uses": ["atomic:example/counter@1"]
         }))
         .is_ok());

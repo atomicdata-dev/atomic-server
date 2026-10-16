@@ -233,8 +233,24 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 2. Scoped grants
 
-- [ ] Replace the six capabilities with `(scope, rights)` grants enforced in the
-      one place grants are intersected today (`host_core.rs`).
+- [x] Rights as `(scope, rights)` grants enforced in the one place grants are
+      intersected today (`host_core.rs`'s `Grant`), for every runtime.
+      *Done as the smallest design:* three ordinary properties on the
+      Installation (`readScope`, `writeScope`: subtree roots; `callScope`:
+      interface names), parsed once by `installation::Scopes`, checked by
+      `hierarchy::check_read` / `check_write` first and then by the scope.
+      Activation (`plugin.rs`, `scope_roots` / `grant_scopes`) validates every
+      root (exists, in the drive, writable by the installer) and puts the
+      app's agent on it, replacing the `full-drive-access` special case in
+      `create_plugin_meta`, which is now the widest scope (the drive).
+      Unset means unlimited (older Installations); `proposed` is the outcome
+      of an out-of-scope write, as for any write the agent may not make.
+      *Not done:* class scopes (`readScope` takes subtrees, not "every Task");
+      the other capabilities (`storage`, `extended-*`, `custom-view`) are not
+      scopes yet and stay in `grants`; removing the agent from old roots when a
+      scope shrinks (the host ignores them); per-call `handle`s still ignored;
+      the manifest does not declare scopes yet (step 4), so the installer picks
+      them freely within their own rights.
 - [ ] Consent dialog shows scopes in plain language.
 - [ ] Covers #1740, #1741, #1849 and most of #2235 with one mechanism.
 

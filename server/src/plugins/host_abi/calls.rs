@@ -75,11 +75,10 @@ impl calls::Host for AbiState {
         args: String,
         handles: Vec<Handle>,
     ) -> Result<String, HostError> {
-        // TODO(host-abi step 2): handles are scoped capabilities the callee may
-        // use for this call only. Until grants have scopes there is nothing to
-        // intersect them with, so they are accepted and ignored: the callee
-        // runs with its own Installation's rights and nothing of the calling
-        // app's, still bounded by whoever made the entry call.
+        // TODO(host-abi): handles are scoped capabilities the callee may use for
+        // this call only. They are accepted and ignored: the callee runs with
+        // its own Installation's scopes and nothing of the calling app's, still
+        // bounded by whoever made the entry call.
         if !handles.is_empty() {
             tracing::debug!(
                 count = handles.len(),
@@ -98,6 +97,12 @@ impl calls::Host for AbiState {
             return Err(error(
                 code::FORBIDDEN,
                 format!("this app does not declare that it uses {interface} (manifest `uses`)"),
+            ));
+        }
+        if !self.host.core.grant().allows_call(&interface) {
+            return Err(error(
+                code::FORBIDDEN,
+                format!("{interface} is outside the call scope of this installation"),
             ));
         }
         call_export(

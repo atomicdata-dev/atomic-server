@@ -55,9 +55,9 @@ A class extender reaches them with `net.fetch` only; it has no `wasi-http` and n
 
 Each Installation gets its own [agent](../agents.md) that the plugin uses to fetch resources and sign commits.
 By default that agent does not have access to any resources.
-The user can grant access to specific resources on the Installation page.
+The installer grants access to specific parts of the drive with the Installation's `readScope`, `writeScope` and `callScope` (see [Scopes](host-abi.md#scopes)), or by hand on a resource's rights.
 
-Alternatively you can declare the `full-drive-access` capability in the manifest to give the agent full access to the drive.
+Alternatively you can declare the `full-drive-access` capability in the manifest to give the agent full access to the drive, which is the widest scope.
 
 ## The plugin package
 

@@ -22,6 +22,7 @@ use wasmtime::{Engine, Store, StoreLimits, StoreLimitsBuilder};
 
 use super::{
     egress,
+    installation::Scopes,
     manifest::{CapabilityName, Manifest},
 };
 
@@ -319,6 +320,8 @@ pub enum World {
 pub struct Grant {
     caller: ForAgent,
     installation: Option<ForAgent>,
+    /// What the Installation's scopes allow on top of its agent's rights.
+    scopes: Scopes,
 }
 
 impl Grant {
@@ -329,7 +332,18 @@ impl Grant {
         Ok(Self {
             caller,
             installation,
+            scopes: Scopes::default(),
         })
+    }
+
+    pub fn with_scopes(mut self, scopes: Scopes) -> Self {
+        self.scopes = scopes;
+        self
+    }
+
+    /// Whether the Installation's scopes let it call `interface`.
+    pub fn allows_call(&self, interface: &str) -> bool {
+        self.scopes.allows_call(interface)
     }
 
     pub fn caller(&self) -> &ForAgent {
@@ -351,6 +365,34 @@ impl Grant {
             hierarchy::check_read(db, resource, installation)
                 .await
                 .map_err(|e| e.to_string())?;
+            if !self.scopes.allows_read(db, resource).await {
+                return Err(format!(
+                    "the installation has no right to read {}: outside its read scope",
+                    resource.get_subject()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Refuses unless the Installation's own agent may write `subject`: by the
+    /// hierarchy, and by its write scope. The caller is checked by the store.
+    pub async fn check_installation_write(&self, db: &Db, subject: &str) -> Result<(), String> {
+        let agent = self
+            .installation
+            .as_ref()
+            .ok_or("this installation has no identity of its own to write as")?;
+        let resource = db
+            .get_resource(&subject.into())
+            .await
+            .map_err(|e| format!("{subject} could not be read: {e}"))?;
+        hierarchy::check_write(db, &resource, agent)
+            .await
+            .map_err(|e| e.to_string())?;
+        if !self.scopes.allows_write(db, &resource).await {
+            return Err(format!(
+                "the installation has no right to write {subject}: outside its write scope"
+            ));
         }
         Ok(())
     }
@@ -459,6 +501,7 @@ impl HostCore {
         caller: ForAgent,
         manifest: Option<Manifest>,
     ) -> Result<Self, String> {
+        let mut scopes = Scopes::default();
         let installation = match super::installation::resolve(&db, drive, plugin)
             .await?
             .signing_as
@@ -468,6 +511,13 @@ impl HostCore {
                     .get_app_agent_info(&key)
                     .map_err(|e| e.to_string())?
                     .ok_or("app identity is missing")?;
+                let owner = db
+                    .get_resource(&key.app.as_str().into())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                if owner.has_class(urls::INSTALLATION) {
+                    scopes = Scopes::of(&owner, drive);
+                }
                 Some(ForAgent::AgentSubject(info.agent.into()))
             }
             None => None,
@@ -477,7 +527,7 @@ impl HostCore {
             db,
             drive: Some(drive.to_string()),
             plugin: Some(plugin.to_string()),
-            grant: Grant::new(caller, installation)?,
+            grant: Grant::new(caller, installation)?.with_scopes(scopes),
             world: World::Extension,
             fetch_policy: match manifest {
                 Some(manifest) => FetchPolicy::Operations(Box::new(manifest)),

@@ -53,6 +53,29 @@ pub(crate) struct Installed {
 /// Publishes a release for `wasm` and installs it in the fixture's drive, with
 /// the identity a real installation gets: an app agent whose key this node holds.
 pub(crate) async fn install(f: &Fixture, name: &str, manifest: &str, wasm: &[u8]) -> Installed {
+    install_scoped(f, name, manifest, wasm, Vec::new()).await
+}
+
+/// The same, with more properties on the Installation (its scopes).
+pub(crate) async fn install_scoped(
+    f: &Fixture,
+    name: &str,
+    manifest: &str,
+    wasm: &[u8],
+    extra: Vec<(&str, Value)>,
+) -> Installed {
+    try_install_scoped(f, name, manifest, wasm, extra)
+        .await
+        .unwrap()
+}
+
+async fn try_install_scoped(
+    f: &Fixture,
+    name: &str,
+    manifest: &str,
+    wasm: &[u8],
+    extra: Vec<(&str, Value)>,
+) -> Result<Installed, String> {
     let db = &f.appstate.store;
     let manifest: Json = serde_json::from_str(manifest).unwrap();
 
@@ -73,23 +96,29 @@ pub(crate) async fn install(f: &Fixture, name: &str, manifest: &str, wasm: &[u8]
         })
         .unwrap();
 
-    let installation = genesis(
-        db,
-        vec![
-            (
-                urls::IS_A,
-                Value::ResourceArray(vec![urls::INSTALLATION.into()]),
-            ),
-            (urls::PARENT, Value::AtomicUrl(f.drive.as_str().into())),
-            (urls::NAME, Value::String(name.into())),
-            (urls::NAMESPACE, Value::String("example".into())),
-            (urls::RELEASE_PROP, Value::String(id.clone())),
-            (urls::RELEASE_ID, Value::String(id)),
-            (urls::INSTALLATION_STATUS, Value::String("active".into())),
-            (urls::GRANTS, Value::Json(json!([]))),
-        ],
-    )
-    .await;
+    let mut props = vec![
+        (
+            urls::IS_A,
+            Value::ResourceArray(vec![urls::INSTALLATION.into()]),
+        ),
+        (urls::PARENT, Value::AtomicUrl(f.drive.as_str().into())),
+        (urls::NAME, Value::String(name.into())),
+        (urls::NAMESPACE, Value::String("example".into())),
+        (urls::RELEASE_PROP, Value::String(id.clone())),
+        (urls::RELEASE_ID, Value::String(id)),
+        (urls::INSTALLATION_STATUS, Value::String("active".into())),
+        (urls::GRANTS, Value::Json(json!([]))),
+    ];
+    props.extend(extra);
+    let mut resource = atomic_lib::Resource::new("did:ad:placeholder".into());
+    for (property, value) in props {
+        resource.set_unsafe(property.into(), value).unwrap();
+    }
+    resource
+        .save_as_genesis(db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let installation = resource.get_subject().to_string();
 
     // Activating the Installation (its before-commit hook) minted the identity.
     let agent = db
@@ -98,10 +127,10 @@ pub(crate) async fn install(f: &Fixture, name: &str, manifest: &str, wasm: &[u8]
         .expect("activation gave the installation an agent")
         .agent;
 
-    Installed {
+    Ok(Installed {
         installation,
         agent,
-    }
+    })
 }
 
 pub(crate) fn owner(db: &Db) -> ForAgent {
@@ -1411,4 +1440,188 @@ async fn a_reader_cannot_cause_a_write_through_a_run_plugin() {
 
     assert_eq!(verdict["code"], code::FORBIDDEN, "{verdict}");
     assert_eq!(count_of(db, &subject, &property).await, 0);
+}
+
+// -- scopes -----------------------------------------------------------------
+
+fn subtrees(roots: &[&str]) -> Value {
+    Value::ResourceArray(roots.iter().map(|r| (*r).into()).collect())
+}
+
+/// A folder `docs` with a counted resource in it, and one outside it.
+async fn inside_and_outside(w: &World) -> (String, String, String, String) {
+    let db = &*w.db;
+    let (outside, property) = counter_resource(&w.f).await;
+    let docs = genesis(
+        db,
+        vec![
+            (urls::IS_A, Value::ResourceArray(vec![urls::FOLDER.into()])),
+            (urls::PARENT, Value::AtomicUrl(w.f.drive.as_str().into())),
+            (urls::NAME, Value::String("docs".into())),
+        ],
+    )
+    .await;
+    let inside = genesis(
+        db,
+        vec![
+            (urls::PARENT, Value::AtomicUrl(docs.as_str().into())),
+            (urls::NAME, Value::String("In docs".into())),
+            (property.as_str(), Value::Integer(0)),
+        ],
+    )
+    .await;
+    (docs, inside, outside, property)
+}
+
+/// A read scope is a subtree: the app reads inside it, and nowhere else, even
+/// when something outside it was shared with the app's agent by hand.
+#[actix_rt::test]
+async fn a_read_scope_limits_reads_to_its_subtree() {
+    let w = World::new("host_abi_read_scope").await;
+    let db = &*w.db;
+    let (docs, inside, outside, _) = inside_and_outside(&w).await;
+    let app = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[&docs]))],
+    )
+    .await;
+
+    let mut state = w.state(&app, owner(db)).await;
+    // Activation put the agent on `docs`, which the resource inherits.
+    assert_eq!(state.get(inside.clone()).await.unwrap().subject, inside);
+    let err = state.get(outside.clone()).await.unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+
+    // Rights the agent has by hand do not widen the scope.
+    share(db, &outside, &[&app.agent], &[]).await;
+    let err = state.get(outside.clone()).await.unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert!(err.message.contains("read scope"), "{err:?}");
+
+    // Nor do queries see it.
+    let list = |parent: &str| QuerySpec {
+        class: None,
+        parent: Some(parent.to_string()),
+        filters: vec![],
+        sort_by: None,
+        sort_desc: false,
+        limit: Some(50),
+        cursor: None,
+        with_resources: false,
+    };
+    let page = state.query(list(&docs)).await.unwrap();
+    assert!(page.subjects.contains(&inside), "{page:?}");
+    let page = state.query(list(&w.f.drive)).await.unwrap();
+    assert!(page.subjects.contains(&docs), "{page:?}");
+    assert!(!page.subjects.contains(&outside), "{page:?}");
+}
+
+/// A write scope permits a write inside it. Outside it nothing is written,
+/// whatever the agent holds: the plan is kept as a proposal, as for any write
+/// the app's agent may not make.
+#[actix_rt::test]
+async fn a_write_scope_limits_writes_to_its_subtree() {
+    let w = World::new("host_abi_write_scope").await;
+    let db = &*w.db;
+    let (docs, inside, outside, property) = inside_and_outside(&w).await;
+    let app = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::WRITE_SCOPE, subtrees(&[&docs]))],
+    )
+    .await;
+    share(db, &outside, &[], &[&app.agent]).await;
+
+    let mut state = w.state(&app, owner(db)).await;
+    let applied = state
+        .apply(vec![set(&inside, &property, WitValue::Integer(5))])
+        .await
+        .unwrap();
+    assert_eq!(applied.outcome, Outcome::Committed, "{applied:?}");
+    assert_eq!(count_of(db, &inside, &property).await, 5);
+
+    let applied = state
+        .apply(vec![set(&outside, &property, WitValue::Integer(5))])
+        .await
+        .unwrap();
+    assert_eq!(applied.outcome, Outcome::Proposed, "{applied:?}");
+    assert!(
+        applied
+            .problems
+            .iter()
+            .any(|p| p.message.contains("write scope")),
+        "{applied:?}"
+    );
+    assert_eq!(count_of(db, &outside, &property).await, 0);
+}
+
+/// An interface scope limits `calls` on top of the manifest's `uses`.
+#[actix_rt::test]
+async fn a_call_scope_limits_the_interfaces_an_app_may_call() {
+    let w = World::new("host_abi_call_scope").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let caller = install_scoped(
+        &w.f,
+        "caller",
+        CALLER_MANIFEST,
+        CALLER_WASM,
+        vec![(
+            urls::CALL_SCOPE,
+            Value::Json(json!(["atomic:example/other@1"])),
+        )],
+    )
+    .await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let args = json!({"subject": subject, "property": property});
+
+    let err = w
+        .call(CALLER, "bump-twice", args.clone(), owner(db))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert!(err.message.contains("call scope"), "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // Scoped to the interface it uses, the same call goes through.
+    let mut installation = db
+        .get_resource(&caller.installation.as_str().into())
+        .await
+        .unwrap();
+    installation
+        .set_unsafe(urls::CALL_SCOPE.into(), Value::Json(json!([COUNTER])))
+        .unwrap();
+    installation.save(db).await.unwrap();
+    let result = w.call(CALLER, "bump-twice", args, owner(db)).await.unwrap();
+    assert_eq!(result, json!({"count": 2}));
+}
+
+/// A scope must name something that exists. (That it is in the drive and the
+/// installer may write it is checked with the hierarchy's own `check_write`.)
+#[actix_rt::test]
+async fn a_scope_must_name_something_that_exists() {
+    let w = World::new("host_abi_scope_bounds").await;
+    let (_, inside, _, _) = inside_and_outside(&w).await;
+    let attempt = |root: String| {
+        let w = &w;
+        async move {
+            try_install_scoped(
+                &w.f,
+                "counter",
+                COUNTER_MANIFEST,
+                COUNTER_WASM,
+                vec![(urls::READ_SCOPE, subtrees(&[&root]))],
+            )
+            .await
+        }
+    };
+    let err = attempt("did:ad:nothing".into()).await.err().unwrap();
+    assert!(err.contains("cannot be read"), "{err}");
+    assert!(attempt(inside).await.is_ok());
 }

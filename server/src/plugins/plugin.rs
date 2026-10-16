@@ -214,6 +214,7 @@ mod installation_hook {
     use super::*;
     use crate::plugins::{
         host_abi::HostAbiRegistry,
+        installation::{within, Scopes},
         manifest::Manifest,
         release,
         wasm::{
@@ -226,6 +227,7 @@ mod installation_hook {
         plugin_meta::PluginMeta,
         plugin_release::{PluginRelease, WORLD_SANDBOXED_APP, WORLD_SERVER_EXTENSION},
     };
+    use atomic_lib::{hierarchy, values::SubResource, Subject};
     use tracing::info;
     use zip::ZipArchive;
 
@@ -304,6 +306,8 @@ mod installation_hook {
         // 2. Grants against what the manifest declares. The grants on the
         //    Installation are the approved set the host reads back.
         release::check_grants(&release.manifest, &json_value(resource, urls::GRANTS)?)?;
+
+        let roots = scope_roots(resource, drive, store, signer).await?;
 
         let (namespace, name) = identifiers(resource, &release.manifest)?;
         let key = PluginMetaKey::new(drive, &namespace, &name);
@@ -387,10 +391,79 @@ mod installation_hook {
             ensure_js_identity(store, drive, &subject, &namespace, &name, &release, &actual)
                 .await?;
         }
+        grant_scopes(roots, resource, drive, store).await?;
         info!(
             "activated installation {subject} ({namespace}/{name}, {})",
             release.runtime
         );
+        Ok(())
+    }
+
+    /// The roots the Installation's scopes name, read, checked and not yet
+    /// granted. Every one must be in the drive and writable by whoever commits
+    /// the Installation: nobody can hand an app more than they hold. Checked
+    /// before anything is installed, so a bad scope leaves nothing behind.
+    async fn scope_roots(
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+        signer: &str,
+    ) -> AtomicResult<Vec<(&'static str, Resource)>> {
+        let scopes = Scopes::of(resource, drive);
+        let signer = ForAgent::AgentSubject(signer.into());
+        let in_drive = [drive.to_string()];
+        let mut roots = Vec::new();
+        for (property, listed) in [(urls::READ, &scopes.read), (urls::WRITE, &scopes.write)] {
+            for root in listed.iter().flatten() {
+                let target = store
+                    .get_resource(&root.as_str().into())
+                    .await
+                    .map_err(|e| AtomicError::from(format!("scope {root} cannot be read: {e}")))?;
+                if !within(store, &target, Some(&in_drive)).await {
+                    return Err(AtomicError::from(format!(
+                        "scope {root} is not in the drive of this installation"
+                    )));
+                }
+                hierarchy::check_write(store, &target, &signer)
+                    .await
+                    .map_err(|e| {
+                        AtomicError::from(format!(
+                            "you cannot grant {root}, since you may not write it: {e}"
+                        ))
+                    })?;
+                roots.push((property, target));
+            }
+        }
+        Ok(roots)
+    }
+
+    /// Puts the Installation's agent on those roots, so the hierarchy and the
+    /// scopes say the same thing. This is the one place a scope becomes a
+    /// right, for every runtime; the host enforces the list itself on top
+    /// (`installation::Scopes`). Rights an earlier set of scopes gave are not
+    /// taken back here; the scopes make them inert for the host.
+    async fn grant_scopes(
+        roots: Vec<(&'static str, Resource)>,
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+    ) -> AtomicResult<()> {
+        let key = AppAgentKey::new(drive, &resource.get_subject().to_string());
+        let Some(identity) = store.get_app_agent_info(&key)? else {
+            return Ok(());
+        };
+        for (property, mut target) in roots {
+            let held = target
+                .get(property)
+                .ok()
+                .and_then(|list| list.to_subjects(None).ok())
+                .is_some_and(|list| list.contains(&identity.agent));
+            if !held {
+                let agent = Subject::from(identity.agent.as_str());
+                target.push(property, SubResource::Subject(agent), true)?;
+                target.save(store).await?;
+            }
+        }
         Ok(())
     }
 
