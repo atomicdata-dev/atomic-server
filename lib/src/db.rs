@@ -308,6 +308,12 @@ const MANAGED_ALIAS_HOSTS_KEY: &[u8] = b"managed_drive_alias_hosts";
 /// looking up lowercased is what makes `ACME.example.com` resolve the Drive
 /// that `acme.example.com` was bound to, instead of silently missing the
 /// mapping and falling through to the store root.
+/// What a replicated resource says changed: it arrives whole, so every
+/// property it holds.
+fn replicated_props(resource: &Resource) -> std::collections::BTreeSet<String> {
+    resource.get_propvals().keys().cloned().collect()
+}
+
 fn drive_mapping_key(host: &str) -> String {
     host.trim().trim_end_matches('.').to_ascii_lowercase()
 }
@@ -824,6 +830,7 @@ impl Db {
         }
         let mut transaction = Transaction::new();
         let mut batched: Vec<&Resource> = Vec::new();
+        let mut events = Vec::new();
         for (i, (resource, snapshot)) in entries.iter().enumerate() {
             let key = self.normalize_subject(resource.get_subject()).pure_id();
             if last.get(&key) != Some(&i) {
@@ -849,12 +856,16 @@ impl Db {
                 transaction.extend(added);
                 transaction.push(crate::search::pending_marker(&key));
             }
+            events.extend(
+                drive_events::PendingEvent::new(self, resource, false, replicated_props(resource))
+                    .await,
+            );
             batched.push(resource);
         }
         if batched.is_empty() {
             return Ok(());
         }
-        self.apply_transaction(&mut transaction)?;
+        self.apply_transaction_with_source(&mut transaction, None, events)?;
         for resource in batched {
             self.note_lens_related(resource).await;
             let _ = self.db_events.send(DbEvent::Changed {
@@ -910,7 +921,10 @@ impl Db {
             &mut transaction,
         )
         .await?;
-        self.apply_transaction(&mut transaction)?;
+        let event =
+            drive_events::PendingEvent::new(self, resource, false, replicated_props(resource))
+                .await;
+        self.apply_transaction_with_source(&mut transaction, None, event.into_iter().collect())?;
         if crate::import_identity::identity(resource).is_some() {
             self.flush()?;
         }
@@ -2745,9 +2759,16 @@ impl Db {
     async fn remove_applied(&self, subject: &Subject) -> AtomicResult<Vec<RemovedSubject>> {
         let mut transaction = Transaction::new();
         let mut removed = Vec::new();
-        self.recursive_remove(subject, &mut transaction, &mut removed, None)
-            .await?;
-        self.apply_transaction(&mut transaction)?;
+        let mut events = Vec::new();
+        self.recursive_remove(
+            subject,
+            &mut transaction,
+            &mut removed,
+            None,
+            Some(&mut events),
+        )
+        .await?;
+        self.apply_transaction_with_source(&mut transaction, None, events)?;
         // Tombstone every removed subject so bulk sync (Iroh / WS `SYNC`)
         // does not resurrect them from a peer that still holds a stale copy.
         // Only after the apply succeeded: a tombstone for a resource that is
@@ -3671,36 +3692,46 @@ impl Db {
     /// membership from the raw atom stream.
     #[instrument(level = "trace", skip_all)]
     pub(crate) fn apply_transaction(&self, transaction: &mut Transaction) -> AtomicResult<()> {
-        self.apply_transaction_with_source(transaction, None, None)
+        self.apply_transaction_with_source(transaction, None, Vec::new())
     }
 
     fn apply_transaction_with_source(
         &self,
         transaction: &mut Transaction,
         source_id: Option<&str>,
-        event: Option<drive_events::PendingEvent>,
+        events: Vec<drive_events::PendingEvent>,
     ) -> AtomicResult<()> {
-        // A commit's query edges ride in its drive event, in the same batch, so
+        // A change's query edges ride in its drive event, in the same batch, so
         // a trigger that was down or lagging replays them from its cursor. A
         // sorted member moving positions has a delete and insert in this
-        // batch, which is not a membership edge.
-        let event = match event {
-            Some(event) => {
-                let mut edges = std::collections::BTreeMap::new();
-                for op in transaction
-                    .iter()
-                    .filter(|op| op.tree == Tree::QueryMembers)
-                {
-                    if let Some((query, _)) = query_index::parse_members_key_id_subject(&op.key) {
-                        *edges.entry(query).or_insert(0i32) +=
-                            if matches!(op.method, Method::Insert) {
-                                1
-                            } else {
-                                -1
-                            };
-                    }
+        // batch, which is not a membership edge. With several events in one
+        // batch (a replicated page, a recursive removal) an edge goes to the
+        // event of the subject it is about; the rest go to the first.
+        let events = if events.is_empty() {
+            events
+        } else {
+            let mut edges = vec![std::collections::BTreeMap::<Vec<u8>, i32>::new(); events.len()];
+            for op in transaction
+                .iter()
+                .filter(|op| op.tree == Tree::QueryMembers)
+            {
+                if let Some((query, member)) = query_index::parse_members_key_id_subject(&op.key) {
+                    let member = drive_events::pure(&member);
+                    let at = events
+                        .iter()
+                        .position(|e| e.subject_id() == member)
+                        .unwrap_or(0);
+                    *edges[at].entry(query).or_insert(0i32) +=
+                        if matches!(op.method, Method::Insert) {
+                            1
+                        } else {
+                            -1
+                        };
                 }
-                let mut watched = None;
+            }
+            let mut watched = None;
+            let mut with_edges = Vec::with_capacity(events.len());
+            for (event, edges) in events.into_iter().zip(edges) {
                 let mut found = Vec::new();
                 for (query, delta) in edges.into_iter().filter(|(_, d)| *d != 0) {
                     let ids = match &watched {
@@ -3711,9 +3742,9 @@ impl Db {
                         found.push((hex::encode(query), delta > 0));
                     }
                 }
-                Some(event.with_edges(found))
+                with_edges.push(event.with_edges(found));
             }
-            None => None,
+            with_edges
         };
         // The drive's event joins the same batch. The sequence lock is held
         // until the batch has landed, so rows appear in sequence order.
@@ -3721,7 +3752,7 @@ impl Db {
             .drive_event_seq
             .lock()
             .map_err(|_| "drive event lock poisoned")?;
-        if let Some(event) = event {
+        for event in events {
             self.queue_drive_event(event, &mut sequence, transaction)?;
         }
         self.kv.apply_batch(transaction)?;
@@ -4316,6 +4347,7 @@ impl Db {
         transaction: &mut Transaction,
         removed: &mut Vec<RemovedSubject>,
         inherited_drive: Option<Subject>,
+        mut events: Option<&mut Vec<drive_events::PendingEvent>>,
     ) -> AtomicResult<()> {
         // Key by `pure_id()` — that is how resources and Loro snapshots are
         // stored (`add_resource_tx`, `apply_commit`). Looking up by the raw
@@ -4329,6 +4361,13 @@ impl Db {
             // Read the drive now, while the resource still exists: a listener
             // reacting to the removal cannot look it up any more.
             let drive = resource.get_drive().or(inherited_drive);
+            if let Some(events) = events.as_deref_mut() {
+                // Still stored, so its parent chain can be read.
+                events.extend(
+                    drive_events::PendingEvent::new(self, &resource, true, Default::default())
+                        .await,
+                );
+            }
             removed.push(RemovedSubject {
                 subject: subject.without_params(),
                 drive: drive.clone(),
@@ -4341,6 +4380,7 @@ impl Db {
                     transaction,
                     removed,
                     drive.clone(),
+                    events.as_deref_mut(),
                 ))
                 .await?;
             }
@@ -4792,7 +4832,7 @@ impl Storelike for Db {
                 // destroy — what `SYNC_DIFF.removeCommits` carries — lands
                 // with the deletion it signs, or not at all. Tombstones and
                 // the children's `Destroyed` events follow the apply below.
-                self.recursive_remove(&subject, &mut transaction, &mut removed, None)
+                self.recursive_remove(&subject, &mut transaction, &mut removed, None, None)
                     .await?;
             }
             _ => {}
@@ -4880,7 +4920,7 @@ impl Storelike for Db {
         store.apply_transaction_with_source(
             &mut transaction,
             commit_response.source_id.as_deref(),
-            drive_event,
+            drive_event.into_iter().collect(),
         )?;
 
         // An import receipt may be the only evidence available when retrying

@@ -5430,3 +5430,81 @@ async fn a_trigger_misses_no_edge_across_a_reopen() {
     }
     assert_eq!(seen, vec![b.to_string(), c.to_string()]);
 }
+
+/// A resource that arrives by replication (a synced state update, a bulk
+/// pull) moves the drive's stream and a trigger's edges like a commit does,
+/// and so does everything a recursive removal takes with it.
+#[tokio::test]
+#[timeout(120000)]
+async fn replicated_and_removed_resources_reach_the_event_stream_and_triggers() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let store = Db::init_temp("replication_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(drive.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        true,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+
+    // Replicated in: one row, one enter edge.
+    let mut replicated = Resource::new("atomic:replicated-1".into());
+    replicated
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    let events = store.drive_events(drive.as_str(), 0, 100);
+    assert!(
+        events.iter().any(|e| e.subject == "atomic:replicated-1"),
+        "{events:?}"
+    );
+    let entered = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!(
+        (entered.subject.as_str(), entered.edge),
+        ("atomic:replicated-1", Edge::Enter)
+    );
+    store.acknowledge_plugin_event(&entered).unwrap();
+
+    // Removed with its child: both are destroyed rows, and the one the trigger
+    // watches leaves.
+    let folder = genesis_child(&store, &drive).await;
+    let inner = genesis_child(&store, &folder).await;
+    let entered = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    store.acknowledge_plugin_event(&entered).unwrap();
+    let seen = store.drive_events(drive.as_str(), 0, 1000).len();
+    store.remove_resource(&folder).await.unwrap();
+    let after: Vec<_> = store
+        .drive_events(drive.as_str(), 0, 1000)
+        .into_iter()
+        .skip(seen)
+        .collect();
+    let destroyed: Vec<_> = after
+        .iter()
+        .filter(|e| e.destroyed)
+        .map(|e| e.subject.clone())
+        .collect();
+    assert!(
+        destroyed.contains(&folder.to_string()) && destroyed.contains(&inner.to_string()),
+        "{after:?}"
+    );
+    let left = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!(
+        (left.subject.as_str(), left.edge),
+        (folder.as_str(), Edge::Leave)
+    );
+}

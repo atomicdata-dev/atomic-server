@@ -76,6 +76,13 @@ pub fn pure(subject: &str) -> String {
     Subject::from(subject.to_string()).pure_id()
 }
 
+/// The first key after every key that starts with `prefix`.
+fn prefix_end(prefix: &[u8]) -> Vec<u8> {
+    let mut end = prefix.to_vec();
+    end.push(0xff);
+    end
+}
+
 fn event_key(drive: &str, seq: u64) -> Vec<u8> {
     format!("{EVENT_PREFIX}{}/{seq:020}", pure(drive)).into_bytes()
 }
@@ -103,6 +110,12 @@ impl PendingEvent {
             .ok()
             .and_then(|v| v.to_subjects(None).ok())
             .unwrap_or_default();
+        // No drive logs yet (the common case, and every first-run `populate`):
+        // nothing to find, and walking parents here would only read.
+        let installation = classes.iter().any(|c| c == crate::urls::INSTALLATION);
+        if !installation && !store.any_drive_events() {
+            return None;
+        }
         let parent = resource
             .get(crate::urls::PARENT)
             .ok()
@@ -113,7 +126,7 @@ impl PendingEvent {
             Some(drive) => drive.pure_id(),
             None => store.event_ancestors(parent.as_deref()).await?.pop()?,
         };
-        if classes.iter().any(|c| c == crate::urls::INSTALLATION) {
+        if installation {
             store.enable_drive_events(&drive).ok()?;
         } else if !store.drive_events_enabled(&drive) {
             return None;
@@ -131,6 +144,11 @@ impl PendingEvent {
                 edges: Vec::new(),
             },
         })
+    }
+
+    /// The subject the event is about, as [`pure`] names it.
+    pub(crate) fn subject_id(&self) -> String {
+        pure(&self.event.subject)
     }
 
     pub(crate) fn with_edges(mut self, edges: Vec<(String, bool)>) -> Self {
@@ -161,6 +179,17 @@ impl Db {
             next = up;
         }
         Some(chain)
+    }
+
+    /// Whether any drive logs its commits.
+    pub(crate) fn any_drive_events(&self) -> bool {
+        if self.drive_events_on.read().is_ok_and(|s| !s.is_empty()) {
+            return true;
+        }
+        let prefix = b"event-on/v1/";
+        self.kv
+            .range_page(Tree::PluginMeta, prefix.to_vec(), prefix_end(prefix), 1)
+            .is_ok_and(|rows| !rows.is_empty())
     }
 
     /// Whether commits on this drive are logged: only drives with an app.
