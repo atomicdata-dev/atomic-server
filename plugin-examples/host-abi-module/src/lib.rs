@@ -21,7 +21,7 @@ use atomic::host::{
     store::{self, Intent, Outcome},
     types::{Error, Problem, PropVal, Resource, Severity, Value},
 };
-use exports::atomic::host::hooks::{CommitInfo, Guest};
+use exports::atomic::host::hooks::{CommitInfo, GetAnswer, Guest};
 
 const FOLDER: &str = "https://atomicdata.dev/classes/Folder";
 const NAME: &str = "https://atomicdata.dev/properties/name";
@@ -65,7 +65,11 @@ impl Guest for Module {
         Ok(())
     }
 
-    fn on_get(mut resource: Resource, agent: String) -> Result<Option<Resource>, Error> {
+    fn on_get(
+        mut resource: Resource,
+        agent: String,
+        _query: Vec<(String, String)>,
+    ) -> Result<Option<GetAnswer>, Error> {
         let me = context::get();
         let config: serde_json::Value = serde_json::from_str(&me.config).unwrap_or_default();
         let mut notes = vec![
@@ -116,7 +120,10 @@ impl Guest for Module {
             property: DESCRIPTION.to_string(),
             value: Value::String(notes.join("; ")),
         });
-        Ok(Some(resource))
+        Ok(Some(GetAnswer {
+            resource,
+            referenced: Vec::new(),
+        }))
     }
 }
 

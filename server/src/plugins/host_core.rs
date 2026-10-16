@@ -481,6 +481,28 @@ impl HostCore {
         })
     }
 
+    /// A built-in app (compiled in, see `host_abi::NativeHooks`) serving one
+    /// read. It acts for the reader and is bounded by the reader's rights, as
+    /// the extender it replaces was; it has no Installation, no secrets and no
+    /// agent to write as. Unlike every other host this accepts `Sudo`, because
+    /// the server's own reads (export, MCP, tests) reach built-ins too.
+    pub fn for_builtin(db: Arc<Db>, reader: ForAgent) -> Self {
+        Self {
+            db,
+            drive: None,
+            plugin: None,
+            grant: Grant {
+                caller: reader,
+                installation: None,
+                scopes: Scopes::default(),
+            },
+            world: World::ServerExtension,
+            fetch_policy: FetchPolicy::SecretOrigins,
+            query_scope: None,
+            query_limit: None,
+        }
+    }
+
     /// The same host in the server-extension world: the module runs inside the
     /// server's own commit path, so there is no one to approve its external
     /// writes (see `net.fetch`). Its rights are unchanged.

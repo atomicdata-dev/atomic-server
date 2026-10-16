@@ -17,8 +17,9 @@ use std::{path::PathBuf, sync::Arc};
 use atomic_lib::{
     agents::{Agent, ForAgent},
     class_extender::{
-        ClassExtender, ClassExtenderScope, CommitExtenderContext, GetExtenderContext,
+        BoxFuture, ClassExtender, ClassExtenderScope, CommitExtenderContext, GetExtenderContext,
     },
+    db::drive_prefix_from_subject,
     errors::{AtomicError, AtomicResult},
     parse::{parse_propval, ParseOpts, SaveOpts},
     storelike::ResourceResponse,
@@ -30,10 +31,12 @@ use wasmtime::{
 };
 
 use super::{
-    bindings::atomic::host::types::Severity,
+    bindings::atomic::host::types::{Problem, Resource as WitResource, Severity},
     convert::{to_wit_resource, wit_value_json},
     module_bindings::{
-        atomic::host::context, exports::atomic::host::hooks::CommitInfo, ServerModule as Bindings,
+        atomic::host::context,
+        exports::atomic::host::hooks::{CommitInfo, GetAnswer},
+        ServerModule as Bindings,
     },
     registry::HostAbiRegistry,
     run::{build_host, AbiHost, AbiState, CallBudget},
@@ -65,9 +68,60 @@ pub struct ServerModule {
     inner: Arc<Inner>,
 }
 
+/// What runs the hooks.
+enum Backend {
+    /// A component, in a fresh instance per hook.
+    Wasm {
+        engine: Arc<Engine>,
+        component: Component,
+    },
+    /// Compiled in: a built-in app. Same hooks, same imports, same registry.
+    Native(Arc<dyn NativeHooks>),
+}
+
+/// The `hooks` interface of `atomic-host/wit/host.wit` as a Rust trait, for a
+/// module compiled into the server (a built-in app). A native module differs
+/// from a component only in how it is loaded: it is registered through
+/// [`ServerModule`] like one, so it gets the same `commit-info`, the same
+/// "own commits do not trigger it" rule and the same answer handling, and its
+/// imports are the very `Host` implementations of [`AbiState`] a component
+/// is linked against (`store::Host::query(imports, ..)`), checked by the same
+/// `Grant`. It runs for the reader (see [`HostCore::for_builtin`]) because it
+/// has no Installation to run as.
+pub trait NativeHooks: Send + Sync {
+    fn classes(&self) -> Vec<String>;
+
+    fn on_get<'a>(
+        &'a self,
+        _imports: &'a mut AbiState,
+        _resource: WitResource,
+        _agent: String,
+        _query: Vec<(String, String)>,
+    ) -> BoxFuture<'a, Result<Option<GetAnswer>, HostError>> {
+        Box::pin(async { Ok(None) })
+    }
+
+    fn before_commit<'a>(
+        &'a self,
+        _imports: &'a mut AbiState,
+        _commit: CommitInfo,
+        _after: WitResource,
+    ) -> BoxFuture<'a, Vec<Problem>> {
+        Box::pin(async { Vec::new() })
+    }
+
+    fn after_commit<'a>(
+        &'a self,
+        _imports: &'a mut AbiState,
+        _commit: CommitInfo,
+        _after: WitResource,
+    ) -> BoxFuture<'a, Result<(), HostError>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
 struct Inner {
-    engine: Arc<Engine>,
-    component: Component,
+    backend: Backend,
     db: Arc<Db>,
     parts: ModuleParts,
     classes: Vec<String>,
@@ -84,6 +138,12 @@ fn host_error(error: HostError) -> AtomicError {
     AtomicError::other_error(format!("{}: {}", error.code, error.message))
 }
 
+/// Whom a built-in app serves: the reader, and the drive its subject is in.
+struct Reader<'a> {
+    agent: &'a ForAgent,
+    subject: &'a str,
+}
+
 impl ServerModule {
     /// Loads a component and asks it which classes it extends.
     pub async fn new(
@@ -93,8 +153,7 @@ impl ServerModule {
         parts: ModuleParts,
     ) -> AtomicResult<Self> {
         let mut inner = Inner {
-            engine,
-            component,
+            backend: Backend::Wasm { engine, component },
             db: Arc::new(db.clone()),
             parts,
             classes: Vec::new(),
@@ -117,6 +176,19 @@ impl ServerModule {
         })
     }
 
+    /// A module compiled into the server: a built-in app. Registered with
+    /// [`ServerModule::into_class_extender`] exactly like a component.
+    pub fn native(hooks: Arc<dyn NativeHooks>, db: &Db, parts: ModuleParts) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                classes: hooks.classes(),
+                backend: Backend::Native(hooks),
+                db: Arc::new(db.clone()),
+                parts,
+            }),
+        }
+    }
+
     /// The classes the module extends.
     pub fn classes(&self) -> &[String] {
         &self.inner.classes
@@ -124,7 +196,11 @@ impl ServerModule {
 
     /// The host of one hook: the Installation resolved now, so a pause or a
     /// revocation takes effect on the next hook.
-    async fn host(&self, installed: bool) -> Result<AbiHost, HostError> {
+    async fn host(
+        &self,
+        installed: bool,
+        reader: Option<&Reader<'_>>,
+    ) -> Result<AbiHost, HostError> {
         let inner = &self.inner;
         let budget = Arc::new(CallBudget::default());
         let mut host = match (
@@ -159,20 +235,33 @@ impl ServerModule {
                 drive: String::new(),
                 installation: String::new(),
                 manifest: None,
-                core: HostCore::for_global_module(inner.db.clone())
-                    .map_err(|e| super::error(super::code::FORBIDDEN, e))?,
+                core: match (&inner.backend, reader) {
+                    (Backend::Native(_), Some(reader)) => {
+                        HostCore::for_builtin(inner.db.clone(), reader.agent.clone())
+                    }
+                    _ => HostCore::for_global_module(inner.db.clone())
+                        .map_err(|e| super::error(super::code::FORBIDDEN, e))?,
+                },
                 depth: 0,
                 budget,
             },
         };
+        if let (Backend::Native(_), Some(reader)) = (&inner.backend, reader) {
+            host.drive = drive_prefix_from_subject(&reader.subject.into()).to_string();
+        }
         host.core = host.core.clone().as_server_module();
         Ok(host)
     }
 
-    async fn instantiate(&self, installed: bool) -> AtomicResult<(Bindings, Store<AbiState>)> {
+    /// The imports of one hook and the limits it runs under.
+    async fn state(
+        &self,
+        installed: bool,
+        reader: Option<&Reader<'_>>,
+    ) -> AtomicResult<(AbiState, host_core::Limits)> {
         let inner = &self.inner;
         let manifest = inner.parts.manifest.as_ref();
-        let host = self.host(installed).await.map_err(host_error)?;
+        let host = self.host(installed, reader).await.map_err(host_error)?;
         let grants = match (&inner.parts.scope, &inner.parts.installation) {
             (ClassExtenderScope::Drive(drive), Some(installation)) if installed => {
                 host_core::installation_grants(&inner.db, drive, installation, manifest).await
@@ -188,14 +277,24 @@ impl ServerModule {
                 .with_data_dir(dir, writable)
                 .map_err(AtomicError::other_error)?;
         }
-        let mut store = Store::new(&inner.engine, state);
+        Ok((state, limits))
+    }
+
+    async fn instantiate(&self, installed: bool) -> AtomicResult<(Bindings, Store<AbiState>)> {
+        let Backend::Wasm { engine, component } = &self.inner.backend else {
+            return Err(AtomicError::other_error(
+                "a native module has no instance".to_string(),
+            ));
+        };
+        let (state, limits) = self.state(installed, None).await?;
+        let mut store = Store::new(engine, state);
         store.limiter(|state| &mut state.limits);
         limits.meter(&mut store).map_err(AtomicError::other_error)?;
 
-        let mut linker = Linker::new(&inner.engine);
+        let mut linker = Linker::new(engine);
         wasmtime_wasi::p2::add_to_linker_async(&mut linker).map_err(trap)?;
         Bindings::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state).map_err(trap)?;
-        let instance = Bindings::instantiate_async(&mut store, &inner.component, &linker)
+        let instance = Bindings::instantiate_async(&mut store, component, &linker)
             .await
             .map_err(trap)?;
         Ok((instance, store))
@@ -226,25 +325,46 @@ impl ServerModule {
     }
 
     async fn on_get(&self, context: GetExtenderContext<'_>) -> AtomicResult<ResourceResponse> {
-        let (instance, mut store) = self.instantiate(true).await?;
-        let answer = instance
-            .atomic_host_hooks()
-            .call_on_get(
-                &mut store,
-                &to_wit_resource(context.db_resource),
-                &context.for_agent.to_string(),
-            )
-            .await
-            .map_err(trap)?
-            .map_err(host_error)?;
-        let Some(answer) = answer else {
+        let resource_wit = to_wit_resource(context.db_resource);
+        let agent = context.for_agent.to_string();
+        let query: Vec<(String, String)> = context
+            .url
+            .query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
+        let answer = match &self.inner.backend {
+            Backend::Wasm { .. } => {
+                let (instance, mut store) = self.instantiate(true).await?;
+                instance
+                    .atomic_host_hooks()
+                    .call_on_get(&mut store, &resource_wit, &agent, &query)
+                    .await
+                    .map_err(trap)?
+            }
+            Backend::Native(hooks) => {
+                let reader = Reader {
+                    agent: context.for_agent,
+                    subject: context.db_resource.get_subject().as_str(),
+                };
+                let (mut state, _) = self.state(true, Some(&reader)).await?;
+                hooks
+                    .on_get(&mut state, resource_wit.clone(), agent, query)
+                    .await
+            }
+        }
+        .map_err(host_error)?;
+        let Some(GetAnswer {
+            resource: answer,
+            referenced,
+        }) = answer
+        else {
             return Ok(ResourceResponse::Resource(context.db_resource.clone()));
         };
 
         // Only what the module changed is rebuilt: the rest (a Loro document,
         // say) never crosses the boundary twice. Values are parsed by the
         // datatype of their property, as every other write is.
-        let before = to_wit_resource(context.db_resource);
+        let before = resource_wit;
         let opts = ParseOpts {
             save: SaveOpts::DontSave,
             for_agent: ForAgent::Sudo,
@@ -266,7 +386,23 @@ impl ServerModule {
                 resource.remove_propval(&pv.property)?;
             }
         }
-        Ok(ResourceResponse::Resource(resource))
+        if referenced.is_empty() {
+            return Ok(ResourceResponse::Resource(resource));
+        }
+
+        // Sent along as the store holds them, if the reader may see them.
+        let reader = Reader {
+            agent: context.for_agent,
+            subject: context.db_resource.get_subject().as_str(),
+        };
+        let (state, _) = self.state(true, Some(&reader)).await?;
+        let mut found = Vec::new();
+        for subject in referenced {
+            if let Ok(r) = state.host.core.get_resource(&subject).await {
+                found.push(r);
+            }
+        }
+        Ok(ResourceResponse::ResourceWithReferenced(resource, found))
     }
 
     async fn before_commit(&self, context: CommitExtenderContext<'_>) -> AtomicResult<()> {
@@ -274,12 +410,21 @@ impl ServerModule {
             return Ok(());
         }
         let info = self.commit_info(&context).await?;
-        let (instance, mut store) = self.instantiate(true).await?;
-        let problems = instance
-            .atomic_host_hooks()
-            .call_before_commit(&mut store, &info, &to_wit_resource(context.resource))
-            .await
-            .map_err(trap)?;
+        let after = to_wit_resource(context.resource);
+        let problems = match &self.inner.backend {
+            Backend::Wasm { .. } => {
+                let (instance, mut store) = self.instantiate(true).await?;
+                instance
+                    .atomic_host_hooks()
+                    .call_before_commit(&mut store, &info, &after)
+                    .await
+                    .map_err(trap)?
+            }
+            Backend::Native(hooks) => {
+                let (mut state, _) = self.state(true, None).await?;
+                hooks.before_commit(&mut state, info.clone(), after).await
+            }
+        };
 
         let mut refusals = Vec::new();
         for problem in problems {
@@ -302,13 +447,22 @@ impl ServerModule {
             return Ok(());
         }
         let info = self.commit_info(&context).await?;
-        let (instance, mut store) = self.instantiate(true).await?;
-        instance
-            .atomic_host_hooks()
-            .call_after_commit(&mut store, &info, &to_wit_resource(context.resource))
-            .await
-            .map_err(trap)?
-            .map_err(host_error)
+        let after = to_wit_resource(context.resource);
+        match &self.inner.backend {
+            Backend::Wasm { .. } => {
+                let (instance, mut store) = self.instantiate(true).await?;
+                instance
+                    .atomic_host_hooks()
+                    .call_after_commit(&mut store, &info, &after)
+                    .await
+                    .map_err(trap)?
+            }
+            Backend::Native(hooks) => {
+                let (mut state, _) = self.state(true, None).await?;
+                hooks.after_commit(&mut state, info, after).await
+            }
+        }
+        .map_err(host_error)
     }
 
     /// The registration the store keeps, one handler per hook.

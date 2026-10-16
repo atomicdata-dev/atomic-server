@@ -169,7 +169,11 @@ impl store::Host for AbiState {
 
         let mut query = to_query(&host.db, &q, &host.drive).await?;
         query.for_agent = host.core.grant().caller().clone();
-        query.limit = Some(convert::SCAN_CAP + 1);
+        // One row past the page tells whether there is a next one; reading
+        // more than that is what a chat with ten thousand messages cannot pay
+        // for on every read. A row the caller may not see makes the answer
+        // `complete: false`, as before.
+        query.limit = Some((offset + limit + 1).min(convert::SCAN_CAP + 1));
 
         let result = host
             .db

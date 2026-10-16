@@ -48,8 +48,9 @@ pub(crate) mod tests;
 mod wit_tests;
 
 pub use js::JsAbi;
-pub use module::{ModuleParts, ServerModule};
+pub use module::{ModuleParts, NativeHooks, ServerModule};
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
+pub(crate) use run::AbiState;
 pub use run::{
     call_as, call_entry, call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS,
     CHAIN_FUEL, ENTRY_TIMEOUT,

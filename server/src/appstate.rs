@@ -108,7 +108,6 @@ impl AppState {
         }
 
         // Register all built-in class extenders
-        store.add_class_extender(plugins::chatroom::build_chatroom_extender())?;
         store.add_class_extender(plugins::chatroom::build_message_extender())?;
         store.add_endpoint(plugins::invite::invite_endpoint())?;
         store.add_endpoint(plugins::conversations::conversations_endpoint())?;
@@ -126,6 +125,13 @@ impl AppState {
             config.uploads_path.clone(),
         ))?;
         store.add_class_extender(plugins::form::build_form_extender())?;
+        // A built-in app: the same hooks and imports as an installed module,
+        // compiled in.
+        #[cfg(feature = "wasm-plugins")]
+        store.add_class_extender(plugins::chatroom::build_chatroom_extender(
+            &store,
+            host_abi.clone(),
+        ))?;
 
         // Owned here rather than in the AppState literal below, because the
         // `/server` endpoint closes over them to report this node's status.

@@ -2,109 +2,150 @@
 # ChatRoom
 These are similar to Channels in Slack or Discord.
 They list a bunch of Messages.
+
+A built-in app on the host ABI (`planning/host-abi.md`, step 7): the same
+`on-get` hook and the same `store` import a component gets, compiled in
+(`NativeHooks`) and registered like a module. It reads the messages with
+`store.query`, so what the reader may see is decided by the host's `Grant`,
+not by code in here.
 */
 
-use atomic_lib::{
-    class_extender::{BoxFuture, ClassExtender, GetExtenderContext},
-    db::drive_prefix_from_subject,
-    errors::AtomicResult,
-    storelike::{Query, QueryResult, ResourceResponse},
-    urls::{self, PARENT},
-    utils, Storelike, Value,
-};
+#[cfg(feature = "wasm-plugins")]
+mod module {
+    use std::sync::Arc;
 
-// Find the messages for the ChatRoom.
-#[tracing::instrument(skip(context))]
-pub fn construct_chatroom<'a>(
-    context: GetExtenderContext<'a>,
-) -> BoxFuture<'a, AtomicResult<ResourceResponse>> {
-    Box::pin(async move {
-        let GetExtenderContext {
-            store,
-            url,
-            db_resource: resource,
-            for_agent,
-        } = context;
+    use atomic_lib::{
+        class_extender::{BoxFuture, ClassExtender},
+        urls, utils, Db,
+    };
 
-        // TODO: From range
-        let mut start_val = utils::now();
-        for (k, v) in url.query_pairs() {
-            if k.as_ref() == "before-timestamp" {
-                start_val = v.parse::<i64>()?;
-            }
+    use crate::plugins::host_abi::{
+        bindings::atomic::host::{
+            store::{Filter, FilterOp, Host as _, QuerySpec},
+            types::{PropVal, Resource, Value},
+        },
+        code, error,
+        module_bindings::exports::atomic::host::hooks::GetAnswer,
+        HostAbiRegistry, ModuleParts, NativeHooks, ServerModule,
+    };
+    use crate::plugins::host_abi::{AbiState, HostError};
+
+    /// A page is this many messages; one more is fetched to know there is a next.
+    const PAGE: u32 = 50;
+
+    struct ChatRoom;
+
+    fn link(property: &str, subject: String) -> PropVal {
+        PropVal {
+            property: property.into(),
+            value: Value::Link(subject),
+        }
+    }
+
+    impl NativeHooks for ChatRoom {
+        fn classes(&self) -> Vec<String> {
+            vec![urls::CHATROOM.to_string()]
         }
 
-        let page_limit = 50;
+        fn on_get<'a>(
+            &'a self,
+            imports: &'a mut AbiState,
+            room: Resource,
+            _agent: String,
+            query: Vec<(String, String)>,
+        ) -> BoxFuture<'a, Result<Option<GetAnswer>, HostError>> {
+            Box::pin(async move {
+                // TODO: From range
+                let mut before = utils::now();
+                for (k, v) in &query {
+                    if k == "before-timestamp" {
+                        before = v.parse::<i64>().map_err(|e| {
+                            error(code::INVALID_ARGUMENT, format!("before-timestamp: {e}"))
+                        })?;
+                    }
+                }
 
-        // First, find all children
-        let query_children = Query {
-            property: Some(PARENT.into()),
-            value: Some(Value::AtomicUrl(resource.get_subject().clone())),
-            filters: Vec::new(),
-            // We fetch one extra to see if there are more, so we can create a next-page URL
-            limit: Some(page_limit + 1),
-            start_val: None,
-            end_val: Some(Value::Timestamp(start_val)),
-            offset: 0,
-            sort_by: Some(urls::CREATED_AT.into()),
-            sort_desc: true,
-            include_external: false,
-            include_nested: true,
-            for_agent: for_agent.clone(),
-            drive: Some(drive_prefix_from_subject(resource.get_subject())),
-            aggregation: None,
-            expression_filters: Vec::new(),
-        };
+                let page = imports
+                    .query(QuerySpec {
+                        class: None,
+                        parent: Some(room.subject.clone()),
+                        filters: vec![Filter {
+                            property: urls::CREATED_AT.into(),
+                            op: FilterOp::Lte,
+                            value: Some(Value::Integer(before)),
+                        }],
+                        sort_by: Some(urls::CREATED_AT.into()),
+                        sort_desc: true,
+                        limit: Some(PAGE + 1),
+                        cursor: None,
+                        with_resources: true,
+                    })
+                    .await?;
 
-        let QueryResult {
-            mut subjects,
-            resources,
-            count,
-            ..
-        } = store.query(&query_children).await?;
+                let mut propvals: Vec<PropVal> = room
+                    .propvals
+                    .iter()
+                    .filter(|pv| pv.property != urls::MESSAGES && pv.property != urls::NEXT_PAGE)
+                    .cloned()
+                    .collect();
 
-        // An attempt at creating a `next_page` URL on the server. But to be honest, it's probably better to do this in the front-end.
-        if count > page_limit {
-            let last_subject = resources
-                .last()
-                .ok_or("There are more messages than the page limit")?
-                .get_subject();
-            let last_resource = store.get_resource(last_subject).await?;
-            let last_timestamp = last_resource.get(urls::CREATED_AT)?;
-            let next_page_url = url::Url::parse_with_params(
-                resource.get_subject().as_str(),
-                &[("before-timestamp", last_timestamp.to_string())],
-            )?;
-            resource
-                .set(
-                    urls::NEXT_PAGE.into(),
-                    Value::AtomicUrl(next_page_url.to_string().into()),
-                    store,
-                )
-                .await?;
+                // The oldest one fetched marks where the next page starts.
+                if page.subjects.len() > PAGE as usize {
+                    let created = page.resources.last().and_then(|last| {
+                        last.propvals.iter().find_map(|pv| match pv.value {
+                            Value::Integer(t) if pv.property == urls::CREATED_AT => Some(t),
+                            _ => None,
+                        })
+                    });
+                    if let Some(created) = created {
+                        let next = url::Url::parse_with_params(
+                            &room.subject,
+                            &[("before-timestamp", created.to_string())],
+                        )
+                        .map_err(|e| error(code::INTERNAL, e.to_string()))?;
+                        propvals.push(link(urls::NEXT_PAGE, next.to_string()));
+                    }
+                }
+
+                // Clients expect messages to appear from old to new
+                let mut messages = page.subjects;
+                messages.reverse();
+                propvals.push(PropVal {
+                    property: urls::MESSAGES.into(),
+                    value: Value::ResourceArray(messages.clone()),
+                });
+
+                Ok(Some(GetAnswer {
+                    resource: Resource { propvals, ..room },
+                    referenced: messages,
+                }))
+            })
         }
+    }
 
-        // Clients expect messages to appear from old to new
-        subjects.reverse();
-
-        resource
-            .set(urls::MESSAGES.into(), subjects.into(), store)
-            .await?;
-
-        Ok(ResourceResponse::ResourceWithReferenced(
-            resource.to_owned(),
-            resources,
-        ))
-    })
+    /// Find the messages for the ChatRoom.
+    pub fn build_chatroom_extender(db: &Db, registry: Arc<HostAbiRegistry>) -> ClassExtender {
+        ServerModule::native(
+            Arc::new(ChatRoom),
+            db,
+            ModuleParts {
+                file_name: "chatroom".into(),
+                scope: atomic_lib::class_extender::ClassExtenderScope::Global,
+                installation: None,
+                agent: None,
+                data_dir: None,
+                manifest: None,
+                registry,
+            },
+        )
+        .into_class_extender()
+    }
 }
 
-pub fn build_chatroom_extender() -> ClassExtender {
-    ClassExtender::builder()
-        .id("chatroom".to_string())
-        .classes(vec![urls::CHATROOM.to_string()])
-        .on_resource_get(ClassExtender::wrap_get_handler(construct_chatroom))
-        .build()
-}
+#[cfg(feature = "wasm-plugins")]
+pub use module::build_chatroom_extender;
+
+use atomic_lib::{class_extender::ClassExtender, urls};
 
 pub fn build_message_extender() -> ClassExtender {
     ClassExtender::builder()
@@ -113,10 +154,12 @@ pub fn build_message_extender() -> ClassExtender {
         .build()
 }
 
+#[cfg(feature = "wasm-plugins")]
 #[tokio::test]
 async fn test_ws_push_chatroom() {
     use atomic_lib::commit::CommitOpts;
     use atomic_lib::{commit::CommitBuilder, urls, values::SubResource, Db, Storelike, Value};
+    use std::sync::Arc;
 
     let test_dir = std::env::temp_dir().join("atomic-test-db-chat");
     let uploads_dir = test_dir.join("uploads");
@@ -124,7 +167,8 @@ async fn test_ws_push_chatroom() {
         .await
         .unwrap();
 
-    db.add_class_extender(build_chatroom_extender()).unwrap();
+    db.add_class_extender(build_chatroom_extender(&db, Arc::default()))
+        .unwrap();
     db.add_class_extender(build_message_extender()).unwrap();
 
     let agent = db.create_agent(Some("agent")).await.unwrap();
@@ -194,14 +238,18 @@ async fn test_ws_push_chatroom() {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "wasm-plugins"))]
 mod tests {
     use super::*;
+    use atomic_lib::Value;
     use atomic_lib::{agents::ForAgent, storelike::ResourceResponse, Db, Resource, Storelike};
+    use std::sync::Arc;
 
     async fn room_with_messages(id: &str, n: usize) -> (Db, Resource, Vec<String>) {
         let store = Db::init_temp(id).await.unwrap();
-        store.add_class_extender(build_chatroom_extender()).unwrap();
+        store
+            .add_class_extender(build_chatroom_extender(&store, Arc::default()))
+            .unwrap();
         store.add_class_extender(build_message_extender()).unwrap();
         let mut room = Resource::new_instance(urls::CHATROOM, &store)
             .await

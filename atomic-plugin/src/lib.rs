@@ -19,7 +19,7 @@ use bindings::atomic::host::{
     store::{self, Intent, Outcome},
     types::{Problem, PropVal, Severity, Value},
 };
-pub use bindings::exports::atomic::host::hooks::{CommitInfo, Guest};
+pub use bindings::exports::atomic::host::hooks::{CommitInfo, GetAnswer, Guest};
 
 const IS_A: &str = "https://atomicdata.dev/properties/isA";
 
@@ -208,11 +208,14 @@ impl<T: ClassExtender> Guest for PluginWrapper<T> {
     fn on_get(
         resource: bindings::atomic::host::types::Resource,
         _agent: String,
-    ) -> Result<Option<bindings::atomic::host::types::Resource>, bindings::atomic::host::types::Error>
-    {
+        _query: Vec<(String, String)>,
+    ) -> Result<Option<GetAnswer>, bindings::atomic::host::types::Error> {
         let mut resource: Resource = resource.into();
         let answer = T::on_resource_get(&mut resource).map_err(error)?;
-        Ok(answer.map(Resource::to_wit))
+        Ok(answer.map(|resource| GetAnswer {
+            resource: Resource::to_wit(resource),
+            referenced: Vec::new(),
+        }))
     }
 }
 

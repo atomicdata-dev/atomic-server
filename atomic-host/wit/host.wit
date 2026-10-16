@@ -323,11 +323,23 @@ interface hooks {
   /// After the commit is stored. A failure is logged and never undoes it.
   after-commit: func(commit: commit-info, after: %resource) -> result<_, error>;
 
-  /// Before a resource of one of the classes is returned to `agent`. The
-  /// answer replaces it (`none` leaves it as it is); `classes` of the answer is
-  /// ignored, the `is-a` property decides, and so does the subject asked for.
-  /// An error fails the read.
-  on-get: func(r: %resource, agent: subject) -> result<option<%resource>, error>;
+  /// What an `on-get` answers: the resource, and other resources to send along
+  /// with it (messages of a chat, say).
+  record get-answer {
+    /// Replaces the resource asked for.
+    %resource: %resource,
+    /// Subjects of resources to send with the answer. The host reads each one
+    /// with the same grant as the module's `store.get`; one it may not read is
+    /// left out.
+    referenced: list<subject>,
+  }
+
+  /// Before a resource of one of the classes is returned to `agent`. `query` is
+  /// the query string of the subject asked for (`?before-timestamp=1`), decoded.
+  /// The answer replaces the resource (`none` leaves it as it is); `classes` of
+  /// the answer is ignored, the `is-a` property decides, and so does the subject
+  /// asked for. An error fails the read.
+  on-get: func(r: %resource, agent: subject, query: list<tuple<string, string>>) -> result<option<get-answer>, error>;
 }
 
 /// A module the operator installed: the same `store`, `net` and `calls` as an
