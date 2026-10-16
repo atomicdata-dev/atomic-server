@@ -537,6 +537,25 @@ pub fn latest_envelope(store: &Db, subject: &str) -> Option<StoredEnvelope> {
     found.rows.into_iter().last()
 }
 
+/// The commit id of the newest retained envelope, read from the row key
+/// alone (no row is decoded). The id `lastCommit` is served as when the
+/// stored row does not carry it.
+pub fn latest_commit_id(store: &Db, subject: &str) -> Option<String> {
+    let (key, _) = store
+        .kv
+        .scan_prefix(Tree::Envelopes, &prefix(subject))
+        .filter_map(|entry| entry.ok())
+        .last()?;
+    let (_, _, signature) = parse_key(&key)?;
+    Some(crate::identifiers::commit_subject(&signature))
+}
+
+/// The id of the genesis commit of a resource whose id was derived from it
+/// (its row is kept; see [`genesis_envelope_from_row`]).
+pub fn genesis_commit_id(subject: &str) -> Option<String> {
+    genesis_signature(subject).map(|signature| crate::identifiers::commit_subject(&signature))
+}
+
 /// The retained envelopes of each subject as commit JSON-AD, for a bulk
 /// push or a vault pack. Subjects with none are absent. A subject with rows
 /// that cannot be read ships the rest and logs a warning.
@@ -1983,5 +2002,177 @@ mod tests {
         assert!(raw_rows(&db, &subject)
             .iter()
             .any(|(k, _)| *k == newest_key));
+    }
+
+    /// Changes in a resource's stored Loro doc with no commit token: what a
+    /// node writes on its own on top of the signed commits.
+    fn untokened_changes(db: &Db, subject: &crate::Subject) -> usize {
+        let doc =
+            crate::loro::AtomicLoroDoc::from_snapshot(&db.get_loro_snapshot(subject).unwrap())
+                .unwrap();
+        let mut untokened = 0;
+        doc.doc()
+            .travel_change_ancestors(
+                &doc.doc().oplog_frontiers().iter().collect::<Vec<_>>(),
+                &mut |change| {
+                    if change.message.as_deref().is_none_or(str::is_empty) {
+                        untokened += 1;
+                    }
+                    std::ops::ControlFlow::Continue(())
+                },
+            )
+            .unwrap();
+        untokened
+    }
+
+    fn doc_stamp(db: &Db, subject: &crate::Subject) -> Option<loro::LoroValue> {
+        crate::loro::AtomicLoroDoc::from_snapshot(&db.get_loro_snapshot(subject).unwrap())
+            .unwrap()
+            .get_all_properties()
+            .get(urls::LAST_COMMIT)
+            .cloned()
+    }
+
+    /// `lastCommit` is served from the newest envelope and is not a change in
+    /// the document: a commit adds exactly the author's change to the oplog.
+    #[tokio::test]
+    async fn last_commit_is_derived_and_adds_nothing_to_the_oplog() {
+        let db = Db::init_temp("envelopes_derived_last_commit")
+            .await
+            .unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+
+        let size = |db: &Db| db.get_loro_snapshot(&subject).unwrap().len();
+        let (changes_before, bytes_before) = (
+            crate::loro::AtomicLoroDoc::from_snapshot(&db.get_loro_snapshot(&subject).unwrap())
+                .unwrap()
+                .doc()
+                .len_changes(),
+            size(&db),
+        );
+        signed_edit(&db, &subject, "one").await;
+        let doc =
+            crate::loro::AtomicLoroDoc::from_snapshot(&db.get_loro_snapshot(&subject).unwrap())
+                .unwrap();
+        println!(
+            "OPLOG one small edit: snapshot {bytes_before} B -> {} B, changes {changes_before} -> {}",
+            size(&db),
+            doc.doc().len_changes()
+        );
+        assert_eq!(
+            doc.doc().len_changes(),
+            changes_before + 1,
+            "one commit, one change: no server-peer bookkeeping"
+        );
+        assert!(
+            doc_stamp(&db, &subject).is_none(),
+            "nothing is stamped in the doc"
+        );
+
+        let latest = latest_envelope(&db, subject.as_str()).unwrap();
+        let served = db.get_resource(&subject).await.unwrap();
+        assert_eq!(
+            served.get(urls::LAST_COMMIT).unwrap().to_string(),
+            latest.commit_id()
+        );
+        assert_eq!(
+            latest_commit_id(&db, subject.as_str()).as_deref(),
+            Some(latest.commit_id().as_str())
+        );
+        // The shallow read (the stored row) serves it too.
+        assert_eq!(
+            db.get_resource_shallow(&subject)
+                .unwrap()
+                .get(urls::LAST_COMMIT)
+                .unwrap()
+                .to_string(),
+            latest.commit_id()
+        );
+        assert_eq!(untokened_changes(&db, &subject), 0);
+    }
+
+    /// A row written from a synced doc carries no `lastCommit`: the newest
+    /// envelope is served, then the genesis commit.
+    #[tokio::test]
+    async fn last_commit_falls_back_to_the_envelope_when_the_row_has_none() {
+        let db = Db::init_temp("envelopes_last_commit_fallback")
+            .await
+            .unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        signed_edit(&db, &subject, "one").await;
+        let latest = latest_envelope(&db, subject.as_str()).unwrap();
+
+        let mut stripped = db.get_resource(&subject).await.unwrap();
+        stripped.remove_propval(urls::LAST_COMMIT).unwrap();
+        db.add_resource_opts(&stripped, false, true, true)
+            .await
+            .unwrap();
+        assert!(db
+            .get_resource_shallow(&subject)
+            .unwrap()
+            .get(urls::LAST_COMMIT)
+            .is_err());
+        assert_eq!(
+            db.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(urls::LAST_COMMIT)
+                .unwrap()
+                .to_string(),
+            latest.commit_id()
+        );
+    }
+
+    /// A doc that still holds the old stamp: the derived value wins, and the
+    /// stamp stands when nothing derived exists.
+    #[tokio::test]
+    async fn a_stamp_in_an_old_doc_loses_to_the_derived_value() {
+        let db = Db::init_temp("envelopes_old_stamp").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        signed_edit(&db, &subject, "one").await;
+        let latest = latest_envelope(&db, subject.as_str()).unwrap();
+
+        let old = "atomic:commit:OLDSTAMP";
+        let doc =
+            crate::loro::AtomicLoroDoc::from_snapshot(&db.get_loro_snapshot(&subject).unwrap())
+                .unwrap();
+        doc.set_property(urls::LAST_COMMIT, &Value::AtomicUrl(old.into()))
+            .unwrap();
+        let mut resource = db.get_resource(&subject).await.unwrap();
+        resource.apply_state_doc(doc).unwrap();
+        assert_eq!(resource.get(urls::LAST_COMMIT).unwrap().to_string(), old);
+        db.add_resource_opts(&resource, false, true, true)
+            .await
+            .unwrap();
+        assert!(
+            doc_stamp(&db, &subject).is_some(),
+            "premise: the stored doc holds the stamp"
+        );
+
+        // The row now says `old` too (it was written from the stamped doc);
+        // the next signed commit derives a fresh value over it.
+        signed_edit(&db, &subject, "two").await;
+        let newest = latest_envelope(&db, subject.as_str()).unwrap();
+        assert_ne!(newest.commit_id(), latest.commit_id());
+        assert_eq!(
+            db.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(urls::LAST_COMMIT)
+                .unwrap()
+                .to_string(),
+            newest.commit_id(),
+            "the derived value wins over the doc's stamp"
+        );
+
+        // Without a row value, the stamp the doc holds stands over a
+        // missing envelope.
+        let mut stamped = resource;
+        stamped.set_derived_last_commit(Value::AtomicUrl(old.into()));
+        db.serve_derived_last_commit(&mut stamped, "internal:/no-envelopes", None);
+        assert_eq!(stamped.get(urls::LAST_COMMIT).unwrap().to_string(), old);
     }
 }

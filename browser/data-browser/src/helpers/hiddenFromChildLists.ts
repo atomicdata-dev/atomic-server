@@ -1,10 +1,13 @@
 import { ai, dataBrowser, isAgentSubject } from '@tomic/lib';
 
-/** Classes kept out of child lists (the AI sidebar and meeting UI reach them). */
-export const HIDDEN_CLASSES: string[] = [
-  ai.classes.aiChat,
-  dataBrowser.classes.meeting,
-];
+/**
+ * Classes kept out of child lists (the AI sidebar and meeting UI reach them),
+ * with the plural label Space usage bundles them under.
+ */
+export const HIDDEN_CLASS_LABELS: Record<string, string> = {
+  [ai.classes.aiChat]: 'AI chats',
+  [dataBrowser.classes.meeting]: 'Meetings',
+};
 
 /**
  * Is a resource hidden from child lists? True for the classes above and for a
@@ -15,7 +18,7 @@ export function isHiddenFromChildLists(
   classes: readonly string[],
   about?: string | null,
 ): boolean {
-  if (classes.some(c => HIDDEN_CLASSES.includes(c))) return true;
+  if (classes.some(c => c in HIDDEN_CLASS_LABELS)) return true;
 
   return (
     !!about &&

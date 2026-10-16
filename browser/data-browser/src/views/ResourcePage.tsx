@@ -25,6 +25,7 @@ import { DocumentPage } from './DocumentPage';
 import ErrorPage, { ErrorBoundary } from './ErrorPage';
 import { ClassPage } from './ClassPage';
 import { FilePage } from './File/FilePage';
+import AgentPage from './AgentPage';
 import { ResourcePageDefault } from './ResourcePageDefault';
 import { Spinner } from '../components/Spinner';
 import { ChatRoomPage } from './ChatRoomPage';
@@ -306,6 +307,8 @@ function selectComponent(klass: string | undefined) {
       return ClassPage;
     case server.classes.file:
       return FilePage;
+    case core.classes.agent:
+      return AgentPage;
     case dataBrowser.classes.chatroom:
       return ChatRoomPage;
     case conversations.classes.conversation:

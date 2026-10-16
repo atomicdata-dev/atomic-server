@@ -332,12 +332,12 @@ export function NoHostNudge(): JSX.Element {
   const hasCloud = getManagedPortalUrl() !== null;
 
   return (
-    <Row gap='0.5rem' center>
+    <Row gap='0.5rem' center wrapItems>
       <InviteOnlyNote role='note'>
         <strong>Forms need a server to receive answers.</strong>
         <br />
         {hasCloud
-          ? 'Host this workspace on a Cloud Server to share it.'
+          ? 'Upgrade to a Cloud Server to publish and share this form.'
           : 'Connect or self-host a server in Sync settings to share it.'}
       </InviteOnlyNote>
       <Button type='button' subtle onClick={() => navigate(paths.sync)}>

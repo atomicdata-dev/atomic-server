@@ -412,6 +412,22 @@ server's results, and a pasted URL is still selected directly. The server search
 is mocked. There is no E2E. A class the store has not fetched (after a reload,
 say) is only reachable by its URL.
 
+## Trash (Rust)
+
+`lib/src/trash/tests.rs` (`cargo test -p atomic_lib --features db-redb --lib -- trash::`)
+covers `trash` / `restore` / `is_trashed` against a real `Db`: reparent plus
+`trashedFrom`, restore, the no-op cases (trash folder, drive, already trashed),
+the property-subject refusal, restore falling back to the drive when the old
+parent was destroyed or never recorded, a stale trash pointer being replaced,
+deep versus direct `is_trashed` and parent cycles, and collections hiding
+trashed members (direct and under a trashed folder, Sudo and a normal agent)
+unless `include_trashed` or the query lists the Trash itself.
+`lib/src/search/tests.rs` covers search hiding the same by default, with
+`include_trashed`, scoped to the Trash, and the filter-only path. Not covered:
+the `include_trashed` HTTP query param on `/search` and collections (no server
+integration test), the Flutter `delete_canvas` move-to-trash (the bridge crate
+has no trash test), and concurrent first-use creating two Trash folders.
+
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint
@@ -2739,3 +2755,7 @@ managed node, reads a saved child directly over HTTP, queues an edit with WS
 disconnected, reconnects, then signs in on a fresh browser and verifies the
 edited child after reload. It does not certify real billing or a full network
 partition.
+
+## Agent page
+
+`browser/e2e/tests/agent-page.spec.ts` (full suite, not `@smoke`) opens another agent's page: the conversation started from its Send message button is listed, a private note typed there survives a reload and is not on the other agent's own page, and a resource that agent created in a shared folder shows under Created (as a resource row), and favoriting the agent from its page menu lists it in the sidebar Favorites. Your own agent page has no messages and no notes. `hasMember` is unit tested in `conversations.test.ts`. Not covered: the Created list is by creator, not by last editor (no index of who edited what, see `planning/auditability-loro-history.md` "Secondary indexes"), and the note's `PlainText` also shows in the private drive's resource list.

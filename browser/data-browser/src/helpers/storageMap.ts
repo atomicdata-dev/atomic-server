@@ -1,5 +1,4 @@
-import { ai, dataBrowser } from '@tomic/lib';
-import { isHiddenFromChildLists } from './hiddenFromChildLists';
+import { HIDDEN_CLASS_LABELS } from './hiddenFromChildLists';
 
 /** One resource's share of a drive, from `GET /drive-usage/breakdown`. */
 export type ResourceUsage = {
@@ -26,12 +25,6 @@ export type StorageNode = {
   children: StorageNode[];
 };
 
-/** Plural label for a bundle of hidden-class siblings. */
-const BUNDLE_LABELS: Record<string, string> = {
-  [ai.classes.aiChat]: 'AI chats',
-  [dataBrowser.classes.meeting]: 'Meetings',
-};
-
 /**
  * Group 2+ siblings of a hidden class into one synthetic node per class. Rows
  * carry no `about`, so only the class decides here.
@@ -45,7 +38,7 @@ function bundleHidden(
   for (const child of children) {
     const cls = classOf.get(child.subject);
 
-    if (cls && isHiddenFromChildLists([cls])) {
+    if (cls && cls in HIDDEN_CLASS_LABELS) {
       groups.set(cls, [...(groups.get(cls) ?? []), child]);
     }
   }
@@ -59,7 +52,7 @@ function bundleHidden(
     members.forEach(m => bundled.add(m));
     out.push({
       subject: `${members[0].subject}#bundle`,
-      name: `${BUNDLE_LABELS[cls] ?? members[0].kind} (${members.length})`,
+      name: `${HIDDEN_CLASS_LABELS[cls]} (${members.length})`,
       kind: members[0].kind,
       ownBytes: members.reduce((n, m) => n + m.ownBytes, 0),
       ownFileBytes: members.reduce((n, m) => n + m.ownFileBytes, 0),

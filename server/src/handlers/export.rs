@@ -177,6 +177,7 @@ impl<'a> CSVExporter<'a> {
             sort_desc: false,
             include_external: false,
             include_nested: true,
+            exclude_trashed: false,
             for_agent: self.agent.clone(),
             drive: None,
             aggregation: None,

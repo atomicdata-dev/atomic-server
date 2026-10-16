@@ -155,6 +155,11 @@ export interface QueryFilter {
    * count and any aggregates describe the filtered set.
    */
   expression_filters?: ExpressionFilter[];
+  /**
+   * Also list members that sit in the Trash. Hidden by default, matching the
+   * server. Sent to the server as `include_trashed=true` and to the local DB.
+   */
+  include_trashed?: boolean;
 }
 
 /** One constraint on a computed value: "logged more than an hour". */
@@ -877,7 +882,8 @@ export class Collection {
       if (
         key === 'filters' ||
         key === 'aggregation' ||
-        key === 'expression_filters'
+        key === 'expression_filters' ||
+        key === 'include_trashed'
       ) {
         continue;
       }
@@ -907,6 +913,10 @@ export class Collection {
         'expression_filters',
         JSON.stringify(this.params.expression_filters),
       );
+    }
+
+    if (this.params.include_trashed) {
+      url.searchParams.set('include_trashed', 'true');
     }
 
     url.searchParams.set('current_page', `${page}`);
@@ -1240,6 +1250,7 @@ export class Collection {
       aggregation: this.params.aggregation?.aggregates.length
         ? this.params.aggregation
         : undefined,
+      includeTrashed: this.params.include_trashed ? true : undefined,
     });
 
     // With a server to ask, a local query that has not answered by the read

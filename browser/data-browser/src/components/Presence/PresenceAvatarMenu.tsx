@@ -5,7 +5,13 @@ import {
   useStore,
   useTitle,
 } from '@tomic/react';
-import { FaEnvelope, FaLocationArrow, FaUser } from 'react-icons/fa6';
+import {
+  FaEnvelope,
+  FaLocationArrow,
+  FaRegStar,
+  FaStar,
+  FaUser,
+} from 'react-icons/fa6';
 import { DropdownMenu, type DropdownItem } from '../Dropdown';
 import type { DropdownTriggerProps } from '../Dropdown/DropdownTrigger';
 import { AgentAvatar } from './AgentAvatar';
@@ -13,6 +19,7 @@ import { FollowingIndicator } from './FollowingIndicator';
 import { useFollow } from './FollowContext';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
+import { useFavorites } from '../../hooks/useFavorites';
 import { findOrStartConversation } from '../../helpers/conversations/useConversations';
 
 interface PresenceAvatarMenuProps {
@@ -47,6 +54,8 @@ export function PresenceAvatarMenu({
   const presence = useDrivePresence();
   const agentResource = useResource(agentSubject);
   const [name] = useTitle(agentResource);
+  const [favorites, addFavorite, removeFavorite] = useFavorites();
+  const isFavorite = favorites.includes(agentSubject);
   const isFollowing = followedAgent === agentSubject;
   const followDisabled = isFollowDisabledFor(agentSubject);
   const online = useMemo(
@@ -77,6 +86,14 @@ export function PresenceAvatarMenu({
       });
     }
 
+    result.push({
+      id: 'favorite',
+      label: isFavorite ? 'Remove from favorites' : 'Add to favorites',
+      icon: isFavorite ? <FaStar /> : <FaRegStar />,
+      onClick: () =>
+        isFavorite ? removeFavorite(agentSubject) : addFavorite(agentSubject),
+    });
+
     // Presence excludes this tab's own session, so even the same agent subject
     // represents another live tab or device that can be followed.
     if (isFollowing) {
@@ -100,6 +117,9 @@ export function PresenceAvatarMenu({
     agentSubject,
     isMe,
     store,
+    isFavorite,
+    addFavorite,
+    removeFavorite,
     isFollowing,
     online,
     followDisabled,

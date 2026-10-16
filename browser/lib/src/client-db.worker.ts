@@ -97,6 +97,8 @@ export type WorkerRequest =
       /** Constraints on values computed per resource, evaluated in the same WASM
        *  pass. */
       expressionFilters?: unknown;
+      /** Also return trashed resources (default hidden). */
+      includeTrashed?: boolean;
     }
   | {
       id: number;
@@ -105,6 +107,7 @@ export type WorkerRequest =
       limit?: number;
       parents?: string | string[];
       filters?: Record<string, string | number | string[]>;
+      includeTrashed?: boolean;
     }
   | { id: number; type: 'allSubjects' }
   | { id: number; type: 'populate' }
@@ -396,6 +399,7 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
         msg.filters ?? null,
         msg.aggregation ?? null,
         msg.expressionFilters ?? null,
+        msg.includeTrashed ?? null,
       );
     }
 
@@ -407,6 +411,7 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
         msg.limit ?? null,
         msg.parents ?? null,
         msg.filters ?? null,
+        msg.includeTrashed ?? null,
       );
     }
 

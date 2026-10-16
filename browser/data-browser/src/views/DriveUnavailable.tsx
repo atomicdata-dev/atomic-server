@@ -5,8 +5,12 @@ import { FaCloud, FaRegWindowMaximize } from 'react-icons/fa6';
 import { Button } from '../components/Button';
 import { ContainerNarrow } from '../components/Containers';
 import { Column, Row } from '../components/Row';
-import { VaultRestoreAction } from '../components/Vault/VaultRestoreAction';
+import {
+  VaultRestoreAction,
+  canRestoreFromVault,
+} from '../components/Vault/VaultRestoreAction';
 import { useSettings } from '../helpers/AppSettings';
+import { useDriveVault } from '../helpers/managed/useDriveVault';
 import { resumePeerLinks } from '../helpers/browserPeerSync';
 
 import type { JSX } from 'react';
@@ -40,6 +44,8 @@ export function DriveUnavailable({
   // Only a request that really failed may blame the server.
   const serverFailed = isServerUnreachable(error);
   const [retrying, setRetrying] = useState(false);
+  const driveVault = useDriveVault(agent ? subject : null);
+  const hasBackup = !!agent && canRestoreFromVault(driveVault);
 
   const retry = async () => {
     setRetrying(true);
@@ -70,66 +76,74 @@ export function DriveUnavailable({
     <ContainerNarrow>
       <Column gap='1.5rem'>
         <h1>
-          {vault
-            ? "This item hasn't reached this device yet"
-            : "This drive isn't on this device yet"}
+          {hasBackup
+            ? 'Bringing this drive to this device'
+            : vault
+              ? "This item hasn't reached this device yet"
+              : "This drive isn't on this device yet"}
         </h1>
-        <Lead>
-          {vault
-            ? 'Your private drive is kept on your devices. It will appear here once the server or your other device answers.'
-            : localOnly
-              ? "This drive isn't connected to a server, so it syncs directly between devices. Open it on a device that has it, and it will arrive here."
-              : serverFailed
-                ? "This device can't reach the drive's server, and it hasn't kept a copy of it. It will open as soon as the server answers."
-                : "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."}
-        </Lead>
-        {/* With a backup, restoring is the way out; offer it first. */}
-        {agent && <VaultRestoreAction subject={subject} />}
-        <Panel data-testid='drive-unavailable'>
-          {!vault && (
-            <Diagram aria-hidden>
-              <Node $muted={localOnly}>
-                <Circle $dashed={localOnly}>
-                  <FaCloud />
-                </Circle>
-                <span>{localOnly ? 'No server' : 'Server'}</span>
-              </Node>
-              <Line />
-              <Devices>
-                <Node>
-                  <Circle $active>
-                    <FaRegWindowMaximize />
+        {/* With a backup, restoring is the way out and starts by itself. */}
+        {hasBackup && (
+          <VaultRestoreAction subject={subject} vault={driveVault} autoStart />
+        )}
+        {!hasBackup && (
+          <Lead>
+            {vault
+              ? 'Your private drive is kept on your devices. It will appear here once the server or your other device answers.'
+              : localOnly
+                ? "This drive isn't connected to a server, so it syncs directly between devices. Open it on a device that has it, and it will arrive here."
+                : serverFailed
+                  ? "This device can't reach the drive's server, and it hasn't kept a copy of it. It will open as soon as the server answers."
+                  : "This device hasn't kept a copy of the drive and isn't connected to its server yet. It will open as soon as the server answers."}
+          </Lead>
+        )}
+        {!hasBackup && (
+          <Panel data-testid='drive-unavailable'>
+            {!vault && (
+              <Diagram aria-hidden>
+                <Node $muted={localOnly}>
+                  <Circle $dashed={localOnly}>
+                    <FaCloud />
                   </Circle>
-                  <span>This device</span>
+                  <span>{localOnly ? 'No server' : 'Server'}</span>
                 </Node>
-                <Link />
-                <Node $muted>
-                  <Circle>
-                    <FaRegWindowMaximize />
-                  </Circle>
-                  <span>Your other devices</span>
-                </Node>
-              </Devices>
-            </Diagram>
-          )}
-          <Status role='status'>
-            <Dot />
-            <p>
-              <strong>
-                {localOnly && !vault
-                  ? 'No device with this drive is reachable.'
-                  : serverFailed
-                    ? "The server isn't reachable."
-                    : 'Not connected to the server yet.'}
-              </strong>{' '}
-              Retrying automatically every 10 seconds.
-            </p>
-            <Button onClick={retry} disabled={retrying}>
-              {retrying ? 'Retrying…' : 'Retry now'}
-            </Button>
-          </Status>
-        </Panel>
-        {localOnly && !vault && (
+                <Line />
+                <Devices>
+                  <Node>
+                    <Circle $active>
+                      <FaRegWindowMaximize />
+                    </Circle>
+                    <span>This device</span>
+                  </Node>
+                  <Link />
+                  <Node $muted>
+                    <Circle>
+                      <FaRegWindowMaximize />
+                    </Circle>
+                    <span>Your other devices</span>
+                  </Node>
+                </Devices>
+              </Diagram>
+            )}
+            <Status role='status'>
+              <Dot />
+              <p>
+                <strong>
+                  {localOnly && !vault
+                    ? 'No device with this drive is reachable.'
+                    : serverFailed
+                      ? "The server isn't reachable."
+                      : 'Not connected to the server yet.'}
+                </strong>{' '}
+                Retrying automatically every 10 seconds.
+              </p>
+              <Button onClick={retry} disabled={retrying}>
+                {retrying ? 'Retrying…' : 'Retry now'}
+              </Button>
+            </Status>
+          </Panel>
+        )}
+        {!hasBackup && localOnly && !vault && (
           <Hint>
             <FaCloud />
             <p>

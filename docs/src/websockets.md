@@ -513,7 +513,8 @@ genesis commit, which the responder rejects. A resource with no state answers
 `ERROR` `UNKNOWN` `No state`; an unreadable or missing subject answers
 `ERROR` `UNKNOWN` with the lookup error, on the same `request_id`.
 That `lastCommit` id is a receipt for genesis detection, not a refetchable
-resource.
+resource. It is derived when the state is sent (the id of the newest kept
+envelope) and is not stored in the resource's Loro document.
 
 A client that needs many subjects at once (a chat and every part of every
 message, say) sends one `GET_MANY` instead of one `GET` per subject, when
@@ -562,12 +563,14 @@ deterministic signing and commit parsing are unaffected by the transport.
 answers `ERROR` with the matching `request_id` and a classified code. HTTP
 `POST /commit` remains the fallback path.
 
-**The echo carries the server's stamp.** The `UPDATE` a commit fans out is
+**The echo carries the server's own ops.** The `UPDATE` a commit fans out is
 not the commit's own bytes: it is every op the stored doc gained during the
-apply, which is the author's ops plus the `lastCommit` stamp the server
-writes afterwards under its own peer. Anyone who loads the stored snapshot
-builds their next edit on top of that stamp, so a subscriber without it parks
-that edit as pending and every later delta parks behind it. For the same
+apply, which is the author's ops plus whatever the server writes afterwards
+under its own peer (`createdAt` at genesis, a derived `drive`). Older servers
+also wrote a `lastCommit` stamp there on every commit; it is now derived and
+no longer part of the document. Anyone who loads the stored snapshot builds
+their next edit on top of those ops, so a subscriber without them parks that
+edit as pending and every later delta parks behind it. For the same
 reason the author's own connection receives the echo too; the client dedups
 it by commit id and imports it without notifying.
 

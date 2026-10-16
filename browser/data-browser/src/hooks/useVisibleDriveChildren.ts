@@ -34,8 +34,36 @@ export function useVisibleDriveChildren(
   drive: string,
   options?: { limit?: number },
 ) {
-  const driveResource = useResource(drive);
   const { subjects: allSubjects, loading, total } = useChildren(drive, options);
+  const hidden = useHiddenDriveSubjects(drive);
+  const children = useResources(allSubjects);
+  const subjects = useMemo(
+    () =>
+      allSubjects.filter(subject => {
+        if (hidden.has(canonicalizeScheme(subject))) return false;
+
+        const child = children.get(subject);
+
+        return !(
+          child &&
+          isHiddenFromChildLists(
+            child.getClasses(),
+            child.get(dataBrowser.properties.about) as string | undefined,
+          )
+        );
+      }),
+    [allSubjects, children, hidden],
+  );
+
+  return { subjects, allSubjects, loading, total };
+}
+
+/**
+ * The standard locations a drive page leaves out (canonical subjects): the
+ * default ontology, Comments folder, AI Chats folder, Inbox and Trash.
+ */
+export function useHiddenDriveSubjects(drive: string): Set<string> {
+  const driveResource = useResource(drive);
   const [defaultOntology] = useString(
     driveResource,
     server.properties.defaultOntology,
@@ -45,42 +73,19 @@ export function useVisibleDriveChildren(
     dataBrowser.properties.commentsFolder,
   );
   const [aiChatsFolder] = useString(driveResource, ai.properties.aiChatsFolder);
-  const children = useResources(allSubjects);
   const [inbox] = useString(driveResource, notifications.properties.inbox);
   const [trashFolder] = useString(
     driveResource,
     dataBrowser.properties.trashFolder,
   );
 
-  const subjects = useMemo(() => {
-    const hidden = new Set(
-      [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder]
-        .filter((subject): subject is string => !!subject)
-        .map(canonicalizeScheme),
-    );
-
-    return allSubjects.filter(subject => {
-      if (hidden.has(canonicalizeScheme(subject))) return false;
-
-      const child = children.get(subject);
-
-      return !(
-        child &&
-        isHiddenFromChildLists(
-          child.getClasses(),
-          child.get(dataBrowser.properties.about) as string | undefined,
-        )
-      );
-    });
-  }, [
-    allSubjects,
-    children,
-    defaultOntology,
-    commentsFolder,
-    aiChatsFolder,
-    inbox,
-    trashFolder,
-  ]);
-
-  return { subjects, allSubjects, loading, total };
+  return useMemo(
+    () =>
+      new Set(
+        [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder]
+          .filter((subject): subject is string => !!subject)
+          .map(canonicalizeScheme),
+      ),
+    [defaultOntology, commentsFolder, aiChatsFolder, inbox, trashFolder],
+  );
 }

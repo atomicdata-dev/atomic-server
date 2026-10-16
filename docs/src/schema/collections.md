@@ -18,6 +18,7 @@ Collections have various filters (`subject`, `property`, `value`) that can help 
 - [`value`](https://atomicdata.dev/properties/collection/value): Filter results by a Value. Combined with `property`, you can create powerful queries.
 - [`sort_by`](https://atomicdata.dev/properties/collection/sortBy): A property URL by which to sort. Defaults to the `subject`.
 - [`sort_desc`](https://atomicdata.dev/properties/collection/sortDesc): Sort descending, instead of ascending. Defaults to `false`.
+- `include_trashed`: Also list members that sit in the drive's Trash folder, directly or through a trashed ancestor. Defaults to `false`: trashed members are hidden. A collection of the Trash folder's own children (`property=parent`, `value=<the Trash folder>`) always lists them. The same query parameter exists on `/search`.
 - [`current_page`](https://atomicdata.dev/properties/collection/currentPage): The number of the current page.
 - [`page_size`](https://atomicdata.dev/properties/collection/pageSize): How many items (members) are visible per page.
 - [`total_pages`](https://atomicdata.dev/properties/collection/totalPages): How many pages there are for the current collection.

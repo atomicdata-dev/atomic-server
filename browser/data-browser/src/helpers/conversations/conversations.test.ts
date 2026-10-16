@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { conversations, core } from '@tomic/react';
-import { hasMembers, startConversation } from './conversations';
+import { hasMember, hasMembers, startConversation } from './conversations';
 
 // The cryptography is wasm; what matters here is who ends up a member.
 vi.mock('./conversationCrypto', () => ({
@@ -143,6 +143,20 @@ describe('startConversation', () => {
     expect(store.newResource).not.toHaveBeenCalled();
     expect(store.registerLocalOnlyDrive).not.toHaveBeenCalled();
     expect(outbox).toEqual([]);
+  });
+});
+
+describe('hasMember', () => {
+  const conversation = (read: unknown) =>
+    ({ get: () => read }) as unknown as Parameters<typeof hasMember>[0];
+
+  it('finds an agent among the readers', () => {
+    expect(hasMember(conversation([ME, OTHER]), OTHER)).toBe(true);
+  });
+
+  it('is false for someone else, and for a conversation that is not loaded', () => {
+    expect(hasMember(conversation([ME]), OTHER)).toBe(false);
+    expect(hasMember(conversation(undefined), OTHER)).toBe(false);
   });
 });
 

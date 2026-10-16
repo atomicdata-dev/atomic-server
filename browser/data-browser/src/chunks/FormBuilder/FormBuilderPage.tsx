@@ -270,9 +270,11 @@ const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Stay on one line and at intrinsic width: these are the items that must
-     not be squeezed. */
-  flex-wrap: nowrap;
+  /* Items keep their intrinsic width (never squeezed), but wrap onto another
+     line when the actions are wider than the screen, as the no-server nudge
+     is on a phone. */
+  flex-wrap: wrap;
+  max-width: 100%;
   flex-shrink: 0;
 
   button {

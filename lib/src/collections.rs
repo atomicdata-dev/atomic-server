@@ -60,6 +60,11 @@ pub struct CollectionBuilder {
     pub include_nested: bool,
     /// Whether to include resources from other servers
     pub include_external: bool,
+    /// Also list members that sit in their drive's Trash folder (directly or
+    /// through an ancestor). Off by default. A collection that lists the
+    /// children of the Trash folder itself (`parent` == the Trash) is the Trash
+    /// view and always shows them. See [`crate::trash`].
+    pub include_trashed: bool,
     /// Scope results to a specific drive. When set, the query index is drive-scoped so watched
     /// queries only trigger for resources in this drive.
     pub drive: Option<Subject>,
@@ -152,6 +157,7 @@ impl CollectionBuilder {
             name: Some(format!("{} collection", path)),
             include_nested: true,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -347,6 +353,7 @@ impl Collection {
             for_agent: for_agent.clone(),
             drive: collection_builder.drive.clone(),
             aggregation: collection_builder.aggregation.clone(),
+            exclude_trashed: !collection_builder.include_trashed,
         };
 
         let query_result = store.query(&q).await?;
@@ -518,6 +525,7 @@ pub async fn construct_collection_from_params(
     let mut name = None;
     let mut include_nested = false;
     let mut include_external = false;
+    let mut include_trashed = false;
     let mut drive: Option<Subject> = None;
     let mut aggregation: Option<crate::aggregate::Aggregation> = None;
     let mut expression_filters: Vec<crate::expression::ExpressionFilter> = Vec::new();
@@ -573,6 +581,7 @@ pub async fn construct_collection_from_params(
             "page_size" => page_size = v.parse::<usize>()?,
             "include_nested" => include_nested = v.parse::<bool>()?,
             "include_external" => include_external = v.parse::<bool>()?,
+            "include_trashed" => include_trashed = v.parse::<bool>()?,
             "drive" => drive = Some(Subject::from(v.as_ref())),
             // Statistics over every matching row, as JSON:
             // `{"aggregates":[{"property":"…","function":"sum"}],
@@ -613,6 +622,7 @@ pub async fn construct_collection_from_params(
         name,
         include_nested,
         include_external,
+        include_trashed,
         drive: Some(drive.unwrap_or_else(|| drive_prefix_from_subject(resource.get_subject()))),
         aggregation,
         expression_filters,
@@ -699,6 +709,7 @@ mod test {
             name: Some("Test collection".into()),
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -725,6 +736,7 @@ mod test {
             name: None,
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -781,6 +793,7 @@ mod test {
             name: None,
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: Some(drive),
             aggregation: None,
             expression_filters: Vec::new(),
@@ -852,6 +865,7 @@ mod test {
                         name: None,
                         include_nested: false,
                         include_external: false,
+                        include_trashed: false,
                         drive: None,
                         aggregation: None,
                         expression_filters: Vec::new(),
@@ -919,6 +933,7 @@ mod test {
                 name: None,
                 include_nested: false,
                 include_external: false,
+                include_trashed: false,
                 drive: None,
                 aggregation: None,
                 expression_filters: Vec::new(),
@@ -971,6 +986,7 @@ mod test {
             name: None,
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -1008,6 +1024,7 @@ mod test {
             name: None,
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -1043,6 +1060,7 @@ mod test {
             name: None,
             include_nested: false,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
@@ -1099,6 +1117,7 @@ mod test {
                 name: None,
                 include_nested: false,
                 include_external: false,
+                include_trashed: false,
                 drive: None,
                 aggregation: None,
                 expression_filters: Vec::new(),
@@ -1139,6 +1158,7 @@ mod test {
                 name: None,
                 include_nested: false,
                 include_external: false,
+                include_trashed: false,
                 drive: None,
                 aggregation: None,
                 expression_filters: Vec::new(),
@@ -1169,6 +1189,7 @@ mod test {
                 name: None,
                 include_nested: false,
                 include_external: false,
+                include_trashed: false,
                 drive: None,
                 aggregation: None,
                 expression_filters: Vec::new(),
@@ -1210,6 +1231,7 @@ mod test {
                     name: None,
                     include_nested: false,
                     include_external: false,
+                    include_trashed: false,
                     drive: None,
                     aggregation: None,
                     expression_filters: Vec::new(),
@@ -1256,6 +1278,7 @@ mod test {
                     name: None,
                     include_nested: false,
                     include_external: false,
+                    include_trashed: false,
                     drive: None,
                     aggregation: None,
                     expression_filters: Vec::new(),
@@ -1288,6 +1311,7 @@ mod test {
                 name: None,
                 include_nested: false,
                 include_external: false,
+                include_trashed: false,
                 drive: None,
                 aggregation: None,
                 expression_filters: Vec::new(),
@@ -1321,6 +1345,7 @@ mod test {
             // The important bit here
             include_nested: true,
             include_external: false,
+            include_trashed: false,
             drive: None,
             aggregation: None,
             expression_filters: Vec::new(),
