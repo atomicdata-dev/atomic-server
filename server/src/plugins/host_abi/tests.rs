@@ -1252,3 +1252,44 @@ async fn calling_an_app_that_declares_secrets_needs_write_on_the_drive() {
         }
     }
 }
+
+#[actix_rt::test]
+async fn a_chain_that_may_not_spend_secrets_never_runs_an_app_that_declares_them() {
+    let w = World::new("host_abi_chain_without_secrets").await;
+    let db = &*w.db;
+    // The counter declares a secret; the caller (no secrets) reaches it.
+    let mut manifest: Json = serde_json::from_str(COUNTER_MANIFEST).unwrap();
+    manifest["secrets"] = json!([{ "name": "token", "origin": "https://api.example.com" }]);
+    let counter = install(&w.f, "counter", &manifest.to_string(), COUNTER_WASM).await;
+    let _caller = install(&w.f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let args = json!({"subject": subject, "property": property});
+
+    // The owner may write the drive, so the per-hop rights check passes.
+    let err = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args.clone(),
+            owner(db),
+            Arc::new(CallBudget::default().without_secrets()),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // Without the restriction the same call runs.
+    let ok = w
+        .call_within(
+            CALLER,
+            "bump-twice",
+            args,
+            owner(db),
+            Arc::new(CallBudget::default()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(ok, json!({"count": 2}));
+}

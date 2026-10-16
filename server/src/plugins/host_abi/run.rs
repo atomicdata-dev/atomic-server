@@ -72,6 +72,8 @@ pub struct CallBudget {
     /// may only cause reads, so an app it calls cannot pass its call on to
     /// one that writes.
     effects: Option<Vec<ExportEffect>>,
+    /// Whether an app that declares secrets may run anywhere in the chain.
+    secrets: bool,
 }
 
 impl Default for CallBudget {
@@ -86,12 +88,21 @@ impl CallBudget {
             calls: AtomicU64::new(calls),
             fuel: AtomicU64::new(fuel),
             effects: None,
+            secrets: true,
         }
     }
 
     /// The same budget, with only these effects allowed anywhere in the chain.
     pub fn only(mut self, effects: Vec<ExportEffect>) -> Self {
         self.effects = Some(effects);
+        self
+    }
+
+    /// The same budget, where no app that declares secrets may run. For a
+    /// caller who may not spend them (a read-only connection), however far
+    /// down the chain the app is.
+    pub fn without_secrets(mut self) -> Self {
+        self.secrets = false;
         self
     }
 
@@ -248,6 +259,12 @@ pub fn call_export<'a>(
             .export(interface, function)
             .expect("provider_of found it");
         budget.allows(export.effect)?;
+        if !budget.secrets && !app.manifest.secrets.is_empty() {
+            return Err(error(
+                code::FORBIDDEN,
+                "this call may not cause an app that declares secrets to run",
+            ));
+        }
         // At every hop, not only the entry: a read export must not let a reader
         // cause a write. An app that declares secrets can spend them whatever
         // its exports say they do, so calling it takes the same rights as

@@ -185,10 +185,14 @@ async fn run(
     let db = Arc::new(appstate.store.clone());
     // Only the effect the connection was offered: a chain it causes may not
     // write when the export reads.
-    let budget = match found.export.effect {
+    let mut budget = match found.export.effect {
         ExportEffect::Read => CallBudget::default().only(vec![ExportEffect::Read]),
         _ => CallBudget::default(),
     };
+    // A read-only connection may not spend secrets, at any hop.
+    if !grant.write {
+        budget = budget.without_secrets();
+    }
     let result = host_abi::call_for_agent(
         &appstate.host_abi,
         &db,
