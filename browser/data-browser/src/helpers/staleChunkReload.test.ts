@@ -35,6 +35,26 @@ describe('handleStaleChunk', () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
+  it('does not reload while offline, and keeps the one reload for later', () => {
+    const storage = memoryStorage();
+    const reload = vi.fn();
+    const offline = { preventDefault: vi.fn() };
+
+    handleStaleChunk(
+      offline,
+      reload,
+      () => storage,
+      () => false,
+    );
+
+    expect(offline.preventDefault).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+
+    handleStaleChunk({ preventDefault: vi.fn() }, reload, () => storage);
+
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it('does not reload when sessionStorage throws', () => {
     const event = { preventDefault: vi.fn() };
     const reload = vi.fn();
