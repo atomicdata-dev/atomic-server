@@ -190,6 +190,40 @@ impl CallBudget {
         }
     }
 
+    /// Whether anything in this chain may write: false when the effects were
+    /// narrowed to leave `write` out. A `read` export can still call
+    /// `store.apply`, so this is checked there too, not only per export.
+    pub(super) fn may_write(&self) -> bool {
+        self.effects
+            .as_ref()
+            .is_none_or(|allowed| allowed.contains(&ExportEffect::Write))
+    }
+
+    pub(super) fn has_voucher(&self) -> bool {
+        self.vouched_by.is_some()
+    }
+
+    /// For a forwarded chain, the node that vouched must be able to write the
+    /// drive as well: a peer never gets more than its own rights.
+    pub(super) async fn check_vouch_write(
+        &self,
+        db: &Db,
+        drive_resource: &atomic_lib::Resource,
+    ) -> Result<(), HostError> {
+        let Some(via) = &self.vouched_by else {
+            return Ok(());
+        };
+        atomic_lib::hierarchy::check_write(db, drive_resource, via)
+            .await
+            .map(|_| ())
+            .map_err(|e| {
+                error(
+                    code::FORBIDDEN,
+                    format!("the node that forwarded this call may not write the drive: {e}"),
+                )
+            })
+    }
+
     /// Fuel still in the pool.
     pub fn fuel_left(&self) -> u64 {
         self.fuel.load(Ordering::SeqCst)
@@ -410,18 +444,7 @@ pub fn call_export<'a>(
             atomic_lib::hierarchy::check_write(&**db, &drive_resource, &caller)
                 .await
                 .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
-            if let Some(via) = &budget.vouched_by {
-                atomic_lib::hierarchy::check_write(&**db, &drive_resource, via)
-                    .await
-                    .map_err(|e| {
-                        error(
-                            code::FORBIDDEN,
-                            format!(
-                                "the node that forwarded this call may not write the drive: {e}"
-                            ),
-                        )
-                    })?;
-            }
+            budget.check_vouch_write(db, &drive_resource).await?;
         }
 
         let parsed: serde_json::Value = serde_json::from_str(args).map_err(|e| {

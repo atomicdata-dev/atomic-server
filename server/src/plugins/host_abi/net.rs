@@ -48,6 +48,14 @@ impl net::Host for AbiState {
             ));
         }
 
+        // A server module is trusted to run, not to exceed the chain that
+        // called it: a chain limited to reads reaches out for no write.
+        if operation.effect != "read" {
+            self.host
+                .budget
+                .allows(crate::plugins::manifest::ExportEffect::External)?;
+        }
+
         let mut url = url::Url::parse(&operation.url)
             .map_err(|e| error(code::INTERNAL, format!("operation URL: {e}")))?;
         if !req.path.is_empty() {

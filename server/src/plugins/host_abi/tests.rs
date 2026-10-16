@@ -274,6 +274,17 @@ impl World {
 
     /// The host state of an installed app, for calling the interfaces directly.
     async fn state(&self, installed: &Installed, caller: ForAgent) -> AbiState {
+        self.state_within(installed, caller, Arc::new(CallBudget::default()))
+            .await
+    }
+
+    /// [`Self::state`] inside a chain with the budget the test chose.
+    async fn state_within(
+        &self,
+        installed: &Installed,
+        caller: ForAgent,
+        budget: Arc<CallBudget>,
+    ) -> AbiState {
         self.registry.refresh(&self.db, &self.f.drive).await;
         let app = self
             .registry
@@ -285,7 +296,7 @@ impl World {
             (&app.drive, &app.installation, Some(app.manifest.clone())),
             caller,
             0,
-            Arc::new(CallBudget::default()),
+            budget,
         )
         .await
         .unwrap();
@@ -554,6 +565,52 @@ async fn without_a_write_grant_apply_is_proposed_and_without_the_callers_rights_
         .unwrap();
     assert_eq!(applied.outcome, Outcome::Refused, "{applied:?}");
     assert_eq!(count_of(db, &subject, &property).await, 41);
+}
+
+#[actix_rt::test]
+async fn a_read_only_chain_or_a_peer_that_cannot_write_never_commits_through_apply() {
+    use crate::plugins::manifest::ExportEffect;
+    use atomic_lib::sync::protocol::CallBudgetWire;
+
+    let w = World::new("host_abi_apply_budget").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    let change = || vec![set(&subject, &property, WitValue::Integer(41))];
+
+    // Narrowed to reads: a read export that calls `apply` is forbidden.
+    let reads = Arc::new(CallBudget::default().only(vec![ExportEffect::Read]));
+    let mut state = w.state_within(&counter, owner(db), reads).await;
+    let err = state.apply(change()).await.unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // A forwarding peer that may only read the drive vouches for the owner:
+    // the owner could write, the peer could not, so nothing is written.
+    let peer = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
+    let wire = CallBudgetWire {
+        calls: 8,
+        fuel: 1_000_000,
+        effects: None,
+        secrets: true,
+    };
+    let vouched = Arc::new(CallBudget::from_wire(
+        &wire,
+        ForAgent::AgentSubject(peer.into()),
+    ));
+    let mut state = w.state_within(&counter, owner(db), vouched).await;
+    let err = state.apply(change()).await.unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // The same call in an unrestricted chain still commits.
+    let mut state = w.state(&counter, owner(db)).await;
+    let applied = state.apply(change()).await.unwrap();
+    assert_eq!(applied.outcome, Outcome::Committed, "{applied:?}");
 }
 
 #[actix_rt::test]

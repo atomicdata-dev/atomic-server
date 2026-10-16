@@ -259,6 +259,22 @@ impl store::Host for AbiState {
         }
         let verdict = intents_to_verdict(&intents)?;
         let host = &self.host;
+        // A chain limited to reads, or vouched for by a node that may not
+        // write, never writes, whatever the export that got here is called.
+        if !host.budget.may_write() {
+            return Err(error(
+                code::FORBIDDEN,
+                "this call may not write: its effects leave out 'write'",
+            ));
+        }
+        if host.budget.has_voucher() {
+            let drive = host
+                .db
+                .get_resource(&host.drive.as_str().into())
+                .await
+                .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+            host.budget.check_vouch_write(&host.db, &drive).await?;
+        }
         let caller = host.core.grant().caller().clone();
 
         let mut writer = StoreApplyHost::for_installation(
