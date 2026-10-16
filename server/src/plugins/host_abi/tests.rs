@@ -905,7 +905,14 @@ async fn bump_count(db: &Db, subject: &str, property: &str, name: Option<&str>, 
 #[actix_rt::test]
 async fn events_are_pulled_with_a_cursor_and_acknowledged() {
     let w = World::new("host_abi_events").await;
-    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let counter = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[w.f.drive.as_str()]))],
+    )
+    .await;
     let mut state = w.state(&counter, owner(&w.db)).await;
     drain_events(&mut state).await;
     assert!(state.next(None, 10).await.unwrap().is_empty());
@@ -914,7 +921,10 @@ async fn events_are_pulled_with_a_cursor_and_acknowledged() {
     bump_count(&w.db, &subject, &property, None, 1).await;
 
     let all = state.next(None, 100).await.unwrap();
-    assert!(commit_subjects(&all).contains(&subject), "{all:?}");
+    assert!(
+        commit_subjects(&all).contains(&subject),
+        "want {subject} got {all:?}"
+    );
     let first = state.next(None, 1).await.unwrap();
     assert_eq!(first.len(), 1);
     // Reading does not consume: the same events come again until acknowledged.
@@ -935,7 +945,14 @@ async fn events_are_pulled_with_a_cursor_and_acknowledged() {
 #[actix_rt::test]
 async fn a_subscription_filters_by_class_subtree_and_property() {
     let w = World::new("host_abi_event_filters").await;
-    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let counter = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[w.f.drive.as_str()]))],
+    )
+    .await;
     let mut state = w.state(&counter, owner(&w.db)).await;
     drain_events(&mut state).await;
     let filter = |class: Option<&str>, subtree: Option<&str>, property: Option<&str>| Filter {
@@ -985,7 +1002,12 @@ async fn a_subscription_filters_by_class_subtree_and_property() {
         .set_filters(vec![filter(None, Some(&property), None)])
         .await
         .unwrap();
-    assert!(state.next(Some("0".into()), 100).await.unwrap().is_empty());
+    // The property is its own subtree, and the counter is not below it.
+    let got = commit_subjects(&state.next(Some("0".into()), 100).await.unwrap());
+    assert!(
+        !got.is_empty() && got.iter().all(|s| *s == property),
+        "{got:?}"
+    );
 }
 
 #[actix_rt::test]
