@@ -1187,6 +1187,8 @@ async fn drive_usage_endpoint() {
         "blobBytes should equal the uploaded content length: {body}"
     );
     assert!(json.get("loroBytes").is_some(), "loroBytes missing: {body}");
+    // An open node hosts every drive it holds.
+    assert_eq!(json["enrolled"], true, "{body}");
 
     // The per-resource breakdown must add up to the drive totals, with the
     // uploaded file's bytes attributed to exactly one resource.
@@ -1209,6 +1211,77 @@ async fn drive_usage_endpoint() {
     assert_eq!(blob_total, test_content.len() as u64, "{body}");
     assert_eq!(rows.len() as u64, json["resourceCount"].as_u64().unwrap());
     assert_eq!(loro_total, json["loroBytes"].as_u64().unwrap());
+}
+
+/// `GET /drive-usage` says whether the node still admits the drive, rather
+/// than leaving clients to infer it from "the node holds data". A drive whose
+/// plan was switched off keeps its data on a managed node but is no longer
+/// enrolled.
+#[actix_rt::test]
+async fn drive_usage_reports_enrollment_on_a_managed_node() {
+    let unique_string = atomic_lib::utils::random_string(10);
+    use clap::Parser;
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
+    ]);
+
+    let mut config = config::build_config(opts).expect("failed init config");
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    let appstate = crate::appstate::AppState::init(config.clone())
+        .await
+        .expect("failed init appstate");
+
+    let data = Data::new(appstate.clone());
+    let app = test::init_service(
+        App::new()
+            .app_data(data)
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+
+    // The drive and its data exist while the node is still open.
+    let drive_did = atomic_lib::test_utils::create_test_drive(&appstate.store)
+        .await
+        .unwrap();
+
+    // Now the node becomes managed: only drives the control plane lists are
+    // enrolled. This one is not (plan switched off), yet its data stays.
+    let policy = std::sync::Arc::new(atomic_lib::sync::policy::AllowlistPolicy::new());
+    appstate.store.set_sync_policy(policy.clone());
+
+    macro_rules! usage {
+        () => {{
+            let uri = format!(
+                "/drive-usage?subject={}",
+                urlencoding::encode(drive_did.as_str())
+            );
+            let req = build_request_authenticated(&uri, &appstate).to_request();
+            let resp = test::call_service(&app, req).await;
+            let status = resp.status();
+            let body = get_body(resp);
+            assert!(status.is_success(), "drive-usage status {status}: {body}");
+            serde_json::from_str::<serde_json::Value>(&body).unwrap()
+        }};
+    }
+
+    let json = usage!();
+    assert!(json["resourceCount"].as_u64().unwrap() >= 1, "{json}");
+    assert_eq!(json["enrolled"], false, "data without enrollment: {json}");
+
+    policy.set_drive_policies([(drive_did.to_string(), None)]);
+    let json = usage!();
+    assert_eq!(json["enrolled"], true, "{json}");
+
+    // Over quota is still enrolled: the drive is hosted, just full.
+    policy.set_drive_policies([(drive_did.to_string(), Some(1))]);
+    policy.record_drive_usage([(drive_did.to_string(), 10)]);
+    let json = usage!();
+    assert_eq!(json["enrolled"], true, "{json}");
 }
 
 /// `GET /server` describes the node itself as a `Server` resource, replacing the

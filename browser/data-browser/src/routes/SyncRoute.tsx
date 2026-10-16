@@ -1013,6 +1013,7 @@ function SyncPage() {
     refusedByServer: store.isDriveRefusedByServer(status.drive),
     status,
     resourceCount: nodeUsage?.resourceCount,
+    enrolled: nodeUsage?.enrolled,
   });
   const cloudEnrolled = hostedByNode ? true : accountEnrolled;
 

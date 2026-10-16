@@ -21,6 +21,13 @@ struct DriveUsageResponse {
     resource_count: u64,
     blob_bytes: u64,
     loro_bytes: u64,
+    /// Whether this node currently admits the drive under its sync policy. On
+    /// a managed node that is "the control plane has the drive on its
+    /// allowlist"; on a self-hosted node it is whether the node hosts the
+    /// drive (an open node hosts everything). Data can outlive enrollment, so
+    /// `resourceCount > 0` alone does not say this. Over-quota still counts as
+    /// enrolled: the drive is hosted, just full.
+    enrolled: bool,
 }
 
 /// `GET /drive-usage?subject=<drive>` — per-drive storage (resource count, blob
@@ -55,7 +62,12 @@ pub async fn handle_drive_usage(
         .next()
         .ok_or_else(|| format!("No usage found for drive {subject}"))?;
 
+    // `drive_is_allowed`, not `admit_decision`: the latter starts a bootstrap
+    // grace clock for unknown drives, and a stat must not change state.
+    let enrolled = store.sync_policy().drive_is_allowed(&subject);
+
     Ok(HttpResponse::Ok().json(DriveUsageResponse {
+        enrolled,
         name: row.name,
         resource_count: row.resource_count,
         blob_bytes: row.blob_bytes,

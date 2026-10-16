@@ -326,6 +326,12 @@ export type NodeDriveUsage = {
   resourceCount: number;
   blobBytes: number;
   loroBytes: number;
+  /**
+   * Whether the node currently admits this drive (enrolled and active). Absent
+   * on a node that predates the field, which callers must read as "unknown",
+   * not as false.
+   */
+  enrolled?: boolean;
 };
 
 /**
@@ -365,6 +371,7 @@ export async function fetchNodeDriveUsage(
       resourceCount: Number(data?.resourceCount ?? 0),
       blobBytes: Number(data?.blobBytes ?? 0),
       loroBytes: Number(data?.loroBytes ?? 0),
+      enrolled: typeof data?.enrolled === 'boolean' ? data.enrolled : undefined,
     };
   } catch {
     return null;
