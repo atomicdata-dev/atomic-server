@@ -135,6 +135,14 @@ async fn drain(appstate: &AppState, guard: &Arc<Mutex<Guard>>) {
                     continue;
                 }
             };
+            // Another node holds the lease: leave the edge where it is.
+            if !appstate
+                .leases
+                .holds(&appstate.store, &key.drive, &key.plugin)
+                .await
+            {
+                continue;
+            }
             let seq = event.seq;
             attempted += deliver(appstate, guard, &key, &trigger, &mut event).await;
             // Acknowledged (the cursor passed it) means the next edge may go.
@@ -986,5 +994,132 @@ mod tests {
         assert!(stopped.unwrap_err().contains("its own query"));
         // Another plugin is unaffected; the cap is per plugin, not per server.
         assert!(guard.admit("other", "s", 1_000).is_ok());
+    }
+
+    // -- Leases: several nodes, one drive. The nodes share one db here (their
+    // sync is instant); each has its own node id and clock.
+
+    use crate::plugins::lease::{head, Lease, Leases, ManualClock, TTL_MS};
+
+    fn node(f: &Fixture, id: &str, clock: &Arc<ManualClock>) -> AppState {
+        let mut appstate = f.appstate.clone();
+        appstate.leases = Arc::new(Leases::with(id, clock.clone()));
+        appstate
+    }
+
+    async fn drained(appstate: &AppState) {
+        drain(appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+    }
+
+    async fn lease_head(f: &Fixture) -> Lease {
+        let found = f
+            .appstate
+            .store
+            .query(&atomic_lib::storelike::Query::new_prop_val(
+                urls::LEASE_OF,
+                &f.plugin,
+            ))
+            .await
+            .unwrap();
+        head(found.resources.iter().filter_map(Lease::read)).expect("a lease exists")
+    }
+
+    /// A drive that has a peer, so leases are in play.
+    async fn shared_drive(name: &str, creates: &str) -> Fixture {
+        let mut f = fixture(name).await;
+        write_plugin(&mut f, creates).await;
+        arm(&f, true).await;
+        atomic_lib::sync::peer::add_known_peer_for_drive(
+            &f.appstate.store,
+            "peer-b",
+            "b",
+            &f.drive,
+        );
+        f
+    }
+
+    #[actix_rt::test]
+    async fn a_single_node_takes_the_lease_and_runs_triggers() {
+        let f = shared_drive("lease_single", "Ran once").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let a = node(&f, "node-a", &clock);
+
+        add_watched(&f, "Arrived").await;
+        drained(&a).await;
+
+        assert_eq!(children_named(&f, &f.drive.clone(), "Ran once").await, 1);
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.holder, "node-a");
+        assert_eq!(lease.generation, 0);
+        assert_eq!(lease.expires_at, 1_000_000 + TTL_MS);
+    }
+
+    #[actix_rt::test]
+    async fn a_second_node_leaves_the_work_while_the_lease_is_valid() {
+        let f = shared_drive("lease_second", "Ran by holder").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let (a, b) = (node(&f, "node-a", &clock), node(&f, "node-b", &clock));
+        add_watched(&f, "First").await;
+        drained(&a).await;
+
+        clock.advance(TTL_MS - 1);
+        add_watched(&f, "Second").await;
+        drained(&b).await;
+
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran by holder").await,
+            1
+        );
+        assert_eq!(lease_head(&f).await.holder, "node-a");
+        // The edge stays pending, for whoever holds the lease next.
+        next_event(&f, &PluginTriggerKey::new(&f.drive, &f.plugin));
+    }
+
+    #[actix_rt::test]
+    async fn after_expiry_the_second_node_takes_over_and_resumes() {
+        let f = shared_drive("lease_takeover", "Ran after takeover").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let (a, b) = (node(&f, "node-a", &clock), node(&f, "node-b", &clock));
+        add_watched(&f, "First").await;
+        drained(&a).await;
+        let first = lease_head(&f).await;
+
+        add_watched(&f, "Second").await;
+        clock.advance(TTL_MS + 1);
+        drained(&b).await;
+
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran after takeover").await,
+            2
+        );
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.holder, "node-b");
+        assert_eq!(lease.generation, 1);
+        assert_eq!(lease.previous.as_deref(), Some(first.subject.as_str()));
+
+        // The old holder comes back, sees the new lease and stays out.
+        add_watched(&f, "Third").await;
+        drained(&a).await;
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran after takeover").await,
+            2
+        );
+    }
+
+    #[actix_rt::test]
+    async fn the_holder_renews_before_the_lease_runs_out() {
+        let f = shared_drive("lease_renew", "Ran renewed").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let a = node(&f, "node-a", &clock);
+        add_watched(&f, "First").await;
+        drained(&a).await;
+
+        clock.advance(TTL_MS - 1_000);
+        add_watched(&f, "Second").await;
+        drained(&a).await;
+
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.generation, 0, "renewed in place, not taken over");
+        assert_eq!(lease.expires_at, 1_000_000 + TTL_MS - 1_000 + TTL_MS);
     }
 }

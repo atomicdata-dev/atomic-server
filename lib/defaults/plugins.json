@@ -97,6 +97,57 @@
     "https://atomicdata.dev/properties/shortname": "plugin-permissions"
   },
   {
+    "@id": "https://atomicdata.dev/properties/leaseOf",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Installation (or plugin) whose background work a Lease guards.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "lease-of"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/leaseHolder",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The node (`did:ad:node:...`) that holds a Lease and runs the background work.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "lease-holder"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/leaseExpiresAt",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "Unix milliseconds after which another node may take a Lease over. Only the holder writes it, to renew.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "lease-expires-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/leaseGeneration",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "How many takeovers precede this Lease: 0 for the first, the previous Lease's generation plus one for a takeover. Never changes after creation.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "lease-generation"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/previousLease",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Lease this one took over. Absent on the first Lease of an Installation.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "previous-lease",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Lease"
+  },
+  {
     "@id": "https://atomicdata.dev/classes/Plugin",
     "https://atomicdata.dev/properties/description": "Deprecated: a legacy Wasm plugin resource. The server migrates it at startup into an Installation of a Release; new installs use Installation.",
     "https://atomicdata.dev/properties/isA": [
@@ -390,6 +441,25 @@
       "https://atomicdata.dev/properties/release"
     ],
     "https://atomicdata.dev/properties/shortname": "listing",
+    "https://atomicdata.dev/properties/subresources": []
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Lease",
+    "https://atomicdata.dev/properties/description": "The right to run an Installation's background work (triggers, schedules) on one node, for a limited time. Created and renewed by the holder with ordinary signed commits, taken over after expiry by a new Lease naming the previous one. The current holder is the Lease with the highest generation, ties broken by the lowest holder node id.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/previousLease"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/leaseOf",
+      "https://atomicdata.dev/properties/leaseHolder",
+      "https://atomicdata.dev/properties/leaseExpiresAt",
+      "https://atomicdata.dev/properties/leaseGeneration"
+    ],
+    "https://atomicdata.dev/properties/shortname": "lease",
     "https://atomicdata.dev/properties/subresources": []
   }
 ]

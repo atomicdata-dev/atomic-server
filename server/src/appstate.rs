@@ -44,6 +44,10 @@ pub struct AppState {
     /// Apps loaded on the host ABI (`plugins::host_abi`), by drive.
     #[cfg(feature = "wasm-plugins")]
     pub host_abi: Arc<crate::plugins::host_abi::HostAbiRegistry>,
+    /// Which Installations' background work this node may run
+    /// (`plugins::lease`).
+    #[cfg(feature = "wasm-plugins")]
+    pub leases: Arc<crate::plugins::lease::Leases>,
     /// Per-agent and per-peer budgets for the write endpoints; see
     /// `crate::rate_limit`. Sized from `--write-rate-limit` and
     /// `--anonymous-write-rate-limit`.
@@ -301,6 +305,8 @@ impl AppState {
             view_tokens: Arc::new(Default::default()),
             #[cfg(feature = "wasm-plugins")]
             host_abi,
+            #[cfg(feature = "wasm-plugins")]
+            leases: Arc::new(crate::plugins::lease::Leases::system()),
         })
     }
 
