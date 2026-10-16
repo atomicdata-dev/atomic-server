@@ -80,10 +80,12 @@ impl AppSchema {
         }
     }
 
-    /// Makes the schema exist in `drive` on behalf of `installer`, who must be
-    /// able to write there: the ontology is created as the server's own agent,
-    /// so nobody gets more than they hold by installing an app.
-    pub async fn ensure(&self, store: &Db, drive: &str, installer: &ForAgent) -> AtomicResult<()> {
+    /// Refuses unless the schema could be made real in `drive` on behalf of
+    /// `installer`, who must be able to write there, and each vocabulary
+    /// exists. Writes nothing: it runs before the Installation is committed,
+    /// so a refused install leaves nothing behind. [`Self::ensure`] follows
+    /// the commit.
+    pub async fn check(&self, store: &Db, drive: &str, installer: &ForAgent) -> AtomicResult<()> {
         let drive_resource = store.get_resource(&drive.into()).await?;
         for vocabulary in &self.vocabularies {
             let found = store.get_resource(&vocabulary.as_str().into()).await;
@@ -98,12 +100,21 @@ impl AppSchema {
                 );
             }
         }
+        if self.ontology.is_some() {
+            hierarchy::check_write(store, &drive_resource, installer)
+                .await
+                .map_err(|e| format!("you cannot add an ontology to this drive: {e}"))?;
+        }
+        Ok(())
+    }
+
+    /// Makes the schema exist in `drive`, after [`Self::check`] passed for the
+    /// installer: the ontology is created as the server's own agent, so nobody
+    /// gets more than they hold by installing an app.
+    pub async fn ensure(&self, store: &Db, drive: &str) -> AtomicResult<()> {
         let Some(plan) = &self.ontology else {
             return Ok(());
         };
-        hierarchy::check_write(store, &drive_resource, installer)
-            .await
-            .map_err(|e| format!("you cannot add an ontology to this drive: {e}"))?;
         let agent = store.get_default_agent()?;
         ensure_ontology(store, &drive.into(), plan, &agent).await?;
         Ok(())

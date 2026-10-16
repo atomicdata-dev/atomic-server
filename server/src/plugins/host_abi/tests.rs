@@ -2010,6 +2010,29 @@ async fn installing_an_app_makes_its_declared_schema_real_and_a_second_app_reuse
 }
 
 #[actix_rt::test]
+async fn an_installation_that_is_refused_leaves_no_schema_behind() {
+    let w = World::new("host_abi_refused_schema").await;
+    install(&w.f, "counter", &counter_with_schema(WORK), COUNTER_WASM).await;
+
+    // The same name on the same drive is refused, after its release resolved
+    // and its schema checked out. Nothing of that schema is written.
+    let mut other: Json = serde_json::from_str(&counter_with_schema(WORK)).unwrap();
+    other["schema"]["ontology"]["shortname"] = json!("refused");
+    let err = try_install_scoped(
+        &w.f,
+        "counter",
+        &other.to_string(),
+        COUNTER_WASM,
+        Vec::new(),
+    )
+    .await
+    .err()
+    .unwrap();
+    assert!(err.contains("already installed"), "{err}");
+    assert!(ontology_of(&w.f, "refused").await.is_none());
+}
+
+#[actix_rt::test]
 async fn a_vocabulary_that_does_not_exist_refuses_the_install() {
     let w = World::new("host_abi_app_schema_missing").await;
     let manifest = counter_with_schema("https://atomicdata.dev/nothing/v1");

@@ -307,14 +307,11 @@ mod installation_hook {
         //    Installation are the approved set the host reads back.
         release::check_grants(&release.manifest, &json_value(resource, urls::GRANTS)?)?;
 
-        let roots = scope_roots(resource, drive, store, signer).await?;
-        // The classes and properties the app declares exist before it runs.
-        if let Some(schema) = Manifest::parse(release.manifest.clone())
-            .ok()
-            .flatten()
-            .and_then(|m| m.schema)
-        {
-            schema.ensure(store, drive, &for_agent).await?;
+        // Checked here, written after the commit (`after_activate`): a refusal
+        // below must leave nothing behind, and these are commits of their own.
+        scope_roots(resource, drive, store, signer).await?;
+        if let Some(schema) = declared_schema(&release) {
+            schema.check(store, drive, &for_agent).await?;
         }
 
         let (namespace, name) = identifiers(resource, &release.manifest)?;
@@ -399,12 +396,39 @@ mod installation_hook {
             ensure_js_identity(store, drive, &subject, &namespace, &name, &release, &actual)
                 .await?;
         }
-        grant_scopes(roots, resource, drive, store).await?;
         info!(
             "activated installation {subject} ({namespace}/{name}, {})",
             release.runtime
         );
         Ok(())
+    }
+
+    fn declared_schema(release: &PluginRelease) -> Option<crate::plugins::app_schema::AppSchema> {
+        Manifest::parse(release.manifest.clone())
+            .ok()
+            .flatten()
+            .and_then(|m| m.schema)
+    }
+
+    /// What activation does once the Installation is stored: the classes and
+    /// properties the app declares exist, and its agent is on the scope roots.
+    /// Both are commits of their own, so they follow the Installation's
+    /// instead of running inside the hook that can still refuse it.
+    pub async fn after_activate(
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+        signer: &str,
+    ) -> AtomicResult<()> {
+        let reference = string_value(resource, urls::RELEASE_PROP)
+            .ok_or("an active Installation needs a release")?;
+        let for_agent = ForAgent::AgentSubject(signer.to_string().into());
+        let release = release::resolve(store, &reference, &for_agent).await?;
+        if let Some(schema) = declared_schema(&release) {
+            schema.ensure(store, drive).await?;
+        }
+        let roots = scope_roots(resource, drive, store, signer).await?;
+        grant_scopes(roots, resource, drive, store).await
     }
 
     /// The roots the Installation's scopes name, read, checked and not yet
@@ -634,6 +658,51 @@ mod installation_hook {
     }
 }
 
+/// Whether this commit (re)activates the Installation.
+#[cfg(feature = "wasm-plugins")]
+fn activation_changed(is_new: bool, changed_props: &std::collections::HashSet<String>) -> bool {
+    is_new
+        || [
+            urls::INSTALLATION_STATUS,
+            urls::RELEASE_PROP,
+            urls::RELEASE_ID,
+            urls::GRANTS,
+            urls::CONFIG,
+        ]
+        .iter()
+        .any(|prop| changed_props.contains(*prop))
+}
+
+/// The writes an activation makes as commits of their own (the app's schema
+/// and its scope grants) follow the Installation's commit, so an Installation
+/// that is refused leaves none of them behind. A failure here is logged by the
+/// commit pipeline; the Installation stays.
+#[allow(unused_variables)]
+fn on_installation_after_commit(context: CommitExtenderContext) -> BoxFuture<AtomicResult<()>> {
+    Box::pin(async move {
+        #[cfg(feature = "wasm-plugins")]
+        {
+            let CommitExtenderContext {
+                store,
+                commit,
+                resource,
+                is_new,
+                changed_props,
+            } = context;
+            if commit.destroy == Some(true)
+                || installation_hook::status(resource) != STATUS_ACTIVE
+                || !activation_changed(is_new, changed_props)
+            {
+                return Ok(());
+            }
+            let drive = get_parent_drive(resource, store).await?;
+            installation_hook::after_activate(resource, &drive, store, commit.signer.as_str())
+                .await?;
+        }
+        Ok(())
+    })
+}
+
 #[allow(unused_variables)]
 fn on_installation_before_commit(
     context: CommitExtenderContext,
@@ -674,16 +743,7 @@ fn on_installation_before_commit(
         {
             use installation_hook::*;
             let status = status(resource);
-            let activation_changed = is_new
-                || [
-                    urls::INSTALLATION_STATUS,
-                    urls::RELEASE_PROP,
-                    urls::RELEASE_ID,
-                    urls::GRANTS,
-                    urls::CONFIG,
-                ]
-                .iter()
-                .any(|prop| changed_props.contains(*prop));
+            let activation_changed = activation_changed(is_new, changed_props);
             match status.as_str() {
                 STATUS_ACTIVE if activation_changed => {
                     activate(
@@ -735,6 +795,9 @@ pub fn build_installation_extender(
         .on_resource_get(ClassExtender::wrap_get_handler(move |context| {
             on_resource_get(context)
         }))
+        .after_commit(ClassExtender::wrap_commit_handler(
+            on_installation_after_commit,
+        ))
         .before_commit(ClassExtender::wrap_commit_handler(move |context| {
             on_installation_before_commit(
                 context,
