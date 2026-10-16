@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { resolveFormHostOrigin } from './formHostOrigin';
+import { resolveFormHostOrigin, formServerUrl } from './formHostOrigin';
 import { rememberOriginWithoutNode } from '@helpers/originNode';
 import type { ManagedEnrollmentSummary } from '@helpers/managed/enrollmentApi';
 
@@ -55,15 +55,32 @@ describe('resolveFormHostOrigin', () => {
     expect(resolveFormHostOrigin(DRIVE, 'not a url', [])).toBeUndefined();
   });
 
-  it('returns undefined for a drive without a server endpoint', () => {
-    expect(
-      resolveFormHostOrigin(DRIVE, 'https://my.node', [], false),
-    ).toBeUndefined();
+  it('still prefers an enrollment node when serverUrl is undefined', () => {
+    expect(resolveFormHostOrigin(DRIVE, undefined, [enrollment({})])).toBe(
+      'https://node1.example',
+    );
+  });
+});
+
+describe('formServerUrl', () => {
+  afterEach(() => rememberOriginWithoutNode(undefined));
+
+  const store = (localOnly: boolean) => ({
+    getServerUrl: () => 'https://my.node',
+    isLocalOnlyDrive: () => localOnly,
   });
 
-  it('still prefers an enrollment node when the drive has no server endpoint', () => {
-    expect(
-      resolveFormHostOrigin(DRIVE, 'https://my.node', [enrollment({})], false),
-    ).toBe('https://node1.example');
+  it('returns the server URL for a drive with a server', () => {
+    expect(formServerUrl(store(false), DRIVE)).toBe('https://my.node');
+  });
+
+  it('returns undefined for a local-only or undefined drive', () => {
+    expect(formServerUrl(store(true), DRIVE)).toBeUndefined();
+    expect(formServerUrl(store(false), undefined)).toBeUndefined();
+  });
+
+  it('returns undefined for an origin without a node', () => {
+    rememberOriginWithoutNode('https://my.node');
+    expect(formServerUrl(store(false), DRIVE)).toBeUndefined();
   });
 });
