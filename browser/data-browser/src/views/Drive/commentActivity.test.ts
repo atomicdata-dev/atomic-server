@@ -6,15 +6,15 @@ describe('newestCommentTimes', () => {
   it('keeps the newest time per resource and skips threads without about or time', () => {
     const times = newestCommentTimes([
       { about: 'did:ad:a', at: 100 },
-      { about: 'did:ad:a', at: 300 },
+      { about: 'did:ad:a', at: 300, by: 'did:ad:agent:x' },
       { about: 'did:ad:b', at: 200 },
       { at: 900 },
       { about: 'did:ad:c' },
     ]);
 
     expect(Object.fromEntries(times)).toEqual({
-      'atomic:a': 300,
-      'atomic:b': 200,
+      'atomic:a': { at: 300, by: 'did:ad:agent:x' },
+      'atomic:b': { at: 200 },
     });
   });
 });
@@ -26,11 +26,13 @@ describe('mergeActivity', () => {
         { subject: 'did:ad:a', at: 100 },
         { subject: 'did:ad:b', at: 200 },
       ],
-      newestCommentTimes([{ about: 'did:ad:a', at: 300 }]),
+      newestCommentTimes([
+        { about: 'did:ad:a', at: 300, by: 'did:ad:agent:x' },
+      ]),
     );
 
     expect(rows).toEqual([
-      { subject: 'did:ad:a', at: 300, kind: 'commented' },
+      { subject: 'did:ad:a', at: 300, kind: 'commented', by: 'did:ad:agent:x' },
       { subject: 'did:ad:b', at: 200, kind: 'edited' },
     ]);
   });

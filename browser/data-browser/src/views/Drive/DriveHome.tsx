@@ -23,10 +23,15 @@ import { Button } from '@components/Button';
 import { Row } from '@components/Row';
 import { ResourceRow, ResourceRowDescription } from '@views/ResourceRow';
 import { PresenceAvatarMenu } from '@components/Presence/PresenceAvatarMenu';
+import { AgentAvatar } from '@components/Presence/AgentAvatar';
+import { useRightPanel } from '@components/RightPanel/RightPanelContext';
 import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
-import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import {
+  toRelativeDateTime,
+  toShortRelativeTime,
+} from '@helpers/dates/relativeDate';
 import { isHiddenFromChildLists } from '@helpers/hiddenFromChildLists';
 import { useHiddenDriveSubjects } from '@hooks/useVisibleDriveChildren';
 import { useRecentComments } from '@hooks/useRecentComments';
@@ -107,33 +112,53 @@ export function DrivePeople(): JSX.Element | null {
   );
 }
 
-/** One full-width line per resource, with an optional quiet edit time. */
+/**
+ * One full-width line per resource, with an optional quiet edit time. A
+ * commented row shows who wrote the comment and opens the Comments panel on
+ * the resource it leads to, so the comment is one click away.
+ */
 function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
+  const { setPanelOpen } = useRightPanel();
+
   return (
     <Lines>
-      {items.map(({ subject, at, kind }) => (
-        <li key={subject}>
-          <ResourceRow
-            clickable
-            tabbable
-            subject={subject}
-            trailing={
-              at ? (
-                <ResourceRowDescription
-                  as='time'
-                  dateTime={new Date(at).toISOString()}
-                >
-                  {kind === 'commented' ? (
-                    <>Commented {toRelativeDateTime(new Date(at), true)}</>
-                  ) : (
-                    <>Edited {toRelativeDateTime(new Date(at), true)}</>
-                  )}
-                </ResourceRowDescription>
-              ) : undefined
+      {items.map(({ subject, at, kind, by }) => {
+        const label = at
+          ? `${kind === 'commented' ? 'Commented' : 'Edited'} ${toRelativeDateTime(new Date(at), true)}`
+          : undefined;
+
+        return (
+          <li
+            key={subject}
+            onClickCapture={
+              kind === 'commented'
+                ? () => setPanelOpen('comments', true)
+                : undefined
             }
-          />
-        </li>
-      ))}
+          >
+            <ResourceRow
+              clickable
+              tabbable
+              subject={subject}
+              trailing={
+                at ? (
+                  <Row center gap='0.4rem'>
+                    {by && <AgentAvatar agentSubject={by} size='1.2rem' />}
+                    <ResourceRowDescription
+                      as='time'
+                      dateTime={new Date(at).toISOString()}
+                      title={label}
+                      aria-label={label}
+                    >
+                      {toShortRelativeTime(new Date(at))}
+                    </ResourceRowDescription>
+                  </Row>
+                ) : undefined
+              }
+            />
+          </li>
+        );
+      })}
     </Lines>
   );
 }

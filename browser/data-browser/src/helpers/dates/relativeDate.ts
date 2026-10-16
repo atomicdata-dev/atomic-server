@@ -60,3 +60,45 @@ function dayDifference(date: Date): number {
 
   return Math.floor(days);
 }
+
+const shortFormatter = new Intl.RelativeTimeFormat(undefined, {
+  numeric: 'always',
+  style: 'narrow',
+});
+const nowFormatter = new Intl.RelativeTimeFormat(undefined, {
+  numeric: 'auto',
+  style: 'narrow',
+});
+
+/**
+ * A very short relative time for dense lists: "now", "5m ago", "3h ago",
+ * "2d ago", "3w ago", "4mo ago", "2y ago" (localised by the browser's
+ * `Intl.RelativeTimeFormat`, narrow style). Future dates clamp to "now".
+ */
+export function toShortRelativeTime(date: Date, now = Date.now()): string {
+  const ms = Math.max(0, now - date.getTime());
+  const minutes = Math.floor(ms / MINUTE);
+  const hours = Math.floor(ms / HOUR);
+  const days = Math.floor(ms / DAY);
+
+  let value: number;
+  let unit: Intl.RelativeTimeFormatUnit;
+
+  if (minutes < 1) {
+    return nowFormatter.format(0, 'second');
+  } else if (hours < 1) {
+    [value, unit] = [minutes, 'minute'];
+  } else if (days < 1) {
+    [value, unit] = [hours, 'hour'];
+  } else if (days < 7) {
+    [value, unit] = [days, 'day'];
+  } else if (days < 30) {
+    [value, unit] = [Math.floor(days / 7), 'week'];
+  } else if (days < 365) {
+    [value, unit] = [Math.min(11, Math.floor(days / 30)), 'month'];
+  } else {
+    [value, unit] = [Math.floor(days / 365), 'year'];
+  }
+
+  return shortFormatter.format(-value, unit);
+}
