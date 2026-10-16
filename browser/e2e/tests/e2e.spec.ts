@@ -745,6 +745,10 @@ test.describe('data-browser', async () => {
     // delete (and its cascade) is only offered once the item sits there.
     await contextMenuClick('trash', page);
     await expect(sidebarParent).toHaveCount(0);
+    // The sidebar drops the row as soon as it is moved here. The move reaches
+    // the server a round trip later, and reloading before that restores the
+    // row from the old parent, where the menu offers the Trash again.
+    await waitForSynced(page);
     await openSubject(page, parentResource);
     await page.click(contextMenu);
     await expect(page.getByTestId('menu-item-trash')).toHaveCount(0);
