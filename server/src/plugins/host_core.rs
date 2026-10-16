@@ -322,6 +322,9 @@ pub struct Grant {
     installation: Option<ForAgent>,
     /// What the Installation's scopes allow on top of its agent's rights.
     scopes: Scopes,
+    /// The peer node that forwarded this call and vouched for the caller. A
+    /// third bound on reads: the call can see nothing the node could not.
+    voucher: Option<ForAgent>,
 }
 
 impl Grant {
@@ -333,7 +336,13 @@ impl Grant {
             caller,
             installation,
             scopes: Scopes::default(),
+            voucher: None,
         })
+    }
+
+    pub fn with_voucher(mut self, voucher: Option<ForAgent>) -> Self {
+        self.voucher = voucher;
+        self
     }
 
     pub fn with_scopes(mut self, scopes: Scopes) -> Self {
@@ -359,8 +368,14 @@ impl Grant {
     }
 
     /// The installation half of [`Grant::check_read`], for reads the store has
-    /// already authorized for the caller.
+    /// already authorized for the caller. It holds the node that vouched for a
+    /// forwarded call to the same read.
     async fn check_installation_read(&self, db: &Db, resource: &Resource) -> Result<(), String> {
+        if let Some(voucher) = &self.voucher {
+            hierarchy::check_read(db, resource, voucher)
+                .await
+                .map_err(|e| format!("the node that forwarded this call may not read it: {e}"))?;
+        }
         if let Some(installation) = &self.installation {
             hierarchy::check_read(db, resource, installation)
                 .await
@@ -473,6 +488,7 @@ impl HostCore {
                 caller: reader,
                 installation: None,
                 scopes: Scopes::default(),
+                voucher: None,
             },
             world: World::ServerExtension,
             fetch_policy: FetchPolicy::SecretOrigins,
@@ -544,6 +560,12 @@ impl HostCore {
 
     pub fn grant(&self) -> &Grant {
         &self.grant
+    }
+
+    /// The same core, for a call a peer node forwarded and vouched for.
+    pub fn vouched_by(mut self, voucher: Option<ForAgent>) -> Self {
+        self.grant = self.grant.with_voucher(voucher);
+        self
     }
 
     // -- reads --------------------------------------------------------------

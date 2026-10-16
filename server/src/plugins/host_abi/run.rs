@@ -331,7 +331,8 @@ pub(super) async fn build_host(
 ) -> Result<AbiHost, HostError> {
     let core = HostCore::for_run(db.clone(), drive, installation, caller, manifest.clone())
         .await
-        .map_err(|e| error(code::FORBIDDEN, e))?;
+        .map_err(|e| error(code::FORBIDDEN, e))?
+        .vouched_by(budget.vouched_by.clone());
 
     Ok(AbiHost {
         registry: registry.clone(),

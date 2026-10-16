@@ -183,6 +183,20 @@ pub(super) async fn serve(
     let budget = Arc::new(CallBudget::from_wire(&request.budget, via.clone()));
     let outcome = async {
         let caller = caller_of(&request.caller)?;
+        // A node vouches for people, not for an app: the agent an Installation
+        // signs as is never a caller, or a peer could make any app act as any
+        // other.
+        for app in registry.apps_in(&request.drive) {
+            let key =
+                atomic_lib::db::app_agent::AppAgentKey::new(&request.drive, &app.installation);
+            let own = db.get_app_agent_info(&key).ok().flatten();
+            if own.is_some_and(|info| ForAgent::AgentSubject(info.agent.into()) == caller) {
+                return Err(error(
+                    code::FORBIDDEN,
+                    "a forwarded call cannot be made as an Installation's own agent",
+                ));
+            }
+        }
         if matches!(via, ForAgent::Public) {
             return Err(error(
                 code::FORBIDDEN,

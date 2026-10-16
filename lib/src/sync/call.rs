@@ -52,7 +52,16 @@ fn failure(code: &str, message: impl Into<String>) -> CallResponse {
 }
 
 /// Answers one `CALL` payload (after the tag) on an authenticated stream.
-pub(crate) async fn serve(payload: &[u8], store: &Db, via: &ForAgent) -> Vec<Vec<u8>> {
+///
+/// `paired` is whether the owner of this node chose to sync with the peer: a
+/// call runs apps and spends their secrets, so a peer that merely found this
+/// node (and can authenticate as some agent) is not served.
+pub(crate) async fn serve(
+    payload: &[u8],
+    store: &Db,
+    via: &ForAgent,
+    paired: bool,
+) -> Vec<Vec<u8>> {
     let Some((id, request)) = protocol::decode_call(payload) else {
         return vec![protocol::encode_error(
             0,
@@ -62,6 +71,7 @@ pub(crate) async fn serve(payload: &[u8], store: &Db, via: &ForAgent) -> Vec<Vec
     };
     let handler = HANDLER.read().ok().and_then(|slot| slot.clone());
     let response = match handler {
+        _ if !paired => failure("forbidden", "only a paired peer may forward a call here"),
         Some(handler) => handler.call(store.clone(), via.clone(), request).await,
         None => failure("unsupported", "this node does not run apps for peers"),
     };
@@ -248,13 +258,12 @@ mod tests {
         assert!(protocol::decode_call(&[0]).is_none());
     }
 
-    /// A dialer's CALL reaches the responder's handler authenticated as the
-    /// dialing node's agent, and the answer comes back.
-    #[tokio::test]
-    async fn a_call_reaches_the_peer_as_the_dialing_nodes_agent() {
-        let db_a = Db::init_temp("call_peer_a").await.unwrap();
+    /// Node A (the responder) with a drive, and a dialing endpoint that is node
+    /// B's, with B's own store signed in as the same person.
+    async fn pair_of_nodes(name: &str) -> (Db, Db, Endpoint, String, String) {
+        let db_a = Db::init_temp(&format!("{name}_a")).await.unwrap();
         let (agent, drive) = db_a.setup("Alice").await.unwrap();
-        let db_b = Db::init_temp("call_peer_b").await.unwrap();
+        let db_b = Db::init_temp(&format!("{name}_b")).await.unwrap();
         db_b.load_agent_from_secret(&agent.build_secret().unwrap())
             .await
             .unwrap();
@@ -268,9 +277,12 @@ mod tests {
             .unwrap();
         ep_b.add_node_addr(router_a.endpoint().node_addr().await.unwrap())
             .unwrap();
+        (db_a, db_b, ep_b, node_a.to_string(), drive)
+    }
 
-        let request = CallRequest {
-            drive: drive.clone(),
+    fn some_call(drive: &str) -> CallRequest {
+        CallRequest {
+            drive: drive.into(),
             interface: "i".into(),
             function: "f".into(),
             args: "{}".into(),
@@ -282,8 +294,18 @@ mod tests {
                 effects: None,
                 secrets: true,
             },
-        };
-        let answer = call_peer_using(&ep_b, &db_b, &node_a.to_string(), &request)
+        }
+    }
+
+    /// A dialer's CALL reaches the responder's handler authenticated as the
+    /// dialing node's agent, and the answer comes back.
+    #[tokio::test]
+    async fn a_call_reaches_the_peer_as_the_dialing_nodes_agent() {
+        let (db_a, db_b, ep_b, node_a, drive) = pair_of_nodes("call_peer").await;
+        // The owner of A paired with B.
+        peer::add_known_peer(&db_a, &ep_b.node_id().to_string(), "b");
+
+        let answer = call_peer_using(&ep_b, &db_b, &node_a, &some_call(&drive))
             .await
             .unwrap();
         let via = db_b.get_default_agent().unwrap().subject;
@@ -292,5 +314,18 @@ mod tests {
             Some(format!("{via}|did:ad:agent:someone|1").as_str())
         );
         assert_eq!((answer.calls_left, answer.fuel_left), (4, 9));
+    }
+
+    /// A call runs apps and spends their secrets: a node that authenticates
+    /// but that the owner never paired with is not served.
+    #[tokio::test]
+    async fn a_call_from_a_node_that_was_never_paired_is_refused() {
+        let (_db_a, db_b, ep_b, node_a, drive) = pair_of_nodes("call_unpaired").await;
+
+        let answer = call_peer_using(&ep_b, &db_b, &node_a, &some_call(&drive))
+            .await
+            .unwrap();
+        assert!(answer.result.is_none(), "{answer:?}");
+        assert_eq!(answer.error.map(|e| e.code).as_deref(), Some("forbidden"));
     }
 }

@@ -86,6 +86,8 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         .unwrap();
     ep_a.add_node_addr(router_b.endpoint().node_addr().await.unwrap())
         .unwrap();
+    // B's owner paired with A: B serves calls only for peers it knows.
+    peer::add_known_peer(&db_b, &ep_a.node_id().to_string(), "a");
     peer::sync_drive_with_peer_using(&ep_a, &node_b.to_string(), &f.drive, &db_a, true)
         .await
         .unwrap();
@@ -281,6 +283,46 @@ async fn the_forwarding_node_cannot_vouch_for_more_than_it_may_do_itself() {
         .expect("refused");
     assert_eq!(refused.code, code::FORBIDDEN, "{refused:?}");
     assert_eq!(count_of(&db, &subject, &property).await, 1);
+}
+
+#[actix_rt::test]
+async fn a_forwarded_call_is_never_made_as_an_installations_own_agent() {
+    let f = fixture("host_abi_forward_own_agent").await;
+    let db = Arc::new(f.appstate.store.clone());
+    let counter = install(&f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let _caller = install(&f, "caller", CALLER_MANIFEST, CALLER_WASM).await;
+    let node_agent = owner(&db).to_string();
+    // The app's agent can read the drive, so a read export would run for it.
+    share(&db, &f.drive, &[&counter.agent], &[]).await;
+    let registry = Arc::new(HostAbiRegistry::new());
+    registry.refresh(&db, &f.drive).await;
+    let read = |caller: &str| CallRequest {
+        interface: CALLER.into(),
+        function: "recurse".into(),
+        args: json!({"n": 0, "limit": 2}).to_string(),
+        ..request(&f.drive, caller, json!({}))
+    };
+
+    let ok = serve(
+        registry.clone(),
+        db.clone(),
+        ForAgent::AgentSubject(node_agent.as_str().into()),
+        read(&node_agent),
+    )
+    .await;
+    assert!(ok.error.is_none(), "a person may call: {ok:?}");
+
+    let refused = serve(
+        registry.clone(),
+        db.clone(),
+        ForAgent::AgentSubject(node_agent.as_str().into()),
+        read(&counter.agent),
+    )
+    .await
+    .error
+    .expect("refused");
+    assert_eq!(refused.code, code::FORBIDDEN, "{refused:?}");
+    assert!(refused.message.contains("own agent"), "{refused:?}");
 }
 
 #[test]

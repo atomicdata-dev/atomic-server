@@ -568,6 +568,39 @@ async fn without_a_write_grant_apply_is_proposed_and_without_the_callers_rights_
 }
 
 #[actix_rt::test]
+async fn the_node_that_forwarded_a_call_bounds_what_the_call_can_read() {
+    let w = World::new("host_abi_voucher_reads").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, _property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[]).await;
+
+    // The caller and the app can read it, so a direct call does.
+    let mut state = w.state(&counter, owner(db)).await;
+    assert!(state.get(subject.clone()).await.is_ok());
+
+    // The same call, vouched for by a node that has no rights here: the caller
+    // and the app still could, the node could not, so nothing is read.
+    let node = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
+    let wire = atomic_lib::sync::protocol::CallBudgetWire {
+        calls: 8,
+        fuel: 1_000_000,
+        effects: None,
+        secrets: true,
+    };
+    let vouched = Arc::new(CallBudget::from_wire(
+        &wire,
+        ForAgent::AgentSubject(node.into()),
+    ));
+    let mut state = w.state_within(&counter, owner(db), vouched).await;
+    let err = state.get(subject.clone()).await.unwrap_err();
+    assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+}
+
+#[actix_rt::test]
 async fn a_read_only_chain_or_a_peer_that_cannot_write_never_commits_through_apply() {
     use crate::plugins::manifest::ExportEffect;
     use atomic_lib::sync::protocol::CallBudgetWire;

@@ -2766,7 +2766,13 @@ async fn handle_stream(
                 .await
             }
         } else if tag == super::protocol::tag::CALL {
-            super::call::serve(&buf[1..], &store, &agent).await
+            super::call::serve(
+                &buf[1..],
+                &store,
+                &agent,
+                is_paired_peer(&store, &remote_key),
+            )
+            .await
         } else {
             super::engine::handle_frame_for_caps(
                 &buf,
