@@ -614,6 +614,8 @@ mod installation_hook {
             // Leaves the revocation tombstone `installation::resolve` honours.
             store.delete_app_agent(&app_key)?;
         }
+        // The app's filters and checkpoint on the drive's event stream.
+        store.forget_event_consumer(drive, &subject)?;
         info!("deactivated installation {subject}");
         Ok(())
     }

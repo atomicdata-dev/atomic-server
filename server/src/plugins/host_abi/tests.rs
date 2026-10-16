@@ -1111,6 +1111,26 @@ async fn next_gets_past_a_long_run_of_events_the_app_filters_out() {
 }
 
 #[actix_rt::test]
+async fn uninstalling_an_app_forgets_its_event_filters_and_checkpoint() {
+    let w = World::new("host_abi_event_forget").await;
+    let db = &*w.db;
+    let app = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    db.set_event_filters(&w.f.drive, &app.installation, &[])
+        .unwrap();
+    db.ack_events(&w.f.drive, &app.installation, 5).unwrap();
+    assert_eq!(db.event_checkpoint(&w.f.drive, &app.installation), 5);
+
+    let mut installation = db
+        .get_resource(&app.installation.as_str().into())
+        .await
+        .unwrap();
+    installation.destroy(db).await.unwrap();
+
+    assert_eq!(db.event_checkpoint(&w.f.drive, &app.installation), 0);
+    assert!(db.event_filters(&w.f.drive, &app.installation).is_none());
+}
+
+#[actix_rt::test]
 async fn a_subscription_filters_by_class_subtree_and_property() {
     let w = World::new("host_abi_event_filters").await;
     let counter = install_scoped(
