@@ -85,11 +85,26 @@ pub struct HostAbiRegistry {
     load_failures: Mutex<HashMap<AppKey, (String, Instant, String)>>,
     /// How many times a release was actually read and compiled.
     load_attempts: AtomicUsize,
+    /// Where a call goes when no app here can run it (`forward.rs`).
+    forwarder: RwLock<Option<Arc<dyn super::forward::CallForwarder>>>,
 }
 
 impl HostAbiRegistry {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    // -- peers --------------------------------------------------------------
+
+    /// Lets calls this node cannot run go to a peer.
+    pub fn set_forwarder(&self, forwarder: Arc<dyn super::forward::CallForwarder>) {
+        if let Ok(mut slot) = self.forwarder.write() {
+            *slot = Some(forwarder);
+        }
+    }
+
+    pub(super) fn forwarder(&self) -> Option<Arc<dyn super::forward::CallForwarder>> {
+        self.forwarder.read().ok()?.clone()
     }
 
     // -- apps ---------------------------------------------------------------

@@ -36,13 +36,14 @@ use crate::plugins::{
 };
 
 pub(crate) const COUNTER_WASM: &[u8] = include_bytes!("../../../../testdata/host-abi/counter.wasm");
-const CALLER_WASM: &[u8] = include_bytes!("../../../../testdata/host-abi/caller.wasm");
+pub(crate) const CALLER_WASM: &[u8] = include_bytes!("../../../../testdata/host-abi/caller.wasm");
 pub(crate) const COUNTER_MANIFEST: &str =
     include_str!("../../../../testdata/host-abi/counter.manifest.json");
-const CALLER_MANIFEST: &str = include_str!("../../../../testdata/host-abi/caller.manifest.json");
+pub(crate) const CALLER_MANIFEST: &str =
+    include_str!("../../../../testdata/host-abi/caller.manifest.json");
 
-const COUNTER: &str = "atomic:example/counter@1";
-const CALLER: &str = "atomic:example/caller@1";
+pub(crate) const COUNTER: &str = "atomic:example/counter@1";
+pub(crate) const CALLER: &str = "atomic:example/caller@1";
 
 pub(crate) struct Installed {
     pub(crate) installation: String,

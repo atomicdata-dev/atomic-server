@@ -389,6 +389,24 @@ pub enum ExportEffect {
     Interactive,
 }
 
+impl ExportEffect {
+    /// The name the manifest and the wire use.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::External => "external",
+            Self::Interactive => "interactive",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [Self::Read, Self::Write, Self::External, Self::Interactive]
+            .into_iter()
+            .find(|e| e.name() == name)
+    }
+}
+
 /// One function an app offers: `atomic:example/counter@1` `increment`.
 ///
 /// The schemas are the bounded JSON Schema subset of [`super::actions::InputSchema`]:

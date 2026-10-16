@@ -15,7 +15,7 @@ use std::{
     time::Duration,
 };
 
-use atomic_lib::{agents::ForAgent, Db};
+use atomic_lib::{agents::ForAgent, sync::protocol::CallBudgetWire, Db};
 use wasmtime::{
     component::{Linker, ResourceTable},
     Store, StoreLimits,
@@ -25,6 +25,7 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 use super::{
     bindings::SandboxedApp,
     code, error,
+    forward::Forward,
     registry::{HostAbiRegistry, LoadedApp, MAX_CALL_DEPTH},
     HostError,
 };
@@ -80,6 +81,14 @@ pub struct CallBudget {
     effects: Option<Vec<ExportEffect>>,
     /// Whether an app that declares secrets may run anywhere in the chain.
     secrets: bool,
+    /// Whether a call with no provider here may go to a peer node. Off on a
+    /// node serving a forwarded call: one hop, so two nodes cannot bounce a
+    /// call between them.
+    forward: bool,
+    /// The node that forwarded this chain to us and vouched for its caller.
+    /// Every hop that needs write on the drive needs it for this agent too, so
+    /// naming someone else's agent never gets a peer more than its own rights.
+    vouched_by: Option<ForAgent>,
 }
 
 impl Default for CallBudget {
@@ -95,7 +104,66 @@ impl CallBudget {
             fuel: AtomicU64::new(fuel),
             effects: None,
             secrets: true,
+            forward: true,
+            vouched_by: None,
         }
+    }
+
+    /// The budget a forwarded call arrives with, from `wire`. It can only be
+    /// as large as this node's own default, and narrower where the sender
+    /// narrowed it: an effect this node does not know is dropped, never read
+    /// as "any". `via` is the peer that vouched for the caller.
+    pub fn from_wire(wire: &CallBudgetWire, via: ForAgent) -> Self {
+        let mut budget = Self::new(wire.calls.min(CHAIN_CALLS), wire.fuel.min(CHAIN_FUEL));
+        budget.effects = wire.effects.as_ref().map(|names| {
+            names
+                .iter()
+                .filter_map(|name| ExportEffect::from_name(name))
+                .collect()
+        });
+        budget.secrets = wire.secrets;
+        budget.forward = false;
+        budget.vouched_by = Some(via);
+        budget
+    }
+
+    /// What is left, for a frame (`CALL`), with `calls` and `fuel` as the share
+    /// handed to the peer.
+    pub(super) fn wire(&self, calls: u64, fuel: u64) -> CallBudgetWire {
+        CallBudgetWire {
+            calls,
+            fuel,
+            effects: self
+                .effects
+                .as_ref()
+                .map(|e| e.iter().map(|e| e.name().to_string()).collect()),
+            secrets: self.secrets,
+        }
+    }
+
+    /// Whether this chain may go to a peer node.
+    pub(super) fn may_forward(&self) -> bool {
+        self.forward
+    }
+
+    /// Takes everything still in the pool, to hand to a peer that continues the
+    /// chain: while it runs, nothing here can be spent a second time.
+    pub(super) fn reserve(&self) -> (u64, u64) {
+        (
+            self.calls.swap(0, Ordering::SeqCst),
+            self.fuel.swap(0, Ordering::SeqCst),
+        )
+    }
+
+    /// Puts back what a peer did not spend. Never more than was reserved.
+    pub(super) fn refund(&self, calls: u64, fuel: u64) {
+        self.calls.fetch_add(calls, Ordering::SeqCst);
+        self.fuel.fetch_add(fuel, Ordering::SeqCst);
+    }
+
+    /// Calls still in the pool.
+    pub fn calls_left(&self) -> u64 {
+        self.calls.load(Ordering::SeqCst)
     }
 
     /// The same budget, with only these effects allowed anywhere in the chain.
@@ -112,7 +180,7 @@ impl CallBudget {
         self
     }
 
-    fn allows(&self, effect: ExportEffect) -> Result<(), HostError> {
+    pub(super) fn allows(&self, effect: ExportEffect) -> Result<(), HostError> {
         match &self.effects {
             Some(allowed) if !allowed.contains(&effect) => Err(error(
                 code::FORBIDDEN,
@@ -272,16 +340,29 @@ pub fn call_export<'a>(
                 format!("apps may call each other at most {MAX_CALL_DEPTH} deep"),
             ));
         }
-        let app = registry
-            .provider_of(drive, interface, function)
-            .ok_or_else(|| {
-                error(
-                    code::NOT_FOUND,
-                    format!(
-                        "no installed app in this drive declares the export {interface} {function}"
-                    ),
-                )
-            })?;
+        let Some(app) = registry.provider_of(drive, interface, function) else {
+            // No app here: a node that syncs this drive may have it.
+            let to_peer = Forward {
+                registry,
+                db,
+                drive,
+                interface,
+                function,
+                args,
+                caller: &caller,
+                depth,
+                budget: &budget,
+            };
+            if let Some(outcome) = to_peer.send().await {
+                return outcome;
+            }
+            return Err(error(
+                code::NOT_FOUND,
+                format!(
+                    "no installed app in this drive declares the export {interface} {function}"
+                ),
+            ));
+        };
         let export = app
             .export(interface, function)
             .expect("provider_of found it");
@@ -291,6 +372,28 @@ pub fn call_export<'a>(
                 code::FORBIDDEN,
                 "this call may not cause an app that declares secrets to run",
             ));
+        }
+        // An app runs where its secrets are. This node has the app but not
+        // every secret it declares: a peer that has them runs it instead. With
+        // no peer that does, it runs here and fails where it needs the secret.
+        if !super::forward::holds_secrets(db, &app) {
+            let to_peer = Forward {
+                registry,
+                db,
+                drive,
+                interface,
+                function,
+                args,
+                caller: &caller,
+                depth,
+                budget: &budget,
+            };
+            match to_peer.send().await {
+                // A peer without the app says nothing about this one.
+                Some(Err(e)) if e.code == code::NOT_FOUND => {}
+                Some(outcome) => return outcome,
+                None => {}
+            }
         }
         // At every hop, not only the entry: a read export must not let a reader
         // cause a write. An app that declares secrets can spend them whatever
@@ -307,6 +410,18 @@ pub fn call_export<'a>(
             atomic_lib::hierarchy::check_write(&**db, &drive_resource, &caller)
                 .await
                 .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+            if let Some(via) = &budget.vouched_by {
+                atomic_lib::hierarchy::check_write(&**db, &drive_resource, via)
+                    .await
+                    .map_err(|e| {
+                        error(
+                            code::FORBIDDEN,
+                            format!(
+                                "the node that forwarded this call may not write the drive: {e}"
+                            ),
+                        )
+                    })?;
+            }
         }
 
         let parsed: serde_json::Value = serde_json::from_str(args).map_err(|e| {
@@ -412,6 +527,26 @@ pub async fn call_for_agent(
     caller: ForAgent,
     budget: Arc<CallBudget>,
 ) -> Result<String, HostError> {
+    call_for_agent_at(
+        registry, db, drive, interface, function, args, caller, budget, 0,
+    )
+    .await
+}
+
+/// [`call_for_agent`] for a chain that already made `depth` hops, which is how
+/// a forwarded call enters the node that runs it.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn call_for_agent_at(
+    registry: &Arc<HostAbiRegistry>,
+    db: &Arc<Db>,
+    drive: &str,
+    interface: &str,
+    function: &str,
+    args: &str,
+    caller: ForAgent,
+    budget: Arc<CallBudget>,
+    depth: usize,
+) -> Result<String, HostError> {
     use atomic_lib::Storelike;
     // Before anything is loaded or run: the caller must see the drive.
     let drive_resource = db
@@ -422,16 +557,11 @@ pub async fn call_for_agent(
         .await
         .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
     registry.refresh(db, drive).await;
-    call_entry(
-        registry,
-        db,
-        drive,
-        interface,
-        function,
-        args,
-        caller,
-        budget,
+    with_deadline(
         ENTRY_TIMEOUT,
+        call_export(
+            registry, db, drive, interface, function, args, caller, depth, budget,
+        ),
     )
     .await
 }

@@ -33,6 +33,7 @@
 mod calls;
 mod convert;
 mod events;
+mod forward;
 mod js;
 mod module;
 mod net;
@@ -41,12 +42,15 @@ mod run;
 mod store;
 
 #[cfg(test)]
+mod forward_tests;
+#[cfg(test)]
 mod module_tests;
 #[cfg(test)]
 pub(crate) mod tests;
 #[cfg(test)]
 mod wit_tests;
 
+pub use forward::{CallForwarder, IrohForwarder, ServedCalls};
 pub use js::JsAbi;
 pub use module::{ModuleParts, NativeHooks, ServerModule};
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};

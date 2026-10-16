@@ -430,6 +430,19 @@ where
 
                 pkarr_node_id = Some(node_id.to_string());
 
+                // Apps this node lacks may run on a peer, and peers' calls run
+                // here (planning/host-abi.md, step 6).
+                #[cfg(feature = "wasm-plugins")]
+                {
+                    use crate::plugins::host_abi::{IrohForwarder, ServedCalls};
+                    appstate
+                        .host_abi
+                        .set_forwarder(std::sync::Arc::new(IrohForwarder::node()));
+                    atomic_lib::sync::call::set_call_handler(std::sync::Arc::new(ServedCalls {
+                        registry: appstate.host_abi.clone(),
+                    }));
+                }
+
                 Some(router)
             }
             Err(e) => {
