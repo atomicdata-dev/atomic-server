@@ -321,6 +321,108 @@ describe('collection page assemble does not flash unsorted members', () => {
     expect(members).toContain(created);
   });
 
+  it('keeps the members it had when a member changes while a refresh is in flight', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setDrive(DRIVE);
+    store.finishDriveSync(DRIVE, 2, Date.now());
+    const answer = {
+      subjects: [ALICE, BOB],
+      resources: [jsonAd(ALICE, 1000), jsonAd(BOB, 2000)],
+      count: 2,
+    };
+    let release!: (result: ClientDbQueryResult) => void;
+    let delayed = false;
+    store.setClientDb(
+      mockClientDb(async () =>
+        delayed
+          ? new Promise(resolve => {
+              release = resolve;
+            })
+          : answer,
+      ),
+    );
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        drive: DRIVE,
+      },
+      true,
+    );
+    await collection.refresh();
+    delayed = true;
+    const refreshing = collection.refresh();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    // A row being edited: the same member, changed, while the page is cleared.
+    const edited = new Resource(BOB);
+    edited.applyHydratedValues([
+      [core.properties.parent, TABLE],
+      [core.properties.isA, [dataBrowser.classes.folder]],
+      [core.properties.name, 'Bob, edited'],
+      [commits.properties.createdAt, 2000],
+    ]);
+    edited.loading = false;
+    collection.applyResourceChange(BOB, edited);
+
+    // It is not the whole collection, and it is not counted twice.
+    expect(collection.totalMembers).toBe(2);
+    expect(pageMembers(collection)).toEqual([ALICE, BOB]);
+
+    release(answer);
+    await refreshing;
+
+    expect(collection.totalMembers).toBe(2);
+    expect(await collection.getMembersOnPage(0)).toEqual([ALICE, BOB]);
+  });
+
+  it('does not believe an empty local answer that was asked before the drive synced', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setDrive(DRIVE);
+    let answer!: (result: ClientDbQueryResult) => void;
+    store.setClientDb(
+      mockClientDb(
+        () =>
+          new Promise(resolve => {
+            answer = resolve;
+          }),
+      ),
+    );
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        drive: DRIVE,
+      },
+      true,
+    );
+    const asking = (
+      collection as unknown as {
+        fetchPageFromLocalDb(page: number): Promise<'ok' | 'no-db'>;
+      }
+    ).fetchPageFromLocalDb(0);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    // The sync finishes, and only then does the query that was posted before
+    // the pulled rows were written come back empty.
+    store.finishDriveSync(DRIVE, 2, Date.now());
+    answer({ subjects: [], count: 0 });
+
+    expect(await asking).toBe('no-db');
+  });
+
   it.each([false, true])(
     'does not restore a deleted member from an in-flight query (optimistic=%s)',
     async optimistic => {

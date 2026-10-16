@@ -5922,6 +5922,21 @@ export class Store {
     return this._syncedDrives.has(drive);
   }
 
+  /**
+   * Calls `callback` once, when a sync of `drive` finishes. Returns a function
+   * that cancels the wait. Does not fire for a sync that has already finished.
+   */
+  public onceDriveSynced(drive: string, callback: () => void): () => void {
+    const off = this.on(StoreEvents.SyncStatusChanged, () => {
+      if (!this.hasCompletedDriveSyncFor(drive)) return;
+
+      off();
+      callback();
+    });
+
+    return off;
+  }
+
   public getSyncStatus(): StoreSyncStatus {
     // Saves that succeed first-try go straight to the server — they
     // never touch the outbox, so `outbox.size` alone misses them.
