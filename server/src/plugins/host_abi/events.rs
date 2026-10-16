@@ -28,10 +28,6 @@ const MAX_SCAN: usize = 20;
 /// Most batches of [`MAX_SCAN`] rows one `next` goes through while it has
 /// found nothing to return.
 const MAX_SCAN_BATCHES: usize = 4;
-/// The name of the marker event `next` returns for an explicit cursor when it
-/// scanned rows and found nothing for the app: its cursor is where the scan
-/// got to, so the app's next call starts there. It carries no subject.
-pub const SCAN_PROGRESS: &str = "scan-progress";
 const FILTER_CAP: usize = 32;
 
 fn parse_cursor(cursor: &str) -> Result<u64, HostError> {
@@ -157,7 +153,7 @@ impl events::Host for AbiState {
             // for ever, in front of a long run it cannot see.
             out.push(Event {
                 cursor: from.to_string(),
-                kind: Kind::Timer(SCAN_PROGRESS.to_string()),
+                kind: Kind::Progress,
                 subject: None,
                 at_ms: 0,
             });

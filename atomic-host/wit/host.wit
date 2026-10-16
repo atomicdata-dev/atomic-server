@@ -162,6 +162,11 @@ interface events {
     connection-needed(string),
     /// The resource was destroyed (tombstone).
     destroyed,
+    /// Not an event: `next` looked at rows the app does not want or may not
+    /// read and found nothing. It has no subject, and its cursor is where the
+    /// scan got to; an app that keeps its own cursor passes it to the next
+    /// call, so it advances over what it cannot see. Skip it otherwise.
+    progress,
   }
 
   record event {

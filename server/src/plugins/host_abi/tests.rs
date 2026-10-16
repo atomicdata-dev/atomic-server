@@ -1152,7 +1152,7 @@ async fn an_explicit_cursor_advances_over_rows_the_app_filters_out() {
         cursor = Some(last.cursor.clone());
         found.extend(
             got.into_iter()
-                .filter(|e| !matches!(e.kind, Kind::Timer(_))),
+                .filter(|e| !matches!(e.kind, Kind::Progress)),
         );
         if !found.is_empty() {
             break;
@@ -1228,7 +1228,7 @@ async fn a_subscription_filters_by_class_subtree_and_property() {
     // Nothing matches; the call only says how far it looked.
     let got = state.next(Some("0".into()), 100).await.unwrap();
     assert!(
-        got.iter().all(|e| matches!(e.kind, Kind::Timer(_))),
+        got.iter().all(|e| matches!(e.kind, Kind::Progress)),
         "{got:?}"
     );
 
