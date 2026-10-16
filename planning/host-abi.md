@@ -273,7 +273,9 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       one saved in-flight record; the old `plugin-event/v1` queue, its dedup
       window and the id-keyed check are gone. Kept: the self-echo skip and the
       30-per-minute rate limit, which the stream does not cover. Old
-      `plugin-event/v1` rows are not migrated.
+      `plugin-event/v1` rows are not migrated: at startup a trigger that waits
+      on a proposal whose in-flight record is gone has the proposal cleared
+      (logged), and the dead rows are removed.
       Retention is 7 days and does not wait for acknowledgements: an event a
       consumer has not acked by then is dropped, with a warning naming the
       consumer whose checkpoint is behind.

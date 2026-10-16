@@ -5548,3 +5548,76 @@ async fn the_event_sequence_outlives_the_rows_retention_removes() {
     assert_eq!(store.drive_events(drive.as_str(), last, 10).len(), 1);
     assert!(store.drive_events(drive.as_str(), u64::MAX, 10).is_empty());
 }
+
+/// A trigger that was waiting on a proposal in the queue the event stream
+/// replaced would wait for ever: nothing can release it. Startup clears it, and
+/// leaves a trigger whose in-flight record exists alone.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_proposal_whose_event_is_gone_is_cleared_at_startup() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey, QueuedEvent};
+
+    let store = Db::init_temp("orphaned_verdicts").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let trigger = |waiting: &str| {
+        let mut trigger = PluginTrigger::new(
+            crate::db::QueryFilter {
+                filters: vec![crate::storelike::PropVal {
+                    property: Some(urls::PARENT.to_string()),
+                    value: Some(Value::AtomicUrl(drive.clone())),
+                    ..Default::default()
+                }],
+                sort_by: None,
+                drive: drive.as_str().into(),
+            },
+            true,
+            false,
+        )
+        .unwrap();
+        trigger.pending_verdict = Some(waiting.into());
+        trigger
+    };
+    let orphan = PluginTriggerKey::new(drive.as_str(), "orphan");
+    let live = PluginTriggerKey::new(drive.as_str(), "live");
+    store.set_plugin_trigger(&orphan, &trigger("old")).unwrap();
+    store.set_plugin_trigger(&live, &trigger("new")).unwrap();
+    store
+        .save_plugin_event(&QueuedEvent {
+            id: "1".into(),
+            seq: 1,
+            key: live.clone(),
+            subject: "x".into(),
+            edge: Edge::Enter,
+            at: 0,
+            verdict: Some("new".into()),
+            waiting_for_review: true,
+            authorization: None,
+        })
+        .unwrap();
+    store
+        .kv
+        .insert(
+            Tree::PluginMeta,
+            b"plugin-event/v1/00000000000000000001",
+            b"{}",
+        )
+        .unwrap();
+
+    let cleared = store.drop_orphaned_trigger_verdicts().unwrap();
+    assert_eq!(cleared, vec![orphan.clone()]);
+    let pending = |key: &PluginTriggerKey| {
+        store
+            .get_plugin_trigger(key)
+            .unwrap()
+            .unwrap()
+            .pending_verdict
+    };
+    assert_eq!(pending(&orphan), None);
+    assert_eq!(pending(&live).as_deref(), Some("new"));
+    assert!(store
+        .kv
+        .get(Tree::PluginMeta, b"plugin-event/v1/00000000000000000001")
+        .unwrap()
+        .is_none());
+}

@@ -295,6 +295,52 @@ impl crate::Db {
         }
     }
 
+    /// Upgrade cleanup, run once at startup: a trigger that is waiting on a
+    /// saved proposal (`pending_verdict`) while no in-flight record of its
+    /// event exists can never be released by the stream, because the record was
+    /// in the queue this replaced (`plugin-event/v1/`, not migrated). The
+    /// proposal is cleared so the trigger runs again, and the dead queue rows
+    /// are removed. Returns the triggers it cleared.
+    pub fn drop_orphaned_trigger_verdicts(
+        &self,
+    ) -> crate::errors::AtomicResult<Vec<PluginTriggerKey>> {
+        let mut cleared = Vec::new();
+        for (key, mut trigger) in self.plugin_triggers()? {
+            if trigger.pending_verdict.is_none()
+                || self
+                    .kv
+                    .get(super::trees::Tree::PluginMeta, &head_key(&key))?
+                    .is_some()
+            {
+                continue;
+            }
+            tracing::warn!(
+                drive = %key.drive,
+                plugin = %key.plugin,
+                "a trigger waited on a proposal whose event is gone (the old event queue was not migrated); clearing the proposal"
+            );
+            trigger.pending_verdict = None;
+            trigger.last_error = None;
+            self.set_plugin_trigger(&key, &trigger)?;
+            cleared.push(key);
+        }
+        let legacy: Vec<Vec<u8>> = self
+            .kv
+            .scan_prefix(super::trees::Tree::PluginMeta, b"plugin-event/v1/")
+            .filter_map(|entry| entry.ok().map(|(key, _)| key))
+            .collect();
+        if !legacy.is_empty() {
+            tracing::warn!(
+                "removing {} queued trigger event(s) of the old event queue; their edges are not replayed",
+                legacy.len()
+            );
+            for key in legacy {
+                self.kv.remove(super::trees::Tree::PluginMeta, &key)?;
+            }
+        }
+        Ok(cleared)
+    }
+
     /// Saves a run's progress on its event.
     pub fn save_plugin_event(&self, event: &QueuedEvent) -> crate::errors::AtomicResult<()> {
         self.kv.insert(

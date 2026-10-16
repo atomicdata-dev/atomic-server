@@ -91,6 +91,10 @@ pub fn spawn(appstate: AppState) {
         Err(e) => tracing::warn!("could not re-watch plugin trigger queries: {e}"),
     }
 
+    if let Err(e) = appstate.store.drop_orphaned_trigger_verdicts() {
+        tracing::warn!("could not clear proposals of the old trigger queue: {e}");
+    }
+
     let guard = Arc::new(Mutex::new(Guard::default()));
     let mut events = appstate.store.subscribe_events();
 
