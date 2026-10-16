@@ -379,6 +379,9 @@ describe('table templates', () => {
               const known =
                 typeOf(reference) !== undefined ||
                 derivedNames.includes(reference) ||
+                (view.rowActions ?? []).some(
+                  a => (a.id ?? a.label) === reference,
+                ) ||
                 reference.toLowerCase() === 'timer';
 
               expect(known, `${reference} is not a column`).toBe(true);

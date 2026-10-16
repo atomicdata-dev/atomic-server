@@ -20,7 +20,6 @@ test.describe('row dialog', () => {
       template: /Grocery list/,
       name: 'Groceries',
     });
-    await page.getByRole('tab', { name: 'List' }).click();
     await expect(page.getByRole('grid')).toBeVisible();
     await waitForGridInteractive(page);
 

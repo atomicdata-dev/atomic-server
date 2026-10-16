@@ -460,24 +460,13 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           name: 'List',
           kind: 'table',
           default: true,
-          derivedColumns: [
-            {
-              name: 'Line total',
-              kind: 'product',
-              args: { a: 'Quantity', b: 'Price' },
-            },
-          ],
           aggregates: [{ function: 'sum', column: 'Quantity' }],
           breakdownColumn: 'Aisle',
           breakdownGranularity: 'exact',
-          columnOrder: [
-            'Name',
-            'Quantity',
-            'Price',
-            'Line total',
-            'Aisle',
-            'Bought',
-          ],
+          // One tap: the button is the first, always visible control (70px,
+          // so it stays on screen on a phone). Bought, Price stay as columns.
+          columns: ['Name', 'Quantity', 'Aisle'],
+          columnOrder: ['Got it', 'Name', 'Quantity', 'Aisle'],
           rowActions: [{ label: 'Got it', kind: 'toggle', column: 'Bought' }],
           // The bar you actually use a shopping list through.
           quickAdd: {
@@ -751,13 +740,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
         {
           name: 'Kind',
           type: 'select',
-          options: [
-            'Article',
-            'Tool',
-            'Video',
-            'Documentation',
-            'Inspiration',
-          ],
+          options: ['Article', 'Tool', 'Video', 'Documentation', 'Inspiration'],
         },
         { name: 'Added', type: 'date' },
         { name: 'Notes', type: 'markdown' },
