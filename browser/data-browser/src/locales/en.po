@@ -1883,14 +1883,6 @@ msgid "Usage instructions for how to fetch and use the resource in your code."
 msgstr "Usage instructions for how to fetch and use the resource in your code."
 
 #: src/actions/resourceActions.tsx
-msgid "Add to chat"
-msgstr "Add to chat"
-
-#: src/actions/resourceActions.tsx
-msgid "Add the resource as context to the AI sidebar"
-msgstr "Add the resource as context to the AI sidebar"
-
-#: src/actions/resourceActions.tsx
 msgid "Search children"
 msgstr "Search children"
 
@@ -13103,3 +13095,19 @@ msgstr "Commented {0}"
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr "Upgrade to a Cloud Server to publish and share this form."
+
+#: src/actions/resourceActions.tsx
+msgid "Start AI Chat"
+msgstr "Start AI Chat"
+
+#: src/actions/resourceActions.tsx
+msgid "Chat with AI about this resource"
+msgstr "Chat with AI about this resource"
+
+#: src/actions/resourceActions.tsx
+msgid "Add a comment"
+msgstr "Add a comment"
+
+#: src/actions/resourceActions.tsx
+msgid "Open the comments for this resource"
+msgstr "Open the comments for this resource"
