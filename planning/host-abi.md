@@ -150,7 +150,7 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       | `commit(commit-json)` | `store.apply` | **done.** Raw signed commits are gone: intents are planned like every other write. `atomic-plugin`'s `commit(&CommitBuilder)` builds the intents (`push` reads the array first) |
       | `fetch(http-request)` | `net.fetch` | **done.** By operation id; no `wasi:http`, no sockets. A module may fetch `write` operations (it runs in the commit path, nobody approves) |
       | `class-url` | `hooks.classes` | kept as an export instead of the manifest: an operator's `global` module has no manifest, and `describe_package` learns a package's classes from it |
-      | `on-resource-get(ctx)` | `hooks.on-get(resource, agent)` | **done.** Answer replaces the resource (only the changed properties are rebuilt); no `referenced` list, no request URL |
+      | `on-resource-get(ctx)` | `hooks.on-get(resource, agent, query)` | **done.** Answer replaces the resource (only the changed properties are rebuilt). The request's query pairs go in as `query`; `get-answer.referenced` lists subjects the host reads (with the module's grant) and sends along |
       | `before-commit(ctx)` | `hooks.before-commit(commit-info, after)` | **done.** `list<problem>`: an `error` refuses. No `before` argument: the commit is not stored yet, so `store.get` is the state before |
       | `after-commit(ctx)` | `hooks.after-commit(commit-info, after)` | **done.** The `events` `commit` kind is still the long-term shape |
 
@@ -344,8 +344,18 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 - [ ] One Rust component (for example the Money statement parser) called by a
       JS app through a typed interface, in the browser and on the server.
-- [ ] One built-in extender (form or chatroom) rewritten as a module on the
-      ABI, as a second conformance test next to the Kanban plugin.
+- [x] One built-in extender (chatroom) rewritten as a module on the
+      ABI, as a second conformance test next to the Kanban plugin. It is a
+      native module: `NativeHooks` (the `hooks` interface as a Rust trait) behind
+      `ServerModule::native`, registered and answered like a component, calling
+      `store.query` through the same `AbiState` imports and `Grant`. It differs
+      from an installed app in loading and in one grant: with no Installation it
+      reads as the reader, not as the public. Form was not taken: its summary is
+      5000 lines of host form logic (`forms::build_form_definition`), not a
+      read of the store. Left: Form and the other built-in extenders
+      (`files`, `installation`, `conversations`), and without the
+      `wasm-plugins` feature the chat room extender is not registered, since
+      the ABI host lives behind it.
 
 ## Not now
 

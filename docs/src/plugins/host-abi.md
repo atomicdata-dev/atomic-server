@@ -280,7 +280,7 @@ A class extender is a **server module**: a component of world `server-module`. I
 | `classes` | Once, when the module is loaded. The classes whose reads and commits it extends |
 | `before-commit(commit, after)` | Before a commit on one of the classes is stored. `after` is the resource as the commit leaves it; the state before is still readable with `store.get`. An `error` problem refuses the commit, a `warning` is logged. A trap or running out of fuel refuses it too |
 | `after-commit(commit, after)` | After it is stored. A failure is logged and never undoes it |
-| `on-get(resource, agent)` | Before a resource is returned to `agent`. The answer replaces it, `none` leaves it, an error fails the read. The subject of the answer is always the one asked for |
+| `on-get(resource, agent, query)` | Before a resource is returned to `agent`. `query` is the request's query string as pairs. The answer (`resource` and `referenced`, subjects of other resources to send along, read with the module's grant) replaces it, `none` leaves it, an error fails the read. The subject of the answer is always the one asked for |
 
 `commit` carries the subject, the signer, the commit as JSON-AD (`commit-json`) and `is-new`. A commit signed by the module's own agent does not trigger it, so a module does not react to its own writes.
 
@@ -310,6 +310,10 @@ What the old `atomic:class-extender` interface became:
 | `class-url`, `on-resource-get`, `before-commit`, `after-commit` | `hooks.classes`, `on-get`, `before-commit`, `after-commit` |
 
 A module's folder (`/`, with the `storage` capability writable) is kept.
+
+### Built-in apps
+
+A module can also be compiled into the server: implement `NativeHooks` (the `hooks` interface as a Rust trait, in `server/src/plugins/host_abi/module.rs`) and register it with `ServerModule::native(..).into_class_extender()`. Nothing else differs from a component: the same hooks, the same `commit-info`, the same handling of the answer, and the imports are the `Host` implementations of the same `AbiState`, so `store.query` is checked by the same `Grant`. The one difference is whose rights it has: with no Installation there is no agent to run as, so a built-in reads as the reader the hook is for. The chat room (`server/src/plugins/chatroom.rs`) is the first: it lists its messages with `store.query` and `on-get`, nothing more.
 
 The Rust helper crate `atomic-plugin` wraps this: implement `ClassExtender` and call `export_plugin!`. `plugin-examples/host-abi-module` shows the raw interface.
 
