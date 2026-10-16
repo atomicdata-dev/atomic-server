@@ -27,6 +27,7 @@ import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
 import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import { isHiddenFromChildLists } from '@helpers/hiddenFromChildLists';
 import { useHiddenDriveSubjects } from '@hooks/useVisibleDriveChildren';
 import { useRecentComments } from '@hooks/useRecentComments';
 import { lastEditedAt } from './lastEditedAt';
@@ -211,6 +212,16 @@ export function ActivityFeed({
       // are recorded per current drive, but also hold whatever was opened
       // from elsewhere (other drives, ontology Properties and Classes).
       if (!children.has(subject) && !belongsToDrive(store, subject, drive)) {
+        continue;
+      }
+
+      // AI chats, meetings and agent notes are reached elsewhere.
+      if (
+        isHiddenFromChildLists(
+          resource.getClasses(),
+          resource.get(dataBrowser.properties.about) as string | undefined,
+        )
+      ) {
         continue;
       }
 

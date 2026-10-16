@@ -38,7 +38,6 @@ interface StoredAgent {
    * still readable.
    */
   privateDrive?: string;
-  aiChatsFolders?: Record<string, string>;
   /**
    * The agent's Cloud Vault proof (see `Agent.vaultProof`). Stored for the
    * same reason as `privateDrive`: WebKit's WebCrypto signs the fixed proof
@@ -63,7 +62,6 @@ interface StoredAgentFallback {
   initialDrive?: string;
   /** See {@link StoredAgent}. */
   privateDrive?: string;
-  aiChatsFolders?: Record<string, string>;
   /** See {@link StoredAgent}. */
   vaultProof?: string;
 }
@@ -100,7 +98,6 @@ export async function getAgentFromIDB(): Promise<Agent | undefined> {
         );
         agent.legacySubject = storedAgent.legacySubject;
         agent.privateDrive = storedAgent.privateDrive;
-        agent.aiChatsFolders = storedAgent.aiChatsFolders ?? {};
         agent.vaultProof = storedAgent.vaultProof;
 
         // Heal installs written while the readable key was saved
@@ -132,7 +129,6 @@ export async function getAgentFromIDB(): Promise<Agent | undefined> {
       );
       agent.legacySubject = fallback.legacySubject;
       agent.privateDrive = fallback.privateDrive;
-      agent.aiChatsFolders = fallback.aiChatsFolders ?? {};
       agent.vaultProof = fallback.vaultProof;
 
       return agent;
@@ -221,8 +217,6 @@ export async function saveAgentToIDB(
       previous?.subject === subject ? previous.initialDrive : undefined,
     privateDrive:
       previous?.subject === subject ? previous.privateDrive : undefined,
-    aiChatsFolders:
-      previous?.subject === subject ? previous.aiChatsFolders : undefined,
     vaultProof: previous?.subject === subject ? previous.vaultProof : undefined,
   } satisfies StoredAgent);
 }
@@ -251,7 +245,6 @@ async function storeSecret(secret: string): Promise<void> {
   // reproduce it. See `StoredAgent.privateDrive`.
   const privateDrive = await Agent.privateDriveSubjectFromSecret(secret);
   const vaultProof = await Agent.vaultProofFromSecret(secret);
-  const aiChatsFolders = await Agent.aiChatsFoldersFromSecret(secret);
 
   {
     // Prefer the non-extractable keypair. Once stored this way the private key
@@ -267,7 +260,6 @@ async function storeSecret(secret: string): Promise<void> {
           legacySubject: legacySubjectFromSecret(secret),
           initialDrive: decoded.initialDrive,
           privateDrive,
-          aiChatsFolders,
           vaultProof,
         } satisfies StoredAgent);
         await del(AGENT_FALLBACK_KEY);
@@ -293,7 +285,6 @@ async function storeSecret(secret: string): Promise<void> {
       legacySubject: legacySubjectFromSecret(secret),
       initialDrive: decoded.initialDrive,
       privateDrive,
-      aiChatsFolders,
       vaultProof,
     } satisfies StoredAgentFallback);
     // Drop a keypair from a previous account, so it can't be loaded instead.
