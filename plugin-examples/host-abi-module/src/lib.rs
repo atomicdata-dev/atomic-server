@@ -5,8 +5,9 @@
 //! - `on-get` replaces the description with a note about the read: who asked,
 //!   who the module is, and what the module's agent could do when its config
 //!   asks it to try (`probeRead`: a subject to `store.get`, `probeWrite`: a
-//!   subject to rename with `store.apply`). The probes report error codes and
-//!   outcomes, so a test can see what the module's rights were.
+//!   subject to rename with `store.apply`, `probeCall`: an `{interface,
+//!   function, args}` to call with `calls.call`). The probes report error codes
+//!   and outcomes, so a test can see what the module's rights were.
 //!
 //! The probes must not name a folder: reading one runs this hook again.
 
@@ -16,7 +17,7 @@ wit_bindgen::generate!({
 });
 
 use atomic::host::{
-    context,
+    calls, context,
     store::{self, Intent, Outcome},
     types::{Error, Problem, PropVal, Resource, Severity, Value},
 };
@@ -96,6 +97,19 @@ impl Guest for Module {
                 Err(e) => e.code,
             };
             notes.push(format!("write {outcome}"));
+        }
+        if let Some(call) = config.get("probeCall") {
+            let text = |key: &str| call[key].as_str().unwrap_or_default().to_string();
+            let outcome = match calls::call(
+                &text("interface"),
+                &text("function"),
+                &call["args"].to_string(),
+                &[],
+            ) {
+                Ok(result) => format!("ok {result}"),
+                Err(e) => e.code,
+            };
+            notes.push(format!("call {outcome}"));
         }
         resource.propvals.retain(|pv| pv.property != DESCRIPTION);
         resource.propvals.push(PropVal {

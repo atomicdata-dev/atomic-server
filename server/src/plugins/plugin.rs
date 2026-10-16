@@ -213,6 +213,7 @@ fn on_resource_get(context: GetExtenderContext) -> BoxFuture<AtomicResult<Resour
 mod installation_hook {
     use super::*;
     use crate::plugins::{
+        host_abi::HostAbiRegistry,
         manifest::Manifest,
         release,
         wasm::{
@@ -271,6 +272,7 @@ mod installation_hook {
         signer: &str,
         plugins_dir: &Path,
         plugin_cache_dir: &Path,
+        registry: &std::sync::Arc<HostAbiRegistry>,
     ) -> AtomicResult<()> {
         let subject = resource.get_subject().to_string();
         let reference = string_value(resource, urls::RELEASE_PROP)
@@ -342,6 +344,7 @@ mod installation_hook {
                     &name,
                     plugins_dir,
                     plugin_cache_dir,
+                    registry,
                 )
                 .await?;
             } else {
@@ -371,6 +374,7 @@ mod installation_hook {
                     store,
                     plugins_dir,
                     plugin_cache_dir,
+                    registry,
                 )
                 .await?;
                 // Now that this release's code is the code on disk, say so, so
@@ -554,6 +558,9 @@ fn on_installation_before_commit(
     context: CommitExtenderContext,
     plugins_dir: PathBuf,
     plugin_cache_dir: PathBuf,
+    #[cfg(feature = "wasm-plugins")] registry: std::sync::Arc<
+        crate::plugins::host_abi::HostAbiRegistry,
+    >,
 ) -> BoxFuture<AtomicResult<()>> {
     Box::pin(async move {
         let CommitExtenderContext {
@@ -605,6 +612,7 @@ fn on_installation_before_commit(
                         commit.signer.as_str(),
                         &plugins_dir,
                         &plugin_cache_dir,
+                        &registry,
                     )
                     .await?
                 }
@@ -636,6 +644,9 @@ fn on_installation_before_commit(
 pub fn build_installation_extender(
     plugins_dir: PathBuf,
     plugin_cache_dir: PathBuf,
+    #[cfg(feature = "wasm-plugins")] registry: std::sync::Arc<
+        crate::plugins::host_abi::HostAbiRegistry,
+    >,
 ) -> ClassExtender {
     ClassExtender::builder()
         .id("installation".to_string())
@@ -644,7 +655,13 @@ pub fn build_installation_extender(
             on_resource_get(context)
         }))
         .before_commit(ClassExtender::wrap_commit_handler(move |context| {
-            on_installation_before_commit(context, plugins_dir.clone(), plugin_cache_dir.clone())
+            on_installation_before_commit(
+                context,
+                plugins_dir.clone(),
+                plugin_cache_dir.clone(),
+                #[cfg(feature = "wasm-plugins")]
+                registry.clone(),
+            )
         }))
         .build()
 }
@@ -1379,6 +1396,7 @@ mod installation_tests {
             db,
             &f.appstate.config.plugin_path,
             &f.appstate.config.plugin_cache_path,
+            &f.appstate.host_abi,
         )
         .await
         .unwrap();

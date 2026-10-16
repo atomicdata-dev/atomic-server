@@ -56,6 +56,8 @@ pub struct ModuleParts {
     /// A folder of its own, writable with the `storage` capability.
     pub data_dir: Option<PathBuf>,
     pub manifest: Option<Manifest>,
+    /// The node's registry, so `calls` finds the apps of the drive.
+    pub registry: Arc<HostAbiRegistry>,
 }
 
 #[derive(Clone)]
@@ -67,8 +69,6 @@ struct Inner {
     engine: Arc<Engine>,
     component: Component,
     db: Arc<Db>,
-    /// Private to the module: `calls` finds no other app through it yet.
-    registry: Arc<HostAbiRegistry>,
     parts: ModuleParts,
     classes: Vec<String>,
 }
@@ -96,7 +96,6 @@ impl ServerModule {
             engine,
             component,
             db: Arc::new(db.clone()),
-            registry: Arc::default(),
             parts,
             classes: Vec::new(),
         };
@@ -134,8 +133,18 @@ impl ServerModule {
             &inner.parts.agent,
         ) {
             (ClassExtenderScope::Drive(drive), Some(installation), Some(agent)) if installed => {
+                // A module that calls apps finds the ones installed since it
+                // last ran; the others have no use for the query.
+                if inner
+                    .parts
+                    .manifest
+                    .as_ref()
+                    .is_some_and(|m| !m.uses.is_empty())
+                {
+                    inner.parts.registry.refresh(&inner.db, drive).await;
+                }
                 build_host(
-                    &inner.registry,
+                    &inner.parts.registry,
                     &inner.db,
                     (drive, installation, inner.parts.manifest.clone()),
                     ForAgent::from(agent),
@@ -145,7 +154,7 @@ impl ServerModule {
                 .await?
             }
             _ => AbiHost {
-                registry: inner.registry.clone(),
+                registry: inner.parts.registry.clone(),
                 db: inner.db.clone(),
                 drive: String::new(),
                 installation: String::new(),

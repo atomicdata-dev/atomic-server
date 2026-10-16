@@ -27,7 +27,7 @@ use wasmtime::{component::Component, Engine};
 
 use atomic_lib::db::plugin_meta::PluginMetaKey;
 
-use super::host_abi::{ModuleParts, ServerModule};
+use super::host_abi::{HostAbiRegistry, ModuleParts, ServerModule};
 use super::host_core;
 use super::manifest::{CapabilityName, Manifest};
 
@@ -37,6 +37,7 @@ pub async fn load_wasm_class_extenders(
     plugin_path: &Path,
     plugin_cache_path: &Path,
     db: &Db,
+    registry: &Arc<HostAbiRegistry>,
 ) -> AtomicResult<Vec<ClassExtender>> {
     // Create the plugin directory if it doesn't exist
     let plugin_dir = plugin_path.join(CLASS_EXTENDER_DIR_NAME);
@@ -153,11 +154,20 @@ pub async fn load_wasm_class_extenders(
         .map(|(path, plugin_dir, plugin_cache_path, scope)| {
             let engine = engine.clone();
             let db = db.clone();
+            let registry = registry.clone();
 
             async move {
-                load_plugin_from_disk(&path, &plugin_dir, &plugin_cache_path, scope, engine, &db)
-                    .await
-                    .unwrap_or((None, PathBuf::new()))
+                load_plugin_from_disk(
+                    &path,
+                    &plugin_dir,
+                    &plugin_cache_path,
+                    scope,
+                    engine,
+                    &db,
+                    registry,
+                )
+                .await
+                .unwrap_or((None, PathBuf::new()))
             }
         });
 
@@ -257,6 +267,8 @@ pub async fn read_class_urls(db: &Db, wasm_bytes: &[u8]) -> AtomicResult<Vec<Str
         agent: None,
         data_dir: None,
         manifest: None,
+        // Only asked which classes it extends: it calls nobody.
+        registry: Arc::default(),
     };
     Ok(ServerModule::new(engine, component, db, parts)
         .await?
@@ -523,6 +535,7 @@ pub async fn register_installed_plugin(
     name: &str,
     plugins_dir: &Path,
     plugin_cache_dir: &Path,
+    registry: &Arc<HostAbiRegistry>,
 ) -> AtomicResult<()> {
     validate_plugin_identifiers(namespace, name)?;
     let id = scoped_extender_id(drive_subject, namespace, name);
@@ -555,6 +568,7 @@ pub async fn register_installed_plugin(
         ClassExtenderScope::Drive(drive_subject.to_string()),
         engine,
         store,
+        registry.clone(),
     )
     .await?;
     let extender = extender.ok_or_else(|| {
@@ -698,6 +712,7 @@ pub async fn uninstall_plugin(
 /// unified manifest the Installation reviewed, which names the package's
 /// namespace and name) and loads the class extender. An update of an already
 /// installed package is rolled back to the previous files when any step fails.
+#[allow(clippy::too_many_arguments)]
 pub async fn install_or_update_plugin(
     zip_file: &mut ZipArchive<std::io::Cursor<Vec<u8>>>,
     drive_subject: &str,
@@ -706,6 +721,7 @@ pub async fn install_or_update_plugin(
     store: &Db,
     plugins_dir: &Path,
     plugin_cache_dir: &Path,
+    registry: &Arc<HostAbiRegistry>,
 ) -> AtomicResult<()> {
     // 1. Validation
     validate_plugin_zip(zip_file)?;
@@ -786,6 +802,7 @@ pub async fn install_or_update_plugin(
             scope,
             engine,
             store,
+            registry.clone(),
         )
         .await?;
 
@@ -995,6 +1012,7 @@ async fn load_plugin_from_disk(
     scope: ClassExtenderScope,
     engine: Arc<Engine>,
     db: &Db,
+    registry: Arc<HostAbiRegistry>,
 ) -> AtomicResult<(Option<ClassExtender>, PathBuf)> {
     let owned_folder_path = setup_plugin_data_dir(path, plugin_dir);
 
@@ -1061,6 +1079,7 @@ async fn load_plugin_from_disk(
             agent,
             data_dir: owned_folder_path,
             manifest,
+            registry,
         };
         ServerModule::new(engine, component, db, parts).await
     }

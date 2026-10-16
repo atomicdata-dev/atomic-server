@@ -260,7 +260,9 @@ A module runs as its Installation's agent, which is the only identity it has: re
 Two things differ from an app, both because a module runs inside the server's own path and nobody is there to approve:
 
 - `net.fetch` may use operations whose `effect` is `write` (an app is limited to `read` and has to propose the rest).
-- A hook has no entry call to meter, only its own fuel and memory (the `extended-fuel` and `extended-memory` capabilities widen them) and no `calls` to other apps yet: a module's `calls` look in a registry of its own.
+- A hook has no entry call to meter, only its own fuel and memory (the `extended-fuel` and `extended-memory` capabilities widen them).
+
+A module's `calls` reach the apps installed in its drive, through the same registry and the same checks as any other call: the interface must be in the module's manifest `uses`, and the module's agent is the caller, so a `write` or `external` export needs write on the drive (`full-drive-access`).
 
 What the old `atomic:class-extender` interface became:
 

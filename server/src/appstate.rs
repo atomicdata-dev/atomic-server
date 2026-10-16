@@ -112,9 +112,15 @@ impl AppState {
         store.add_class_extender(plugins::chatroom::build_message_extender())?;
         store.add_endpoint(plugins::invite::invite_endpoint())?;
         store.add_endpoint(plugins::conversations::conversations_endpoint())?;
+        // One registry for every runtime: modules loaded below and by an
+        // Installation's activation reach the same apps as `/host/call`.
+        #[cfg(feature = "wasm-plugins")]
+        let host_abi: Arc<plugins::host_abi::HostAbiRegistry> = Arc::default();
         store.add_class_extender(plugins::plugin::build_installation_extender(
             config.plugin_path.clone(),
             config.plugin_cache_path.clone(),
+            #[cfg(feature = "wasm-plugins")]
+            host_abi.clone(),
         ))?;
         store.add_class_extender(plugins::files::build_file_extender(
             config.uploads_path.clone(),
@@ -165,6 +171,7 @@ impl AppState {
                 &config.plugin_path,
                 &config.plugin_cache_path,
                 &store,
+                &host_abi,
             )
             .await?;
 
@@ -287,7 +294,7 @@ impl AppState {
             managed_dashboard_url: server_info.managed_dashboard_url,
             view_tokens: Arc::new(Default::default()),
             #[cfg(feature = "wasm-plugins")]
-            host_abi: Arc::new(Default::default()),
+            host_abi,
         })
     }
 

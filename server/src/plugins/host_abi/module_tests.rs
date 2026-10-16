@@ -9,10 +9,15 @@ use atomic_lib::{
 };
 use serde_json::json;
 
+use super::tests::{
+    count_of, counter_resource, install as install_app, share, COUNTER_MANIFEST, COUNTER_WASM,
+};
 use crate::plugins::{
     release,
     test_fixture::{fixture, genesis, Fixture},
 };
+
+const COUNTER: &str = "atomic:example/counter@1";
 
 const MODULE_WASM: &[u8] = include_bytes!("../../../../testdata/host-abi/module.wasm");
 
@@ -46,10 +51,25 @@ fn package(full_drive_access: bool) -> Vec<u8> {
 
 /// Installs the module in the fixture's drive, as an active Installation.
 async fn install(f: &Fixture, full_drive_access: bool, config: serde_json::Value) -> Module {
+    install_using(f, full_drive_access, config, &[]).await
+}
+
+/// The same, with a release that declares `uses`: `plugin.json` cannot, so the
+/// translated manifest is amended before the release is published.
+async fn install_using(
+    f: &Fixture,
+    full_drive_access: bool,
+    config: serde_json::Value,
+    uses: &[&str],
+) -> Module {
     let db = &f.appstate.store;
-    let (id, _, _) = release::publish_package(db, &package(full_drive_access), None)
-        .await
-        .unwrap();
+    let (_, mut published, mut manifest) =
+        release::publish_package(db, &package(full_drive_access), None)
+            .await
+            .unwrap();
+    manifest.uses = uses.iter().map(|u| u.to_string()).collect();
+    published.manifest = serde_json::to_value(&manifest).unwrap();
+    let id = db.publish_plugin_release(&published).unwrap();
     let installation = genesis(
         db,
         vec![
@@ -212,4 +232,63 @@ async fn a_module_with_full_drive_access_reads_and_writes_as_its_agent() {
     assert!(note.contains("read ok"), "{note}");
     assert!(note.contains("write committed"), "{note}");
     assert_eq!(name_of(db, &target).await, "overwritten");
+}
+
+fn call_counter(subject: &str, property: &str) -> serde_json::Value {
+    json!({"probeCall": {
+        "interface": COUNTER,
+        "function": "increment",
+        "args": {"subject": subject, "property": property},
+    }})
+}
+
+/// `calls` from a module reaches the apps of its drive: the registry is the
+/// node's, not one of its own. The export runs as its own Installation's
+/// agent, and the module (the caller) may write the drive.
+#[actix_rt::test]
+async fn a_module_hook_calls_an_app_export_and_gets_the_result() {
+    let f = fixture("module_calls").await;
+    let db = &f.appstate.store;
+    let counter = install_app(&f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+    install_using(&f, true, call_counter(&subject, &property), &[COUNTER]).await;
+    let folder = try_folder(db, &f.drive, "Docs").await.unwrap();
+
+    let note = extended_description(db, &folder).await;
+    assert!(note.contains(r#"call ok {"count":1}"#), "{note}");
+    assert_eq!(count_of(db, &subject, &property).await, 1);
+}
+
+/// Without write on the drive the module may not cause a `write` export, and
+/// without `uses` it may not call the interface at all. Both are `forbidden`,
+/// and the counter stays where it was.
+#[actix_rt::test]
+async fn a_module_hook_without_the_rights_is_forbidden_to_call() {
+    let f = fixture("module_calls_forbidden").await;
+    let db = &f.appstate.store;
+    let counter = install_app(&f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    install_using(&f, false, call_counter(&subject, &property), &[COUNTER]).await;
+    let folder = try_folder(db, &f.drive, "Docs").await.unwrap();
+    let note = extended_description(db, &folder).await;
+    assert!(note.contains("call forbidden"), "{note}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+}
+
+#[actix_rt::test]
+async fn a_module_that_does_not_declare_uses_cannot_call() {
+    let f = fixture("module_calls_undeclared").await;
+    let db = &f.appstate.store;
+    let counter = install_app(&f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    install(&f, true, call_counter(&subject, &property)).await;
+    let folder = try_folder(db, &f.drive, "Docs").await.unwrap();
+    let note = extended_description(db, &folder).await;
+    assert!(note.contains("call forbidden"), "{note}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
 }

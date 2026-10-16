@@ -220,10 +220,14 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       - [x] (6) rebuild `test-plugin`, `random-folder-extender` (its Discord
         webhook is dropped: a user-configured URL is not an operation);
         atomic-plugins has no extender crates and no `atomic-plugin` users
-      *Next:* give a module the shared `HostAbiRegistry` (its `calls` look in
-      a private one, so `calls.call` finds no app), an entry deadline for hooks
-      (only fuel and memory bound them), the `storage` folder under the ABI's
-      own name, and move `events` `commit` in as the after-commit.
+      A module shares the node's `HostAbiRegistry` (`appstate.host_abi`,
+      threaded through the Installation hook and the loader), so `calls.call`
+      from a hook finds the apps of its drive. A server extension may declare
+      `uses` now; a module that declares some loads the drive's apps before
+      each hook.
+      *Next:* an entry deadline for hooks (only fuel and memory bound them),
+      the `storage` folder under the ABI's own name, and move `events`
+      `commit` in as the after-commit.
 - [ ] Conformance suite: run published catalog releases against each host
       build (regression test until v1, a promise after).
 

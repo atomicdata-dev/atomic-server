@@ -37,8 +37,8 @@ pub struct Manifest {
     pub exports: Vec<Export>,
     /// Interfaces this app may call through `calls.call`. An app that lists
     /// none calls nobody: what a call causes is bounded by what the caller
-    /// declared and was granted, not only by who asked. Not for a server
-    /// extension; a run plugin (world `extension`) declares them too.
+    /// declared and was granted, not only by who asked. A server module's
+    /// hooks call through the same check.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uses: Vec<String>,
     /// Coarse egress allowance for packages that call the host `fetch` without
@@ -419,12 +419,9 @@ fn check_interface(interface: &str) -> Result<(), String> {
     }
 }
 
-fn validate_uses(uses: &[String], world: World) -> Result<(), String> {
+fn validate_uses(uses: &[String]) -> Result<(), String> {
     if uses.is_empty() {
         return Ok(());
-    }
-    if world == World::ServerExtension {
-        return Err("a server extension may not declare uses".into());
     }
     if uses.len() > 64 {
         return Err("at most 64 used interfaces per release".into());
@@ -598,7 +595,7 @@ impl Manifest {
             _ => {}
         }
         validate_exports(&self.exports, self.world)?;
-        validate_uses(&self.uses, self.world)?;
+        validate_uses(&self.uses)?;
         if let Some(view) = &self.entrypoints.view {
             if view.is_empty()
                 || view.starts_with('/')
@@ -1325,7 +1322,7 @@ mod export_tests {
     }
 
     #[test]
-    fn uses_is_validated_like_exports_and_not_for_a_server_extension() {
+    fn uses_is_validated_like_exports() {
         let with = |uses: serde_json::Value| {
             let mut raw = app(json!([]));
             raw["uses"] = uses;
@@ -1343,7 +1340,7 @@ mod export_tests {
             "atomic:example/counter@1"
         ]))
         .is_err());
-        // A run plugin (world extension) may; a server extension may not.
+        // A run plugin (world extension) and a server extension may both.
         assert!(
             Manifest::parse(json!({"schemaVersion": 2, "uses": ["atomic:example/counter@1"]}))
                 .is_ok()
@@ -1353,7 +1350,7 @@ mod export_tests {
             "world": "server-extension",
             "uses": ["atomic:example/counter@1"]
         }))
-        .is_err());
+        .is_ok());
         // Nothing declared serializes as it always did.
         assert!(serde_json::to_value(with(json!([])).unwrap().unwrap())
             .unwrap()
