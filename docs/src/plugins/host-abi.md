@@ -220,7 +220,18 @@ If this node has no provider for the interface in the drive, and a known Iroh pe
 
 Nothing widens across the hop. The peer runs the call for the same agent, so every check applies there: read on the drive, `write` on the drive for each hop that writes or spends secrets, the Installation's own agent, scopes and `uses`. The peer also needs the forwarding node's agent to be allowed to write the drive for such a hop, so a node cannot vouch for more than it could do itself. The remaining call count, fuel, allowed effects and the no-secrets flag travel with the call and can only shrink, depth counts across the hop, and a node does not forward a call it received. The calling node reserves the remaining budget while the peer runs, so one chain cannot spend it twice.
 
-Not yet: leases for background work, choosing among several peers (they are tried in the order of the known-peers list), forwarding of MCP tools (MCP lists exports of apps installed on this node only) and calling a drive this node has never synced.
+Not yet: choosing among several peers (they are tried in the order of the known-peers list), forwarding of MCP tools (MCP lists exports of apps installed on this node only) and calling a drive this node has never synced.
+
+### Background work on several nodes: leases
+
+When several nodes sync one drive, only one of them runs an Installation's triggers and schedules at a time. The right to do so is a `Lease` resource under the Installation (`leaseOf`, `leaseHolder` as a node id, `leaseExpiresAt`, `leaseGeneration`, and `previousLease` when it took another over). It is written and renewed with ordinary signed commits, so it syncs like anything else.
+
+- A node runs the background work only while it holds an unexpired lease, and renews it (every 30 s of its 60 s lifetime). It writes the first lease when none exists.
+- Once a lease has expired, any node takes over by writing a new lease with `previousLease` set to the old one and the generation one higher.
+- The current holder is the lease with the highest generation; equal generations go to the lowest node id (then the lowest subject). These fields never change after a lease is created, so every node holding the same leases picks the same holder, whatever order they arrived in. Two nodes that take over at the same moment both run until their leases have synced, then the one with the higher node id stops.
+- Expiry is compared with each node's own clock, so the nodes' clocks should agree to within a few seconds.
+
+Cursors do not move between nodes: each node's event cursors and trigger positions stay in its own db, and a new holder resumes from the cursor it has. Delivery across a takeover is therefore **at-least-once**: an edge the old holder handled may be delivered again by the new holder, so a trigger must tolerate a repeat. Nothing is skipped, because every node writes an event row for each commit it applies. A node with no Iroh node id, or with no known peer for the drive and no lease, writes no lease and runs everything, as before. Event subscriptions that an app pulls with `events.next` are not leased: they run where the call runs.
 
 ## Calling an export from outside
 

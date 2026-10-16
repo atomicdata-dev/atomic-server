@@ -335,18 +335,44 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 6. Placement and multiple machines
 
-- [ ] Leases for background work, as resources.
-      *Design (not built):* a `Lease` resource under the Installation names the
-      node (`did:ad:node:…`) that runs the app's background work (triggers,
-      cron, event subscriptions) and an expiry. A node runs background work for
-      an Installation only while it holds an unexpired lease; the holder renews
-      it, another node takes it over after expiry by writing a new lease with
-      the previous one's id as `previousLease` (a Loro LWW write is not enough:
-      two nodes can both see it expired, so the takeover must be a commit the
-      other can reject as a causality conflict). Event cursors already live in
-      the db and sync, so a takeover resumes at the checkpoint. Forwarded calls
-      (below) are the synchronous half; a lease decides who runs what nobody
-      asked for.
+- [x] Leases for background work, as resources.
+      *Done (first slice):* `server/src/plugins/lease.rs`, vocabulary in
+      `lib/defaults/plugins.json` (`Lease`, `leaseOf`, `leaseHolder`,
+      `leaseExpiresAt`, `leaseGeneration`, `previousLease`). A lease is a child
+      of the Installation, created with a genesis commit and renewed by its
+      holder only. `triggers::drain` and `scheduler::run_due` ask
+      `Leases::holds` before running anything; a non-holder leaves edges
+      pending. TTL 60 s, renewed with 30 s left; an expired head is taken over
+      by a new lease naming it (`previousLease`, generation + 1).
+      *Convergence:* the head is the maximum of the synced leases under
+      `(generation desc, holder node id asc, subject asc)`. All three are
+      immutable after creation and the order is total, so the head is a
+      function of the *set* of leases: nodes with the same set agree, and sets
+      only grow. Concurrent takeovers share a generation, so the lowest node id
+      wins. This replaces the "reject as a causality conflict" idea above: the
+      takeover needs no rejection because losing is decided by the rule, and
+      a Loro LWW write is never what picks the holder (expiry only decides
+      whether the head *may* be replaced). Overlap while two contenders have
+      not yet synced is the sync latency; a holder that lost keeps running at
+      most until its cached verdict ends (at most 30 s, the renewal point).
+      *Delivery across a takeover: at-least-once.* Cursors and in-flight
+      records stay in each node's db. A standby does not move its cursor, so
+      the new holder repeats edges the old holder handled since the standby
+      last held the lease (bounded by the 7-day retention). Nothing is
+      skipped: each node writes an event row for every commit it applies.
+      *Single node:* no Iroh node id, or no known peer for the drive and no
+      lease synced, writes no lease; the verdict is cached for 10 s, so the
+      hot path is a map lookup.
+      *Not done:* a watermark in the lease so a new holder skips what the old
+      one finished (needs a commit-level identity shared across nodes; event
+      `seq` and `at_ms` are per node, so a time cutoff could lose edges);
+      trigger and schedule registrations themselves are node-local rows, not
+      synced, so a standby only takes over triggers it has; `events.next`
+      consumers and the future cron/field-timer producers are not leased;
+      no validation of a takeover by other nodes (a signer with write rights
+      could take over early, or lie about time); clocks are assumed to agree
+      to within seconds; not tested over a real Iroh sync, the tests carry
+      the lease commits between dbs by hand.
 - [x] Forward a call to a node that can run it, same signature.
       *Done (first slice):* `call_export` finds no provider and a known Iroh
       peer syncs the drive: the call goes out as a `CALL` frame
