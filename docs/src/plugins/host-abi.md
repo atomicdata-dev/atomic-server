@@ -136,7 +136,7 @@ cargo build --target wasm32-wasip2 --release -p host-abi-counter
 An app is a release whose manifest has `"runtime": "wasip2/1"` and `"world": "sandboxed-app"`, and lists what it offers in `exports`.
 An app that calls other apps lists the interfaces it will call in `uses` (same form as an export's `interface`, once each, world `sandboxed-app` or `extension`): `"uses": ["atomic:example/counter@1"]`. An app that lists none calls nobody.
 Each export has an `interface` (`package:name/interface@major`), a `function` (kebab-case), a `description`, an `inputSchema` and an `outputSchema`, and an `effect` (`read`, `write`, `external` or `interactive`).
-The schemas are a bounded JSON Schema subset: a flat object of `string`, `integer` and `boolean` properties, each with a `description`, and `additionalProperties: false`.
+The schemas are a bounded JSON Schema subset: a flat object of `string`, `integer` and `boolean` properties, each with a `description`, and `additionalProperties: false`. A property may also be an `array` whose `items` is such a flat object (one level, at most 5000 elements, no `property` binding), so an export can return a list of records.
 The host validates the arguments before the app runs, and the result before the caller sees it.
 
 ```json
@@ -253,6 +253,10 @@ The name is made from the interface and the function: lowercase, every character
 A tool call takes the same path as `POST /host/call`: the connection's issued agent must read the drive, and write it for a `write` export or an app that declares secrets, at every hop. On top of that the person's choice counts: a read-only connection is only offered `read` exports of apps without secrets.
 `external` and `interactive` exports are not offered over MCP yet.
 
+## Example: a statement parser called from JS
+
+`plugin-examples/host-abi-statement` is a pure Rust app (it never touches the store) exporting `atomic:example/statement@1` `read`: a CSV statement (`date,description,amount`) in, `{ count, totalMinor, transactions: [{ date, description, amountMinor }] }` out, with amounts in minor units. A JS caller gets that object, not text to parse, from the server (`calls.call('atomic:example/statement@1', 'read', { statement })` in a run plugin) and from a frame (`store.callExport`, which goes to `/host/call` on the server). Neither goes through WASM on the caller's side: the component runs in the server's wasmtime. It does not run in the browser itself; that would take compiling it with `jco transpile` and running it in a worker, with the host imports (`store`, `calls`) wired to the frame's postMessage client.
+
 ## From a frame (TypeScript)
 
 A drive app's frame calls an export through its store, with the signed-in person's rights. The host sends the signed `POST /host/call` for it, and for now only runs exports whose `effect` is `read`; a `write`, `external` or `interactive` export is `forbidden` from a frame until the host can ask the person to approve it. (`store.call(op, args)` is the transport under every store method, as before.)
@@ -272,7 +276,7 @@ try {
 }
 ```
 
-`store.callExport` resolves to the parsed result. A drive app served by `/plugin-ui?format=client` has the same `store.callExport`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
+`store.callExport` resolves to the parsed result. To type it, generate bindings from the manifest: `cd browser/plugin && pnpm generate-bindings path/to/manifest.json path/to/bindings.ts` writes one interface per schema and one function per export (`statementRead(store, { statement })`, see `plugin-examples/host-abi-statement/bindings.ts`). The output imports nothing, and `@tomic/plugin` tests check the checked-in file against its manifest. A drive app served by `/plugin-ui?format=client` has the same `store.callExport`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
 
 ## From a QuickJS run plugin
 

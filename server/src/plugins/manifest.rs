@@ -410,8 +410,9 @@ impl ExportEffect {
 /// One function an app offers: `atomic:example/counter@1` `increment`.
 ///
 /// The schemas are the bounded JSON Schema subset of [`super::actions::InputSchema`]:
-/// a flat object of strings, integers and booleans. The host validates call
-/// arguments and results against them.
+/// a flat object of strings, integers and booleans, where a field may also be
+/// an array of such flat objects. The host validates call arguments and results
+/// against them.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Export {
@@ -458,6 +459,26 @@ fn validate_uses(uses: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// A flat object of strings, integers and booleans. At the top level a field
+/// may also be an `array` of such flat objects (`items`), one level deep.
+fn flat_object(schema: &super::actions::InputSchema, top: bool) -> bool {
+    schema.r#type == "object"
+        && !schema.additional_properties
+        && schema.properties.len() <= 32
+        && schema
+            .required
+            .iter()
+            .all(|p| schema.properties.contains_key(p))
+        && schema.properties.values().all(|p| match p.r#type.as_str() {
+            "string" | "integer" | "boolean" => p.items.is_none(),
+            "array" => {
+                top && p.property.is_none()
+                    && p.items.as_deref().is_some_and(|i| flat_object(i, false))
+            }
+            _ => false,
+        })
+}
+
 fn validate_exports(
     exports: &[Export],
     world: World,
@@ -491,18 +512,7 @@ fn validate_exports(
             return Err("exports must be unique per interface and function".into());
         }
         for schema in [&export.input_schema, &export.output_schema] {
-            if schema.r#type != "object"
-                || schema.additional_properties
-                || schema.properties.len() > 32
-                || schema
-                    .required
-                    .iter()
-                    .any(|p| !schema.properties.contains_key(p))
-                || schema
-                    .properties
-                    .values()
-                    .any(|p| !matches!(p.r#type.as_str(), "string" | "integer" | "boolean"))
-            {
+            if !flat_object(schema, true) {
                 return Err("unsupported export schema".into());
             }
             for reference in schema
@@ -1356,6 +1366,27 @@ mod export_tests {
             with(&|e| e["inputSchema"]["properties"]["subject"]["type"] = json!("array")).is_err()
         );
         assert!(with(&|e| e["inputSchema"]["required"] = json!(["missing"])).is_err());
+        // Arrays are lists of flat objects, and only at the top level.
+        let field = |items: serde_json::Value| {
+            let mut field = json!({"type": "array", "description": "d"});
+            if !items.is_null() {
+                field["items"] = items;
+            }
+            field
+        };
+        let flat = json!({"type": "object", "properties": {"n": {"type": "integer", "description": "n"}},
+            "additionalProperties": false});
+        let nested = json!({"type": "object", "properties": {"l": field(flat.clone())},
+            "additionalProperties": false});
+        assert!(with(&|e| e["outputSchema"]["properties"]["list"] = field(flat.clone())).is_ok());
+        assert!(with(&|e| e["outputSchema"]["properties"]["list"] = field(json!(null))).is_err());
+        assert!(
+            with(&|e| e["outputSchema"]["properties"]["list"] = field(nested.clone())).is_err()
+        );
+        assert!(with(&|e| e["outputSchema"]["properties"]["s"] = json!({
+            "type": "string", "description": "d", "items": flat.clone()
+        }))
+        .is_err());
         assert!(with(&|_| {}).is_ok());
 
         // Two exports of one function.

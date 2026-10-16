@@ -308,7 +308,7 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       and its `allowsOnly`, after the JSON shape check. Not a second schema
       engine.
       *Not done:* the binding is not stored as a resource; class scopes (step
-      2) and `uses`/`extends` by class; nested or array fields; a class as a
+      2) and `uses`/`extends` by class; nested fields, and a `property` binding inside array items (arrays of flat objects exist); a class as a
       field type; the scheduler still uses `drive_terms`; moving
       `ontology-kit` classes into the vocabularies; `@tomic/lib` has no
       matching type for the manifest `schema` field.
@@ -420,8 +420,34 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 7. Proof
 
-- [ ] One Rust component (for example the Money statement parser) called by a
+- [~] One Rust component (for example the Money statement parser) called by a
       JS app through a typed interface, in the browser and on the server.
+      *Done:* `plugin-examples/host-abi-statement` (`atomic:example/statement@1`
+      `read`: CSV text in, a list of transactions out; a small parser of its own,
+      not the Money plugin's, whose MT940 parser ships minified in `ui.js`).
+      Server: a QuickJS run plugin calls it through `calls.call` and gets a typed
+      object (`host_abi/tests.rs`, `a_run_plugin_reads_a_statement_...`).
+      Browser: a frame calls it with `store.callExport`, which the host sends to
+      `/host/call`, so the browser runs no WASM for it (JS to server, never
+      JS to WASM to Rust). To make a list a result the export schema subset got
+      `array` fields of flat objects (`actions.rs` `Field::items`, checked by
+      `manifest.rs`). Typed bindings: `generateExportBindings` in
+      `@tomic/plugin` (`pnpm generate-bindings <manifest> <out.ts>`) turns the
+      manifest schemas into interfaces and a typed `statementRead(store, args)`;
+      a test keeps the checked-in `bindings.ts` in step and type-checks a
+      caller. The frame test (`browser/plugin/src/exportBindings.test.ts`) uses
+      a mocked transport: no integration test of `callExport` against a real
+      server exists, and `/host/call` has no handler test of its own beyond
+      `call_as`.
+      *Not done:* running the component itself in the browser. That takes
+      `jco transpile` of the wasip2 component to a core module plus JS glue, run
+      in a worker, with `store` / `calls` imports backed by the frame's
+      postMessage client; only worth it for work that must run offline, and it
+      cannot hold a server-side secret or the app's agent. The manifest `schema`
+      does not fit this app (no stored properties; array item fields cannot yet
+      point at a Property), so the parser declares none. Array fields have no
+      `property` binding or nested arrays; the 64 KiB argument cap applies to
+      the statement and the result.
 - [x] One built-in extender (chatroom) rewritten as a module on the
       ABI, as a second conformance test next to the Kanban plugin. It is a
       native module: `NativeHooks` (the `hooks` interface as a Rust trait) behind

@@ -42,6 +42,11 @@ pub(crate) const COUNTER_MANIFEST: &str =
 pub(crate) const CALLER_MANIFEST: &str =
     include_str!("../../../../testdata/host-abi/caller.manifest.json");
 
+pub(crate) const STATEMENT_WASM: &[u8] =
+    include_bytes!("../../../../testdata/host-abi/statement.wasm");
+pub(crate) const STATEMENT_MANIFEST: &str =
+    include_str!("../../../../testdata/host-abi/statement.manifest.json");
+
 pub(crate) const COUNTER: &str = "atomic:example/counter@1";
 pub(crate) const CALLER: &str = "atomic:example/caller@1";
 
@@ -1698,10 +1703,21 @@ async fn a_chain_that_may_not_spend_secrets_never_runs_an_app_that_declares_them
 /// Runs `source` as a QuickJS run plugin of the fixture, as `caller`, with the
 /// ABI of [`super::JsAbi`]. Returns its verdict.
 async fn run_js(w: &World, caller: ForAgent, budget: Option<CallBudget>, source: &str) -> Json {
+    run_js_using(w, caller, budget, &[COUNTER], source).await
+}
+
+/// The same, for a plugin that declares `uses`.
+async fn run_js_using(
+    w: &World,
+    caller: ForAgent,
+    budget: Option<CallBudget>,
+    uses: &[&str],
+    source: &str,
+) -> Json {
     use crate::plugins::{host_abi::JsAbi, js_runtime::StoreHost};
     let manifest = crate::plugins::manifest::Manifest::parse(json!({
         "schemaVersion": 2,
-        "uses": [COUNTER],
+        "uses": uses,
     }))
     .unwrap();
     let host = StoreHost {
@@ -1771,6 +1787,64 @@ async fn a_run_plugin_calls_an_export_of_an_app_and_gets_the_result() {
     let verdict = run_js(&w, owner(db), Some(CallBudget::default()), &source).await;
     assert_eq!(verdict["result"], json!({"count": 1}), "{verdict}");
     assert_eq!(count_of(db, &subject, &property).await, 1);
+}
+
+const STATEMENT: &str = "atomic:example/statement@1";
+
+#[actix_rt::test]
+async fn a_run_plugin_reads_a_statement_with_a_rust_component_and_gets_typed_results() {
+    let mut w = World::new("host_abi_js_statement").await;
+    crate::plugins::test_fixture::write_plugin(&mut w.f, "Runner").await;
+    let db = &*w.db;
+    install(&w.f, "statement", STATEMENT_MANIFEST, STATEMENT_WASM).await;
+
+    // The default budget (reads only) is enough: the export is a `read`. The
+    // result is an object with a list of objects, not a string to parse.
+    let source = format!(
+        r#"export function run() {{
+          const code = (statement) => {{
+            try {{ calls.call("{STATEMENT}", "read", {{ statement }}); return null; }}
+            catch (e) {{ return e.code + ": " + e.message; }}
+          }};
+          const statement = 'date,description,amount\n2026-01-03,"Coffee, beans",-12.5\n\n2026-01-04,Salary,2500\n';
+          const r = calls.call("{STATEMENT}", "read", {{ statement }});
+          return {{
+            intents: [],
+            count: r.count,
+            total: r.totalMinor,
+            first: r.transactions[0],
+            sum: r.transactions.reduce((n, t) => n + t.amountMinor, 0),
+            badDate: code("13/01/2026,x,1"),
+            badAmount: code("2026-01-01,x,1.234"),
+            badShape: code("2026-01-01,x"),
+            wrongType: (() => {{
+              try {{ calls.call("{STATEMENT}", "read", {{ statement: 5 }}); return null; }}
+              catch (e) {{ return e.code; }}
+            }})(),
+          }};
+        }}"#
+    );
+    let verdict = run_js_using(&w, owner(db), None, &[STATEMENT], &source).await;
+    assert_eq!(verdict["count"], 2, "{verdict}");
+    assert_eq!(verdict["total"], 248750, "{verdict}");
+    assert_eq!(verdict["sum"], 248750, "{verdict}");
+    assert_eq!(
+        verdict["first"],
+        json!({"date": "2026-01-03", "description": "Coffee, beans", "amountMinor": -1250}),
+        "{verdict}"
+    );
+    for (key, needle) in [
+        ("badDate", "line 1: '13/01/2026' is not a YYYY-MM-DD date"),
+        ("badAmount", "line 1: '1.234' is not an amount"),
+        ("badShape", "line 1: expected 3 fields"),
+    ] {
+        let message = verdict[key].as_str().unwrap();
+        assert!(
+            message.starts_with(code::INVALID_ARGUMENT) && message.contains(needle),
+            "{key}: {verdict}"
+        );
+    }
+    assert_eq!(verdict["wrongType"], code::INVALID_ARGUMENT, "{verdict}");
 }
 
 #[actix_rt::test]

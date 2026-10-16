@@ -6097,6 +6097,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-abi-statement"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "wit-bindgen 0.48.1",
+]
+
+[[package]]
 name = "hostname"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

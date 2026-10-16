@@ -56,3 +56,5 @@ export type {
 } from './store.js';
 export { HOST_ERROR_CODES, HostError, toHostErrorCode } from './hostAbi.js';
 export type { AppExport, Effect, HostErrorCode } from './hostAbi.js';
+export { generateExportBindings } from './exportBindings.js';
+export type { BindingsManifest } from './exportBindings.js';
