@@ -26,7 +26,10 @@ import { PresenceAvatarMenu } from '@components/Presence/PresenceAvatarMenu';
 import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
-import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import {
+  toRelativeDateTime,
+  toShortRelativeTime,
+} from '@helpers/dates/relativeDate';
 import { isHiddenFromChildLists } from '@helpers/hiddenFromChildLists';
 import { useHiddenDriveSubjects } from '@hooks/useVisibleDriveChildren';
 import { useRecentComments } from '@hooks/useRecentComments';
@@ -111,29 +114,33 @@ export function DrivePeople(): JSX.Element | null {
 function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
   return (
     <Lines>
-      {items.map(({ subject, at, kind }) => (
-        <li key={subject}>
-          <ResourceRow
-            clickable
-            tabbable
-            subject={subject}
-            trailing={
-              at ? (
-                <ResourceRowDescription
-                  as='time'
-                  dateTime={new Date(at).toISOString()}
-                >
-                  {kind === 'commented' ? (
-                    <>Commented {toRelativeDateTime(new Date(at), true)}</>
-                  ) : (
-                    <>Edited {toRelativeDateTime(new Date(at), true)}</>
-                  )}
-                </ResourceRowDescription>
-              ) : undefined
-            }
-          />
-        </li>
-      ))}
+      {items.map(({ subject, at, kind }) => {
+        const label = at
+          ? `${kind === 'commented' ? 'Commented' : 'Edited'} ${toRelativeDateTime(new Date(at), true)}`
+          : undefined;
+
+        return (
+          <li key={subject}>
+            <ResourceRow
+              clickable
+              tabbable
+              subject={subject}
+              trailing={
+                at ? (
+                  <ResourceRowDescription
+                    as='time'
+                    dateTime={new Date(at).toISOString()}
+                    title={label}
+                    aria-label={label}
+                  >
+                    {toShortRelativeTime(new Date(at))}
+                  </ResourceRowDescription>
+                ) : undefined
+              }
+            />
+          </li>
+        );
+      })}
     </Lines>
   );
 }
