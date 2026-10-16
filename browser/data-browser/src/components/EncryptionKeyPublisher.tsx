@@ -17,17 +17,28 @@ export function EncryptionKeyPublisher() {
     if (!agent?.subject || store.isLocalOnlySubject(agent.subject)) return;
 
     let cancelled = false;
-    // Not on the boot path: the first screen needs the network more.
-    const timer = setTimeout(() => {
+
+    const publish = () => {
       if (cancelled) return;
       ensureEncryptionKey(store, agent).catch(error =>
         console.warn('Could not publish the encryption key:', error),
       );
+    };
+
+    // Not on the boot path: the first screen needs the network more. Offline
+    // it would only fail on the chunks it imports, so wait for the network.
+    const timer = setTimeout(() => {
+      if (navigator.onLine === false) {
+        window.addEventListener('online', publish, { once: true });
+      } else {
+        publish();
+      }
     }, 2000);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      window.removeEventListener('online', publish);
     };
   }, [store, agent]);
 

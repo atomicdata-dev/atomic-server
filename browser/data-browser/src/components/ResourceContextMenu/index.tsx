@@ -73,6 +73,7 @@ export const ContextMenuOptions = {
   Export: 'export',
   Open: 'open',
   AddToChat: 'addToChat',
+  Comment: 'comment',
   ReportAIChat: 'reportAIChat',
   Favorite: 'favorite',
   Parent: 'parent',

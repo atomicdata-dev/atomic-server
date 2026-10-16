@@ -1883,14 +1883,6 @@ msgid "Usage instructions for how to fetch and use the resource in your code."
 msgstr "Instrucciones de uso sobre cómo obtener y utilizar el recurso en su código."
 
 #: src/actions/resourceActions.tsx
-msgid "Add to chat"
-msgstr "Añadir al chat"
-
-#: src/actions/resourceActions.tsx
-msgid "Add the resource as context to the AI sidebar"
-msgstr "Añadir el recurso como contexto a la barra lateral de la IA"
-
-#: src/actions/resourceActions.tsx
 msgid "Search children"
 msgstr "Buscar hijos"
 
@@ -13075,18 +13067,20 @@ msgstr "Comentado {0}"
 msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr ""
 
-#. 0: missing; 1: suggestion ? ` Did you mean "${suggestion}"?` \\: ''
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "There is no column \"{0}\".{1}"
+#: src/actions/resourceActions.tsx
+msgid "Start AI Chat"
 msgstr ""
 
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "Formula"
+#: src/actions/resourceActions.tsx
+msgid "Chat with AI about this resource"
 msgstr ""
 
-#. 0: Object.keys(slugs).join(', ') || 'none yet'
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+#: src/actions/resourceActions.tsx
+msgid "Add a comment"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Open the comments for this resource"
 msgstr ""
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
@@ -13115,4 +13109,18 @@ msgstr ""
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Birthday soon"
+msgstr ""
+
+#. 0: missing; 1: suggestion ? ` Did you mean "${suggestion}"?` \\: ''
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "There is no column \"{0}\".{1}"
+msgstr ""
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Formula"
+msgstr ""
+
+#. 0: Object.keys(slugs).join(', ') || 'none yet'
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr ""

@@ -4,7 +4,16 @@ import { before, FRONTEND_URL, waitForSynced } from './test-utils';
 test('data inspector reacts to an unsaved edit without replacing its resource', async ({
   page,
   context,
+  browserDiagnostics,
 }) => {
+  browserDiagnostics.expect(
+    'error',
+    /Failed to load resource: net::ERR_INTERNET_DISCONNECTED/,
+    'The app asks for the server resource (/server) while the test is offline.',
+    1,
+    /\/server$/,
+    { optional: true },
+  );
   await before({ page });
   const subject = await page.evaluate(async () => {
     const resource = await window.store.newResource({

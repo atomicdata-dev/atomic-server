@@ -29,6 +29,8 @@ const RightPanelContext = createContext<{
   setPanelOpen: (
     panel: RightPanelId,
     action: React.SetStateAction<boolean>,
+    /** Only for `comments`: the resource the panel is about. */
+    commentSubject?: string,
   ) => void;
   togglePanel: (panel: RightPanelId) => void;
   closePanel: (panel: RightPanelId) => void;
@@ -83,8 +85,14 @@ export const RightPanelProvider: React.FC<
   }, []);
 
   const setPanelOpen = useCallback(
-    (panel: RightPanelId, action: React.SetStateAction<boolean>) => {
-      setState(previous => updatePanelState(previous, scope, panel, action));
+    (
+      panel: RightPanelId,
+      action: React.SetStateAction<boolean>,
+      target?: string,
+    ) => {
+      setState(previous =>
+        updatePanelState(previous, scope, panel, action, target),
+      );
     },
     [scope],
   );
