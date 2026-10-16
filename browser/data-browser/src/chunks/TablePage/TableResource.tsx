@@ -1171,11 +1171,15 @@ export const TableResource: React.FC<TableResourceProps> = ({
         ),
       );
 
+      // A move changes `parent`, which fires collection updates before the
+      // local index has the write; re-read once the moves are saved.
+      await invalidateCollection();
+
       return moved
         .filter((subject): subject is string => !!subject)
         .map(subject => createResourceTrashedHistoryItem(subject, drive));
     },
-    [store],
+    [store, invalidateCollection],
   );
 
   const deleteRowSubjects = useCallback(

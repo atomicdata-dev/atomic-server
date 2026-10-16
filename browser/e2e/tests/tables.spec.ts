@@ -704,6 +704,30 @@ test.describe('tables', async () => {
     await expect(page.getByRole('gridcell', { name: 'rowA' })).toBeVisible();
     await expect(page.getByRole('gridcell', { name: 'rowC' })).toBeVisible();
     await expect(toolbar).toBeHidden();
+
+    // Deleted rows are parked in the drive's Trash, not destroyed.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const { store } = window as any;
+          const trashed = (value: string) => {
+            for (const res of store.resources.values()) {
+              const hit = res
+                .getEntries()
+                .some(([, v]: [string, unknown]) => v === value);
+
+              if (hit) {
+                return store.isTrashed(res, store.getDrive());
+              }
+            }
+
+            return undefined;
+          };
+
+          return ['rowA', 'rowB', 'rowC', 'rowD'].map(trashed);
+        }),
+      )
+      .toEqual([false, true, false, true]);
   });
 
   test('right-click a row header and a multi-cell selection', async ({
