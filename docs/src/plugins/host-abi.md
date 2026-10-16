@@ -10,7 +10,7 @@ An app is a WebAssembly component (`wasm32-wasip2`) that imports four interfaces
 | --- | --- |
 | `store` | `get`, `get-many`, `query` (class, parent, filters, cursor), `apply` (create, set, remove, destroy), `subscribe` |
 | `net` | `fetch` by manifest operation id. The host knows the operation's method, endpoint and effect, and substitutes `secret:<name>` in headers |
-| `events` | `next` and `ack`: one pull stream with a cursor |
+| `events` | `set-filters`, `next` and `ack`: the drive's durable event stream, read from a cursor |
 | `calls` | `providers`, `describe` and `call` to the other apps in the drive |
 | `app` (export) | `invoke` answers a call to one of the app's declared exports. `on-event` handles an event |
 
@@ -295,10 +295,19 @@ A module's folder (`/`, with the `storage` capability writable) is kept.
 
 The Rust helper crate `atomic-plugin` wraps this: implement `ClassExtender` and call `export_plugin!`. `plugin-examples/host-abi-module` shows the raw interface.
 
+## Events
+
+Every applied commit appends one row to its drive's event log, in the same batch that stores the commit (`lib/src/db/drive_events.rs`, `Tree::PluginMeta`). Sequence numbers only grow, so a cursor is the last sequence an app handled.
+
+- `set-filters` replaces the app's subscription. A filter has `class`, `subtree` and `property`; fields that are set must all match, and an event is delivered when any filter matches. An app that never subscribed gets every event it may read.
+- `next(cursor, max)` returns events after `cursor`, oldest first. With no cursor it starts at the app's checkpoint. Reading does not consume.
+- `ack(cursor)` moves the checkpoint forward and never back. Filters and checkpoint are stored in the db, so after a restart the app gets what it missed exactly once.
+- Delivery is rights-checked at read time: an event is only returned when the caller and the Installation's agent may read the resource (and its `readScope`). For a destroyed resource the parent is asked. The log keeps seven days.
+
 ## Not built yet
 
 - `store.search` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.
-- `events` is an in-memory queue per installation. Nothing feeds it from query triggers, cron or commits yet, and the host does not call `on-event` itself.
+- `events` carries one event per applied commit. Query-edge triggers, cron, field timers, inbound webhooks and tombstones do not feed it yet, and the host does not call `on-event` itself: an app pulls.
 - Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
 - A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared, so an approval UI must not rely on it alone. Every hop is still bounded by the signed-in agent's rights and the callee's own grant.

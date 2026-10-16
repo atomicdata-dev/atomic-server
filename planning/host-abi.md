@@ -98,10 +98,10 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       world `sandboxed-app` in `server/src/plugins/host_abi/`: `get`,
       `get-many`, `query` (class, parent, `eq`/`lt`/`lte`/`gt`/`gte`/`contains`/
       `exists`, cursor, `complete`), `apply`, `subscribe`, `net.fetch`,
-      `events.next`/`ack`, `calls.providers`/`describe`/`call`. Still
+      `events.set-filters`/`next`/`ack`, `calls.providers`/`describe`/`call`. Still
       `unsupported` or missing: `search`, `undo`, the `ne` filter, subclass
       matching in `class`, `invoke-action`, state as resources, feeding
-      `events` from triggers/cron/commits, durable proposals, `handles`.
+      `events` from triggers/cron, durable proposals, `handles`.
       Docs: `docs/src/plugins/host-abi.md`.
       *Review hold fixed (2026-10-15):* `/host/call` is v2-signed (method + body),
       needs read (and write for `write`/`external` exports) on the drive before
@@ -258,6 +258,21 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 - [ ] Durable, cursor-based stream: query edges, commits on a class, cron,
       field timers, inbound webhooks, "connection needed", tombstones (#1850).
+      *Done:* one ordered log per drive (`lib/src/db/drive_events.rs`), a row
+      per applied commit written in the commit's own batch, so a crash never
+      separates change and event. Apps subscribe through `events.set-filters`
+      (class, subtree, property), read from a cursor with `next` and `ack`;
+      filters and checkpoint are stored, so a restart replays what was missed
+      exactly once. Delivery checks the caller's and the Installation agent's
+      read rights and `readScope` per event; tombstones (destroy events) exist.
+      Replaces the in-memory per-installation queue.
+      *Not done:* the producers other than commits (query edges, cron, field
+      timers, webhooks, connection-needed) and the consumers `triggers.rs`
+      (query-edge delivery queue with its own guard), module `after-commit`
+      (synchronous, in-commit) and the WS commit notifications still run on
+      their own paths. Query edges are not commits, so `triggers.rs` needs
+      edge events in the log first. The host does not call `on-event`; apps
+      pull. Event rows hold no per-subscriber state, so no fan-out cost.
 - [ ] Untriggered verdicts become stored proposals, not discarded ones.
 - [ ] Replace the three webhook proposals (#77, #976, atomic-plugins#369).
 
