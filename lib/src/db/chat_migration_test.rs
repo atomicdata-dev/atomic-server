@@ -625,6 +625,10 @@ pub(super) fn stored_bytes(store: &Db) -> (usize, Vec<(Tree, usize, usize)>) {
         let (mut rows, mut bytes) = (0usize, 0usize);
         for kv in store.kv.iter_tree(tree) {
             let (key, val) = kv.unwrap();
+            // The drive's event log is its own, time-bounded cost per commit.
+            if key.starts_with(b"drive-event/") {
+                continue;
+            }
             rows += 1;
             bytes += key.len()
                 + if super::compressed_kv::is_compressed_tree(tree) {
