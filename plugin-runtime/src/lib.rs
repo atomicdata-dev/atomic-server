@@ -147,16 +147,17 @@ impl Guest for Component {
             globals
                 .set(
                     "__hostAbi",
-                    Function::new(ctx.clone(), |function: String, args: String| {
-                        match host::abi(&function, &args) {
+                    Function::new(
+                        ctx.clone(),
+                        |function: String, args: String| match host::abi(&function, &args) {
                             Ok(value) => encode(Ok(value)),
                             Err(e) => format!(
                                 "{{\"error\":{{\"code\":{},\"message\":{}}}}}",
                                 serde_json_string(&e.code),
                                 serde_json_string(&e.message)
                             ),
-                        }
-                    })
+                        },
+                    )
                     .map_err(|e| e.to_string())?,
                 )
                 .map_err(|e| e.to_string())?;
