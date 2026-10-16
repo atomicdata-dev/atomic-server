@@ -99,6 +99,49 @@
         }
       })();
     </script>
+    <!-- The signed-in agent is read from IndexedDB (idb-keyval's default
+         database) before the app's JavaScript has loaded; agentStorage.ts
+         takes the result once and reads as before if there is none. The
+         upgrade handler matches idb-keyval's, so opening first can never
+         leave it a database without its store. -->
+    <script>
+      (function () {
+        try {
+          if (!window.indexedDB) return;
+          window.__atomicAgentRead = new Promise(function (resolve) {
+            var req = indexedDB.open('keyval-store');
+            req.onupgradeneeded = function () {
+              req.result.createObjectStore('keyval');
+            };
+            req.onerror = function () {
+              resolve(undefined);
+            };
+            req.onsuccess = function () {
+              var db = req.result;
+              try {
+                var tx = db.transaction('keyval', 'readonly');
+                var store = tx.objectStore('keyval');
+                var agent = store.get('atomic.agent');
+                var fallback = store.get('atomic.agent.fallback');
+                tx.oncomplete = function () {
+                  db.close();
+                  resolve({ agent: agent.result, fallback: fallback.result });
+                };
+                tx.onerror = tx.onabort = function () {
+                  db.close();
+                  resolve(undefined);
+                };
+              } catch (e) {
+                db.close();
+                resolve(undefined);
+              }
+            };
+          });
+        } catch (e) {
+          // agentStorage.ts reads it itself.
+        }
+      })();
+    </script>
     <link
       rel="preconnect"
       crossorigin="anonymous"
@@ -167,7 +210,7 @@
         background-color: var(--background-color);
         color: var(--text-splash);
         transition:
-          opacity 420ms ease,
+          opacity 200ms ease,
           visibility 0s;
       }
 
@@ -176,8 +219,8 @@
         visibility: hidden;
         pointer-events: none;
         transition:
-          opacity 420ms ease,
-          visibility 0s linear 420ms;
+          opacity 200ms ease,
+          visibility 0s linear 200ms;
       }
 
       /* No scale or slide on the way in or out: the mark stays put from the
