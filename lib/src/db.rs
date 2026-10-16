@@ -3143,13 +3143,19 @@ impl Db {
     }
 
     /// The agents every app installed on `drive` signs as, revoked ones
-    /// included: a name that was an Installation's agent stays one.
+    /// included: a name that was an Installation's agent stays one. The drive
+    /// is compared by its canonical form, whichever spelling (`did:ad:` or
+    /// `atomic:`, with or without a drive hint) the key was stored under.
     pub fn app_agents_in_drive(&self, drive: &str) -> Vec<String> {
-        let mut prefix = drive.as_bytes().to_vec();
-        prefix.push(0);
+        let canonical = |drive: &str| Subject::from(drive.to_string()).pure_id();
+        let want = canonical(drive);
         self.kv
-            .scan_prefix(Tree::AppAgent, &prefix)
+            .scan_prefix(Tree::AppAgent, b"")
             .flatten()
+            .filter(|(key, _)| {
+                let drive_part = key.split(|b| *b == 0).next().unwrap_or_default();
+                std::str::from_utf8(drive_part).is_ok_and(|d| canonical(d) == want)
+            })
             .filter_map(|(_, bin)| Some(AppAgent::from_bytes(&bin).ok()?.agent))
             .collect()
     }
