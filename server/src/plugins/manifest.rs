@@ -41,6 +41,9 @@ pub struct Manifest {
     /// hooks call through the same check.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uses: Vec<String>,
+    /// Classes and properties the app defines or uses; see [`AppSchema`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<super::app_schema::AppSchema>,
     /// Coarse egress allowance for packages that call the host `fetch` without
     /// an operation id. It never widens what `operations` grant.
     #[serde(default, skip_serializing_if = "Network::is_default")]
@@ -105,6 +108,7 @@ impl From<ManifestV1> for Manifest {
             actions: v1.actions,
             exports: Vec::new(),
             uses: Vec::new(),
+            schema: None,
             network: Network::default(),
             config: v1.config,
             config_schema: None,
@@ -436,7 +440,11 @@ fn validate_uses(uses: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_exports(exports: &[Export], world: World) -> Result<(), String> {
+fn validate_exports(
+    exports: &[Export],
+    world: World,
+    manifest_schema: Option<&super::app_schema::AppSchema>,
+) -> Result<(), String> {
     if exports.is_empty() {
         return Ok(());
     }
@@ -478,6 +486,17 @@ fn validate_exports(exports: &[Export], world: World) -> Result<(), String> {
                     .any(|p| !matches!(p.r#type.as_str(), "string" | "integer" | "boolean"))
             {
                 return Err("unsupported export schema".into());
+            }
+            for reference in schema
+                .properties
+                .values()
+                .filter_map(|f| f.property.as_ref())
+            {
+                if !manifest_schema.is_some_and(|s| s.declares(reference)) {
+                    return Err(format!(
+                        "export field property '{reference}' is not declared in the manifest's schema"
+                    ));
+                }
             }
         }
     }
@@ -594,7 +613,10 @@ impl Manifest {
             }
             _ => {}
         }
-        validate_exports(&self.exports, self.world)?;
+        if let Some(schema) = &self.schema {
+            schema.validate()?;
+        }
+        validate_exports(&self.exports, self.world, self.schema.as_ref())?;
         validate_uses(&self.uses)?;
         if let Some(view) = &self.entrypoints.view {
             if view.is_empty()
@@ -768,6 +790,7 @@ pub fn translate_plugin_json(
         actions: Vec::new(),
         exports: Vec::new(),
         uses: Vec::new(),
+        schema: None,
         network: Network {
             origins,
             reason: network_reason,
@@ -1319,6 +1342,34 @@ mod export_tests {
 
         // Two exports of one function.
         assert!(Manifest::parse(app(json!([export(), export()]))).is_err());
+    }
+
+    #[test]
+    fn a_field_may_only_point_at_a_property_the_schema_declares() {
+        let with = |reference: &str, vocabularies: serde_json::Value| {
+            let mut raw = app(json!([export()]));
+            raw["schema"] = json!({
+                "vocabularies": vocabularies,
+                "ontology": {"shortname": "own", "properties": [
+                    {"shortname": "title", "datatype": "https://atomicdata.dev/datatypes/string"}
+                ], "classes": []},
+            });
+            raw["exports"][0]["inputSchema"]["properties"]["subject"]["property"] =
+                json!(reference);
+            Manifest::parse(raw)
+        };
+        let work = json!(["https://atomicdata.dev/work/v1"]);
+        assert!(with("title", work.clone()).is_ok());
+        assert!(with("https://atomicdata.dev/work/v1/start", work.clone()).is_ok());
+        assert!(with("missing", work.clone()).is_err());
+        assert!(with("https://atomicdata.dev/money/v1/amount", work.clone()).is_err());
+        assert!(with("https://atomicdata.dev/work/v1", work.clone()).is_err());
+        assert!(with("title", json!(["ftp://nope"])).is_err());
+        assert!(with("title", json!([work[0], work[0]])).is_err());
+        // No schema at all: nothing to point into.
+        let mut raw = app(json!([export()]));
+        raw["exports"][0]["inputSchema"]["properties"]["subject"]["property"] = json!("title");
+        assert!(Manifest::parse(raw).is_err());
     }
 
     #[test]

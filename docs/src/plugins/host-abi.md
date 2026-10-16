@@ -176,6 +176,24 @@ The host validates the arguments before the app runs, and the result before the 
 Network access works as for other plugins: declare `operations` (and `secrets`) in the manifest, and the app calls them with `net.fetch`.
 Only `read` operations can be fetched directly; an external write is something a person approves.
 
+### Declaring the schema an app uses
+
+An app says which classes and properties it defines or uses in `schema`. There is no schema format of its own: it names ordinary ontologies.
+
+```json
+"schema": {
+  "vocabularies": ["https://atomicdata.dev/work/v1"],
+  "ontology": {
+    "shortname": "counting",
+    "classes": [{ "shortname": "counter", "properties": [{ "shortname": "counted", "datatype": "https://atomicdata.dev/datatypes/atomicURL" }] }]
+  }
+}
+```
+
+- `vocabularies` are shared ontologies at fixed subjects. They are referenced where they live and never copied into the drive. Installing fails when one does not exist on the server.
+- `ontology` is the plan `ensureOntology` takes (`@tomic/lib`, the MCP tool). Installing makes it real in the drive with the same code: an Ontology with content-addressed Properties and its Classes, found again by its shortname, so a second app declaring it (or a reinstall) reuses the resources. The installer needs write on the drive.
+- An export field may add `"property"`: a shortname from the inline ontology, or a Property of a declared vocabulary (`https://atomicdata.dev/work/v1/start`). The manifest is refused when it points anywhere else. Besides its JSON `type`, the host then checks the argument (and the result) with the Property's datatype, the same parse every other value goes through, and its `allowsOnly`. A violation is `invalid-argument`. Dates, URLs and slugs are therefore checked, not only "is a string".
+
 ## Calling another app
 
 ```rust
@@ -311,6 +329,7 @@ Every applied commit appends one row to its drive's event log, in the same batch
 - `events` carries one event per applied commit, and a destroy is one. Cron, field timers and inbound webhooks do not feed it yet, and the host does not call `on-event` itself: an app pulls.
 - Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
+- Declared schemas: the binding from a manifest name to the installed Property is not stored as a resource (it is recomputed), only the inline ontology of one app is supported, a class cannot be a scope or a field type, and views do not match subclasses of a declared class.
 - A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared, so an approval UI must not rely on it alone. Every hop is still bounded by the signed-in agent's rights and the callee's own grant.
 - Publishing a `sandboxed-app` package through `/plugin-release-package` is not wired: the example tests publish a release record and package directly. Activating an Installation of such a release only mints its identity.
 - `net.fetch` reads response bodies as text.

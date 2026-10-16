@@ -37,6 +37,10 @@ pub struct InputSchema {
 pub struct Field {
     pub r#type: String,
     pub description: String,
+    /// A Property of the manifest's `schema` whose datatype the value must
+    /// also satisfy. Only exports use it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub property: Option<String>,
 }
 impl InputSchema {
     pub fn validate(&self, args: &Value) -> Result<(), String> {
@@ -90,9 +94,10 @@ pub fn validate_actions(manifest: &Manifest) -> Result<(), String> {
             || s.additional_properties
             || s.properties.len() > 32
             || s.required.iter().any(|p| !s.properties.contains_key(p))
-            || s.properties
-                .values()
-                .any(|p| !matches!(p.r#type.as_str(), "string" | "integer" | "boolean"))
+            || s.properties.values().any(|p| {
+                p.property.is_some()
+                    || !matches!(p.r#type.as_str(), "string" | "integer" | "boolean")
+            })
         {
             return Err("unsupported action input schema".into());
         }

@@ -1753,3 +1753,135 @@ async fn a_scope_must_name_something_that_exists() {
     assert!(err.contains("cannot be read"), "{err}");
     assert!(attempt(inside).await.is_ok());
 }
+
+const WORK: &str = "https://atomicdata.dev/work/v1";
+
+/// The counter, declaring the schema it uses: a shared vocabulary and a small
+/// ontology of its own, which two of its fields point into.
+fn counter_with_schema(vocabulary: &str) -> String {
+    let mut manifest: Json = serde_json::from_str(COUNTER_MANIFEST).unwrap();
+    manifest["schema"] = json!({
+        "vocabularies": [vocabulary],
+        "ontology": {
+            "shortname": "counting",
+            "classes": [{
+                "shortname": "counter",
+                "properties": [{"shortname": "counted", "datatype": urls::ATOMIC_URL}],
+            }],
+        },
+    });
+    let fields = &mut manifest["exports"][0]["inputSchema"]["properties"];
+    fields["subject"]["property"] = json!(format!("{vocabulary}/project"));
+    fields["property"]["property"] = json!("counted");
+    manifest.to_string()
+}
+
+async fn ontology_of(f: &Fixture, shortname: &str) -> Option<String> {
+    atomic_lib::import_identity::find_existing(
+        &f.appstate.store,
+        &f.drive.as_str().into(),
+        &format!("schema:ontology:{shortname}"),
+    )
+    .await
+    .unwrap()
+}
+
+#[actix_rt::test]
+async fn installing_an_app_makes_its_declared_schema_real_and_a_second_app_reuses_it() {
+    let w = World::new("host_abi_app_schema").await;
+    let db = &*w.db;
+    assert!(ontology_of(&w.f, "counting").await.is_none());
+
+    let manifest = counter_with_schema(WORK);
+    install(&w.f, "counter", &manifest, COUNTER_WASM).await;
+    let ontology = ontology_of(&w.f, "counting")
+        .await
+        .expect("ontology created");
+    let resource = db.get_resource(&ontology.as_str().into()).await.unwrap();
+    assert!(resource
+        .get(urls::IS_A)
+        .unwrap()
+        .to_subjects(None)
+        .unwrap()
+        .contains(&urls::ONTOLOGY.to_string()));
+    // An ordinary class and a content-addressed property, not a private format.
+    let classes = resource
+        .get(urls::CLASSES)
+        .unwrap()
+        .to_subjects(None)
+        .unwrap();
+    let properties = resource
+        .get(urls::PROPERTIES)
+        .unwrap()
+        .to_subjects(None)
+        .unwrap();
+    assert_eq!((classes.len(), properties.len()), (1, 1));
+    assert!(properties[0].starts_with("atomic:prop:"), "{properties:?}");
+
+    // A second app that declares the same schema finds the same resources.
+    let mut second: Json = serde_json::from_str(&manifest).unwrap();
+    second["name"] = json!("counter-b");
+    install(&w.f, "counter-b", &second.to_string(), COUNTER_WASM).await;
+    assert_eq!(ontology_of(&w.f, "counting").await, Some(ontology.clone()));
+    let again = db.get_resource(&ontology.as_str().into()).await.unwrap();
+    assert_eq!(
+        again
+            .get(urls::PROPERTIES)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap(),
+        properties
+    );
+    assert_eq!(
+        again.get(urls::CLASSES).unwrap().to_subjects(None).unwrap(),
+        classes
+    );
+    // The shared vocabulary is referenced where it lives, never copied here.
+    assert!(db.get_resource(&WORK.into()).await.is_ok());
+    assert!(ontology_of(&w.f, "work").await.is_none());
+}
+
+#[actix_rt::test]
+async fn a_vocabulary_that_does_not_exist_refuses_the_install() {
+    let w = World::new("host_abi_app_schema_missing").await;
+    let manifest = counter_with_schema("https://atomicdata.dev/nothing/v1");
+    let err = try_install_scoped(&w.f, "counter", &manifest, COUNTER_WASM, Vec::new())
+        .await
+        .err()
+        .unwrap();
+    assert!(err.contains("is not an ontology"), "{err}");
+}
+
+#[actix_rt::test]
+async fn arguments_are_checked_against_the_datatype_of_the_property_they_reference() {
+    let w = World::new("host_abi_app_schema_values").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", &counter_with_schema(WORK), COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    // Both are strings, so the JSON shape passes; neither is an AtomicUrl.
+    for bad in [
+        json!({"subject": "not a url", "property": property}),
+        json!({"subject": subject, "property": "not a url"}),
+    ] {
+        let err = w
+            .call(COUNTER, "increment", bad.clone(), owner(db))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, code::INVALID_ARGUMENT, "{bad}: {err:?}");
+        assert!(err.message.contains("is not valid for"), "{err:?}");
+    }
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    let ok = w
+        .call(
+            COUNTER,
+            "increment",
+            json!({"subject": subject, "property": property}),
+            owner(db),
+        )
+        .await
+        .unwrap();
+    assert_eq!(ok, json!({"count": 1}));
+}

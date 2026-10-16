@@ -29,6 +29,7 @@ use super::{
     HostError,
 };
 use crate::plugins::{
+    app_schema::check_values,
     host_core::{self, HostCore, Runtime},
     manifest::{ExportEffect, Manifest},
 };
@@ -318,6 +319,14 @@ pub fn call_export<'a>(
             .input_schema
             .validate(&parsed)
             .map_err(|e| error(code::INVALID_ARGUMENT, e))?;
+        check_values(
+            db,
+            app.manifest.schema.as_ref(),
+            &export.input_schema,
+            &parsed,
+        )
+        .await
+        .map_err(|e| error(code::INVALID_ARGUMENT, e))?;
 
         let host = build_host(
             registry,
@@ -339,6 +348,19 @@ pub fn call_export<'a>(
             )
         })?;
         export.output_schema.validate(&parsed).map_err(|e| {
+            error(
+                code::INTERNAL,
+                format!("{interface} {function} returned a result its outputSchema forbids: {e}"),
+            )
+        })?;
+        check_values(
+            db,
+            app.manifest.schema.as_ref(),
+            &export.output_schema,
+            &parsed,
+        )
+        .await
+        .map_err(|e| {
             error(
                 code::INTERNAL,
                 format!("{interface} {function} returned a result its outputSchema forbids: {e}"),

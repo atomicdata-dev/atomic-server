@@ -293,6 +293,20 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Releases declare the classes they read, write and extend; the host binds
       at install. The scheduler stops looking up vocabulary by shortname
       (`drive_terms`).
+      *Started (smallest slice):* a manifest `schema` has `vocabularies`
+      (fixed shared ontologies, referenced, never copied) and one inline
+      `ontology` (the `ensureOntology` plan). `plugin.rs`'s `activate` makes the
+      inline one real through `ensure_ontology` (`plugins/app_schema.rs`), so a
+      second app or a reinstall reuses it, and refuses a missing vocabulary. An
+      export field's `property` points into either; `check_values` validates
+      call arguments and results with `Value::new` for that Property's datatype
+      and its `allowsOnly`, after the JSON shape check. Not a second schema
+      engine.
+      *Not done:* the binding is not stored as a resource; class scopes (step
+      2) and `uses`/`extends` by class; nested or array fields; a class as a
+      field type; the scheduler still uses `drive_terms`; moving
+      `ontology-kit` classes into the vocabularies; `@tomic/lib` has no
+      matching type for the manifest `schema` field.
 - [ ] Views match subclasses of the class they declare, so drive classes that
       extend a shared class get its views (to settle with atomic-plugins, whose
       views match the exact class).

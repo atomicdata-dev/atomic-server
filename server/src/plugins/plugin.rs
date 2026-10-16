@@ -308,6 +308,14 @@ mod installation_hook {
         release::check_grants(&release.manifest, &json_value(resource, urls::GRANTS)?)?;
 
         let roots = scope_roots(resource, drive, store, signer).await?;
+        // The classes and properties the app declares exist before it runs.
+        if let Some(schema) = Manifest::parse(release.manifest.clone())
+            .ok()
+            .flatten()
+            .and_then(|m| m.schema)
+        {
+            schema.ensure(store, drive, &for_agent).await?;
+        }
 
         let (namespace, name) = identifiers(resource, &release.manifest)?;
         let key = PluginMetaKey::new(drive, &namespace, &name);
