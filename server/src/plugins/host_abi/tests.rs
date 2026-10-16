@@ -21,7 +21,7 @@ use wasmtime::StoreLimitsBuilder;
 use super::{
     bindings::atomic::host::{
         calls::Host as _,
-        events::{Host as _, Kind},
+        events::{Event, Filter, Host as _, Kind},
         net::{Host as _, Request},
         store::{Host as _, Intent, Outcome, QuerySpec},
         types::{PropVal, Value as WitValue},
@@ -871,38 +871,144 @@ async fn query_filters_pages_with_a_cursor_and_says_when_it_is_complete() {
         .is_empty());
 }
 
+/// Reads everything pending and acknowledges it, so a test starts from "now".
+async fn drain_events(state: &mut AbiState) {
+    let events = state.next(None, 100).await.unwrap();
+    if let Some(last) = events.last() {
+        state.ack(last.cursor.clone()).await.unwrap();
+    }
+}
+
+fn commit_subjects(events: &[Event]) -> Vec<String> {
+    events
+        .iter()
+        .filter_map(|e| match &e.kind {
+            Kind::Commit(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+async fn bump_count(db: &Db, subject: &str, property: &str, name: Option<&str>, to: i64) {
+    let mut resource = db.get_resource(&subject.into()).await.unwrap();
+    resource
+        .set_unsafe(property.into(), Value::Integer(to))
+        .unwrap();
+    if let Some(name) = name {
+        resource
+            .set_unsafe(urls::NAME.into(), Value::String(name.into()))
+            .unwrap();
+    }
+    resource.save(db).await.unwrap();
+}
+
 #[actix_rt::test]
 async fn events_are_pulled_with_a_cursor_and_acknowledged() {
     let w = World::new("host_abi_events").await;
     let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
     let mut state = w.state(&counter, owner(&w.db)).await;
-    let (drive, installation) = (w.f.drive.as_str(), counter.installation.as_str());
-
+    drain_events(&mut state).await;
     assert!(state.next(None, 10).await.unwrap().is_empty());
-    for subject in ["a", "b", "c"] {
-        w.registry
-            .push_event(drive, installation, Kind::Commit(subject.into()), None);
-    }
 
-    let first = state.next(None, 2).await.unwrap();
-    assert_eq!(first.len(), 2);
+    let (subject, property) = counter_resource(&w.f).await;
+    bump_count(&w.db, &subject, &property, None, 1).await;
+
+    let all = state.next(None, 100).await.unwrap();
+    assert!(commit_subjects(&all).contains(&subject), "{all:?}");
+    let first = state.next(None, 1).await.unwrap();
+    assert_eq!(first.len(), 1);
     // Reading does not consume: the same events come again until acknowledged.
-    assert_eq!(state.next(None, 2).await.unwrap(), first);
+    assert_eq!(state.next(None, 1).await.unwrap(), first);
 
-    state.ack(first[1].cursor.clone()).await.unwrap();
-    let rest = state.next(None, 10).await.unwrap();
-    assert_eq!(rest.len(), 1);
-    assert_eq!(rest[0].kind, Kind::Commit("c".into()));
+    state.ack(first[0].cursor.clone()).await.unwrap();
+    let rest = state.next(None, 100).await.unwrap();
+    assert_eq!(rest.len(), all.len() - 1);
     // After an explicit cursor, from there.
-    assert!(state
-        .next(Some(rest[0].cursor.clone()), 10)
-        .await
-        .unwrap()
-        .is_empty());
+    let last = rest.last().unwrap().cursor.clone();
+    assert!(state.next(Some(last), 10).await.unwrap().is_empty());
     assert_eq!(
         state.ack("garbage".into()).await.unwrap_err().code,
         code::INVALID_ARGUMENT
     );
+}
+
+#[actix_rt::test]
+async fn a_subscription_filters_by_class_subtree_and_property() {
+    let w = World::new("host_abi_event_filters").await;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let mut state = w.state(&counter, owner(&w.db)).await;
+    drain_events(&mut state).await;
+    let filter = |class: Option<&str>, subtree: Option<&str>, property: Option<&str>| Filter {
+        class: class.map(Into::into),
+        subtree: subtree.map(Into::into),
+        property: property.map(Into::into),
+    };
+
+    let (subject, property) = counter_resource(&w.f).await;
+    drain_events(&mut state).await;
+
+    // Property: only commits that changed it.
+    state
+        .set_filters(vec![filter(None, None, Some(&property))])
+        .await
+        .unwrap();
+    bump_count(&w.db, &subject, &property, Some("renamed"), 1).await;
+    let mut got = commit_subjects(&state.next(None, 100).await.unwrap());
+    got.dedup();
+    assert_eq!(got, vec![subject.clone()]);
+    drain_events(&mut state).await;
+    let mut resource = w.db.get_resource(&subject.as_str().into()).await.unwrap();
+    resource
+        .set_unsafe(urls::NAME.into(), Value::String("again".into()))
+        .unwrap();
+    resource.save(&*w.db).await.unwrap();
+    assert!(state.next(None, 100).await.unwrap().is_empty());
+
+    // Class: nothing here has it.
+    state
+        .set_filters(vec![filter(Some(urls::FOLDER), None, None)])
+        .await
+        .unwrap();
+    assert!(state.next(Some("0".into()), 100).await.unwrap().is_empty());
+
+    // Subtree: this resource and below, or a branch it is not in.
+    state
+        .set_filters(vec![filter(None, Some(&subject), None)])
+        .await
+        .unwrap();
+    let got = commit_subjects(&state.next(Some("0".into()), 100).await.unwrap());
+    assert!(
+        !got.is_empty() && got.iter().all(|s| *s == subject),
+        "{got:?}"
+    );
+    state
+        .set_filters(vec![filter(None, Some(&property), None)])
+        .await
+        .unwrap();
+    assert!(state.next(Some("0".into()), 100).await.unwrap().is_empty());
+}
+
+#[actix_rt::test]
+async fn an_app_never_sees_events_for_what_it_cannot_read() {
+    let w = World::new("host_abi_event_rights").await;
+    let (docs, inside, outside, property) = inside_and_outside(&w).await;
+    let app = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[&docs]))],
+    )
+    .await;
+    let mut state = w.state(&app, owner(&w.db)).await;
+    drain_events(&mut state).await;
+
+    bump_count(&w.db, &outside, &property, None, 1).await;
+    bump_count(&w.db, &inside, &property, None, 1).await;
+
+    let got = commit_subjects(&state.next(None, 100).await.unwrap());
+    assert!(got.contains(&inside), "{got:?}");
+    assert!(!got.contains(&outside), "{got:?}");
 }
 
 #[actix_rt::test]

@@ -171,7 +171,23 @@ interface events {
     at-ms: u64,
   }
 
-  /// Up to `max` events after `cursor` (none: from the app's checkpoint).
+  /// Which events the app wants. A field that is set must match; an event
+  /// matches the subscription when any filter matches.
+  record filter {
+    /// The resource has this class.
+    class: option<subject>,
+    /// The resource is this one or below it.
+    subtree: option<subject>,
+    /// The commit changed this property.
+    property: option<subject>,
+  }
+
+  /// Replace the app's subscription, durably. Never subscribed: every event of
+  /// the drive the app may read.
+  set-filters: func(filters: list<filter>) -> result<_, error>;
+
+  /// Up to `max` events after `cursor` (none: from the app's checkpoint),
+  /// oldest first, only for resources the app may read.
   next: func(cursor: option<string>, max: u32) -> result<list<event>, error>;
   /// Everything up to `cursor` is handled; the host advances the checkpoint.
   ack: func(cursor: string) -> result<_, error>;

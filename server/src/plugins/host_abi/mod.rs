@@ -25,9 +25,8 @@
 //! component lifecycle, one fresh instance per invocation.
 //!
 //! Gaps in this slice, deliberately: handles passed to `calls.call` are
-//! accepted and ignored (the callee gets exactly its own grant); `events` is a
-//! per-process queue that nothing feeds yet but [`HostAbiRegistry::push_event`];
-//! `search`, `undo` and the `ne` filter are `unsupported`; proposals are kept in
+//! accepted and ignored (the callee gets exactly its own grant); the host does
+//! not call `on-event` itself (apps pull `events`); `search`, `undo` and the `ne` filter are `unsupported`; proposals are kept in
 //! memory; `apply` is checked for rights before it writes but is not a single
 //! store transaction.
 

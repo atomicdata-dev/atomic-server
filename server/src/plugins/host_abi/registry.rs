@@ -19,7 +19,7 @@ use std::{
 use atomic_lib::{agents::ForAgent, storelike::Query, urls, Db, Storelike, Value};
 use wasmtime::{component::Component, Engine};
 
-use super::bindings::atomic::host::{events::Event, events::Kind, store::QuerySpec};
+use super::bindings::atomic::host::store::QuerySpec;
 use crate::plugins::{
     host_core,
     manifest::{Export, Manifest, Runtime, World},
@@ -29,9 +29,6 @@ use crate::plugins::{
 /// How many apps may call each other in one chain before the host refuses.
 pub const MAX_CALL_DEPTH: usize = 8;
 
-/// Events kept per installation. The oldest are dropped past this; a stream
-/// that nobody reads must not grow without bound.
-const EVENT_QUEUE_CAP: usize = 1000;
 /// Subscriptions one installation may hold.
 pub(super) const SUBSCRIPTION_CAP: usize = 64;
 /// Proposals kept in memory per installation.
@@ -80,17 +77,8 @@ pub struct Proposal {
 }
 
 #[derive(Default)]
-struct EventQueue {
-    next: u64,
-    /// The last cursor the app acknowledged.
-    checkpoint: u64,
-    pending: VecDeque<(u64, Event)>,
-}
-
-#[derive(Default)]
 pub struct HostAbiRegistry {
     apps: RwLock<BTreeMap<AppKey, Arc<LoadedApp>>>,
-    events: Mutex<HashMap<AppKey, EventQueue>>,
     subscriptions: Mutex<HashMap<AppKey, BTreeMap<String, QuerySpec>>>,
     proposals: Mutex<HashMap<AppKey, VecDeque<Proposal>>>,
     /// Releases that failed to load, per installation: (release id, when, why).
@@ -142,9 +130,6 @@ impl HostAbiRegistry {
         let key = (drive.to_string(), installation.to_string());
         if let Ok(mut apps) = self.apps.write() {
             apps.remove(&key);
-        }
-        if let Ok(mut events) = self.events.lock() {
-            events.remove(&key);
         }
         if let Ok(mut subs) = self.subscriptions.lock() {
             subs.remove(&key);
@@ -274,68 +259,6 @@ impl HostAbiRegistry {
     /// failure cache).
     pub fn load_attempts(&self) -> usize {
         self.load_attempts.load(Ordering::SeqCst)
-    }
-
-    // -- events -------------------------------------------------------------
-
-    /// Queues an event for an installation. The only producer in this slice;
-    /// the trigger edges (`triggers.rs`) are not wired to it yet.
-    pub fn push_event(&self, drive: &str, installation: &str, kind: Kind, subject: Option<String>) {
-        let Ok(mut queues) = self.events.lock() else {
-            return;
-        };
-        let queue = queues
-            .entry((drive.to_string(), installation.to_string()))
-            .or_default();
-        queue.next += 1;
-        let cursor = queue.next;
-        queue.pending.push_back((
-            cursor,
-            Event {
-                cursor: cursor.to_string(),
-                kind,
-                subject,
-                at_ms: atomic_lib::utils::now().max(0) as u64,
-            },
-        ));
-        while queue.pending.len() > EVENT_QUEUE_CAP {
-            queue.pending.pop_front();
-        }
-    }
-
-    pub(super) fn next_events(
-        &self,
-        drive: &str,
-        installation: &str,
-        after: Option<u64>,
-        max: usize,
-    ) -> Vec<Event> {
-        let Ok(queues) = self.events.lock() else {
-            return Vec::new();
-        };
-        let Some(queue) = queues.get(&(drive.to_string(), installation.to_string())) else {
-            return Vec::new();
-        };
-        let after = after.unwrap_or(queue.checkpoint);
-        queue
-            .pending
-            .iter()
-            .filter(|(cursor, _)| *cursor > after)
-            .take(max)
-            .map(|(_, event)| event.clone())
-            .collect()
-    }
-
-    pub(super) fn ack_events(&self, drive: &str, installation: &str, up_to: u64) {
-        let Ok(mut queues) = self.events.lock() else {
-            return;
-        };
-        let queue = queues
-            .entry((drive.to_string(), installation.to_string()))
-            .or_default();
-        queue.checkpoint = queue.checkpoint.max(up_to);
-        let checkpoint = queue.checkpoint;
-        queue.pending.retain(|(cursor, _)| *cursor > checkpoint);
     }
 
     // -- subscriptions ------------------------------------------------------

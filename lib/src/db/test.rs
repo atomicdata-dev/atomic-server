@@ -5272,3 +5272,68 @@ async fn index_keys_migration_rebuilds_old_rows_in_slices() {
         .is_some());
     assert!(propvalsub_key(&atom).len() < old_key.len());
 }
+
+/// The drive's event log is written with the commit, in order, and a consumer's
+/// checkpoint survives re-opening the database: nothing is lost, nothing twice.
+#[tokio::test]
+#[timeout(120000)]
+async fn drive_events_survive_a_restart_exactly_once() {
+    use crate::db::drive_events::EventFilter;
+
+    let dir = ".temp/db/drive_events_restart";
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(format!("{dir}/uploads")).unwrap();
+    let uploads = format!("{dir}/uploads");
+    let open = || {
+        Db::init_redb_file(
+            std::path::Path::new(dir),
+            Some("https://localhost".into()),
+            std::path::Path::new(&uploads),
+        )
+    };
+    let store = open().await.unwrap();
+    let agent = store.create_agent(None).await.unwrap();
+    store.set_default_agent(agent);
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let before = store.drive_events(drive.as_str(), 0, 100).len();
+
+    let a = genesis_child(&store, &drive).await;
+    let b = genesis_child(&store, &drive).await;
+    let events = store.drive_events(drive.as_str(), 0, 100);
+    assert_eq!(events.len(), before + 2, "{events:?}");
+    let (ea, eb) = (&events[before], &events[before + 1]);
+    assert_eq!(
+        (ea.subject.as_str(), eb.subject.as_str()),
+        (a.as_str(), b.as_str())
+    );
+    assert!(ea.seq < eb.seq);
+    assert_eq!(
+        ea.ancestors.first().map(String::as_str),
+        Some(drive.as_str())
+    );
+
+    let only_b = EventFilter {
+        subtree: Some(b.to_string()),
+        ..Default::default()
+    };
+    assert!(!only_b.matches(ea) && only_b.matches(eb));
+
+    store.ack_events(drive.as_str(), "app", ea.seq).unwrap();
+    // The checkpoint never moves back.
+    store.ack_events(drive.as_str(), "app", 0).unwrap();
+    let agent = store.get_default_agent().unwrap();
+    drop(store);
+
+    let store = open().await.unwrap();
+    store.set_default_agent(agent);
+    let c = genesis_child(&store, &drive).await;
+    let checkpoint = store.event_checkpoint(drive.as_str(), "app");
+    assert_eq!(checkpoint, ea.seq);
+    let missed: Vec<_> = store
+        .drive_events(drive.as_str(), checkpoint, 100)
+        .into_iter()
+        .map(|e| e.subject)
+        .collect();
+    assert_eq!(missed, vec![b.to_string(), c.to_string()]);
+}

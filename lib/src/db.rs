@@ -14,6 +14,7 @@ mod chat_migration_test;
 #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
 pub mod compaction;
 mod compressed_kv;
+pub mod drive_events;
 mod encoding;
 pub mod encrypted_backend;
 mod index_keys;
@@ -467,6 +468,9 @@ pub struct Db {
     /// store, not global — see [`crate::subject_lock`].
     pub(crate) subject_locks: crate::subject_lock::SubjectLocks,
     plugin_locks: crate::subject_lock::SubjectLocks,
+    /// Last sequence number given per drive, held while a commit's batch
+    /// lands so the stream stays in order. See [`drive_events`].
+    drive_event_seq: Arc<std::sync::Mutex<HashMap<String, u64>>>,
     /// Where the DB is stored on disk.
     #[allow(dead_code)]
     path: std::path::PathBuf,
@@ -582,6 +586,7 @@ impl Db {
             filter_drive_roots: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
             plugin_locks: Default::default(),
+            drive_event_seq: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -3671,13 +3676,14 @@ impl Db {
     /// membership from the raw atom stream.
     #[instrument(level = "trace", skip_all)]
     pub(crate) fn apply_transaction(&self, transaction: &mut Transaction) -> AtomicResult<()> {
-        self.apply_transaction_with_source(transaction, None)
+        self.apply_transaction_with_source(transaction, None, None)
     }
 
     fn apply_transaction_with_source(
         &self,
         transaction: &mut Transaction,
         source_id: Option<&str>,
+        event: Option<drive_events::PendingEvent>,
     ) -> AtomicResult<()> {
         // Persist delivery before publishing the wake-up. A crashed or lagging
         // subscriber can replay the queue; it is never the owner of the event.
@@ -3728,7 +3734,17 @@ impl Db {
                 });
             }
         }
+        // The drive's event joins the same batch. The sequence lock is held
+        // until the batch has landed, so rows appear in sequence order.
+        let mut sequence = self
+            .drive_event_seq
+            .lock()
+            .map_err(|_| "drive event lock poisoned")?;
+        if let Some(event) = event {
+            self.queue_drive_event(event, &mut sequence, transaction)?;
+        }
         self.kv.apply_batch(transaction)?;
+        drop(sequence);
 
         for op in transaction.iter() {
             if op.tree != Tree::QueryMembers {
@@ -4864,9 +4880,27 @@ impl Storelike for Db {
             }
         }
 
+        let drive_event = match commit_response
+            .resource_new
+            .as_ref()
+            .or(commit_response.resource_old.as_ref())
+        {
+            Some(resource) => {
+                drive_events::PendingEvent::new(
+                    store,
+                    resource,
+                    commit_response.commit.destroy.unwrap_or(false),
+                    commit_response.changed_props.iter().cloned().collect(),
+                    &commit_response.commit.signer.to_string(),
+                )
+                .await
+            }
+            None => None,
+        };
         store.apply_transaction_with_source(
             &mut transaction,
             commit_response.source_id.as_deref(),
+            drive_event,
         )?;
 
         // An import receipt may be the only evidence available when retrying
