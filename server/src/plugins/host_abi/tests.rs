@@ -1111,6 +1111,57 @@ async fn next_gets_past_a_long_run_of_events_the_app_filters_out() {
 }
 
 #[actix_rt::test]
+async fn an_explicit_cursor_advances_over_rows_the_app_filters_out() {
+    let w = World::new("host_abi_event_stall_cursor").await;
+    let counter = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[w.f.drive.as_str()]))],
+    )
+    .await;
+    let mut state = w.state(&counter, owner(&w.db)).await;
+    drain_events(&mut state).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    drain_events(&mut state).await;
+    state
+        .set_filters(vec![Filter {
+            class: None,
+            subtree: None,
+            property: Some(property.clone()),
+        }])
+        .await
+        .unwrap();
+    // Further than the most rows one call looks at (8 x 20 in tests).
+    for i in 0..200 {
+        let mut resource = w.db.get_resource(&subject.as_str().into()).await.unwrap();
+        resource
+            .set_unsafe(urls::NAME.into(), Value::String(format!("name {i}")))
+            .unwrap();
+        resource.save(&*w.db).await.unwrap();
+    }
+    bump_count(&w.db, &subject, &property, None, 1).await;
+
+    // An app that keeps its own cursor: it must get somewhere each call.
+    let mut cursor = Some("0".to_string());
+    let mut found = Vec::new();
+    for _ in 0..10 {
+        let got = state.next(cursor.clone(), 10).await.unwrap();
+        let Some(last) = got.last() else { break };
+        cursor = Some(last.cursor.clone());
+        found.extend(
+            got.into_iter()
+                .filter(|e| !matches!(e.kind, Kind::Timer(_))),
+        );
+        if !found.is_empty() {
+            break;
+        }
+    }
+    assert_eq!(commit_subjects(&found), vec![subject]);
+}
+
+#[actix_rt::test]
 async fn uninstalling_an_app_forgets_its_event_filters_and_checkpoint() {
     let w = World::new("host_abi_event_forget").await;
     let db = &*w.db;

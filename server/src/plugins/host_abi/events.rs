@@ -22,12 +22,16 @@ const MAX_EVENTS: u32 = 100;
 /// Most log rows one `next` looks at, readable or not, so an app that cannot
 /// read what is in front of it does not scan the log forever.
 #[cfg(not(test))]
-const MAX_SCAN: usize = 5000;
+const MAX_SCAN: usize = 1000;
 #[cfg(test)]
 const MAX_SCAN: usize = 20;
 /// Most batches of [`MAX_SCAN`] rows one `next` goes through while it has
 /// found nothing to return.
-const MAX_SCAN_BATCHES: usize = 8;
+const MAX_SCAN_BATCHES: usize = 4;
+/// The name of the marker event `next` returns for an explicit cursor when it
+/// scanned rows and found nothing for the app: its cursor is where the scan
+/// got to, so the app's next call starts there. It carries no subject.
+pub const SCAN_PROGRESS: &str = "scan-progress";
 const FILTER_CAP: usize = 32;
 
 fn parse_cursor(cursor: &str) -> Result<u64, HostError> {
@@ -146,6 +150,17 @@ impl events::Host for AbiState {
             if scanned < MAX_SCAN {
                 break;
             }
+        }
+        if out.is_empty() && !after_checkpoint && from > after {
+            // An app that passes its own cursor has no checkpoint to move, so
+            // without this it would be handed `[]` and the same cursor again,
+            // for ever, in front of a long run it cannot see.
+            out.push(Event {
+                cursor: from.to_string(),
+                kind: Kind::Timer(SCAN_PROGRESS.to_string()),
+                subject: None,
+                at_ms: 0,
+            });
         }
         Ok(out)
     }
