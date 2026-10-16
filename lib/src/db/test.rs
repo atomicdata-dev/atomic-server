@@ -5350,3 +5350,68 @@ async fn drive_events_survive_a_restart_exactly_once() {
         .collect();
     assert_eq!(missed, vec![b.to_string(), c.to_string()]);
 }
+
+/// A trigger's edges come from the drive's event log: closing the database
+/// between arrivals loses none, and one handled before a restart is not
+/// delivered again.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_trigger_misses_no_edge_across_a_reopen() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let dir = ".temp/db/trigger_edges_reopen";
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(format!("{dir}/uploads")).unwrap();
+    let uploads = format!("{dir}/uploads");
+    let open = || {
+        Db::init_redb_file(
+            std::path::Path::new(dir),
+            Some("https://localhost".into()),
+            std::path::Path::new(&uploads),
+        )
+    };
+    let store = open().await.unwrap();
+    let agent = store.create_agent(None).await.unwrap();
+    store.set_default_agent(agent.clone());
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let before = genesis_child(&store, &drive).await;
+
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(drive.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        false,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+    let a = genesis_child(&store, &drive).await;
+    let b = genesis_child(&store, &drive).await;
+    drop(store);
+
+    let store = open().await.unwrap();
+    store.set_default_agent(agent.clone());
+    let first = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!((first.subject.as_str(), first.edge), (a.as_str(), Edge::Enter));
+    assert_ne!(first.subject, before.as_str(), "older than the trigger");
+    assert_eq!(store.pending_trigger_events(&key, &trigger).unwrap(), 2);
+    store.acknowledge_plugin_event(&first).unwrap();
+    let c = genesis_child(&store, &drive).await;
+    drop(store);
+
+    let store = open().await.unwrap();
+    let mut seen = Vec::new();
+    while let Some(event) = store.next_trigger_event(&key, &trigger).unwrap() {
+        seen.push(event.subject.clone());
+        store.acknowledge_plugin_event(&event).unwrap();
+    }
+    assert_eq!(seen, vec![b.to_string(), c.to_string()]);
+}

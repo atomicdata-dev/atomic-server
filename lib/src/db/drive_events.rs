@@ -37,6 +37,11 @@ pub struct DriveEvent {
     /// The properties the commit changed.
     pub props: BTreeSet<String>,
     pub at_ms: i64,
+    /// The watched queries this commit moved the resource into (`true`) or out
+    /// of, by hex query id. Only queries a plugin trigger watches are listed.
+    /// Triggers read their enter and leave edges from here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edges: Vec<(String, bool)>,
 }
 
 /// Which events a consumer wants. Every field that is set must match.
@@ -123,8 +128,14 @@ impl PendingEvent {
                 parent,
                 props,
                 at_ms: crate::utils::now(),
+                edges: Vec::new(),
             },
         })
+    }
+
+    pub(crate) fn with_edges(mut self, edges: Vec<(String, bool)>) -> Self {
+        self.event.edges = edges;
+        self
     }
 }
 
@@ -240,6 +251,14 @@ impl Db {
         self.kv
             .scan_prefix(Tree::PluginMeta, prefix.as_bytes())
             .flatten()
+            // The key ends in the sequence number: skip rows already handled
+            // without decoding them.
+            .filter(|(k, _)| {
+                std::str::from_utf8(k)
+                    .ok()
+                    .and_then(|k| k.rsplit('/').next()?.parse::<u64>().ok())
+                    .is_none_or(|seq| seq > after)
+            })
             .filter_map(|(_, v)| serde_json::from_slice::<DriveEvent>(&v).ok())
             .filter(|e| e.seq > after)
             .take(max)

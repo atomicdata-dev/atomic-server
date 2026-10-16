@@ -171,20 +171,12 @@ fn read(
     appstate: &AppState,
     key: &PluginTriggerKey,
 ) -> AtomicServerResult<Option<serde_json::Value>> {
-    let mut info = appstate
-        .store
-        .get_plugin_trigger(key)?
-        .as_ref()
-        .map(PluginTriggerInfo::from);
-    if let Some(info) = &mut info {
-        info.queued_events = appstate
-            .store
-            .queued_plugin_events()?
-            .iter()
-            .filter(|event| &event.key == key)
-            .count();
-    }
-    Ok(info.as_ref().map(trigger_response))
+    let Some(trigger) = appstate.store.get_plugin_trigger(key)? else {
+        return Ok(None);
+    };
+    let mut info = PluginTriggerInfo::from(&trigger);
+    info.queued_events = appstate.store.pending_trigger_events(key, &trigger)?;
+    Ok(Some(trigger_response(&info)))
 }
 
 /// HTTP filters use the same string values accepted by FilterBody, not the

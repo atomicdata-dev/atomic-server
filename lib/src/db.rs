@@ -3277,8 +3277,12 @@ impl Db {
         // would sit there looking armed and never fire.
         trigger.query.watch(self)?;
 
+        let is_new = self.kv.get(Tree::PluginTrigger, &key.encode()?)?.is_none();
         self.kv
             .insert(Tree::PluginTrigger, &key.encode()?, &trigger.encode()?)?;
+        if is_new {
+            self.start_trigger_cursor(key)?;
+        }
         Ok(())
     }
 
@@ -3298,31 +3302,16 @@ impl Db {
         // — may be watching the same filter, and unwatching one that is still
         // in use would silently stop delivering to it.
         self.kv.remove(Tree::PluginTrigger, &key.encode()?)?;
+        self.forget_trigger_cursor(key)?;
         Ok(())
     }
 
-    /// Every trigger whose query is the one that just changed.
-    ///
-    /// A whole-tree scan, for the same reason `due_plugin_schedules` is one:
-    /// there is one entry per triggered plugin, which is a very small set. An
-    /// index keyed by query id would be another thing to keep in step for no
-    /// gain at this size.
-    pub fn plugin_triggers_for_query(
-        &self,
-        query_id: &[u8],
-    ) -> AtomicResult<Vec<(PluginTriggerKey, PluginTrigger)>> {
-        let mut found = Vec::new();
-
-        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
-            let (key, value) = entry?;
-            let trigger = PluginTrigger::from_bytes(&value)?;
-
-            if crate::db::query_index::query_id(&trigger.query)?.as_slice() == query_id {
-                found.push((PluginTriggerKey::from_bytes(&key)?, trigger));
-            }
-        }
-
-        Ok(found)
+    /// The ids of the queries plugin triggers watch.
+    fn trigger_query_ids(&self) -> AtomicResult<std::collections::HashSet<Vec<u8>>> {
+        self.plugin_triggers()?
+            .iter()
+            .map(|(_, t)| Ok(crate::db::query_index::query_id(&t.query)?.to_vec()))
+            .collect()
     }
 
     /// Re-registers every stored trigger's query as watched.
@@ -3337,6 +3326,9 @@ impl Db {
             let (_, value) = entry?;
             PluginTrigger::from_bytes(&value)?.query.watch(self)?;
             watched += 1;
+        }
+        for (key, _) in self.plugin_triggers()? {
+            self.enable_drive_events(&key.drive)?;
         }
 
         Ok(watched)
@@ -3688,55 +3680,37 @@ impl Db {
         source_id: Option<&str>,
         event: Option<drive_events::PendingEvent>,
     ) -> AtomicResult<()> {
-        // Persist delivery before publishing the wake-up. A crashed or lagging
-        // subscriber can replay the queue; it is never the owner of the event.
-        // A sorted member moving positions has a delete and insert in this
+        // A commit's query edges ride in its drive event, in the same batch, so
+        // a trigger that was down or lagging replays them from its cursor. A
+        // sorted member moving positions has a delete and insert in this
         // batch, which is not a membership edge.
-        let mut edges = std::collections::BTreeMap::new();
-        for op in transaction
-            .iter()
-            .filter(|op| op.tree == Tree::QueryMembers)
-        {
-            if let Some((query, subject)) = query_index::parse_members_key_id_subject(&op.key) {
-                let delta = edges.entry((query, subject)).or_insert(0i32);
-                *delta += if matches!(op.method, Method::Insert) {
-                    1
-                } else {
-                    -1
-                };
-            }
-        }
-        for ((query, subject), delta) in edges {
-            if delta == 0 {
-                continue;
-            }
-            let edge = plugin_trigger::Edge::of(delta > 0);
-            for (key, trigger) in self.plugin_triggers_for_query(&query)? {
-                if !trigger.wants(edge) {
-                    continue;
+        let event = match event {
+            Some(event) => {
+                let mut edges = std::collections::BTreeMap::new();
+                for op in transaction
+                    .iter()
+                    .filter(|op| op.tree == Tree::QueryMembers)
+                {
+                    if let Some((query, _)) = query_index::parse_members_key_id_subject(&op.key) {
+                        *edges.entry(query).or_insert(0i32) +=
+                            if matches!(op.method, Method::Insert) { 1 } else { -1 };
+                    }
                 }
-                let event = plugin_trigger::QueuedEvent {
-                    id: format!(
-                        "{:020}-{}",
-                        crate::utils::now(),
-                        crate::utils::random_string(24)
-                    ),
-                    key,
-                    subject: subject.clone(),
-                    edge,
-                    at: crate::utils::now(),
-                    verdict: None,
-                    waiting_for_review: false,
-                    authorization: None,
-                };
-                transaction.push(Operation {
-                    tree: Tree::PluginMeta,
-                    method: Method::Insert,
-                    key: format!("plugin-event/v1/{}", event.id).into_bytes(),
-                    val: Some(serde_json::to_vec(&event)?),
-                });
+                let mut watched = None;
+                let mut found = Vec::new();
+                for (query, delta) in edges.into_iter().filter(|(_, d)| *d != 0) {
+                    let ids = match &watched {
+                        Some(ids) => ids,
+                        None => watched.insert(self.trigger_query_ids()?),
+                    };
+                    if ids.contains(&query) {
+                        found.push((hex::encode(query), delta > 0));
+                    }
+                }
+                Some(event.with_edges(found))
             }
-        }
+            None => None,
+        };
         // The drive's event joins the same batch. The sequence lock is held
         // until the batch has landed, so rows appear in sequence order.
         let mut sequence = self

@@ -157,10 +157,14 @@ mod tests {
     }
 }
 
-/// A query edge persisted in the same batch as the resource and membership.
+/// One query edge from the drive's event log, plus the progress a run has
+/// saved for it. The trigger's cursor stays below it until it is acknowledged,
+/// so a restart resumes this event instead of repeating or losing it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueuedEvent {
     pub id: String,
+    /// The event's sequence number in the drive's log.
+    pub seq: u64,
     pub key: PluginTriggerKey,
     pub subject: String,
     pub edge: Edge,
@@ -171,31 +175,148 @@ pub struct QueuedEvent {
     pub authorization: Option<String>,
 }
 
+fn consumer(key: &PluginTriggerKey) -> String {
+    format!("trigger/{}", key.plugin)
+}
+
+fn head_key(key: &PluginTriggerKey) -> Vec<u8> {
+    format!(
+        "trigger-head/v1/{}/{}",
+        super::drive_events::pure(&key.drive),
+        key.plugin
+    )
+    .into_bytes()
+}
+
 impl crate::Db {
-    pub fn queued_plugin_events(&self) -> crate::errors::AtomicResult<Vec<QueuedEvent>> {
+    /// Every stored trigger.
+    pub fn plugin_triggers(
+        &self,
+    ) -> crate::errors::AtomicResult<Vec<(PluginTriggerKey, PluginTrigger)>> {
         self.kv
-            .scan_prefix(super::trees::Tree::PluginMeta, b"plugin-event/v1/")
+            .iter_tree(super::trees::Tree::PluginTrigger)
             .map(|entry| {
-                let (_, value) = entry?;
-                Ok(serde_json::from_slice(&value)?)
+                let (key, value) = entry?;
+                Ok((
+                    PluginTriggerKey::from_bytes(&key)?,
+                    PluginTrigger::from_bytes(&value)?,
+                ))
             })
             .collect()
     }
+
+    /// The trigger's next edge: the one a run already saved progress on, else
+    /// the first one in the drive's log after the trigger's cursor. Events
+    /// that are not this trigger's edges move the cursor past themselves.
+    pub fn next_trigger_event(
+        &self,
+        key: &PluginTriggerKey,
+        trigger: &PluginTrigger,
+    ) -> crate::errors::AtomicResult<Option<QueuedEvent>> {
+        if let Some(saved) = self.kv.get(super::trees::Tree::PluginMeta, &head_key(key))? {
+            return Ok(Some(serde_json::from_slice(&saved)?));
+        }
+        let name = consumer(key);
+        let after = self.event_checkpoint(&key.drive, &name);
+        let mut last = after;
+        for (event, edge) in self.trigger_edges(trigger, &key.drive, after, 1000)? {
+            if let Some(edge) = edge {
+                return Ok(Some(QueuedEvent {
+                    id: format!("{:020}", event.seq),
+                    seq: event.seq,
+                    key: key.clone(),
+                    subject: event.subject,
+                    edge,
+                    at: event.at_ms,
+                    verdict: None,
+                    waiting_for_review: false,
+                    authorization: None,
+                }));
+            }
+            last = event.seq;
+        }
+        if last > after {
+            self.ack_events(&key.drive, &name, last)?;
+        }
+        Ok(None)
+    }
+
+    /// The log after `after`, each event with the edge this trigger wants from
+    /// it (None when it is not one).
+    fn trigger_edges(
+        &self,
+        trigger: &PluginTrigger,
+        drive: &str,
+        after: u64,
+        max: usize,
+    ) -> crate::errors::AtomicResult<Vec<(super::drive_events::DriveEvent, Option<Edge>)>> {
+        let query = hex::encode(crate::db::query_index::query_id(&trigger.query)?);
+        Ok(self
+            .drive_events(drive, after, max)
+            .into_iter()
+            .map(|event| {
+                let edge = event
+                    .edges
+                    .iter()
+                    .find(|(q, _)| *q == query)
+                    .map(|(_, enter)| Edge::of(*enter))
+                    .filter(|edge| trigger.wants(*edge));
+                (event, edge)
+            })
+            .collect())
+    }
+
+    /// How many edges the trigger has not finished.
+    pub fn pending_trigger_events(
+        &self,
+        key: &PluginTriggerKey,
+        trigger: &PluginTrigger,
+    ) -> crate::errors::AtomicResult<usize> {
+        let after = self.event_checkpoint(&key.drive, &consumer(key));
+        Ok(self
+            .trigger_edges(trigger, &key.drive, after, usize::MAX)?
+            .iter()
+            .filter(|(_, edge)| edge.is_some())
+            .count())
+    }
+
+    /// Saves a run's progress on its event.
     pub fn save_plugin_event(&self, event: &QueuedEvent) -> crate::errors::AtomicResult<()> {
         self.kv.insert(
             super::trees::Tree::PluginMeta,
-            format!("plugin-event/v1/{}", event.id).as_bytes(),
+            &head_key(&event.key),
             &serde_json::to_vec(event)?,
         )?;
-        self.flush()?;
-        Ok(())
+        self.flush()
     }
+
+    /// The event is done: forget its progress and move the cursor past it.
     pub fn acknowledge_plugin_event(&self, event: &QueuedEvent) -> crate::errors::AtomicResult<()> {
-        self.kv.remove(
-            super::trees::Tree::PluginMeta,
-            format!("plugin-event/v1/{}", event.id).as_bytes(),
-        )?;
-        self.flush()?;
-        Ok(())
+        self.kv
+            .remove(super::trees::Tree::PluginMeta, &head_key(&event.key))?;
+        self.ack_events(&event.key.drive, &consumer(&event.key), event.seq)?;
+        self.flush()
+    }
+
+    /// Starts a new trigger at the end of the log; an old trigger keeps its cursor.
+    pub(crate) fn start_trigger_cursor(
+        &self,
+        key: &PluginTriggerKey,
+    ) -> crate::errors::AtomicResult<()> {
+        self.enable_drive_events(&key.drive)?;
+        let latest = self
+            .drive_events(&key.drive, 0, usize::MAX)
+            .last()
+            .map_or(0, |e| e.seq);
+        self.ack_events(&key.drive, &consumer(key), latest)
+    }
+
+    pub(crate) fn forget_trigger_cursor(
+        &self,
+        key: &PluginTriggerKey,
+    ) -> crate::errors::AtomicResult<()> {
+        self.kv
+            .remove(super::trees::Tree::PluginMeta, &head_key(key))?;
+        self.forget_event_consumer(&key.drive, &consumer(key))
     }
 }
