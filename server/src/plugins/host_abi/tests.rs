@@ -568,6 +568,33 @@ async fn without_a_write_grant_apply_is_proposed_and_without_the_callers_rights_
 }
 
 #[actix_rt::test]
+async fn what_an_on_get_answer_references_is_read_as_the_reader_too() {
+    let w = World::new("host_abi_referenced").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, _property) = counter_resource(&w.f).await;
+    // The module's agent may read it; the person asking may not.
+    share(db, &subject, &[&counter.agent], &[]).await;
+    let state = w.state(&counter, owner(db)).await;
+    let stranger = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
+
+    let seen = super::module::referenced_for_reader(
+        &state.host,
+        &ForAgent::AgentSubject(stranger.into()),
+        vec![subject.clone()],
+    )
+    .await;
+    assert!(seen.is_empty(), "{seen:?}");
+
+    let seen =
+        super::module::referenced_for_reader(&state.host, &owner(db), vec![subject.clone()]).await;
+    assert_eq!(seen.len(), 1);
+}
+
+#[actix_rt::test]
 async fn the_node_that_forwarded_a_call_bounds_what_the_call_can_read() {
     let w = World::new("host_abi_voucher_reads").await;
     let db = &*w.db;

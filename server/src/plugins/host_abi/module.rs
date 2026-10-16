@@ -396,12 +396,7 @@ impl ServerModule {
             subject: context.db_resource.get_subject().as_str(),
         };
         let (state, _) = self.state(true, Some(&reader)).await?;
-        let mut found = Vec::new();
-        for subject in referenced {
-            if let Ok(r) = state.host.core.get_resource(&subject).await {
-                found.push(r);
-            }
-        }
+        let found = referenced_for_reader(&state.host, context.for_agent, referenced).await;
         Ok(ResourceResponse::ResourceWithReferenced(resource, found))
     }
 
@@ -512,4 +507,27 @@ impl context::Host for AbiState {
             config: self.host.core.get_config().await,
         }
     }
+}
+
+/// The resources an `on-get` answer points at, as `reader` may see them. The
+/// module's own state reads as the Installation's agent, which may see more
+/// than the person asking, so the reader is asked too.
+pub(super) async fn referenced_for_reader(
+    host: &AbiHost,
+    reader: &ForAgent,
+    referenced: Vec<String>,
+) -> Vec<atomic_lib::Resource> {
+    let mut found = Vec::new();
+    for subject in referenced {
+        let Ok(resource) = host.core.get_resource(&subject).await else {
+            continue;
+        };
+        if atomic_lib::hierarchy::check_read(&*host.db, &resource, reader)
+            .await
+            .is_ok()
+        {
+            found.push(resource);
+        }
+    }
+    found
 }
