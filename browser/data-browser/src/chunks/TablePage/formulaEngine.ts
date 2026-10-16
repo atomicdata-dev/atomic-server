@@ -3,6 +3,7 @@ import {
   loadAtomicWasm,
   type AtomicWasmModule,
 } from '@helpers/managed/recovery';
+import { calendarDateToLocalDate } from '@helpers/dates/calendarDate';
 import type { Expression } from '@tomic/react';
 
 /**
@@ -57,10 +58,20 @@ export function evaluateFormula(
   start();
 
   // Only what the evaluator can read as a number: a list or an object is no input.
+  // A civil date has no zone: it reads as local midnight, as the date a row
+  // action stamps (`localCalendarDate`) does, not as the UTC midnight the
+  // evaluator would parse, which made "today" read as tomorrow east of UTC.
   const cells = Object.fromEntries(
-    Object.entries(values).filter(([, value]) =>
-      ['number', 'string', 'boolean'].includes(typeof value),
-    ),
+    Object.entries(values)
+      .filter(([, value]) =>
+        ['number', 'string', 'boolean'].includes(typeof value),
+      )
+      .map(([key, value]) => [
+        key,
+        typeof value === 'string'
+          ? (calendarDateToLocalDate(value)?.getTime() ?? value)
+          : value,
+      ]),
   );
 
   try {

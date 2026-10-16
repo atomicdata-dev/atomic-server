@@ -179,10 +179,12 @@ fn is_leap(year: i64) -> bool {
 }
 
 /// Whole days from today (UTC) to the next occurrence of `date_ms`'s month and
-/// day; 0 when that is today.
+/// day; 0 when that is today. The date is rounded to the nearest day, not
+/// floored: the browser hands a civil date over as local midnight, which east of
+/// UTC is the evening before in UTC.
 fn days_until_anniversary(date_ms: f64, now_ms: f64) -> f64 {
     let today = (now_ms / DAY_MS).floor() as i64;
-    let (_, month, day) = civil_from_days((date_ms / DAY_MS).floor() as i64);
+    let (_, month, day) = civil_from_days((date_ms / DAY_MS).round() as i64);
     let (year, _, _) = civil_from_days(today);
     let on = |y: i64| match (month, day) {
         (2, 29) if !is_leap(y) => days_from_civil(y, 3, 1),
@@ -610,6 +612,18 @@ mod tests {
         assert_eq!(days.evaluate(&dec28, day_ms(2026, 12, 28)), Some(0.0));
         assert_eq!(days.evaluate(&dec28, day_ms(2026, 12, 29)), Some(364.0));
         assert_eq!(days.evaluate(&row(&[]), dec20), None);
+    }
+
+    #[test]
+    fn a_birthday_given_as_local_midnight_east_of_utc_is_the_same_day() {
+        let days = formula("daysUntilAnniversary(birth)", &[("birth", START)]);
+        // Dec 28 at 00:00 in UTC+2 is Dec 27 22:00 UTC.
+        let dec28_local = row(&[(
+            START,
+            Value::Timestamp(day_ms(1990, 12, 28) - 2 * 3_600_000),
+        )]);
+
+        assert_eq!(days.evaluate(&dec28_local, day_ms(2026, 12, 20)), Some(8.0));
     }
 
     #[test]

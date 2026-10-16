@@ -107,6 +107,18 @@ describe('computing a formula over a row', () => {
     ).toBe(NOW + 14 * DAY);
   });
 
+  it('counts a date stamped today as today, in any time zone', () => {
+    const sinceDate = spec('days(now() - d)', { d: LAST_DONE }, 'days');
+    const today = new Date(2026, 6, 30);
+    const stamped = `${today.getFullYear()}-07-30`;
+    // 00:30 local on the stamped day, which east of UTC is still the day before in UTC.
+    const justAfterMidnight = new Date(2026, 6, 30, 0, 30).getTime();
+
+    expect(
+      computeDerived(sinceDate, { [LAST_DONE]: stamped }, justAfterMidnight),
+    ).toBe(0);
+  });
+
   it('knows how far away a birthday is', () => {
     const days = spec('daysUntilAnniversary(birthday)', { birthday: BIRTHDAY });
     const soon = spec(
