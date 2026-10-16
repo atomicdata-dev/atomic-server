@@ -21,6 +21,9 @@ pub struct PluginTriggerKey {
     pub plugin: String,
 }
 
+/// Most edges [`Db::pending_trigger_events`] counts.
+pub const PENDING_COUNT_CAP: usize = 1000;
+
 impl PluginTriggerKey {
     pub fn new(drive: &str, plugin: &str) -> Self {
         Self {
@@ -269,18 +272,27 @@ impl crate::Db {
             .collect())
     }
 
-    /// How many edges the trigger has not finished.
+    /// How many edges the trigger has not finished, counted up to
+    /// [`PENDING_COUNT_CAP`]: a backlog beyond that is "a lot", and counting it
+    /// would read the whole log.
     pub fn pending_trigger_events(
         &self,
         key: &PluginTriggerKey,
         trigger: &PluginTrigger,
     ) -> crate::errors::AtomicResult<usize> {
-        let after = self.event_checkpoint(&key.drive, &consumer(key));
-        Ok(self
-            .trigger_edges(trigger, &key.drive, after, usize::MAX)?
-            .iter()
-            .filter(|(_, edge)| edge.is_some())
-            .count())
+        let mut after = self.event_checkpoint(&key.drive, &consumer(key));
+        let mut pending = 0;
+        loop {
+            let page = self.trigger_edges(trigger, &key.drive, after, 1000)?;
+            let Some((last, _)) = page.last() else {
+                return Ok(pending);
+            };
+            after = last.seq;
+            pending += page.iter().filter(|(_, edge)| edge.is_some()).count();
+            if pending >= PENDING_COUNT_CAP {
+                return Ok(PENDING_COUNT_CAP);
+            }
+        }
     }
 
     /// Saves a run's progress on its event.
@@ -307,10 +319,7 @@ impl crate::Db {
         key: &PluginTriggerKey,
     ) -> crate::errors::AtomicResult<()> {
         self.enable_drive_events(&key.drive)?;
-        let latest = self
-            .drive_events(&key.drive, 0, usize::MAX)
-            .last()
-            .map_or(0, |e| e.seq);
+        let latest = self.last_event_seq(&key.drive);
         self.ack_events(&key.drive, &consumer(key), latest)
     }
 

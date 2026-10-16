@@ -19,7 +19,10 @@ use super::trees::{Method, Operation, Transaction, Tree};
 use crate::{errors::AtomicResult, Db, Resource, Storelike, Subject};
 
 const EVENT_PREFIX: &str = "drive-event/v1/";
-/// Events older than this are dropped when a new one is appended.
+/// Events older than this are dropped when a new one is appended, whether or
+/// not every consumer acknowledged them (the drop is logged with the consumer
+/// whose checkpoint is behind it). A consumer that is offline longer than this
+/// misses the events in between and has to resync from the resources.
 const RETENTION_MS: i64 = 7 * 24 * 3600 * 1000;
 
 /// What happened to one resource.
@@ -85,6 +88,12 @@ fn prefix_end(prefix: &[u8]) -> Vec<u8> {
 
 fn event_key(drive: &str, seq: u64) -> Vec<u8> {
     format!("{EVENT_PREFIX}{}/{seq:020}", pure(drive)).into_bytes()
+}
+
+/// Where a drive's last sequence number is kept, so appending never has to read
+/// the log to find where it ended.
+fn last_seq_key(drive: &str) -> Vec<u8> {
+    format!("event-seq/v1/{}", pure(drive)).into_bytes()
 }
 
 fn consumer_key(kind: &str, drive: &str, consumer: &str) -> Vec<u8> {
@@ -241,10 +250,7 @@ impl Db {
         let PendingEvent { drive, mut event } = pending;
         let seq = match last.get(&drive) {
             Some(seq) => *seq,
-            None => self
-                .drive_events(&drive, 0, usize::MAX)
-                .last()
-                .map_or(0, |e| e.seq),
+            None => self.last_event_seq(&drive),
         } + 1;
         last.insert(drive.clone(), seq);
         event.seq = seq;
@@ -254,43 +260,71 @@ impl Db {
             key: event_key(&drive, seq),
             val: Some(serde_json::to_vec(&event)?),
         });
-        // Old rows go with a later write, so no sweeper has to run.
-        let cutoff = event.at_ms - RETENTION_MS;
-        for old in self
-            .drive_events(&drive, 0, 64)
-            .into_iter()
-            .filter(|_| seq % 64 == 0)
-        {
-            if old.at_ms >= cutoff {
-                break;
+        transaction.push(Operation {
+            tree: Tree::PluginMeta,
+            method: Method::Insert,
+            key: last_seq_key(&drive),
+            val: Some(seq.to_string().into_bytes()),
+        });
+        // Old rows go with a later write, so no sweeper has to run: every 64th
+        // event looks at the oldest 64 rows and drops the ones past retention.
+        if seq % 64 == 0 {
+            let cutoff = event.at_ms - RETENTION_MS;
+            for old in self.drive_events(&drive, 0, 64) {
+                if old.at_ms >= cutoff {
+                    break;
+                }
+                transaction.push(Operation {
+                    tree: Tree::PluginMeta,
+                    method: Method::Delete,
+                    key: event_key(&drive, old.seq),
+                    val: None,
+                });
             }
-            transaction.push(Operation {
-                tree: Tree::PluginMeta,
-                method: Method::Delete,
-                key: event_key(&drive, old.seq),
-                val: None,
-            });
         }
         Ok(())
     }
 
+    /// The highest sequence number of `drive`'s log (0 when empty). Read from
+    /// where appending keeps it; a log from before that was kept is walked once
+    /// and the answer is stored with the next append.
+    pub fn last_event_seq(&self, drive: &str) -> u64 {
+        if let Some(seq) = self
+            .kv
+            .get(Tree::PluginMeta, &last_seq_key(drive))
+            .ok()
+            .flatten()
+            .and_then(|b| String::from_utf8(b).ok()?.parse().ok())
+        {
+            return seq;
+        }
+        let mut after = 0;
+        loop {
+            match self.drive_events(drive, after, 1000).last() {
+                Some(event) => after = event.seq,
+                None => return after,
+            }
+        }
+    }
+
     /// Up to `max` events of `drive` with a sequence number above `after`.
+    /// Seeks to `after`, so the cost is the page, not the log.
     pub fn drive_events(&self, drive: &str, after: u64, max: usize) -> Vec<DriveEvent> {
         let prefix = format!("{EVENT_PREFIX}{}/", pure(drive));
+        let Some(first) = after.checked_add(1) else {
+            return Vec::new();
+        };
         self.kv
-            .scan_prefix(Tree::PluginMeta, prefix.as_bytes())
-            .flatten()
-            // The key ends in the sequence number: skip rows already handled
-            // without decoding them.
-            .filter(|(k, _)| {
-                std::str::from_utf8(k)
-                    .ok()
-                    .and_then(|k| k.rsplit('/').next()?.parse::<u64>().ok())
-                    .is_none_or(|seq| seq > after)
-            })
+            .range_page(
+                Tree::PluginMeta,
+                event_key(drive, first),
+                prefix_end(prefix.as_bytes()),
+                max,
+            )
+            .unwrap_or_default()
+            .into_iter()
             .filter_map(|(_, v)| serde_json::from_slice::<DriveEvent>(&v).ok())
             .filter(|e| e.seq > after)
-            .take(max)
             .collect()
     }
 

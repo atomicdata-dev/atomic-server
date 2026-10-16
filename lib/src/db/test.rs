@@ -5508,3 +5508,38 @@ async fn replicated_and_removed_resources_reach_the_event_stream_and_triggers() 
         (folder.as_str(), Edge::Leave)
     );
 }
+
+/// Appending finds where the log ended without reading it, and retention
+/// emptying the log does not send the sequence back to 1 (a consumer's
+/// checkpoint would then sit above every new event and miss them).
+#[tokio::test]
+#[timeout(120000)]
+async fn the_event_sequence_outlives_the_rows_retention_removes() {
+    let store = Db::init_temp("event_seq_persisted").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+    genesis_child(&store, &drive).await;
+    genesis_child(&store, &drive).await;
+    let last = store.last_event_seq(drive.as_str());
+    assert!(last >= 2);
+
+    // Retention removed every row.
+    for event in store.drive_events(drive.as_str(), 0, 1000) {
+        let key = format!(
+            "drive-event/v1/{}/{:020}",
+            crate::db::drive_events::pure(drive.as_str()),
+            event.seq
+        );
+        store.kv.remove(Tree::PluginMeta, key.as_bytes()).unwrap();
+    }
+    assert!(store.drive_events(drive.as_str(), 0, 1000).is_empty());
+
+    genesis_child(&store, &drive).await;
+    let events = store.drive_events(drive.as_str(), 0, 1000);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].seq, last + 1, "continues, does not restart");
+    // And a cursor from before the gap still sees it.
+    assert_eq!(store.drive_events(drive.as_str(), last, 10).len(), 1);
+    assert!(store.drive_events(drive.as_str(), u64::MAX, 10).is_empty());
+}
