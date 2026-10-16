@@ -1,4 +1,5 @@
 import { driveDisplayMetadata } from './driveDisplayMetadata';
+import toast from 'react-hot-toast';
 import {
   StoreEvents,
   isNotFound,
@@ -6,7 +7,9 @@ import {
   type Store,
 } from '@tomic/lib';
 import {
+  VaultQuotaExceededError,
   VaultSessionEndedError,
+  vaultQuotaFullMessage,
   agentVaultProof,
   canEnrollVault,
   getVaultState,
@@ -178,9 +181,27 @@ const enrolled = new Map<
   { drivePseudonym: string; metadata?: string } & DriveKeyHandle
 >();
 
+/**
+ * Drives the control plane refused for being over quota. Retrying only repeats
+ * the refusal every minute, so backups stay off until the page reloads, the
+ * user frees storage or asks for a backup by hand.
+ */
+const quotaBlocked = new Set<string>();
+const quotaToasted = new Set<string>();
+
+export function isVaultQuotaBlocked(driveSubject: string): boolean {
+  return quotaBlocked.has(driveSubject);
+}
+
+export function clearVaultQuotaBlock(driveSubject: string): void {
+  quotaBlocked.delete(driveSubject);
+}
+
 /** Only in tests. */
 export function forgetEnrolledVaults(): void {
   enrolled.clear();
+  quotaBlocked.clear();
+  quotaToasted.clear();
 }
 
 export type EnsureVaultOutcome =
@@ -209,6 +230,13 @@ export function ensureVaultBackup(
   // Sign-in and the boot watcher both ask for the same drive within the same
   // second. `runVaultBackup` already shares an in-flight pass, but enrolling
   // and unwrapping the key twice is still two round trips for nothing.
+  if (quotaBlocked.has(driveSubject)) {
+    return Promise.resolve({
+      status: 'skipped',
+      reason: /* @wc-ignore */ 'Cloud Vault is full',
+    });
+  }
+
   const existing = ensuring.get(driveSubject);
 
   if (existing) return existing;
@@ -444,6 +472,19 @@ async function ensureVaultBackupOnce(
       };
     }
 
+    if (error instanceof VaultQuotaExceededError) {
+      quotaBlocked.add(driveSubject);
+      console.warn('[cloud-vault] backup paused, vault is full', error);
+      notifyVaultChanged(driveSubject);
+
+      if (!quotaToasted.has(driveSubject)) {
+        quotaToasted.add(driveSubject);
+        toast.error(vaultQuotaFullMessage());
+      }
+
+      return { status: 'failed', error };
+    }
+
     console.warn('[cloud-vault] backup failed', error);
 
     return {
@@ -641,7 +682,7 @@ export function watchForVaultBackups(
     clearTimeout(timer);
     clearTimeout(deadline);
     timer = deadline = undefined;
-    const drives = [...pending];
+    const drives = [...pending].filter(d => !quotaBlocked.has(d));
     pending.clear();
     const identity = store.getAgent()?.subject;
     const passGeneration = generation;
@@ -654,6 +695,7 @@ export function watchForVaultBackups(
       const retry = (drive: string) => {
         if (
           !stopped &&
+          !quotaBlocked.has(drive) &&
           passGeneration === generation &&
           store.getAgent()?.subject === identity
         )
@@ -725,6 +767,7 @@ export function watchForVaultBackups(
   const reset = () => {
     generation++;
     enrolled.clear();
+    quotaBlocked.clear();
     pending.clear();
     clearTimeout(timer);
     clearTimeout(deadline);

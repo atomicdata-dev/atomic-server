@@ -11,6 +11,7 @@ import { ServiceRow, type ServiceStanding } from '../Cloud/ServiceRow';
 import { UsageMeter } from '../Cloud/UsageMeter';
 import { VaultStorage } from './VaultStorage';
 import { PRODUCT_NAME } from '../../helpers/managed/product';
+import { vaultQuotaFullMessage } from '../../helpers/managed/vault';
 import type { UseVaultBackup } from '../../helpers/managed/useVaultBackup';
 
 /**
@@ -130,6 +131,7 @@ export function VaultPanel({
   }
 
   const { enrollment, details } = status;
+  const quotaFull = vault.quotaBlocked || error === vaultQuotaFullMessage();
   const suspended = enrollment.status !== 'active';
 
   // The status line is the state: when it last went up. How much is stored
@@ -161,42 +163,51 @@ export function VaultPanel({
         standing={standing}
         tagline={tagline}
         status={
-          error
-            ? { tone: 'error', text: <ErrorText>{error}</ErrorText> }
-            : restoreProgress !== null
-              ? {
-                  tone: 'busy',
-                  text: (
-                    <span data-testid='vault-restore-progress'>
-                      Restoring… {Math.round(restoreProgress * 100)}%
-                    </span>
-                  ),
-                }
-              : suspended
+          quotaFull
+            ? {
+                tone: 'error',
+                text: (
+                  <span data-testid='vault-quota-blocked'>
+                    {vaultQuotaFullMessage()}
+                  </span>
+                ),
+              }
+            : error
+              ? { tone: 'error', text: <ErrorText>{error}</ErrorText> }
+              : restoreProgress !== null
                 ? {
-                    tone: 'error',
+                    tone: 'busy',
                     text: (
-                      <span data-testid='vault-suspended'>
-                        Backups are paused. You can still restore what is
-                        already stored.
+                      <span data-testid='vault-restore-progress'>
+                        Restoring… {Math.round(restoreProgress * 100)}%
                       </span>
                     ),
                   }
-                : {
-                    tone: 'ok',
-                    text: (
-                      // The object count is an attribute as well as prose: a
-                      // test asserting that a second backup stored something
-                      // should read the number, not parse a sentence.
-                      <span
-                        data-testid='vault-summary'
-                        data-vault-objects={details.confirmed_objects}
-                        data-vault-bytes={enrollment.used_bytes}
-                      >
-                        {summary}
-                      </span>
-                    ),
-                  }
+                : suspended
+                  ? {
+                      tone: 'error',
+                      text: (
+                        <span data-testid='vault-suspended'>
+                          Backups are paused. You can still restore what is
+                          already stored.
+                        </span>
+                      ),
+                    }
+                  : {
+                      tone: 'ok',
+                      text: (
+                        // The object count is an attribute as well as prose: a
+                        // test asserting that a second backup stored something
+                        // should read the number, not parse a sentence.
+                        <span
+                          data-testid='vault-summary'
+                          data-vault-objects={details.confirmed_objects}
+                          data-vault-bytes={enrollment.used_bytes}
+                        >
+                          {summary}
+                        </span>
+                      ),
+                    }
         }
         details={
           <>
@@ -218,7 +229,7 @@ export function VaultPanel({
             {storageOpen && (
               <VaultStorage
                 drivePseudonym={enrollment.drive_pseudonym}
-                onChanged={() => void vault.refresh()}
+                onChanged={() => void vault.storageChanged()}
                 onClose={() => setStorageOpen(false)}
                 busy={busy}
                 suspended={suspended}

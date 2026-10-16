@@ -10,6 +10,8 @@ import {
   dataBrowser,
 } from '@tomic/lib';
 import {
+  clearVaultQuotaBlock,
+  isVaultQuotaBlocked,
   isEmbeddedVaultDrive,
   ensureVaultBackup,
   forgetEnrolledVaults,
@@ -19,6 +21,7 @@ import {
   type VaultAutoBackupDeps,
 } from './vaultAutoBackup';
 import {
+  VaultQuotaExceededError,
   VaultSessionEndedError,
   type VaultEnrollment,
   type VaultKeyOps,
@@ -662,6 +665,40 @@ describe('watchForVaultBackups', () => {
         .mocked(deps.runVaultBackup)
         .mock.calls.map(([args]) => args.driveSubject),
     ).toEqual(expect.arrayContaining([DRIVE, other]));
+    stop();
+  });
+
+  it('stops after a quota refusal instead of retrying every minute', async () => {
+    vi.useFakeTimers();
+    const store = await signedInStore();
+    store.setDrive(DRIVE);
+    store.registerLocalOnlyDrive(DRIVE);
+    const deps = fakeDeps({
+      runVaultBackup: vi
+        .fn()
+        .mockRejectedValue(new VaultQuotaExceededError('quota exceeded')),
+    });
+    const stop = watchForVaultBackups(store, deps, {
+      idleMs: 10,
+      retryMs: 100,
+      window: null,
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+    expect(isVaultQuotaBlocked(DRIVE)).toBe(true);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+
+    const skipped = await ensureVaultBackup(store, DRIVE, deps);
+    expect(skipped).toEqual({
+      status: 'skipped',
+      reason: 'Cloud Vault is full',
+    });
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(1);
+
+    clearVaultQuotaBlock(DRIVE);
+    expect(isVaultQuotaBlocked(DRIVE)).toBe(false);
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.runVaultBackup).toHaveBeenCalledTimes(2);
     stop();
   });
 

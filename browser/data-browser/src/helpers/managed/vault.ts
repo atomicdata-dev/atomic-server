@@ -1,5 +1,6 @@
 import { AGENT_VAULT_PROOF_MESSAGE, decodeB64 } from '@tomic/lib';
 import { managedFetch } from './api';
+import { CLOUD_SERVER_PRICE } from '../cloudServerPrice';
 
 /**
  * Cloud Vault client: encrypted, blind backup of a drive.
@@ -280,6 +281,19 @@ export class VaultSessionEndedError extends Error {
   }
 }
 
+// Plain functions, for the same reason as above.
+export function vaultQuotaFullMessage(): string {
+  return `Backups are paused because this Cloud Vault is full. Free up space under Manage storage, or upgrade to Cloud Server from ${CLOUD_SERVER_PRICE}.`;
+}
+
+/** The control plane refused an upload because the vault is over its quota. */
+export class VaultQuotaExceededError extends Error {
+  constructor(serverMessage: string) {
+    super(serverMessage);
+    this.name = /* @wc-ignore */ 'VaultQuotaExceededError';
+  }
+}
+
 /** The control plane does not offer this route (yet): a 404 or a non-JSON page. */
 export class VaultNotAvailableError extends Error {
   constructor() {
@@ -334,6 +348,11 @@ async function api<T>(
     // generic failure, which is what a user would otherwise see for a billing
     // problem.
     const body = await response.json().catch(() => null);
+
+    if (response.status === 400 && /quota exceeded/i.test(body?.error ?? '')) {
+      throw new VaultQuotaExceededError(body.error);
+    }
+
     throw new Error(
       body?.error ?? `Cloud Vault request failed (${response.status})`,
     );
