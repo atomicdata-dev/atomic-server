@@ -589,6 +589,12 @@ export class Collection {
    * user reloads. */
   private _refreshPending = false;
 
+  /** The first page and the count as they stood when the current `refresh()`
+   * cleared them. A change that arrives before the fetch lands is placed on
+   * top of these, so the collection never reads as only the changed row. */
+  private _staleMembers: string[] = [];
+  private _staleTotal = 0;
+
   public async refresh(): Promise<void> {
     if (this._refreshInFlight) {
       this._refreshPending = true;
@@ -599,6 +605,9 @@ export class Collection {
     this._refreshInFlight = (async () => {
       while (true) {
         this._refreshPending = false;
+        this._staleMembers =
+          this.pages.get(0)?.getSubjects(collections.properties.members) ?? [];
+        this._staleTotal = this._totalMembers;
         this.clearPages();
         this._waitForReady = this.fetchPage(0);
         await this._waitForReady;
@@ -747,10 +756,22 @@ export class Collection {
       // against the server.
       if (!this.pages.has(0)) {
         this._optimisticAdds.add(subject);
+
+        // During a refresh the member index is empty, so every existing member
+        // that changes here looks new. Standing in for the whole collection,
+        // that one row made it read as a single member until the fetch landed,
+        // and a table remapped its rows onto it: typing into a row inserted
+        // moments before ended up in the rows below. Keep what was there.
+        const before = this._refreshInFlight ? this._staleMembers : [];
+        const isNew = !before.includes(subject);
+        const members = isNew ? [...before, subject] : before;
+        const total = this._refreshInFlight
+          ? this._staleTotal + (isNew ? 1 : 0)
+          : 1;
         const page = new Resource<Collections.Collection>(this.buildSubject(0));
-        this.writePageMembers(page, [subject], 1);
+        this.writePageMembers(page, members, total);
         this.setPage(0, page);
-        this._totalMembers = 1;
+        this._totalMembers = total;
 
         return 'member-added';
       }
@@ -1018,6 +1039,7 @@ export class Collection {
 
     if (this.store.serverConnected) {
       await this.fetchPageFromServer(page).catch(() => undefined);
+      this.retryAfterDriveSync();
 
       return;
     }
@@ -1036,6 +1058,7 @@ export class Collection {
 
     if (this.store.serverConnected) {
       await this.fetchPageFromServer(page).catch(() => undefined);
+      this.retryAfterDriveSync();
     }
   }
 
@@ -1232,6 +1255,12 @@ export class Collection {
       return 'no-db';
     }
 
+    // Whether this drive's sync had finished when the question was asked, not
+    // when the answer came back. A query posted while the sync was still
+    // landing can be answered after it finished, and its empty result predates
+    // the rows the sync wrote: believing that one hid the whole table.
+    const syncedWhenAsked = this.store.hasCompletedDriveSyncFor(drive);
+
     const query = this.store.queryLocalDb({
       property: this.params.property,
       value: this.params.value,
@@ -1288,7 +1317,7 @@ export class Collection {
     this._assemblingPage = true;
 
     try {
-      return this.finishLocalDbPage(page, result, drive);
+      return this.finishLocalDbPage(page, result, drive, syncedWhenAsked);
     } finally {
       this._assemblingPage = false;
     }
@@ -1305,6 +1334,7 @@ export class Collection {
       aggregates?: AggregateOutcome[];
     },
     drive: string | undefined,
+    syncedWhenAsked: boolean,
   ): 'ok' | 'no-db' {
     if (result.count === 0) {
       this._queriedMembers.clear();
@@ -1318,7 +1348,7 @@ export class Collection {
       // Per-drive on purpose. Asking whether *any* sync had finished meant a
       // synced personal drive vouched for every other drive too, so browsing
       // a drive that was never synced locally showed nothing at all.
-      if (this.store.hasCompletedDriveSyncFor(drive)) {
+      if (syncedWhenAsked) {
         // `fetchPage` races us against `/query`. If the server already
         // populated the page with non-empty data, leave it — server is
         // authoritative for the instant of the query.
@@ -1494,6 +1524,7 @@ export class Collection {
       page,
       { subjects, count: subjects.length },
       this.params.drive,
+      this.store.hasCompletedDriveSyncFor(this.params.drive),
     );
   }
 
@@ -1580,6 +1611,43 @@ export class Collection {
     }
 
     return subjects;
+  }
+
+  /** Set while a query that neither the local database nor the server could
+   *  answer waits for its drive's sync to finish. */
+  private _syncRetry: (() => void) | undefined;
+  private _syncRetried = false;
+
+  /**
+   * The local database did not answer yet and the server did not either. That
+   * is no answer, and nothing asks again by itself: the table stays empty until
+   * a reload. The sync that is still filling the local database is what makes
+   * the next local answer believable, so ask once it has finished.
+   */
+  private retryAfterDriveSync(): void {
+    if (this.pages.has(0) || this._syncRetry) return;
+
+    const drive = this.params.drive ?? this.store.getDrive();
+
+    if (!drive) return;
+
+    const retry = () => {
+      this._syncRetry = undefined;
+      this.refresh().catch(() => undefined);
+    };
+
+    if (this.store.hasCompletedDriveSyncFor(drive)) {
+      // Finished while this query was running, so the next local answer counts.
+      // Once only: a client without a usable local database must not loop.
+      if (this._syncRetried) return;
+
+      this._syncRetried = true;
+      retry();
+
+      return;
+    }
+
+    this._syncRetry = this.store.onceDriveSynced(drive, retry);
   }
 
   private async fetchPageFromServer(page: number): Promise<void> {
