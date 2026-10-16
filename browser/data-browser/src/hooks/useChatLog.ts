@@ -61,15 +61,10 @@ export function useChatLogPages(
     let cancelled = false;
 
     const read = async () => {
-      await collection.waitForReady();
-      const queried: string[] = [];
+      let queried: string[];
 
       try {
-        for (let i = 0; i < collection.totalMembers; i++) {
-          const member = await collection.getMemberWithIndex(i);
-
-          if (member) queried.push(member);
-        }
+        queried = await collection.getAllMembers();
       } catch {
         // The collection changed under us; its next refresh reads again.
         return;

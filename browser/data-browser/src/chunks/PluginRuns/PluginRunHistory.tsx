@@ -59,11 +59,7 @@ export function PluginRunHistory({
       const schema = await pluginClassesFor(store, drive);
       const found: RunSummary[] = [];
 
-      for (let i = 0; i < collection.totalMembers; i++) {
-        const child = await collection.getMemberWithIndex(i);
-
-        if (!child) continue;
-
+      for await (const child of collection) {
         const record = await store.getResource(child);
         const status = record.get(schema.properties['run-status']) as
           | string

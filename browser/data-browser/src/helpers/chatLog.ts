@@ -175,17 +175,8 @@ export async function queryPages(
     .setPreferServer(true);
 
   if (drive) builder.setDrive(drive);
-  const collection = builder.build();
-  await collection.waitForReady();
-  const pages: string[] = [];
 
-  for (let i = 0; i < collection.totalMembers; i++) {
-    const member = await collection.getMemberWithIndex(i);
-
-    if (member) pages.push(member);
-  }
-
-  return pages;
+  return builder.build().getAllMembers();
 }
 
 /** Every page, oldest first: the ones in a query and the ones this client made. */
