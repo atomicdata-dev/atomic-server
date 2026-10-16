@@ -771,7 +771,7 @@ impl Db {
             let built = self
                 .build_projection_tx(&resource, false, true, true, snapshot, &mut transaction)
                 .await;
-            match built.and_then(|()| self.apply_transaction(&mut transaction)) {
+            match built.and_then(|_| self.apply_transaction(&mut transaction)) {
                 Ok(()) => {}
                 Err(e) => {
                     tracing::warn!(%subject, error = %e, "Could not backfill lens");
@@ -841,25 +841,26 @@ impl Db {
                 continue;
             }
             let before = transaction.len();
-            self.build_projection_tx(
-                resource,
-                false,
-                true,
-                true,
-                snapshot.clone(),
-                &mut transaction,
-            )
-            .await?;
+            let changed = self
+                .build_projection_tx(
+                    resource,
+                    false,
+                    true,
+                    true,
+                    snapshot.clone(),
+                    &mut transaction,
+                )
+                .await?;
             if defer_search {
                 let mut added = transaction.split_off(before);
                 added.retain(|op| !crate::search::is_search_op(op));
                 transaction.extend(added);
                 transaction.push(crate::search::pending_marker(&key));
             }
-            events.extend(
-                drive_events::PendingEvent::new(self, resource, false, replicated_props(resource))
-                    .await,
-            );
+            if let Some(changed) = changed {
+                events
+                    .extend(drive_events::PendingEvent::new(self, resource, false, changed).await);
+            }
             batched.push(resource);
         }
         if batched.is_empty() {
@@ -912,18 +913,20 @@ impl Db {
         snapshot: Option<Vec<u8>>,
     ) -> AtomicResult<()> {
         let mut transaction = Transaction::new();
-        self.build_projection_tx(
-            resource,
-            check_required_props,
-            update_index,
-            overwrite_existing,
-            snapshot,
-            &mut transaction,
-        )
-        .await?;
-        let event =
-            drive_events::PendingEvent::new(self, resource, false, replicated_props(resource))
-                .await;
+        let changed = self
+            .build_projection_tx(
+                resource,
+                check_required_props,
+                update_index,
+                overwrite_existing,
+                snapshot,
+                &mut transaction,
+            )
+            .await?;
+        let event = match changed {
+            Some(changed) => drive_events::PendingEvent::new(self, resource, false, changed).await,
+            None => None,
+        };
         self.apply_transaction_with_source(&mut transaction, None, event.into_iter().collect())?;
         if crate::import_identity::identity(resource).is_some() {
             self.flush()?;
@@ -953,7 +956,7 @@ impl Db {
         overwrite_existing: bool,
         snapshot: Option<Vec<u8>>,
         transaction: &mut Transaction,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<Option<std::collections::BTreeSet<String>>> {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
         let subject = self.normalize_subject(resource.get_subject());
@@ -987,6 +990,26 @@ impl Db {
             )
             .into());
         }
+        // What this write changes, for the drive's event stream: a resource
+        // seen for the first time changes everything it holds, a known one
+        // only the properties whose value differs. `None` is a write that
+        // changes nothing (a peer pushing again what we have).
+        let changed = match &existing {
+            None => Some(replicated_props(resource)),
+            Some(old) => {
+                let new = resource.get_propvals();
+                let changed: std::collections::BTreeSet<String> = new
+                    .iter()
+                    .filter(|(prop, value)| {
+                        // `Value` has no equality; its debug form names the variant and the content.
+                        old.get(*prop).map(|v| format!("{v:?}")) != Some(format!("{value:?}"))
+                    })
+                    .map(|(prop, _)| prop.clone())
+                    .chain(old.keys().filter(|prop| !new.contains_key(*prop)).cloned())
+                    .collect();
+                (!changed.is_empty()).then_some(changed)
+            }
+        };
         if check_required_props {
             resource.check_required_props(self).await?;
         }
@@ -1034,7 +1057,7 @@ impl Db {
         // and the removal of other identifier spellings: the same write a
         // commit makes.
         self.add_resource_tx(resource, transaction)?;
-        Ok(())
+        Ok(changed)
     }
 
     /// Install a sync admission/quota policy (managed nodes). The default is

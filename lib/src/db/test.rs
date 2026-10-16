@@ -5509,6 +5509,67 @@ async fn replicated_and_removed_resources_reach_the_event_stream_and_triggers() 
     );
 }
 
+/// A peer pushing again what this node already holds (a reconnect) changes
+/// nothing, so the stream does not move; a push that changes one property
+/// says only that property changed.
+#[tokio::test]
+#[timeout(120000)]
+async fn replicating_what_is_already_held_adds_no_event() {
+    let store = Db::init_temp("replication_noop_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+
+    let mut replicated = Resource::new("atomic:replicated-noop".into());
+    replicated
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    replicated
+        .set_unsafe(urls::NAME.into(), Value::String("one".into()))
+        .unwrap();
+    let count = |store: &Db| {
+        store
+            .drive_events(drive.as_str(), 0, 1000)
+            .into_iter()
+            .filter(|e| e.subject == "atomic:replicated-noop")
+            .collect::<Vec<_>>()
+    };
+
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    assert_eq!(count(&store).len(), 1);
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    store
+        .persist_replicated_resources(vec![(replicated.clone(), None)])
+        .await
+        .unwrap();
+    assert_eq!(count(&store).len(), 1, "the same state again is not news");
+
+    replicated
+        .set_unsafe(urls::NAME.into(), Value::String("two".into()))
+        .unwrap();
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    let events = count(&store);
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[1]
+            .props
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec![urls::NAME],
+        "only what changed"
+    );
+}
+
 /// A destroy *commit* takes its children with it. Each child is its own row in
 /// the stream, and the leave edge of each is on its own event rather than
 /// merged into the destroyed parent's.
