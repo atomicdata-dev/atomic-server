@@ -12,7 +12,8 @@ import {
   TableEvent,
   useTableEditorContext,
 } from './TableEditorContext';
-import { FaUpRightAndDownLeftFromCenter } from 'react-icons/fa6';
+import { FaEllipsis, FaUpRightAndDownLeftFromCenter } from 'react-icons/fa6';
+import { ghostButtonStyles } from '@components/Button';
 import { isInMultiSelection } from './helpers/selectionBounds';
 import { IconButton } from '@components/IconButton/IconButton';
 import { KeyboardInteraction } from './helpers/keyboardHandlers';
@@ -345,14 +346,29 @@ export function IndexCell({
 
   return (
     <StyledIndexCell role='rowheader' {...props} hasMarking={!!marking}>
-      {(Extra || RowHeaderAddonComponent) && (
-        <AddonSlot>
-          {Extra && <Extra index={props.rowIndex} />}
-          {RowHeaderAddonComponent && (
-            <RowHeaderAddonComponent rowIndex={props.rowIndex} />
-          )}
-        </AddonSlot>
-      )}
+      <AddonSlot>
+        {Extra && <Extra index={props.rowIndex} />}
+        {RowHeaderAddonComponent && (
+          <RowHeaderAddonComponent rowIndex={props.rowIndex} />
+        )}
+        {props.onContextMenu && (
+          <RowMenuButton
+            type='button'
+            title='Row menu'
+            data-row-menu
+            // The header cell selects itself on mouse down; opening a menu shouldn't.
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => {
+              e.stopPropagation();
+              props.onContextMenu?.(
+                e as unknown as React.MouseEvent<HTMLDivElement>,
+              );
+            }}
+          >
+            <FaEllipsis />
+          </RowMenuButton>
+        )}
+      </AddonSlot>
       <IconButton
         title='Open resource'
         onClick={() => onExpand(props.rowIndex)}
@@ -365,6 +381,18 @@ export function IndexCell({
 }
 
 const IndexNumber = styled.span``;
+
+/* The right-click menu, for a pointer that has no right button: only shown
+ * where nothing hovers. Same menu a right-click on the row opens. */
+const RowMenuButton = styled.button`
+  ${ghostButtonStyles}
+  display: none;
+  padding: 0.2rem;
+
+  @media (hover: none) {
+    display: inline-flex;
+  }
+`;
 
 /**
  * Holds the gutter affordance at the start of the row. It keeps its box even

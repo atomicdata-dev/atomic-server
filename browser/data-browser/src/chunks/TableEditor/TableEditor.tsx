@@ -568,7 +568,7 @@ const Table = styled.div.attrs<TableProps>(p => ({
   /* No hover on touch, and a phone has no width to spare: the gutter shrinks
      to the tick, the comment bubble and the number (see IndexCell). */
   @media (hover: none) {
-    --table-index-width: 4.75rem;
+    --table-index-width: 7rem;
   }
   --table-content-height: ${p => p.totalContentHeight}px;
   background: ${p => p.theme.colors.bg};

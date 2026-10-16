@@ -13103,3 +13103,7 @@ msgstr "Commented {0}"
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr "Upgrade to a Cloud Server to publish and share this form."
+
+#: src/chunks/TableEditor/Cell.tsx
+msgid "Row menu"
+msgstr "Row menu"
