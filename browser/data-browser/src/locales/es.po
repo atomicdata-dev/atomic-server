@@ -6064,6 +6064,7 @@ msgid "Add class"
 msgstr "Agregar clase"
 
 #: src/routes/History/VersionTitle.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Edited"
 msgstr ""
 
@@ -12724,11 +12725,6 @@ msgstr "Mostrar menos"
 msgid "Show all"
 msgstr "Mostrar todo"
 
-#. 0: toRelativeDateTime(new Date(at), true)
-#: src/views/Drive/DriveHome.tsx
-msgid "Edited {0}"
-msgstr "Editado {0}"
-
 #: src/views/Drive/DrivePage.tsx
 msgid "<0/> Drive settings"
 msgstr "<0/> Ajustes del drive"
@@ -13082,11 +13078,10 @@ msgstr ""
 msgid "Your notes"
 msgstr ""
 
-#. 0: toRelativeDateTime(new Date(at), true)
-#: src/views/Drive/DriveHome.tsx
-msgid "Commented {0}"
-msgstr "Comentado {0}"
-
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Upgrade to a Cloud Server to publish and share this form."
+msgstr ""
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Commented"
 msgstr ""

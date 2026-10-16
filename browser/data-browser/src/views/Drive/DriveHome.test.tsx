@@ -73,9 +73,13 @@ vi.mock('@views/ResourceRow', () => ({
       {trailing}
     </i>
   ),
-  ResourceRowDescription: ({ children }: { children: React.ReactNode }) => (
-    <span>{children}</span>
-  ),
+  ResourceRowDescription: ({
+    children,
+    title,
+  }: {
+    children: React.ReactNode;
+    title?: string;
+  }) => <span title={title}>{children}</span>,
 }));
 vi.mock('@components/Presence/PresenceAvatarMenu', () => ({
   PresenceAvatarMenu: () => null,
@@ -159,6 +163,7 @@ describe('ActivityFeed', () => {
 
     expect(html).toContain('atomic:only-comment');
     expect(html).toContain('Commented');
+    expect(html).toContain('>1m ago<');
     expect(html).not.toContain('hidden-doc');
   });
 
