@@ -249,8 +249,12 @@ pub fn call_export<'a>(
             .expect("provider_of found it");
         budget.allows(export.effect)?;
         // At every hop, not only the entry: a read export must not let a reader
-        // cause a write, or make another app spend its secrets.
-        if matches!(export.effect, ExportEffect::Write | ExportEffect::External) {
+        // cause a write. An app that declares secrets can spend them whatever
+        // its exports say they do, so calling it takes the same rights as
+        // `/plugin-run`: write on the drive.
+        if matches!(export.effect, ExportEffect::Write | ExportEffect::External)
+            || !app.manifest.secrets.is_empty()
+        {
             use atomic_lib::Storelike;
             let drive_resource = db
                 .get_resource(&drive.into())

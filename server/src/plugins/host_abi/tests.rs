@@ -1183,3 +1183,72 @@ async fn apply_refuses_to_turn_a_resource_into_an_installation_plugin_or_release
     let still = db.get_resource(&subject.as_str().into()).await.unwrap();
     assert!(!still.has_class(urls::INSTALLATION));
 }
+
+/// The counter, declaring a `read` effect (and a secret, when asked): the wasm
+/// is the same, only what the manifest claims differs.
+fn counter_manifest_reading(secret: bool) -> String {
+    let mut manifest: Json = serde_json::from_str(COUNTER_MANIFEST).unwrap();
+    manifest["exports"][0]["effect"] = json!("read");
+    if secret {
+        manifest["secrets"] = json!([
+            { "name": "token", "origin": "https://api.example.com" }
+        ]);
+    }
+    manifest.to_string()
+}
+
+#[actix_rt::test]
+async fn calling_an_app_that_declares_secrets_needs_write_on_the_drive() {
+    for (secret, allowed) in [(true, false), (false, true)] {
+        let w = World::new("host_abi_secrets_need_write").await;
+        let db = &*w.db;
+        let counter = install(
+            &w.f,
+            "counter",
+            &counter_manifest_reading(secret),
+            COUNTER_WASM,
+        )
+        .await;
+        let (subject, property) = counter_resource(&w.f).await;
+        let reader = atomic_lib::agents::Agent::new(None)
+            .unwrap()
+            .subject
+            .to_string();
+        // May read the drive and write the one resource, but not the drive.
+        share(
+            db,
+            &subject,
+            &[&counter.agent, &reader],
+            &[&counter.agent, &reader],
+        )
+        .await;
+        let mut drive = db.get_resource(&w.f.drive.as_str().into()).await.unwrap();
+        let mut readers = match drive.get(urls::READ) {
+            Ok(Value::ResourceArray(list)) => list.clone(),
+            _ => Vec::new(),
+        };
+        readers.push(atomic_lib::Subject::from(reader.as_str()).into());
+        drive
+            .set_unsafe(urls::READ.into(), Value::ResourceArray(readers))
+            .unwrap();
+        drive.save(db).await.unwrap();
+
+        let outcome = w
+            .call(
+                COUNTER,
+                "increment",
+                json!({"subject": subject, "property": property}),
+                ForAgent::AgentSubject(reader.into()),
+            )
+            .await;
+
+        if allowed {
+            assert_eq!(outcome.unwrap(), json!({"count": 1}));
+            assert_eq!(count_of(db, &subject, &property).await, 1);
+        } else {
+            let err = outcome.unwrap_err();
+            assert_eq!(err.code, code::FORBIDDEN, "{err:?}");
+            assert_eq!(count_of(db, &subject, &property).await, 0);
+        }
+    }
+}
