@@ -173,7 +173,12 @@ impl store::Host for AbiState {
         // more than that is what a chat with ten thousand messages cannot pay
         // for on every read. A row the caller may not see makes the answer
         // `complete: false`, as before.
-        query.limit = Some((offset + limit + 1).min(convert::SCAN_CAP + 1));
+        query.limit = Some(
+            offset
+                .saturating_add(limit)
+                .saturating_add(1)
+                .min(convert::SCAN_CAP + 1),
+        );
 
         let result = host
             .db
@@ -195,7 +200,7 @@ impl store::Host for AbiState {
             }
         }
 
-        let end = (offset + limit).min(visible.len());
+        let end = offset.saturating_add(limit).min(visible.len());
         let page: Vec<_> = visible
             .get(offset.min(end)..end)
             .unwrap_or_default()

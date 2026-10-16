@@ -849,6 +849,16 @@ async fn query_filters_pages_with_a_cursor_and_says_when_it_is_complete() {
     };
     let mut state = w.state(&counter, owner(db)).await;
 
+    // A cursor a guest made up must not overflow the window arithmetic.
+    let huge = state
+        .query(spec(Some(2), Some(usize::MAX.to_string()), vec![]))
+        .await
+        .unwrap();
+    assert!(
+        huge.subjects.is_empty() && huge.cursor.is_none(),
+        "{huge:?}"
+    );
+
     let first = state.query(spec(Some(2), None, vec![])).await.unwrap();
     assert_eq!(first.subjects.len(), 2);
     assert!(
