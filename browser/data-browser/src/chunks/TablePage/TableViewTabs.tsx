@@ -7,7 +7,8 @@ import {
   useTitle,
 } from '@tomic/react';
 import { useContext, useMemo, useState, type JSX } from 'react';
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
+import { ghostButtonStyles } from '@components/Button';
 import {
   DndContext,
   PointerSensor,
@@ -823,45 +824,25 @@ const Actions = styled.div`
 `;
 
 const IconBtn = styled.button`
-  display: inline-flex;
-  align-items: center;
+  ${ghostButtonStyles}
   justify-content: center;
   height: 1.85rem;
   width: 1.85rem;
-  border: none;
-  border-radius: ${p => p.theme.radius};
-  background-color: transparent;
-  color: ${p => p.theme.colors.textLight};
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  &:hover:not(:disabled) {
-    background-color: ${p => p.theme.colors.bg1};
-    color: ${p => p.theme.colors.text};
-  }
+  padding: 0;
 `;
 
 const Tab = styled.button<{ $active: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  ${ghostButtonStyles}
   height: 1.85rem;
-  padding: 0.1rem 0.7rem;
-  border: none;
-  border-radius: ${p => p.theme.radius};
-  background-color: ${p => (p.$active ? p.theme.colors.bg1 : 'transparent')};
-  color: ${p => (p.$active ? p.theme.colors.text : p.theme.colors.textLight)};
-  font-weight: ${p => (p.$active ? 'bold' : 'normal')};
-  cursor: pointer;
   white-space: nowrap;
-
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
-  }
+  font-size: inherit;
+  ${p =>
+    p.$active &&
+    css`
+      background-color: ${p.theme.colors.bg1};
+      color: ${p.theme.colors.text};
+      font-weight: bold;
+    `}
 `;
 
 const TabInput = styled(InputStyled)`

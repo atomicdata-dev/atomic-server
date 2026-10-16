@@ -52,7 +52,6 @@ export const TEMPLATE_CATALOG: TemplateDefinition[] = [
     entryPoints: ['workspace'],
     parts: [
       table('project-tasks'),
-      table('issue-tracker'),
       {
         key: 'wiki',
         kind: 'document',
@@ -78,6 +77,17 @@ export const TEMPLATE_CATALOG: TemplateDefinition[] = [
     icon: '🌱',
     description: 'Reading, projects and everyday ideas.',
     entryPoints: ['workspace'],
-    parts: [table('project-tasks'), table('reading-list'), table('bookmarks')],
+    parts: [
+      table('project-tasks'),
+      table('reading-list'),
+      table('bookmarks'),
+      {
+        key: 'notes',
+        kind: 'document',
+        name: 'Notes',
+        text: '',
+        exampleText: 'Ideas\n\nWrite down anything worth coming back to.',
+      },
+    ],
   },
 ];
