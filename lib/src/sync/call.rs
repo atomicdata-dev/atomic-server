@@ -207,6 +207,7 @@ pub async fn call_known_peers_using(
 mod tests {
     use super::*;
     use crate::sync::{peer, protocol::CallBudgetWire};
+    use iroh::protocol::Router;
 
     /// Answers with what it saw, so the test can read the rights off the wire.
     struct Echo;
@@ -260,7 +261,7 @@ mod tests {
 
     /// Node A (the responder) with a drive, and a dialing endpoint that is node
     /// B's, with B's own store signed in as the same person.
-    async fn pair_of_nodes(name: &str) -> (Db, Db, Endpoint, String, String) {
+    async fn pair_of_nodes(name: &str) -> (Db, Db, Endpoint, String, String, Router) {
         let db_a = Db::init_temp(&format!("{name}_a")).await.unwrap();
         let (agent, drive) = db_a.setup("Alice").await.unwrap();
         let db_b = Db::init_temp(&format!("{name}_b")).await.unwrap();
@@ -277,7 +278,9 @@ mod tests {
             .unwrap();
         ep_b.add_node_addr(router_a.endpoint().node_addr().await.unwrap())
             .unwrap();
-        (db_a, db_b, ep_b, node_a.to_string(), drive)
+        // The router must outlive the call: only the first test's router is
+        // kept by the global, a later one stops serving once dropped.
+        (db_a, db_b, ep_b, node_a.to_string(), drive, router_a)
     }
 
     fn some_call(drive: &str) -> CallRequest {
@@ -301,7 +304,7 @@ mod tests {
     /// dialing node's agent, and the answer comes back.
     #[tokio::test]
     async fn a_call_reaches_the_peer_as_the_dialing_nodes_agent() {
-        let (db_a, db_b, ep_b, node_a, drive) = pair_of_nodes("call_peer").await;
+        let (db_a, db_b, ep_b, node_a, drive, _router) = pair_of_nodes("call_peer").await;
         // The owner of A paired with B.
         peer::add_known_peer(&db_a, &ep_b.node_id().to_string(), "b");
 
@@ -320,7 +323,7 @@ mod tests {
     /// but that the owner never paired with is not served.
     #[tokio::test]
     async fn a_call_from_a_node_that_was_never_paired_is_refused() {
-        let (_db_a, db_b, ep_b, node_a, drive) = pair_of_nodes("call_unpaired").await;
+        let (_db_a, db_b, ep_b, node_a, drive, _router) = pair_of_nodes("call_unpaired").await;
 
         let answer = call_peer_using(&ep_b, &db_b, &node_a, &some_call(&drive))
             .await
