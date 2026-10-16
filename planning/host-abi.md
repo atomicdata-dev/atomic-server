@@ -336,9 +336,56 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 ### 6. Placement and multiple machines
 
 - [ ] Leases for background work, as resources.
-- [ ] Forward a call to a node that can run it (WS or Iroh), same signature,
-      async.
-- [ ] Apps needing a secret run on the node that holds it.
+      *Design (not built):* a `Lease` resource under the Installation names the
+      node (`did:ad:node:…`) that runs the app's background work (triggers,
+      cron, event subscriptions) and an expiry. A node runs background work for
+      an Installation only while it holds an unexpired lease; the holder renews
+      it, another node takes it over after expiry by writing a new lease with
+      the previous one's id as `previousLease` (a Loro LWW write is not enough:
+      two nodes can both see it expired, so the takeover must be a commit the
+      other can reject as a causality conflict). Event cursors already live in
+      the db and sync, so a takeover resumes at the checkpoint. Forwarded calls
+      (below) are the synchronous half; a lease decides who runs what nobody
+      asked for.
+- [x] Forward a call to a node that can run it, same signature.
+      *Done (first slice):* `call_export` finds no provider and a known Iroh
+      peer syncs the drive: the call goes out as a `CALL` frame
+      (`lib/src/sync/call.rs`, `docs/src/websockets.md`), the answer is a
+      `CALL_RESULT`. Server side in `host_abi/forward.rs`: `CallForwarder`
+      (Iroh, over the known peers whose `drives` list the drive), `ServedCalls`
+      (the `CallHandler` the lib calls). *Auth:* the stream's AUTH is the
+      forwarding node's agent, bound to `drive#nodeId` like a sync. The caller's
+      own proof is not forwarded: it is signed for the first node (or is an MCP
+      token), and replaying it at another node is what the node binding exists
+      to stop. So the node vouches for the caller named in the frame, and the
+      serving node needs *both* to pass: `call_for_agent` for the caller, and
+      `check_read` / `check_write` on the drive for the vouching node's agent
+      (`CallBudget::vouched_by`, checked at each hop that writes). A node can
+      therefore only vouch for what it could do itself; a malicious paired node
+      can still name any caller whose rights it holds too, for the drive-level
+      checks. App reads inside the call are bounded by the named caller and the
+      Installation's agent only, not by the vouching node. *Budget:* calls,
+      fuel, effects and the secrets flag travel; the server caps them at its own
+      limits and never widens; the sender reserves its whole pool and gets back
+      `callsLeft` / `fuelLeft`. Depth counts across the hop; a served call is not
+      forwarded again (no loops). Tested in `host_abi/forward_tests.rs` (two
+      nodes in one process, a real Iroh connection) and
+      `lib/src/sync/call.rs`.
+      *Not done:* MCP tools are listed from local exports only, so a forwarded
+      export is reachable over `/host/call` but not offered by MCP; peers are
+      tried in known-peers order with no health or load; a drive this node
+      never synced is not forwarded; the call is synchronous (no async/queued
+      form, so a call over 30 s is stopped); a forwarded call to a peer without
+      the `CALL` frame times out instead of failing fast (no capability
+      advertised yet); the forward is not tested across two OS processes.
+- [~] Apps needing a secret run on the node that holds it.
+      *Minimal:* an app found locally whose declared secrets this node does not
+      hold (`forward::holds_secrets`, name and origin) is forwarded too, and a
+      peer's `not-found` falls back to running here. Secrets are never sent or
+      synced. Left: knowing *which* peer holds them (today every known peer of
+      the drive is tried in order, and each re-runs the check on its own
+      secrets), and an explicit "run only where the secret is" policy for
+      background work, which belongs to the lease above.
 
 ### 7. Proof
 

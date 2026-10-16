@@ -214,6 +214,14 @@ Apps may call each other at most 8 deep, and one entry call may cause at most 64
 
 `calls.providers(interface)` lists the installations that provide an interface, and `calls.describe(interface)` returns their exports with the schemas, so an LLM or a UI can discover what is callable.
 
+### When no app here can run it
+
+If this node has no provider for the interface in the drive, and a known Iroh peer syncs that drive, the call is forwarded to the peer as a `CALL` frame (`docs/src/websockets.md`) with the same interface, function, arguments and result. The same happens when this node has the app but not every secret it declares: an app runs where its secrets are. With no peer, or none that can run it, the call fails as before (`not-found`, or the app runs and fails where it needs the secret).
+
+Nothing widens across the hop. The peer runs the call for the same agent, so every check applies there: read on the drive, `write` on the drive for each hop that writes or spends secrets, the Installation's own agent, scopes and `uses`. The peer also needs the forwarding node's agent to be allowed to write the drive for such a hop, so a node cannot vouch for more than it could do itself. The remaining call count, fuel, allowed effects and the no-secrets flag travel with the call and can only shrink, depth counts across the hop, and a node does not forward a call it received. The calling node reserves the remaining budget while the peer runs, so one chain cannot spend it twice.
+
+Not yet: leases for background work, choosing among several peers (they are tried in the order of the known-peers list), forwarding of MCP tools (MCP lists exports of apps installed on this node only) and calling a drive this node has never synced.
+
 ## Calling an export from outside
 
 The browser and MCP are not components, so they call over HTTP:
