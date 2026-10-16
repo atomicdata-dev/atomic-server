@@ -252,7 +252,7 @@ impl World {
         let host = build_host(
             &self.registry,
             &self.db,
-            &app,
+            (&app.drive, &app.installation, Some(app.manifest.clone())),
             caller,
             0,
             Arc::new(CallBudget::default()),
@@ -1292,4 +1292,123 @@ async fn a_chain_that_may_not_spend_secrets_never_runs_an_app_that_declares_them
         .await
         .unwrap();
     assert_eq!(ok, json!({"count": 2}));
+}
+
+/// Runs `source` as a QuickJS run plugin of the fixture, as `caller`, with the
+/// ABI of [`super::JsAbi`]. Returns its verdict.
+async fn run_js(w: &World, caller: ForAgent, budget: Option<CallBudget>, source: &str) -> Json {
+    use crate::plugins::{host_abi::JsAbi, js_runtime::StoreHost};
+    let manifest = crate::plugins::manifest::Manifest::parse(json!({
+        "schemaVersion": 2,
+        "uses": [COUNTER],
+    }))
+    .unwrap();
+    let host = StoreHost {
+        db: w.db.clone(),
+        plugin: w.f.plugin.clone(),
+        drive: w.f.drive.clone(),
+        for_agent: caller,
+        manifest,
+    };
+    let mut abi = JsAbi::new(host, w.registry.clone());
+    if let Some(budget) = budget {
+        abi = abi.with_budget(budget);
+    }
+    let verdict = crate::plugins::js_runtime::embedded_runtime()
+        .unwrap()
+        .run(source, r#"{"trigger":{"kind":"manual","at":1}}"#, abi)
+        .await
+        .unwrap()
+        .unwrap();
+    serde_json::from_str(&verdict).unwrap()
+}
+
+fn bump(subject: &str, property: &str) -> String {
+    format!(
+        r#"export function run() {{
+          const code = (f) => {{ try {{ f(); return null; }} catch (e) {{ return e.code; }} }};
+          const args = {{ subject: "{subject}", property: "{property}" }};
+          return {{
+            intents: [],
+            denied: code(() => calls.call("{COUNTER}", "increment", args)),
+            undeclared: code(() => calls.call("atomic:other/x@1", "f", {{}})),
+            applies: code(() => store.apply([])),
+            read: store.get("{subject}").subject,
+            exports: calls.describe("{COUNTER}").map((e) => e.function + ":" + e.effect),
+          }};
+        }}"#
+    )
+}
+
+#[actix_rt::test]
+async fn a_run_plugin_calls_an_export_of_an_app_and_gets_the_result() {
+    let mut w = World::new("host_abi_js_calls").await;
+    crate::plugins::test_fixture::write_plugin(&mut w.f, "Runner").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
+
+    // The default budget of a run is reads only: an export that writes is
+    // forbidden, with the ABI's code, and the other functions answer as the
+    // ABI does.
+    let verdict = run_js(&w, owner(db), None, &bump(&subject, &property)).await;
+    assert_eq!(verdict["denied"], code::FORBIDDEN, "{verdict}");
+    assert_eq!(verdict["undeclared"], code::FORBIDDEN, "{verdict}");
+    assert_eq!(verdict["applies"], code::NEEDS_APPROVAL, "{verdict}");
+    assert_eq!(verdict["read"], subject.as_str(), "{verdict}");
+    assert_eq!(verdict["exports"], json!(["increment:write"]), "{verdict}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
+
+    // With the effect allowed the call goes through `call_export`, as the
+    // owner and the counter's own agent, and the result comes back.
+    let source = format!(
+        r#"export function run() {{
+          return {{ intents: [], result: calls.call("{COUNTER}", "increment", {{ subject: "{subject}", property: "{property}" }}) }};
+        }}"#
+    );
+    let verdict = run_js(&w, owner(db), Some(CallBudget::default()), &source).await;
+    assert_eq!(verdict["result"], json!({"count": 1}), "{verdict}");
+    assert_eq!(count_of(db, &subject, &property).await, 1);
+}
+
+#[actix_rt::test]
+async fn a_reader_cannot_cause_a_write_through_a_run_plugin() {
+    let mut w = World::new("host_abi_js_reader").await;
+    crate::plugins::test_fixture::write_plugin(&mut w.f, "Runner").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    let reader = atomic_lib::agents::Agent::new(None)
+        .unwrap()
+        .subject
+        .to_string();
+    // The reader may even write the one resource, but not the drive.
+    share(
+        db,
+        &subject,
+        &[&counter.agent, &reader],
+        &[&counter.agent, &reader],
+    )
+    .await;
+
+    // Even with a budget that allows writes: `call_export` asks for write on
+    // the drive at this hop, of the person who ran the plugin.
+    let source = format!(
+        r#"export function run() {{
+          try {{ calls.call("{COUNTER}", "increment", {{ subject: "{subject}", property: "{property}" }}); }}
+          catch (e) {{ return {{ intents: [], code: e.code }}; }}
+          return {{ intents: [], code: "wrote" }};
+        }}"#
+    );
+    let verdict = run_js(
+        &w,
+        ForAgent::AgentSubject(reader.into()),
+        Some(CallBudget::default()),
+        &source,
+    )
+    .await;
+
+    assert_eq!(verdict["code"], code::FORBIDDEN, "{verdict}");
+    assert_eq!(count_of(db, &subject, &property).await, 0);
 }

@@ -18,10 +18,11 @@ use super::{
 
 impl net::Host for AbiState {
     async fn fetch(&mut self, req: Request) -> Result<Response, HostError> {
-        let manifest = &self.host.app.manifest;
-        let operation = manifest
-            .operations
+        let operation = self
+            .host
+            .manifest
             .iter()
+            .flat_map(|manifest| &manifest.operations)
             .find(|operation| operation.id == req.operation)
             .ok_or_else(|| {
                 error(

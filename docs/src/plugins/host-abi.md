@@ -117,7 +117,7 @@ cargo build --target wasm32-wasip2 --release -p host-abi-counter
 ## The manifest
 
 An app is a release whose manifest has `"runtime": "wasip2/1"` and `"world": "sandboxed-app"`, and lists what it offers in `exports`.
-An app that calls other apps lists the interfaces it will call in `uses` (same form as an export's `interface`, once each, `sandboxed-app` only): `"uses": ["atomic:example/counter@1"]`. An app that lists none calls nobody.
+An app that calls other apps lists the interfaces it will call in `uses` (same form as an export's `interface`, once each, world `sandboxed-app` or `extension`): `"uses": ["atomic:example/counter@1"]`. An app that lists none calls nobody.
 Each export has an `interface` (`package:name/interface@major`), a `function` (kebab-case), a `description`, an `inputSchema` and an `outputSchema`, and an `effect` (`read`, `write`, `external` or `interactive`).
 The schemas are a bounded JSON Schema subset: a flat object of `string`, `integer` and `boolean` properties, each with a `description`, and `additionalProperties: false`.
 The host validates the arguments before the app runs, and the result before the caller sees it.
@@ -219,6 +219,22 @@ try {
 ```
 
 `store.callExport` resolves to the parsed result. A drive app served by `/plugin-ui?format=client` has the same `store.callExport`, whose errors carry `code` but are plain `Error`s. `AppExport`, `Effect` and `HostErrorCode` are exported as types. They are hand-written from `atomic-host/wit/host.wit`, and a test checks the codes against the Rust host. Packaged views (not drive apps) do not support `call` yet.
+
+## From a QuickJS run plugin
+
+A plugin that runs in the server's QuickJS runtime (`/plugin-run`, triggers, schedules) has the same `store`, `net` and `calls` as a component, as globals with the same names and error codes. A failed call throws an `Error` with `code`.
+
+```js
+export function run(ctx) {
+  const page = store.query({ class: TASK, filters: [{ property: DONE, op: 'eq', value: { tag: 'boolean', val: false } }], limit: 50 });
+  const { count } = calls.call('atomic:example/counter@1', 'increment', { subject, property });
+  return { intents: [] };
+}
+```
+
+Values cross as `{tag, val}` (the WIT variant case: `string`, `integer`, `link`, `resource-array`, `json`, ...), fields are camelCase. Available: `store.get`, `getMany`, `query`, `net.fetch` (the body is text) and `calls.providers`, `describe`, `call`. They are the same host code as for a component, so the rights are too: reads need the caller and the Installation's agent, `net.fetch` only reaches manifest operations, and `calls.call` goes through the same checks as above (`manifest.uses`, write on the drive at every hop for `write` and `external` exports).
+A run plugin lists `uses` in its manifest like an app does. Its calls are limited to `read` exports, as for a frame. `store.apply` is `needs-approval`: a run plugin proposes writes by returning intents, which the host plans and applies after review. `subscribe`, `undo`, `search` and `events` are `unsupported`.
+`ctx.http`, `ctx.read`, `ctx.query` and `ctx.integration` stay as they were.
 
 ## Not built yet
 

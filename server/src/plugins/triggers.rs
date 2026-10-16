@@ -337,7 +337,11 @@ async fn run(
     let verdict = match &event.verdict {
         Some(verdict) => verdict.clone(),
         None => runtime
-            .run_triggered(&source, &input, host)
+            .run_triggered(
+                &source,
+                &input,
+                super::host_abi::JsAbi::new(host, appstate.host_abi.clone()),
+            )
             .await
             .map_err(|e| e.to_string())??,
     };

@@ -27,7 +27,7 @@ fn parse_cursor(cursor: &str) -> Result<u64, HostError> {
 impl events::Host for AbiState {
     async fn next(&mut self, cursor: Option<String>, max: u32) -> Result<Vec<Event>, HostError> {
         let after = cursor.as_deref().map(parse_cursor).transpose()?;
-        let app = &self.host.app;
+        let app = &self.host;
         Ok(self.host.registry.next_events(
             &app.drive,
             &app.installation,
@@ -38,7 +38,7 @@ impl events::Host for AbiState {
 
     async fn ack(&mut self, cursor: String) -> Result<(), HostError> {
         let up_to = parse_cursor(&cursor)?;
-        let app = &self.host.app;
+        let app = &self.host;
         self.host
             .registry
             .ack_events(&app.drive, &app.installation, up_to);

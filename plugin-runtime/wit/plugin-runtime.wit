@@ -18,6 +18,22 @@ interface host {
 
   /// Subjects matching a property/value, as a JSON array.
   query: func(property: string, value: string) -> result<string, string>;
+
+  /// Machine-readable failure of an ABI function; `code` is one of the
+  /// stable codes of `atomic:host` (`atomic-host/wit/host.wit`).
+  record error {
+    code: string,
+    message: string,
+  }
+
+  /**
+  One function of the host ABI (`atomic:host`), by its WIT name:
+  `store.get`, `store.get-many`, `store.query`, `net.fetch`, `calls.providers`,
+  `calls.describe`, `calls.call`. `args` is a JSON array of the positional
+  arguments, the result a JSON value. One entry point rather than one import
+  per function, so the ABI can grow without a new runtime build.
+  */
+  abi: func(function: string, args: string) -> result<string, error>;
 }
 
 world plugin-runtime {

@@ -90,6 +90,19 @@ impl<H: PluginHost> bindings::atomic::plugin_runtime::host::Host for RuntimeStat
     async fn query(&mut self, property: String, value: String) -> Result<String, String> {
         self.host.query(property, value).await
     }
+
+    async fn abi(
+        &mut self,
+        function: String,
+        args: String,
+    ) -> Result<String, bindings::atomic::plugin_runtime::host::Error> {
+        self.host.abi(&function, &args).await.map_err(|e| {
+            bindings::atomic::plugin_runtime::host::Error {
+                code: e.code,
+                message: e.message,
+            }
+        })
+    }
 }
 
 /// The compiled runtime, kept for the process' lifetime.

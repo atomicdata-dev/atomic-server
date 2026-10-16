@@ -220,6 +220,18 @@ pub trait PluginHost: Send + 'static {
     async fn fetch(&mut self, request: String) -> Result<String, String>;
     async fn get_resource(&mut self, subject: String) -> Result<String, String>;
     async fn query(&mut self, property: String, value: String) -> Result<String, String>;
+    /// A function of the host ABI by its WIT name (`store.get`, `calls.call`,
+    /// ...), `args` a JSON array, the result JSON. See `host_abi::JsAbi`.
+    async fn abi(
+        &mut self,
+        _function: &str,
+        _args: &str,
+    ) -> Result<String, super::host_abi::HostError> {
+        Err(super::host_abi::error(
+            super::host_abi::code::UNSUPPORTED,
+            "the host ABI is not available in this context",
+        ))
+    }
     /// The capabilities that widen this run's fuel and memory. Read before the
     /// store is built, so they can come from the Installation the plugin runs
     /// under. A host without one gets the baseline.

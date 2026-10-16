@@ -167,7 +167,7 @@ impl store::Host for AbiState {
         let (offset, limit) = check_spec(&q)?;
         let host = &self.host;
 
-        let mut query = to_query(&host.db, &q, &host.app.drive).await?;
+        let mut query = to_query(&host.db, &q, &host.drive).await?;
         query.for_agent = host.core.grant().caller().clone();
         query.limit = Some(convert::SCAN_CAP + 1);
 
@@ -228,10 +228,10 @@ impl store::Host for AbiState {
         check_spec(&q)?;
         // Resolves the properties now, so a bad query fails here and not
         // silently never fires.
-        to_query(&self.host.db, &q, &self.host.app.drive).await?;
+        to_query(&self.host.db, &q, &self.host.drive).await?;
         self.host
             .registry
-            .subscribe(&self.host.app.drive, &self.host.app.installation, q)
+            .subscribe(&self.host.drive, &self.host.installation, q)
             .map_err(|e| {
                 error(
                     code::INVALID_ARGUMENT,
@@ -241,11 +241,9 @@ impl store::Host for AbiState {
     }
 
     async fn unsubscribe(&mut self, subscription: String) {
-        self.host.registry.unsubscribe(
-            &self.host.app.drive,
-            &self.host.app.installation,
-            &subscription,
-        );
+        self.host
+            .registry
+            .unsubscribe(&self.host.drive, &self.host.installation, &subscription);
     }
 
     async fn apply(&mut self, intents: Vec<Intent>) -> Result<Applied, HostError> {
@@ -261,8 +259,8 @@ impl store::Host for AbiState {
 
         let mut writer = StoreApplyHost::for_installation(
             &host.db,
-            &host.app.drive,
-            &host.app.installation,
+            &host.drive,
+            &host.installation,
             caller.clone(),
         )
         .await
@@ -326,8 +324,8 @@ impl store::Host for AbiState {
         };
         if let Some(reason) = why_not {
             host.registry.keep_proposal(Proposal {
-                drive: host.app.drive.clone(),
-                installation: host.app.installation.clone(),
+                drive: host.drive.clone(),
+                installation: host.installation.clone(),
                 caller: format!("{caller:?}"),
                 at_ms: atomic_lib::utils::now(),
                 verdict,

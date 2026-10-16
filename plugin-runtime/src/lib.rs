@@ -83,6 +83,26 @@ globalThis.__atomic = (function () {
     return JSON.parse(unwrap(__hostQuery(property, value)));
   };
 
+  // The host ABI (`atomic:host`): the same functions, names and error codes as
+  // every other kind of app. A failure throws an Error with `.code`.
+  function abi(name, ...args) {
+    const r = JSON.parse(__hostAbi(name, JSON.stringify(args)));
+    if (r.error !== undefined) throw Object.assign(new Error(r.error.message), { code: r.error.code });
+    return JSON.parse(r.ok);
+  }
+  globalThis.store = {
+    get: (subject) => abi('store.get', subject),
+    getMany: (subjects) => abi('store.get-many', subjects),
+    query: (spec) => abi('store.query', spec),
+    apply: (intents) => abi('store.apply', intents),
+  };
+  globalThis.net = { fetch: (request) => abi('net.fetch', request) };
+  globalThis.calls = {
+    providers: (name) => abi('calls.providers', name),
+    describe: (name) => abi('calls.describe', name),
+    call: (name, fn, args, handles = []) => abi('calls.call', name, fn, args, handles),
+  };
+
   return input;
 })();
 "#;
@@ -135,6 +155,23 @@ impl Guest for Component {
                     "__hostAction",
                     Function::new(ctx.clone(), |request: String| {
                         encode(host::invoke_action(&request))
+                    })
+                    .map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())?;
+
+            globals
+                .set(
+                    "__hostAbi",
+                    Function::new(ctx.clone(), |function: String, args: String| {
+                        match host::abi(&function, &args) {
+                            Ok(value) => encode(Ok(value)),
+                            Err(e) => format!(
+                                "{{\"error\":{{\"code\":{},\"message\":{}}}}}",
+                                serde_json_string(&e.code),
+                                serde_json_string(&e.message)
+                            ),
+                        }
                     })
                     .map_err(|e| e.to_string())?,
                 )

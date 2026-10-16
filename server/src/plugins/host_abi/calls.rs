@@ -58,14 +58,14 @@ impl calls::Host for AbiState {
     async fn providers(&mut self, interface: String) -> Vec<String> {
         self.host
             .registry
-            .providers(&self.host.app.drive, &interface)
+            .providers(&self.host.drive, &interface)
             .into_iter()
             .map(|app| app.installation.clone())
             .collect()
     }
 
     async fn describe(&mut self, interface: String) -> Result<Vec<AppExport>, HostError> {
-        describe(&self.host.registry, &self.host.app.drive, &interface)
+        describe(&self.host.registry, &self.host.drive, &interface)
     }
 
     async fn call(
@@ -89,7 +89,12 @@ impl calls::Host for AbiState {
         // What a call causes is bounded by what the calling app declared, not
         // only by who asked: an app calls only the interfaces its manifest
         // lists in `uses`.
-        if !self.host.app.manifest.uses.contains(&interface) {
+        let declared = self
+            .host
+            .manifest
+            .as_ref()
+            .is_some_and(|m| m.uses.contains(&interface));
+        if !declared {
             return Err(error(
                 code::FORBIDDEN,
                 format!("this app does not declare that it uses {interface} (manifest `uses`)"),
@@ -98,7 +103,7 @@ impl calls::Host for AbiState {
         call_export(
             &self.host.registry,
             &self.host.db,
-            &self.host.app.drive,
+            &self.host.drive,
             &interface,
             &function,
             &args,

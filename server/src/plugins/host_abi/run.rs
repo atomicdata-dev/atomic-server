@@ -30,7 +30,7 @@ use super::{
 };
 use crate::plugins::{
     host_core::{self, HostCore, Runtime},
-    manifest::ExportEffect,
+    manifest::{ExportEffect, Manifest},
 };
 
 /// The failure of a call, as the ABI reports it to a calling app.
@@ -40,7 +40,12 @@ pub type CallError = HostError;
 pub(super) struct AbiHost {
     pub registry: Arc<HostAbiRegistry>,
     pub db: Arc<Db>,
-    pub app: Arc<LoadedApp>,
+    /// Where the app is installed and what its release declares. A QuickJS run
+    /// plugin has the same (see `js.rs`); its manifest may be absent (a legacy
+    /// draft), which declares nothing.
+    pub drive: String,
+    pub installation: String,
+    pub manifest: Option<Manifest>,
     /// Reads, fetches and secrets, under the caller and the Installation's
     /// agent. The caller is the agent the entry call came from, at every hop;
     /// a calling app's own rights are never passed on.
@@ -191,25 +196,21 @@ impl WasiView for AbiState {
 pub(super) async fn build_host(
     registry: &Arc<HostAbiRegistry>,
     db: &Arc<Db>,
-    app: &Arc<LoadedApp>,
+    (drive, installation, manifest): (&str, &str, Option<Manifest>),
     caller: ForAgent,
     depth: usize,
     budget: Arc<CallBudget>,
 ) -> Result<AbiHost, HostError> {
-    let core = HostCore::for_run(
-        db.clone(),
-        &app.drive,
-        &app.installation,
-        caller,
-        Some(app.manifest.clone()),
-    )
-    .await
-    .map_err(|e| error(code::FORBIDDEN, e))?;
+    let core = HostCore::for_run(db.clone(), drive, installation, caller, manifest.clone())
+        .await
+        .map_err(|e| error(code::FORBIDDEN, e))?;
 
     Ok(AbiHost {
         registry: registry.clone(),
         db: db.clone(),
-        app: app.clone(),
+        drive: drive.to_string(),
+        installation: installation.to_string(),
+        manifest,
         core,
         depth,
         budget,
@@ -293,9 +294,17 @@ pub fn call_export<'a>(
             .validate(&parsed)
             .map_err(|e| error(code::INVALID_ARGUMENT, e))?;
 
-        let host = build_host(registry, db, &app, caller, depth, budget).await?;
+        let host = build_host(
+            registry,
+            db,
+            (&app.drive, &app.installation, Some(app.manifest.clone())),
+            caller,
+            depth,
+            budget,
+        )
+        .await?;
         // What the callee gets is what was validated, not the caller's bytes.
-        let result = run_invoke(host, interface, function, &parsed.to_string()).await?;
+        let result = run_invoke(host, &app, interface, function, &parsed.to_string()).await?;
 
         // The app is trusted to compute, not to describe what it computed.
         let parsed: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
@@ -433,11 +442,11 @@ pub(super) fn app_error(e: HostError) -> HostError {
 
 async fn run_invoke(
     host: AbiHost,
+    app: &Arc<LoadedApp>,
     interface: &str,
     function: &str,
     args: &str,
 ) -> Result<String, HostError> {
-    let app = host.app.clone();
     let budget = host.budget.clone();
     let grants = host_core::installation_grants(
         &host.db,

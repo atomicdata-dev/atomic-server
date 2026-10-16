@@ -127,6 +127,72 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Port the three runtimes (class-extender WIT, plugin-runtime WIT, frame
       `store`) onto it. Legacy RPC, `plugin.json` and `/app-write` go once the
       catalog apps are ported; stored installations stay readable.
+      *Mapping (2026-10-16).* Old function -> ABI function; "missing" is what
+      one side lacks.
+
+      QuickJS `run` (`plugin-runtime/wit`, `js_runtime.rs`, `ctx.*`):
+      | old | ABI | note |
+      | --- | --- | --- |
+      | `fetch(json{method,url,...})` / `ctx.http` | `net.fetch` | old is URL-based, ABI names a manifest operation; kept as the alias (testdata plugins call it) |
+      | `get-resource(subject)` / `ctx.read` | `store.get` | old returns JSON-AD, ABI a typed resource; alias kept (testdata plugins read `row[prop]`) |
+      | `query(property, value)` / `ctx.query` | `store.query` (`eq`) | old returns subjects, drive-scoped; alias kept |
+      | `invoke-action` / `ctx.integration` | none | integration actions; closest is `calls.call` on a connector app |
+      | `run(source, input) -> verdict` | `app.on-event` / `invoke` | the verdict's intents are `store.intent`s; proposing is `store.apply` -> `proposed` |
+      | missing in old, **built (JS)**: | `store.get`, `get-many`, `query`, `net.fetch`, `calls.providers/describe/call` | `host_abi/js.rs`, globals `store`, `net`, `calls` |
+      | missing in old, not built | `store.apply` (`needs-approval`, intents are the verdict), `subscribe`, `undo`, `search`, `events` | |
+
+      Class extender (`atomic-plugin/wit/class-extender.wit`):
+      | old | ABI | note |
+      | --- | --- | --- |
+      | `get-resource(subject, agent?)` | `store.get` | ABI has no `agent` override: reads are caller ∩ Installation agent |
+      | `query(property, value, agent?)` | `store.query` + `eq`, `with-resources` | same |
+      | `get-plugin-agent()` | none | implicit; a `context` call would give it |
+      | `get-config()` | none | config is a resource of the Installation: `store.get` once reading it is allowed |
+      | `commit(commit-json)` | `store.apply` | old signs a raw CommitBuilder as the plugin agent; ABI plans intents. Raw commits (Loro updates) have no ABI function |
+      | `fetch(http-request)` | `net.fetch` | URL-based vs operation-based, as above |
+      | `class-url` | manifest | |
+      | `on-resource-get(ctx)` | `hooks.on-get` (world `server-module`) | |
+      | `before-commit(ctx)` | `hooks.before-commit(before, after)` | old gets `commit-json`, `is-new`; ABI gets resources |
+      | `after-commit(ctx)` | none | `server-module` has no after-commit; `events` `commit` kind would be it |
+
+      Frame (`hostStore.ts` ops):
+      | op | ABI | note |
+      | --- | --- | --- |
+      | `get`, `getMany` (100) | `store.get`, `get-many` (100) | |
+      | `query` | `store.query` | frame's `parseViewQuery` fields differ |
+      | `search` | `store.search` | unsupported on the host too |
+      | `apply`, `undo` | `store.apply`, `undo` | frame has its own history |
+      | `create`, `save`, `destroy` | `store.apply` (`create`/`set`+`remove`/`destroy`) | `refuseOutsideApp` is a frame-side scope; ABI needs step 2 grants |
+      | `call` | `calls.call` | done (`callExport`) |
+      | `subscribe`, `unsubscribe` | `store.subscribe`, `unsubscribe` | frame no-ops |
+      | `proxyCapability`, `proxyFetch`, `proxyConnections` | `net.fetch` | integration proxy has no ABI function |
+      | `app`, `data`, `context` | none | the Installation, table binding and current agent: a `context` call |
+
+      *Built (slice 1, 2026-10-16): QuickJS `run` plugins.* The runtime has
+      one new import, `abi(function, args)` by WIT name, and the globals
+      `store`, `net`, `calls` (`plugin-runtime/src/lib.rs`). The host side,
+      `host_abi::JsAbi` (`host_abi/js.rs`), builds an `AbiState` for the
+      plugin's Installation per call and calls the same interface code as a
+      component, so rights, `CallBudget`, `check_write` per hop, error codes
+      and `manifest.uses` are the same code. Wired in `/plugin-run`, triggers
+      and schedules. A run's budget allows `read` exports only (as a frame);
+      `store.apply` is `needs-approval` (the verdict proposes). `uses` is
+      allowed in world `extension` too. Old names stay: `ctx.http`, `ctx.read`,
+      `ctx.query`, `ctx.integration`. Net lines: positive, nothing to delete:
+      the old functions have callers and different shapes.
+      *Next:* make the aliases real (JSON-AD from `store.get`, operation ids
+      for `ctx.http`) and delete `fetch`/`get-resource`/`query` from the
+      runtime WIT and `PluginHost`; widen a run's budget once approval exists.
+      *Class extender to `server-module` (not built), what it takes:* (1) add
+      `after-commit` and `commit-json`/`is-new` to `hooks` (or feed `events`
+      `commit`); (2) a typed way to write that is not a plan: raw commit, or
+      make `apply` fit hook-time writes; (3) `get-config` and
+      `get-plugin-agent` as a `context` call; (4) a `server-module` linker in
+      `host_abi/run.rs` and registry, with the hooks called from `wasm.rs`'s
+      commit and read path in place of `bindings::ClassExtender`; (5)
+      operator-only install (world `server-extension`); (6) rebuild
+      `plugin-examples/random-folder-extender` and the atomic-plugins
+      extenders; then delete `atomic-plugin`'s host and `PluginHostState`.
 - [ ] Conformance suite: run published catalog releases against each host
       build (regression test until v1, a promise after).
 

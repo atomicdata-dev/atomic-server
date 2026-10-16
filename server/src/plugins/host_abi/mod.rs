@@ -30,6 +30,7 @@
 mod calls;
 mod convert;
 mod events;
+mod js;
 mod net;
 mod registry;
 mod run;
@@ -40,6 +41,7 @@ pub(crate) mod tests;
 #[cfg(test)]
 mod wit_tests;
 
+pub use js::JsAbi;
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
 pub use run::{
     call_as, call_entry, call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS,

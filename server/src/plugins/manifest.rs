@@ -37,8 +37,8 @@ pub struct Manifest {
     pub exports: Vec<Export>,
     /// Interfaces this app may call through `calls.call`. An app that lists
     /// none calls nobody: what a call causes is bounded by what the caller
-    /// declared and was granted, not only by who asked. Only a
-    /// `sandboxed-app` may declare any.
+    /// declared and was granted, not only by who asked. Not for a server
+    /// extension; a run plugin (world `extension`) declares them too.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uses: Vec<String>,
     /// Coarse egress allowance for packages that call the host `fetch` without
@@ -423,8 +423,8 @@ fn validate_uses(uses: &[String], world: World) -> Result<(), String> {
     if uses.is_empty() {
         return Ok(());
     }
-    if world != World::SandboxedApp {
-        return Err("only world sandboxed-app may declare uses".into());
+    if world == World::ServerExtension {
+        return Err("a server extension may not declare uses".into());
     }
     if uses.len() > 64 {
         return Err("at most 64 used interfaces per release".into());
@@ -1325,7 +1325,7 @@ mod export_tests {
     }
 
     #[test]
-    fn uses_is_validated_like_exports_and_only_for_a_sandboxed_app() {
+    fn uses_is_validated_like_exports_and_not_for_a_server_extension() {
         let with = |uses: serde_json::Value| {
             let mut raw = app(json!([]));
             raw["uses"] = uses;
@@ -1343,10 +1343,17 @@ mod export_tests {
             "atomic:example/counter@1"
         ]))
         .is_err());
+        // A run plugin (world extension) may; a server extension may not.
         assert!(
             Manifest::parse(json!({"schemaVersion": 2, "uses": ["atomic:example/counter@1"]}))
-                .is_err()
+                .is_ok()
         );
+        assert!(Manifest::parse(json!({
+            "schemaVersion": 2,
+            "world": "server-extension",
+            "uses": ["atomic:example/counter@1"]
+        }))
+        .is_err());
         // Nothing declared serializes as it always did.
         assert!(serde_json::to_value(with(json!([])).unwrap().unwrap())
             .unwrap()
