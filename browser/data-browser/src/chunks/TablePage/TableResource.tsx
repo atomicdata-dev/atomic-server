@@ -14,6 +14,7 @@ import {
 } from '@tomic/react';
 import type { CellIndex } from '@chunks/TableEditor';
 import toast from 'react-hot-toast';
+import { moveToTrash } from '@helpers/trash';
 import { styled } from 'styled-components';
 import { AppFrame } from '@chunks/AppPage/AppFrame';
 import { computeSortOrder, readSortKey } from '@helpers/fractionalSortOrder';
@@ -23,7 +24,7 @@ import { useHandleCopyCommand } from '@chunks/TablePage/helpers/useHandleCopyCom
 import { useHandlePaste } from '@chunks/TablePage/helpers/useHandlePaste';
 import {
   useTableHistory,
-  createResourceDeletedHistoryItem,
+  createResourceTrashedHistoryItem,
 } from '@chunks/TablePage/helpers/useTableHistory';
 import {
   TablePageContext,
@@ -1152,6 +1153,35 @@ export const TableResource: React.FC<TableResourceProps> = ({
     [queryKey],
   );
 
+  // Rows go to the drive's Trash, not into oblivion, so a bulk delete stays
+  // restorable. Writes run in parallel: the Trash folder is created first so
+  // they don't race to create it.
+  const trashRows = useCallback(
+    async (subjects: string[]) => {
+      const drive = store.getDrive();
+
+      if (!drive) {
+        throw new Error('No drive to put the Trash in.');
+      }
+
+      await store.getOrCreateTrashFolder(drive);
+      const moved = await Promise.all(
+        subjects.map(async subject =>
+          (await moveToTrash(store, subject, drive)) ? subject : undefined,
+        ),
+      );
+
+      // A move changes `parent`, which fires collection updates before the
+      // local index has the write; re-read once the moves are saved.
+      await invalidateCollection();
+
+      return moved
+        .filter((subject): subject is string => !!subject)
+        .map(subject => createResourceTrashedHistoryItem(subject, drive));
+    },
+    [store, invalidateCollection],
+  );
+
   const deleteRowSubjects = useCallback(
     async (subjects: string[]) => {
       const resources = subjects
@@ -1180,12 +1210,12 @@ export const TableResource: React.FC<TableResourceProps> = ({
         return;
       }
 
+      const trashed = await trashRows(resources.map(row => row.subject));
+
       // One undo step restores the whole batch.
-      addItemsToHistoryStack(resources.map(createResourceDeletedHistoryItem));
+      addItemsToHistoryStack(trashed);
 
       for (const row of resources) {
-        await row.destroy();
-
         if (!sessionSubjects.has(row.subject)) {
           decrementMemberCount();
         }
@@ -1194,6 +1224,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     [
       newRowSubjects,
       store,
+      trashRows,
       clearRowSelection,
       addItemsToHistoryStack,
       decrementMemberCount,
@@ -1387,9 +1418,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
         return;
       }
 
-      addItemsToHistoryStack(createResourceDeletedHistoryItem(rowResource));
-
-      await rowResource.destroy();
+      addItemsToHistoryStack(await trashRows([subject]));
 
       if (isMember) {
         decrementMemberCount();
@@ -1406,6 +1435,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     [
       rowCollection,
       store,
+      trashRows,
       addItemsToHistoryStack,
       gridMemberCount,
       gridNewRowSubjects,
