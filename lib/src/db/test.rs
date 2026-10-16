@@ -5509,6 +5509,67 @@ async fn replicated_and_removed_resources_reach_the_event_stream_and_triggers() 
     );
 }
 
+/// A destroy *commit* takes its children with it. Each child is its own row in
+/// the stream, and the leave edge of each is on its own event rather than
+/// merged into the destroyed parent's.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_destroy_commit_gives_every_child_its_own_event_and_leave_edge() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let store = Db::init_temp("destroy_children_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let folder = genesis_child(&store, &drive).await;
+    let mut kids = vec![
+        genesis_child(&store, &folder).await.to_string(),
+        genesis_child(&store, &folder).await.to_string(),
+        genesis_child(&store, &folder).await.to_string(),
+    ];
+    kids.sort();
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(folder.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        true,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+    let seen = store.drive_events(drive.as_str(), 0, 1000).len();
+
+    let mut resource = store.get_resource(&folder).await.unwrap();
+    resource.destroy(&store).await.unwrap();
+
+    let destroyed: Vec<String> = store
+        .drive_events(drive.as_str(), 0, 1000)
+        .into_iter()
+        .skip(seen)
+        .filter(|e| e.destroyed)
+        .map(|e| e.subject)
+        .collect();
+    for kid in &kids {
+        assert!(destroyed.contains(kid), "{kid} missing in {destroyed:?}");
+    }
+    assert!(destroyed.contains(&folder.to_string()));
+
+    let mut left = Vec::new();
+    while let Some(event) = store.next_trigger_event(&key, &trigger).unwrap() {
+        assert_eq!(event.edge, Edge::Leave);
+        left.push(event.subject.clone());
+        store.acknowledge_plugin_event(&event).unwrap();
+    }
+    left.sort();
+    assert_eq!(left, kids, "one leave edge per child");
+}
+
 /// Appending finds where the log ended without reading it, and retention
 /// emptying the log does not send the sequence back to 1 (a consumer's
 /// checkpoint would then sit above every new event and miss them).

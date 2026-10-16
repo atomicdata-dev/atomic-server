@@ -4801,6 +4801,9 @@ impl Storelike for Db {
         // cascade-deleted children). Tombstoned and announced once the
         // transaction has landed; empty for anything but a destroy.
         let mut removed: Vec<RemovedSubject> = Vec::new();
+        // The destroyed resource's drive event and one per cascade-deleted
+        // child, each with its own query edges.
+        let mut destroy_events: Vec<drive_events::PendingEvent> = Vec::new();
 
         match (&commit_response.resource_old, &commit_response.resource_new) {
             (None, None) if !commit_response.commit.destroy.unwrap_or(false) => {
@@ -4832,8 +4835,14 @@ impl Storelike for Db {
                 // destroy — what `SYNC_DIFF.removeCommits` carries — lands
                 // with the deletion it signs, or not at all. Tombstones and
                 // the children's `Destroyed` events follow the apply below.
-                self.recursive_remove(&subject, &mut transaction, &mut removed, None, None)
-                    .await?;
+                self.recursive_remove(
+                    &subject,
+                    &mut transaction,
+                    &mut removed,
+                    None,
+                    Some(&mut destroy_events),
+                )
+                .await?;
             }
             _ => {}
         };
@@ -4901,26 +4910,32 @@ impl Storelike for Db {
             }
         }
 
-        let drive_event = match commit_response
-            .resource_new
-            .as_ref()
-            .or(commit_response.resource_old.as_ref())
-        {
-            Some(resource) => {
-                drive_events::PendingEvent::new(
+        let drive_events_for_commit: Vec<drive_events::PendingEvent> = if !removed.is_empty() {
+            // A destroy: the cascade already built the event of every subject
+            // it removes, the destroyed one first.
+            destroy_events
+        } else {
+            match commit_response
+                .resource_new
+                .as_ref()
+                .or(commit_response.resource_old.as_ref())
+            {
+                Some(resource) => drive_events::PendingEvent::new(
                     store,
                     resource,
                     commit_response.commit.destroy.unwrap_or(false),
                     commit_response.changed_props.iter().cloned().collect(),
                 )
                 .await
+                .into_iter()
+                .collect(),
+                None => Vec::new(),
             }
-            None => None,
         };
         store.apply_transaction_with_source(
             &mut transaction,
             commit_response.source_id.as_deref(),
-            drive_event.into_iter().collect(),
+            drive_events_for_commit,
         )?;
 
         // An import receipt may be the only evidence available when retrying
