@@ -46,6 +46,45 @@ export function isTransportError(error?: Error): boolean {
   return error instanceof AtomicError && error.type === ErrorType.Transport;
 }
 
+/** Loopback host names: `localhost`, `*.localhost`, 127.0.0.0/8 and `[::1]`. */
+function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+
+  return (
+    h === 'localhost' ||
+    h.endsWith('.localhost') ||
+    h === '::1' ||
+    /^127(\.\d{1,3}){3}$/.test(h)
+  );
+}
+
+/**
+ * True for a subject on a loopback host that this page can never reach: the
+ * page itself is served from a non-loopback host and so is our server. Old dev
+ * resources (`http://localhost:9883/<id>`) linger in a hosted user's store;
+ * fetching them from there can only fail, after a browser "local network
+ * access" prompt and a CORS error.
+ */
+export function isUnreachableLoopbackSubject(
+  subject: string,
+  pageHostname: string | undefined,
+  serverUrl: string,
+): boolean {
+  if (!pageHostname || isLoopbackHost(pageHostname)) return false;
+
+  try {
+    const url = new URL(subject);
+
+    return (
+      /^https?:$/.test(url.protocol) &&
+      isLoopbackHost(url.hostname) &&
+      !isLoopbackHost(new URL(serverUrl).hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The message a fetch fails with when the Store has no server to ask and the
  * local database does not hold the resource. Named so callers can tell this
