@@ -7,6 +7,14 @@ export interface ActivityRow {
   at?: number;
   /** What that activity was. */
   kind?: 'edited' | 'commented';
+  /** Who wrote the newest comment, for a commented row. */
+  by?: string;
+}
+
+/** The newest comment on a resource. */
+export interface CommentInfo {
+  at: number;
+  by?: string;
 }
 
 /**
@@ -16,15 +24,15 @@ export interface ActivityRow {
  * time say nothing.
  */
 export function newestCommentTimes(
-  threads: { about?: string; at?: number }[],
-): Map<string, number> {
-  const out = new Map<string, number>();
+  threads: { about?: string; at?: number; by?: string }[],
+): Map<string, CommentInfo> {
+  const out = new Map<string, CommentInfo>();
 
-  for (const { about, at } of threads) {
+  for (const { about, at, by } of threads) {
     const key = about && canonicalizeScheme(about);
 
-    if (key && at && at > (out.get(key) ?? 0)) {
-      out.set(key, at);
+    if (key && at && at > (out.get(key)?.at ?? 0)) {
+      out.set(key, { at, by });
     }
   }
 
@@ -39,13 +47,13 @@ export function newestCommentTimes(
  */
 export function mergeActivity(
   edits: { subject: string; at?: number }[],
-  comments: ReadonlyMap<string, number>,
+  comments: ReadonlyMap<string, CommentInfo>,
 ): ActivityRow[] {
   const rows = edits.map(({ subject, at }): ActivityRow => {
-    const commentedAt = comments.get(canonicalizeScheme(subject));
+    const comment = comments.get(canonicalizeScheme(subject));
 
-    if (commentedAt !== undefined && commentedAt > (at ?? 0)) {
-      return { subject, at: commentedAt, kind: 'commented' };
+    if (comment && comment.at > (at ?? 0)) {
+      return { subject, at: comment.at, kind: 'commented', by: comment.by };
     }
 
     return { subject, at, kind: at ? 'edited' : undefined };

@@ -10,16 +10,19 @@ import {
   useString,
 } from '@tomic/react';
 import { useChatLogRevision } from './useChatLog';
-import { newestCommentTimes } from '../views/Drive/commentActivity';
+import {
+  newestCommentTimes,
+  type CommentInfo,
+} from '../views/Drive/commentActivity';
 
 /** How many of the newest threads in the Comments folder are read. */
 export const RECENT_COMMENT_THREADS = 50;
 
 const NO_MEMBERS: string[] = [];
-const NONE: ReadonlyMap<string, number> = new Map();
+const NONE: ReadonlyMap<string, CommentInfo> = new Map();
 
 /**
- * When the resources of a drive were last commented on (`about` -> ms): one
+ * When the resources of a drive were last commented on (`about` -> time and author): one
  * bounded read of the newest threads in the drive's Comments folder (ChatLog
  * pages, plus old Message resources). Reads the folder only if the drive
  * already has one and never creates it. Empty without a drive.
@@ -29,7 +32,7 @@ const NONE: ReadonlyMap<string, number> = new Map();
  */
 export function useRecentComments(
   drive: string | undefined,
-): ReadonlyMap<string, number> {
+): ReadonlyMap<string, CommentInfo> {
   const store = useStore();
   const driveResource = useResource(drive);
   const [folder] = useString(
@@ -88,13 +91,16 @@ export function useRecentComments(
 
           const about = resource.get(dataBrowser.properties.about);
           const entries = resource.listChatLogEntries();
-          const at = entries.length
-            ? Math.max(...entries.map(({ entry }) => entry.c))
-            : resource.getCreatedAt();
+          const newest = entries.reduce<(typeof entries)[number] | undefined>(
+            (best, item) =>
+              !best || item.entry.c > best.entry.c ? item : best,
+            undefined,
+          );
 
           return {
             about: typeof about === 'string' ? about : undefined,
-            at,
+            at: newest ? newest.entry.c : resource.getCreatedAt(),
+            by: newest?.entry.a,
           };
         }),
       );

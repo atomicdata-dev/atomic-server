@@ -23,7 +23,9 @@ test.describe('issues view', () => {
     });
     await expect(page.getByTestId('kanban-board')).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Issues', exact: true }).click();
+    // The template no longer ships an Issues tab; add the view like any other.
+    await page.getByRole('button', { name: 'Add view' }).click();
+    await page.getByTestId('menu-item-issues').click();
     const view = page.getByTestId('issues-view');
     await expect(view).toBeVisible();
 

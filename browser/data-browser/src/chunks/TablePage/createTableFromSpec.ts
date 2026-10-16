@@ -27,6 +27,7 @@ import {
   type DerivedColumnSpec,
 } from './derivedColumns';
 import { stringToSlug } from '@helpers/stringToSlug';
+import { rowActionKey } from './rowActions';
 import type { RowActionKind, RowActionSpec } from './rowActions';
 import {
   attachPropertiesToClass,
@@ -767,6 +768,15 @@ export function buildViewPropVals(
 
         if (asColumn) {
           return asColumn;
+        }
+
+        // A row action, by its label or id.
+        const action = view.rowActions?.find(
+          a => stringToSlug(a.id ?? a.label) === stringToSlug(reference),
+        );
+
+        if (action) {
+          return rowActionKey(stringToSlug(action.id ?? action.label));
         }
 
         // A computed column, by the name it was created with.
