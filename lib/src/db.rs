@@ -3119,6 +3119,18 @@ impl Db {
         })
     }
 
+    /// The agents every app installed on `drive` signs as, revoked ones
+    /// included: a name that was an Installation's agent stays one.
+    pub fn app_agents_in_drive(&self, drive: &str) -> Vec<String> {
+        let mut prefix = drive.as_bytes().to_vec();
+        prefix.push(0);
+        self.kv
+            .scan_prefix(Tree::AppAgent, &prefix)
+            .flatten()
+            .filter_map(|(_, bin)| Some(AppAgent::from_bytes(&bin).ok()?.agent))
+            .collect()
+    }
+
     /// Read identity and lifecycle atomically, so revocation cannot look legacy
     /// between separate existence and status probes.
     pub fn get_app_agent_state(&self, key: &AppAgentKey) -> AtomicResult<AppAgentState> {

@@ -323,6 +323,18 @@ async fn a_forwarded_call_is_never_made_as_an_installations_own_agent() {
     .expect("refused");
     assert_eq!(refused.code, code::FORBIDDEN, "{refused:?}");
     assert!(refused.message.contains("own agent"), "{refused:?}");
+
+    // The check does not depend on the app being loaded on this node.
+    let unloaded = serve(
+        Arc::new(HostAbiRegistry::new()),
+        db.clone(),
+        ForAgent::AgentSubject(node_agent.as_str().into()),
+        read(&counter.agent),
+    )
+    .await
+    .error
+    .expect("refused");
+    assert!(unloaded.message.contains("own agent"), "{unloaded:?}");
 }
 
 #[test]
