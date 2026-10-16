@@ -1,10 +1,6 @@
 import { test, expect } from './fixtures';
-import { before, getDevDriveSecret, signIn, FRONTEND_URL } from './test-utils';
-import {
-  enableAIForTesting,
-  setupAIRouteMocks,
-  sendChatMessage,
-} from './ai-mock';
+import { before } from './test-utils';
+import { enableAIForTesting, setupAIRouteMocks } from './ai-mock';
 import { ai, core, dataBrowser } from '@tomic/lib';
 
 test('AI chat discovery includes both duplicate folders and root chats, scoped to the private drive', async ({
@@ -77,74 +73,5 @@ test('AI chat discovery includes both duplicate folders and root chats, scoped t
     await expect(
       panel.getByRole('link', { name: title, exact: true }),
     ).toBeVisible();
-  }
-});
-
-test('independent signed-in devices create chats in one deterministic folder', async ({
-  page,
-  browser,
-  browserDiagnostics,
-}) => {
-  // Two apps cold-start in one test, each with its own WASM and local
-  // database. On a CI host running several pipelines, the second one's
-  // database took longer to open than the default budget (batch #1915,
-  // runs 1 and 7). The app keeps working meanwhile and says so.
-  test.slow();
-
-  for (const kind of ['warning', 'error'] as const) {
-    browserDiagnostics.expect(
-      kind,
-      /ClientDb is running without its local cache/,
-      "The second device's local database can open late on a loaded host; the app reads from the server meanwhile",
-      2,
-      undefined,
-      { optional: true },
-    );
-  }
-
-  await enableAIForTesting(page);
-  await setupAIRouteMocks(page, { chatResponse: 'Phone answer' });
-  await before({ page });
-  const secret = await getDevDriveSecret(page);
-  const context = await browser.newContext();
-  const desktop = await context.newPage();
-
-  try {
-    await enableAIForTesting(desktop);
-    await setupAIRouteMocks(desktop, { chatResponse: 'Desktop answer' });
-    await desktop.goto(`${FRONTEND_URL}/app/welcome`);
-    await signIn(desktop, secret);
-    await desktop.goto(page.url());
-    await expect(desktop.getByTestId('sidebar')).toBeVisible();
-    await Promise.all([
-      sendChatMessage(page, 'Phone conversation'),
-      sendChatMessage(desktop, 'Desktop conversation'),
-    ]);
-    await expect(page.getByText('Phone answer', { exact: true })).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(
-      desktop.getByText('Desktop answer', { exact: true }),
-    ).toBeVisible({ timeout: 30_000 });
-    const folder = async (target: typeof page) =>
-      target.evaluate(async pointer => {
-        const store = window.store;
-        const drive = await store.privateDriveSubject();
-        const expected = await store.getAgent()!.aiChatsFolderSubject(drive);
-
-        return {
-          expected,
-          actual: (await store.getResource(drive)).get(pointer),
-        };
-      }, ai.properties.aiChatsFolder);
-    await expect.poll(async () => (await folder(page)).actual).toBeTruthy();
-    await expect.poll(async () => (await folder(desktop)).actual).toBeTruthy();
-    const phone = await folder(page);
-    const other = await folder(desktop);
-    expect(phone.actual).toBe(phone.expected);
-    expect(other.actual).toBe(phone.actual);
-    expect(other.expected).toBe(phone.expected);
-  } finally {
-    await context.close();
   }
 });

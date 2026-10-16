@@ -16,7 +16,7 @@
 import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import { getPublicKey, hashes, sign, verify } from '@noble/ed25519';
 import { decodeB64, encodeB64Url } from './base64.js';
-import { agentSubject, resourceSubject, toLegacyScheme } from './subject.js';
+import { agentSubject, resourceSubject } from './subject.js';
 
 // Match `CryptoProvider.ts`: the synchronous noble API needs sha512 installed.
 hashes.sha512 = sha512;
@@ -45,22 +45,6 @@ export function privateDriveCert(signerPubkey: Uint8Array): GenesisCert {
     nonce: domainSeparatorNonce(PERSONAL_DRIVE_PURPOSE),
     parent: '',
     drive: '',
-  };
-}
-
-/** Stable storage location for AI chats, scoped to the signer and drive.
- * No content hash: title and other folder metadata remain editable. */
-export function aiChatsFolderCert(
-  signerPubkey: Uint8Array,
-  drive: string,
-): GenesisCert {
-  return {
-    signerPubkey,
-    createdAt: 0,
-    nonce: domainSeparatorNonce('atomic-ai-chats-folder-v1'),
-    // This singleton predates atomic:. Keep its original signed bytes forever.
-    parent: toLegacyScheme(drive),
-    drive: toLegacyScheme(drive),
   };
 }
 

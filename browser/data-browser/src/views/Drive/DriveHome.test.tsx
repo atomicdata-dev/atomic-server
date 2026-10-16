@@ -42,7 +42,7 @@ vi.mock('@helpers/recentResources', () => ({
   getRecentResources: (d: string) => recents[d] ?? [],
 }));
 vi.mock('@tomic/react', () => ({
-  dataBrowser: { classes: {} },
+  dataBrowser: { classes: {}, properties: {} },
   isNotFound: () => false,
   isUnauthorized: () => false,
   useDrivePresence: () => [],
@@ -56,6 +56,8 @@ vi.mock('@tomic/react', () => ({
           loading: false,
           getLoroDoc: () => undefined,
           getCreatedAt: () => 1_700_000_000_000,
+          getClasses: () => [],
+          get: () => undefined,
         },
       ]),
     ),
