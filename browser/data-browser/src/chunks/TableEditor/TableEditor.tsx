@@ -399,6 +399,7 @@ function FancyTableInner<T>({
             rowIndex={index}
             columnIndex={0}
             onExpand={onRowExpand}
+            isDraftRow={!readOnly && index === itemCount - 1}
             Extra={RowHeaderExtra}
             onContextMenu={e => onRowContextMenu?.(index, e)}
             RowHeaderAddonComponent={RowHeaderAddonComponent}
@@ -418,6 +419,8 @@ function FancyTableInner<T>({
     [
       children,
       onRowExpand,
+      itemCount,
+      readOnly,
       RowHeaderExtra,
       onRowContextMenu,
       RowHeaderAddonComponent,

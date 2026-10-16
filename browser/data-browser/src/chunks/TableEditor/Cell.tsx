@@ -47,6 +47,8 @@ export interface CellProps {
 
 interface IndexCellProps extends CellProps {
   onExpand: (rowIndex: number) => void;
+  /** The trailing draft row has no resource yet, so it has no menu to open. */
+  isDraftRow?: boolean;
   /** Rendered before the expand button, e.g. a row-select tick box. */
   Extra?: React.ComponentType<{ index: number }>;
   /**
@@ -336,6 +338,7 @@ export function Cell({
 export function IndexCell({
   children,
   onExpand,
+  isDraftRow,
   Extra,
   RowHeaderAddonComponent,
   ...props
@@ -351,7 +354,7 @@ export function IndexCell({
         {RowHeaderAddonComponent && (
           <RowHeaderAddonComponent rowIndex={props.rowIndex} />
         )}
-        {props.onContextMenu && (
+        {props.onContextMenu && !isDraftRow && (
           <RowMenuButton
             type='button'
             title='Row menu'
