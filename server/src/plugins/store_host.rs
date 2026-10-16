@@ -14,6 +14,7 @@ use serde_json::Value as Json;
 
 use crate::plugins::{
     apply::{ApplyHost, CreateRequest},
+    installation::Scopes,
     plan::PlanHost,
 };
 
@@ -103,7 +104,49 @@ impl StoreApplyHost {
         result.map(|_| ()).map_err(|e| format!("{what}: {e}"))
     }
 
-    /// Refuses unless `for_agent` may write here.
+    /// The Installation's write scope, as its resource lists it. No limit for
+    /// a host that is not an Installation's (a legacy plugin, the server's own
+    /// agent).
+    async fn write_scope(&self) -> Scopes {
+        let Some(key) = &self.signing_as else {
+            return Scopes::default();
+        };
+        match self.store.get_resource(&key.app.as_str().into()).await {
+            Ok(owner) if owner.has_class(urls::INSTALLATION) => Scopes::of(&owner, &key.drive),
+            _ => Scopes::default(),
+        }
+    }
+
+    /// Refuses unless the Installation's own agent may write `resource`: by
+    /// the hierarchy, and by the Installation's `writeScope`. The one place the
+    /// scope is enforced, for every path that writes as an Installation
+    /// (`apply`, triggers, schedules, app writes, sync).
+    pub async fn installation_may_write(&self, resource: &Resource) -> Result<(), String> {
+        let Some(agent) = self.app_agent()? else {
+            return Ok(());
+        };
+        check_write(
+            &self.store,
+            resource,
+            &ForAgent::AgentSubject(agent.subject),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        if !self
+            .write_scope()
+            .await
+            .allows_write(&self.store, resource)
+            .await
+        {
+            return Err(format!(
+                "the installation has no right to write {}: outside its write scope",
+                resource.get_subject()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Refuses unless `for_agent` and the Installation may write here.
     async fn may_write(&self, subject: &str) -> Result<(), String> {
         let resource = self
             .store
@@ -114,16 +157,7 @@ impl StoreApplyHost {
         check_write(&self.store, &resource, &self.for_agent)
             .await
             .map_err(|e| e.to_string())?;
-        if let Some(agent) = self.app_agent()? {
-            check_write(
-                &self.store,
-                &resource,
-                &ForAgent::AgentSubject(agent.subject),
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-        }
-        Ok(())
+        self.installation_may_write(&resource).await
     }
 
     async fn value_for(&self, property: &str, value: Json) -> Result<Value, String> {
@@ -476,6 +510,68 @@ mod destroy_identity_tests {
         assert_eq!(
             destroy.get(urls::SIGNER).unwrap().to_string(),
             app.subject.to_string()
+        );
+    }
+
+    /// Every path that writes as an Installation goes through
+    /// `StoreApplyHost` (triggers, schedules, app writes, sync, `apply`), so
+    /// its write scope has to hold there, not only in the host ABI.
+    #[actix_rt::test]
+    async fn a_verdict_outside_the_write_scope_is_refused_by_the_host() {
+        use crate::plugins::{
+            host_abi::tests::{install_scoped, share, COUNTER_MANIFEST, COUNTER_WASM},
+            test_fixture::{fixture, genesis},
+        };
+        let f = fixture("write_scope_host").await;
+        let (db, drive) = (&f.appstate.store, f.drive.clone());
+        let child = |parent: &str, name: &str| {
+            genesis(
+                db,
+                vec![
+                    (urls::PARENT, Value::AtomicUrl(parent.into())),
+                    (urls::NAME, Value::String(name.into())),
+                ],
+            )
+        };
+        let docs = child(&drive, "docs").await;
+        let inside = child(&docs, "inside").await;
+        let outside = child(&drive, "outside").await;
+        let app = install_scoped(
+            &f,
+            "counter",
+            COUNTER_MANIFEST,
+            COUNTER_WASM,
+            vec![(
+                urls::WRITE_SCOPE,
+                Value::ResourceArray(vec![docs.as_str().into()]),
+            )],
+        )
+        .await;
+        // The agent holds write on `outside` too, by hand: only the scope
+        // limits it.
+        share(db, &outside, &[&app.agent], &[&app.agent]).await;
+
+        let owner = db.get_default_agent().unwrap().subject;
+        let mut host = StoreApplyHost::for_installation(
+            db,
+            &drive,
+            &app.installation,
+            ForAgent::AgentSubject(owner),
+        )
+        .await
+        .unwrap();
+        let rename = || HashMap::from([(urls::NAME.to_string(), serde_json::json!("renamed"))]);
+        host.set(&inside, rename()).await.unwrap();
+        let err = host.set(&outside, rename()).await.unwrap_err();
+        assert!(err.contains("write scope"), "{err}");
+        assert_eq!(
+            db.get_resource(&outside.as_str().into())
+                .await
+                .unwrap()
+                .get(urls::NAME)
+                .unwrap()
+                .to_string(),
+            "outside"
         );
     }
 }

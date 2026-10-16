@@ -339,12 +339,11 @@ impl store::Host for AbiState {
             Some(_) => {
                 let mut first = None;
                 for target in &targets {
-                    if let Err(e) = host
-                        .core
-                        .grant()
-                        .check_installation_write(&host.db, target)
-                        .await
-                    {
+                    let allowed = match host.db.get_resource(&target.as_str().into()).await {
+                        Ok(resource) => writer.installation_may_write(&resource).await,
+                        Err(e) => Err(format!("{target} could not be read: {e}")),
+                    };
+                    if let Err(e) = allowed {
                         first = Some(format!("the installation may not write {target}: {e}"));
                         break;
                     }

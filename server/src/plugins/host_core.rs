@@ -374,28 +374,6 @@ impl Grant {
         }
         Ok(())
     }
-
-    /// Refuses unless the Installation's own agent may write `subject`: by the
-    /// hierarchy, and by its write scope. The caller is checked by the store.
-    pub async fn check_installation_write(&self, db: &Db, subject: &str) -> Result<(), String> {
-        let agent = self
-            .installation
-            .as_ref()
-            .ok_or("this installation has no identity of its own to write as")?;
-        let resource = db
-            .get_resource(&subject.into())
-            .await
-            .map_err(|e| format!("{subject} could not be read: {e}"))?;
-        hierarchy::check_write(db, &resource, agent)
-            .await
-            .map_err(|e| e.to_string())?;
-        if !self.scopes.allows_write(db, &resource).await {
-            return Err(format!(
-                "the installation has no right to write {subject}: outside its write scope"
-            ));
-        }
-        Ok(())
-    }
 }
 
 /// Which destinations a fetch may reach. Two declaration styles exist today;
