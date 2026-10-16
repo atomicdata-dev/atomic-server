@@ -113,3 +113,12 @@ it('restores from a picked file and clears the input', async () => {
   await waitFor(() => expect(onRestored).toHaveBeenCalled());
   expect(vault.restoreFromFile).toHaveBeenCalledWith(file);
 });
+
+it('says backups are paused when the vault is full', () => {
+  show(QUOTA, false, { ...vaultWith(QUOTA), quotaBlocked: true });
+
+  expect(screen.getByTestId('vault-quota-blocked').textContent).toContain(
+    'Backups are paused because this Cloud Vault is full.',
+  );
+  expect(screen.queryByTestId('vault-summary')).toBeNull();
+});

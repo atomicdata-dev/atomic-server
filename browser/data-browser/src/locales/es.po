@@ -13090,3 +13090,8 @@ msgstr "Comentado {0}"
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr ""
+
+#. 0: CLOUD_SERVER_PRICE
+#: src/helpers/managed/vault.ts
+msgid "Backups are paused because this Cloud Vault is full. Free up space under Manage storage, or upgrade to Cloud Server from {0}."
+msgstr ""

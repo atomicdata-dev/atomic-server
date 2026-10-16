@@ -18,6 +18,8 @@ import {
   type VaultEnrollment,
   type VaultKeyOps,
   type VaultProofSigner,
+  VaultQuotaExceededError,
+  vaultQuotaFullMessage,
 } from './vault';
 import {
   fetchVaultBackupFile,
@@ -25,7 +27,12 @@ import {
   restoreDriveFromFile,
   suggestedFileName,
 } from './vaultFile';
-import { onVaultChanged, setVaultOptOut } from './vaultAutoBackup';
+import {
+  clearVaultQuotaBlock,
+  isVaultQuotaBlocked,
+  onVaultChanged,
+  setVaultOptOut,
+} from './vaultAutoBackup';
 
 /**
  * Cloud Vault state for one drive, ready to bind to a UI.
@@ -73,6 +80,10 @@ export type UseVaultBackup = {
    * that did not exist when the first read said `unavailable`.
    */
   refresh: () => Promise<void>;
+  /** Automatic backups are paused because the vault is full. */
+  quotaBlocked: boolean;
+  /** The person freed storage: lift the pause and re-read. */
+  storageChanged: () => Promise<void>;
 };
 
 /**
@@ -136,6 +147,7 @@ export function useVaultBackup({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [restoreProgress, setRestoreProgress] = useState<number | null>(null);
+  const [quotaBlocked, setQuotaBlocked] = useState(false);
 
   // Kept in a ref rather than state: it is not rendered, and putting a key in
   // state would put it in React DevTools for anyone with the page open.
@@ -162,6 +174,8 @@ export function useVaultBackup({
 
   const refresh = useCallback(async () => {
     if (!driveSubject) return;
+
+    setQuotaBlocked(isVaultQuotaBlocked(driveSubject));
 
     try {
       if (!(await getManagedAccount())) {
@@ -265,7 +279,11 @@ export function useVaultBackup({
       try {
         return await action();
       } catch (e) {
-        setError((e as Error).message);
+        setError(
+          e instanceof VaultQuotaExceededError
+            ? vaultQuotaFullMessage()
+            : (e as Error).message,
+        );
 
         return null;
       } finally {
@@ -332,8 +350,17 @@ export function useVaultBackup({
     });
   }, [run, status, driveSubject, refresh]);
 
+  const storageChanged = useCallback(async () => {
+    if (driveSubject) clearVaultQuotaBlock(driveSubject);
+
+    await refresh();
+  }, [driveSubject, refresh]);
+
   const backupNow = useCallback(async () => {
     if (status.state !== 'on') return;
+
+    clearVaultQuotaBlock(driveSubject!);
+    setQuotaBlocked(false);
 
     await run(async () => {
       const key = await ensureKey(status.enrollment.drive_pseudonym);
@@ -506,5 +533,7 @@ export function useVaultBackup({
     restore,
     restoreProgress,
     refresh,
+    quotaBlocked,
+    storageChanged,
   };
 }
