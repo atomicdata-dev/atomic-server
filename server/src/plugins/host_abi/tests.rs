@@ -1011,6 +1011,46 @@ async fn events_are_pulled_with_a_cursor_and_acknowledged() {
 }
 
 #[actix_rt::test]
+async fn next_gets_past_a_long_run_of_events_the_app_filters_out() {
+    let w = World::new("host_abi_event_stall").await;
+    let counter = install_scoped(
+        &w.f,
+        "counter",
+        COUNTER_MANIFEST,
+        COUNTER_WASM,
+        vec![(urls::READ_SCOPE, subtrees(&[w.f.drive.as_str()]))],
+    )
+    .await;
+    let mut state = w.state(&counter, owner(&w.db)).await;
+    drain_events(&mut state).await;
+    let (subject, property) = counter_resource(&w.f).await;
+    drain_events(&mut state).await;
+    state
+        .set_filters(vec![Filter {
+            class: None,
+            subtree: None,
+            property: Some(property.clone()),
+        }])
+        .await
+        .unwrap();
+
+    // More commits that do not match than one `next` looks at, then one that
+    // does. The app only ever calls `next` and acks what it was given.
+    for i in 0..45 {
+        let mut resource = w.db.get_resource(&subject.as_str().into()).await.unwrap();
+        resource
+            .set_unsafe(urls::NAME.into(), Value::String(format!("name {i}")))
+            .unwrap();
+        resource.save(&*w.db).await.unwrap();
+    }
+    bump_count(&w.db, &subject, &property, None, 1).await;
+
+    let got = state.next(None, 10).await.unwrap();
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert_eq!(commit_subjects(&got), vec![subject]);
+}
+
+#[actix_rt::test]
 async fn a_subscription_filters_by_class_subtree_and_property() {
     let w = World::new("host_abi_event_filters").await;
     let counter = install_scoped(

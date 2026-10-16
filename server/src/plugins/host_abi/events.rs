@@ -21,7 +21,13 @@ use super::{
 const MAX_EVENTS: u32 = 100;
 /// Most log rows one `next` looks at, readable or not, so an app that cannot
 /// read what is in front of it does not scan the log forever.
+#[cfg(not(test))]
 const MAX_SCAN: usize = 5000;
+#[cfg(test)]
+const MAX_SCAN: usize = 20;
+/// Most batches of [`MAX_SCAN`] rows one `next` goes through while it has
+/// found nothing to return.
+const MAX_SCAN_BATCHES: usize = 8;
 const FILTER_CAP: usize = 32;
 
 fn parse_cursor(cursor: &str) -> Result<u64, HostError> {
@@ -78,6 +84,7 @@ impl events::Host for AbiState {
             &self.host.drive,
             self.host.installation.clone(),
         );
+        let after_checkpoint = cursor.is_none();
         let after = match cursor {
             Some(c) => parse_cursor(&c)?,
             None => db.event_checkpoint(drive, &app),
@@ -92,29 +99,52 @@ impl events::Host for AbiState {
         let max = max.clamp(1, MAX_EVENTS) as usize;
 
         let mut out = Vec::new();
-        for event in db.drive_events(drive, after, MAX_SCAN) {
-            let ancestors = if needs_ancestors {
-                db.event_ancestors(event.parent.as_deref()).await
-            } else {
-                None
+        let mut from = after;
+        for _ in 0..MAX_SCAN_BATCHES {
+            let batch = db.drive_events(drive, from, MAX_SCAN);
+            let Some(last) = batch.last().map(|e| e.seq) else {
+                break;
             };
-            let wanted = filters
-                .as_ref()
-                .is_none_or(|fs| fs.iter().any(|f| f.matches(&event, ancestors.as_deref())));
-            if wanted && may_see(&self.host, &event).await {
-                out.push(Event {
-                    cursor: event.seq.to_string(),
-                    kind: if event.destroyed {
-                        Kind::Destroyed
-                    } else {
-                        Kind::Commit(event.subject.clone())
-                    },
-                    subject: Some(event.subject),
-                    at_ms: event.at_ms.max(0) as u64,
-                });
-                if out.len() == max {
-                    break;
+            let scanned = batch.len();
+            for event in batch {
+                let ancestors = if needs_ancestors {
+                    db.event_ancestors(event.parent.as_deref()).await
+                } else {
+                    None
+                };
+                let wanted = filters
+                    .as_ref()
+                    .is_none_or(|fs| fs.iter().any(|f| f.matches(&event, ancestors.as_deref())));
+                if wanted && may_see(&self.host, &event).await {
+                    out.push(Event {
+                        cursor: event.seq.to_string(),
+                        kind: if event.destroyed {
+                            Kind::Destroyed
+                        } else {
+                            Kind::Commit(event.subject.clone())
+                        },
+                        subject: Some(event.subject),
+                        at_ms: event.at_ms.max(0) as u64,
+                    });
+                    if out.len() == max {
+                        break;
+                    }
                 }
+            }
+            if !out.is_empty() {
+                break;
+            }
+            // Everything looked at was filtered out or not visible, so there is
+            // no event to ack past it: the app would look at the same rows on
+            // every call and never reach what comes after. The checkpoint moves
+            // over them, as the trigger path does for edges nobody wants.
+            if after_checkpoint {
+                db.ack_events(drive, &app, last)
+                    .map_err(|e| error(code::INTERNAL, e.to_string()))?;
+            }
+            from = last;
+            if scanned < MAX_SCAN {
+                break;
             }
         }
         Ok(out)
