@@ -191,6 +191,14 @@ POST /host/call
 
 The request is signed with a version 2 signature (`signRequest(url, agent, {}, { method, body })`), which covers the method and the body, so a captured request cannot be replayed with other arguments. It may carry `"allowEffects": ["read", ...]`; an export whose effect is not listed is `forbidden`, at every hop of the chain, so an app called with `["read"]` cannot pass the call on to one that writes. The answer is `{"result": ...}`, or `{"error": {"code": ..., "message": ...}}` with a status that follows the code (`forbidden` 403, `not-found` 404, `invalid-argument` 400, `unsupported` 501).
 
+## Exports as tools
+
+Every export of an installed `sandboxed-app` is also an MCP tool on `/mcp`, so an LLM finds it with `tools/list` and calls it with `tools/call`, without knowing about apps.
+The name is made from the interface and the function: lowercase, every character outside `a-z0-9_` becomes `_`, and a double underscore separates them, so `atomic:example/counter@1` `increment` is `atomic_example_counter_1__increment` (a name over 64 characters keeps its tail behind a short hash of the whole). The description and `inputSchema` are the export's own, plus an optional `drive` argument for when several shared drives provide the same tool (the first one is the default).
+
+A tool call takes the same path as `POST /host/call`: the connection's issued agent must read the drive, and write it for a `write` export or an app that declares secrets, at every hop. On top of that the person's choice counts: a read-only connection is only offered `read` exports of apps without secrets.
+`external` and `interactive` exports are not offered over MCP yet.
+
 ## From a frame (TypeScript)
 
 A drive app's frame calls an export through its store, with the signed-in person's rights. The host sends the signed `POST /host/call` for it, and for now only runs exports whose `effect` is `read`; a `write`, `external` or `interactive` export is `forbidden` from a frame until the host can ask the person to approve it. (`store.call(op, args)` is the transport under every store method, as before.)

@@ -236,6 +236,11 @@ impl HostAbiRegistry {
         self.providers_in(drive).len()
     }
 
+    /// Every app loaded for `drive`, in installation order.
+    pub fn apps_in(&self, drive: &str) -> Vec<Arc<LoadedApp>> {
+        self.providers_in(drive)
+    }
+
     fn providers_in(&self, drive: &str) -> Vec<Arc<LoadedApp>> {
         self.apps
             .read()

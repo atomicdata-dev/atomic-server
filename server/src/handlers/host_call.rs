@@ -18,14 +18,14 @@
 //! `allowEffects`; a frame has no network of its own and cannot set it.
 
 use actix_web::{http::StatusCode, web, HttpResponse};
-use atomic_lib::{agents::ForAgent, hierarchy::check_read, Storelike};
+use atomic_lib::agents::ForAgent;
 
 use crate::{
     appstate::AppState,
     errors::{AppErrorType, AtomicServerError, AtomicServerResult},
     helpers::get_client_agent_for_request,
     plugins::{
-        host_abi::{self, code, CallBudget, ENTRY_TIMEOUT},
+        host_abi::{self, code, CallBudget},
         manifest::ExportEffect,
     },
 };
@@ -71,12 +71,6 @@ fn effect_name(effect: ExportEffect) -> &'static str {
     }
 }
 
-fn refusal(code: &str, status: StatusCode, message: impl Into<String>) -> HttpResponse {
-    HttpResponse::build(status).json(serde_json::json!({
-        "error": { "code": code, "message": message.into() },
-    }))
-}
-
 #[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_host_call(
     appstate: web::Data<AppState>,
@@ -107,22 +101,10 @@ pub async fn handle_host_call(
     let body: HostCallBody = serde_json::from_slice(&raw)
         .map_err(|e| AtomicServerError::bad_request(format!("Invalid JSON body: {e}")))?;
 
-    // Before anything is loaded or run: the caller must see the drive.
-    let store = &appstate.store;
-    let drive = store.get_resource(&body.drive.as_str().into()).await?;
-    if let Err(e) = check_read(store, &drive, &agent).await {
-        return Ok(refusal(
-            code::FORBIDDEN,
-            StatusCode::FORBIDDEN,
-            e.to_string(),
-        ));
-    }
+    let db = std::sync::Arc::new(appstate.store.clone());
 
-    let db = std::sync::Arc::new(store.clone());
-    appstate.host_abi.refresh(&db, &body.drive).await;
-
-    // Write and external exports also need write on the drive; `call_export`
-    // checks that at every hop.
+    // Write and external exports, and apps with secrets, also need write on
+    // the drive; `call_export` checks that at every hop.
     // Checked at every hop, not only here: an app a frame calls cannot hand
     // the call on to one that writes.
     let budget = match &body.allow_effects {
@@ -140,7 +122,8 @@ pub async fn handle_host_call(
         None => CallBudget::default(),
     };
 
-    let outcome = host_abi::call_entry(
+    // The drive must be readable by the agent before anything is loaded.
+    let outcome = host_abi::call_for_agent(
         &appstate.host_abi,
         &db,
         &body.drive,
@@ -149,7 +132,6 @@ pub async fn handle_host_call(
         &body.args.to_string(),
         agent,
         std::sync::Arc::new(budget),
-        ENTRY_TIMEOUT,
     )
     .await;
 

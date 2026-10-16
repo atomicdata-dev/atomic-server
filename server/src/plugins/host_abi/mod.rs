@@ -42,7 +42,8 @@ mod wit_tests;
 
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
 pub use run::{
-    call_as, call_entry, call_export, CallBudget, CallError, CHAIN_CALLS, CHAIN_FUEL, ENTRY_TIMEOUT,
+    call_as, call_entry, call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS,
+    CHAIN_FUEL, ENTRY_TIMEOUT,
 };
 
 pub(crate) mod bindings {

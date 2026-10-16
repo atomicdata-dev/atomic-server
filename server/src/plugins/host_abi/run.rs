@@ -323,6 +323,46 @@ pub async fn call_as(
     .await
 }
 
+/// The entry call of every outside caller (`/host/call`, MCP): the agent must
+/// be able to read the drive, the drive's apps are loaded, and the call runs
+/// under `budget` with [`ENTRY_TIMEOUT`]. Write on the drive, for exports that
+/// write, reach out or belong to an app with secrets, is checked by
+/// [`call_export`] at every hop. A caller must not be the public agent.
+#[allow(clippy::too_many_arguments)]
+pub async fn call_for_agent(
+    registry: &Arc<HostAbiRegistry>,
+    db: &Arc<Db>,
+    drive: &str,
+    interface: &str,
+    function: &str,
+    args: &str,
+    caller: ForAgent,
+    budget: Arc<CallBudget>,
+) -> Result<String, HostError> {
+    use atomic_lib::Storelike;
+    // Before anything is loaded or run: the caller must see the drive.
+    let drive_resource = db
+        .get_resource(&drive.into())
+        .await
+        .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+    atomic_lib::hierarchy::check_read(&**db, &drive_resource, &caller)
+        .await
+        .map_err(|e| error(code::FORBIDDEN, e.to_string()))?;
+    registry.refresh(db, drive).await;
+    call_entry(
+        registry,
+        db,
+        drive,
+        interface,
+        function,
+        args,
+        caller,
+        budget,
+        ENTRY_TIMEOUT,
+    )
+    .await
+}
+
 /// An entry call into apps that are already loaded, under one budget and one
 /// deadline for the whole chain it causes.
 #[allow(clippy::too_many_arguments)]

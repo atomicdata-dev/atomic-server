@@ -168,9 +168,15 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       bounded JSON Schema subset) and `calls.describe` / `POST /host/call`
       serve them. They are not resources yet, and MCP tools, Cmd+K and docs are
       not derived from them.
+      *Progress (step 5, MCP):* every `read` / `write` export of an installed
+      app is also an MCP tool on `/mcp` (`server/src/mcp/exports.rs`), named
+      `<interface>__<function>`, called through the same rights path as
+      `/host/call` (`host_abi::call_for_agent`). `external` and `interactive`
+      are not offered. Cmd+K, in-app AI tools, bindings and docs do not derive
+      from exports yet, and the exports are still not resources.
 - [ ] MCP tools, Cmd+K actions, in-app AI tools, bindings and docs are all
       derived from those resources (today only manifest `actions` become MCP
-      tools, `server/src/plugins/actions.rs`).
+      tools in `server/src/plugins/actions.rs`'s `list`, an in-app listing).
 - [ ] The host ABI itself is described the same way.
 
 ### 6. Placement and multiple machines
