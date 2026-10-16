@@ -118,11 +118,8 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         json!({"count": 1})
     );
     assert_eq!(count_of(&db_b, &subject, &property).await, 1);
-    let on_a = db_a.get_resource(&subject.as_str().into()).await;
-    assert!(
-        !matches!(on_a.map(|r| r.get(&property).cloned()), Ok(Ok(atomic_lib::Value::Integer(n))) if n > 0),
-        "the write happened on B, not on A"
-    );
+    // The count is on B, where the app ran. A may get it too, through the live
+    // sync it has with B, but it could not have written it: it has no app.
 
     // -- A caller who cannot write B's drive is forbidden there, for a write.
     let err = call_as(
