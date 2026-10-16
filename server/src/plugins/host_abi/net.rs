@@ -7,7 +7,7 @@
 //! actually connected to, secret substitution scoped to the origin, and the
 //! response cap.
 
-use crate::plugins::host_core::FetchRequest;
+use crate::plugins::host_core::{FetchRequest, World};
 
 use super::{
     bindings::atomic::host::net::{self, Header, Request, Response},
@@ -35,8 +35,10 @@ impl net::Host for AbiState {
             })?;
 
         // Same rule as the JS runtime: an external write is something a person
-        // approved as an intent, not something code decides mid-run.
-        if operation.effect != "read" {
+        // approved as an intent, not something code decides mid-run. A server
+        // module is the exception: it runs inside the server's own commit
+        // path, installed by the operator, and there is no run to approve.
+        if operation.effect != "read" && self.host.core.world() != World::ServerExtension {
             return Err(error(
                 code::NEEDS_APPROVAL,
                 format!(

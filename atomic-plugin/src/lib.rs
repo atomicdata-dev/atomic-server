@@ -1,19 +1,25 @@
+//! Helper library for server modules (class extenders) on the Atomic host ABI,
+//! world `server-module` (`atomic-host/wit/host.wit`).
+
 #[doc(hidden)]
-pub mod bindings;
+pub mod bindings {
+    wit_bindgen::generate!({
+        path: "../atomic-host/wit",
+        world: "server-module",
+        pub_export_macro: true,
+        default_bindings_module: "atomic_plugin::bindings",
+    });
+}
 
 use std::collections::{HashMap, HashSet};
 
-#[doc(hidden)]
-pub use bindings::*;
-
-// Types re-exports
-pub use bindings::atomic::class_extender::host;
-pub use bindings::atomic::class_extender::types::{
-    CommitContext, GetContext, HttpHeader, HttpRequest, HttpResponse, ResourceJson,
-    ResourceResponse,
+pub use bindings::atomic::host::{calls, net};
+use bindings::atomic::host::{
+    context,
+    store::{self, Intent, Outcome},
+    types::{Problem, PropVal, Severity, Value},
 };
-
-pub use bindings::Guest;
+pub use bindings::exports::atomic::host::hooks::{CommitInfo, Guest};
 
 const IS_A: &str = "https://atomicdata.dev/properties/isA";
 
@@ -131,13 +137,16 @@ impl CommitBuilder {
     }
 }
 
-/// High-level trait for implementing a Class Extender plugin.
+/// High-level trait for implementing a server module that extends classes.
 pub trait ClassExtender {
+    /// The classes this module extends.
     fn class_url() -> Vec<String>;
 
-    /// Called when a resource is fetched from the server. You can modify the resource in place.
-    fn on_resource_get(resource: &mut Resource) -> Result<Option<&Resource>, String> {
-        Ok(Some(resource))
+    /// Called when a resource of the class is read. Change it in place and
+    /// return it, or return `None` to leave it as it is. The default leaves it.
+    /// An error fails the read.
+    fn on_resource_get(_resource: &mut Resource) -> Result<Option<&Resource>, String> {
+        Ok(None)
     }
 
     /// Called before a Commit that targets the class is persisted. If you return an error, the commit will be rejected.
@@ -154,80 +163,96 @@ pub trait ClassExtender {
 #[doc(hidden)]
 pub struct PluginWrapper<T>(std::marker::PhantomData<T>);
 
+fn commit_of(info: &CommitInfo) -> Result<Commit, String> {
+    serde_json::from_str(&info.commit_json).map_err(|e| e.to_string())
+}
+
+fn error(message: String) -> bindings::atomic::host::types::Error {
+    bindings::atomic::host::types::Error {
+        code: "internal".into(),
+        message,
+    }
+}
+
 impl<T: ClassExtender> Guest for PluginWrapper<T> {
-    fn class_url() -> Vec<String> {
+    fn classes() -> Vec<String> {
         T::class_url()
     }
 
-    fn on_resource_get(ctx: GetContext) -> Result<Option<ResourceResponse>, String> {
-        let mut resource = Resource::try_from(ctx.snapshot)?;
-
-        let Some(result) = T::on_resource_get(&mut resource)? else {
-            return Ok(None);
-        };
-
-        let updated_payload = result.to_json()?;
-
-        Ok(Some(ResourceResponse {
-            primary: ResourceJson {
-                subject: resource.subject,
-                json_ad: updated_payload,
-            },
-            referenced: Vec::new(),
-        }))
+    fn before_commit(
+        info: CommitInfo,
+        after: bindings::atomic::host::types::Resource,
+    ) -> Vec<Problem> {
+        let verdict = commit_of(&info)
+            .and_then(|commit| T::before_commit(&commit, &after.into(), info.is_new));
+        match verdict {
+            Ok(()) => Vec::new(),
+            Err(message) => vec![Problem {
+                severity: Severity::Error,
+                message,
+                subject: Some(info.subject),
+                property: None,
+            }],
+        }
     }
 
-    fn before_commit(ctx: CommitContext) -> Result<(), String> {
-        let commit: Commit = serde_json::from_str(&ctx.commit_json).map_err(|e| e.to_string())?;
-        let snapshot: Resource = Resource::try_from(ctx.snapshot)?;
-
-        T::before_commit(&commit, &snapshot, ctx.is_new)
+    fn after_commit(
+        info: CommitInfo,
+        after: bindings::atomic::host::types::Resource,
+    ) -> Result<(), bindings::atomic::host::types::Error> {
+        commit_of(&info)
+            .and_then(|commit| T::after_commit(&commit, &after.into(), info.is_new))
+            .map_err(error)
     }
 
-    fn after_commit(ctx: CommitContext) -> Result<(), String> {
-        let commit: Commit = serde_json::from_str(&ctx.commit_json).map_err(|e| e.to_string())?;
-        let snapshot: Resource = Resource::try_from(ctx.snapshot)?;
-
-        T::after_commit(&commit, &snapshot, ctx.is_new)
+    fn on_get(
+        resource: bindings::atomic::host::types::Resource,
+        _agent: String,
+    ) -> Result<Option<bindings::atomic::host::types::Resource>, bindings::atomic::host::types::Error>
+    {
+        let mut resource: Resource = resource.into();
+        let answer = T::on_resource_get(&mut resource).map_err(error)?;
+        Ok(answer.map(Resource::to_wit))
     }
 }
 
 #[macro_export]
 macro_rules! export_plugin {
     ($plugin_type:ty) => {
-        struct Shim;
-        impl $crate::Guest for Shim {
-            fn class_url() -> Vec<String> {
-                <$crate::PluginWrapper<$plugin_type> as $crate::Guest>::class_url()
-            }
-            fn on_resource_get(ctx: $crate::GetContext) -> Result<Option<$crate::ResourceResponse>, String> {
-                <$crate::PluginWrapper<$plugin_type> as $crate::Guest>::on_resource_get(ctx)
-            }
-            fn before_commit(ctx: $crate::CommitContext) -> Result<(), String> {
-                <$crate::PluginWrapper<$plugin_type> as $crate::Guest>::before_commit(ctx)
-            }
-            fn after_commit(ctx: $crate::CommitContext) -> Result<(), String> {
-                <$crate::PluginWrapper<$plugin_type> as $crate::Guest>::after_commit(ctx)
-            }
-        }
-
-       $crate::__export_world_class_extender_cabi!(Shim with_types_in $crate::bindings);
+        type Plugin = $crate::PluginWrapper<$plugin_type>;
+        $crate::bindings::export!(Plugin with_types_in $crate::bindings);
     };
 }
 
-/// Gets a resource from the store by subject, the plugin's agent is used to authorize the request.
-pub fn get_resource(subject: String) -> Result<Resource, String> {
-    host::get_resource(&subject, None)
-        .map(|json| Resource::try_from(json).map_err(|e| e.to_string()))?
+fn failure(error: bindings::atomic::host::types::Error) -> String {
+    format!("{}: {}", error.code, error.message)
 }
 
-/// Queries the store for resources that match the given property and value, the plugin's agent is used to authorize the request.
+/// Gets a resource from the store by subject, as the module's agent: it sees
+/// what that agent may read and nothing else.
+pub fn get_resource(subject: String) -> Result<Resource, String> {
+    store::get(&subject).map(Resource::from).map_err(failure)
+}
+
+/// Queries the store for resources whose `property` equals `value` (a page of
+/// at most 100), as the module's agent.
 pub fn query(property: String, value: String) -> Result<Vec<Resource>, String> {
-    host::query(&property, &value, None).map(|json| {
-        json.into_iter()
-            .map(|json| Resource::try_from(json).map_err(|e| e.to_string()))
-            .collect::<Result<Vec<Resource>, String>>()
-    })?
+    let page = store::query(&store::QuerySpec {
+        class: None,
+        parent: None,
+        filters: vec![store::Filter {
+            property,
+            op: store::FilterOp::Eq,
+            value: Some(Value::String(value)),
+        }],
+        sort_by: None,
+        sort_desc: false,
+        limit: None,
+        cursor: None,
+        with_resources: true,
+    })
+    .map_err(failure)?;
+    Ok(page.resources.into_iter().map(Resource::from).collect())
 }
 
 /// Gets the config of the plugin deserialized to the given type.
@@ -236,73 +261,148 @@ pub fn get_config<'a, T>() -> Result<T, String>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let config_str = host::get_config();
-    serde_json::from_str::<T>(&config_str)
+    serde_json::from_str::<T>(&context::get().config)
         .map_err(|e| format!("Failed to deserialize config: {}", e))
 }
 
-/// Creates a commit and signs it using the plugin's agent.
+/// The subject of the agent the module acts as, if it has one.
+pub fn get_plugin_agent() -> Option<String> {
+    context::get().agent
+}
+
+/// Writes what the builder describes as one transaction, signed by the
+/// module's agent. An error if it was not written (the agent may not write
+/// there, or the change is invalid).
 pub fn commit(commit: &CommitBuilder) -> Result<(), String> {
-    let commit_str =
-        serde_json::to_string(commit).map_err(|e| format!("Failed to serialize commit: {}", e))?;
-    host::commit(&commit_str).map_err(|e| format!("Failed to commit: {}", e))
+    let subject = commit.subject.clone();
+    let mut intents = Vec::new();
+    if commit.destroy {
+        intents.push(Intent::Destroy(subject));
+    } else {
+        let mut set: Vec<PropVal> = commit
+            .set
+            .iter()
+            .map(|(property, value)| PropVal {
+                property: property.clone(),
+                value: json_to_value(value),
+            })
+            .collect();
+        if !commit.push.is_empty() {
+            let current = store::get(&subject).map_err(failure)?;
+            for (property, items) in &commit.push {
+                let mut all = match current.propvals.iter().find(|pv| &pv.property == property) {
+                    Some(PropVal {
+                        value: Value::ResourceArray(existing),
+                        ..
+                    }) => existing.clone(),
+                    _ => Vec::new(),
+                };
+                all.extend(items.iter().cloned());
+                set.push(PropVal {
+                    property: property.clone(),
+                    value: Value::ResourceArray(all),
+                });
+            }
+        }
+        if !set.is_empty() {
+            intents.push(Intent::Set((subject.clone(), set)));
+        }
+        if !commit.remove.is_empty() {
+            intents.push(Intent::Remove((
+                subject,
+                commit.remove.iter().cloned().collect(),
+            )));
+        }
+    }
+    if intents.is_empty() {
+        return Ok(());
+    }
+
+    let applied = store::apply(&intents).map_err(failure)?;
+    match applied.outcome {
+        Outcome::Committed => Ok(()),
+        outcome => Err(format!(
+            "Failed to commit ({outcome:?}): {}",
+            applied
+                .problems
+                .iter()
+                .map(|p| p.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        )),
+    }
 }
 
 /// Makes an HTTP request through the host.
 ///
-/// A plugin has no sockets of its own; this is the only way out, and the host
-/// decides whether it opens. The manifest must declare the origin, and the URL
-/// must resolve to somewhere on the public internet.
+/// A module has no sockets of its own; this is the only way out. A request
+/// names an operation the manifest declares (`operations`): the host knows its
+/// origin and method, the module supplies the path, query, headers and body,
+/// and the host checks that the address is on the public internet.
 ///
 /// # Credentials
 ///
 /// Put `secret:<name>` in a **header value** and the host substitutes the
-/// secret before sending. The plugin never sees it — printing the header shows
-/// `secret:example`, not the token.
-///
-/// ```no_run
-/// # use atomic_plugin::{fetch, HttpHeader, HttpRequest};
-/// let response = fetch(HttpRequest {
-///     method: "GET".to_string(),
-///     url: "https://api.example.com/v1/users/me".to_string(),
-///     headers: vec![HttpHeader {
-///         name: "Authorization".to_string(),
-///         value: "Bearer secret:example".to_string(),
-///     }],
-///     body: None,
-/// })?;
-/// # Ok::<(), String>(())
-/// ```
-///
-/// A handle in the URL or the body is an error, not a substitution: a
-/// credential in a URL is written to access logs as a matter of course.
-/// Redirects are not followed, so a 3xx comes back for the plugin to handle.
-pub fn fetch(request: HttpRequest) -> Result<HttpResponse, String> {
-    host::fetch(&request)
+/// secret before sending. The module never sees it. A handle anywhere else is
+/// an error, not a substitution. Redirects are not followed.
+pub fn fetch(request: net::Request) -> Result<net::Response, String> {
+    net::fetch(&request).map_err(failure)
 }
 
-impl TryFrom<ResourceJson> for Resource {
-    type Error = String;
+fn json_to_value(value: &JsonValue) -> Value {
+    match value {
+        JsonValue::Null => Value::Null,
+        JsonValue::Bool(b) => Value::Boolean(*b),
+        JsonValue::Number(n) => match n.as_i64() {
+            Some(i) => Value::Integer(i),
+            None => Value::Float(n.as_f64().unwrap_or_default()),
+        },
+        JsonValue::String(s) => Value::String(s.clone()),
+        other => Value::Json(other.to_string()),
+    }
+}
 
-    fn try_from(resource_json: ResourceJson) -> Result<Self, Self::Error> {
-        let json_value: JsonValue = serde_json::from_str(&resource_json.json_ad)
-            .map_err(|e| format!("Invalid JSON: {}", e))?;
+fn value_to_json(value: Value) -> JsonValue {
+    match value {
+        Value::Null => JsonValue::Null,
+        Value::Boolean(b) => JsonValue::Bool(b),
+        Value::Integer(i) => i.into(),
+        Value::Float(f) => serde_json::Number::from_f64(f).map_or(JsonValue::Null, Into::into),
+        Value::String(s) | Value::Link(s) => JsonValue::String(s),
+        Value::ResourceArray(items) => items.into(),
+        Value::Json(text) => serde_json::from_str(&text).unwrap_or(JsonValue::String(text)),
+    }
+}
 
-        let Some(obj) = json_value.as_object() else {
-            return Err("Resource is not a JSON object".into());
-        };
-
-        let mut props = obj.clone();
-        props.remove("@id");
-
-        Ok(Self {
-            subject: resource_json.subject,
-            props,
-        })
+impl From<bindings::atomic::host::types::Resource> for Resource {
+    fn from(resource: bindings::atomic::host::types::Resource) -> Self {
+        Self {
+            subject: resource.subject,
+            props: resource
+                .propvals
+                .into_iter()
+                .map(|pv| (pv.property, value_to_json(pv.value)))
+                .collect(),
+        }
     }
 }
 
 impl Resource {
+    fn to_wit(&self) -> bindings::atomic::host::types::Resource {
+        bindings::atomic::host::types::Resource {
+            subject: self.subject.clone(),
+            classes: Vec::new(),
+            propvals: self
+                .props
+                .iter()
+                .map(|(property, value)| PropVal {
+                    property: property.clone(),
+                    value: json_to_value(value),
+                })
+                .collect(),
+        }
+    }
+
     pub fn to_json(&self) -> Result<String, String> {
         let mut props = self.props.clone();
         props.insert("@id".to_string(), JsonValue::String(self.subject.clone()));

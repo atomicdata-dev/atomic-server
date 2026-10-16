@@ -256,20 +256,71 @@ world sandboxed-app {
   export app;
 }
 
-/// Operator-installed module: same imports, plus class hooks that run inside
-/// the commit path. Replaces `atomic:class-extender`.
+/// Who the code runs as, for modules that run inside the server's own commit
+/// and read path and so have no caller to ask.
+interface context {
+  use types.{subject};
+
+  record module-context {
+    /// The Installation this module belongs to. None for a module an operator
+    /// dropped into the server's global directory.
+    installation: option<subject>,
+    /// The agent the module acts as: every `store` call is checked against it
+    /// and `store.apply` is signed by it. None when it has no identity (then
+    /// it reads as the public and writes nothing).
+    agent: option<subject>,
+    /// The Installation's config as JSON text, `{}` when it has none.
+    config: string,
+  }
+
+  get: func() -> module-context;
+}
+
+/// Hooks in the server's commit and read path, for the classes the module
+/// extends. They run as the module's agent (see `context`); a commit the
+/// module's own agent signed does not trigger them, which keeps a module from
+/// reacting to its own writes.
+interface hooks {
+  use types.{subject, %resource, problem, error};
+
+  /// A commit, as the hooks see it.
+  record commit-info {
+    /// The resource the commit is about.
+    subject: subject,
+    signer: subject,
+    /// The commit as JSON-AD.
+    commit-json: string,
+    /// The commit creates the resource.
+    is-new: bool,
+  }
+
+  /// The classes this module extends. Asked once, when the module is loaded.
+  classes: func() -> list<subject>;
+
+  /// Before a commit on one of the classes is stored. `after` is the resource
+  /// as the commit leaves it; the state before is still readable with
+  /// `store.get`. An `error` problem refuses the commit, a `warning` is logged.
+  /// A trap or an out-of-fuel run refuses it too. The commit is not stored yet,
+  /// so the module must not write the same resource here: use `after-commit`.
+  before-commit: func(commit: commit-info, after: %resource) -> list<problem>;
+
+  /// After the commit is stored. A failure is logged and never undoes it.
+  after-commit: func(commit: commit-info, after: %resource) -> result<_, error>;
+
+  /// Before a resource of one of the classes is returned to `agent`. The
+  /// answer replaces it (`none` leaves it as it is); `classes` of the answer is
+  /// ignored, the `is-a` property decides, and so does the subject asked for.
+  /// An error fails the read.
+  on-get: func(r: %resource, agent: subject) -> result<option<%resource>, error>;
+}
+
+/// A module the operator installed: the same `store`, `net` and `calls` as an
+/// app, under its Installation's agent, plus hooks in the commit and read path.
+/// Replaces `atomic:class-extender`.
 world server-module {
   import store;
-  import events;
   import net;
   import calls;
-  export app;
-  export hooks: interface {
-    use types.{%resource, problem};
-    use store.{intent};
-    /// Before a commit on a declared class: problems block it.
-    before-commit: func(before: option<%resource>, after: %resource) -> list<problem>;
-    /// Extra properties when a resource of a declared class is read.
-    on-get: func(r: %resource) -> option<%resource>;
-  }
+  import context;
+  export hooks;
 }

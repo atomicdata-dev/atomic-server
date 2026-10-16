@@ -139,7 +139,7 @@ impl CallBudget {
     }
 
     /// Up to `want` fuel, or an error when the pool is empty.
-    fn take_fuel(&self, want: u64) -> Result<u64, HostError> {
+    pub(super) fn take_fuel(&self, want: u64) -> Result<u64, HostError> {
         let before = self
             .fuel
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |pool| {
@@ -154,7 +154,7 @@ impl CallBudget {
         Ok(before.min(want))
     }
 
-    fn give_back(&self, fuel: u64) {
+    pub(super) fn give_back(&self, fuel: u64) {
         self.fuel.fetch_add(fuel, Ordering::SeqCst);
     }
 }
@@ -162,7 +162,7 @@ impl CallBudget {
 pub struct AbiState {
     table: ResourceTable,
     ctx: WasiCtx,
-    limits: StoreLimits,
+    pub(super) limits: StoreLimits,
     pub(super) host: AbiHost,
 }
 
@@ -176,6 +176,31 @@ impl AbiState {
             limits,
             host,
         }
+    }
+}
+
+impl AbiState {
+    /// The module's own folder as `/`: readable, and writable when its
+    /// manifest holds the `storage` capability. Nothing else of the disk.
+    pub(super) fn with_data_dir(
+        mut self,
+        dir: &std::path::Path,
+        writable: bool,
+    ) -> Result<Self, String> {
+        use wasmtime_wasi::{DirPerms, FilePerms};
+        let (dir_perms, file_perms) = if writable {
+            (
+                DirPerms::READ | DirPerms::MUTATE,
+                FilePerms::READ | FilePerms::WRITE,
+            )
+        } else {
+            (DirPerms::READ, FilePerms::READ)
+        };
+        self.ctx = WasiCtxBuilder::new()
+            .preopened_dir(dir, "/", dir_perms, file_perms)
+            .map_err(|e| format!("Failed to preopen directory: {e}"))?
+            .build();
+        Ok(self)
     }
 }
 

@@ -86,7 +86,6 @@ wasmtime = { version = "47.0.4", optional = true, features = [
   "component-model",
 ] }
 wasmtime-wasi = { version = "47.0.4", optional = true, features = ["p2"] }
-wasmtime-wasi-http = { version = "47.0.4", optional = true }
 ulid = "1.2.1"
 url = "2.5.8"
 html2md = "0.2.15"
@@ -269,13 +268,12 @@ telemetry = [
 ]
 img = ["webp", "image"]
 https = ["rustls", "instant-acme", "rcgen", "rustls-pemfile"]
-wasm-plugins = ["wasmtime", "wasmtime-wasi", "wasmtime-wasi-http", "zip"]
+wasm-plugins = ["wasmtime", "wasmtime-wasi", "zip"]
 image = ["dep:image"]
 tonic = ["dep:tonic"]
 tracing-opentelemetry = ["dep:tracing-opentelemetry"]
 wasmtime = ["dep:wasmtime"]
 wasmtime-wasi = ["dep:wasmtime-wasi"]
-wasmtime-wasi-http = ["dep:wasmtime-wasi-http"]
 webp = ["dep:webp"]
 zip = ["dep:zip"]
 vector-search = [

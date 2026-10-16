@@ -17,6 +17,10 @@
 //! - [`calls`]: `providers`, `describe` and `call` between apps in one drive.
 //!   The callee runs with its own Installation's rights, never the caller's.
 //!
+//! A server module (world `server-module`, [`ServerModule`]) is an app that also
+//! has hooks in the commit and read path. It gets the same `store`, `net` and
+//! `calls`, from the same code, running as its Installation's agent.
+//!
 //! The registry ([`HostAbiRegistry`]) holds the loaded apps; [`run`] holds the
 //! component lifecycle, one fresh instance per invocation.
 //!
@@ -31,17 +35,21 @@ mod calls;
 mod convert;
 mod events;
 mod js;
+mod module;
 mod net;
 mod registry;
 mod run;
 mod store;
 
 #[cfg(test)]
+mod module_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 #[cfg(test)]
 mod wit_tests;
 
 pub use js::JsAbi;
+pub use module::{ModuleParts, ServerModule};
 pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
 pub use run::{
     call_as, call_entry, call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS,
@@ -55,6 +63,25 @@ pub(crate) mod bindings {
         imports: { default: async },
         exports: { default: async },
         additional_derives: [PartialEq],
+    });
+}
+
+/// World `server-module`: the same imports as `sandboxed-app` (the interfaces
+/// and their `Host` implementations are the ones above, so rights and error
+/// codes are the same code) plus `context` and the `hooks` export.
+pub(crate) mod module_bindings {
+    wasmtime::component::bindgen!({
+        path: "../atomic-host/wit",
+        world: "server-module",
+        imports: { default: async },
+        exports: { default: async },
+        additional_derives: [PartialEq],
+        with: {
+            "atomic:host/types": super::bindings::atomic::host::types,
+            "atomic:host/store": super::bindings::atomic::host::store,
+            "atomic:host/net": super::bindings::atomic::host::net,
+            "atomic:host/calls": super::bindings::atomic::host::calls,
+        },
     });
 }
 

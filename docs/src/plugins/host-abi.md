@@ -236,6 +236,46 @@ Values cross as `{tag, val}` (the WIT variant case: `string`, `integer`, `link`,
 A run plugin lists `uses` in its manifest like an app does. Its calls are limited to `read` exports, as for a frame. `store.apply` is `needs-approval`: a run plugin proposes writes by returning intents, which the host plans and applies after review. `subscribe`, `undo`, `search` and `events` are `unsupported`.
 `ctx.http`, `ctx.read` and `ctx.query` keep their shapes and are shims over `net.fetch` (which also takes the URL form `{method, url, headers, body}` there), `store.get` and `store.query`; `ctx.integration` is unchanged.
 
+## A server module: hooks in the commit and read path
+
+A class extender is a **server module**: a component of world `server-module`. It has the same `store`, `net` and `calls` as an app, from the same code, and it exports `hooks` instead of `app`. It is installed by the operator (manifest `world: "server-extension"`) and extends the classes `hooks.classes` names.
+
+| Export | When |
+| --- | --- |
+| `classes` | Once, when the module is loaded. The classes whose reads and commits it extends |
+| `before-commit(commit, after)` | Before a commit on one of the classes is stored. `after` is the resource as the commit leaves it; the state before is still readable with `store.get`. An `error` problem refuses the commit, a `warning` is logged. A trap or running out of fuel refuses it too |
+| `after-commit(commit, after)` | After it is stored. A failure is logged and never undoes it |
+| `on-get(resource, agent)` | Before a resource is returned to `agent`. The answer replaces it, `none` leaves it, an error fails the read. The subject of the answer is always the one asked for |
+
+`commit` carries the subject, the signer, the commit as JSON-AD (`commit-json`) and `is-new`. A commit signed by the module's own agent does not trigger it, so a module does not react to its own writes.
+
+One import is new, because a module has no caller to ask:
+
+| Import | What it gives |
+| --- | --- |
+| `context.get` | The Installation, the agent the module acts as (`none` for a module in the operator's `global` folder, which reads as the public and writes nothing) and the Installation's config as JSON text. The user can edit the config at any time |
+
+A module runs as its Installation's agent, which is the only identity it has: reads are checked against that agent, `store.apply` is signed by it and gets the same `committed`, `proposed` and `refused` outcomes as for an app, and an Installation, plugin or Release cannot be changed through it. There is no separate rights code and no way to read or write as someone else. A module reads only what its agent was given (`full-drive-access`, or access granted on the Installation page).
+
+Two things differ from an app, both because a module runs inside the server's own path and nobody is there to approve:
+
+- `net.fetch` may use operations whose `effect` is `write` (an app is limited to `read` and has to propose the rest).
+- A hook has no entry call to meter, only its own fuel and memory (the `extended-fuel` and `extended-memory` capabilities widen them) and no `calls` to other apps yet: a module's `calls` look in a registry of its own.
+
+What the old `atomic:class-extender` interface became:
+
+| Class extender | Server module |
+| --- | --- |
+| `get-resource(subject, agent?)`, `query(property, value, agent?)` | `store.get`, `store.query` with an `eq` filter. There is no `agent` override: the old host ignored it too |
+| `get-plugin-agent()`, `get-config()` | `context.get` |
+| `commit(commit-json)` | `store.apply`. A raw signed commit has no ABI function: intents are planned like every other write, which also checks the datatype of each value |
+| `fetch(http-request)` | `net.fetch` by operation id. A module declares `operations` in its manifest instead of `network.origins`, and gets no `wasi:http` or sockets |
+| `class-url`, `on-resource-get`, `before-commit`, `after-commit` | `hooks.classes`, `on-get`, `before-commit`, `after-commit` |
+
+A module's folder (`/`, with the `storage` capability writable) is kept.
+
+The Rust helper crate `atomic-plugin` wraps this: implement `ClassExtender` and call `export_plugin!`. `plugin-examples/host-abi-module` shows the raw interface.
+
 ## Not built yet
 
 - `store.search` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.

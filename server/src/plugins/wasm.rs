@@ -1,5 +1,6 @@
-use std::future::Future;
-use std::pin::Pin;
+//! Installing server modules (class extenders): the zip, the files on disk and
+//! the extender registration. The component itself runs in
+//! [`super::host_abi::ServerModule`].
 
 use futures::future::join_all;
 use zip::ZipArchive;
@@ -12,84 +13,25 @@ use std::{
 };
 
 use atomic_lib::{
-    agents::{Agent, ForAgent},
-    class_extender::ClassExtender,
+    agents::Agent,
+    class_extender::{ClassExtender, ClassExtenderScope},
+    db::app_agent::{AppAgent, AppAgentKey, AppAgentState},
     db::plugin_meta::{validate_plugin_identifiers, PermissionType, PluginManifest, PluginMeta},
     errors::{AtomicError, AtomicResult},
-    parse::{parse_json_ad_resource, ParseOpts, SaveOpts},
-    storelike::ResourceResponse,
-    urls, Db, Resource, Storelike,
-};
-use atomic_lib::{
-    class_extender::{self, ClassExtenderScope},
-    AtomicErrorType,
+    urls, Db, Storelike,
 };
 use base64::{engine::general_purpose, Engine as _};
 use ring::digest::{digest, SHA256};
 use tracing::{error, info, warn};
-use wasmtime::{
-    component::{Component, Linker, ResourceTable},
-    Engine, ResourceLimiter, Store, StoreLimits, Trap,
-};
-use wasmtime_wasi::{p2, DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiView};
-use wasmtime_wasi_http::{
-    p2::{add_only_http_to_linker_async, WasiHttpCtxView, WasiHttpView},
-    WasiHttpCtx,
-};
+use wasmtime::{component::Component, Engine};
 
 use atomic_lib::db::plugin_meta::PluginMetaKey;
 
-use super::host_core::{self, FetchRequest, HostCore, ResourceGrants, Runtime};
+use super::host_abi::{ModuleParts, ServerModule};
+use super::host_core;
 use super::manifest::{CapabilityName, Manifest};
 
-mod bindings {
-    wasmtime::component::bindgen!({
-    path: "wit/class-extender.wit",
-    world: "class-extender",
-    imports: { default: async },
-    exports: { default: async },
-    });
-}
-
-use bindings::atomic::class_extender::types::{
-    CommitContext as WasmCommitContext, GetContext as WasmGetContext,
-    ResourceJson as WasmResourceJson, ResourceResponse as WasmResourceResponse,
-};
-
 const CLASS_EXTENDER_DIR_NAME: &str = "class-extenders"; // Relative to the store path.
-
-struct WasmtimeErrorWrapper(wasmtime::Error);
-
-impl From<wasmtime::Error> for WasmtimeErrorWrapper {
-    fn from(error: wasmtime::Error) -> Self {
-        WasmtimeErrorWrapper(error)
-    }
-}
-
-impl From<WasmtimeErrorWrapper> for AtomicError {
-    fn from(wrapper: WasmtimeErrorWrapper) -> Self {
-        let error = wrapper.0;
-        if let Some(trap) = error.downcast_ref::<Trap>() {
-            if *trap == Trap::OutOfFuel {
-                return AtomicError {
-                    message: "Wasm plugin exceeded its fuel limit".to_string(),
-                    error_type: AtomicErrorType::OtherError,
-                    subject: None,
-                };
-            }
-        }
-
-        AtomicError {
-            message: error.to_string(),
-            error_type: AtomicErrorType::OtherError,
-            subject: None,
-        }
-    }
-}
-
-fn to_atomic_error(error: wasmtime::Error) -> AtomicError {
-    WasmtimeErrorWrapper(error).into()
-}
 
 pub async fn load_wasm_class_extenders(
     plugin_path: &Path,
@@ -236,547 +178,6 @@ pub async fn load_wasm_class_extenders(
     Ok(extenders)
 }
 
-#[derive(Clone)]
-struct WasmPlugin {
-    inner: Arc<WasmPluginInner>,
-}
-
-struct WasmPluginInner {
-    engine: Arc<Engine>,
-    component: Component,
-    path: PathBuf,
-    owned_folder_path: Option<PathBuf>,
-    scope: ClassExtenderScope,
-    class_url: Vec<String>,
-    /// The shared host, under the plugin agent's grant. Cloned per instance.
-    core: HostCore,
-    plugin_subject: Option<String>,
-    agent: Option<Agent>,
-    /// The unified manifest the plugin was installed with. `None` for an
-    /// operator-installed global extension, which declares nothing.
-    manifest: Option<Manifest>,
-}
-
-/// Whether a class extender's manifest gives it network access: it declares
-/// origins, not operations, so declaring at least one is the switch.
-fn has_network(manifest: Option<&Manifest>) -> bool {
-    manifest.is_some_and(|m| !m.network.origins.is_empty())
-}
-
-impl WasmPlugin {
-    #[allow(clippy::too_many_arguments)]
-    async fn load(
-        engine: Arc<Engine>,
-        wasm_bytes: &[u8],
-        path: &Path,
-        cwasm_path: &Path,
-        owned_folder_path: Option<PathBuf>,
-        db: &Db,
-        scope: ClassExtenderScope,
-        plugin_subject: Option<String>,
-        agent: Option<Agent>,
-        manifest: Option<Manifest>,
-    ) -> AtomicResult<Self> {
-        let core = HostCore::for_class_extender(
-            Arc::new(db.clone()),
-            &scope,
-            plugin_subject.clone(),
-            agent.clone(),
-            manifest.as_ref(),
-        )
-        .map_err(AtomicError::from)?;
-
-        let component = if cwasm_path.exists() {
-            match std::fs::read(cwasm_path) {
-                Ok(bytes) => {
-                    // Safety: We trust the pre-compiled component on disk as it is generated by us or the admin
-                    match unsafe { Component::deserialize(&engine, &bytes) } {
-                        Ok(c) => c,
-                        Err(e) => {
-                            warn!(
-                                "Failed to deserialize cwasm at {}, recompiling. Error: {}",
-                                cwasm_path.display(),
-                                e
-                            );
-                            compile_and_save_component(&engine, wasm_bytes, path, cwasm_path)?
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to read cwasm file: {}", e);
-                    compile_and_save_component(&engine, wasm_bytes, path, cwasm_path)?
-                }
-            }
-        } else {
-            compile_and_save_component(&engine, wasm_bytes, path, cwasm_path)?
-        };
-
-        let runtime = WasmPlugin {
-            inner: Arc::new(WasmPluginInner {
-                engine: engine.clone(),
-                component,
-                path: path.to_path_buf(),
-                owned_folder_path,
-                class_url: Vec::new(),
-                scope: scope.clone(),
-                core: core.clone(),
-                plugin_subject: plugin_subject.clone(),
-                agent: agent.clone(),
-                manifest: manifest.clone(),
-            }),
-        };
-
-        let class_url = runtime.call_class_url().await?;
-        Ok(WasmPlugin {
-            inner: Arc::new(WasmPluginInner {
-                engine,
-                component: runtime.inner.component.clone(),
-                path: runtime.inner.path.clone(),
-                owned_folder_path: runtime.inner.owned_folder_path.clone(),
-                class_url,
-                scope,
-                core,
-                plugin_subject,
-                agent,
-                manifest,
-            }),
-        })
-    }
-
-    fn into_class_extender(self) -> ClassExtender {
-        let get_plugin = self.clone();
-        let before_plugin = self.clone();
-        let after_plugin = self.clone();
-
-        let id = if let ClassExtenderScope::Drive(drive) = &self.inner.scope {
-            let filename = self
-                .inner
-                .path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
-            format!("{}:{}", drive, filename)
-        } else {
-            let filename = self
-                .inner
-                .path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
-            format!("global:{}", filename)
-        };
-
-        let mut builder = ClassExtender::builder()
-            .id(id)
-            .classes(self.inner.class_url.clone())
-            .on_resource_get(ClassExtender::wrap_get_handler(move |context| {
-                let get_plugin = get_plugin.clone();
-                Box::pin(async move { get_plugin.call_on_resource_get(context).await })
-            }))
-            .before_commit(ClassExtender::wrap_commit_handler(move |context| {
-                let before_plugin = before_plugin.clone();
-                Box::pin(async move { before_plugin.call_before_commit(context).await })
-            }))
-            .after_commit(ClassExtender::wrap_commit_handler(move |context| {
-                let after_plugin = after_plugin.clone();
-                Box::pin(async move { after_plugin.call_after_commit(context).await })
-            }))
-            .scope(self.inner.scope.clone());
-
-        if let Some(subject) = self.inner.plugin_subject.clone() {
-            builder = builder.subject(subject);
-        }
-
-        builder.build()
-    }
-
-    async fn call_class_url(&self) -> AtomicResult<Vec<String>> {
-        let (instance, mut store) = self.instantiate().await?;
-        instance
-            .call_class_url(&mut store)
-            .await
-            .map_err(to_atomic_error)
-    }
-
-    async fn call_on_resource_get<'a>(
-        &'a self,
-        context: class_extender::GetExtenderContext<'a>,
-    ) -> AtomicResult<ResourceResponse> {
-        let payload = self.build_get_context(&context)?;
-        let (instance, mut store) = self.instantiate().await?;
-        let response = instance
-            .call_on_resource_get(&mut store, &payload)
-            .await
-            .map_err(to_atomic_error)??;
-
-        let Some(payload) = response else {
-            return Ok(ResourceResponse::Resource(context.db_resource.clone()));
-        };
-
-        self.inflate_resource_response(payload, context.store).await
-    }
-
-    async fn call_before_commit<'a>(
-        &'a self,
-        context: class_extender::CommitExtenderContext<'a>,
-    ) -> AtomicResult<()> {
-        if let Some(agent) = &self.inner.agent {
-            // If the commit was signed by the plugin's agent, we skip the handler to prevent infinite loops.
-            if agent.subject == context.commit.signer {
-                return Ok(());
-            }
-        }
-
-        let payload = self.build_commit_context(&context).await?;
-        let (instance, mut store) = self.instantiate().await?;
-        instance
-            .call_before_commit(&mut store, &payload)
-            .await
-            .map_err(to_atomic_error)?
-            .map_err(AtomicError::other_error)
-    }
-
-    async fn call_after_commit<'a>(
-        &'a self,
-        context: class_extender::CommitExtenderContext<'a>,
-    ) -> AtomicResult<()> {
-        if let Some(agent) = &self.inner.agent {
-            // If the commit was signed by the plugin's agent, we skip the handler to prevent infinite loops.
-            if agent.subject == context.commit.signer {
-                return Ok(());
-            }
-        }
-
-        let payload = self.build_commit_context(&context).await?;
-        let (instance, mut store) = self.instantiate().await?;
-        instance
-            .call_after_commit(&mut store, &payload)
-            .await
-            .map_err(to_atomic_error)?
-            .map_err(AtomicError::other_error)
-    }
-
-    async fn instantiate(&self) -> AtomicResult<(bindings::ClassExtender, Store<PluginHostState>)> {
-        let limits = host_core::limits(
-            Runtime::ClassExtender,
-            ResourceGrants::from_v2(self.inner.manifest.as_ref()),
-        );
-
-        let mut store = Store::new(
-            &self.inner.engine,
-            PluginHostState::new(
-                self.inner.core.clone(),
-                &self.inner.owned_folder_path,
-                self.inner.manifest.as_ref(),
-                limits.store_limits(),
-            )?,
-        );
-
-        limits.meter(&mut store).map_err(AtomicError::from)?;
-        store.limiter(|state| state);
-
-        let mut linker = Linker::new(&self.inner.engine);
-        p2::add_to_linker_async(&mut linker).map_err(|err| AtomicError::from(err.to_string()))?;
-
-        if has_network(self.inner.manifest.as_ref()) {
-            add_only_http_to_linker_async(&mut linker)
-                .map_err(|err| AtomicError::from(err.to_string()))?;
-        }
-
-        // Add our host implementations to the linker.
-        bindings::atomic::class_extender::host::add_to_linker::<
-            PluginHostState,
-            wasmtime::component::HasSelf<PluginHostState>,
-        >(&mut linker, |state: &mut PluginHostState| state)
-        .map_err(|err| AtomicError::from(err.to_string()))?;
-
-        let instance =
-            bindings::ClassExtender::instantiate_async(&mut store, &self.inner.component, &linker)
-                .await
-                .map_err(to_atomic_error)?;
-        Ok((instance, store))
-    }
-
-    fn build_get_context(
-        &self,
-        context: &class_extender::GetExtenderContext,
-    ) -> AtomicResult<WasmGetContext> {
-        Ok(WasmGetContext {
-            request_url: context.url.as_str().to_string(),
-            requested_subject: context.db_resource.get_subject().to_string(),
-            agent_subject: context.for_agent.to_string(),
-            snapshot: self.encode_resource(context.db_resource)?,
-        })
-    }
-
-    async fn build_commit_context<'a>(
-        &self,
-        context: &'a class_extender::CommitExtenderContext<'a>,
-    ) -> AtomicResult<WasmCommitContext> {
-        // Plugins parse `commit_json` into `atomic_plugin::Commit`, which
-        // requires the `subject` field. The deterministic serializer
-        // strips `subject` for genesis commits (because the signature
-        // derivation can't include it — circular dep), so using it here
-        // makes every genesis commit fail with "missing field subject"
-        // inside the plugin's WASM before user logic runs. The plugin
-        // doesn't care about signing-deterministic output; it just needs
-        // to inspect the commit. Use a regular `to_json_ad` of the commit
-        // resource — that always includes `subject`.
-        let commit_resource = context.commit.into_resource(context.store).await?;
-        let origin = context
-            .store
-            .get_base_domain()
-            .unwrap_or_else(|| "http://localhost".to_string());
-        Ok(WasmCommitContext {
-            subject: context.resource.get_subject().to_string(),
-            commit_json: commit_resource.to_json_ad(Some(&origin))?,
-            snapshot: self.encode_resource(context.resource)?,
-            is_new: context.is_new,
-        })
-    }
-
-    fn encode_resource(&self, resource: &Resource) -> AtomicResult<WasmResourceJson> {
-        Ok(WasmResourceJson {
-            subject: resource.get_subject().to_string(),
-            json_ad: resource.to_json_ad(None)?,
-        })
-    }
-
-    fn inflate_resource_response<'a>(
-        &self,
-        payload: WasmResourceResponse,
-        store: &'a atomic_lib::Db,
-    ) -> Pin<Box<dyn Future<Output = AtomicResult<ResourceResponse>> + Send + 'a>> {
-        Box::pin(async move {
-            let parse_opts = ParseOpts {
-                save: SaveOpts::DontSave,
-                for_agent: ForAgent::Sudo,
-                ..Default::default()
-            };
-
-            let mut base =
-                parse_json_ad_resource(&payload.primary.json_ad, store, &parse_opts).await?;
-            base.set_subject(payload.primary.subject);
-
-            let mut referenced = Vec::new();
-            for item in payload.referenced {
-                let mut resource =
-                    parse_json_ad_resource(&item.json_ad, store, &parse_opts).await?;
-                resource.set_subject(item.subject);
-                referenced.push(resource);
-            }
-
-            if referenced.is_empty() {
-                Ok(ResourceResponse::Resource(base))
-            } else {
-                Ok(ResourceResponse::ResourceWithReferenced(base, referenced))
-            }
-        })
-    }
-}
-
-/// Everything a class-extender instance can reach: WASI, optionally HTTP and
-/// its own folder, and the shared host.
-struct PluginHostState {
-    table: ResourceTable,
-    ctx: WasiCtx,
-    http: WasiHttpCtx,
-    limits: StoreLimits,
-    core: HostCore,
-}
-
-impl PluginHostState {
-    fn new(
-        core: HostCore,
-        owned_folder_path: &Option<PathBuf>,
-        manifest: Option<&Manifest>,
-        limits: StoreLimits,
-    ) -> AtomicResult<Self> {
-        let mut builder = WasiCtxBuilder::new();
-        // Plugins should not have access to the host's stdin, stdout and stderr.
-        // But it could be useful during development.
-        // builder
-        //     .inherit_stdout()
-        //     .inherit_stderr()
-        //     .inherit_stdin()
-
-        if has_network(manifest) {
-            // Not `inherit_network()`, which is `socket_addr_check(|_, _| true)`
-            // and hands the plugin loopback, the private ranges and any cloud
-            // metadata endpoint the host can reach. The check runs on the
-            // resolved address, which is the only place it can work — a
-            // hostname resolving to 169.254.169.254 is the whole attack.
-            builder.socket_addr_check(|addr, _use| {
-                Box::pin(async move {
-                    match crate::plugins::egress::refuse_address(addr.ip()) {
-                        None => true,
-                        Some(refusal) => {
-                            tracing::warn!(
-                                address = %addr,
-                                ?refusal,
-                                "plugin refused an address outside the public internet",
-                            );
-
-                            false
-                        }
-                    }
-                })
-            });
-        }
-
-        if let Some(owned_folder_path) = owned_folder_path {
-            let has_storage = manifest.is_some_and(|m| m.has_capability(CapabilityName::Storage));
-
-            let dir_perms = if has_storage {
-                DirPerms::READ | DirPerms::MUTATE
-            } else {
-                DirPerms::READ
-            };
-
-            let file_perms = if has_storage {
-                FilePerms::READ | FilePerms::WRITE
-            } else {
-                FilePerms::READ
-            };
-
-            builder
-                .preopened_dir(owned_folder_path.clone(), "/", dir_perms, file_perms)
-                .map_err(|e| AtomicError::from(format!("Failed to preopen directory: {}", e)))?;
-        }
-
-        Ok(Self {
-            table: ResourceTable::new(),
-            ctx: builder.build(),
-            http: WasiHttpCtx::new(),
-            limits,
-            core,
-        })
-    }
-}
-
-impl ResourceLimiter for PluginHostState {
-    fn memory_growing(
-        &mut self,
-        current: usize,
-        desired: usize,
-        maximum: Option<usize>,
-    ) -> Result<bool, wasmtime::Error> {
-        self.limits.memory_growing(current, desired, maximum)
-    }
-
-    fn table_growing(
-        &mut self,
-        current: usize,
-        desired: usize,
-        maximum: Option<usize>,
-    ) -> Result<bool, wasmtime::Error> {
-        self.limits.table_growing(current, desired, maximum)
-    }
-}
-
-impl WasiView for PluginHostState {
-    fn ctx(&mut self) -> wasmtime_wasi::WasiCtxView<'_> {
-        wasmtime_wasi::WasiCtxView {
-            ctx: &mut self.ctx,
-            table: &mut self.table,
-        }
-    }
-}
-
-impl WasiHttpView for PluginHostState {
-    fn http(&mut self) -> WasiHttpCtxView<'_> {
-        WasiHttpCtxView {
-            ctx: &mut self.http,
-            table: &mut self.table,
-            hooks: Default::default(),
-        }
-    }
-}
-
-fn encode(resource: &Resource) -> Result<WasmResourceJson, String> {
-    Ok(WasmResourceJson {
-        subject: resource.get_subject().to_string(),
-        json_ad: resource.to_json_ad(None).map_err(|e| e.to_string())?,
-    })
-}
-
-/// The guest's view of the shared host: types translated, nothing decided.
-impl bindings::atomic::class_extender::host::Host for PluginHostState {
-    async fn fetch(
-        &mut self,
-        request: bindings::atomic::class_extender::types::HttpRequest,
-    ) -> Result<bindings::atomic::class_extender::types::HttpResponse, String> {
-        let response = self
-            .core
-            .fetch(
-                FetchRequest {
-                    operation: None,
-                    method: request.method,
-                    url: request.url,
-                    headers: request
-                        .headers
-                        .into_iter()
-                        .map(|h| (h.name, h.value))
-                        .collect(),
-                    body: request.body,
-                },
-                // A class extender declares origins, not operations, so the
-                // effect does not narrow anything here.
-                "write",
-            )
-            .await?;
-
-        Ok(bindings::atomic::class_extender::types::HttpResponse {
-            status: response.status,
-            headers: response
-                .headers
-                .into_iter()
-                .map(
-                    |(name, value)| bindings::atomic::class_extender::types::HttpHeader {
-                        name,
-                        value,
-                    },
-                )
-                .collect(),
-            body: response.body,
-        })
-    }
-
-    async fn get_resource(
-        &mut self,
-        subject: String,
-        _agent: Option<String>,
-    ) -> Result<WasmResourceJson, String> {
-        encode(&self.core.get_resource(&subject).await?)
-    }
-
-    async fn query(
-        &mut self,
-        property: String,
-        value: String,
-        _agent: Option<String>,
-    ) -> Result<Vec<WasmResourceJson>, String> {
-        self.core
-            .query(&property, &value)
-            .await?
-            .iter()
-            .map(encode)
-            .collect()
-    }
-
-    async fn get_plugin_agent(&mut self) -> String {
-        self.core.plugin_agent().unwrap_or_default()
-    }
-
-    async fn commit(&mut self, commit: String) -> Result<(), String> {
-        self.core.commit(&commit).await
-    }
-
-    async fn get_config(&mut self) -> String {
-        self.core.get_config().await
-    }
-}
-
 pub fn validate_plugin_zip(
     zip: &mut ZipArchive<std::io::Cursor<Vec<u8>>>,
 ) -> AtomicResult<PluginManifest> {
@@ -842,35 +243,25 @@ pub fn wasm_bytes_from_zip(
     Ok(bytes)
 }
 
-/// Asks a component which classes it extends, by instantiating it once with
-/// no scope, no folder and no manifest, and calling its `class-url` export.
+/// Asks a component which classes it extends, by loading it once as a global
+/// module (the public agent, no folder, no manifest) and calling `classes`.
 /// `plugin.json` alone does not say; this is what decides the package's world.
 pub async fn read_class_urls(db: &Db, wasm_bytes: &[u8]) -> AtomicResult<Vec<String>> {
     let engine = host_core::engine().map_err(AtomicError::from)?;
-    let component = Component::from_binary(&engine, wasm_bytes).map_err(to_atomic_error)?;
-    let core = HostCore::for_class_extender(
-        Arc::new(db.clone()),
-        &ClassExtenderScope::Global,
-        None,
-        None,
-        None,
-    )
-    .map_err(AtomicError::from)?;
-    let probe = WasmPlugin {
-        inner: Arc::new(WasmPluginInner {
-            engine,
-            component,
-            path: PathBuf::from("plugin.wasm"),
-            owned_folder_path: None,
-            scope: ClassExtenderScope::Global,
-            class_url: Vec::new(),
-            core,
-            plugin_subject: None,
-            agent: None,
-            manifest: None,
-        }),
+    let component = Component::from_binary(&engine, wasm_bytes)
+        .map_err(|e| AtomicError::from(format!("the package is not a server module: {e}")))?;
+    let parts = ModuleParts {
+        file_name: "plugin.wasm".into(),
+        scope: ClassExtenderScope::Global,
+        installation: None,
+        agent: None,
+        data_dir: None,
+        manifest: None,
     };
-    probe.call_class_url().await
+    Ok(ServerModule::new(engine, component, db, parts)
+        .await?
+        .classes()
+        .to_vec())
 }
 
 /// Validates a package and translates its `plugin.json` into the version-two
@@ -1644,6 +1035,7 @@ async fn load_plugin_from_disk(
 
             let agent = Agent::from_secret(&m.agent_secret)?;
             let manifest = unified_manifest(db, &key, m, &wasm_bytes).await?;
+            bind_installation_agent(db, drive_subject, &manifest.0, &agent)?;
 
             (Some(manifest.0), Some(agent), Some(manifest.1))
         }
@@ -1656,26 +1048,31 @@ async fn load_plugin_from_disk(
     let cwasm_path = plugin_cache_path.join(cwasm_filename);
     let cwasm_path_ret = cwasm_path.clone();
 
-    match WasmPlugin::load(
-        engine.clone(),
-        &wasm_bytes,
-        path,
-        &cwasm_path,
-        owned_folder_path,
-        db,
-        scope,
-        plugin_subject,
-        agent,
-        manifest,
-    )
-    .await
-    {
-        Ok(plugin) => {
+    let loaded = async {
+        let component = load_component(&engine, &wasm_bytes, path, &cwasm_path)?;
+        let parts = ModuleParts {
+            file_name: path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_string(),
+            scope,
+            installation: plugin_subject,
+            agent,
+            data_dir: owned_folder_path,
+            manifest,
+        };
+        ServerModule::new(engine, component, db, parts).await
+    }
+    .await;
+
+    match loaded {
+        Ok(module) => {
             info!(
                 "Loaded {}",
                 path.file_name().unwrap_or(OsStr::new("Unknown")).display()
             );
-            Ok((Some(plugin.into_class_extender()), cwasm_path_ret))
+            Ok((Some(module.into_class_extender()), cwasm_path_ret))
         }
         Err(err) => {
             error!(
@@ -1686,6 +1083,55 @@ async fn load_plugin_from_disk(
             Ok((None, cwasm_path_ret))
         }
     }
+}
+
+/// The compiled component: the cached one when it still loads, else a fresh
+/// compile that is saved for next time.
+fn load_component(
+    engine: &Engine,
+    wasm_bytes: &[u8],
+    path: &Path,
+    cwasm_path: &Path,
+) -> AtomicResult<Component> {
+    let Ok(bytes) = std::fs::read(cwasm_path) else {
+        return compile_and_save_component(engine, wasm_bytes, path, cwasm_path);
+    };
+    // Safety: We trust the pre-compiled component on disk as it is generated by us or the admin
+    match unsafe { Component::deserialize(engine, &bytes) } {
+        Ok(component) => Ok(component),
+        Err(e) => {
+            warn!(
+                "Failed to deserialize cwasm at {}, recompiling. Error: {}",
+                cwasm_path.display(),
+                e
+            );
+            compile_and_save_component(engine, wasm_bytes, path, cwasm_path)
+        }
+    }
+}
+
+/// A module runs as its Installation's agent, which is the identity
+/// `installation::resolve` looks up. A plugin installed as a class extender
+/// keeps its key in `PluginMeta`; this makes the same key the Installation's.
+fn bind_installation_agent(db: &Db, drive: &str, subject: &str, agent: &Agent) -> AtomicResult<()> {
+    let key = AppAgentKey::new(drive, subject);
+    match db.get_app_agent_state(&key)? {
+        AppAgentState::Legacy => db.set_app_agent(
+            &key,
+            &AppAgent::new(
+                agent.subject.to_string(),
+                agent.build_secret()?,
+                atomic_lib::utils::now(),
+            ),
+        )?,
+        AppAgentState::Active(_) => {}
+        AppAgentState::Revoked => {
+            return Err(AtomicError::from(
+                "this installation's identity was revoked; create a new Installation",
+            ))
+        }
+    }
+    Ok(())
 }
 
 fn compile_and_save_component(

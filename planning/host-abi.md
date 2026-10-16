@@ -141,19 +141,18 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       | missing in old, **built (JS)**: | `store.get`, `get-many`, `query`, `net.fetch`, `calls.providers/describe/call` | `host_abi/js.rs`, globals `store`, `net`, `calls` |
       | missing in old, not built | `store.apply` (`needs-approval`, intents are the verdict), `subscribe`, `undo`, `search`, `events` | |
 
-      Class extender (`atomic-plugin/wit/class-extender.wit`):
+      Class extender (`atomic:class-extender@0.1.0`, now world `server-module`):
       | old | ABI | note |
       | --- | --- | --- |
-      | `get-resource(subject, agent?)` | `store.get` | ABI has no `agent` override: reads are caller ∩ Installation agent |
-      | `query(property, value, agent?)` | `store.query` + `eq`, `with-resources` | same |
-      | `get-plugin-agent()` | none | implicit; a `context` call would give it |
-      | `get-config()` | none | config is a resource of the Installation: `store.get` once reading it is allowed |
-      | `commit(commit-json)` | `store.apply` | old signs a raw CommitBuilder as the plugin agent; ABI plans intents. Raw commits (Loro updates) have no ABI function |
-      | `fetch(http-request)` | `net.fetch` | URL-based vs operation-based, as above |
-      | `class-url` | manifest | |
-      | `on-resource-get(ctx)` | `hooks.on-get` (world `server-module`) | |
-      | `before-commit(ctx)` | `hooks.before-commit(before, after)` | old gets `commit-json`, `is-new`; ABI gets resources |
-      | `after-commit(ctx)` | none | `server-module` has no after-commit; `events` `commit` kind would be it |
+      | `get-resource(subject, agent?)` | `store.get` | **done.** ABI has no `agent` override: reads are caller ∩ Installation agent, and the module is both. The old host ignored `agent` too |
+      | `query(property, value, agent?)` | `store.query` + `eq`, `with-resources` | **done**, same |
+      | `get-plugin-agent()`, `get-config()` | `context.get` (new, `server-module` only) | **done.** The Installation, the agent and the config |
+      | `commit(commit-json)` | `store.apply` | **done.** Raw signed commits are gone: intents are planned like every other write. `atomic-plugin`'s `commit(&CommitBuilder)` builds the intents (`push` reads the array first) |
+      | `fetch(http-request)` | `net.fetch` | **done.** By operation id; no `wasi:http`, no sockets. A module may fetch `write` operations (it runs in the commit path, nobody approves) |
+      | `class-url` | `hooks.classes` | kept as an export instead of the manifest: an operator's `global` module has no manifest, and `describe_package` learns a package's classes from it |
+      | `on-resource-get(ctx)` | `hooks.on-get(resource, agent)` | **done.** Answer replaces the resource (only the changed properties are rebuilt); no `referenced` list, no request URL |
+      | `before-commit(ctx)` | `hooks.before-commit(commit-info, after)` | **done.** `list<problem>`: an `error` refuses. No `before` argument: the commit is not stored yet, so `store.get` is the state before |
+      | `after-commit(ctx)` | `hooks.after-commit(commit-info, after)` | **done.** The `events` `commit` kind is still the long-term shape |
 
       Frame (`hostStore.ts` ops):
       | op | ABI | note |
@@ -191,16 +190,40 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       its plugins use `ctx.*`.
       *Next:* widen a run's budget once approval exists; move the URL form's
       checks onto operation ids and drop it.
-      *Class extender to `server-module` (not built), what it takes:* (1) add
-      `after-commit` and `commit-json`/`is-new` to `hooks` (or feed `events`
-      `commit`); (2) a typed way to write that is not a plan: raw commit, or
-      make `apply` fit hook-time writes; (3) `get-config` and
-      `get-plugin-agent` as a `context` call; (4) a `server-module` linker in
-      `host_abi/run.rs` and registry, with the hooks called from `wasm.rs`'s
-      commit and read path in place of `bindings::ClassExtender`; (5)
-      operator-only install (world `server-extension`); (6) rebuild
-      `plugin-examples/random-folder-extender` and the atomic-plugins
-      extenders; then delete `atomic-plugin`'s host and `PluginHostState`.
+      *Built (slice 2, 2026-10-16): class extenders as `server-module`.*
+      `host_abi/module.rs` (`ServerModule`) loads a component of world
+      `server-module` and registers its hooks with `lib`'s `ClassExtender`.
+      Each hook builds an `AbiState` for the module's Installation
+      (`build_host`, so `HostCore::for_run`), caller and Installation both the
+      module's own agent, and links the same `store`, `net` and `calls`
+      implementations as an app (`module_bindings` maps those interfaces onto
+      the `sandboxed-app` bindings). There is no rights code of its own.
+      `wasm.rs` keeps only the zip, the files and the registration; the old
+      `WasmPlugin`, `PluginHostState`, the class-extender `Host` impl,
+      `HostCore::{for_class_extender, commit, plugin_agent}`, `FetchPolicy::Origins`,
+      `egress::refuse_url`, `wasi-http` and `server/wit/class-extender.wit` are
+      deleted. `atomic-plugin` is regenerated from `atomic-host/wit` (same
+      `ClassExtender` trait, now with `on_resource_get` defaulting to `None`).
+      A legacy `PluginMeta` agent becomes the Installation's app agent when the
+      module loads (`bind_installation_agent`), so `installation::resolve` finds
+      one identity. Fixtures rebuilt: `browser/e2e/tests/fixtures/test-plugin.zip`
+      (README procedure, ui included) and the new `testdata/host-abi/module.wasm`.
+      What took the six steps:
+      - [x] (1) `after-commit` and `commit-info` (`commit-json`, `is-new`) in `hooks`
+      - [x] (2) writes: `store.apply`, no raw commit
+      - [x] (3) `get-config` and `get-plugin-agent` as `context.get`
+      - [x] (4) `server-module` linker (`module.rs`) and hooks from `wasm.rs`'s
+        registration in place of `bindings::ClassExtender`
+      - [ ] (5) operator-only install: world `server-extension` still means "a
+        `server-module` component", and who may install it is unchanged (not
+        a new check)
+      - [x] (6) rebuild `test-plugin`, `random-folder-extender` (its Discord
+        webhook is dropped: a user-configured URL is not an operation);
+        atomic-plugins has no extender crates and no `atomic-plugin` users
+      *Next:* give a module the shared `HostAbiRegistry` (its `calls` look in
+      a private one, so `calls.call` finds no app), an entry deadline for hooks
+      (only fuel and memory bound them), the `storage` folder under the ABI's
+      own name, and move `events` `commit` in as the after-commit.
 - [ ] Conformance suite: run published catalog releases against each host
       build (regression test until v1, a promise after).
 

@@ -1,26 +1,21 @@
 //! The one host behind every sandboxed plugin.
 //!
-//! Two guest contracts run on the server — the class extender (a wasip2
-//! component that participates in reads and commits) and the JS `run` plugin
-//! (QuickJS inside a wasip2 component, which only proposes) — but they share a
-//! sandbox and, since this module, a host. Everything security-relevant that
-//! both need lives here exactly once: which agent a read is authorized for,
-//! which origins a fetch may reach, where a secret may be substituted, how
-//! large a response may grow, and who may commit.
+//! Every sandboxed guest on the server (an app, a server module, a QuickJS
+//! `run` plugin) shares this host. Everything security-relevant lives here
+//! exactly once: which agent a read is authorized for, which operations a
+//! fetch may reach, where a secret may be substituted and how large a response
+//! may grow. Writes go through the planner and applier (`host_abi::store`).
 //!
-//! `wasm.rs` and `js_runtime.rs` keep only what differs: the WIT bindings and
-//! the component lifecycle. They translate their guest's types into the calls
-//! below and back, and nothing else.
+//! `host_abi` and `js_runtime.rs` keep only what differs: the bindings and the
+//! component lifecycle.
 
 use std::sync::{Arc, OnceLock};
 
 use atomic_lib::{
-    agents::{Agent, ForAgent},
-    class_extender::ClassExtenderScope,
-    commit::{CommitBuilder, CommitOpts},
+    agents::ForAgent,
     hierarchy,
     storelike::{Query, ResourceResponse},
-    urls, Commit, Db, Resource, Storelike, Subject, Value,
+    urls, Db, Resource, Storelike, Subject, Value,
 };
 use futures::{Stream, StreamExt};
 use wasmtime::{Engine, Store, StoreLimits, StoreLimitsBuilder};
@@ -361,12 +356,10 @@ impl Grant {
     }
 }
 
-/// Which destinations a fetch may reach. Three declaration styles exist today;
-/// they all end in the same checks.
+/// Which destinations a fetch may reach. Two declaration styles exist today;
+/// they end in the same checks.
 #[derive(Clone, Debug)]
 pub enum FetchPolicy {
-    /// Exact origins from a class extender's `plugin.json`, any method.
-    Origins(Vec<String>),
     /// Declared operations from a versioned JS manifest: id, method, endpoint
     /// and effect must all match.
     Operations(Box<Manifest>),
@@ -421,58 +414,37 @@ pub struct HostCore {
     drive: Option<String>,
     /// The installation's resource, which owns its secrets and config.
     plugin: Option<String>,
-    /// The key the installation signs with, when it may commit.
-    agent: Option<Agent>,
     grant: Grant,
     world: World,
     fetch_policy: FetchPolicy,
-    /// Whether `get_resource` may fetch a subject from another server.
-    remote_reads: bool,
     /// The drive queries are scoped to, and the most rows a query may return.
     query_scope: Option<String>,
     query_limit: Option<usize>,
 }
 
 impl HostCore {
-    /// A class extender, in the server-extension world.
-    ///
-    /// Reads are authorized for the plugin's own agent, or as the public agent
-    /// for a global extension that has none. It may commit, signed by that
-    /// agent, and may reach the origins its manifest declares.
-    pub fn for_class_extender(
-        db: Arc<Db>,
-        scope: &ClassExtenderScope,
-        plugin: Option<String>,
-        agent: Option<Agent>,
-        manifest: Option<&Manifest>,
-    ) -> Result<Self, String> {
-        let caller = agent
-            .as_ref()
-            .map(ForAgent::from)
-            .unwrap_or(ForAgent::Public);
-        let drive = match scope {
-            ClassExtenderScope::Drive(drive) => Some(drive.clone()),
-            ClassExtenderScope::Global => None,
-        };
-        // A class extender declares origins, not operations. Declaring at
-        // least one is what network access means for it: the legacy `network`
-        // permission translated into `network.origins` and nothing else.
-        let origins = manifest
-            .map(|m| m.network.origins.clone())
-            .unwrap_or_default();
-
+    /// A server module no Installation owns (the operator's `global/`
+    /// folder): the public agent. It reads what anyone may read, cannot
+    /// commit, has no secrets, and its queries are scoped to no drive.
+    pub fn for_global_module(db: Arc<Db>) -> Result<Self, String> {
         Ok(Self {
             db,
-            drive,
-            plugin,
-            agent,
-            grant: Grant::new(caller, None)?,
+            drive: None,
+            plugin: None,
+            grant: Grant::new(ForAgent::Public, None)?,
             world: World::ServerExtension,
-            remote_reads: !origins.is_empty(),
-            fetch_policy: FetchPolicy::Origins(origins),
+            fetch_policy: FetchPolicy::SecretOrigins,
             query_scope: None,
             query_limit: None,
         })
+    }
+
+    /// The same host in the server-extension world: the module runs inside the
+    /// server's own commit path, so there is no one to approve its external
+    /// writes (see `net.fetch`). Its rights are unchanged.
+    pub fn as_server_module(mut self) -> Self {
+        self.world = World::ServerExtension;
+        self
     }
 
     /// A JS `run` host, in the extension world.
@@ -505,14 +477,12 @@ impl HostCore {
             db,
             drive: Some(drive.to_string()),
             plugin: Some(plugin.to_string()),
-            agent: None,
             grant: Grant::new(caller, installation)?,
             world: World::Extension,
             fetch_policy: match manifest {
                 Some(manifest) => FetchPolicy::Operations(Box::new(manifest)),
                 None => FetchPolicy::SecretOrigins,
             },
-            remote_reads: false,
             query_scope: Some(drive.to_string()),
             query_limit: Some(10_000),
         })
@@ -524,11 +494,6 @@ impl HostCore {
 
     pub fn grant(&self) -> &Grant {
         &self.grant
-    }
-
-    /// The subject of the agent this installation signs as, if it has one.
-    pub fn plugin_agent(&self) -> Option<String> {
-        self.agent.as_ref().map(|a| a.subject.to_string())
     }
 
     // -- reads --------------------------------------------------------------
@@ -545,7 +510,10 @@ impl HostCore {
         let parsed = Subject::from_raw(subject, self.db.get_base_domain().as_deref());
 
         if !parsed.is_local() && !self.db.has_resource_locally(&parsed.pure_id()) {
-            return self.fetch_remote(subject).await;
+            return Err(
+                "this plugin has no network permission, so it cannot read resources on other servers"
+                    .into(),
+            );
         }
 
         let resource = match self
@@ -566,27 +534,6 @@ impl HostCore {
             .await?;
 
         Ok(resource)
-    }
-
-    async fn fetch_remote(&self, subject: &str) -> Result<Resource, String> {
-        if !self.remote_reads {
-            return Err(
-                "this plugin has no network permission, so it cannot read resources on other servers"
-                    .into(),
-            );
-        }
-
-        // The host fetches this one, so no guest socket check sees it. Same
-        // rules, applied here.
-        if let Some(refusal) = egress::refuse_url(subject).await {
-            tracing::warn!(%subject, %refusal, "plugin refused a foreign subject fetch");
-            return Err(format!("cannot fetch {subject}: {refusal}"));
-        }
-
-        self.db
-            .fetch_resource(subject, self.agent.as_ref())
-            .await
-            .map_err(|e| e.to_string())
     }
 
     /// Resources matching `property = value`, each one authorized for the
@@ -665,105 +612,6 @@ impl HostCore {
             }
             _ => "{}".to_string(),
         }
-    }
-
-    // -- writes -------------------------------------------------------------
-
-    /// Applies a commit signed by the installation's agent.
-    ///
-    /// Only a server extension may do this. An extension-world installation
-    /// proposes; the host applies after review, and this call tells it so.
-    /// `commit` is the plugin SDK's wire shape: `subject`, full `set` and
-    /// `remove` payloads, `destroy`.
-    pub async fn commit(&self, commit: &str) -> Result<(), String> {
-        if self.world != World::ServerExtension {
-            return Err(
-                "this installation is proposal-only: return intents from `run` instead of committing"
-                    .into(),
-            );
-        }
-
-        let Some(agent) = &self.agent else {
-            return Err("Plugin does not have an agent".to_string());
-        };
-
-        // The plugin SDK's `CommitBuilder` serializes with full set / remove
-        // payloads (HashMap<String, JsonValue> / HashSet<String>). The
-        // canonical `CommitBuilderJSON` only carries `loro_update`, so plugins
-        // that build a commit by accumulating `set` calls would otherwise
-        // arrive with no Loro update and get rejected. Parse the wire shape
-        // directly here and convert each JsonValue → typed `Value` via the
-        // property's datatype, then `sign` materializes the Loro update.
-        #[derive(serde::Deserialize)]
-        struct PluginCommitWire {
-            subject: String,
-            #[serde(default)]
-            set: std::collections::HashMap<String, serde_json::Value>,
-            #[serde(default)]
-            remove: std::collections::HashSet<String>,
-            #[serde(default)]
-            destroy: bool,
-            #[serde(default)]
-            previous_commit: Option<String>,
-        }
-
-        let wire: PluginCommitWire =
-            serde_json::from_str(commit).map_err(|e| format!("Invalid commit JSON: {e}"))?;
-
-        let mut commit_builder = CommitBuilder::new(wire.subject.into());
-        commit_builder.destroy(wire.destroy);
-        // `previous_commit` is intentionally ignored: `sign()` overrides it
-        // from the resource's `lastCommit` propval, so any value the plugin
-        // supplies would be discarded anyway.
-        let _ = wire.previous_commit;
-        for prop in wire.remove {
-            commit_builder.remove(prop);
-        }
-        let parse_opts = atomic_lib::parse::ParseOpts::default();
-        for (prop, json_val) in wire.set {
-            let (key, value) =
-                atomic_lib::parse::parse_propval(&prop, &json_val, None, &*self.db, &parse_opts)
-                    .await
-                    .map_err(|e| format!("Failed to convert plugin set value for {prop}: {e}"))?;
-            commit_builder.set(key.to_string(), value);
-        }
-
-        let resource = self
-            .db
-            .get_resource_extended(&commit_builder.subject, false, &agent.into())
-            .await
-            .map_err(|e| e.to_string())?
-            .to_single();
-
-        let commit = commit_builder
-            .sign(agent, &*self.db, &resource)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // A plugin editing plugin resources could install or update code
-        // without the user's consent.
-        if commit_changes_plugin(&commit, &resource)? {
-            return Err("Plugin cannot edit plugin resources".to_string());
-        }
-
-        let opts = CommitOpts {
-            validate_schema: true,
-            validate_constraints: true,
-            validate_signature: true,
-            validate_timestamp: false,
-            validate_rights: true,
-            validate_loro_causality: false,
-            update_index: true,
-            validate_for_agent: None,
-            source_id: None,
-        };
-
-        self.db
-            .apply_commit(commit, &opts)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
     }
 
     // -- egress -------------------------------------------------------------
@@ -858,13 +706,6 @@ impl HostCore {
         let origin = egress::origin_of(&url)?;
 
         match &self.fetch_policy {
-            FetchPolicy::Origins(origins) => {
-                if !origins.iter().any(|o| o == &origin) {
-                    return Err(format!(
-                        "this plugin does not declare {origin} in its manifest, so it cannot reach it",
-                    ));
-                }
-            }
             FetchPolicy::Operations(manifest) => {
                 if !manifest.allows_effect(
                     request.operation.as_deref(),
@@ -983,51 +824,10 @@ where
     Ok(bytes)
 }
 
-/// Whether this commit touches a plugin resource, either because the target
-/// already is one or because the commit makes it one.
-fn commit_changes_plugin(commit: &Commit, resource: &Resource) -> Result<bool, String> {
-    if let Ok(is_a) = resource.get(urls::IS_A) {
-        let resource_classes = is_a.to_subjects(None).map_err(|e| e.to_string())?;
-
-        if resource_classes
-            .iter()
-            .any(|class| class == urls::INSTALLATION || class == urls::PLUGIN)
-        {
-            return Ok(true);
-        }
-    }
-
-    if let Some(loro_bytes) = &commit.loro_update {
-        let doc = atomic_lib::loro::AtomicLoroDoc::new();
-        let _ = doc.import_update(loro_bytes);
-        if let Some(is_a_str) = doc.get_string_property(urls::IS_A) {
-            if is_a_str.contains(urls::INSTALLATION) || is_a_str.contains(urls::PLUGIN) {
-                return Ok(true);
-            }
-        }
-    }
-
-    Ok(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use atomic_lib::db::plugin_secret::{PluginSecret, PluginSecretKey};
-
-    fn class_extender_manifest(origins: &[&str]) -> Manifest {
-        Manifest::parse(serde_json::json!({
-            "schemaVersion": 2,
-            "runtime": "wasip2/1",
-            "world": "server-extension",
-            "name": "probe",
-            "namespace": "test",
-            "version": "0.0.1",
-            "network": {"origins": origins},
-        }))
-        .unwrap()
-        .unwrap()
-    }
 
     fn js_manifest(origin: &str) -> Manifest {
         Manifest::parse(serde_json::json!({
@@ -1052,7 +852,7 @@ mod tests {
         }
     }
 
-    /// One class-extender host and one JS host over the same store, plugin
+    /// One server-module host and one JS host over the same store, plugin
     /// and drive, each allowed to reach `origin`. The fixture comes along so
     /// the store outlives the hosts.
     async fn both_hosts(
@@ -1064,14 +864,16 @@ mod tests {
         let db = Arc::new(fixture.appstate.store.clone());
         let agent = db.get_default_agent().unwrap();
 
-        let wasm = HostCore::for_class_extender(
+        let wasm = HostCore::for_run(
             db.clone(),
-            &ClassExtenderScope::Drive(fixture.drive.clone()),
-            Some(fixture.plugin.clone()),
-            Some(agent.clone()),
-            Some(&class_extender_manifest(&[origin])),
+            &fixture.drive,
+            &fixture.plugin,
+            ForAgent::AgentSubject(agent.subject.clone()),
+            Some(js_manifest(origin)),
         )
-        .unwrap();
+        .await
+        .unwrap()
+        .as_server_module();
 
         let js = HostCore::for_run(
             db.clone(),
@@ -1200,7 +1002,7 @@ mod tests {
     async fn both_hosts_refuse_a_loopback_address_the_same_way() {
         let (_fixture, wasm, js) = both_hosts("host_core_loopback", "http://127.0.0.1:9").await;
         let req = request("http://127.0.0.1:9/x", &[]);
-        let from_wasm = wasm.fetch(req.clone(), "write").await.unwrap_err();
+        let from_wasm = wasm.fetch(req.clone(), "read").await.unwrap_err();
         let from_js = js.fetch(req, "read").await.unwrap_err();
         assert!(from_wasm.contains("Loopback"), "{from_wasm}");
         assert_eq!(from_wasm, from_js);
@@ -1252,23 +1054,13 @@ mod tests {
 
         // A handle in the URL is refused before anything resolves or sends.
         let in_url = request("https://api.test/x?t=secret:token", &[]);
-        let from_wasm = wasm.fetch(in_url.clone(), "write").await.unwrap_err();
+        let from_wasm = wasm.fetch(in_url.clone(), "read").await.unwrap_err();
         let from_js = js.fetch(in_url, "read").await.unwrap_err();
         assert!(
             from_wasm.contains("secret handle in the URL"),
             "{from_wasm}"
         );
         assert_eq!(from_wasm, from_js);
-    }
-
-    #[actix_rt::test]
-    async fn only_a_server_extension_may_commit() {
-        let (_fixture, wasm, js) = both_hosts("host_core_commit", "https://api.test").await;
-        let err = js.commit("{}").await.unwrap_err();
-        assert!(err.contains("proposal-only"), "{err}");
-        // The class extender gets past the world check and fails on the payload.
-        let err = wasm.commit("{}").await.unwrap_err();
-        assert!(!err.contains("proposal-only"), "{err}");
     }
 
     #[tokio::test]

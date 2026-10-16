@@ -17,7 +17,9 @@ fn the_wit_parses_with_the_interfaces_and_worlds_the_host_implements() {
     let package = &resolve.packages[package];
     assert_eq!(package.name.to_string(), "atomic:host@0.1.0");
 
-    for interface in ["types", "store", "events", "net", "calls", "app"] {
+    for interface in [
+        "types", "store", "events", "net", "calls", "app", "context", "hooks",
+    ] {
         assert!(
             package.interfaces.contains_key(interface),
             "missing interface {interface}"

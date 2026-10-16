@@ -1,22 +1,12 @@
 # Contributing to Atomic Plugin
 
-When updating the bindings, keep the following in mind:
-There is a weird issue where the bindings do not work when using the standard `wit_bidgen::generate!` macro.
-To get the right bindings change bindings.rs to the following:
+The bindings are generated at build time from `../atomic-host/wit` (world
+`server-module`) by `wit_bindgen::generate!` in `src/lib.rs`; nothing is checked
+in. `pub_export_macro` and `default_bindings_module` are what let a plugin crate
+call `export_plugin!`: it expands to the export macro of `atomic_plugin::bindings`.
 
-```rust
-wit_bindgen::generate!({
-    path: "wit/class-extender.wit",
-    world: "class-extender",
-    pub_export_macro: true,
-});
-```
+When the WIT changes, rebuild the plugins that use the crate (`plugin-examples/`)
+and, for the Rust fixtures, run `scripts/build-host-abi-fixtures.sh`.
 
-Then run `cargo component check` on the atomic-plugin crate, for some reason this expands the macro in a way that it actually works.
-The only thing left is to mark the following macro as exported:
-
-```rust
-#[doc(hidden)]
-#[macro_export] // <-- add this line
-macro_rules! __export_world_class_extender_cabi {
-```
+The crate depends on a path outside itself (`../atomic-host/wit`), so it cannot be
+published as it is: copy the WIT in first.

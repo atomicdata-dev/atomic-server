@@ -12,6 +12,7 @@ members = [
   # plugin-runtime: `cargo build --target wasm32-wasip2 --release -p host-abi-counter`.
   "plugin-examples/host-abi-counter",
   "plugin-examples/host-abi-caller",
+  "plugin-examples/host-abi-module",
   "atomic-plugin",
   # Built for wasm32-wasip2, not the host triple. Kept in the workspace so it
   # shares the lockfile; the server loads the artifact rather than linking it.
