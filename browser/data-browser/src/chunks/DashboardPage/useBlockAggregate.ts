@@ -6,7 +6,7 @@ import {
 } from '@tomic/react';
 import { useMemo } from 'react';
 import { useTableAggregates } from '../TablePage/useTableAggregates';
-import { toExpression } from '../TablePage/derivedColumns';
+import { dependsOnNow, toExpression } from '../TablePage/derivedColumns';
 import type { BlockAggregateSpec } from './dashboardBlocks';
 import type { BlockQuery } from './useBlockQuery';
 
@@ -62,11 +62,7 @@ export function toBlockAggregation(
 
   const measuresNow =
     spec.derived !== undefined &&
-    query.derivedColumns.some(
-      c =>
-        c.id === spec.derived &&
-        (c.kind === 'elapsed' || c.kind === 'daysSince'),
-    );
+    query.derivedColumns.some(c => c.id === spec.derived && dependsOnNow(c));
 
   return {
     aggregates: [aggregate],

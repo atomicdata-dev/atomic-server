@@ -16,15 +16,32 @@ const INTERVAL = 'https://example.com/interval';
 const duration: DerivedColumnSpec = {
   id: 'duration',
   label: 'Duration',
-  kind: 'elapsed',
-  args: { from: START, until: END },
+  formula: 'coalesce(end, now()) - start',
+  vars: { start: START, end: END },
+  valueKind: 'duration',
 };
 
 const nextWater: DerivedColumnSpec = {
   id: 'next-water',
   label: 'Next water',
-  kind: 'offset',
-  args: { from: WATERED, days: INTERVAL },
+  formula: 'addDays(watered, interval)',
+  vars: { watered: WATERED, interval: INTERVAL },
+  valueKind: 'date',
+};
+
+const birthdaySoon: DerivedColumnSpec = {
+  id: 'birthday-soon',
+  label: 'Birthday soon',
+  formula: 'daysUntilAnniversary(birthday) <= 14',
+  vars: { birthday: 'https://example.com/birthday' },
+  valueKind: 'boolean',
+};
+
+const total: DerivedColumnSpec = {
+  id: 'total',
+  label: 'Total',
+  formula: 'quantity * price',
+  vars: { quantity: START, price: END },
 };
 
 const NOW = 1_700_000_000_000;
@@ -66,7 +83,11 @@ describe('splitFilters', () => {
 
     expect(expressionFilters).toEqual([
       {
-        expression: { kind: 'elapsed', from: START, until: END },
+        expression: {
+          kind: 'formula',
+          formula: 'coalesce(end, now()) - start',
+          vars: { start: START, end: END },
+        },
         operator: 'gt',
         value: 5_400_000,
         // A running entry measures against the clock, so the query carries one.
@@ -95,6 +116,27 @@ describe('splitFilters', () => {
     expect(expressionFilters[0].value).toBe(Date.parse('2026-08-05'));
   });
 
+  it('compares a true/false column as 1 or 0, against the same clock as its cells', () => {
+    const filters: TableFilter[] = [
+      { derived: 'birthday-soon', operator: 'eq', value: '1' },
+    ];
+    const { expressionFilters } = splitFilters(filters, [birthdaySoon], NOW);
+
+    expect(expressionFilters).toMatchObject([
+      { operator: 'eq', value: 1, now_ms: NOW },
+    ]);
+  });
+
+  it('leaves the clock out of a filter on plain arithmetic', () => {
+    const filters: TableFilter[] = [
+      { derived: 'total', operator: 'gt', value: '100' },
+    ];
+    const { expressionFilters } = splitFilters(filters, [total], NOW);
+
+    expect(expressionFilters).toMatchObject([{ operator: 'gt', value: 100 }]);
+    expect(expressionFilters[0].now_ms).toBeUndefined();
+  });
+
   it('skips a filter that has no value yet', () => {
     // Its chip stays visible while being edited; the table must not blank out.
     const filters: TableFilter[] = [
@@ -115,7 +157,7 @@ describe('splitFilters', () => {
     // Asking anyway would narrow to nothing and read as a broken table.
     expect(splitFilters(filters, [], NOW).expressionFilters).toEqual([]);
     expect(
-      splitFilters(filters, [{ ...duration, args: { from: '' } }], NOW)
+      splitFilters(filters, [{ ...duration, formula: ' ' }], NOW)
         .expressionFilters,
     ).toEqual([]);
   });

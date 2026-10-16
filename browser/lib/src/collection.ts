@@ -188,29 +188,23 @@ export interface Aggregate {
 
 export type AggregateFunction = 'sum' | 'count' | 'avg' | 'min' | 'max';
 
-/** A property to read off the resource, or a fixed number. */
-export type Operand = string | number;
-
 /**
  * A value computed from a resource rather than stored on it: a duration, an
  * amount, a days-since, a next-due date. Evaluated by the store, so a total or a
  * filter can name one wherever it can name a property.
  *
- * A fixed set of five, not a formula language — the same five the data-browser's
- * computed columns offer, in the same argument names.
+ * A formula (parsed by the store's `evalexpr`) plus the property each identifier
+ * in it reads: `{ formula: 'coalesce(until, now()) - start', vars: { start,
+ * until } }`. Dates are milliseconds; a missing value makes the row's value
+ * empty. Functions: `now()`, `coalesce(a, b, ..)`, `days(ms)`, `addDays(ms, n)`,
+ * `daysUntilAnniversary(ms)`, and evalexpr's builtins.
  */
-export type Expression =
-  /** `to − from`, in milliseconds. */
-  | { kind: 'difference'; from: Operand; to: Operand }
-  /** `(until ?? now) − from`, in milliseconds: still running while `until` is
-   *  empty. */
-  | { kind: 'elapsed'; from: Operand; until?: Operand | null }
-  /** Whole days between `from` and now. */
-  | { kind: 'daysSince'; from: Operand }
-  /** `a × b` — quantity × price, hours × rate. */
-  | { kind: 'product'; a: Operand; b: Operand }
-  /** `from + days`, as an instant. */
-  | { kind: 'offset'; from: Operand; days: Operand };
+export interface Expression {
+  kind: 'formula';
+  formula: string;
+  /** Identifier used in the formula → property subject. */
+  vars: Record<string, string>;
+}
 
 /** Break the statistics down per distinct value of a property. */
 export interface AggregateGrouping {

@@ -418,8 +418,10 @@ export async function describeTable(
 
       const derived = read(dataBrowser.properties.viewDerivedColumns);
 
-      if (Array.isArray(derived) && derived.length > 0) {
-        described.derivedColumns = derived as JSONValue;
+      const specs = parseDerivedColumnSpecs(derived as JSONValue);
+
+      if (specs.length > 0) {
+        described.derivedColumns = specs as unknown as JSONValue;
       }
 
       const rowActions = read(dataBrowser.properties.viewRowActions);

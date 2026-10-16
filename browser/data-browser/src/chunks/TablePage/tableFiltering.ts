@@ -2,9 +2,8 @@ import { Datatype, type FilterOperator } from '@tomic/react';
 import { useCallback, useState } from 'react';
 import type { ExpressionFilter, PropVal } from '@tomic/react';
 import {
-  DERIVED_COLUMN_GENERATORS,
+  dependsOnNow,
   toExpression,
-  type DerivedColumnKind,
   type DerivedColumnSpec,
   type DerivedValueKind,
 } from './derivedColumns';
@@ -195,6 +194,16 @@ export interface DerivedFilterUnit {
 
 const HOUR_MS = 3_600_000;
 
+const plainNumber: DerivedFilterUnit = {
+  suffix: '',
+  allowsNow: false,
+  toNumber: value => {
+    const number = Number(value);
+
+    return Number.isFinite(number) ? number : undefined;
+  },
+};
+
 const UNITS: Record<DerivedValueKind, DerivedFilterUnit> = {
   duration: {
     suffix: 'hours',
@@ -205,24 +214,10 @@ const UNITS: Record<DerivedValueKind, DerivedFilterUnit> = {
       return Number.isFinite(hours) ? hours * HOUR_MS : undefined;
     },
   },
-  days: {
-    suffix: 'days',
-    allowsNow: false,
-    toNumber: value => {
-      const days = Number(value);
-
-      return Number.isFinite(days) ? days : undefined;
-    },
-  },
-  number: {
-    suffix: '',
-    allowsNow: false,
-    toNumber: value => {
-      const number = Number(value);
-
-      return Number.isFinite(number) ? number : undefined;
-    },
-  },
+  days: { ...plainNumber, suffix: 'days' },
+  number: plainNumber,
+  // A true/false column compares as 1/0: "equals 1" keeps the rows where it holds.
+  boolean: plainNumber,
   date: {
     suffix: '',
     allowsNow: true,
@@ -241,8 +236,8 @@ const UNITS: Record<DerivedValueKind, DerivedFilterUnit> = {
 /** The value that means "the moment the query runs". */
 export const NOW_VALUE = 'now';
 
-export function derivedFilterUnit(kind: DerivedColumnKind): DerivedFilterUnit {
-  return UNITS[DERIVED_COLUMN_GENERATORS[kind].valueKind];
+export function derivedFilterUnit(spec: DerivedColumnSpec): DerivedFilterUnit {
+  return UNITS[spec.valueKind ?? 'number'];
 }
 
 /**
@@ -287,7 +282,7 @@ export function splitFilters(
       continue;
     }
 
-    const value = derivedFilterUnit(spec.kind).toNumber(filter.value, now);
+    const value = derivedFilterUnit(spec).toNumber(filter.value, now);
 
     if (value === undefined) {
       continue;
@@ -300,9 +295,7 @@ export function splitFilters(
       // The same instant for every constraint in the query, and quantized: this
       // is part of the query's identity, so a raw `Date.now()` would re-run it
       // on every render.
-      ...(spec.kind === 'elapsed' || spec.kind === 'daysSince' || value === now
-        ? { now_ms: now }
-        : {}),
+      ...(dependsOnNow(spec) || value === now ? { now_ms: now } : {}),
     });
   }
 

@@ -236,10 +236,17 @@ export async function decryptRecoverySecret(
 
 // --- Envelope v2 (DEK + recovery-code wrapper via Argon2id) ---
 
-type Argon2WasmModule = {
+export type AtomicWasmModule = {
   default: (init?: {
     module_or_path: string | WebAssembly.Module;
   }) => Promise<unknown>;
+  /** `values` is `{ [propertySubject]: number | string | boolean | null }`. */
+  evaluateFormula: (
+    expression: unknown,
+    values: unknown,
+    nowMs: number,
+  ) => number | null;
+  validateFormula: (expression: unknown) => string | null;
   argon2idDeriveKey: (
     secret: string,
     salt: Uint8Array,
@@ -250,25 +257,26 @@ type Argon2WasmModule = {
 };
 
 /** What the dynamic import actually gives us: an older build of the glue has
- * `default` but not the KDF, which is the case {@link loadArgon2Wasm} checks. */
-type LoadedWasmModule = Partial<Argon2WasmModule> &
-  Pick<Argon2WasmModule, 'default'>;
+ * `default` but not the exports added later, which is what {@link loadAtomicWasm}
+ * checks. */
+type LoadedWasmModule = Partial<AtomicWasmModule> &
+  Pick<AtomicWasmModule, 'default'>;
 
-let argon2ModulePromise: Promise<Argon2WasmModule> | null = null;
+let wasmModulePromise: Promise<AtomicWasmModule> | null = null;
 
 /**
  * Lazily loads the atomic_wasm bundle on the main thread, independent of the
- * ClientDb worker (initClientDb.ts) — this is a stateless KDF call, not a
- * database, so it doesn't need OPFS or worker/leader-election machinery.
+ * ClientDb worker (initClientDb.ts) — its stateless exports (the KDF, formula
+ * evaluation) are not a database, so it doesn't need OPFS or worker/leader-election machinery.
  *
  * The export is verified rather than assumed. A page that spans a deploy can
  * hold a module from an older build (see `helpers/wasmUrls.ts`), where calling
  * the missing KDF surfaces as a bare "is not a function" TypeError halfway
  * through generating a recovery code. Failing here instead says what to do.
  */
-async function loadArgon2Wasm(): Promise<Argon2WasmModule> {
-  if (!argon2ModulePromise) {
-    argon2ModulePromise = (async () => {
+export async function loadAtomicWasm(): Promise<AtomicWasmModule> {
+  if (!wasmModulePromise) {
+    wasmModulePromise = (async () => {
       try {
         const url = wasmJsUrl();
         const loaded = (await import(
@@ -282,18 +290,18 @@ async function loadArgon2Wasm(): Promise<Argon2WasmModule> {
           );
         }
 
-        return loaded as Argon2WasmModule;
+        return loaded as AtomicWasmModule;
       } catch (e) {
         // Never memoize a failure: after the reload this asks for, and for an
         // offline blip on the way to a 6MB binary, a retry must be able to
         // load it rather than replay the rejection for the tab's lifetime.
-        argon2ModulePromise = null;
+        wasmModulePromise = null;
         throw e;
       }
     })();
   }
 
-  return argon2ModulePromise;
+  return wasmModulePromise;
 }
 
 async function deriveKeyFromRecoveryCode(
@@ -302,7 +310,7 @@ async function deriveKeyFromRecoveryCode(
   usages: KeyUsage[],
   kdfParams?: Record<string, unknown>,
 ): Promise<CryptoKey> {
-  const wasm = await loadArgon2Wasm();
+  const wasm = await loadAtomicWasm();
   const memKib = Number(kdfParams?.mem_kib ?? ARGON2_MEM_KIB);
   const iterations = Number(kdfParams?.iterations ?? ARGON2_ITERATIONS);
   const parallelism = Number(kdfParams?.parallelism ?? ARGON2_PARALLELISM);
