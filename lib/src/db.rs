@@ -990,25 +990,50 @@ impl Db {
             )
             .into());
         }
-        // What this write changes, for the drive's event stream: a resource
-        // seen for the first time changes everything it holds, a known one
-        // only the properties whose value differs. `None` is a write that
-        // changes nothing (a peer pushing again what we have).
-        let changed = match &existing {
-            None => Some(replicated_props(resource)),
+        // What this write changes, for the drive's event stream. Whether it
+        // changed anything is decided from the CRDT: the incoming state's
+        // version against the stored one, so an edit that leaves the
+        // projected properties alone (rich text, say) still counts, and a
+        // peer pushing again what we hold does not. A resource with no CRDT
+        // state of its own (it would be seeded from its properties, with a
+        // fresh peer id each time) is compared by its properties instead.
+        // Which properties differ is listed either way, as extra information.
+        let differing: std::collections::BTreeSet<String> = match &existing {
+            None => replicated_props(resource),
             Some(old) => {
                 let new = resource.get_propvals();
-                let changed: std::collections::BTreeSet<String> = new
-                    .iter()
+                new.iter()
                     .filter(|(prop, value)| {
-                        // `Value` has no equality; its debug form names the variant and the content.
+                        // `Value` has no equality; its debug form names the
+                        // variant and the content.
                         old.get(*prop).map(|v| format!("{v:?}")) != Some(format!("{value:?}"))
                     })
                     .map(|(prop, _)| prop.clone())
                     .chain(old.keys().filter(|prop| !new.contains_key(*prop)).cloned())
-                    .collect();
-                (!changed.is_empty()).then_some(changed)
+                    .collect()
             }
+        };
+        let incoming = snapshot.clone().or_else(|| resource.materialized_state());
+        let changed = match (&existing, incoming) {
+            (None, _) => Some(differing),
+            (Some(_), Some(incoming)) => {
+                let stored = self.get_loro_snapshot_bytes(&subject_str);
+                let same = match &stored {
+                    None => false,
+                    Some(stored) if *stored == incoming => true,
+                    Some(stored) => {
+                        match (
+                            crate::loro::AtomicLoroDoc::from_snapshot(stored),
+                            crate::loro::AtomicLoroDoc::from_snapshot(&incoming),
+                        ) {
+                            (Ok(old), Ok(new)) => old.oplog_vv() == new.oplog_vv(),
+                            _ => false,
+                        }
+                    }
+                };
+                (!same).then_some(differing)
+            }
+            (Some(_), None) => (!differing.is_empty()).then_some(differing),
         };
         if check_required_props {
             resource.check_required_props(self).await?;

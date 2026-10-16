@@ -5570,6 +5570,62 @@ async fn replicating_what_is_already_held_adds_no_event() {
     );
 }
 
+/// Whether a synced Loro state changed anything is decided from the CRDT's
+/// version, not from the projected properties: a rich-text edit that leaves
+/// them alone is still news, and the same state pushed again is not.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_synced_edit_that_leaves_the_properties_alone_still_adds_an_event() {
+    use crate::sync::ws_apply::{persist_update, resolve_update};
+
+    let store = Db::init_temp("replication_loro_version").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+    let subject = "atomic:replicated-text";
+
+    let doc = crate::loro::AtomicLoroDoc::new();
+    doc.set_property(urls::PARENT, &Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    doc.set_property(urls::NAME, &Value::String("Doc".into()))
+        .unwrap();
+    doc.commit_with_message("peer");
+    let push = |bytes: Vec<u8>| {
+        let store = store.clone();
+        async move {
+            let resolved = resolve_update(&store, subject, &bytes)
+                .await
+                .expect("the state resolves");
+            persist_update(&store, subject, resolved).await.unwrap();
+        }
+    };
+    let events = |store: &Db| {
+        store
+            .drive_events(drive.as_str(), 0, 1000)
+            .into_iter()
+            .filter(|e| e.subject == subject)
+            .collect::<Vec<_>>()
+    };
+
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 1);
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 1, "the same state again is not news");
+
+    // Text lives in its own container: no projected property moves.
+    doc.doc().get_text("body").insert(0, "hello").unwrap();
+    doc.doc().commit();
+    push(doc.export_snapshot()).await;
+    let after = events(&store);
+    assert_eq!(after.len(), 2, "{after:?}");
+    assert!(
+        after[1].props.iter().all(|p| p == urls::LORO_UPDATE),
+        "no property of the resource differs: {after:?}"
+    );
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 2);
+}
+
 /// A destroy *commit* takes its children with it. Each child is its own row in
 /// the stream, and the leave edge of each is on its own event rather than
 /// merged into the destroyed parent's.
