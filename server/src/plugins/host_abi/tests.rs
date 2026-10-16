@@ -1225,7 +1225,12 @@ async fn a_subscription_filters_by_class_subtree_and_property() {
         .set_filters(vec![filter(Some(urls::FOLDER), None, None)])
         .await
         .unwrap();
-    assert!(state.next(Some("0".into()), 100).await.unwrap().is_empty());
+    // Nothing matches; the call only says how far it looked.
+    let got = state.next(Some("0".into()), 100).await.unwrap();
+    assert!(
+        got.iter().all(|e| matches!(e.kind, Kind::Timer(_))),
+        "{got:?}"
+    );
 
     // Subtree: this resource and below, or a branch it is not in.
     state
