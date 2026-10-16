@@ -274,6 +274,16 @@ impl Db {
                 if old.at_ms >= cutoff {
                     break;
                 }
+                // An event nobody handled yet is lost with it. Say whose.
+                for (consumer, checkpoint) in self.event_consumers_behind(&drive, old.seq) {
+                    tracing::warn!(
+                        drive = %drive,
+                        consumer = %consumer,
+                        checkpoint,
+                        dropped = old.seq,
+                        "dropping a drive event older than the retention that this consumer has not acknowledged"
+                    );
+                }
                 transaction.push(Operation {
                     tree: Tree::PluginMeta,
                     method: Method::Delete,
@@ -305,6 +315,30 @@ impl Db {
                 None => return after,
             }
         }
+    }
+
+    /// The consumers of `drive` whose checkpoint is below `seq`: they have not
+    /// handled that event yet.
+    pub(crate) fn event_consumers_behind(&self, drive: &str, seq: u64) -> Vec<(String, u64)> {
+        let prefix = format!("event-ck/v1/{}/", pure(drive));
+        self.kv
+            .range_page(
+                Tree::PluginMeta,
+                prefix.clone().into_bytes(),
+                prefix_end(prefix.as_bytes()),
+                256,
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|(key, value)| {
+                let consumer = String::from_utf8(key)
+                    .ok()?
+                    .strip_prefix(&prefix)?
+                    .to_string();
+                let checkpoint: u64 = String::from_utf8(value).ok()?.parse().ok()?;
+                (checkpoint < seq).then_some((consumer, checkpoint))
+            })
+            .collect()
     }
 
     /// Up to `max` events of `drive` with a sequence number above `after`.

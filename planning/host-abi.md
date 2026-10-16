@@ -274,6 +274,9 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       window and the id-keyed check are gone. Kept: the self-echo skip and the
       30-per-minute rate limit, which the stream does not cover. Old
       `plugin-event/v1` rows are not migrated.
+      Retention is 7 days and does not wait for acknowledgements: an event a
+      consumer has not acked by then is dropped, with a warning naming the
+      consumer whose checkpoint is behind.
       *Not done:* the producers other than commits (cron, field timers,
       webhooks, connection-needed). Module `after-commit` stays synchronous: it
       is handed the resource as the commit left it, runs under the commit's

@@ -5523,6 +5523,11 @@ async fn the_event_sequence_outlives_the_rows_retention_removes() {
     genesis_child(&store, &drive).await;
     let last = store.last_event_seq(drive.as_str());
     assert!(last >= 2);
+    store.ack_events(drive.as_str(), "slow", 1).unwrap();
+    assert_eq!(
+        store.event_consumers_behind(drive.as_str(), last),
+        vec![("slow".to_string(), 1)]
+    );
 
     // Retention removed every row.
     for event in store.drive_events(drive.as_str(), 0, 1000) {
