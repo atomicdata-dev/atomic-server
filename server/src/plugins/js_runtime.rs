@@ -79,18 +79,6 @@ impl<H: PluginHost> bindings::atomic::plugin_runtime::host::Host for RuntimeStat
         }
         Ok(output)
     }
-    async fn fetch(&mut self, request: String) -> Result<String, String> {
-        self.host.fetch(request).await
-    }
-
-    async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-        self.host.get_resource(subject).await
-    }
-
-    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
-        self.host.query(property, value).await
-    }
-
     async fn abi(
         &mut self,
         function: String,
@@ -255,17 +243,7 @@ pub struct StoreHost {
 
 pub(super) struct NoCapabilities;
 #[async_trait::async_trait]
-impl PluginHost for NoCapabilities {
-    async fn fetch(&mut self, _: String) -> Result<String, String> {
-        Err("manifest evaluation has no I/O".into())
-    }
-    async fn get_resource(&mut self, _: String) -> Result<String, String> {
-        Err("manifest evaluation has no I/O".into())
-    }
-    async fn query(&mut self, _: String, _: String) -> Result<String, String> {
-        Err("manifest evaluation has no I/O".into())
-    }
-}
+impl PluginHost for NoCapabilities {}
 
 pub async fn describe_manifest(source: &str) -> Result<Option<super::manifest::Manifest>, String> {
     let raw = embedded_runtime()
@@ -380,29 +358,16 @@ impl PluginHost for StoreHost {
         )
         .await
     }
-    async fn fetch(&mut self, request: String) -> Result<String, String> {
-        self.request(request, "read").await
-    }
-
-    async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-        self.core()
-            .await?
-            .get_resource(&subject)
-            .await?
-            .to_json_ad(None)
-            .map_err(|e| e.to_string())
-    }
-
-    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
-        let subjects: Vec<String> = self
-            .core()
-            .await?
-            .query(&property, &value)
-            .await?
-            .iter()
-            .map(|resource| resource.get_subject().to_string())
-            .collect();
-        serde_json::to_string(&subjects).map_err(|e| e.to_string())
+    async fn abi(
+        &mut self,
+        function: &str,
+        args: &str,
+    ) -> Result<String, super::host_abi::HostError> {
+        // No shared registry here: `calls.*` loads the drive's apps afresh.
+        // Runs that should share one are wrapped in `host_abi::JsAbi`.
+        super::host_abi::JsAbi::new(self.clone(), Default::default())
+            .abi(function, args)
+            .await
     }
 
     async fn resource_grants(&mut self) -> ResourceGrants {
@@ -446,15 +411,6 @@ mod tests {
         ) -> Result<String, String> {
             Ok(serde_json::json!({"status":"read","automatic":automatic,"run":run}).to_string())
         }
-        async fn fetch(&mut self, _: String) -> Result<String, String> {
-            Err("unused".into())
-        }
-        async fn get_resource(&mut self, _: String) -> Result<String, String> {
-            Err("unused".into())
-        }
-        async fn query(&mut self, _: String, _: String) -> Result<String, String> {
-            Err("unused".into())
-        }
     }
     #[actix_rt::test]
     async fn only_host_triggered_runs_own_receipts_and_js_cannot_change_the_identity() {
@@ -484,6 +440,7 @@ mod tests {
     }
 
     use super::*;
+    use serde_json::json;
 
     #[actix_rt::test]
     async fn manifests_are_evaluated_without_host_access() {
@@ -538,9 +495,13 @@ mod tests {
             manifest: None,
         };
         assert!(host
-            .fetch(r#"{"method":"DELETE","url":"https://api.test/items"}"#.into())
+            .abi(
+                "net.fetch",
+                r#"[{"method":"DELETE","url":"https://api.test/items"}]"#
+            )
             .await
             .unwrap_err()
+            .message
             .contains("legacy preview"));
         host.validate_binding().await.unwrap();
         let drive = host.drive.clone();
@@ -551,9 +512,15 @@ mod tests {
             .unwrap_err()
             .contains("does not belong"));
         host.drive = drive;
-        assert!(host.get_resource(hidden.clone()).await.is_err());
+        assert!(host
+            .abi("store.get", &json!([hidden]).to_string())
+            .await
+            .is_err());
         let matches = host
-            .query(urls::NAME.into(), "private-host-record".into())
+            .abi(
+                "store.query",
+                &json!([{"filters": [{"property": urls::NAME, "op": "eq", "value": {"tag": "string", "val": "private-host-record"}}]}]).to_string(),
+            )
             .await
             .unwrap();
         assert!(!matches.contains(&hidden));
@@ -566,7 +533,10 @@ mod tests {
         assert!(planner.read_resource(&hidden).await.is_none());
         // The account may read its plugin, but attaching an app identity must
         // restrict access to the intersection, not inherit the account's ACL.
-        assert!(host.get_resource(host.plugin.clone()).await.is_ok());
+        assert!(host
+            .abi("store.get", &json!([host.plugin]).to_string())
+            .await
+            .is_ok());
         let app = atomic_lib::agents::Agent::new(None).unwrap();
         store
             .set_app_agent(
@@ -578,7 +548,10 @@ mod tests {
                 ),
             )
             .unwrap();
-        assert!(host.get_resource(host.plugin.clone()).await.is_err());
+        assert!(host
+            .abi("store.get", &json!([host.plugin]).to_string())
+            .await
+            .is_err());
     }
 
     /// Records what the plugin asked for and answers with canned data.
@@ -588,18 +561,14 @@ mod tests {
 
     #[async_trait::async_trait]
     impl PluginHost for FakeHost {
-        async fn fetch(&mut self, request: String) -> Result<String, String> {
-            self.fetched.lock().unwrap().push(request);
+        async fn abi(
+            &mut self,
+            _: &str,
+            args: &str,
+        ) -> Result<String, crate::plugins::host_abi::HostError> {
+            self.fetched.lock().unwrap().push(args.to_string());
 
             Ok(r#"{"status":200,"body":"{\"name\":\"Ada\"}"}"#.to_string())
-        }
-
-        async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-            Ok(format!("{{\"@id\":\"{subject}\"}}"))
-        }
-
-        async fn query(&mut self, _p: String, _v: String) -> Result<String, String> {
-            Ok("[\"https://x/a\"]".to_string())
         }
     }
 

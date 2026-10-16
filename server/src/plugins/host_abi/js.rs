@@ -28,7 +28,7 @@ use super::{
         store::{self, Filter, FilterOp, Page, QuerySpec},
         types::{Resource, Value},
     },
-    code, error,
+    classify, code, error,
     registry::HostAbiRegistry,
     run::{build_host, with_deadline, AbiState, CallBudget, ENTRY_TIMEOUT},
     HostError,
@@ -117,6 +117,15 @@ impl JsAbi {
                     code::NEEDS_APPROVAL,
                     "a run plugin proposes writes by returning intents; the host plans and applies them after review",
                 ))
+            }
+            // The URL form `ctx.http` sends: `{method, url, headers, body}`
+            // (optionally with `operation`), through the same `HostCore::fetch`.
+            "net.fetch" if arg(&args, 0)?.get("url").is_some() => {
+                return self
+                    .host
+                    .request(arg(&args, 0)?.to_string(), "read")
+                    .await
+                    .map_err(classify);
             }
             "net.fetch" => {
                 let request: JsFetch = serde_json::from_value(arg(&args, 0)?)
@@ -366,15 +375,6 @@ impl PluginHost for JsAbi {
         self.host
             .invoke_action(request, source_hash, allow_automatic, consumer)
             .await
-    }
-    async fn fetch(&mut self, request: String) -> Result<String, String> {
-        self.host.fetch(request).await
-    }
-    async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-        self.host.get_resource(subject).await
-    }
-    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
-        self.host.query(property, value).await
     }
     async fn abi(&mut self, function: &str, args: &str) -> Result<String, HostError> {
         self.dispatch(function, args).await

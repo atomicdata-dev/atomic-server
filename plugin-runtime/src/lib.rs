@@ -68,21 +68,9 @@ globalThis.__atomic = (function () {
     return parsed.ok;
   }
 
-  // Parsed, like `read` and `query`: a plugin wants `res.status` and
-  // `res.body`, not a string it has to remember to parse.
   input.integration = function (request) {
     return JSON.parse(unwrap(__hostAction(JSON.stringify(request))));
   };
-  input.http = function (request) {
-    return JSON.parse(unwrap(__hostFetch(JSON.stringify(request))));
-  };
-  input.read = function (subject) {
-    return JSON.parse(unwrap(__hostGetResource(subject)));
-  };
-  input.query = function (property, value) {
-    return JSON.parse(unwrap(__hostQuery(property, value)));
-  };
-
   // The host ABI (`atomic:host`): the same functions, names and error codes as
   // every other kind of app. A failure throws an Error with `.code`.
   function abi(name, ...args) {
@@ -101,6 +89,30 @@ globalThis.__atomic = (function () {
     providers: (name) => abi('calls.providers', name),
     describe: (name) => abi('calls.describe', name),
     call: (name, fn, args, handles = []) => abi('calls.call', name, fn, args, handles),
+  };
+
+  // The older `ctx.*` names, as thin shims over the ABI with their old shapes:
+  // `http` takes a URL request, `read` returns JSON-AD, `query` returns
+  // subjects matching an exact string value.
+  input.http = (request) => abi('net.fetch', request);
+  input.read = (subject) => {
+    const { subject: id, propvals } = abi('store.get', subject);
+    return Object.fromEntries([['@id', id], ...propvals.map((pv) => [pv.property, pv.value.val])]);
+  };
+  input.query = (property, value) => {
+    const subjects = [];
+    let cursor = null;
+    do {
+      const page = abi('store.query', {
+        filters: [{ property, op: 'eq', value: { tag: 'string', val: value } }],
+        limit: 500,
+        cursor,
+      });
+      subjects.push(...page.subjects);
+      if (!page.complete && !page.cursor) throw new Error('sandbox query is incomplete');
+      cursor = page.cursor;
+    } while (cursor);
+    return subjects;
   };
 
   return input;
@@ -122,34 +134,6 @@ impl Guest for Component {
             // Host imports are handed to JS as ordinary functions. Each returns
             // `{ok}` or `{error}` as JSON: a WIT `result` has no JS equivalent,
             // and a thrown string loses which call failed.
-            globals
-                .set(
-                    "__hostFetch",
-                    Function::new(ctx.clone(), |request: String| encode(host::fetch(&request)))
-                        .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            globals
-                .set(
-                    "__hostGetResource",
-                    Function::new(ctx.clone(), |subject: String| {
-                        encode(host::get_resource(&subject))
-                    })
-                    .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            globals
-                .set(
-                    "__hostQuery",
-                    Function::new(ctx.clone(), |property: String, value: String| {
-                        encode(host::query(&property, &value))
-                    })
-                    .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
             globals
                 .set(
                     "__hostAction",

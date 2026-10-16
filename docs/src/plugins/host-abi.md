@@ -234,7 +234,7 @@ export function run(ctx) {
 
 Values cross as `{tag, val}` (the WIT variant case: `string`, `integer`, `link`, `resource-array`, `json`, ...), fields are camelCase. Available: `store.get`, `getMany`, `query`, `net.fetch` (the body is text) and `calls.providers`, `describe`, `call`. They are the same host code as for a component, so the rights are too: reads need the caller and the Installation's agent, `net.fetch` only reaches manifest operations, and `calls.call` goes through the same checks as above (`manifest.uses`, write on the drive at every hop for `write` and `external` exports).
 A run plugin lists `uses` in its manifest like an app does. Its calls are limited to `read` exports, as for a frame. `store.apply` is `needs-approval`: a run plugin proposes writes by returning intents, which the host plans and applies after review. `subscribe`, `undo`, `search` and `events` are `unsupported`.
-`ctx.http`, `ctx.read`, `ctx.query` and `ctx.integration` stay as they were.
+`ctx.http`, `ctx.read` and `ctx.query` keep their shapes and are shims over `net.fetch` (which also takes the URL form `{method, url, headers, body}` there), `store.get` and `store.query`; `ctx.integration` is unchanged.
 
 ## Not built yet
 

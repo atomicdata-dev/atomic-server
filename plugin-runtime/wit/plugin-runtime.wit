@@ -1,23 +1,8 @@
 package atomic:plugin-runtime@0.1.0;
 
 interface host {
-  /**
-  An HTTP request, as a JSON `{ method, url, headers, body }`.
-
-  The plugin has no sockets. The host checks the origin against the manifest,
-  refuses anything resolving off the public internet, and substitutes
-  `secret:<name>` in header values for credentials the plugin never sees.
-  */
-  fetch: func(request: string) -> result<string, string>;
-
   /// Invoke a named action on an explicitly referenced integration. Writes only prepare review.
   invoke-action: func(request: string) -> result<string, string>;
-
-  /// A resource as JSON-AD.
-  get-resource: func(subject: string) -> result<string, string>;
-
-  /// Subjects matching a property/value, as a JSON array.
-  query: func(property: string, value: string) -> result<string, string>;
 
   /// Machine-readable failure of an ABI function; `code` is one of the
   /// stable codes of `atomic:host` (`atomic-host/wit/host.wit`).
@@ -29,7 +14,8 @@ interface host {
   /**
   One function of the host ABI (`atomic:host`), by its WIT name:
   `store.get`, `store.get-many`, `store.query`, `net.fetch`, `calls.providers`,
-  `calls.describe`, `calls.call`. `args` is a JSON array of the positional
+  `calls.describe`, `calls.call`. `net.fetch` also takes the older URL form
+  `{method, url, headers, body}` that `ctx.http` sends. `args` is a JSON array of the positional
   arguments, the result a JSON value. One entry point rather than one import
   per function, so the ABI can grow without a new runtime build.
   */

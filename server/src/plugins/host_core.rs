@@ -217,9 +217,6 @@ pub trait PluginHost: Send + 'static {
     ) -> Result<String, String> {
         Err("integration actions are not available in this context".into())
     }
-    async fn fetch(&mut self, request: String) -> Result<String, String>;
-    async fn get_resource(&mut self, subject: String) -> Result<String, String>;
-    async fn query(&mut self, property: String, value: String) -> Result<String, String>;
     /// A function of the host ABI by its WIT name (`store.get`, `calls.call`,
     /// ...), `args` a JSON array, the result JSON. See `host_abi::JsAbi`.
     async fn abi(

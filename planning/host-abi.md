@@ -177,12 +177,20 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       and `manifest.uses` are the same code. Wired in `/plugin-run`, triggers
       and schedules. A run's budget allows `read` exports only (as a frame);
       `store.apply` is `needs-approval` (the verdict proposes). `uses` is
-      allowed in world `extension` too. Old names stay: `ctx.http`, `ctx.read`,
-      `ctx.query`, `ctx.integration`. Net lines: positive, nothing to delete:
-      the old functions have callers and different shapes.
-      *Next:* make the aliases real (JSON-AD from `store.get`, operation ids
-      for `ctx.http`) and delete `fetch`/`get-resource`/`query` from the
-      runtime WIT and `PluginHost`; widen a run's budget once approval exists.
+      allowed in world `extension` too.
+      *Old names are shims (same slice).* `ctx.http`, `ctx.read`, `ctx.query`
+      are JS in the prelude over `abi(...)`, with their old shapes: `http` is
+      `net.fetch` in its URL form (`{method, url, ...}`, still
+      `HostCore::fetch`; the operation-id form is the ABI's), `read` builds
+      JSON-AD from `store.get`, `query` pages `store.query` (`eq`, string
+      value). `fetch`, `get-resource` and `query` are gone from the runtime
+      WIT, `PluginHost`, `StoreHost` and the test fakes. `ctx.integration`
+      stays on `invoke-action` (no ABI function). A bare `StoreHost` answers
+      `abi` with a throwaway registry (`calls.*` reloads apps); `JsAbi` shares
+      one. `atomic-plugins` calls none of the removed imports directly; all
+      its plugins use `ctx.*`.
+      *Next:* widen a run's budget once approval exists; move the URL form's
+      checks onto operation ids and drop it.
       *Class extender to `server-module` (not built), what it takes:* (1) add
       `after-commit` and `commit-json`/`is-new` to `hooks` (or feed `events`
       `commit`); (2) a typed way to write that is not a plan: raw commit, or
