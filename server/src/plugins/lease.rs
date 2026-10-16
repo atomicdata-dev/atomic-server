@@ -73,6 +73,7 @@ use std::{
 
 use atomic_lib::{
     agents::ForAgent,
+    commit::{Commit, CommitBuilder, CommitOpts},
     hierarchy::check_write,
     identifiers::{canonicalize_scheme, commit_subject, identifier_body},
     storelike::Query,
@@ -272,23 +273,48 @@ impl Leases {
         generation: i64,
         previous: Option<&str>,
     ) -> Result<(), String> {
-        let mut lease = Resource::new("did:ad:placeholder".into());
-        let mut set = |property: &str, value: Value| {
-            lease
-                .set_unsafe(property.into(), value)
-                .map(|_| ())
-                .map_err(|e| e.to_string())
-        };
-        set(urls::IS_A, Value::ResourceArray(vec![urls::LEASE.into()]))?;
-        set(urls::PARENT, Value::AtomicUrl(plugin.into()))?;
-        set(urls::LEASE_OF, Value::AtomicUrl(plugin.into()))?;
-        set(urls::LEASE_HOLDER, Value::String(me.to_string()))?;
-        set(urls::LEASE_EXPIRES_AT, Value::Timestamp(now + TTL_MS))?;
-        set(urls::LEASE_GENERATION, Value::Integer(generation))?;
+        // Minted with a genesis certificate, which travels with the resource:
+        // a peer that receives the lease as a plain Loro update (live sync, a
+        // bulk push) has no commit to read the signer from, and reads it off
+        // the certificate instead.
+        let agent = db.get_default_agent().map_err(|e| e.to_string())?;
+        let mut builder = CommitBuilder::new("placeholder".into());
+        builder.set(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::LEASE.into()]),
+        );
+        builder.set(urls::PARENT.into(), Value::AtomicUrl(plugin.into()));
+        builder.set(urls::LEASE_OF.into(), Value::AtomicUrl(plugin.into()));
+        builder.set(urls::LEASE_HOLDER.into(), Value::String(me.to_string()));
+        builder.set(
+            urls::LEASE_EXPIRES_AT.into(),
+            Value::Timestamp(now + TTL_MS),
+        );
+        builder.set(urls::LEASE_GENERATION.into(), Value::Integer(generation));
         if let Some(previous) = previous {
-            set(urls::PREVIOUS_LEASE, Value::AtomicUrl(previous.into()))?;
+            builder.set(
+                urls::PREVIOUS_LEASE.into(),
+                Value::AtomicUrl(previous.into()),
+            );
         }
-        let response = lease.save_as_genesis(db).await.map_err(|e| e.to_string())?;
+        let commit = Commit::create_did(builder, &agent, db)
+            .await
+            .map_err(|e| e.to_string())?;
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_constraints: true,
+            validate_signature: true,
+            validate_timestamp: false,
+            validate_rights: false,
+            validate_loro_causality: false,
+            update_index: true,
+            validate_for_agent: Some(agent.subject.to_string()),
+            source_id: None,
+        };
+        let response = db
+            .apply_commit(commit, &opts)
+            .await
+            .map_err(|e| e.to_string())?;
         self.sent(response.commit);
         Ok(())
     }
@@ -378,11 +404,11 @@ async fn read_leases(db: &Db, plugin: &str, now: i64) -> Result<Vec<Lease>, Stri
     Ok(accepted)
 }
 
-/// Who signed the genesis of `lease`. A lease is named by its genesis
-/// signature, so the commit that carries that signature is the one that
-/// created it, and its signer was checked when it was applied. (The lease
-/// writer does not mint a genesis certificate, so [`Resource::genesis_signer`]
-/// has nothing to read; it answers first for a resource that has one.)
+/// Who signed the genesis of `lease`: read off the genesis certificate the
+/// lease carries, which travels with it in a plain Loro update (a peer stores
+/// no commit for what it receives that way). A lease from before the writer
+/// minted a certificate falls back to the commit that carries its signature,
+/// when this node has that commit.
 async fn creator(db: &Db, lease: &Resource) -> Option<String> {
     if let Some(signer) = lease.genesis_signer() {
         return Some(signer);
@@ -442,7 +468,6 @@ impl Clock for ManualClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use atomic_lib::commit::CommitOpts;
 
     const DRIVE: &str = "did:ad:drive";
 
@@ -466,13 +491,22 @@ mod tests {
         }
     }
 
-    /// What a sync does for these resources: applies the commits a node wrote
-    /// to the other nodes' dbs.
+    /// What a sync does for these resources: the Loro bytes of every commit a
+    /// node wrote reach the other nodes as a state update and are persisted
+    /// the way a live `UPDATE` or a `SYNC_PUSH` is. No commit travels, so a
+    /// node can only know who signed a lease from the lease itself.
     async fn ship(from: &Leases, to: &[&Db]) {
         let sent = std::mem::take(&mut *from.sent.lock().unwrap());
         for commit in sent {
+            let subject = commit.subject.to_string();
+            let bytes = commit.loro_update.clone().expect("a lease commit is Loro");
             for db in to {
-                db.apply_commit(commit.clone(), &sync_opts()).await.unwrap();
+                let resolved = atomic_lib::sync::ws_apply::resolve_update(db, &subject, &bytes)
+                    .await
+                    .expect("the update resolves");
+                atomic_lib::sync::ws_apply::persist_update(db, &subject, resolved)
+                    .await
+                    .unwrap();
             }
         }
     }
@@ -614,6 +648,39 @@ mod tests {
             1,
             "renewed in place"
         );
+    }
+
+    /// A lease reaches a peer as Loro bytes only (live `UPDATE`, `SYNC_PUSH`):
+    /// no commit is stored there. The peer still knows who signed it, from the
+    /// genesis certificate the lease carries, so it counts. Without that each
+    /// node ignored the other's lease and believed it held its own.
+    #[actix_rt::test]
+    async fn a_lease_that_arrives_without_its_commit_still_counts() {
+        let (db_a, db_b) = (
+            node_db("lease_nocommit_a").await,
+            node_db("lease_nocommit_b").await,
+        );
+        let plugin = plugin_on(&[&db_a, &db_b]).await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let a = Leases::with("node-a", clock.clone());
+        assert!(a.holds(&db_a, DRIVE, &plugin).await);
+        let subject = head_of(&db_a, &plugin, clock.now_ms()).await.subject;
+        ship(&a, &[&db_b]).await;
+
+        // No commit resource for it on B.
+        let signature = identifier_body(&subject).unwrap();
+        assert!(db_b
+            .get_resource(&commit_subject(signature).as_str().into())
+            .await
+            .is_err());
+        let seen = read_leases(&db_b, &plugin, clock.now_ms()).await.unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].holder, "node-a");
+
+        // So B defers to it instead of writing a lease of its own.
+        let b = Leases::with("node-b", clock.clone());
+        assert!(!b.holds(&db_b, DRIVE, &plugin).await);
+        assert!(b.sent.lock().unwrap().is_empty());
     }
 
     #[actix_rt::test]
