@@ -47,6 +47,9 @@ test.describe('computed columns', () => {
   test('a human can add, edit and remove one, in any table view', async ({
     page,
   }) => {
+    // A whole journey: create, add two columns, rename, reload, remove.
+    test.slow();
+
     // The Time tracker template gives two timestamp columns and a quick way to
     // fill them: start an entry and stop it.
     await createTableFromDialog(page, {
