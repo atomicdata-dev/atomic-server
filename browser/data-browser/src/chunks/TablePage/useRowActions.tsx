@@ -1,6 +1,8 @@
 import { useResource, useStore, useValue, type Property } from '@tomic/react';
 import { useMemo, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
+import { FaCheck } from 'react-icons/fa6';
+import { ghostButtonStyles } from '@components/Button';
 import type { TableColumn } from './useTableColumns';
 import { useIsUnsavedDraft } from './draftRow';
 import {
@@ -121,6 +123,8 @@ function RowActionCell({
     <Button
       type='button'
       title={spec.label}
+      aria-label={spec.label}
+      data-kind={spec.kind}
       data-testid={`row-action-${spec.id}`}
       data-active={active}
       aria-pressed={
@@ -131,46 +135,55 @@ function RowActionCell({
       $confirming={justRan}
       onClick={run}
     >
-      {spec.label}
+      {spec.kind === 'toggle' ? <FaCheck size='0.75em' /> : spec.label}
     </Button>
   );
 }
 
+/* Ghost pill (the shared `ghostButtonStyles`) centred in its cell, so it never
+ * touches the row borders. A toggle is a round tick control instead. */
 const Button = styled.button<{ $active: boolean; $confirming: boolean }>`
-  width: 100%;
-  border: 1px solid
-    ${p => (p.$active ? p.theme.colors.main : p.theme.colors.bg2)};
-  border-radius: ${p => p.theme.radius};
+  ${ghostButtonStyles}
+  display: flex;
+  margin: auto;
+  max-width: calc(100% - 0.5rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background-color: ${p =>
     p.$confirming
       ? p.theme.colors.main
       : p.$active
         ? p.theme.colors.mainSelectedBg
-        : p.theme.colors.bg};
+        : 'transparent'};
   color: ${p =>
     p.$confirming
       ? p.theme.colors.bg
       : p.$active
         ? p.theme.colors.main
-        : p.theme.colors.text};
-  cursor: pointer;
-  font-size: 0.8rem;
-  padding: 0.15rem 0.3rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* The confirm flash fades out rather than snapping, so a fast double press
-   * still reads as two presses. */
-  transition:
-    background-color 0.15s ease-out,
-    color 0.15s ease-out;
-
-  &:hover:not(:disabled) {
-    border-color: ${p => p.theme.colors.main};
-  }
+        : p.theme.colors.textLight};
 
   &:disabled {
     cursor: progress;
     opacity: 0.6;
+  }
+
+  &[data-kind='toggle'] {
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid
+      ${p => (p.$active ? p.theme.colors.main : p.theme.colors.bg2)};
+    background-color: ${p => (p.$active ? p.theme.colors.main : 'transparent')};
+    color: ${p => (p.$active ? p.theme.colors.bg : 'transparent')};
+
+    &:hover:not(:disabled) {
+      border-color: ${p => p.theme.colors.main};
+      color: ${p => (p.$active ? p.theme.colors.bg : p.theme.colors.main)};
+      background-color: ${p =>
+        p.$active ? p.theme.colors.main : 'transparent'};
+    }
   }
 `;

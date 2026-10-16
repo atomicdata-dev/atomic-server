@@ -463,8 +463,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           aggregates: [{ function: 'sum', column: 'Quantity' }],
           breakdownColumn: 'Aisle',
           breakdownGranularity: 'exact',
-          // One tap: the button is the first, always visible control (70px,
-          // so it stays on screen on a phone). Bought, Price stay as columns.
+          // One tap: the tick is the first, always visible control (a narrow
+          // column, so it stays on screen on a phone). Bought, Price stay as columns.
           columns: ['Name', 'Quantity', 'Aisle'],
           columnOrder: ['Got it', 'Name', 'Quantity', 'Aisle'],
           rowActions: [{ label: 'Got it', kind: 'toggle', column: 'Bought' }],

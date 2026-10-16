@@ -563,6 +563,13 @@ const Table = styled.div.attrs<TableProps>(p => ({
   --table-height: 80vh;
   --table-row-height: ${p => p.rowHeight}px;
   --table-inner-padding: 0.5rem;
+  --table-index-width: 6.75rem;
+
+  /* No hover on touch, and a phone has no width to spare: the gutter shrinks
+     to the tick, the comment bubble and the number (see IndexCell). */
+  @media (hover: none) {
+    --table-index-width: 4.75rem;
+  }
   --table-content-height: ${p => p.totalContentHeight}px;
   background: ${p => p.theme.colors.bg};
   border-radius: ${p => p.theme.radius};

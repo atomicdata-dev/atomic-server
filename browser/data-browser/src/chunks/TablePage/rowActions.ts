@@ -144,7 +144,7 @@ export const ROW_ACTION_GENERATORS: Record<RowActionKind, RowActionGenerator> =
         'Flips a checkbox column on and off. A grocery list’s "bought", a "starred".',
       defaultLabel: 'Toggle',
       accepts: property => property.datatype === Datatype.BOOLEAN,
-      width: 70,
+      width: 52,
       // Unset rather than `false`: a row that was never ticked and one that was
       // un-ticked should read the same, and an unset boolean is the datatype's
       // own idea of false.
