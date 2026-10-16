@@ -14,22 +14,15 @@ on:
         required: false
         default: develop
         type: string
-  # ON HOLD (25 September 2026, Joep's call). Staging used to deploy itself
-  # whenever a develop pipeline concluded success. Four consecutive runs then
-  # failed on the same step, the pre-swap `./atomic-server export` being
-  # OOM-killed on the host (exit 137), and each failure rolled back to an older
-  # binary that had never been health-checked. So the automatic path was
-  # reliably producing a failed deploy rather than a deployment.
-  #
-  # `workflow_dispatch` above is untouched: staging can still be deployed by
-  # hand, which is the same shape atomic-saas staging was given on
-  # 24 September. Restore the trigger below once the export no longer runs the
-  # host out of memory.
-  #
-  # workflow_run:
-  #   workflows: ["Main pipeline: build, lint, test"]
-  #   branches: ["develop"]
-  #   types: [completed]
+  # Was on hold from 25 September 2026 to 15 October: the pre-swap
+  # `./atomic-server export` was OOM-killed on the host (exit 137) on four
+  # deploys in a row, and each failure rolled back to an unchecked binary. The
+  # pre-swap backup in `deploy-server` is now a copy of the redb store file,
+  # which needs no extra memory.
+  workflow_run:
+    workflows: ["Main pipeline: build, lint, test"]
+    branches: ["develop"]
+    types: [completed]
 
 jobs:
   check-current-tip:
