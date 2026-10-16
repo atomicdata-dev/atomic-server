@@ -6066,7 +6066,7 @@ msgstr "Ajouter une classe"
 #: src/routes/History/VersionTitle.tsx
 #: src/views/Drive/DriveHome.tsx
 msgid "Edited"
-msgstr ""
+msgstr "Modifié"
 
 #: src/routes/History/VersionTitle.tsx
 msgid "by"
@@ -13084,4 +13084,4 @@ msgstr ""
 
 #: src/views/Drive/DriveHome.tsx
 msgid "Commented"
-msgstr ""
+msgstr "Commenté"
