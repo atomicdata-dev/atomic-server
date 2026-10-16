@@ -6,9 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
  * (see `FancyTableProps.RowHeaderAddonComponent`). Wide enough for the widest
  * of those states — a comment bubble with a count next to the expand button —
  * so nothing in it is ever squeezed or clipped. The row-select tick box sits in
- * the same gutter, hence the extra room.
+ * the same gutter, hence the extra room. The width itself is the
+ * `--table-index-width` property set by the grid, which is narrower on touch.
  */
-const INDEX_CELL_WIDTH = '6.75rem';
+const INDEX_CELL_WIDTH = 'var(--table-index-width)';
 
 const parseSize = (size: string) => {
   try {
