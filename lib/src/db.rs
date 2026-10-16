@@ -4096,6 +4096,17 @@ impl Db {
         // One instant for the whole pass: a `daysSince` evaluated per row against
         // a moving clock could put two rows of the same day in different buckets.
         let now_ms = aggregation.now_ms.unwrap_or_else(crate::utils::now);
+        // Parse each formula once for the whole pass, not once per row.
+        let compiled: Vec<_> = aggregation
+            .aggregates
+            .iter()
+            .map(|aggregate| {
+                aggregate
+                    .expression
+                    .as_ref()
+                    .map(|expression| expression.compile(now_ms).ok())
+            })
+            .collect();
 
         for subject in subjects {
             let Ok(resource) = self.get_resource_shallow(&subject) else {
@@ -4110,10 +4121,16 @@ impl Db {
                 // A computed value stands in for a stored one: `Some(None)` means
                 // "this row has nothing to contribute", which is exactly how a
                 // missing property already reads below.
-                let computed = aggregate
-                    .expression
-                    .as_ref()
-                    .map(|expression| expression.evaluate(&resource, now_ms));
+                let computed = compiled[index].as_ref().map(|compiled| {
+                    compiled.as_ref().and_then(|compiled| {
+                        compiled.evaluate(&|p| {
+                            resource
+                                .get(p)
+                                .ok()
+                                .and_then(crate::aggregate::value_as_number)
+                        })
+                    })
+                });
 
                 let stored = if computed.is_some() {
                     None

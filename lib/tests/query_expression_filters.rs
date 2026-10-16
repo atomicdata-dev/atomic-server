@@ -11,7 +11,7 @@
 use atomic_lib::{
     agents::ForAgent,
     aggregate::{Aggregate, AggregateFunction, Aggregation},
-    expression::{Expression, ExpressionFilter, Operand},
+    expression::{Expression, ExpressionFilter, ExpressionSpec, Operand},
     storelike::{FilterOperator, Query},
     urls, Db, Storelike, Subject, Value,
 };
@@ -46,10 +46,10 @@ fn query_for(table: &str) -> Query {
 
 /// A duration column: `end − start`.
 fn duration() -> Expression {
-    Expression::Difference {
+    Expression::from(ExpressionSpec::Difference {
         from: Operand::Property(START.into()),
         to: Operand::Property(END.into()),
-    }
+    })
 }
 
 const MINUTE: i64 = 60_000;
@@ -223,10 +223,10 @@ async fn a_running_row_is_measured_against_the_callers_clock() {
         .await
         .unwrap();
 
-    let elapsed = Expression::Elapsed {
+    let elapsed = Expression::from(ExpressionSpec::Elapsed {
         from: Operand::Property(START.into()),
         until: Some(Operand::Property(END.into())),
-    };
+    });
 
     let running_for = |now_ms: i64, at_least: i64| {
         let mut query = query_for(&table);

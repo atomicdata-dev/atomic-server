@@ -204,7 +204,7 @@ fn bucket_instant(millis: i64, granularity: GroupGranularity, tz_offset_minutes:
 
 /// Days since the epoch → calendar date. Howard Hinnant's `civil_from_days`;
 /// this crate compiles to wasm, so it carries no date dependency of its own.
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
@@ -233,7 +233,7 @@ fn days_from_iso_date(date: &str) -> Option<i64> {
 }
 
 /// Calendar date → days since the epoch (the inverse of `civil_from_days`).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = if y >= 0 { y } else { y - 399 } / 400;
     let yoe = y - era * 400;

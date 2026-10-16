@@ -1053,6 +1053,58 @@ fn resource_to_json_ad(resource: &Resource, origin: &str) -> Result<String, JsEr
     resource.to_json_ad(Some(origin)).map_err(to_js_err)
 }
 
+/// One cell of a row handed to `evaluateFormula`.
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum CellValue {
+    Number(f64),
+    Bool(bool),
+    Text(String),
+}
+
+impl CellValue {
+    /// Same reading as a stored value: numbers as themselves, booleans as 1/0,
+    /// a numeric string as that number, a DATE/ISO string as midnight UTC.
+    fn as_number(&self) -> Option<f64> {
+        use atomic_lib::aggregate::value_as_number;
+        match self {
+            CellValue::Number(n) => Some(*n),
+            CellValue::Bool(b) => Some(f64::from(*b)),
+            CellValue::Text(s) => value_as_number(&Value::String(s.clone()))
+                .or_else(|| value_as_number(&Value::Date(s.clone()))),
+        }
+    }
+}
+
+/// Evaluate a computed-column expression (formula or legacy kind) against a
+/// row's current values, `{ [propertySubject]: number | string | boolean | null }`.
+/// Needs no `ClientDb`. Returns a number, or `null` when the row has no value.
+#[wasm_bindgen(js_name = "evaluateFormula")]
+pub fn evaluate_formula(
+    expression: JsValue,
+    values: JsValue,
+    now_ms: f64,
+) -> Result<JsValue, JsError> {
+    let expression: atomic_lib::expression::Expression =
+        serde_wasm_bindgen::from_value(expression).map_err(to_js_err)?;
+    let values: std::collections::HashMap<String, Option<CellValue>> =
+        serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
+    let result = expression.evaluate_with(now_ms as i64, &|property| {
+        values.get(property)?.as_ref()?.as_number()
+    });
+
+    Ok(result.map_or(JsValue::NULL, JsValue::from_f64))
+}
+
+/// The formula's error message, or `null` when it is valid.
+#[wasm_bindgen(js_name = "validateFormula")]
+pub fn validate_formula(expression: JsValue) -> Result<Option<String>, JsError> {
+    let expression: atomic_lib::expression::Expression =
+        serde_wasm_bindgen::from_value(expression).map_err(to_js_err)?;
+
+    Ok(expression.validate().err())
+}
+
 fn to_js_err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
 }
