@@ -11,6 +11,7 @@ import {
   installCommitWatcher,
   openSubject,
   SERVER_URL,
+  waitForSynced,
 } from './test-utils';
 
 async function agentSubject(page: Page): Promise<string> {
@@ -97,6 +98,9 @@ test.describe('agent page', () => {
         folderClass: dataBrowser.classes.folder,
       },
     );
+    // `save()` can resolve before the server has the commit; the Created list
+    // below is a server query, so wait until his write has left his outbox.
+    await waitForSynced(bob);
 
     // Alice starts a conversation with Bob from his page.
     await openSubject(page, bobSubject);
@@ -133,6 +137,8 @@ test.describe('agent page', () => {
     await editor.click();
     await page.keyboard.type('Real name: Robert');
     await page.getByRole('button', { name: 'Save' }).click();
+    // A reload before the note is on the server and on disk loses it.
+    await waitForSynced(page);
     await page.reload();
     await expect(page.getByText('Real name: Robert')).toBeVisible({
       timeout: 30_000,
