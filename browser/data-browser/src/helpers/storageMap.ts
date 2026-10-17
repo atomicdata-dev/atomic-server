@@ -1,3 +1,5 @@
+import { HIDDEN_CLASS_LABELS } from './hiddenFromChildLists';
+
 /** One resource's share of a drive, from `GET /drive-usage/breakdown`. */
 export type ResourceUsage = {
   subject: string;
@@ -22,6 +24,46 @@ export type StorageNode = {
   totalFileBytes: number;
   children: StorageNode[];
 };
+
+/**
+ * Group 2+ siblings of a hidden class into one synthetic node per class. Rows
+ * carry no `about`, so only the class decides here.
+ */
+function bundleHidden(
+  children: StorageNode[],
+  classOf: Map<string, string>,
+): StorageNode[] {
+  const groups = new Map<string, StorageNode[]>();
+
+  for (const child of children) {
+    const cls = classOf.get(child.subject);
+
+    if (cls && cls in HIDDEN_CLASS_LABELS) {
+      groups.set(cls, [...(groups.get(cls) ?? []), child]);
+    }
+  }
+
+  const bundled = new Set<StorageNode>();
+  const out = [...children];
+
+  for (const [cls, members] of groups) {
+    if (members.length < 2) continue;
+
+    members.forEach(m => bundled.add(m));
+    out.push({
+      subject: `${members[0].subject}#bundle`,
+      name: `${HIDDEN_CLASS_LABELS[cls]} (${members.length})`,
+      kind: members[0].kind,
+      ownBytes: members.reduce((n, m) => n + m.ownBytes, 0),
+      ownFileBytes: members.reduce((n, m) => n + m.ownFileBytes, 0),
+      totalBytes: members.reduce((n, m) => n + m.totalBytes, 0),
+      totalFileBytes: members.reduce((n, m) => n + m.totalFileBytes, 0),
+      children: members.sort((a, b) => b.totalBytes - a.totalBytes),
+    });
+  }
+
+  return out.filter(n => !bundled.has(n));
+}
 
 /** Last path segment of a class URL, for a label such as "Document". */
 function kindOf(isA: string | null): string | null {
@@ -52,8 +94,11 @@ export function buildStorageTree(
   driveSubject: string,
 ): StorageNode {
   const nodes = new Map<string, StorageNode>();
+  const classOf = new Map<string, string>();
 
   for (const row of rows) {
+    if (row.isA) classOf.set(row.subject, row.isA);
+
     nodes.set(row.subject, {
       subject: row.subject,
       name: nameOf(row),
@@ -102,6 +147,7 @@ export function buildStorageTree(
       node.totalFileBytes += child.totalFileBytes;
     }
 
+    node.children = bundleHidden(node.children, classOf);
     node.children.sort((a, b) => b.totalBytes - a.totalBytes);
   };
 

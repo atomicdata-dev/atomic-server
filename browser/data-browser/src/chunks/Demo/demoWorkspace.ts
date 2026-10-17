@@ -17,7 +17,6 @@ import {
 } from '@tomic/react';
 import { buildTableFromSpec } from '../TablePage/createTableFromSpec';
 import { sendLogEntry } from '../../helpers/chatLog';
-import { getOrCreateMeetingsFolder } from '../../helpers/standardLocations';
 import { MOODBOARD_BAKED_STROKES } from './moodboardStrokes';
 
 /**
@@ -430,7 +429,7 @@ export async function createDemoWorkspace(
   // starts. It carries its start time already so it never shows as an
   // unstarted agenda with a "Start meeting" button.
   const meeting = await store.newResource({
-    parent: await getOrCreateMeetingsFolder(store, drive.subject),
+    parent: drive.subject,
     isA: dataBrowser.classes.meeting,
     propVals: {
       [core.properties.name]: 'Onboarding meeting',

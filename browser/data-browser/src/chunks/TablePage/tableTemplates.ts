@@ -62,7 +62,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     id: 'issue-tracker',
     title: 'Issue Tracker',
     description:
-      'Status, Assignee and Priority, plus a kanban board and an Issues view.',
+      'Status, Assignee and Priority, on a kanban board or in a table.',
     rowName: 'Issue',
     icon: FaBug,
     spec: {
@@ -97,7 +97,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           groupByColumn: 'Status',
           default: true,
         },
-        { name: 'Issues', kind: 'issues', groupByColumn: 'Status' },
         { name: 'All issues', kind: 'table' },
       ],
     },
@@ -176,11 +175,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           name: 'Project',
           type: 'relation',
           propertySubject: workSchema.properties.project,
-        },
-        {
-          name: 'Person',
-          type: 'relation',
-          propertySubject: workSchema.properties.person,
         },
         {
           name: 'Billable',
@@ -438,56 +432,24 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
   {
     id: 'grocery-list',
     title: 'Grocery list',
-    description: 'Grouped by aisle, with the basket priced up.',
+    description: 'Quick add, tick off what you bought.',
     rowName: 'Item',
     icon: FaCartShopping,
     spec: {
       columns: [
         { name: 'Quantity', type: 'number' },
-        {
-          name: 'Aisle',
-          type: 'select',
-          options: [
-            'Produce',
-            'Bakery',
-            'Dairy',
-            'Meat & fish',
-            'Frozen',
-            'Pantry',
-            'Drinks',
-            'Household',
-          ],
-        },
         { name: 'Price', type: 'decimal', description: 'Per item' },
         { name: 'Bought', type: 'checkbox' },
       ],
       views: [
         {
-          name: 'By aisle',
-          kind: 'kanban',
-          groupByColumn: 'Aisle',
-          default: true,
-        },
-        {
           name: 'List',
           kind: 'table',
-          derivedColumns: [
-            {
-              name: 'Line total',
-              formula: 'quantity * price',
-            },
-          ],
-          aggregates: [{ function: 'sum', column: 'Quantity' }],
-          breakdownColumn: 'Aisle',
-          breakdownGranularity: 'exact',
-          columnOrder: [
-            'Name',
-            'Quantity',
-            'Price',
-            'Line total',
-            'Aisle',
-            'Bought',
-          ],
+          default: true,
+          // One tap: the tick is the first, always visible control (a narrow
+          // column, so it stays on screen on a phone). Bought, Price stay as columns.
+          columns: ['Name', 'Quantity'],
+          columnOrder: ['Got it', 'Name', 'Quantity'],
           rowActions: [{ label: 'Got it', kind: 'toggle', column: 'Bought' }],
           // The bar you actually use a shopping list through.
           quickAdd: {
@@ -518,8 +480,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
             'Overhead press',
             'Row',
             'Pull-up',
-            'Run',
-            'Cycle',
           ],
         },
         { name: 'Sets', type: 'number' },
@@ -632,7 +592,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           },
           default: true,
         },
-        { name: 'By room', kind: 'kanban', groupByColumn: 'Location' },
       ],
     },
   },
@@ -762,14 +721,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
         {
           name: 'Kind',
           type: 'select',
-          options: [
-            'Article',
-            'Tool',
-            'Video',
-            'Documentation',
-            'Inspiration',
-            'To read',
-          ],
+          options: ['Article', 'Tool', 'Video', 'Documentation', 'Inspiration'],
         },
         { name: 'Added', type: 'date' },
         { name: 'Notes', type: 'markdown' },
@@ -784,7 +736,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           breakdownGranularity: 'exact',
           default: true,
         },
-        { name: 'By kind', kind: 'kanban', groupByColumn: 'Kind' },
       ],
     },
   },

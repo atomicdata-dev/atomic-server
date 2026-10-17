@@ -31,7 +31,15 @@ const recents: Record<string, string[]> = {
   'did:ad:drive-b': ['did:ad:a-doc'],
 };
 
-let commentTimes = new Map<string, number>();
+let commentTimes = new Map<string, { at: number; by?: string }>();
+vi.mock('@components/RightPanel/RightPanelContext', () => ({
+  useRightPanel: () => ({ setPanelOpen: () => {} }),
+}));
+vi.mock('@components/Presence/AgentAvatar', () => ({
+  AgentAvatar: ({ agentSubject }: { agentSubject: string }) => (
+    <span data-avatar={agentSubject} />
+  ),
+}));
 vi.mock('@hooks/useRecentComments', () => ({
   useRecentComments: () => commentTimes,
 }));
@@ -42,7 +50,7 @@ vi.mock('@helpers/recentResources', () => ({
   getRecentResources: (d: string) => recents[d] ?? [],
 }));
 vi.mock('@tomic/react', () => ({
-  dataBrowser: { classes: {} },
+  dataBrowser: { classes: {}, properties: {} },
   isNotFound: () => false,
   isUnauthorized: () => false,
   useDrivePresence: () => [],
@@ -56,6 +64,8 @@ vi.mock('@tomic/react', () => ({
           loading: false,
           getLoroDoc: () => undefined,
           getCreatedAt: () => 1_700_000_000_000,
+          getClasses: () => [],
+          get: () => undefined,
         },
       ]),
     ),
@@ -73,9 +83,13 @@ vi.mock('@views/ResourceRow', () => ({
       {trailing}
     </i>
   ),
-  ResourceRowDescription: ({ children }: { children: React.ReactNode }) => (
-    <span>{children}</span>
-  ),
+  ResourceRowDescription: ({
+    children,
+    title,
+  }: {
+    children: React.ReactNode;
+    title?: string;
+  }) => <span title={title}>{children}</span>,
 }));
 vi.mock('@components/Presence/PresenceAvatarMenu', () => ({
   PresenceAvatarMenu: () => null,
@@ -151,14 +165,19 @@ describe('ActivityFeed', () => {
     loaded.add('atomic:only-comment');
     loaded.add('atomic:hidden-doc');
     commentTimes = new Map([
-      [canonicalizeScheme('did:ad:only-comment'), Date.now() - 60_000],
-      [canonicalizeScheme('did:ad:hidden-doc'), Date.now() - 60_000],
+      [
+        canonicalizeScheme('did:ad:only-comment'),
+        { at: Date.now() - 60_000, by: 'did:ad:agent:me' },
+      ],
+      [canonicalizeScheme('did:ad:hidden-doc'), { at: Date.now() - 60_000 }],
     ]);
 
     const html = render('did:ad:drive-a', ['did:ad:a-doc']);
 
     expect(html).toContain('atomic:only-comment');
     expect(html).toContain('Commented');
+    expect(html).toContain('>1m ago<');
+    expect(html).toContain('data-avatar="did:ad:agent:me"');
     expect(html).not.toContain('hidden-doc');
   });
 

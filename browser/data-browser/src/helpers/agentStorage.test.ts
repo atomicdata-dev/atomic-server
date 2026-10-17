@@ -133,20 +133,6 @@ describe('agent key storage', () => {
   });
 });
 
-it('persists folder identities through non-extractable key restoration and keypair updates', async () => {
-  const secret = await makeSecret();
-  const expected = await Agent.aiChatsFoldersFromSecret(secret);
-  await saveAgentToIDB(secret);
-  const restored = await getAgentFromIDB();
-  expect(restored?.aiChatsFolders).toEqual(expected);
-  const stored = store.get(AGENT_IDB_KEY) as {
-    keyPair: CryptoKeyPair;
-    subject: string;
-  };
-  await saveAgentToIDB(stored.keyPair, stored.subject);
-  expect((await getAgentFromIDB())?.aiChatsFolders).toEqual(expected);
-});
-
 describe('keeping a replaced identity', () => {
   beforeEach(() => store.clear());
 

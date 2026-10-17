@@ -113,7 +113,12 @@ test.describe('agent page', () => {
     // Back on his page: the conversation is listed, her note is saved, and
     // his document shows up.
     await openSubject(page, bobSubject);
-    await expect(page.getByTestId('conversation-item')).toBeVisible({
+    // The sidebar's Messages panel lists the same conversation, so a bare
+    // test id is ambiguous as soon as both have rendered (strict mode error
+    // under load). Scope it to his page.
+    await expect(
+      page.getByRole('main').getByTestId('conversation-item'),
+    ).toBeVisible({
       timeout: 30_000,
     });
     // The query runs on the server, which may not have his commit yet.

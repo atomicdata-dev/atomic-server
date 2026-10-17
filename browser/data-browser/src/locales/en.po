@@ -6046,6 +6046,7 @@ msgid "Add class"
 msgstr "Add class"
 
 #: src/routes/History/VersionTitle.tsx
+#: src/views/Drive/DriveHome.tsx
 msgid "Edited"
 msgstr "Edited"
 
@@ -12713,11 +12714,6 @@ msgstr "Show less"
 msgid "Show all"
 msgstr "Show all"
 
-#. 0: toRelativeDateTime(new Date(at), true)
-#: src/views/Drive/DriveHome.tsx
-msgid "Edited {0}"
-msgstr "Edited {0}"
-
 #: src/views/Drive/DrivePage.tsx
 msgid "<0/> Drive settings"
 msgstr "<0/> Drive settings"
@@ -13071,11 +13067,6 @@ msgstr "Only you can see these. {0} cannot."
 msgid "Your notes"
 msgstr "Your notes"
 
-#. 0: toRelativeDateTime(new Date(at), true)
-#: src/views/Drive/DriveHome.tsx
-msgid "Commented {0}"
-msgstr "Commented {0}"
-
 #: src/chunks/FormBuilder/ShareLinkPanel.tsx
 msgid "Upgrade to a Cloud Server to publish and share this form."
 msgstr "Upgrade to a Cloud Server to publish and share this form."
@@ -13095,6 +13086,14 @@ msgstr "Add a comment"
 #: src/actions/resourceActions.tsx
 msgid "Open the comments for this resource"
 msgstr "Open the comments for this resource"
+
+#: src/chunks/TableEditor/Cell.tsx
+msgid "Row menu"
+msgstr "Row menu"
+
+#: src/views/Drive/DriveHome.tsx
+msgid "Commented"
+msgstr "Commented"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Live duration"
