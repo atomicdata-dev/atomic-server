@@ -6,7 +6,6 @@ import { setLocalStorageValue, useLocalStorage } from '@hooks/useLocalStorage';
 import { TOOL_NAMES } from '../useAtomicTools';
 import tablesSkillContent from './tables/SKILL.md?raw';
 import creatingTablesContent from './tables/references/creating-tables.md?raw';
-import tableFormulasContent from './table-formulas/SKILL.md?raw';
 import skillCreationContent from './skill-creation/SKILL.md?raw';
 import ontologiesSkillContent from './ontologies/SKILL.md?raw';
 
@@ -51,16 +50,6 @@ export const atomicSkills: AgentSkill[] = [
         content: creatingTablesContent,
       },
     ],
-  },
-  {
-    meta: {
-      id: 'atomic.skills.table-formulas',
-      name: 'table-formulas',
-      description:
-        'Use this when someone asks for a computed column on a table: a duration, days since, an amount, a next-due date, or a yes/no flag like "birthday within two weeks". It documents the formula language.',
-    },
-    content: tableFormulasContent,
-    references: [],
   },
   {
     meta: {

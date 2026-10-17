@@ -1,4 +1,4 @@
-import { beforeAll, describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Datatype, type JSONValue, type Property } from '@tomic/react';
 import {
   aggregateRows,
@@ -11,9 +11,6 @@ import {
   toAggregation,
   BREAKDOWN_ROWS_ID,
 } from './tableAggregates';
-import { useRealFormulaEngine } from './formulaEngine.testing';
-
-beforeAll(useRealFormulaEngine);
 
 const property = (datatype: Datatype, shortname = 'x'): Property =>
   ({
@@ -102,9 +99,8 @@ describe('toAggregation', () => {
     const duration = {
       id: 'duration',
       label: 'Duration',
-      formula: 'coalesce(end, now()) - start',
-      vars: { start: START.subject, end: 'https://example.com/end' },
-      valueKind: 'duration' as const,
+      kind: 'elapsed' as const,
+      args: { from: START.subject, until: 'https://example.com/end' },
     };
     const sumDuration = {
       id: 'sum-duration-0',
@@ -122,9 +118,9 @@ describe('toAggregation', () => {
           id: 'sum-duration-0',
           function: 'sum',
           expression: {
-            kind: 'formula',
-            formula: 'coalesce(end, now()) - start',
-            vars: { start: START.subject, end: 'https://example.com/end' },
+            kind: 'elapsed',
+            from: START.subject,
+            until: 'https://example.com/end',
           },
         },
       ]);
@@ -146,8 +142,8 @@ describe('toAggregation', () => {
       const total = {
         id: 'total',
         label: 'Total',
-        formula: 'amount * 2',
-        vars: { amount: AMOUNT.subject },
+        kind: 'product' as const,
+        args: { a: AMOUNT.subject, b: 2 },
       };
       const aggregation = toAggregation(
         [{ id: 'sum-total-0', derived: 'total', function: 'sum' }],
@@ -168,7 +164,7 @@ describe('toAggregation', () => {
     });
 
     it('asks for nothing when the column is still incomplete', () => {
-      const halfBuilt = { ...duration, formula: '' };
+      const halfBuilt = { ...duration, args: { from: '' } };
 
       expect(
         toAggregation([sumDuration], undefined, 'day', [halfBuilt]),
@@ -279,11 +275,7 @@ describe('aggregateRows', () => {
           { id: 'latest', property: DUE, function: 'max' },
           {
             id: 'amount',
-            expression: {
-              kind: 'formula',
-              formula: 'q * p',
-              vars: { q: Q, p: P },
-            },
+            expression: { kind: 'product', a: Q, b: P },
             function: 'sum',
           },
         ],

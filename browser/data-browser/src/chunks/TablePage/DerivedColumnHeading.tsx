@@ -5,7 +5,10 @@ import type { DraggableAttributes } from '@dnd-kit/core';
 import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { TablePageContext } from './tablePageContext';
 import { DerivedColumnDialog } from './DerivedColumnDialog';
-import type { DerivedColumnSpec } from './derivedColumns';
+import {
+  DERIVED_COLUMN_GENERATORS,
+  type DerivedColumnSpec,
+} from './derivedColumns';
 import { ColumnSpecHeading } from './ColumnSpecHeading';
 
 const Trigger = buildDefaultTrigger(
@@ -38,7 +41,7 @@ export function DerivedColumnHeading({
       readOnly={readOnly}
       dragListeners={dragListeners}
       dragAttributes={dragAttributes}
-      generatorTitle={spec.formula}
+      generatorTitle={DERIVED_COLUMN_GENERATORS[spec.kind]?.title}
       Trigger={Trigger}
       removeTitle='Remove computed column'
       removeBody={

@@ -62,7 +62,7 @@ export function TableFilterChip({
   const chipOperator = derived
     ? operatorLabel(filter.operator)
     : operatorLabelForColumn(filter.operator, column!.datatype);
-  const unit = derived ? derivedFilterUnit(derived) : undefined;
+  const unit = derived ? derivedFilterUnit(derived.kind) : undefined;
 
   return (
     <Popover

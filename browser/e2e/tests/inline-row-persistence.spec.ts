@@ -25,8 +25,12 @@ async function addDurationColumn(page: Page) {
   await page.getByTestId('menu-item-computed').click();
 
   await inDialog(page, async () => {
+    await page.getByTestId('derived-kind').selectOption('difference');
     await page.getByTestId('derived-label').fill('Duration');
-    await page.getByTestId('derived-formula').fill('ends - starts');
+    await page
+      .getByTestId('derived-arg-from')
+      .selectOption({ label: 'Starts' });
+    await page.getByTestId('derived-arg-to').selectOption({ label: 'Ends' });
     await page.getByTestId('derived-save').click();
   });
 }

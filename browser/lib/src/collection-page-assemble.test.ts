@@ -88,7 +88,7 @@ describe('collection page assemble does not flash unsorted members', () => {
         value: TABLE,
         expression_filters: [
           {
-            expression: { kind: 'formula', formula: '10 - 0', vars: {} },
+            expression: { kind: 'difference', from: 0, to: 10 },
             operator: 'gte',
             value: 100,
           },

@@ -1,28 +1,13 @@
-import {
-  ResourceEvents,
-  useResource,
-  useStore,
-  type JSONValue,
-} from '@tomic/react';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type JSX,
-} from 'react';
+import { useResource, useValue } from '@tomic/react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import type { TableColumn } from './useTableColumns';
 import {
-  DEFAULT_DERIVED_WIDTH,
-  computeDerived,
-  formatDerivedValue,
-  isLive,
-  specProperties,
+  DERIVED_COLUMN_GENERATORS,
+  argProperties,
+  type ArgValues,
   type DerivedColumnSpec,
 } from './derivedColumns';
-import { useFormulaReady } from './formulaEngine';
 
 /**
  * One shared 1s ticker for every live cell on screen, rather than an interval
@@ -89,6 +74,8 @@ export function useDerivedColumns(specs: DerivedColumnSpec[]): TableColumn[] {
     const stable = JSON.parse(specsKey) as DerivedColumnSpec[];
 
     return stable.map((spec): TableColumn => {
+      const generator = DERIVED_COLUMN_GENERATORS[spec.kind];
+
       const Cell = ({ subject }: { subject: string }): JSX.Element => (
         <DerivedCell subject={subject} spec={spec} />
       );
@@ -98,55 +85,12 @@ export function useDerivedColumns(specs: DerivedColumnSpec[]): TableColumn[] {
         derived: spec,
         virtual: {
           label: spec.label,
-          width: spec.width ?? DEFAULT_DERIVED_WIDTH,
+          width: spec.width ?? generator.width,
           Cell,
         },
       };
     });
   }, [specsKey]);
-}
-
-/**
- * The current values of some of a row's properties, re-read whenever the row
- * changes — as many as the formula names, in one hook call, so the number of
- * hooks never depends on the formula (the rules of hooks).
- *
- * Reading `resource.get(...)` during render instead made the React Compiler
- * memoize the result on the resource proxy's identity, which never changes
- * because the store mutates resources in place: a computed column showed what it
- * computed at mount until the page was reloaded. The snapshot is therefore read
- * inside `useSyncExternalStore`, as a string, so equal values are equal.
- */
-function useRowValues(
-  subject: string,
-  properties: string[],
-): Record<string, JSONValue | undefined> {
-  const store = useStore();
-  const resource = useResource(subject);
-  const stable = resource.stable;
-  const subscribe = useCallback(
-    (notify: () => void) => {
-      const unsubscribeStore = store.subscribe(subject, () => notify());
-      const unsubscribeLocal = stable.on(ResourceEvents.LocalChange, notify);
-
-      return () => {
-        unsubscribeStore();
-        unsubscribeLocal();
-      };
-    },
-    [store, subject, stable],
-  );
-  const read = () =>
-    JSON.stringify(properties.map(property => resource.get(property) ?? null));
-  const json = useSyncExternalStore(subscribe, read, read);
-
-  return useMemo(() => {
-    const values = JSON.parse(json) as JSONValue[];
-
-    return Object.fromEntries(
-      properties.map((property, i) => [property, values[i] ?? undefined]),
-    );
-  }, [json]);
 }
 
 function DerivedCell({
@@ -156,20 +100,39 @@ function DerivedCell({
   subject: string;
   spec: DerivedColumnSpec;
 }): JSX.Element {
-  const values = useRowValues(subject, specProperties(spec));
-  // The evaluator loads lazily: until it has, a cell is empty rather than wrong.
-  useFormulaReady();
+  const resource = useResource(subject);
+  const generator = DERIVED_COLUMN_GENERATORS[spec.kind];
 
-  // A running duration ticks; a finished one reads the same at any instant.
-  const live =
-    isLive(spec) &&
-    computeDerived(spec, values, 0) !== computeDerived(spec, values, 1);
+  // Subscribing reads of exactly the properties this column derives from.
+  //
+  // Two calls, unconditionally, because no generator declares more than
+  // `MAX_DERIVED_ARGS` arguments (`derivedColumns.test.ts` holds that, so a third
+  // one fails there rather than here) — and a *fixed* number
+  // of hook calls is what the rules of hooks require. Looping over the spec's
+  // arguments instead is a violation the React Compiler is free to break, and
+  // does.
+  //
+  // These values, not the resource, are what `compute` is a function of. Reading
+  // `resource.get(...)` during render made the Compiler memoize the result on the
+  // proxy's identity — which never changes, because the store mutates resources
+  // in place — so a computed column showed whatever it computed at mount until
+  // the page was reloaded.
+  const [firstProperty = '', secondProperty = ''] = argProperties(spec);
+  const [firstValue] = useValue(resource, firstProperty);
+  const [secondValue] = useValue(resource, secondProperty);
+
+  const values: ArgValues = useMemo(
+    () => ({ [firstProperty]: firstValue, [secondProperty]: secondValue }),
+    [firstProperty, firstValue, secondProperty, secondValue],
+  );
+
+  const live = generator.live?.(values, spec.args) ?? false;
   const now = useNow(live);
-  const value = computeDerived(spec, values, now);
+  const value = generator.compute(values, spec.args, now);
 
   return (
     <Value $live={live} data-testid={`derived-${spec.id}`}>
-      {value === undefined ? '' : formatDerivedValue(spec, value)}
+      {value === undefined ? '' : generator.format(value)}
     </Value>
   );
 }

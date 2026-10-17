@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { TABLE_TEMPLATES } from './tableTemplates';
 import { VIEW_KINDS } from './tableViewKinds';
-import { bindFormula, columnSlugs } from './derivedColumns';
+import {
+  DERIVED_COLUMN_GENERATORS,
+  type DerivedColumnKind,
+} from './derivedColumns';
 import type { TableColumnType, TableViewSpec } from './createTableFromSpec';
 
 /**
@@ -226,23 +229,39 @@ describe('table templates', () => {
             }
           });
 
-          it('computes its derived columns from columns that hold numbers', () => {
-            const slugs = columnSlugs(
-              spec.columns.map(column => [column.name, column.name]),
-            );
-
+          it('computes its derived columns from arguments that fit', () => {
             for (const derived of view.derivedColumns ?? []) {
-              const { vars, unknown } = bindFormula(derived.formula, slugs);
+              const generator =
+                DERIVED_COLUMN_GENERATORS[derived.kind as DerivedColumnKind];
+              expect(generator, `unknown kind ${derived.kind}`).toBeDefined();
 
-              expect(unknown, `${derived.name} reads unknown columns`).toEqual(
-                [],
-              );
+              for (const [name, argument] of Object.entries(generator.args)) {
+                const value = derived.args[name];
 
-              for (const name of Object.values(vars)) {
+                if (value === undefined) {
+                  expect(
+                    argument.optional,
+                    `${derived.name} is missing ${name}`,
+                  ).toBe(true);
+                  continue;
+                }
+
+                if (typeof value === 'number') {
+                  expect(argument.allowsLiteral).toBe(true);
+                  continue;
+                }
+
+                const type = typeOf(value);
+                expect(type, `${value} is not a column`).toBeDefined();
                 expect(
-                  [...NUMERIC, ...INSTANT, 'checkbox'],
-                  `${derived.name} reads ${name}`,
-                ).toContain(typeOf(name));
+                  argument.accepts === 'instant' ? INSTANT : NUMERIC,
+                  `${derived.name}.${name} reads ${value}`,
+                ).toContain(type);
+              }
+
+              // Arguments the generator doesn't declare are dropped silently.
+              for (const name of Object.keys(derived.args)) {
+                expect(Object.keys(generator.args)).toContain(name);
               }
             }
           });

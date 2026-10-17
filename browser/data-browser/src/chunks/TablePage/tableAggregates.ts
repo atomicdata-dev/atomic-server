@@ -14,12 +14,13 @@ import {
   formatCalendarDate,
 } from '@helpers/dates/calendarDate';
 import {
-  dependsOnNow,
-  formatDerivedValue,
+  DERIVED_COLUMN_GENERATORS,
   toExpression,
+  type ArgValues,
+  type DerivedColumnArg,
+  type DerivedColumnKind,
   type DerivedColumnSpec,
 } from './derivedColumns';
-import { evaluateFormula, localOffsetMinutes } from './formulaEngine';
 
 /**
  * A statistic a view shows under its rows. Configuration on the View
@@ -109,13 +110,8 @@ export function propertiesForFunction(
 export function functionsForDerived(
   spec: DerivedColumnSpec,
 ): AggregateFunction[] {
-  if (spec.valueKind === 'date') {
-    return ['min', 'max', 'count'];
-  }
-
-  // A true/false column sums to the number of rows where it holds.
-  return spec.valueKind === 'boolean'
-    ? ['sum', 'count']
+  return DERIVED_COLUMN_GENERATORS[spec.kind].valueKind === 'date'
+    ? ['min', 'max', 'count']
     : ['sum', 'avg', 'min', 'max', 'count'];
 }
 
@@ -233,7 +229,7 @@ export function toAggregation(
       ? specById.get(aggregate.derived)
       : undefined;
 
-    return spec ? dependsOnNow(spec) : false;
+    return spec ? measuresAgainstNow(spec) : false;
   });
 
   return {
@@ -254,10 +250,6 @@ export function toAggregation(
     // re-run the query on every render. A minute is close enough for a total
     // while the cells themselves tick every second.
     ...(live ? { now_ms: quantizedNow() } : {}),
-    // A computed total reads dates in the caller's zone, like the cells.
-    ...(requests.some(request => request.expression)
-      ? { tz_offset_minutes: localOffsetMinutes() }
-      : {}),
   };
 }
 
@@ -266,6 +258,11 @@ const NOW_QUANTUM_MS = 60_000;
 
 function quantizedNow(): number {
   return Math.floor(Date.now() / NOW_QUANTUM_MS) * NOW_QUANTUM_MS;
+}
+
+/** Whether a computed column's value keeps moving on its own. */
+function measuresAgainstNow(spec: DerivedColumnSpec): boolean {
+  return spec.kind === 'daysSince' || spec.kind === 'elapsed';
 }
 
 /** How many totals rows the configuration needs (always at least one). */
@@ -322,7 +319,7 @@ export function formatAggregateValue(
   // A sum of durations is a duration: format it the way the column itself does,
   // or "5:30:00" of logged time reads as 19800000.
   if (derived) {
-    return formatDerivedValue(derived, value);
+    return DERIVED_COLUMN_GENERATORS[derived.kind].format(value);
   }
 
   if (
@@ -512,15 +509,20 @@ export function aggregateRows(
       let number: number | undefined;
 
       if (aggregate.expression) {
-        // The same formula the store evaluates (`toExpression`), over this row.
-        const { vars } = aggregate.expression;
-        const values: Record<string, unknown> = {};
+        // An expression is a computed column's kind and arguments, flattened
+        // (`toExpression`), so the column's own generator evaluates it.
+        const { kind, ...args } = aggregate.expression as {
+          kind: DerivedColumnKind;
+        } & Record<string, DerivedColumnArg>;
+        const values: ArgValues = {};
 
-        for (const property of Object.values(vars)) {
-          values[property] = read(property);
+        for (const arg of Object.values(args)) {
+          if (typeof arg === 'string' && arg !== '') {
+            values[arg] = read(arg);
+          }
         }
 
-        number = evaluateFormula(aggregate.expression, values, now);
+        number = DERIVED_COLUMN_GENERATORS[kind]?.compute(values, args, now);
         present = number !== undefined;
       } else if (aggregate.property) {
         const value = read(aggregate.property);

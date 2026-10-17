@@ -22,11 +22,9 @@ import {
 import { ViewKind } from './tableViewKinds';
 import type { FilterOperator } from './tableFiltering';
 import {
-  bindFormula,
-  columnSlugs,
-  specFromFormula,
+  DERIVED_COLUMN_GENERATORS,
+  type DerivedColumnKind,
   type DerivedColumnSpec,
-  type DerivedValueKind,
 } from './derivedColumns';
 import { stringToSlug } from '@helpers/stringToSlug';
 import { rowActionKey } from './rowActions';
@@ -80,17 +78,20 @@ export interface TableColumnSpec {
 }
 
 /**
- * A computed column: a name and a formula that refers to this table's columns by
- * the lowercase slug of their name (`Last watered` is `last_watered`) and
- * resolves to property subjects on creation.
+ * A computed column, described in the same column-name vocabulary as the rest
+ * of a spec: its arguments name columns of this table (or are literal numbers),
+ * and are resolved to property subjects on creation.
  */
 export interface TableDerivedColumnSpec {
   /** The column heading, e.g. 'Duration'. */
   name: string;
-  /** e.g. `coalesce(end, now()) - start`. See the table-formulas skill. */
-  formula: string;
-  /** How the number is shown; a plain number when omitted. */
-  valueKind?: DerivedValueKind;
+  kind: DerivedColumnKind;
+  /**
+   * The generator's arguments — `difference` takes `from`/`to`, `elapsed`
+   * `from`/`until`, `daysSince` `from`, `product` `a`/`b`, `offset`
+   * `from`/`days`.
+   */
+  args: Record<string, string | number>;
 }
 
 /**
@@ -550,22 +551,39 @@ function resolveRowActions(
 
 function resolveDerivedColumns(
   specs: TableDerivedColumnSpec[],
-  columnSubjectByName: Record<string, string>,
+  resolve: (reference: string, role: string) => string,
 ): DerivedColumnSpec[] {
-  const slugs = columnSlugs(Object.entries(columnSubjectByName));
-
   return specs.map(spec => {
-    const { unknown } = bindFormula(spec.formula, slugs);
+    const generator = DERIVED_COLUMN_GENERATORS[spec.kind];
 
-    if (unknown.length > 0) {
+    if (!generator) {
       throw new Error(
-        `Unknown column "${unknown[0][0]}" in the formula of computed column "${spec.name}". Name columns by their lowercase slug: ${Object.keys(slugs).join(', ')}`,
+        `Unknown derived column kind "${spec.kind}". Available kinds: ${Object.keys(
+          DERIVED_COLUMN_GENERATORS,
+        ).join(', ')}`,
       );
     }
 
-    return specFromFormula(spec.name, spec.formula, slugs, {
-      valueKind: spec.valueKind,
-    });
+    const args: Record<string, string | number> = {};
+
+    for (const [argument, value] of Object.entries(spec.args)) {
+      if (typeof value === 'number') {
+        args[argument] = value;
+        continue;
+      }
+
+      args[argument] = resolve(
+        value,
+        `the "${argument}" argument of derived column "${spec.name}"`,
+      );
+    }
+
+    return {
+      id: stringToSlug(spec.name),
+      label: spec.name,
+      kind: spec.kind,
+      args,
+    };
   });
 }
 
@@ -771,7 +789,7 @@ export function buildViewPropVals(
     // A spec is plain JSON, just a narrower shape than `JSONValue` describes.
     propVals[dataBrowser.properties.viewDerivedColumns] = resolveDerivedColumns(
       view.derivedColumns,
-      columnSubjectByName,
+      require,
     ) as unknown as JSONValue;
   }
 

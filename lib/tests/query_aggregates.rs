@@ -108,7 +108,6 @@ async fn totals_cover_every_matching_row_not_just_the_page() {
                 ],
                 group_by: None,
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             Some(1),
         ))
@@ -163,7 +162,6 @@ async fn a_filtered_query_only_totals_what_it_matches() {
                 aggregates: vec![sum_of(AMOUNT)],
                 group_by: None,
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             None,
         ))
@@ -183,7 +181,6 @@ async fn a_filtered_query_only_totals_what_it_matches() {
             aggregates: vec![sum_of(AMOUNT)],
             group_by: None,
             now_ms: None,
-            tz_offset_minutes: 0,
         },
         None,
     );
@@ -251,7 +248,6 @@ async fn a_breakdown_splits_the_total_per_group() {
                 limit: None,
             }),
             now_ms: None,
-            tz_offset_minutes: 0,
         },
         None,
     );
@@ -317,7 +313,6 @@ async fn a_breakdown_by_day_buckets_timestamps() {
                     limit: None,
                 }),
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             None,
         ))
@@ -382,7 +377,6 @@ async fn rows_without_a_value_are_counted_but_do_not_change_the_sum() {
                 ],
                 group_by: None,
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             None,
         ))
@@ -430,7 +424,6 @@ async fn an_empty_set_has_no_sum_but_counts_zero() {
                 ],
                 group_by: None,
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             None,
         ))
@@ -462,7 +455,6 @@ async fn a_query_without_aggregation_returns_none() {
             aggregates: vec![],
             group_by: None,
             now_ms: None,
-            tz_offset_minutes: 0,
         },
         None,
     );
@@ -481,7 +473,7 @@ async fn a_query_without_aggregation_returns_none() {
 /// elapsed time of every entry, bucketed by the day it started.
 #[tokio::test]
 async fn a_computed_value_can_be_summed_and_broken_down() {
-    use atomic_lib::expression::{Expression, ExpressionSpec, Operand};
+    use atomic_lib::expression::{Expression, Operand};
 
     let store = Db::init_temp("aggregates_expression").await.unwrap();
     let (_agent, drive) = store.setup("Alice").await.unwrap();
@@ -521,10 +513,10 @@ async fn a_computed_value_can_be_summed_and_broken_down() {
     }
 
     // `AMOUNT` stands in for the end column here: any second timestamp will do.
-    let duration = Expression::from(ExpressionSpec::Elapsed {
+    let duration = Expression::Elapsed {
         from: Operand::Property(SPENT_AT.into()),
         until: Some(Operand::Property(AMOUNT.into())),
-    });
+    };
 
     let mut query = query_for(
         &table,
@@ -544,7 +536,6 @@ async fn a_computed_value_can_be_summed_and_broken_down() {
             // The caller's clock, so the running entry's 15 minutes are exact
             // rather than however long this test took to get here.
             now_ms: Some(now),
-            tz_offset_minutes: 0,
         },
         None,
     );
@@ -587,7 +578,7 @@ async fn a_computed_value_can_be_summed_and_broken_down() {
 /// drag an average down and claim a denominator the sum never added up.
 #[tokio::test]
 async fn a_row_missing_an_argument_is_left_out_of_a_computed_total() {
-    use atomic_lib::expression::{Expression, ExpressionSpec, Operand};
+    use atomic_lib::expression::{Expression, Operand};
 
     let store = Db::init_temp("aggregates_expression_gaps").await.unwrap();
     let (_agent, drive) = store.setup("Alice").await.unwrap();
@@ -614,26 +605,25 @@ async fn a_row_missing_an_argument_is_left_out_of_a_computed_total() {
                     Aggregate {
                         id: Some("total".into()),
                         // Quantity × a fixed price, the "amount" of a line item.
-                        expression: Some(Expression::from(ExpressionSpec::Product {
+                        expression: Some(Expression::Product {
                             a: Operand::Property(AMOUNT.into()),
                             b: Operand::Literal(2.5),
-                        })),
+                        }),
                         property: None,
                         function: AggregateFunction::Sum,
                     },
                     Aggregate {
                         id: Some("average".into()),
-                        expression: Some(Expression::from(ExpressionSpec::Product {
+                        expression: Some(Expression::Product {
                             a: Operand::Property(AMOUNT.into()),
                             b: Operand::Literal(2.5),
-                        })),
+                        }),
                         property: None,
                         function: AggregateFunction::Avg,
                     },
                 ],
                 group_by: None,
                 now_ms: None,
-                tz_offset_minutes: 0,
             },
             None,
         ))

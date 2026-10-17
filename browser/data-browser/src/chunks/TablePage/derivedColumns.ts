@@ -6,159 +6,125 @@ import {
   type Resource,
 } from '@tomic/react';
 import { calendarDateToLocalDate } from '@helpers/dates/calendarDate';
-import { stringToSlug } from '@helpers/stringToSlug';
-import { evaluateFormula, localOffsetMinutes } from './formulaEngine';
 import { formatClock } from './helpers/formatDuration';
 
 /**
  * A column whose value is computed from the row rather than stored on it: a
- * duration, a days-since, an amount, "birthday within two weeks". Configuration,
- * not code — the View lists them in `view-derived-columns` and every view kind
- * renders them. See `planning/table-templates-and-mini-apps.md`.
+ * duration, a days-since, an amount. Configuration, not code — the View lists
+ * them in `view-derived-columns` and every view kind renders them, so a
+ * mini-app that needs one is a template, not a renderer. See
+ * `planning/table-templates-and-mini-apps.md`.
  *
- * The value is a formula (evaluated by the Rust `evalexpr` crate, in the browser
- * and in the store alike) over `vars`, which bind the identifiers it uses to
- * property subjects: `coalesce(until, now()) - start`.
+ * Deliberately a fixed set of generators rather than a formula language: these
+ * five cover every mini-app on that list, and a formula language can wait until
+ * one of them doesn't.
  */
+export type DerivedColumnKind =
+  | 'difference'
+  | 'elapsed'
+  | 'daysSince'
+  | 'product'
+  | 'offset';
+
+/** Either a property subject to read off the row, or a literal number. */
+export type DerivedColumnArg = string | number;
+
 export interface DerivedColumnSpec {
   /** Stable identity within the view — the grid column key. */
   id: string;
   /** Heading label. */
   label: string;
-  formula: string;
-  /** Identifier used in the formula → property subject. */
-  vars: Record<string, string>;
-  /** Column width in px. */
+  kind: DerivedColumnKind;
+  /** The generator's arguments, by the names it declares. */
+  args: Record<string, DerivedColumnArg>;
+  /** Column width in px. Falls back to the generator's default. */
   width?: number;
-  /** What the number means, for formatting. Defaults to a plain number. */
-  valueKind?: DerivedValueKind;
 }
 
 /**
- * What kind of number a formula produces. Decides how a value and a total over
- * the column are formatted, which statistics are offered for it, and (for a
- * filter) what the value input asks for.
+ * One argument of a generator, described richly enough for the column dialog to
+ * build its own form — which properties may fill it, whether a number can be
+ * typed instead, whether it may be left empty.
  */
-export type DerivedValueKind =
-  | 'duration'
-  | 'days'
-  | 'number'
-  | 'date'
-  | 'boolean';
-
-export const DEFAULT_DERIVED_WIDTH = 120;
-
-/** `3d ago` / `today` / `in 5d` — a days-since reads as a distance, not a count. */
-function formatDays(days: number): string {
-  if (days === 0) {
-    return 'today';
-  }
-
-  return days > 0 ? `${days}d ago` : `in ${-days}d`;
-}
-
-const FORMATTERS: Record<DerivedValueKind, (value: number) => string> = {
-  duration: formatClock,
-  days: formatDays,
-  // Amounts keep two decimals unless they're whole (`12` / `127.50`).
-  number: value => (Number.isInteger(value) ? String(value) : value.toFixed(2)),
-  // A formula reads a DATE as midnight at the zone's *current* offset
-  // (`localOffsetMinutes`), so it is shown through the same offset: through the
-  // browser's own zone a January date read in summer would show a day early.
-  date: instant =>
-    new Date(instant + localOffsetMinutes() * 60_000).toLocaleDateString(
-      undefined,
-      { timeZone: 'UTC' },
-    ),
-  boolean: value => (value ? '✓' : ''),
-};
-
-export function formatDerivedValue(
-  spec: Pick<DerivedColumnSpec, 'valueKind'>,
-  value: number,
-): string {
-  return FORMATTERS[spec.valueKind ?? 'number'](value);
+export interface DerivedColumnArgSpec {
+  /** Field label in the column dialog. */
+  label: string;
+  /** Which of the class's properties can fill this argument. */
+  accepts: 'instant' | 'number';
+  /** True when a fixed number may be typed in instead of picking a property. */
+  allowsLiteral?: boolean;
+  /** True when the column still computes with this argument left empty. */
+  optional?: boolean;
 }
 
 /**
- * How to show a formula's result, guessed from its shape so a typed formula
- * needs no setting: a comparison is true or false, a span between two instants
- * is a duration, `days(..)` counts days, `addDays(..)` is a date.
+ * What kind of number a generator produces. Decides how a total over the column
+ * is formatted, which statistics are offered for it, and (for a filter) what the
+ * value input asks for.
  */
-export function inferValueKind(
-  formula: string,
-  /** Whether every column the formula reads is a date or a datetime. */
-  readsInstants: boolean,
-): DerivedValueKind | undefined {
-  const operand = String.raw`(?:coalesce\((?:[^()]|\(\))*\)|\w+|now\(\))`;
+export type DerivedValueKind = 'duration' | 'days' | 'number' | 'date';
 
-  if (/[<>]=?|[!=]=|&&|\|\|/.test(formula)) {
-    return 'boolean';
-  }
-
-  if (
-    readsInstants &&
-    new RegExp(`^\\s*${operand}\\s*-\\s*${operand}\\s*$`).test(formula)
-  ) {
-    return 'duration';
-  }
-
-  return /^\s*days\(.*\)\s*$/.test(formula)
-    ? 'days'
-    : /^\s*addDays\(.*\)\s*$/.test(formula)
-      ? 'date'
-      : undefined;
+interface DerivedColumnGenerator {
+  /** Name of this generator in the "add computed column" picker. */
+  title: string;
+  /** What its value is, beyond "a number". */
+  valueKind: DerivedValueKind;
+  /** One line saying what it computes, shown under the picker. */
+  description: string;
+  /** Prefills the column name. */
+  defaultLabel: string;
+  /** The arguments this generator reads. */
+  args: Record<string, DerivedColumnArgSpec>;
+  /** Default column width in px. */
+  width: number;
+  /**
+   * The value to show, or undefined for an empty cell. `now` is only read by
+   * generators that measure against the present.
+   *
+   * A pure function of the resolved argument values — see {@link ArgValues} for
+   * why it does not take the row.
+   */
+  compute: (
+    values: ArgValues,
+    args: Record<string, DerivedColumnArg>,
+    now: number,
+  ) => number | undefined;
+  format: (value: number) => string;
+  /**
+   * True while this row's value keeps changing on its own, so its cell
+   * subscribes to the 1s ticker (and is emphasised as live).
+   */
+  live?: (values: ArgValues, args: Record<string, DerivedColumnArg>) => boolean;
 }
 
-/** The store's form of a column, so a total or a filter can be computed over it. */
-export function toExpression(spec: DerivedColumnSpec): Expression | undefined {
-  return spec.formula.trim() === ''
-    ? undefined
-    : { kind: 'formula', formula: spec.formula, vars: spec.vars };
-}
-
-/** Whether the formula reads the clock, so its value (and a query on it) moves. */
-export function dependsOnNow(
-  spec: Pick<DerivedColumnSpec, 'formula'>,
-): boolean {
-  return /\b(now|daysUntilAnniversary)\s*\(/.test(spec.formula);
-}
+const DAY_MS = 86_400_000;
 
 /**
- * True while a cell's value ticks on its own every second: a running duration.
- * A days count changes once a day, so it does not subscribe to the ticker.
+ * The values of the properties a spec's arguments name, by property subject.
+ *
+ * Generators are functions of *this* rather than of the row, so that a cell can
+ * subscribe to exactly these values and recompute when one changes. Passing the
+ * `Resource` instead looks simpler and is the bug it used to have: the React
+ * Compiler memoizes a render-time read on the resource proxy's identity, and the
+ * store mutates resources in place, so that identity never changes and the value
+ * is computed once and cached forever.
  */
-export function isLive(spec: DerivedColumnSpec): boolean {
-  return spec.valueKind === 'duration' && /\bnow\s*\(/.test(spec.formula);
+export type ArgValues = Record<string, JSONValue | undefined>;
+
+/** Every generator's argument list, so a cell knows how many to subscribe to. */
+export const MAX_DERIVED_ARGS = 2;
+
+/** The property subjects a spec reads, in declaration order. */
+export function argProperties(spec: DerivedColumnSpec): string[] {
+  return Object.values(spec.args).filter(
+    (arg): arg is string => typeof arg === 'string' && arg !== '',
+  );
 }
 
-/** The value for one row, from the current values of its properties. */
-export function computeDerived(
-  spec: DerivedColumnSpec,
-  values: Record<string, JSONValue | undefined>,
-  now: number,
-): number | undefined {
-  const expression = toExpression(spec);
-
-  if (!expression) {
-    return undefined;
-  }
-
-  return evaluateFormula(expression, values, now);
-}
-
-/** The property subjects a spec reads. */
-export function specProperties(spec: DerivedColumnSpec): string[] {
-  return [...new Set(Object.values(spec.vars))];
-}
-
-/** Pulls a spec's inputs off a row — for callers outside of render. */
-export function rowValuesOf(
-  row: Resource,
-  spec: DerivedColumnSpec,
-): Record<string, JSONValue | undefined> {
+/** Pulls the argument's values off a row — for callers outside of render. */
+export function argValuesOf(row: Resource, spec: DerivedColumnSpec): ArgValues {
   return Object.fromEntries(
-    specProperties(spec).map(property => [
+    argProperties(spec).map(property => [
       property,
       row.get(property) as JSONValue | undefined,
     ]),
@@ -167,13 +133,22 @@ export function rowValuesOf(
 
 /**
  * Reads an instant: a TIMESTAMP is already a number of millis, a DATE is an ISO
- * day string — both place the row in time, so both are usable.
+ * day string — both place the row in time, so both are usable. A literal number
+ * argument is the instant itself.
  */
 export function readInstant(
-  values: Record<string, JSONValue | undefined>,
-  property: string,
+  values: ArgValues,
+  arg: DerivedColumnArg | undefined,
 ): number | undefined {
-  const value = values[property];
+  if (typeof arg === 'number') {
+    return arg;
+  }
+
+  if (typeof arg !== 'string' || arg === '') {
+    return undefined;
+  }
+
+  const value = values[arg];
 
   if (typeof value === 'number') {
     return value;
@@ -196,232 +171,242 @@ export function readInstant(
   return undefined;
 }
 
-// --- Naming columns in a formula -------------------------------------------
-
-/** A column's label as a formula identifier: lowercase a-z, 0-9 and `_`. */
-export const columnSlug = (label: string): string =>
-  label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/^(\d)/, 'c$1') || 'column';
-
-/**
- * Identifier → property subject for columns given as `[label, subject]`. Two
- * labels that slug alike get a numeric suffix (`price`, `price_2`); the same
- * column listed twice (say by name and by shortname) keeps one entry.
- */
-export function columnSlugs(
-  columns: Array<[label: string, subject: string]>,
-): Record<string, string> {
-  const slugs: Record<string, string> = {};
-
-  for (const [label, subject] of columns) {
-    const base = columnSlug(label);
-    let slug = base;
-
-    for (let n = 2; slugs[slug] !== undefined && slugs[slug] !== subject; n++) {
-      slug = `${base}_${n}`;
-    }
-
-    slugs[slug] = subject;
+/** Reads a plain number: the literal itself, or the value for a property. */
+function readNumber(
+  values: ArgValues,
+  arg: DerivedColumnArg | undefined,
+): number | undefined {
+  if (typeof arg === 'number') {
+    return arg;
   }
 
-  return slugs;
-}
-
-/** Whether a property holds something a formula can read as a number. */
-export function isFormulaProperty(property: Property): boolean {
-  return [
-    Datatype.INTEGER,
-    Datatype.FLOAT,
-    Datatype.TIMESTAMP,
-    Datatype.DATE,
-    Datatype.BOOLEAN,
-  ].includes(property.datatype);
-}
-
-/** `evalexpr` names that are not columns: literals, and anything called. */
-const NOT_COLUMNS = new Set(['true', 'false']);
-
-/** The column identifiers a formula reads — not function names or literals. */
-export function formulaIdentifiers(formula: string): string[] {
-  const identifiers = formula
-    .replace(/"[^"]*"/g, '')
-    .matchAll(/(?<![\w:])[A-Za-z_]\w*(?!\s*\(|\w|::)/g);
-
-  return [...new Set([...identifiers].map(m => m[0]))].filter(
-    name => !NOT_COLUMNS.has(name),
-  );
-}
-
-/**
- * Binds the identifiers a formula uses to property subjects. An identifier that
- * names no column comes back in `unknown`, with the closest column to suggest.
- */
-export function bindFormula(
-  formula: string,
-  slugs: Record<string, string>,
-): { vars: Record<string, string>; unknown: Array<[string, string?]> } {
-  const vars: Record<string, string> = {};
-  const unknown: Array<[string, string?]> = [];
-
-  for (const name of formulaIdentifiers(formula)) {
-    if (slugs[name]) {
-      vars[name] = slugs[name];
-    } else {
-      unknown.push([name, closest(name, Object.keys(slugs))]);
-    }
+  if (typeof arg !== 'string' || arg === '') {
+    return undefined;
   }
 
-  return { vars, unknown };
+  const value = values[arg];
+
+  return typeof value === 'number' ? value : undefined;
 }
 
-function closest(name: string, candidates: string[]): string | undefined {
-  const distance = (a: string, b: string): number => {
-    let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+/** `3d ago` / `today` / `in 5d` — a days-since reads as a distance, not a count. */
+function formatDays(days: number): string {
+  if (days === 0) {
+    return 'today';
+  }
 
-    for (let i = 1; i <= a.length; i++) {
-      const next = [i];
+  return days > 0 ? `${days}d ago` : `in ${-days}d`;
+}
 
-      for (let j = 1; j <= b.length; j++) {
-        next[j] = Math.min(
-          row[j] + 1,
-          next[j - 1] + 1,
-          row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-        );
+/** Amounts keep two decimals unless they're whole (`12` / `127.50`). */
+function formatAmount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatDate(instant: number): string {
+  return new Date(instant).toLocaleDateString();
+}
+
+export const DERIVED_COLUMN_GENERATORS: Record<
+  DerivedColumnKind,
+  DerivedColumnGenerator
+> = {
+  /** `to − from`: a finished duration, a lead time. */
+  difference: {
+    title: 'Time between two dates',
+    description:
+      'The span from one date or time column to another, as a clock.',
+    defaultLabel: 'Duration',
+    args: {
+      from: { label: 'From', accepts: 'instant' },
+      to: { label: 'To', accepts: 'instant' },
+    },
+    valueKind: 'duration',
+    width: 130,
+    compute: (values, args) => {
+      const from = readInstant(values, args.from);
+      const to = readInstant(values, args.to);
+
+      return from === undefined || to === undefined ? undefined : to - from;
+    },
+    format: formatClock,
+  },
+  /**
+   * `(until ?? now) − from`: the ticking variant. A row with a `from` but no
+   * `until` is still running, which is exactly what a timer entry is.
+   */
+  elapsed: {
+    title: 'Live duration',
+    description:
+      'Counts up from a start until an end is filled in — a row without an end is still running.',
+    defaultLabel: 'Duration',
+    args: {
+      from: { label: 'Start', accepts: 'instant' },
+      until: { label: 'End', accepts: 'instant', optional: true },
+    },
+    valueKind: 'duration',
+    width: 130,
+    compute: (values, args, now) => {
+      const from = readInstant(values, args.from);
+
+      if (from === undefined) {
+        return undefined;
       }
 
-      row = next;
-    }
+      return (readInstant(values, args.until) ?? now) - from;
+    },
+    format: formatClock,
+    live: (values, args) =>
+      readInstant(values, args.from) !== undefined &&
+      readInstant(values, args.until) === undefined,
+  },
+  /** Whole days between `from` and now — "days since last contact". */
+  daysSince: {
+    title: 'Days since',
+    description: 'Whole days between a date column and today.',
+    defaultLabel: 'Days since',
+    args: { from: { label: 'Date', accepts: 'instant' } },
+    valueKind: 'days',
+    width: 110,
+    compute: (values, args, now) => {
+      const from = readInstant(values, args.from);
 
-    return row[b.length];
-  };
+      return from === undefined ? undefined : Math.floor((now - from) / DAY_MS);
+    },
+    format: formatDays,
+  },
+  /** `a × b` — quantity × price, hours × rate. Either side may be a literal. */
+  product: {
+    title: 'Multiplication',
+    description:
+      'Two numbers multiplied — quantity × price, hours × rate. Either side can be a fixed number.',
+    defaultLabel: 'Total',
+    args: {
+      a: { label: 'First value', accepts: 'number', allowsLiteral: true },
+      b: { label: 'Second value', accepts: 'number', allowsLiteral: true },
+    },
+    valueKind: 'number',
+    width: 110,
+    compute: (values, args) => {
+      const a = readNumber(values, args.a);
+      const b = readNumber(values, args.b);
 
-  const [best] = candidates.sort(
-    (x, y) => distance(name, x) - distance(name, y),
-  );
+      return a === undefined || b === undefined ? undefined : a * b;
+    },
+    format: formatAmount,
+  },
+  /** `from + days` — a next-due date from a last-done date and an interval. */
+  offset: {
+    title: 'Date plus days',
+    description:
+      'A date shifted by a number of days — a next-due date from a last-done date and an interval.',
+    defaultLabel: 'Next due',
+    args: {
+      from: { label: 'Date', accepts: 'instant' },
+      days: { label: 'Days', accepts: 'number', allowsLiteral: true },
+    },
+    valueKind: 'date',
+    width: 130,
+    compute: (values, args) => {
+      const from = readInstant(values, args.from);
+      const days = readNumber(values, args.days);
 
-  return best && distance(name, best) <= Math.max(2, name.length / 2)
-    ? best
-    : undefined;
-}
-
-/** Builds a spec from a name and a formula that names columns by slug. */
-export function specFromFormula(
-  label: string,
-  formula: string,
-  slugs: Record<string, string>,
-  rest: Partial<Pick<DerivedColumnSpec, 'id' | 'valueKind' | 'width'>> = {},
-): DerivedColumnSpec {
-  return {
-    id: rest.id ?? stringToSlug(label),
-    label,
-    formula,
-    vars: bindFormula(formula, slugs).vars,
-    ...(rest.valueKind ? { valueKind: rest.valueKind } : {}),
-    ...(rest.width ? { width: rest.width } : {}),
-  };
-}
-
-// --- Reading what is stored -------------------------------------------------
-
-type LegacyArgs = Record<string, string | number | undefined>;
-
-/** The five fixed generators this replaced: their arguments and the formula each meant. */
-const LEGACY: Record<
-  string,
-  [
-    args: string[],
-    formula: (v: string[]) => string,
-    valueKind: DerivedValueKind,
-  ]
-> = {
-  difference: [['from', 'to'], v => `${v[1]} - ${v[0]}`, 'duration'],
-  elapsed: [
-    ['from', 'until'],
-    v => (v[1] ? `coalesce(${v[1]}, now()) - ${v[0]}` : `now() - ${v[0]}`),
-    'duration',
-  ],
-  daysSince: [['from'], v => `days(now() - ${v[0]})`, 'days'],
-  product: [['a', 'b'], v => `${v[0]} * ${v[1]}`, 'number'],
-  offset: [['from', 'days'], v => `${v[0]} + ${v[1]} * 86400000.0`, 'date'],
+      return from === undefined || days === undefined
+        ? undefined
+        : from + days * DAY_MS;
+    },
+    format: formatDate,
+  },
 };
 
-/** A spec stored as `{ kind, args }`, as the same formula the store converts it to. */
-function fromLegacy(kind: string, args: LegacyArgs) {
-  const [names, formula, valueKind] = LEGACY[kind] ?? [];
-  const vars: Record<string, string> = {};
-  const operands = names?.map(name => {
-    const arg = args[name];
+/** The kinds, in the order the column dialog offers them. */
+export const DERIVED_COLUMN_KINDS: DerivedColumnKind[] = [
+  'elapsed',
+  'difference',
+  'daysSince',
+  'product',
+  'offset',
+];
 
-    if (typeof arg === 'number') {
-      return `(${Number.isInteger(arg) ? arg.toFixed(1) : arg})`;
-    }
-
-    if (typeof arg === 'string' && arg) {
-      vars[`v${Object.keys(vars).length}`] = arg;
-
-      return `v${Object.keys(vars).length - 1}`;
-    }
-  });
-
-  // Only a running duration may leave an argument (the end) empty.
-  if (!operands?.slice(0, kind === 'elapsed' ? 1 : undefined).every(Boolean)) {
-    return undefined;
+/** Whether a property can fill an argument that `accepts` this kind of value. */
+export function propertyFitsArg(
+  property: Property,
+  accepts: DerivedColumnArgSpec['accepts'],
+): boolean {
+  if (accepts === 'instant') {
+    return (
+      property.datatype === Datatype.TIMESTAMP ||
+      property.datatype === Datatype.DATE
+    );
   }
 
-  return { formula: formula(operands as string[]), vars, valueKind };
-}
-
-function readSpec(value: unknown): DerivedColumnSpec | undefined {
-  if (typeof value !== 'object' || value === null) {
-    return undefined;
-  }
-
-  const spec = value as Record<string, unknown>;
-
-  if (typeof spec.id !== 'string' || typeof spec.label !== 'string') {
-    return undefined;
-  }
-
-  const base = {
-    id: spec.id,
-    label: spec.label,
-    ...(typeof spec.width === 'number' ? { width: spec.width } : {}),
-  };
-
-  if (typeof spec.formula === 'string') {
-    const vars = spec.vars ?? {};
-    const isVars =
-      typeof vars === 'object' &&
-      vars !== null &&
-      Object.values(vars).every(v => typeof v === 'string');
-
-    return isVars
-      ? {
-          ...base,
-          formula: spec.formula,
-          vars: vars as Record<string, string>,
-          ...(typeof spec.valueKind === 'string'
-            ? { valueKind: spec.valueKind as DerivedValueKind }
-            : {}),
-        }
-      : undefined;
-  }
-
-  const args = spec.args as LegacyArgs | undefined;
-
-  return typeof spec.kind === 'string' && typeof args === 'object' && args
-    ? ({ ...base, ...fromLegacy(spec.kind, args) } as DerivedColumnSpec)
-    : undefined;
+  return (
+    property.datatype === Datatype.INTEGER ||
+    property.datatype === Datatype.FLOAT
+  );
 }
 
 /**
- * Reads the specs stored on a View, converting the older `{ kind, args }` form
- * to formulas. Anything malformed is dropped rather than thrown: hand-edited (or
- * assistant-written) config must not be able to take the whole table down with
- * it.
+ * The store's form of a computed column, so a total or a filter can be computed
+ * over one where the rows live. The wire shape is the generator's own kind and
+ * argument names, flattened — `{ kind: 'elapsed', from, until }`.
+ *
+ * Returns undefined for a spec that can't compute anything (an argument still
+ * empty), because asking the store for it would only produce a blank.
+ */
+export function toExpression(spec: DerivedColumnSpec): Expression | undefined {
+  if (!isDerivedColumnComplete(spec)) {
+    return undefined;
+  }
+
+  return { kind: spec.kind, ...spec.args } as Expression;
+}
+
+/** True once every argument the generator requires is filled in. */
+export function isDerivedColumnComplete(spec: DerivedColumnSpec): boolean {
+  const generator = DERIVED_COLUMN_GENERATORS[spec.kind];
+
+  if (!generator) {
+    return false;
+  }
+
+  return Object.entries(generator.args).every(([name, arg]) => {
+    if (arg.optional) {
+      return true;
+    }
+
+    const value = spec.args[name];
+
+    return (
+      typeof value === 'number' || (typeof value === 'string' && value !== '')
+    );
+  });
+}
+
+function isSpec(value: unknown): value is DerivedColumnSpec {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const spec = value as Partial<DerivedColumnSpec>;
+
+  return (
+    typeof spec.id === 'string' &&
+    typeof spec.label === 'string' &&
+    typeof spec.kind === 'string' &&
+    spec.kind in DERIVED_COLUMN_GENERATORS &&
+    typeof spec.args === 'object' &&
+    spec.args !== null &&
+    Object.values(spec.args).every(
+      arg => typeof arg === 'string' || typeof arg === 'number',
+    )
+  );
+}
+
+/**
+ * Reads the specs stored on a View. Anything malformed is dropped rather than
+ * thrown: hand-edited (or assistant-written) config must not be able to take
+ * the whole table down with it.
  */
 export function parseDerivedColumnSpecs(
   value: JSONValue | undefined,
@@ -430,9 +415,7 @@ export function parseDerivedColumnSpecs(
     return [];
   }
 
-  return (value as unknown[]).flatMap(item => {
-    const spec = readSpec(item);
-
-    return spec?.formula ? [spec] : [];
-  });
+  // Through `unknown[]`: a spec is a narrower shape than `JSONValue`, which the
+  // predicate overload of `filter` won't accept directly.
+  return (value as unknown[]).filter(isSpec);
 }
