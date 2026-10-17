@@ -19,12 +19,15 @@ export function CloudServerDetails({
   usage,
   quotaBytes,
   signedIn,
+  managed,
 }: {
   drive: string;
   usage: NodeDriveUsage | null;
   quotaBytes: number | null;
   /** Web addresses belong to the account, so they need a session. */
   signedIn: boolean;
+  /** This account pays for the drive's plan. Everyone else just sees it. */
+  managed: boolean;
 }) {
   const used = usage ? usage.blobBytes + usage.loroBytes : null;
 
@@ -43,10 +46,23 @@ export function CloudServerDetails({
           }
         />
       )}
-      {signedIn && <DriveAddress drive={drive} />}
+      {managed ? (
+        signedIn && <DriveAddress drive={drive} />
+      ) : (
+        <Managed data-testid='cloud-server-managed-elsewhere'>
+          This drive is on Cloud Server, managed by another account. Only that
+          account can change the plan or the web address.
+        </Managed>
+      )}
     </>
   );
 }
+
+const Managed = styled.p`
+  margin: 0;
+  color: ${p => p.theme.colors.textLight};
+  font-size: ${CARD_SUB_FONT};
+`;
 
 const StorageLink = styled(Link)`
   color: ${p => p.theme.colors.main};

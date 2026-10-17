@@ -12,7 +12,7 @@
 const SPLASH_ID = 'boot-splash';
 const LEAVING = 'boot-splash-leaving';
 const REVEALING = 'boot-revealing';
-const LEAVE_MS = 420;
+const LEAVE_MS = 200;
 
 let revealWaiters: (() => void)[] = [];
 let leaveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -100,7 +100,7 @@ export function holdBootSplash(): () => void {
  * quiet gap bridges one loader replacing another.
  */
 export function hideBootSplashWhenSettled({
-  quietMs = 250,
+  quietMs = 100,
   maxMs = 8_000,
 } = {}): void {
   if (settleTimer) return;
@@ -116,7 +116,7 @@ export function hideBootSplashWhenSettled({
     clearInterval(settleTimer);
     settleTimer = undefined;
     hideBootSplash();
-  }, 50);
+  }, 25);
 }
 
 /** Resolves once the app is on screen with no splash in front of it. */

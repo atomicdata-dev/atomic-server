@@ -42,6 +42,52 @@ export function isOriginWithoutNode(url: string | undefined): boolean {
   return originOf(url) === originWithoutNode;
 }
 
+const MEMO_KEY = 'atomic.originProbe';
+
+type Answer = 'node' | 'none';
+
+function readMemo(origin: string): Answer | undefined {
+  try {
+    const memo = JSON.parse(localStorage.getItem(MEMO_KEY) ?? '{}');
+    const answer = memo[origin];
+
+    return answer === 'node' || answer === 'none' ? answer : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeMemo(origin: string, answer: Answer): void {
+  try {
+    const memo = JSON.parse(localStorage.getItem(MEMO_KEY) ?? '{}');
+    localStorage.setItem(
+      MEMO_KEY,
+      JSON.stringify({ ...memo, [origin]: answer }),
+    );
+  } catch {
+    // Without storage every boot waits for the probe, as it always did.
+  }
+}
+
+/**
+ * Apply the answer from the last visit, if there is one, so boot does not
+ * have to wait for the probe. Why trust it: a deployment's origin is either
+ * the portal or a node for as long as anyone uses it, and the probe runs again
+ * in the background on every boot and corrects the memo (and, once it is
+ * known, the in-memory answer). A wrong memo costs one boot with the old
+ * answer, never a stuck state. The first visit has no memo and waits, exactly
+ * as before. Returns whether a memo was applied.
+ */
+export function recallOriginProbe(origin: string): boolean {
+  const answer = readMemo(origin);
+
+  if (!answer) return false;
+
+  rememberOriginWithoutNode(answer === 'none' ? origin : undefined);
+
+  return true;
+}
+
 /** Only in tests. Boot sets this through {@link probeOriginForNode}. */
 export function rememberOriginWithoutNode(origin: string | undefined): void {
   originWithoutNode = origin ? originOf(origin) : undefined;
@@ -56,6 +102,16 @@ export function rememberOriginWithoutNode(origin: string | undefined): void {
  */
 export function originMayLackNode(): boolean {
   return isHostedDistribution() && !isRunningInTauri();
+}
+
+function concludeNone(origin: string): void {
+  rememberOriginWithoutNode(origin);
+  writeMemo(origin, 'none');
+}
+
+function concludeNode(origin: string): void {
+  if (isOriginWithoutNode(origin)) rememberOriginWithoutNode(undefined);
+  writeMemo(origin, 'node');
 }
 
 /**
@@ -83,7 +139,7 @@ export async function probeOriginForNode(
     });
 
     if (res.status === 404) {
-      rememberOriginWithoutNode(origin);
+      concludeNone(origin);
 
       return;
     }
@@ -96,7 +152,7 @@ export async function probeOriginForNode(
       data = await res.json();
     } catch {
       // index.html, not JSON.
-      rememberOriginWithoutNode(origin);
+      concludeNone(origin);
 
       return;
     }
@@ -109,7 +165,9 @@ export async function probeOriginForNode(
     ];
 
     if (!version && !nodeId) {
-      rememberOriginWithoutNode(origin);
+      concludeNone(origin);
+    } else {
+      concludeNode(origin);
     }
   } catch {
     // No answer is not a "no".

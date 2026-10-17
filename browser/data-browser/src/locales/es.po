@@ -537,6 +537,7 @@ msgstr "No configurado"
 #: src/routes/ConnectAgentRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
+#: src/routes/SyncRoute.tsx
 msgid "Connected"
 msgstr "Conectado"
 
@@ -13081,6 +13082,10 @@ msgstr ""
 #: src/views/Drive/DriveHome.tsx
 msgid "Commented"
 msgstr "Comentado"
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
+msgstr ""
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Live duration"
