@@ -4095,7 +4095,10 @@ impl Db {
 
         // One instant for the whole pass: a `daysSince` evaluated per row against
         // a moving clock could put two rows of the same day in different buckets.
-        let now_ms = aggregation.now_ms.unwrap_or_else(crate::utils::now);
+        let clock = crate::expression::Clock {
+            now_ms: aggregation.now_ms.unwrap_or_else(crate::utils::now),
+            tz_offset_minutes: aggregation.tz_offset_minutes,
+        };
         // Parse each formula once for the whole pass, not once per row.
         let compiled: Vec<_> = aggregation
             .aggregates
@@ -4104,7 +4107,7 @@ impl Db {
                 aggregate
                     .expression
                     .as_ref()
-                    .map(|expression| expression.compile(now_ms).ok())
+                    .map(|expression| expression.compile(clock).ok())
             })
             .collect();
 
@@ -4127,7 +4130,7 @@ impl Db {
                             resource
                                 .get(p)
                                 .ok()
-                                .and_then(crate::aggregate::value_as_number)
+                                .and_then(|value| compiled.instant(value))
                         })
                     })
                 });

@@ -142,6 +142,7 @@ pub struct Compiled {
     tree: Node<Num>,
     vars: Vec<(String, String)>,
     base: Context,
+    tz_ms: f64,
 }
 
 /// A function over numbers. An empty argument makes the result empty.
@@ -178,13 +179,13 @@ fn is_leap(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
-/// Whole days from today (UTC) to the next occurrence of `date_ms`'s month and
-/// day; 0 when that is today. The date is rounded to the nearest day, not
-/// floored: the browser hands a civil date over as local midnight, which east of
-/// UTC is the evening before in UTC.
-fn days_until_anniversary(date_ms: f64, now_ms: f64) -> f64 {
-    let today = (now_ms / DAY_MS).floor() as i64;
-    let (_, month, day) = civil_from_days((date_ms / DAY_MS).round() as i64);
+/// Whole days from today to the next occurrence of `date_ms`'s month and day;
+/// 0 when that is today. Days are the caller's: both the date and today are
+/// placed in the zone `tz_ms` east of UTC, so a birthday does not move a day when
+/// the clock passes UTC midnight.
+fn days_until_anniversary(date_ms: f64, now_ms: f64, tz_ms: f64) -> f64 {
+    let today = ((now_ms + tz_ms) / DAY_MS).floor() as i64;
+    let (_, month, day) = civil_from_days(((date_ms + tz_ms) / DAY_MS).floor() as i64);
     let (year, _, _) = civil_from_days(today);
     let on = |y: i64| match (month, day) {
         (2, 29) if !is_leap(y) => days_from_civil(y, 3, 1),
@@ -199,8 +200,28 @@ fn days_until_anniversary(date_ms: f64, now_ms: f64) -> f64 {
     (next - today) as f64
 }
 
-fn base_context(now_ms: i64) -> Context {
-    let now = now_ms as f64;
+/// The caller's clock: the instant "now" is, and the zone its calendar days are
+/// in. A DATE has no zone; it is read as midnight in this one, so "today" and a
+/// date stamped today agree on what day it is. A bare instant is UTC.
+#[derive(Debug, Clone, Copy)]
+pub struct Clock {
+    pub now_ms: i64,
+    /// Minutes east of UTC, as `-new Date().getTimezoneOffset()` gives them.
+    pub tz_offset_minutes: i64,
+}
+
+impl From<i64> for Clock {
+    fn from(now_ms: i64) -> Self {
+        Self {
+            now_ms,
+            tz_offset_minutes: 0,
+        }
+    }
+}
+
+fn base_context(clock: Clock) -> Context {
+    let now = clock.now_ms as f64;
+    let tz_ms = (clock.tz_offset_minutes * 60_000) as f64;
     let mut ctx = Context::new();
     let mut set = |name: &str, function: Function<Num>| {
         ctx.set_function(name.to_string(), function)
@@ -225,13 +246,24 @@ fn base_context(now_ms: i64) -> Context {
     set("addDays", numeric(2, |a| a[0] + a[1] * DAY_MS));
     set(
         "daysUntilAnniversary",
-        numeric(1, move |a| days_until_anniversary(a[0], now)),
+        numeric(1, move |a| days_until_anniversary(a[0], now, tz_ms)),
     );
 
     ctx
 }
 
 impl Compiled {
+    /// A stored value as a number, with a DATE placed at midnight in the clock's
+    /// zone rather than in UTC.
+    pub fn instant(&self, value: &crate::Value) -> Option<f64> {
+        let number = value_as_number(value)?;
+
+        Some(match value {
+            crate::Value::Date(_) => number - self.tz_ms,
+            _ => number,
+        })
+    }
+
     /// This row's value; `get` reads a property subject as a number. `None` for
     /// a missing input, an evaluation error, or a non-numeric result.
     pub fn evaluate(&self, get: &dyn Fn(&str) -> Option<f64>) -> Option<f64> {
@@ -256,8 +288,10 @@ impl Compiled {
 }
 
 impl Expression {
-    /// Parse the formula for repeated evaluation at `now_ms`.
-    pub fn compile(&self, now_ms: i64) -> Result<Compiled, String> {
+    /// Parse the formula for repeated evaluation at `clock` (a bare `now_ms` is
+    /// UTC).
+    pub fn compile(&self, clock: impl Into<Clock>) -> Result<Compiled, String> {
+        let clock = clock.into();
         let tree =
             evalexpr::build_operator_tree::<Num>(&self.formula).map_err(|e| e.to_string())?;
 
@@ -268,14 +302,19 @@ impl Expression {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
-            base: base_context(now_ms),
+            base: base_context(clock),
+            tz_ms: (clock.tz_offset_minutes * 60_000) as f64,
         })
     }
 
     /// Evaluate with `get` standing in for the row: the one path both a stored
     /// [`Resource`] and a plain map of values (the browser's cells) go through.
-    pub fn evaluate_with(&self, now_ms: i64, get: &dyn Fn(&str) -> Option<f64>) -> Option<f64> {
-        self.compile(now_ms).ok()?.evaluate(get)
+    pub fn evaluate_with(
+        &self,
+        clock: impl Into<Clock>,
+        get: &dyn Fn(&str) -> Option<f64>,
+    ) -> Option<f64> {
+        self.compile(clock).ok()?.evaluate(get)
     }
 
     /// This row's value, or `None` when an input it needs is missing — the same
@@ -284,8 +323,15 @@ impl Expression {
     /// `now_ms` is passed in rather than read here so every row in one pass
     /// measures against the same instant, and so a caller (a browser, a test)
     /// can supply its own clock.
-    pub fn evaluate(&self, resource: &Resource, now_ms: i64) -> Option<f64> {
-        self.evaluate_with(now_ms, &|p| resource.get(p).ok().and_then(value_as_number))
+    pub fn evaluate(&self, resource: &Resource, clock: impl Into<Clock>) -> Option<f64> {
+        let compiled = self.compile(clock).ok()?;
+
+        compiled.evaluate(&|p| {
+            resource
+                .get(p)
+                .ok()
+                .and_then(|value| compiled.instant(value))
+        })
     }
 
     /// Whether this expression can measure against the present, so its value may
@@ -305,7 +351,7 @@ impl Expression {
     pub fn validate(&self) -> Result<(), String> {
         let tree =
             evalexpr::build_operator_tree::<Num>(&self.formula).map_err(|e| e.to_string())?;
-        let probe = base_context(0);
+        let probe = base_context(0.into());
 
         for name in tree.iter_variable_identifiers() {
             if !self.vars.contains_key(name) {
@@ -360,6 +406,9 @@ pub struct ExpressionFilter {
     /// in one query should carry the same one.
     #[serde(default)]
     pub now_ms: Option<i64>,
+    /// Minutes east of UTC the caller's calendar days are in; see [`Clock`].
+    #[serde(default)]
+    pub tz_offset_minutes: i64,
 }
 
 impl ExpressionFilter {
@@ -367,9 +416,12 @@ impl ExpressionFilter {
     pub fn matches(&self, resource: &Resource) -> bool {
         use crate::storelike::FilterOperator;
 
-        let now = self.now_ms.unwrap_or_else(crate::utils::now);
+        let clock = Clock {
+            now_ms: self.now_ms.unwrap_or_else(crate::utils::now),
+            tz_offset_minutes: self.tz_offset_minutes,
+        };
 
-        let Some(value) = self.expression.evaluate(resource, now) else {
+        let Some(value) = self.expression.evaluate(resource, clock) else {
             return false;
         };
 
@@ -615,15 +667,35 @@ mod tests {
     }
 
     #[test]
-    fn a_birthday_given_as_local_midnight_east_of_utc_is_the_same_day() {
+    fn days_are_the_callers_not_utcs() {
+        // Dec 28 00:30 in UTC+2 is still Dec 27 22:30 in UTC.
+        let east = Clock {
+            now_ms: day_ms(2026, 12, 27) + 22 * 3_600_000 + 30 * 60_000,
+            tz_offset_minutes: 120,
+        };
         let days = formula("daysUntilAnniversary(birth)", &[("birth", START)]);
-        // Dec 28 at 00:00 in UTC+2 is Dec 27 22:00 UTC.
-        let dec28_local = row(&[(
+        let date = row(&[(START, Value::Date("1990-12-28".into()))]);
+        let late_utc = row(&[(
             START,
-            Value::Timestamp(day_ms(1990, 12, 28) - 2 * 3_600_000),
+            Value::Timestamp(day_ms(1990, 12, 28) + 14 * 3_600_000),
         )]);
 
-        assert_eq!(days.evaluate(&dec28_local, day_ms(2026, 12, 20)), Some(8.0));
+        // Today is Dec 28 there: a DATE birthday is today (the UTC reading says 1).
+        assert_eq!(days.evaluate(&date, east), Some(0.0));
+        assert_eq!(days.evaluate(&date, east.now_ms), Some(1.0));
+        // A timestamp at 14:00 UTC is Dec 28 16:00 there, and 14:00 UTC is still
+        // Dec 28 in UTC: floor, not round, so it is the same day both ways.
+        assert_eq!(days.evaluate(&late_utc, east), Some(0.0));
+        assert_eq!(days.evaluate(&late_utc, day_ms(2026, 12, 20)), Some(8.0));
+
+        // A date stamped today is not "in a day" at 00:30 local.
+        let since = formula("days(now() - d)", &[("d", START)]);
+        assert_eq!(since.evaluate(&date_today_east(), east), Some(0.0));
+    }
+
+    /// 2026-12-28 as a DATE, read in UTC+2.
+    fn date_today_east() -> Resource {
+        row(&[(START, Value::Date("2026-12-28".into()))])
     }
 
     #[test]

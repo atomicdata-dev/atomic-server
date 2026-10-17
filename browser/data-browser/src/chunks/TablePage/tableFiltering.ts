@@ -1,6 +1,7 @@
 import { Datatype, type FilterOperator } from '@tomic/react';
 import { useCallback, useState } from 'react';
 import type { ExpressionFilter, PropVal } from '@tomic/react';
+import { localOffsetMinutes } from './formulaEngine';
 import {
   dependsOnNow,
   toExpression,
@@ -296,6 +297,8 @@ export function splitFilters(
       // is part of the query's identity, so a raw `Date.now()` would re-run it
       // on every render.
       ...(dependsOnNow(spec) || value === now ? { now_ms: now } : {}),
+      // Dates and "today" are the caller's, as in the cells.
+      tz_offset_minutes: localOffsetMinutes(),
     });
   }
 

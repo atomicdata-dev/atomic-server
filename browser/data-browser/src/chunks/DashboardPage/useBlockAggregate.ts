@@ -5,6 +5,7 @@ import {
   type Aggregation,
 } from '@tomic/react';
 import { useMemo } from 'react';
+import { localOffsetMinutes } from '../TablePage/formulaEngine';
 import { useTableAggregates } from '../TablePage/useTableAggregates';
 import { dependsOnNow, toExpression } from '../TablePage/derivedColumns';
 import type { BlockAggregateSpec } from './dashboardBlocks';
@@ -77,6 +78,9 @@ export function toBlockAggregation(
       ? {
           now_ms: Math.floor(Date.now() / NOW_QUANTUM_MS) * NOW_QUANTUM_MS,
         }
+      : {}),
+    ...(aggregate.expression
+      ? { tz_offset_minutes: localOffsetMinutes() }
       : {}),
   };
 }

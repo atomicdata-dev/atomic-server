@@ -92,6 +92,7 @@ describe('splitFilters', () => {
         value: 5_400_000,
         // A running entry measures against the clock, so the query carries one.
         now_ms: NOW,
+        tz_offset_minutes: -new Date().getTimezoneOffset(),
       },
     ]);
   });

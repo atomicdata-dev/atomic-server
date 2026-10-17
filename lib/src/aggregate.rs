@@ -94,6 +94,15 @@ pub struct Aggregation {
     /// itself; defaults to this machine's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub now_ms: Option<i64>,
+    /// Minutes east of UTC the caller's calendar days are in, so a computed value
+    /// that reads a DATE or "today" agrees with the cells; see
+    /// [`crate::expression::Clock`].
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub tz_offset_minutes: i64,
+}
+
+fn is_zero(n: &i64) -> bool {
+    *n == 0
 }
 
 impl Aggregation {

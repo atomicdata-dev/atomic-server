@@ -172,6 +172,9 @@ export interface ExpressionFilter {
   /** The instant to measure "now" against, for expressions that do. Send the
    *  same one for every filter in a query. */
   now_ms?: number;
+  /** Minutes east of UTC the caller's days are in (`-new Date().getTimezoneOffset()`),
+   *  so a DATE and "today" mean the caller's. */
+  tz_offset_minutes?: number;
 }
 
 /** One statistic to compute. `count` needs no property. */
@@ -226,6 +229,8 @@ export interface Aggregation {
    *  duration, a days-since) is evaluated at. Send `Date.now()` so the number
    *  agrees with the cells the client computed itself. */
   now_ms?: number;
+  /** Minutes east of UTC the caller's days are in, as on `ExpressionFilter`. */
+  tz_offset_minutes?: number;
 }
 
 /** One bucket of a breakdown. */

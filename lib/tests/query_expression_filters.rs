@@ -101,6 +101,7 @@ async fn a_constraint_on_a_computed_value_narrows_the_rows() {
         operator: FilterOperator::GreaterThan,
         value: (60 * MINUTE) as f64,
         now_ms: None,
+        tz_offset_minutes: 0,
     }];
 
     let result = store.query(&query).await.unwrap();
@@ -123,6 +124,7 @@ async fn a_constraint_on_a_computed_value_narrows_the_rows() {
         operator: FilterOperator::LessThan,
         value: (60 * MINUTE) as f64,
         now_ms: None,
+        tz_offset_minutes: 0,
     }];
 
     let result = store.query(&shorter).await.unwrap();
@@ -145,6 +147,7 @@ async fn paging_happens_after_the_constraint() {
         operator: FilterOperator::GreaterThanOrEqual,
         value: (30 * MINUTE) as f64,
         now_ms: None,
+        tz_offset_minutes: 0,
     }];
     query.limit = Some(1);
 
@@ -178,6 +181,7 @@ async fn a_total_covers_exactly_the_rows_the_constraint_keeps() {
         operator: FilterOperator::GreaterThan,
         value: (60 * MINUTE) as f64,
         now_ms: None,
+        tz_offset_minutes: 0,
     }];
     query.aggregation = Some(Aggregation {
         aggregates: vec![Aggregate {
@@ -188,6 +192,7 @@ async fn a_total_covers_exactly_the_rows_the_constraint_keeps() {
         }],
         group_by: None,
         now_ms: None,
+        tz_offset_minutes: 0,
     });
     // A page of one, to prove the total ignores paging but not the constraint.
     query.limit = Some(1);
@@ -235,6 +240,7 @@ async fn a_running_row_is_measured_against_the_callers_clock() {
             operator: FilterOperator::GreaterThanOrEqual,
             value: at_least as f64,
             now_ms: Some(now_ms),
+            tz_offset_minutes: 0,
         }];
         query
     };

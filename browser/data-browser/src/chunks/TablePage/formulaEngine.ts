@@ -3,7 +3,6 @@ import {
   loadAtomicWasm,
   type AtomicWasmModule,
 } from '@helpers/managed/recovery';
-import { calendarDateToLocalDate } from '@helpers/dates/calendarDate';
 import type { Expression } from '@tomic/react';
 
 /**
@@ -49,6 +48,9 @@ export function useFormulaReady(): boolean {
   );
 }
 
+/** Minutes east of UTC, the zone a civil date is read in: the same one a query sends. */
+export const localOffsetMinutes = (): number => -new Date().getTimezoneOffset();
+
 /** The value for one row, or undefined when it has none (or the engine is loading). */
 export function evaluateFormula(
   expression: Expression,
@@ -58,24 +60,17 @@ export function evaluateFormula(
   start();
 
   // Only what the evaluator can read as a number: a list or an object is no input.
-  // A civil date has no zone: it reads as local midnight, as the date a row
-  // action stamps (`localCalendarDate`) does, not as the UTC midnight the
-  // evaluator would parse, which made "today" read as tomorrow east of UTC.
   const cells = Object.fromEntries(
-    Object.entries(values)
-      .filter(([, value]) =>
-        ['number', 'string', 'boolean'].includes(typeof value),
-      )
-      .map(([key, value]) => [
-        key,
-        typeof value === 'string'
-          ? (calendarDateToLocalDate(value)?.getTime() ?? value)
-          : value,
-      ]),
+    Object.entries(values).filter(([, value]) =>
+      ['number', 'string', 'boolean'].includes(typeof value),
+    ),
   );
 
   try {
-    return engine?.evaluateFormula(expression, cells, now) ?? undefined;
+    return (
+      engine?.evaluateFormula(expression, cells, now, localOffsetMinutes()) ??
+      undefined
+    );
   } catch {
     return undefined;
   }

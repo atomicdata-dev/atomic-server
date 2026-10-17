@@ -245,6 +245,8 @@ export type AtomicWasmModule = {
     expression: unknown,
     values: unknown,
     nowMs: number,
+    /** Minutes east of UTC; a DATE is midnight in this zone. */
+    tzOffsetMinutes: number,
   ) => number | null;
   validateFormula: (expression: unknown) => string | null;
   argon2idDeriveKey: (

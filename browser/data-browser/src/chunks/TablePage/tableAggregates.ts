@@ -19,7 +19,7 @@ import {
   toExpression,
   type DerivedColumnSpec,
 } from './derivedColumns';
-import { evaluateFormula } from './formulaEngine';
+import { evaluateFormula, localOffsetMinutes } from './formulaEngine';
 
 /**
  * A statistic a view shows under its rows. Configuration on the View
@@ -254,6 +254,10 @@ export function toAggregation(
     // re-run the query on every render. A minute is close enough for a total
     // while the cells themselves tick every second.
     ...(live ? { now_ms: quantizedNow() } : {}),
+    // A computed total reads dates in the caller's zone, like the cells.
+    ...(requests.some(request => request.expression)
+      ? { tz_offset_minutes: localOffsetMinutes() }
+      : {}),
   };
 }
 

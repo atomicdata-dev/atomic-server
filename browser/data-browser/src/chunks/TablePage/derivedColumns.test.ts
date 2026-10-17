@@ -31,7 +31,8 @@ const PRICE = 'https://example.com/property/price';
 const LAST_DONE = 'https://example.com/property/last-done';
 const BIRTHDAY = 'https://example.com/property/birthday';
 
-const NOW = Date.parse('2026-07-30T12:00:00.000Z');
+// Noon on the 30th wherever the tests run: dates are read in the local zone.
+const NOW = new Date(2026, 6, 30, 12).getTime();
 
 const spec = (
   formula: string,
