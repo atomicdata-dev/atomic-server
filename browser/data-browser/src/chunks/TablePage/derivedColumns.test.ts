@@ -120,6 +120,17 @@ describe('computing a formula over a row', () => {
     ).toBe(0);
   });
 
+  it('shows a date a formula moved on the day it lands, in any season', () => {
+    const next = spec('addDays(d, 7)', { d: LAST_DONE }, 'date');
+    const value = computeDerived(next, { [LAST_DONE]: '2026-01-15' }, NOW);
+
+    expect(formatDerivedValue(next, value as number)).toBe(
+      new Date(Date.UTC(2026, 0, 22)).toLocaleDateString(undefined, {
+        timeZone: 'UTC',
+      }),
+    );
+  });
+
   it('knows how far away a birthday is', () => {
     const days = spec('daysUntilAnniversary(birthday)', { birthday: BIRTHDAY });
     const soon = spec(

@@ -7,7 +7,7 @@ import {
 } from '@tomic/react';
 import { calendarDateToLocalDate } from '@helpers/dates/calendarDate';
 import { stringToSlug } from '@helpers/stringToSlug';
-import { evaluateFormula } from './formulaEngine';
+import { evaluateFormula, localOffsetMinutes } from './formulaEngine';
 import { formatClock } from './helpers/formatDuration';
 
 /**
@@ -62,7 +62,14 @@ const FORMATTERS: Record<DerivedValueKind, (value: number) => string> = {
   days: formatDays,
   // Amounts keep two decimals unless they're whole (`12` / `127.50`).
   number: value => (Number.isInteger(value) ? String(value) : value.toFixed(2)),
-  date: instant => new Date(instant).toLocaleDateString(),
+  // A formula reads a DATE as midnight at the zone's *current* offset
+  // (`localOffsetMinutes`), so it is shown through the same offset: through the
+  // browser's own zone a January date read in summer would show a day early.
+  date: instant =>
+    new Date(instant + localOffsetMinutes() * 60_000).toLocaleDateString(
+      undefined,
+      { timeZone: 'UTC' },
+    ),
   boolean: value => (value ? '✓' : ''),
 };
 
