@@ -15,29 +15,14 @@ const row = (page: Page, text: string) =>
 /** Opens Add column → Computed and fills in the dialog. */
 async function addComputedColumn(
   page: Page,
-  spec: {
-    kind: string;
-    name: string;
-    /** Argument name → the option label to pick. */
-    args: Record<string, string>;
-    /** Argument name → the number to type, for "A fixed number…" arguments. */
-    literals?: Record<string, string>;
-  },
+  spec: { name: string; formula: string },
 ) {
   await page.getByRole('button', { name: 'Add column' }).click();
   await page.getByTestId('menu-item-computed').click();
 
   await inDialog(page, async () => {
-    await page.getByTestId('derived-kind').selectOption(spec.kind);
     await page.getByTestId('derived-label').fill(spec.name);
-
-    for (const [arg, label] of Object.entries(spec.args)) {
-      await page.getByTestId(`derived-arg-${arg}`).selectOption({ label });
-    }
-
-    for (const [arg, value] of Object.entries(spec.literals ?? {})) {
-      await page.getByTestId(`derived-literal-${arg}`).fill(value);
-    }
+    await page.getByTestId('derived-formula').fill(spec.formula);
 
     // By test id, not by its label: the button's text is translated, so a
     // missing catalog entry would fail this as if the feature were broken.
@@ -62,6 +47,9 @@ test.describe('computed columns', () => {
   test('a human can add, edit and remove one, in any table view', async ({
     page,
   }) => {
+    // A whole journey: create, add two columns, rename, reload, remove.
+    test.slow();
+
     // The Time tracker template gives two timestamp columns and a quick way to
     // fill them: start an entry and stop it.
     await createTableFromDialog(page, {
@@ -87,9 +75,8 @@ test.describe('computed columns', () => {
 
     // A column computed from two date columns.
     await addComputedColumn(page, {
-      kind: 'difference',
       name: 'Logged',
-      args: { from: 'Start', to: 'End' },
+      formula: 'end - start',
     });
 
     await expect(
@@ -99,13 +86,11 @@ test.describe('computed columns', () => {
       row(page, 'Write docs').getByTestId('derived-logged'),
     ).toHaveText(/^\d+:\d{2}:\d{2}$/);
 
-    // And one whose second argument is a number typed into the dialog rather
-    // than read off a column.
+    // And one with a number typed into the formula rather than read off a
+    // column.
     await addComputedColumn(page, {
-      kind: 'offset',
       name: 'Next due',
-      args: { from: 'Start', days: 'A fixed number…' },
-      literals: { days: '14' },
+      formula: 'addDays(start, 14)',
     });
 
     await expect(

@@ -69,7 +69,10 @@ only, so an amount stored in one silently loses its cents.
 ### Computed columns
 
 A value derived from the row is configuration, not a stored column: put it in a
-view's `derivedColumns` instead of asking the user to keep it up to date.
+view's `derivedColumns` instead of asking the user to keep it up to date. Each is
+a `name` and a `formula` over the table's columns, written as the lowercase slug
+of their names (`Last watered` is `last_watered`). **Read the `table-formulas`
+skill** for the formula language, every function and its gotchas.
 
 ```json
 {
@@ -78,23 +81,13 @@ view's `derivedColumns` instead of asking the user to keep it up to date.
   "derivedColumns": [
     {
       "name": "Duration",
-      "kind": "elapsed",
-      "args": { "from": "Start", "until": "End" }
+      "formula": "coalesce(end, now()) - start",
+      "valueKind": "duration"
     },
-    { "name": "Fee", "kind": "product", "args": { "a": "Hours", "b": 85 } }
+    { "name": "Fee", "formula": "hours * 85" }
   ]
 }
 ```
-
-The five kinds, with the arguments each takes (a column name, or a literal
-number where one makes sense):
-
-- `difference` — `{ from, to }`: a finished duration between two dates.
-- `elapsed` — `{ from, until }`: ticks live while `until` is empty, so a row
-  with a start and no end reads as still running.
-- `daysSince` — `{ from }`: whole days between a date and now.
-- `product` — `{ a, b }`: quantity × price, hours × rate.
-- `offset` — `{ from, days }`: a next-due date from a last-done date.
 
 ### Totals
 
@@ -128,7 +121,7 @@ on a view:
   instead of `column`, and the store evaluates it per row:
   `{ "function": "sum", "computedColumn": "Duration" }`. That is how a timesheet
   gets its hours per day (a `sum` of Duration with `breakdownColumn: "Start"`),
-  or an inventory its total value (a `sum` of a `product` column). The column has
+  or an inventory its total value (a `sum` of a `quantity * price` column). The column has
   to exist on the same view; `configure_view` can name one the view already has.
 
 Only fall back to building a table by hand (multiple `create_resource` calls)

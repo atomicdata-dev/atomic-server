@@ -4912,6 +4912,7 @@ msgstr "One at a time"
 msgid "Stop the running entry when another starts"
 msgstr "Stop the running entry when another starts"
 
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Duration"
 msgstr "Duration"
@@ -4969,23 +4970,6 @@ msgstr "Edit computed column"
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "New computed column"
 msgstr "New computed column"
-
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "Computes"
-msgstr "Computes"
-
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "Choose a column…"
-msgstr "Choose a column…"
-
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "A fixed number…"
-msgstr "A fixed number…"
-
-#. 0: arg.accepts === 'instant' ? 'date' \\: 'number'
-#: src/chunks/TablePage/DerivedColumnDialog.tsx
-msgid "This table has no {0} column to use here yet."
-msgstr "This table has no {0} column to use here yet."
 
 #: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
@@ -13110,3 +13094,45 @@ msgstr "Row menu"
 #: src/views/Drive/DriveHome.tsx
 msgid "Commented"
 msgstr "Commented"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Live duration"
+msgstr "Live duration"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Time between"
+msgstr "Time between"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Days since"
+msgstr "Days since"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Total"
+msgstr "Total"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Next due"
+msgstr "Next due"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Days until next birthday"
+msgstr "Days until next birthday"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Birthday soon"
+msgstr "Birthday soon"
+
+#. 0: missing; 1: suggestion ? ` Did you mean "${suggestion}"?` \\: ''
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "There is no column \"{0}\".{1}"
+msgstr "There is no column \"{0}\".{1}"
+
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Formula"
+msgstr "Formula"
+
+#. 0: Object.keys(slugs).join(', ') || 'none yet'
+#: src/chunks/TablePage/DerivedColumnDialog.tsx
+msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."

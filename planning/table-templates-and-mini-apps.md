@@ -64,7 +64,7 @@ A list of plausible templates, and what each needs **beyond a plain table**.
 Reading down the right-hand column, the same handful of capabilities keep
 appearing. None of them is specific to one app:
 
-- **Derived columns.** duration (`end − start`), days-since (`now − date`),
+- **Derived columns.** *(Now user-defined formulas, see step 3.)* duration (`end − start`), days-since (`now − date`),
   amount (`qty × price`), next-due (`date + interval`), streaks. Wanted by
   timer, CRM, expenses, invoices, plants, workouts.
 - **Aggregation.** sum / count / avg, overall and per group. Wanted by timer,
@@ -305,12 +305,12 @@ configuration, not a renderer.
      memo's dependencies from what the callback reads and ignores the written
      array**, so a cache-busting dep is inert. Worth remembering generally: under
      the Compiler, a dep array is not a lever.
-  What worked: the generators are now pure functions of their **resolved argument
-  values** (`ArgValues`) rather than of the row, and the cell reads those through a
-  *fixed* two top-level `useValue` calls — two because no generator takes more
-  than `MAX_DERIVED_ARGS` arguments, which a unit test now enforces so a future
-  three-argument generator fails loudly instead of silently losing reactivity in
-  its third. The memo's real inputs then change when the data does.
+  What worked: the computation is a pure function of the **resolved input
+  values** rather than of the row, and the cell reads those through one
+  `useSyncExternalStore` (`useRowValues`) whose snapshot is the JSON of exactly
+  the properties the formula names, so any number of columns is one hook call.
+  (It was a *fixed* two `useValue` calls while the generators took at most two
+  arguments.) The memo's real inputs then change when the data does.
   `TimerActionCell` had the same latent bug and reads through `useValue` now too.
   Guarded by an e2e that edits a factor of Inventory's `Quantity × Unit price` and
   expects the product to follow with no reload — verified to fail without the fix.
@@ -331,33 +331,39 @@ done.
 `Duration` used to be hand-built in `useTimerColumns`. Now:
 
 - `chunks/TablePage/derivedColumns.ts` — a `DerivedColumnSpec`
-  (`{ id, label, kind, args, width? }`) plus a **fixed** registry of five
-  generators, not a formula language: `difference` (`to − from`), `elapsed`
-  (`(until ?? now) − from`, the ticking variant), `daysSince`, `product`
-  (either factor may be a literal, so a rate needs no column) and `offset`
-  (date + days). Each declares its argument names, computes a number and
-  formats it. Malformed stored config is dropped, not thrown: hand- or
-  assistant-written config must not be able to take a table down.
+  (`{ id, label, formula, vars, width?, valueKind? }`). **Updated 2026-10-16: a
+  formula, not five fixed generators.** The formula is evaluated by the Rust
+  `evalexpr` crate (`lib/src/expression.rs`), in the store (totals, filters) and
+  in the browser (cells, through the `evaluateFormula` wasm export, loaded once
+  by `formulaEngine.ts`), so a cell and a filter on it cannot disagree.
+  `vars` binds the identifiers a formula uses to property subjects; in the UI a
+  column is written as the slug of its name (`last_watered`). Functions: `now()`,
+  `coalesce`, `days`, `addDays`, `daysUntilAnniversary` plus evalexpr's builtins.
+  The old `difference` / `elapsed` / `daysSince` / `product` / `offset` kinds are
+  converted to the same formulas on read (`parseDerivedColumnSpecs`) and by the
+  store, so stored Views keep working. `valueKind` only chooses formatting and
+  which totals are offered. Malformed stored config is dropped, not thrown:
+  hand- or assistant-written config must not be able to take a table down.
 - `useDerivedColumns.tsx` — turns specs into `TableColumn[]` with `virtual`
-  cells, and holds the shared 1s ticker moved out of `useTimerColumns` (only
-  `elapsed` reports itself live, so a table of settled durations ticks zero
-  times). Keyed on the specs' serialized shape, since the parsed JSON's
+  cells, and holds the shared 1s ticker moved out of `useTimerColumns` (only a
+  `duration` formula that reads `now()` ticks, and only for rows whose value
+  still moves, so a table of settled durations ticks zero times). Keyed on the specs' serialized shape, since the parsed JSON's
   identity churns every render.
 - Ontology: `view-derived-columns` (JSON) on the View class, alongside
   `view-filters` — in `lib/defaults/table.json` and
   `browser/lib/src/ontologies/dataBrowser.ts`, and copied by `duplicateView`.
 - UI, on the same footing as the tool: **Add column → Computed** opens a dialog
-  generated from the registry — the generator's arguments become its fields,
-  `accepts` filters the column picker to date or number properties, and
-  `allowsLiteral` offers "a fixed number" where one makes sense. A computed
-  column's heading carries its own menu (Edit / Remove) since there's no
-  property behind it to configure. Anything the assistant can build here, a
-  person can build and change too; that constraint is worth keeping for
-  aggregation and row actions.
+  with a name, one formula field (validated inline by `validateFormula`, with the
+  closest column suggested for an unknown name) and a row of example formulas
+  that fill it. A computed column's heading carries its own menu (Edit / Remove)
+  since there's no property behind it to configure. Anything the assistant can
+  build here, a person can build and change too; that constraint is worth
+  keeping for aggregation and row actions.
 - `create_table` gained per-view `derivedColumns` in the same change, in the
-  column-name vocabulary the rest of a spec uses (arguments resolve to property
-  subjects on creation), so the capability is assistant-reachable immediately.
-- The timer: `Duration` is an `elapsed` spec over `view-group-by` /
+  column-name vocabulary the rest of a spec uses (`{ name, formula }`, the
+  formula's slugs resolve to property subjects on creation; the assistant reads
+  the `table-formulas` skill), so the capability is assistant-reachable immediately.
+- The timer: `Duration` is an `coalesce(end, now()) - start` formula over `view-group-by` /
   `view-end-prop`, seeded by the Time tracker template. The bespoke duration
   cell is gone; only the start/stop row action stays behind. A timer view that
   configures none of its own (added from the view menu rather than the
