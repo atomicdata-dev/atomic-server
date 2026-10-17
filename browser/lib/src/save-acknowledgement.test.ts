@@ -147,6 +147,17 @@ describe('explicit save acknowledgement', () => {
     store.setServerConnected(false);
   });
 
+  it("keeps each drive's finished sync, so another drive finishing later does not hide it", async () => {
+    const { store } = await testStore();
+    const ontola = 'did:ad:ontola';
+    store.finishDriveSync(ontola, 5, 100);
+    store.finishDriveSync('did:ad:own', 2, 200);
+    store.setDrive(ontola);
+    expect(store.getSyncStatus().lastDriveSync?.drive).toBe(ontola);
+    expect(store.getSyncStatus().lastDriveSync?.timestamp).toBe(100);
+    store.setServerConnected(false);
+  });
+
   it('reports writes refused for a missing parent once per drive', async () => {
     const { store } = await testStore();
     const drive = await store.newResource({

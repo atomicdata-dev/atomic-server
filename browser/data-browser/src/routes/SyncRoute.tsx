@@ -176,6 +176,14 @@ function StatusIcon({ status }: { status: NodeStatus }) {
   }
 }
 
+/** Connected and answering usage for this drive, but no finished sync is
+ *  recorded here yet: not "In sync", and no longer just "Connecting…". */
+function serverStatusLabel(status: NodeStatus, answersUsage: boolean): string {
+  return status === 'unknown' && answersUsage
+    ? 'Connected'
+    : statusLabel(status);
+}
+
 function statusLabel(status: NodeStatus): string {
   switch (status) {
     case 'synced':
@@ -390,7 +398,10 @@ function ServerCard({
           : refusedByServer
             ? { tone: 'offline', label: 'Not hosted here' }
             : isActive
-              ? { tone: serverStatus, label: statusLabel(serverStatus) }
+              ? {
+                  tone: serverStatus,
+                  label: serverStatusLabel(serverStatus, !!nodeUsage),
+                }
               : { tone: 'unknown', label: 'Not connected' }
       }
       controls={
@@ -999,6 +1010,7 @@ function SyncPage() {
     refusedByServer: store.isDriveRefusedByServer(status.drive),
     status,
     resourceCount: nodeUsage?.resourceCount,
+    enrolled: nodeUsage?.enrolled,
   });
   const cloudEnrolled = hostedByNode ? true : accountEnrolled;
 
@@ -1579,7 +1591,12 @@ function SyncPage() {
     details?: ReactNode;
     actions: ReactNode;
   } = (() => {
-    const managePlan = accountPortalUrl && status.drive && (
+    // Hosting belongs to the drive, but the plan belongs to whoever pays for
+    // it. Unknown (not yet loaded, or no session) counts as not paying: a
+    // member should never be offered another account's controls.
+    const paysForDrive =
+      subscriptionStatus !== null && subscriptionStatus !== 'free';
+    const managePlan = paysForDrive && accountPortalUrl && status.drive && (
       <Button
         subtle
         data-testid='cloud-server-manage'
@@ -1606,7 +1623,7 @@ function SyncPage() {
                 : tone === 'unknown'
                   ? 'muted'
                   : 'busy',
-          text: `${statusLabel(tone)} · ${serverHostname ?? managedServer}`,
+          text: `${serverStatusLabel(tone, !!nodeUsage)} · ${serverHostname ?? managedServer}`,
         },
         details: status.drive ? (
           <CloudServerDetails
@@ -1615,6 +1632,7 @@ function SyncPage() {
             usage={nodeUsage}
             quotaBytes={quotaBytes}
             signedIn={!!managedAccount}
+            managed={paysForDrive}
           />
         ) : undefined,
         actions: managePlan,

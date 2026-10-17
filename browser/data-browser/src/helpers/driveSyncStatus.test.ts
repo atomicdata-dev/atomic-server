@@ -77,7 +77,7 @@ describe('driveHostedByNode', () => {
     expect(driveHostedByNode({ ...hosted, managed: false })).toBe(false);
   });
 
-  it('waits for this drive to finish syncing', () => {
+  it('does not wait for this device to finish its first sync', () => {
     expect(
       driveHostedByNode({
         ...hosted,
@@ -86,7 +86,7 @@ describe('driveHostedByNode', () => {
           lastDriveSync: { drive: 'did:ad:other', count: 3, timestamp: 1 },
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('does not count a refused, offline or empty drive', () => {
@@ -98,6 +98,24 @@ describe('driveHostedByNode', () => {
       }),
     ).toBe(false);
     expect(driveHostedByNode({ ...hosted, resourceCount: 0 })).toBe(false);
+  });
+
+  it('trusts the node saying the drive is enrolled, whatever the count', () => {
+    expect(
+      driveHostedByNode({ ...hosted, enrolled: true, resourceCount: 0 }),
+    ).toBe(true);
+  });
+
+  it('does not call a drive hosted when the node says it is not enrolled', () => {
+    // The plan was switched off but the data stayed on the node.
+    expect(driveHostedByNode({ ...hosted, enrolled: false })).toBe(false);
+  });
+
+  it('falls back to the data inference on a node that does not say', () => {
+    expect(driveHostedByNode({ ...hosted, enrolled: undefined })).toBe(true);
+    expect(
+      driveHostedByNode({ ...hosted, enrolled: undefined, resourceCount: 0 }),
+    ).toBe(false);
   });
 });
 

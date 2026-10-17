@@ -537,6 +537,7 @@ msgstr "Not configured"
 #: src/routes/ConnectAgentRoute.tsx
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
+#: src/routes/SyncRoute.tsx
 msgid "Connected"
 msgstr "Connected"
 
@@ -13110,3 +13111,7 @@ msgstr "Row menu"
 #: src/views/Drive/DriveHome.tsx
 msgid "Commented"
 msgstr "Commented"
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."

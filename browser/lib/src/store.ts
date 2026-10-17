@@ -881,6 +881,13 @@ export class Store {
    *  local index populated for THIS drive" once more than one is in play —
    *  see `hasCompletedDriveSyncFor`. */
   private _syncedDrives = new Set<string>();
+  /** The last finished sync of each drive, by normalized subject. A member
+   *  device syncs several drives (its own plus the shared ones); a single
+   *  "last" slot would let any other drive's sync hide this one's. */
+  private _driveSyncs = new Map<
+    string,
+    { drive: string; count: number; timestamp: number }
+  >();
   private _commitLog: CommitLogEntry[] = [];
   /**
    * Commit-log entry id → that commit's `loroUpdate`, kept only while the
@@ -5836,6 +5843,11 @@ export class Store {
 
     if (drive) {
       this._syncedDrives.add(drive);
+      this._driveSyncs.set(this.normalizeSubject(drive), {
+        drive,
+        count,
+        timestamp,
+      });
 
       if (this._lastDriveSyncError?.drive === drive) {
         this._lastDriveSyncError = undefined;
@@ -5916,6 +5928,16 @@ export class Store {
     this._driveSyncPulling = true;
   }
 
+  /** The finished sync of the open drive when there is one, else the most
+   *  recent finished sync of any drive. */
+  private currentDriveSyncRecord() {
+    const own = this.drive
+      ? this._driveSyncs.get(this.normalizeSubject(this.drive))
+      : undefined;
+
+    return own ? { ...own, drive: this.drive! } : this._lastDriveSync;
+  }
+
   public hasCompletedDriveSyncFor(drive: string | undefined): boolean {
     if (!drive) return false;
 
@@ -5972,7 +5994,7 @@ export class Store {
       clientDbReady: this.clientDb?.isReady ?? false,
       clientDbAttached: !!this.clientDb,
       clientDbError: this.clientDb?.initError?.message,
-      lastDriveSync: this._lastDriveSync,
+      lastDriveSync: this.currentDriveSyncRecord(),
       lastDriveSyncError: this._lastDriveSyncError,
     };
   }
