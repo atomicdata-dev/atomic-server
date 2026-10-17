@@ -5,8 +5,9 @@ import {
   type Aggregation,
 } from '@tomic/react';
 import { useMemo } from 'react';
+import { localOffsetMinutes } from '../TablePage/formulaEngine';
 import { useTableAggregates } from '../TablePage/useTableAggregates';
-import { toExpression } from '../TablePage/derivedColumns';
+import { dependsOnNow, toExpression } from '../TablePage/derivedColumns';
 import type { BlockAggregateSpec } from './dashboardBlocks';
 import type { BlockQuery } from './useBlockQuery';
 
@@ -62,11 +63,7 @@ export function toBlockAggregation(
 
   const measuresNow =
     spec.derived !== undefined &&
-    query.derivedColumns.some(
-      c =>
-        c.id === spec.derived &&
-        (c.kind === 'elapsed' || c.kind === 'daysSince'),
-    );
+    query.derivedColumns.some(c => c.id === spec.derived && dependsOnNow(c));
 
   return {
     aggregates: [aggregate],
@@ -81,6 +78,9 @@ export function toBlockAggregation(
       ? {
           now_ms: Math.floor(Date.now() / NOW_QUANTUM_MS) * NOW_QUANTUM_MS,
         }
+      : {}),
+    ...(aggregate.expression
+      ? { tz_offset_minutes: localOffsetMinutes() }
       : {}),
   };
 }

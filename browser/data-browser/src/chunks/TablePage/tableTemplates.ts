@@ -196,8 +196,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Duration',
-              kind: 'elapsed',
-              args: { from: 'Start', until: 'End' },
+              formula: 'coalesce(end, now()) - start',
+              valueKind: 'duration',
             },
           ],
           default: true,
@@ -305,8 +305,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Days since contact',
-              kind: 'daysSince',
-              args: { from: 'Last contact' },
+              formula: 'days(now() - last_contact)',
+              valueKind: 'days',
             },
           ],
           aggregates: [{ function: 'sum', column: 'Amount' }],
@@ -372,8 +372,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Waiting',
-              kind: 'daysSince',
-              args: { from: 'Applied on' },
+              formula: 'days(now() - applied_on)',
+              valueKind: 'days',
             },
           ],
           breakdownColumn: 'Stage',
@@ -495,8 +495,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Total reps',
-              kind: 'product',
-              args: { a: 'Sets', b: 'Reps' },
+              formula: 'sets * reps',
             },
           ],
           aggregates: [
@@ -564,13 +563,13 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Thirsty for',
-              kind: 'daysSince',
-              args: { from: 'Last watered' },
+              formula: 'days(now() - last_watered)',
+              valueKind: 'days',
             },
             {
               name: 'Next water',
-              kind: 'offset',
-              args: { from: 'Last watered', days: 'Water every' },
+              formula: 'addDays(last_watered, water_every)',
+              valueKind: 'date',
             },
           ],
           columnOrder: [
@@ -628,8 +627,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Value',
-              kind: 'product',
-              args: { a: 'Quantity', b: 'Unit price' },
+              formula: 'quantity * unit_price',
             },
           ],
           aggregates: [{ function: 'sum', column: 'Quantity' }],

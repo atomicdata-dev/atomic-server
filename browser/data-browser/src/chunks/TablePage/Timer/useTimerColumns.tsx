@@ -63,7 +63,7 @@ export interface UseTimerColumnsResult {
    * The Duration column, as a derived-column spec — the timer's fallback for a
    * View that configures none of its own (one added from the view menu, rather
    * than built from the Time tracker template). Nothing here is timer-specific:
-   * a duration is `elapsed` over the two timestamps the view already knows.
+   * a duration is `coalesce(end, now()) - start` over the two timestamps the view already knows.
    */
   derivedColumns: DerivedColumnSpec[];
   status: TimerPropsStatus;
@@ -252,8 +252,9 @@ export function useTimerColumns(
         {
           id: 'duration',
           label: 'Duration',
-          kind: 'elapsed' as const,
-          args: { from: startSubject, until: endSubject },
+          formula: 'coalesce(end, now()) - start',
+          vars: { start: startSubject, end: endSubject },
+          valueKind: 'duration' as const,
           width: 130,
         },
       ],

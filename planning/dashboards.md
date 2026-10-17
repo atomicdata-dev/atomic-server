@@ -209,8 +209,8 @@ Only 2–5 are new, and they are new in two different ways.
 
 #### Actions are data, not code
 
-The rule this codebase has held: a fixed vocabulary the store can execute, that an
-LLM can write and a person can edit in a dialog — five derived-column generators,
+The rule this codebase has held: a small vocabulary the store can execute, that an
+LLM can write and a person can edit in a dialog — computed-column formulas,
 five aggregate functions. An action follows it: a **patch template**, not a
 script.
 
