@@ -8,6 +8,18 @@ fn reported_by_sentry_actix(target: &str) -> bool {
     target.starts_with("tracing_actix_web")
 }
 
+/// Whether a Sentry event describes a host we proxy for being down. That is
+/// the other host's outage, not a fault of this node, and a page that lists
+/// many of its resources (the sync page) would file one event per resource.
+fn is_upstream_unreachable(event: &sentry::protocol::Event<'_>) -> bool {
+    let marker = atomic_lib::errors::UPSTREAM_UNREACHABLE_MARKER;
+    event.message.as_deref().is_some_and(|m| m.contains(marker))
+        || event
+            .exception
+            .iter()
+            .any(|e| e.value.as_deref().is_some_and(|v| v.contains(marker)))
+}
+
 /// Start logging / tracing. Creates a subscribers that logs to stdout.
 /// Also optionally creates a Chrome trace file. Starts OpenTelemetry if configured.
 /// Returns a [tracing_chrome::FlushGuard] that should be dropped when the server is no longer needed.
@@ -187,6 +199,7 @@ pub fn init_sentry(config: &crate::config::Config) -> Option<sentry::ClientInitG
         // OpenTelemetry already covers it, and the free Sentry tier has a
         // small event quota.
         .attach_stacktrace(true)
+        .before_send(|event| (!is_upstream_unreachable(&event)).then_some(event))
         .send_default_pii(false);
     let guard = sentry::init(options);
     if guard.is_enabled() {
@@ -199,7 +212,22 @@ pub fn init_sentry(config: &crate::config::Config) -> Option<sentry::ClientInitG
 
 #[cfg(test)]
 mod tests {
-    use super::reported_by_sentry_actix;
+    use super::{is_upstream_unreachable, reported_by_sentry_actix};
+
+    #[test]
+    fn an_unreachable_upstream_is_not_reported() {
+        let marker = atomic_lib::errors::UPSTREAM_UNREACHABLE_MARKER;
+        let down = sentry::protocol::Event {
+            message: Some(format!("{marker}Error when fetching https://x/y")),
+            ..Default::default()
+        };
+        let other = sentry::protocol::Event {
+            message: Some("Error handling path Endpoint: boom".into()),
+            ..Default::default()
+        };
+        assert!(is_upstream_unreachable(&down));
+        assert!(!is_upstream_unreachable(&other));
+    }
 
     #[test]
     fn request_failures_are_left_to_sentry_actix() {
