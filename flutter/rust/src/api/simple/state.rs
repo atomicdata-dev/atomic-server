@@ -9,7 +9,7 @@ pub(super) const CANVAS_FOLDER_ID: &str = "https://atomicdata.dev/ontology/canva
 pub(super) const CANVAS_DATE_EDITED: &str = "https://atomicdata.dev/ontology/canvas/dateEdited";
 pub(super) const FOLDER_CLASS: &str = "https://atomicdata.dev/classes/Folder";
 
-pub(super) fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)

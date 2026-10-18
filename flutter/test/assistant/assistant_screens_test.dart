@@ -14,6 +14,7 @@ class FakeApi extends AssistantApi {
   final List<ChatMessage> messageList;
   final List<SearchHit> hits;
   final List<String> asked = [];
+  final List<String> opened = [];
 
   FakeApi({
     this.chatList = const [],
@@ -31,6 +32,8 @@ class FakeApi extends AssistantApi {
     return hits;
   }
 
+  @override
+  void noteOpened(String drive, String subject) => opened.add(subject);
   @override
   String webUrl(String subject) => throw 'Not connected to a server';
 }
@@ -133,6 +136,22 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Zebra'), findsNothing);
     });
+
+    testWidgets('opening a hit is remembered as recently opened',
+        (tester) async {
+      final api = FakeApi(hits: [
+        (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
+      ]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.enterText(find.byType(TextField), 'zebr');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Zebra'));
+      await tester.pump();
+      expect(api.opened, ['did:ad:9']);
+    });
   });
 
   group('AtomicClient parsing', () {
@@ -183,6 +202,12 @@ void main() {
           ('T', 'C', 0.5));
     });
 
+    test('reads recently opened resources', () {
+      final recent = AtomicClient.parseRecentResources(
+          '[{"subject":"did:ad:1","title":"T","class_name":"C","opened_at":9}]');
+      expect((recent.single.title, recent.single.openedAt), ('T', 9));
+    });
+
     test('timeAgo', () {
       final now = DateTime(2026, 10, 18, 12);
       int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;
@@ -196,5 +221,6 @@ void main() {
 
 class _Failing extends FakeApi {
   @override
-  Future<List<ChatSummary>> chats(String drive) => Future.error('No active drive');
+  Future<List<ChatSummary>> chats(String drive) =>
+      Future.error('No active drive');
 }

@@ -168,6 +168,11 @@ pub async fn open_db(path: String) -> Result<(), String> {
         .map_err(err)?;
 
     set_db(store);
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        crate::recents::load(std::path::Path::new(&path));
+        crate::recents::spawn_listener(db()?.clone());
+    }
     Ok(())
 }
 

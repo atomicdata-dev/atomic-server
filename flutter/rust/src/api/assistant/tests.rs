@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::api::simple::tests::shared_drive;
+use crate::recents;
 use atomic_lib::{
     chat_log::Entry,
     commit::{CommitBuilder, CommitOpts},
@@ -88,14 +89,16 @@ async fn assistant_reads_chat_entries_oldest_first_across_pages() {
 
 #[tokio::test]
 async fn assistant_lists_chats_of_the_drive_by_last_activity() {
+    let drive = shared_drive().await.to_string();
+    let mut rx = db().unwrap().subscribe_events();
     let old = new_chat("Assistant old chat").await;
     let new = new_chat("Assistant new chat").await;
     let empty = new_chat("Assistant empty chat").await;
     add_page(&old, &[("1-00000001", ai_entry("user", "hi", 1_000))]).await;
     add_page(&new, &[("1-00000001", ai_entry("user", "hi", 9_000))]).await;
 
-    let drive = shared_drive().await.to_string();
-    let list: Vec<Json> = serde_json::from_str(&list_ai_chats(drive).await.unwrap()).unwrap();
+    pump(&mut rx).await;
+    let list: Vec<Json> = serde_json::from_str(&list_ai_chats(drive, 50).await.unwrap()).unwrap();
     let position = |subject: &str| list.iter().position(|c| c["subject"] == subject).unwrap();
     assert!(position(&new) < position(&old));
     assert!(position(&old) < position(&empty));
@@ -112,7 +115,7 @@ async fn assistant_list_leaves_out_other_classes() {
         .create_resource(urls::FOLDER, drive, "Not a chat", None)
         .await
         .unwrap();
-    let list = list_ai_chats(drive.to_string()).await.unwrap();
+    let list = list_ai_chats(drive.to_string(), 50).await.unwrap();
     assert!(!list.contains(&folder));
 }
 
@@ -120,7 +123,7 @@ async fn assistant_list_leaves_out_other_classes() {
 async fn assistant_list_and_search_are_scoped_to_the_given_drive() {
     let chat = new_chat("Quokka scoping chat").await;
     let other = "https://example.test/not-this-drive".to_string();
-    let list = list_ai_chats(other.clone()).await.unwrap();
+    let list = list_ai_chats(other.clone(), 50).await.unwrap();
     assert!(!list.contains(&chat));
     let hits = search(other, "quokka".into(), 5).await.unwrap();
     assert!(!hits.contains(&chat));
@@ -156,4 +159,102 @@ async fn assistant_web_url_names_the_connected_server() {
         resource_web_url("did:ad:abc?drive=did:ad:x y".into()).unwrap(),
         "https://example.test/app/show?subject=did%3Aad%3Aabc%3Fdrive%3Ddid%3Aad%3Ax%20y"
     );
+}
+
+/// Feed the store's pending change events to the recents index, as the
+/// listener does in the app.
+async fn pump(rx: &mut tokio::sync::broadcast::Receiver<atomic_lib::db::DbEvent>) {
+    let store = db().unwrap();
+    while let Ok(event) = rx.try_recv() {
+        recents::handle_event(store, event).await;
+    }
+}
+
+#[tokio::test]
+async fn recents_follow_the_commits_without_rescanning() {
+    let drive = shared_drive().await.to_string();
+    // From here on only events can tell the index about new chats.
+    recents::ensure_scanned(&drive).await.unwrap();
+    let mut rx = db().unwrap().subscribe_events();
+
+    let first = new_chat("Recents first").await;
+    let second = new_chat("Recents second").await;
+    add_page(&first, &[("1-00000001", ai_entry("user", "hi", 5_000_000))]).await;
+    add_page(
+        &second,
+        &[("1-00000001", ai_entry("user", "hi", 4_000_000))],
+    )
+    .await;
+    add_page(
+        &second,
+        &[("2-00000002", ai_entry("user", "again", 6_000_000))],
+    )
+    .await;
+    pump(&mut rx).await;
+
+    let chats = recents::recent_chats(&drive, 2).await.unwrap();
+    assert_eq!(
+        chats,
+        vec![
+            (second.clone(), "Recents second".to_string(), 6_000_000),
+            (first.clone(), "Recents first".to_string(), 5_000_000),
+        ]
+    );
+    let one = recents::recent_chats(&drive, 1).await.unwrap();
+    assert_eq!(one.len(), 1);
+}
+
+#[tokio::test]
+async fn recents_drop_destroyed_chats() {
+    let drive = shared_drive().await.to_string();
+    recents::ensure_scanned(&drive).await.unwrap();
+    let mut rx = db().unwrap().subscribe_events();
+    let chat = new_chat("Recents doomed").await;
+    pump(&mut rx).await;
+    assert!(list_ai_chats(drive.clone(), 500)
+        .await
+        .unwrap()
+        .contains(&chat));
+
+    db().unwrap()
+        .remove_resource(&chat.as_str().into())
+        .await
+        .unwrap();
+    pump(&mut rx).await;
+    assert!(!list_ai_chats(drive, 500).await.unwrap().contains(&chat));
+}
+
+#[tokio::test]
+async fn opened_resources_are_listed_newest_first_and_stay_local() {
+    let drive = shared_drive().await.to_string();
+    let store = db().unwrap();
+    let a = new_chat("Opened a").await;
+    let b = new_chat("Opened b").await;
+    let before = store.get_resource(&a.as_str().into()).await.unwrap();
+    recents::note_opened(&drive, &a, 1_000);
+    recents::note_opened(&drive, &b, 2_000);
+    recents::note_opened(&drive, &a, 3_000);
+    recents::note_opened(&drive, "https://example.test/gone", 4_000);
+
+    let list: Vec<Json> =
+        serde_json::from_str(&list_recent_resources(drive.clone(), 10).await.unwrap()).unwrap();
+    let subjects: Vec<&str> = list
+        .iter()
+        .map(|r| r["subject"].as_str().unwrap())
+        .collect();
+    assert_eq!(subjects[..2], [a.as_str(), b.as_str()]);
+    assert!(!subjects.contains(&"https://example.test/gone"));
+    assert_eq!(list[0]["title"], "Opened a");
+    assert_eq!(list[0]["opened_at"], 3_000);
+
+    // Opening is not an edit: the resource itself did not change.
+    let after = store.get_resource(&a.as_str().into()).await.unwrap();
+    assert_eq!(
+        before.get(urls::LAST_COMMIT).map(|v| v.to_string()).ok(),
+        after.get(urls::LAST_COMMIT).map(|v| v.to_string()).ok()
+    );
+
+    let limited: Vec<Json> =
+        serde_json::from_str(&list_recent_resources(drive, 1).await.unwrap()).unwrap();
+    assert_eq!(limited.len(), 1);
 }

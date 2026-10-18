@@ -22,6 +22,13 @@ typedef SearchHit = ({
   double score
 });
 
+typedef RecentResource = ({
+  String subject,
+  String title,
+  String className,
+  int openedAt
+});
+
 /// Atomic Data SDK — local-first with optional sync.
 ///
 /// Groups:
@@ -86,8 +93,18 @@ class AtomicClient {
 
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
 
-  static Future<List<ChatSummary>> listAiChats(String drive) async =>
-      parseChats(await assistant.listAiChats(drive: drive));
+  static Future<List<ChatSummary>> listAiChats(String drive,
+          {int limit = 50}) async =>
+      parseChats(await assistant.listAiChats(drive: drive, limit: limit));
+
+  /// Remember that this device opened [subject]; local, nothing is synced.
+  static void noteResourceOpened(String drive, String subject) =>
+      assistant.noteResourceOpened(drive: drive, subject: subject);
+
+  static Future<List<RecentResource>> recentResources(String drive,
+          {int limit = 20}) async =>
+      parseRecentResources(
+          await assistant.listRecentResources(drive: drive, limit: limit));
 
   static Future<List<ChatMessage>> readChat(String subject) async =>
       parseChatMessages(await assistant.readChat(subject: subject));
@@ -134,6 +151,17 @@ class AtomicClient {
     }
     return out;
   }
+
+  @visibleForTesting
+  static List<RecentResource> parseRecentResources(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            subject: e['subject'] as String,
+            title: e['title'] as String? ?? '',
+            className: e['class_name'] as String? ?? '',
+            openedAt: (e['opened_at'] as num?)?.toInt() ?? 0,
+          ),
+      ];
 
   @visibleForTesting
   static List<SearchHit> parseHits(String json) => [

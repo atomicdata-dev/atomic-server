@@ -11,5 +11,9 @@ class AssistantApi {
       AtomicClient.readChat(chat);
   Future<List<SearchHit>> search(String drive, String query) =>
       AtomicClient.search(drive, query);
+  Future<List<RecentResource>> recentResources(String drive) =>
+      AtomicClient.recentResources(drive);
+  void noteOpened(String drive, String subject) =>
+      AtomicClient.noteResourceOpened(drive, subject);
   String webUrl(String subject) => AtomicClient.resourceWebUrl(subject);
 }

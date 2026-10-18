@@ -8,14 +8,15 @@
 mod tests;
 
 use super::simple::state::{connected_server, db, err};
+use crate::recents;
 use atomic_lib::{storelike::Query, urls, Resource, Storelike, Subject};
 use flutter_rust_bridge::frb;
 use serde_json::{json, Value as Json};
 
 /// `ai.classes.aiChat` (`browser/lib/src/ontologies/ai.ts`).
-const AI_CHAT: &str = "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/ai-chat";
+pub(crate) const AI_CHAT: &str = "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/ai-chat";
 
-fn name_of(resource: &Resource) -> String {
+pub(crate) fn name_of(resource: &Resource) -> String {
     resource
         .get(urls::NAME)
         .or_else(|_| resource.get(urls::SHORTNAME))
@@ -23,11 +24,24 @@ fn name_of(resource: &Resource) -> String {
         .unwrap_or_default()
 }
 
+/// The name of a resource's first class, its subject when the class has none.
+async fn class_name_of(resource: &Resource) -> String {
+    let class = match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
+        Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
+        _ => String::new(),
+    };
+    let Ok(store) = db() else { return class };
+    match store.get_resource(&Subject::from(class.as_str())).await {
+        Ok(c) if !name_of(&c).is_empty() => name_of(&c),
+        _ => class,
+    }
+}
+
 /// Every entry of the `ChatLog` pages under `chat`, oldest first (by `c`, then
 /// key), as the entry's own fields plus `id` (`<page>#<key>`). `parts` is
 /// stored as a JSON string and comes out parsed. An entry key that sits on two
 /// pages is listed once.
-async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String> {
+pub(crate) async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String> {
     let store = db()?;
     let pages = store
         .query(&Query::new_prop_val(urls::PARENT, chat))
@@ -65,36 +79,46 @@ async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String> {
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
 }
 
-/// AI chats of `drive`, newest activity first, as JSON
+/// The newest `limit` AI chats of `drive`, newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-pub async fn list_ai_chats(drive: String) -> Result<String, String> {
-    let store = db()?;
-    let drive_id = Subject::from(drive.as_str()).pure_id();
-    let found = store.query(&Query::new_class(AI_CHAT)).await.map_err(err)?;
+/// Read from the recents index, not rebuilt from the chats' pages.
+pub async fn list_ai_chats(drive: String, limit: u32) -> Result<String, String> {
+    let chats = recents::recent_chats(&drive, limit as usize).await?;
+    let list: Vec<Json> = chats
+        .into_iter()
+        .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
+        .collect();
+    serde_json::to_string(&list).map_err(|e| e.to_string())
+}
 
-    let mut items: Vec<(i64, String, Json)> = Vec::new();
-    for subject in &found.subjects {
-        let Ok(chat) = store.get_resource(subject).await else {
+/// Record that this device opened `subject` in `drive`. Local to the device:
+/// nothing is committed or synced.
+#[frb(sync)]
+pub fn note_resource_opened(drive: String, subject: String) {
+    recents::note_opened(&drive, &subject, super::simple::state::now_ms());
+}
+
+/// The `limit` resources of `drive` this device opened last, newest first, as
+/// JSON `[{subject, title, class_name, opened_at}]`. Resources that are gone
+/// are left out.
+pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, String> {
+    let store = db()?;
+    let mut out = Vec::new();
+    for (subject, opened_at) in recents::opened(&drive, limit as usize * 2) {
+        if out.len() >= limit as usize {
+            break;
+        }
+        let Ok(resource) = store.get_resource(&Subject::from(subject.as_str())).await else {
             continue;
         };
-        let in_drive = chat
-            .get(urls::DRIVE_PROP)
-            .is_ok_and(|d| Subject::from(d.to_string().as_str()).pure_id() == drive_id);
-        if !in_drive {
-            continue;
-        }
-        let subject = chat.get_subject().to_string();
-        let last = chat_entries(&subject).await?.last().map_or(0, |(c, _)| *c);
-        let name = name_of(&chat);
-        items.push((
-            last,
-            name.clone(),
-            json!({ "subject": subject, "name": name, "last_activity": last }),
-        ));
+        out.push(json!({
+            "subject": subject,
+            "title": name_of(&resource),
+            "class_name": class_name_of(&resource).await,
+            "opened_at": opened_at,
+        }));
     }
-    items.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
-    let list: Vec<Json> = items.into_iter().map(|(_, _, json)| json).collect();
-    serde_json::to_string(&list).map_err(|e| e.to_string())
+    serde_json::to_string(&out).map_err(|e| e.to_string())
 }
 
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
@@ -124,18 +148,11 @@ pub async fn search(drive: String, query: String, limit: u32) -> Result<String, 
         let Ok(resource) = store.get_resource(&hit.subject).await else {
             continue;
         };
-        let class = match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
-            Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
-            _ => String::new(),
-        };
-        let class_name = match store.get_resource(&Subject::from(class.as_str())).await {
-            Ok(c) => name_of(&c),
-            Err(_) => String::new(),
-        };
+        let class_name = class_name_of(&resource).await;
         out.push(json!({
             "subject": hit.subject.to_string(),
             "title": name_of(&resource),
-            "class_name": if class_name.is_empty() { class } else { class_name },
+            "class_name": class_name,
             "score": hit.score,
         }));
     }

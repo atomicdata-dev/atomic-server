@@ -80,13 +80,15 @@ class _SearchScreenState extends State<SearchScreen> {
                   title: Text(hit.title.isEmpty ? hit.subject : hit.title,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: hit.className.isEmpty ? null : Text(hit.className),
-                  onTap: () =>
-                      Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => ResourceWebView(
-                        api: widget.api,
-                        subject: hit.subject,
-                        title: hit.title),
-                  )),
+                  onTap: () {
+                    widget.api.noteOpened(widget.drive, hit.subject);
+                    Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => ResourceWebView(
+                          api: widget.api,
+                          subject: hit.subject,
+                          title: hit.title),
+                    ));
+                  },
                 ),
             ]),
     );
