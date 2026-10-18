@@ -211,13 +211,18 @@ async fn recents_follow_the_commits_without_rescanning() {
     .await;
     pump(&mut rx).await;
 
-    let chats = recents::recent_chats(2).await.unwrap();
+    // Other tests add chats at the same time: look at these two among all.
+    let chats = recents::recent_chats(500).await.unwrap();
+    let at = |chat: &str| chats.iter().position(|(subject, _, _)| subject == chat);
+    let (second_at, first_at) = (at(&second).unwrap(), at(&first).unwrap());
+    assert!(second_at < first_at);
     assert_eq!(
-        chats,
-        vec![
-            (second.clone(), "Recents second".to_string(), 6_000_000),
-            (first.clone(), "Recents first".to_string(), 5_000_000),
-        ]
+        chats[second_at],
+        (second.clone(), "Recents second".to_string(), 6_000_000)
+    );
+    assert_eq!(
+        chats[first_at],
+        (first.clone(), "Recents first".to_string(), 5_000_000)
     );
     let one = recents::recent_chats(1).await.unwrap();
     assert_eq!(one.len(), 1);
@@ -273,4 +278,45 @@ async fn opened_resources_are_listed_newest_first_and_stay_local() {
     let limited: Vec<Json> =
         serde_json::from_str(&list_recent_resources(drive, 1).await.unwrap()).unwrap();
     assert_eq!(limited.len(), 1);
+}
+
+#[tokio::test]
+async fn a_chat_started_here_takes_messages_in_order_on_one_page() {
+    shared_drive().await;
+    let mut rx = db().unwrap().subscribe_events();
+    let chat = create_ai_chat("Phone chat".into()).await.unwrap();
+    let user = append_chat_entry(
+        chat.clone(),
+        "user".into(),
+        json!([{ "type": "text", "text": "Hallo" }]).to_string(),
+    )
+    .await
+    .unwrap();
+    let assistant = append_chat_entry(
+        chat.clone(),
+        "assistant".into(),
+        json!([{ "type": "text", "text": "Hoi!" }]).to_string(),
+    )
+    .await
+    .unwrap();
+    // Both entries sit on the same page, the second after the first.
+    assert_eq!(user.split('#').next(), assistant.split('#').next());
+
+    let entries: Vec<Json> = serde_json::from_str(&read_chat(chat.clone()).await.unwrap()).unwrap();
+    let texts: Vec<(&str, &str)> = entries
+        .iter()
+        .map(|e| {
+            (
+                e["role"].as_str().unwrap(),
+                e["parts"][0]["text"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(texts, [("user", "Hallo"), ("assistant", "Hoi!")]);
+
+    // It is in the private drive, and shows up in the recents.
+    pump(&mut rx).await;
+    let list = list_ai_chats(500).await.unwrap();
+    assert!(list.contains(&chat));
+    assert!(list.contains("Phone chat"));
 }

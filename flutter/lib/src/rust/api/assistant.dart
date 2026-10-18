@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`
+// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`, `own_commit_opts`
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
@@ -44,3 +44,19 @@ Future<String> search(
 /// for a webview. Errors when no server is connected (`open_ws_sync`).
 String resourceWebUrl({required String subject}) =>
     RustLib.instance.api.crateApiAssistantResourceWebUrl(subject: subject);
+
+/// Start an AI chat named `name` in the agent's private drive, as the web
+/// app's AI sidebar does. Returns the chat's subject.
+Future<String> createAiChat({required String name}) =>
+    RustLib.instance.api.crateApiAssistantCreateAiChat(name: name);
+
+/// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
+/// message's parts as the web app stores them (`[{"type":"text","text":…}]`).
+/// It goes on the newest page with room, or on a new page. Returns the entry's
+/// id (`<page>#<key>`).
+Future<String> appendChatEntry(
+        {required String chat,
+        required String role,
+        required String partsJson}) =>
+    RustLib.instance.api.crateApiAssistantAppendChatEntry(
+        chat: chat, role: role, partsJson: partsJson);

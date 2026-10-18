@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
+import 'package:atomiccanvas_flutter/assistant/hosted_ai.dart';
 import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
@@ -17,10 +18,14 @@ class FakeApi extends AssistantApi {
   final List<SearchHit> hits;
   final List<String> asked = [];
   final List<String> opened = [];
+  final HostedAi? ai;
+  final List<(String, String, String)> added = [];
+  final List<String> created = [];
 
   FakeApi({
     this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
     this.recent = const [],
+    this.ai,
     this.chatList = const [],
     this.messageList = const [],
     this.hits = const [],
@@ -41,6 +46,18 @@ class FakeApi extends AssistantApi {
     asked.add(query);
     return hits;
   }
+
+  @override
+  Future<HostedAi?> hostedAi() async => ai;
+  @override
+  Future<String> newChat(String name) async {
+    created.add(name);
+    return 'did:ad:new-chat';
+  }
+
+  @override
+  Future<void> addMessage(String chat, String role, String text) async =>
+      added.add((chat, role, text));
 
   @override
   void noteOpened(String drive, String subject) => opened.add(subject);
@@ -212,6 +229,66 @@ void main() {
       await tester.tap(find.text('Zebra'));
       await tester.pump();
       expect(api.opened, ['did:ad:9']);
+    });
+  });
+
+  group('ChatScreen with an AI', () {
+    HostedAi ai(
+            {bool consent = true, List<String> answer = const ['Ho', 'i!']}) =>
+        HostedAi(
+          status: {'enabled': true, 'consent': consent, 'model': 'm'},
+          stream: (messages, model) => Stream.fromIterable(answer),
+          enable: () async => {'enabled': true, 'consent': true, 'model': 'm'},
+        );
+
+    testWidgets('writes, streams the answer and keeps both messages',
+        (tester) async {
+      final api = FakeApi(ai: ai());
+      await tester.pumpWidget(app(ChatScreen(api: api)));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Hallo daar');
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pumpAndSettle();
+
+      // A new chat is created with the first message, named after it.
+      expect(api.created, ['Hallo daar']);
+      expect(api.added, [
+        ('did:ad:new-chat', 'user', 'Hallo daar'),
+        ('did:ad:new-chat', 'assistant', 'Hoi!'),
+      ]);
+    });
+
+    testWidgets('asks for consent before the AI is used', (tester) async {
+      final api = FakeApi(ai: ai(consent: false));
+      await tester.pumpWidget(app(ChatScreen(api: api)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsNothing);
+      await tester.tap(find.text('Turn on AI'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
+    testWidgets('says so, without more, when there is no AI', (tester) async {
+      await tester.pumpWidget(app(ChatScreen(api: FakeApi())));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('No AI is set up on this device.'), findsOneWidget);
+    });
+
+    testWidgets('a new chat can be started from the home', (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive',
+          api: FakeApi(ai: ai()),
+          onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('New chat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+      expect(find.text('Message'), findsOneWidget);
     });
   });
 

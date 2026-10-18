@@ -143,6 +143,22 @@ class AtomicClient {
       parseRecentResources(
           await assistant.listRecentResources(drive: drive, limit: limit));
 
+  /// Starts an AI chat named [name] in the private drive; returns its subject.
+  static Future<String> createAiChat(String name) =>
+      assistant.createAiChat(name: name);
+
+  /// Adds a text message by [role] (`user` or `assistant`) to [chat]; returns
+  /// the entry's id. Signed here and synced like any other edit.
+  static Future<String> appendChatEntry(
+          String chat, String role, String text) =>
+      assistant.appendChatEntry(
+        chat: chat,
+        role: role,
+        partsJson: jsonEncode([
+          {'type': 'text', 'text': text}
+        ]),
+      );
+
   static Future<List<ChatMessage>> readChat(String subject) async =>
       parseChatMessages(await assistant.readChat(subject: subject));
 

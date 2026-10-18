@@ -36,6 +36,10 @@ class AccountStore {
 
   static Future<void> clear() => _secure.delete(key: _key);
 
+  /// The saved session, for a client to restore; null when no account is
+  /// linked.
+  static Future<String?> read() => _secure.read(key: _key);
+
   /// The linked account's state for [drive]; null when no account is linked.
   /// Throws when it is linked but the portal cannot be read, so a failed read
   /// is not shown as "not linked".

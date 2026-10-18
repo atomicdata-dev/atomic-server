@@ -188,6 +188,91 @@ class AtomicAccountClient {
   }
 
   Future<List<Map<String, dynamic>>> devices() => _list('devices', 'devices');
+
+  /// The account's included AI: whether it is on, consent, the model and the
+  /// credits left. Null when the portal offers none (404) or the session is not
+  /// valid (401).
+  Future<Map<String, dynamic>?> aiStatus() async {
+    final response = await _request('GET', 'ai/status');
+    if (response.statusCode == 404 || response.statusCode == 401) return null;
+    return _object(response);
+  }
+
+  /// Accept the included-AI terms for this account.
+  Future<Map<String, dynamic>> aiConsent() async =>
+      _object(await _request('POST', 'ai/consent', body: {'accepted': true}));
+
+  /// One streamed answer from the account's included AI: the text deltas of an
+  /// OpenAI-compatible `chat/completions` stream. Throws with the portal's own
+  /// message when it refuses (no credits, no consent).
+  Stream<String> chatCompletion(
+    List<Map<String, String>> messages, {
+    required String model,
+  }) async* {
+    if (_token == null) throw StateError('Sign in first');
+    final request = http.Request(
+        'POST', origin.replace(path: '/api/ai/chat/completions'))
+      ..followRedirects = false
+      ..headers['Authorization'] = 'Bearer $_token'
+      ..headers['Content-Type'] = 'application/json'
+      ..headers['Accept'] = 'text/event-stream'
+      ..body =
+          jsonEncode({'model': model, 'messages': messages, 'stream': true});
+    final http.StreamedResponse response;
+    try {
+      response = await _http.send(request).timeout(const Duration(seconds: 30));
+    } catch (_) {
+      throw StateError('Could not reach the account provider');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = await response.stream.bytesToString();
+      var message = 'Included AI is unavailable (${response.statusCode})';
+      try {
+        final json = jsonDecode(body);
+        if (json is Map && json['error'] is String) {
+          message = json['error'] as String;
+        }
+      } catch (_) {}
+      if (response.statusCode == 401) message = 'Sign in again to continue';
+      throw StateError(message);
+    }
+    yield* parseCompletionStream(response.stream.transform(utf8.decoder));
+  }
+
+  /// The text deltas of a server-sent-events completion stream.
+  static Stream<String> parseCompletionStream(Stream<String> chunks) async* {
+    var buffer = '';
+    await for (final chunk in chunks) {
+      buffer += chunk;
+      while (true) {
+        final newline = buffer.indexOf('\n');
+        if (newline < 0) break;
+        final line = buffer.substring(0, newline).trim();
+        buffer = buffer.substring(newline + 1);
+        if (!line.startsWith('data:')) continue;
+        final data = line.substring(5).trim();
+        if (data == '[DONE]') return;
+        try {
+          final json = jsonDecode(data);
+          final choices = json is Map ? json['choices'] : null;
+          final delta = choices is List && choices.isNotEmpty
+              ? (choices.first as Map)['delta']
+              : null;
+          final text = delta is Map ? delta['content'] : null;
+          if (text is String && text.isNotEmpty) yield text;
+          final error = json is Map ? json['error'] : null;
+          if (error != null) {
+            throw StateError(error is Map
+                ? '${error['message'] ?? 'Included AI failed'}'
+                : '$error');
+          }
+        } on FormatException {
+          // A keep-alive comment or a partial line: nothing to show.
+        }
+      }
+    }
+  }
+
   /// Cloud Vault enrollments: one blind, encrypted backup per drive.
   Future<List<Map<String, dynamic>>> vaultDrives() =>
       _list('cloud-vault/drives', 'drives');

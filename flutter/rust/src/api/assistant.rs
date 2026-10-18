@@ -9,7 +9,13 @@ mod tests;
 
 use super::simple::state::{connected_server, db, err};
 use crate::recents;
-use atomic_lib::{storelike::Query, urls, Resource, Storelike, Subject};
+use atomic_lib::{
+    chat_log::Entry,
+    commit::{CommitBuilder, CommitOpts},
+    loro::AtomicLoroDoc,
+    storelike::Query,
+    urls, Commit, Resource, Storelike, Subject, Value,
+};
 use flutter_rust_bridge::frb;
 use serde_json::{json, Value as Json};
 
@@ -180,4 +186,120 @@ pub fn resource_web_url(subject: String) -> Result<String, String> {
         }
     }
     Ok(format!("{origin}/app/show?subject={encoded}"))
+}
+
+/// Entries a `ChatLog` page holds before the next page is started
+/// (`browser/data-browser/src/helpers/chatLog.ts`, `CHAT_LOG_CAPACITY`).
+const CHAT_LOG_CAPACITY: usize = 256;
+
+/// The options of a commit this device signs for its own agent.
+fn own_commit_opts() -> CommitOpts {
+    CommitOpts {
+        validate_signature: true,
+        validate_timestamp: false,
+        validate_rights: false,
+        update_index: true,
+        ..CommitOpts::no_validations_no_index()
+    }
+}
+
+/// Start an AI chat named `name` in the agent's private drive, as the web
+/// app's AI sidebar does. Returns the chat's subject.
+pub async fn create_ai_chat(name: String) -> Result<String, String> {
+    let store = db()?;
+    let agent = store.get_default_agent().map_err(err)?;
+    let home = store.ensure_private_drive().await.map_err(err)?;
+
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        Value::ResourceArray(vec![AI_CHAT.into()]),
+    );
+    builder.set(urls::NAME.into(), Value::String(name));
+    builder.set(urls::PARENT.into(), Value::AtomicUrl(home.as_str().into()));
+    let commit = Commit::create_did(builder, &agent, store.as_ref())
+        .await
+        .map_err(err)?;
+    let subject = commit.subject.to_string();
+    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
+    super::simple::push_local_write(&response, store.as_ref()).await;
+    Ok(subject)
+}
+
+/// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
+/// message's parts as the web app stores them (`[{"type":"text","text":…}]`).
+/// It goes on the newest page with room, or on a new page. Returns the entry's
+/// id (`<page>#<key>`).
+pub async fn append_chat_entry(
+    chat: String,
+    role: String,
+    parts_json: String,
+) -> Result<String, String> {
+    let store = db()?;
+    let agent = store.get_default_agent().map_err(err)?;
+    let author = agent.subject.to_string();
+    let mut entry = Entry::new(author, "", super::simple::state::now_ms());
+    entry.extra.insert("role".into(), role.as_str().into());
+    entry
+        .extra
+        .insert("parts".into(), parts_json.as_str().into());
+
+    // The newest page that is not full.
+    let pages = store
+        .query(&Query::new_prop_val(urls::PARENT, &chat))
+        .await
+        .map_err(err)?;
+    let mut target: Option<(i64, Subject)> = None;
+    for subject in &pages.subjects {
+        let Ok(page) = store.get_resource(subject).await else {
+            continue;
+        };
+        if !atomic_lib::hierarchy::is_chat_log(&page) {
+            continue;
+        }
+        let Ok(doc) = page.build_state_doc() else {
+            continue;
+        };
+        let entries = doc.entries();
+        if entries.len() >= CHAT_LOG_CAPACITY {
+            continue;
+        }
+        let last = entries
+            .values()
+            .filter_map(atomic_lib::chat_log::entry_created_at)
+            .max()
+            .unwrap_or(0);
+        if target.as_ref().is_none_or(|(best, _)| last >= *best) {
+            target = Some((last, subject.clone()));
+        }
+    }
+
+    if let Some((_, subject)) = target {
+        let mut page = store.get_resource(&subject).await.map_err(err)?;
+        let key = page.add_chat_entry(&entry).map_err(err)?;
+        let response = super::simple::state::node()?
+            .save_locally(&mut page)
+            .await
+            .map_err(err)?;
+        super::simple::push_local_write(&response, store.as_ref()).await;
+        return Ok(format!("{subject}#{key}"));
+    }
+
+    // A first page.
+    let doc = AtomicLoroDoc::new();
+    let key = doc.add_entry(&entry).map_err(err)?;
+    let is_a = Value::ResourceArray(vec![urls::CHAT_LOG.to_string().into()]);
+    let parent = Value::AtomicUrl(chat.as_str().into());
+    doc.set_property(urls::IS_A, &is_a).map_err(err)?;
+    doc.set_property(urls::PARENT, &parent).map_err(err)?;
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(urls::PARENT.into(), parent);
+    builder.set_loro_update(doc.export_snapshot());
+    let commit = Commit::create_did(builder, &agent, store.as_ref())
+        .await
+        .map_err(err)?;
+    let page = commit.subject.to_string();
+    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
+    super::simple::push_local_write(&response, store.as_ref()).await;
+    Ok(format!("{page}#{key}"))
 }

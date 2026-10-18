@@ -158,8 +158,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                           chats: _chats,
                           onOpen: (chat) => _push(ChatScreen(
                             api: widget.api,
-                            subject: chat.subject,
-                            title: chat.name,
+                            subject: chat?.subject,
+                            title: chat?.name ?? '',
                           )),
                         ),
                         if (drives.length > 1)
@@ -193,7 +193,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 /// The person's newest chats, whatever drive they were started in.
 class _ChatsSection extends StatelessWidget {
   final Future<List<ChatSummary>> chats;
-  final void Function(ChatSummary) onOpen;
+  final void Function(ChatSummary?) onOpen;
 
   const _ChatsSection({required this.chats, required this.onOpen});
 
@@ -208,6 +208,11 @@ class _ChatsSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _Heading('Recent chats', c),
+            ResourceRow(
+              icon: Icons.add,
+              title: 'New chat',
+              onTap: () => onOpen(null),
+            ),
             if (snapshot.hasError)
               Padding(
                 padding: const EdgeInsets.all(16),

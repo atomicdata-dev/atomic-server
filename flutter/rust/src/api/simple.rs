@@ -25,6 +25,26 @@ async fn save_and_push(
 ) -> Result<(), String> {
     touch_date_edited(resource);
     let response = node()?.save_locally(resource).await.map_err(err)?;
+    push_local_write(&response, store).await;
+    Ok(())
+}
+
+/// Hand a commit this device just signed to whoever can take it: live peers
+/// get the state at once, the server gets the queued commit, and a paired
+/// device takes it when there is no server in reach.
+/// Apply a commit this device signed itself and queue it for the server, like
+/// `save_locally` does for an edit.
+pub(crate) async fn node_apply_local(
+    commit: atomic_lib::Commit,
+    opts: &atomic_lib::commit::CommitOpts,
+) -> Result<atomic_lib::commit::CommitResponse, String> {
+    node()?.apply_local_commit(commit, opts).await.map_err(err)
+}
+
+pub(crate) async fn push_local_write(
+    response: &atomic_lib::commit::CommitResponse,
+    store: &atomic_lib::Db,
+) {
     if let Some(bytes) = &response.commit.loro_update {
         if !bytes.is_empty() {
             let subject_key = response.commit.subject.pure_id();
@@ -43,7 +63,6 @@ async fn save_and_push(
     if !ws_ok || atomic_lib::sync::peer::live_peer_count() == 0 {
         nudge_peers_after_local_change(store).await;
     }
-    Ok(())
 }
 
 /// Catch a cached editing session up to the store's current snapshot before a

@@ -50,7 +50,7 @@ pub(crate) fn db() -> Result<&'static Arc<atomic_lib::Db>, String> {
 /// The runtime the binding writes through (`planning/atomic-lib-runtime.md`):
 /// saves and self-signed commits go via the node so they land in the
 /// outbox. Cheap: a `Db` is a bundle of `Arc`s.
-pub(super) fn node() -> Result<atomic_lib::runtime::AtomicNode, String> {
+pub(crate) fn node() -> Result<atomic_lib::runtime::AtomicNode, String> {
     Ok(atomic_lib::runtime::AtomicNode::from_db((**db()?).clone()))
 }
 
