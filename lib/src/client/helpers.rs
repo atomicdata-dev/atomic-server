@@ -160,9 +160,29 @@ mod ssrf_guard {
     }
 }
 
+/// The system's CA certificates, read once. On Android reqwest's default
+/// verifier (rustls-platform-verifier) needs JNI initialisation from the host
+/// app and panics on the first HTTPS request without it ("Expect
+/// rustls-platform-verifier to be initialized"), so the roots are handed over
+/// directly and verified by rustls itself.
+#[cfg(target_os = "android")]
+fn android_roots() -> &'static [reqwest::Certificate] {
+    static ROOTS: std::sync::OnceLock<Vec<reqwest::Certificate>> = std::sync::OnceLock::new();
+    ROOTS.get_or_init(|| {
+        rustls_native_certs::load_native_certs()
+            .certs
+            .iter()
+            .filter_map(|der| reqwest::Certificate::from_der(der.as_ref()).ok())
+            .collect()
+    })
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn http_client_builder() -> reqwest::ClientBuilder {
-    reqwest::Client::builder().timeout(std::time::Duration::from_secs(10))
+    let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10));
+    #[cfg(target_os = "android")]
+    let builder = builder.tls_certs_only(android_roots().iter().cloned());
+    builder
 }
 
 #[cfg(target_arch = "wasm32")]

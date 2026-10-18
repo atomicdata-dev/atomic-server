@@ -1442,6 +1442,7 @@ dependencies = [
  "rio_api",
  "rio_turtle",
  "rmp-serde",
+ "rustls-native-certs",
  "serde",
  "serde_jcs",
  "serde_json",

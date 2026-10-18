@@ -247,6 +247,14 @@ class _Dots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    // Dots only while they fit; with many drives, a count.
+    if (count > 8) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text('${current + 1} / $count',
+            style: TextStyle(color: c.textSecondary, fontSize: 12)),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(

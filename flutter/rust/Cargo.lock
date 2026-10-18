@@ -285,6 +285,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.4",
  "rmp-serde",
+ "rustls-native-certs",
  "serde",
  "serde_jcs",
  "serde_json",

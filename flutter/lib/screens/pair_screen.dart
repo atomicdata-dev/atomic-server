@@ -73,10 +73,12 @@ class PairScreen extends StatefulWidget {
   const PairScreen({super.key, this.initialNodeId});
 
   static Future<int?> show(BuildContext context, {String? nodeId}) {
-    return showDialog<int>(
-      context: context,
+    // A page, not a dialog: nothing of the screen it was opened from stays
+    // visible behind the result.
+    return Navigator.of(context).push<int>(MaterialPageRoute<int>(
+      fullscreenDialog: true,
       builder: (_) => PairScreen(initialNodeId: nodeId),
-    );
+    ));
   }
 
   /// Parse a QR code value into a PeerInfo. Null when it is not a pairing code
@@ -110,7 +112,8 @@ class PairScreen extends StatefulWidget {
         if (qIndex == -1) {
           return PeerInfo(value.toLowerCase());
         }
-        return _parseNodeQuery(value.toLowerCase(), opaque.substring(qIndex + 1));
+        return _parseNodeQuery(
+            value.toLowerCase(), opaque.substring(qIndex + 1));
       }
     }
 
@@ -185,9 +188,8 @@ class PairScreen extends StatefulWidget {
     final version = uri.queryParameters['v'];
     if (version != null && version != '1') return null;
     if (uri.queryParameters.containsKey('secret')) return null;
-    final drives = uri.queryParametersAll['drives']
-        ?.where((d) => d != '*')
-        .toList();
+    final drives =
+        uri.queryParametersAll['drives']?.where((d) => d != '*').toList();
     return PeerInfo(
       nodeId,
       '',
@@ -353,22 +355,34 @@ class _PairScreenState extends State<PairScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isPhone = screenWidth < 600;
-
-    return AlertDialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isPhone ? 16 : 40,
-        vertical: 24,
-      ),
-      content: SizedBox(
-        width: isPhone ? screenWidth * 0.85 : 360.0,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: _buildStep(theme),
+    final actions = _buildActions(theme);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pair a device')),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _buildStep(theme),
+              ),
+            ),
+          ),
         ),
       ),
-      actions: _buildActions(theme),
+      bottomNavigationBar: actions.isEmpty
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions,
+                ),
+              ),
+            ),
     );
   }
 
