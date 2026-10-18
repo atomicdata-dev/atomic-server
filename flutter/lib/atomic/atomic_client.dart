@@ -1,12 +1,26 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import '../src/rust/api/assistant.dart' as assistant;
 import '../src/rust/api/simple.dart' as ffi;
 import '../src/rust/api/simple/types.dart'
     show AgentInfo, CanvasListItem, VersionMetadata;
 
 export '../src/rust/api/simple/types.dart'
     show AgentInfo, CanvasListItem, VersionMetadata;
+
+/// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
+typedef ChatSummary = ({String subject, String name, int lastActivity});
+
+/// One message of a chat: the text parts of an entry, `role` user or assistant.
+typedef ChatMessage = ({String id, String role, String text, int createdAt});
+
+typedef SearchHit = ({
+  String subject,
+  String title,
+  String className,
+  double score
+});
 
 /// Atomic Data SDK — local-first with optional sync.
 ///
@@ -69,6 +83,66 @@ class AtomicClient {
   static Future<void> setProperty(
           String subject, String property, String value) =>
       ffi.setProperty(subject: subject, property: property, value: value);
+
+  // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
+
+  static Future<List<ChatSummary>> listAiChats() async =>
+      parseChats(await assistant.listAiChats());
+
+  static Future<List<ChatMessage>> readChat(String subject) async =>
+      parseChatMessages(await assistant.readChat(subject: subject));
+
+  static Future<List<SearchHit>> search(String query, {int limit = 20}) async =>
+      parseHits(await assistant.search(query: query, limit: limit));
+
+  /// Where the connected server's web app shows [subject]. Throws when no
+  /// server is connected.
+  static String resourceWebUrl(String subject) =>
+      assistant.resourceWebUrl(subject: subject);
+
+  @visibleForTesting
+  static List<ChatSummary> parseChats(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            subject: e['subject'] as String,
+            name: e['name'] as String? ?? '',
+            lastActivity: (e['last_activity'] as num?)?.toInt() ?? 0,
+          ),
+      ];
+
+  /// Text parts only (tool calls, reasoning and files are left out); entries
+  /// without text, and roles other than user and assistant, are skipped.
+  @visibleForTesting
+  static List<ChatMessage> parseChatMessages(String json) {
+    final out = <ChatMessage>[];
+    for (final e in jsonDecode(json) as List) {
+      final role = e['role'] as String? ?? '';
+      if (role != 'user' && role != 'assistant') continue;
+      final text = [
+        for (final p in (e['parts'] as List? ?? const []))
+          if (p is Map && p['type'] == 'text') p['text'] as String? ?? '',
+      ].join('\n\n').trim();
+      if (text.isEmpty) continue;
+      out.add((
+        id: e['id'] as String,
+        role: role,
+        text: text,
+        createdAt: (e['c'] as num?)?.toInt() ?? 0,
+      ));
+    }
+    return out;
+  }
+
+  @visibleForTesting
+  static List<SearchHit> parseHits(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            subject: e['subject'] as String,
+            title: e['title'] as String? ?? '',
+            className: e['class_name'] as String? ?? '',
+            score: (e['score'] as num?)?.toDouble() ?? 0,
+          ),
+      ];
 
   // ── 5. Canvas CRUD ───────────────────────────────────────────────────────
 
@@ -161,9 +235,8 @@ class AtomicClient {
           .map((e) => {
                 'node_id': (e['node_id'] ?? '') as String,
                 'name': (e['name'] ?? '') as String,
-                'last_synced': e['last_synced'] == null
-                    ? ''
-                    : '${e['last_synced']}',
+                'last_synced':
+                    e['last_synced'] == null ? '' : '${e['last_synced']}',
               })
           .toList();
     } catch (_) {

@@ -24,6 +24,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   integration_test:

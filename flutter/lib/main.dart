@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
+import 'assistant/chats_screen.dart';
 import 'canvas/infinite_canvas.dart';
 import 'gallery/canvas_store.dart';
 import 'gallery/gallery_screen.dart';
@@ -34,6 +35,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
   final CanvasStore _store = CanvasStore();
   CanvasEntry? _openCanvas;
   bool _loggedIn = false;
+  bool _showGallery = false;
   final _navKey = GlobalKey<NavigatorState>();
   static const _linkChannel = MethodChannel('app.atomicdata.canvas/deeplink');
   Timer? _eventPoller;
@@ -213,6 +215,15 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
     });
   }
 
+  void _signedOut() {
+    setState(() {
+      _loggedIn = false;
+      _showGallery = false;
+      _openCanvas = null;
+      _store.canvases.clear();
+    });
+  }
+
   void _openFromGallery(CanvasEntry canvas) async {
     final isDarkMode = View.of(context).platformDispatcher.platformBrightness ==
         Brightness.dark;
@@ -288,34 +299,34 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
       ),
       home: !_loggedIn
           ? LoginScreen(onLoggedIn: _onLoggedIn)
-          : !_store.isLoaded
-              ? Scaffold(
-                  backgroundColor:
-                      Theme.of(context).extension<AppColors>()?.canvasBg ??
-                          AppColors.dark.canvasBg,
-                  body: const SafeArea(
-                      child: Center(child: CircularProgressIndicator())),
+          : _openCanvas == null && !_showGallery
+              ? ChatsScreen(
+                  onOpenGallery: () => setState(() => _showGallery = true),
+                  onSignOut: _signedOut,
                 )
-              : _openCanvas != null
-                  ? InfiniteCanvas(
-                      key: ValueKey(_openCanvas!.id),
-                      canvas: _openCanvas!,
-                      store: _store,
-                      onClose: _closeCanvas,
-                      onNewCanvas: _newCanvas,
+              : !_store.isLoaded
+                  ? Scaffold(
+                      backgroundColor:
+                          Theme.of(context).extension<AppColors>()?.canvasBg ??
+                              AppColors.dark.canvasBg,
+                      body: const SafeArea(
+                          child: Center(child: CircularProgressIndicator())),
                     )
-                  : GalleryScreen(
-                      store: _store,
-                      onOpen: _openFromGallery,
-                      onNew: ({folderId}) => _newCanvas(folderId: folderId),
-                      onSignOut: () {
-                        setState(() {
-                          _loggedIn = false;
-                          _openCanvas = null;
-                          _store.canvases.clear();
-                        });
-                      },
-                    ),
+                  : _openCanvas != null
+                      ? InfiniteCanvas(
+                          key: ValueKey(_openCanvas!.id),
+                          canvas: _openCanvas!,
+                          store: _store,
+                          onClose: _closeCanvas,
+                          onNewCanvas: _newCanvas,
+                        )
+                      : GalleryScreen(
+                          store: _store,
+                          onOpen: _openFromGallery,
+                          onNew: ({folderId}) => _newCanvas(folderId: folderId),
+                          onExit: () => setState(() => _showGallery = false),
+                          onSignOut: _signedOut,
+                        ),
     );
   }
 }

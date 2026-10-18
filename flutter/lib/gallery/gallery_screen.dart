@@ -14,12 +14,16 @@ class GalleryScreen extends StatefulWidget {
   final void Function({String? folderId}) onNew;
   final VoidCallback? onSignOut;
 
+  /// Leaves the gallery (back to the chats); adds a back button at its root.
+  final VoidCallback? onExit;
+
   const GalleryScreen({
     super.key,
     required this.store,
     required this.onOpen,
     required this.onNew,
     this.onSignOut,
+    this.onExit,
   });
 
   @override
@@ -99,10 +103,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
         _currentFolder = null;
         _editingFolderName = false;
       });
+    } else {
+      widget.onExit?.call();
     }
   }
 
-  bool get _canGoBack => _pickingFolder || _selecting || _currentFolder != null;
+  bool get _canGoBack =>
+      _pickingFolder ||
+      _selecting ||
+      _currentFolder != null ||
+      widget.onExit != null;
 
   void _moveSelectedToFolder(String? folderId) {
     widget.store.moveToFolder(_selected.toList(), folderId);
