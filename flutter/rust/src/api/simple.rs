@@ -3,9 +3,9 @@ use flutter_rust_bridge::frb;
 
 #[cfg(test)]
 mod peer_tests;
-mod state;
+pub(crate) mod state;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 pub mod types;
 pub mod ws_sync;
 

@@ -43,7 +43,7 @@ pub(super) fn canvas_date_edited_ms(resource: &atomic_lib::Resource) -> i64 {
     0
 }
 
-pub(super) fn db() -> Result<&'static Arc<atomic_lib::Db>, String> {
+pub(crate) fn db() -> Result<&'static Arc<atomic_lib::Db>, String> {
     DB.get().ok_or_else(|| "Call openDb() first.".into())
 }
 
@@ -58,6 +58,17 @@ pub(super) fn set_db(store: atomic_lib::Db) {
     let _ = DB.set(Arc::new(store));
 }
 
-pub(super) fn err(e: atomic_lib::AtomicError) -> String {
+pub(crate) fn err(e: atomic_lib::AtomicError) -> String {
     e.to_string()
+}
+
+static SERVER_ORIGIN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Remember the server `open_ws_sync` connected to (for links into its web app).
+pub(crate) fn set_server_origin(origin: &str) {
+    *SERVER_ORIGIN.lock().unwrap() = Some(origin.trim_end_matches('/').to_string());
+}
+
+pub(crate) fn connected_server() -> Option<String> {
+    SERVER_ORIGIN.lock().unwrap().clone()
 }

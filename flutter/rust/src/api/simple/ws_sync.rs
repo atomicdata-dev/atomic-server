@@ -8,7 +8,7 @@ use atomic_lib::{
     Storelike,
 };
 
-use super::state::{db, err};
+use super::state::{db, err, set_server_origin};
 
 static WS_TASK: OnceLock<Mutex<Option<tokio::task::JoinHandle<()>>>> = OnceLock::new();
 static WS_CLIENT: OnceLock<Mutex<Option<Arc<WsClient>>>> = OnceLock::new();
@@ -60,6 +60,7 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
 
     let store = db()?.clone();
     store.set_base_url(server_origin.trim_end_matches('/'));
+    set_server_origin(server_origin);
 
     let client = Arc::new(WsClient::connect(&ws_url).await.map_err(err)?);
     let agent = store.get_default_agent().map_err(err)?;

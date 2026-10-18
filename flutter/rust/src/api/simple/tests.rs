@@ -22,7 +22,7 @@ use super::*;
 
 /// One database for the whole test binary — `state::DB` is a `OnceLock` and
 /// cannot be re-set. Tests isolate by canvas, not by store.
-pub(super) async fn shared_drive() -> &'static str {
+pub(crate) async fn shared_drive() -> &'static str {
     static SETUP: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
 
     SETUP
