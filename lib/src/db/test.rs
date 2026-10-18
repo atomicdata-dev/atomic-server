@@ -1007,6 +1007,33 @@ async fn test_collection_update_value(
     );
 }
 
+/// sled holds its directory lock until its background threads have let go of
+/// the handle, which is a moment after `drop`. Opening the same directory right
+/// away fails with "could not acquire lock" on a slow host (develop run 5385,
+/// `test_migration_v2_to_v3`), so wait for the lock, bounded, and let any other
+/// error through at once.
+#[cfg(feature = "db-sled")]
+async fn open_when_unlocked<T, F, Fut>(mut open: F) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = crate::errors::AtomicResult<T>>,
+{
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+
+    loop {
+        match open().await {
+            Ok(opened) => return opened,
+            Err(error)
+                if error.to_string().contains("could not acquire lock")
+                    && std::time::Instant::now() < deadline =>
+            {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            Err(error) => panic!("{error}"),
+        }
+    }
+}
+
 #[cfg(feature = "db-sled")]
 #[tokio::test]
 async fn test_migration_v2_to_v3() {
@@ -1040,8 +1067,10 @@ async fn test_migration_v2_to_v3() {
     // Manually insert into resources_v2 using raw sled access
     // Drop the Db first so we can open the sled database directly
     drop(store);
-    let sled_store =
-        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path)).unwrap();
+    let sled_store = open_when_unlocked(|| async {
+        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path))
+    })
+    .await;
     {
         let v2_tree = sled_store.raw_db().open_tree("resources_v2").unwrap();
         v2_tree
@@ -1058,12 +1087,13 @@ async fn test_migration_v2_to_v3() {
     drop(sled_store);
 
     // Re-open the Db to pick up the migrated data
-    let store = crate::Db::init(
-        std::path::Path::new(&tmp_dir_path),
-        Some(server_url.to_string()),
-    )
-    .await
-    .unwrap();
+    let store = open_when_unlocked(|| {
+        crate::Db::init(
+            std::path::Path::new(&tmp_dir_path),
+            Some(server_url.to_string()),
+        )
+    })
+    .await;
 
     // Verify results in v3
     let resource = store
@@ -1092,8 +1122,10 @@ async fn test_migration_v2_to_v3() {
 
     // Verify it is NOT in resources_v2 anymore (it should have been dropped)
     drop(store);
-    let sled_store2 =
-        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path)).unwrap();
+    let sled_store2 = open_when_unlocked(|| async {
+        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path))
+    })
+    .await;
     assert!(!sled_store2
         .raw_db()
         .tree_names()
