@@ -15,7 +15,7 @@ import {
   type SignInCredentials,
 } from './localDbKey';
 
-const AGENT_IDB_KEY = 'atomic.agent';
+export const AGENT_IDB_KEY = 'atomic.agent';
 
 interface StoredAgent {
   keyPair: CryptoKeyPair;
@@ -66,7 +66,7 @@ interface StoredAgentFallback {
   vaultProof?: string;
 }
 
-const AGENT_FALLBACK_KEY = 'atomic.agent.fallback';
+export const AGENT_FALLBACK_KEY = 'atomic.agent.fallback';
 
 function hasSubtleCrypto(): boolean {
   try {

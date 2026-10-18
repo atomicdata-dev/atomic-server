@@ -1,6 +1,7 @@
 import { useLocalStorage } from '@hooks/useLocalStorage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { loadLocale } from 'wuchale/load-utils';
+import { getBrowserLocale } from '@helpers/preloadLocale';
 
 interface LocaleContextType {
   locale: string;
@@ -11,8 +12,6 @@ const LocaleContext = createContext<LocaleContextType>({
   locale: 'en',
   setLocale: () => {},
 });
-
-export const SUPPORTED_LOCALES = ['en', 'es', 'fr', 'de'];
 
 /**
  * Loads the catalog for the chosen locale and renders the app only once it
@@ -64,10 +63,4 @@ export const LocaleProvider = ({ children }: React.PropsWithChildren) => {
 
 export const useLocale = () => {
   return useContext(LocaleContext);
-};
-
-const getBrowserLocale = () => {
-  const locales = navigator.languages.map(x => x.trim().split(/-|_/)[0]);
-
-  return locales.find(x => SUPPORTED_LOCALES.includes(x)) ?? 'en';
 };
