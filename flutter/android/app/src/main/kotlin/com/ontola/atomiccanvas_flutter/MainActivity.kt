@@ -1,6 +1,10 @@
 package com.ontola.atomiccanvas_flutter
 
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
+import android.os.Bundle
+import androidx.core.view.WindowCompat
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -10,6 +14,25 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "app.atomicdata.canvas/deeplink"
     private var initialLink: String? = null
     private var channel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        styleNavigationBar()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        styleNavigationBar()
+    }
+
+    /** Black bar with light buttons in dark mode, white with dark ones in light mode. */
+    private fun styleNavigationBar() {
+        val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        window.navigationBarColor = if (dark) Color.BLACK else Color.WHITE
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !dark
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

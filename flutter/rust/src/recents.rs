@@ -18,12 +18,14 @@ use std::sync::{Mutex, OnceLock};
 const OPENED_CAP: usize = 100;
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 struct DriveRecents {
     /// Resource subject → when this device opened it (ms).
     opened: HashMap<String, i64>,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 struct Recents {
     /// Chat subject → newest entry time (ms), 0 for a chat without entries.
     chats: HashMap<String, i64>,
