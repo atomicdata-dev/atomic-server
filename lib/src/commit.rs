@@ -1046,7 +1046,7 @@ impl Commit {
                         .filter_map(|(key, incoming_val)| {
                             let stored = merged_state.get(key);
 
-                            if stored.is_some_and(|mv| mv == incoming_val) {
+                            if stored.is_some_and(|mv| same_up_to_scheme(mv, incoming_val)) {
                                 return None;
                             }
 
@@ -2001,6 +2001,24 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 
 /// The amount of milliseconds that a Commit signature is valid for.
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
+
+/// Whether two Loro values are equal once `atomic:` and the legacy `did:ad:`
+/// spelling of an identifier are treated as one. A client on the canonical
+/// scheme re-sending a reference stored in the legacy spelling lost LWW to
+/// itself; that is an already-applied write, not a client that never read the
+/// resource. Genuinely different identifiers or values still differ.
+fn same_up_to_scheme(a: &loro::LoroValue, b: &loro::LoroValue) -> bool {
+    use loro::LoroValue;
+    match (a, b) {
+        (LoroValue::String(x), LoroValue::String(y)) => {
+            crate::identifiers::canonicalize_scheme(x) == crate::identifiers::canonicalize_scheme(y)
+        }
+        (LoroValue::List(x), LoroValue::List(y)) => {
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(x, y)| same_up_to_scheme(x, y))
+        }
+        _ => a == b,
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -3885,6 +3903,49 @@ mod test {
             error.contains(crate::urls::NAME) && error.contains("sent") && error.contains("stored"),
             "the rejection names the write that was dropped and both sides of it: {error}"
         );
+    }
+
+    /// The same drive spelled `atomic:` by the client and `did:ad:` in the
+    /// store is the same value. A profile save re-sends `personalDrive` in the
+    /// canonical spelling; losing LWW to the legacy spelling of itself is not
+    /// a dropped write, and must not fail the commit.
+    #[tokio::test]
+    async fn a_loss_to_the_legacy_spelling_of_the_same_identifier_is_accepted() {
+        let (store, agent) = store_with_known_agent().await;
+        let subject = "https://localhost/legacy_spelling_loss";
+        let prop = "https://atomicdata.dev/properties/personalDrive";
+        let rest = "hcmCsncX42v9xXHahzYtM7mqjdcC2gvTQ9R7B79nI3fnqWS_grBh2MHhB1IY-zSN8gpxnXGAeY6QMu5QFxqyDw";
+
+        let stored_doc = crate::loro::AtomicLoroDoc::new();
+        stored_doc.set_peer_id(u64::MAX - 1).unwrap();
+        stored_doc
+            .set_property(prop, &Value::String(format!("did:ad:{rest}")))
+            .unwrap();
+        stored_doc
+            .set_property(crate::urls::NAME, &Value::String("A".into()))
+            .unwrap();
+        let empty = Resource::new(subject.into());
+        let mut builder = CommitBuilder::new(subject.into());
+        builder.set_loro_update(stored_doc.export_snapshot());
+        let commit1 = builder.sign(&agent, &store, &empty).await.unwrap();
+        store.apply_commit(commit1, &OPTS).await.unwrap();
+
+        let fresh = crate::loro::AtomicLoroDoc::new();
+        fresh.set_peer_id(1).unwrap();
+        fresh
+            .set_property(prop, &Value::String(format!("atomic:{rest}")))
+            .unwrap();
+        fresh
+            .set_property(crate::urls::NAME, &Value::String("A".into()))
+            .unwrap();
+        let after_first = store.get_resource(&subject.into()).await.unwrap();
+        let mut builder2 = CommitBuilder::new(subject.into());
+        builder2.set_loro_update(fresh.export_snapshot());
+        let commit2 = builder2.sign(&agent, &store, &after_first).await.unwrap();
+        store
+            .apply_commit(commit2, &OPTS)
+            .await
+            .expect("a re-spelled but identical identifier is not a dropped write");
     }
 
     /// Two commits where each commit comes from a FRESH Loro doc with a
