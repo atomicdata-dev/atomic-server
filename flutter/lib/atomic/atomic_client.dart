@@ -22,6 +22,8 @@ typedef SearchHit = ({
   double score
 });
 
+typedef DriveInfo = ({String subject, String name});
+
 typedef RecentResource = ({
   String subject,
   String title,
@@ -76,6 +78,15 @@ class AtomicClient {
   static Future<String> createDrive(String name) => ffi.createDrive(name: name);
 
   static Future<List<String>> listDrives() => ffi.listDrives();
+
+  /// The agent's drives with their names (empty when a drive has none yet).
+  static Future<List<DriveInfo>> listDrivesWithNames() async => [
+        for (final e in jsonDecode(await ffi.listDrivesWithNames()) as List)
+          (
+            subject: e['subject'] as String,
+            name: e['name'] as String? ?? '',
+          ),
+      ];
 
   static String? getActiveDrive() => ffi.getActiveDrive();
 

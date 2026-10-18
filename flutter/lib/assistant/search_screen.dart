@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
 import 'assistant_api.dart';
+import 'resource_row.dart';
 import 'resource_web_view.dart';
 
 /// Type-ahead search over [drive]; a hit opens in the web view.
@@ -75,11 +76,10 @@ class _SearchScreenState extends State<SearchScreen> {
           ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
           : ListView(children: [
               for (final hit in _hits)
-                ListTile(
-                  leading: Icon(Icons.description_outlined, color: c.main),
-                  title: Text(hit.title.isEmpty ? hit.subject : hit.title,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: hit.className.isEmpty ? null : Text(hit.className),
+                ResourceRow(
+                  icon: Icons.description_outlined,
+                  title: hit.title.isEmpty ? hit.subject : hit.title,
+                  detail: hit.className,
                   onTap: () {
                     widget.api.noteOpened(widget.drive, hit.subject);
                     Navigator.of(context).push(MaterialPageRoute<void>(

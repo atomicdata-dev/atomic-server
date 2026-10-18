@@ -5,6 +5,7 @@ import '../atomic/atomic_client.dart';
 class AssistantApi {
   const AssistantApi();
 
+  Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
   Future<List<ChatSummary>> chats(String drive) =>
       AtomicClient.listAiChats(drive);
   Future<List<ChatMessage>> messages(String chat) =>
