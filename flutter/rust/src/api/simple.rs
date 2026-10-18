@@ -1243,8 +1243,14 @@ async fn follow_listed_drives(home: String) {
                         got = true;
                         break;
                     }
-                    // Dialled and answered, just not hosting this drive.
-                    Ok(Ok(_)) | Ok(Err(_)) => {}
+                    Ok(Ok(_)) => {}
+                    // The device did not answer at all: do not dial it again
+                    // for the next drive. A device that answered but lacks
+                    // this drive is a different failure, and stays in.
+                    Ok(Err(e)) if e.to_string().contains("timed out") => {
+                        dead_peers.insert(node_id);
+                    }
+                    Ok(Err(_)) => {}
                     Err(_) => {
                         dead_peers.insert(node_id);
                     }
