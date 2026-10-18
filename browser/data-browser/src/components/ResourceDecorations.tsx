@@ -425,7 +425,7 @@ export function IconPickerDialog({
             </DialogTitle>
             <DialogContent>
               <Column>
-                <Row justify='flex-end' gap='0.5rem'>
+                <Row justify='flex-end' gap='0.5rem' wrapItems>
                   <Button
                     subtle
                     onClick={() => {
