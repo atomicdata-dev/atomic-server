@@ -601,7 +601,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 12),
         Text(
           'This device does not have your drive yet. '
-          'We look for other devices on the network, or you can pair with QR.',
+          'We look for other devices on the network, or you can pair with QR or a node ID.',
           style: TextStyle(fontSize: 14, color: c.iconDisabled),
           textAlign: TextAlign.center,
         ),
@@ -631,28 +631,13 @@ class _LoginScreenState extends State<LoginScreen> {
           label: const Text('Pair with QR'),
           style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
-          onPressed: () async {
-            await PairScreen.show(context);
-            // Check if drive is now available
-            final drive = AtomicClient.getActiveDrive();
-            if (drive != null) {
-              try {
-                final name = await AtomicClient.getProperty(
-                    drive, 'https://atomicdata.dev/properties/name');
-                if (name.isNotEmpty) {
-                  widget.onLoggedIn();
-                  return;
-                }
-              } catch (_) {}
-            }
-            // Still no drive — stay on this screen
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Drive not synced yet — try again')),
-              );
-            }
-          },
+          onPressed: () => _pairThenCheck(null),
+        ),
+        const SizedBox(height: 4),
+        TextButton.icon(
+          icon: const Icon(Icons.content_paste),
+          label: const Text('Paste node ID'),
+          onPressed: _pasteNodeId,
         ),
         const SizedBox(height: 12),
         OutlinedButton(
@@ -663,6 +648,77 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ],
     );
+  }
+
+  /// Pair with [nodeId] (or scan a code when null), then continue when the
+  /// drive arrived.
+  Future<void> _pairThenCheck(String? nodeId) async {
+    await PairScreen.show(context, nodeId: nodeId);
+    final drive = AtomicClient.getActiveDrive();
+    if (drive != null) {
+      try {
+        final name = await AtomicClient.getProperty(
+            drive, 'https://atomicdata.dev/properties/name');
+        if (name.isNotEmpty) {
+          widget.onLoggedIn();
+          return;
+        }
+      } catch (_) {}
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Drive not synced yet — try again')),
+      );
+    }
+  }
+
+  /// For when no camera can see the other device's code: its node ID, copied
+  /// from its Sync page, pasted here. Prefilled from the clipboard.
+  Future<void> _pasteNodeId() async {
+    final clip = (await Clipboard.getData(Clipboard.kTextPlain))?.text ?? '';
+    if (!mounted) return;
+    final controller = TextEditingController(
+        text: PairScreen.parsePeerInfo(clip) != null ? clip.trim() : '');
+    final nodeId = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String? error;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void submit() {
+              final info = PairScreen.parsePeerInfo(controller.text);
+              if (info == null) {
+                setDialogState(() => error = 'Not a node ID');
+                return;
+              }
+              Navigator.of(context).pop(info.nodeId);
+            }
+
+            return AlertDialog(
+              title: const Text('Paste node ID'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'did:ad:node:…',
+                  errorText: error,
+                ),
+                onSubmitted: (_) => submit(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(onPressed: submit, child: const Text('Connect')),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    if (nodeId != null && mounted) await _pairThenCheck(nodeId);
   }
 
   Widget _errorWidget() {
