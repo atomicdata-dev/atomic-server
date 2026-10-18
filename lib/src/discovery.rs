@@ -28,6 +28,10 @@ const NODES_LABEL: &str = "_atomic_nodes";
 /// cannot dial Iroh, but it can read the relay over https and fetch from these.
 pub const HTTP_LABEL: &str = "_atomic_http";
 const NODES_TTL: u32 = 300;
+/// How many NodeIDs a record keeps. Every install publishes a fresh one and
+/// nothing removes it, so without a cap the record fills with dead devices
+/// (and stops fitting a TXT record). The newest replicas are kept.
+const MAX_NODE_IDS: usize = 6;
 const HTTP_TTL: u32 = 3600;
 
 /// What a drive's pkarr record holds: where its replicas can be reached.
@@ -71,6 +75,14 @@ fn push_unique(list: &mut Vec<String>, item: &str) {
     if !list.iter().any(|i| i == item) {
         list.push(item.to_string());
     }
+}
+
+/// Put `id` first (resolvers try the list in order) and drop the oldest
+/// entries beyond [`MAX_NODE_IDS`].
+fn add_node_id(node_ids: &mut Vec<String>, id: &str) {
+    node_ids.retain(|existing| existing != id);
+    node_ids.insert(0, id.to_string());
+    node_ids.truncate(MAX_NODE_IDS);
 }
 
 /// Build the signed packet for a drive. Both TXT records are written when
@@ -128,7 +140,7 @@ pub async fn publish_drive_record(
     let mut record = resolve_record_raw(&client, &keypair.public_key()).await;
 
     if let Some(id) = iroh_node_id {
-        push_unique(&mut record.node_ids, id);
+        add_node_id(&mut record.node_ids, id);
     }
     if let Some(origin) = &origin {
         push_unique(&mut record.http_origins, origin);
@@ -172,6 +184,17 @@ pub async fn resolve_node_id_filtered(
     drive_did: &str,
     exclude_node_id: Option<&str>,
 ) -> AtomicResult<String> {
+    let ids = resolve_node_ids_filtered(drive_did, exclude_node_id).await?;
+    Ok(ids.into_iter().next().expect("not empty"))
+}
+
+/// Every NodeID the drive's record names except `exclude_node_id`, newest
+/// first. Records keep the replicas of uninstalled apps too, so a caller
+/// should try several rather than trust the first. Errors when none is left.
+pub async fn resolve_node_ids_filtered(
+    drive_did: &str,
+    exclude_node_id: Option<&str>,
+) -> AtomicResult<Vec<String>> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
     let client = build_client()?;
     let node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
@@ -179,30 +202,24 @@ pub async fn resolve_node_id_filtered(
     if node_ids.is_empty() {
         return Err(format!("No peers found for drive {drive_did}").into());
     }
-
-    let peer = node_ids
-        .iter()
-        .find(|id| {
-            if let Some(exclude) = exclude_node_id {
-                id.as_str() != exclude
-            } else {
-                true
-            }
-        })
-        .ok_or_else(|| {
-            format!(
-                "Found {} NodeID(s) but all are ours ({})",
-                node_ids.len(),
-                exclude_node_id.unwrap_or("?")
-            )
-        })?;
-
+    let total = node_ids.len();
+    let peers: Vec<String> = node_ids
+        .into_iter()
+        .filter(|id| Some(id.as_str()) != exclude_node_id)
+        .collect();
+    if peers.is_empty() {
+        return Err(format!(
+            "Found {total} NodeID(s) but all are ours ({})",
+            exclude_node_id.unwrap_or("?")
+        )
+        .into());
+    }
     tracing::debug!(
-        "Discovery: resolved peer {} for drive {}",
-        &peer[..peer.len().min(16)],
+        "Discovery: resolved {} peers for drive {}",
+        peers.len(),
         drive_did
     );
-    Ok(peer.clone())
+    Ok(peers)
 }
 
 /// What the pkarr relay says about where a drive lives: its replicas' Iroh
@@ -505,6 +522,18 @@ mod tests {
         };
         let packet = build_packet(&keypair, &record).unwrap();
         assert_eq!(parse_record(&packet), record);
+    }
+
+    #[test]
+    fn newest_node_id_goes_first_and_old_ones_drop_off() {
+        let mut ids: Vec<String> = (0..MAX_NODE_IDS).map(|i| format!("old{i}")).collect();
+        add_node_id(&mut ids, "old3");
+        assert_eq!(ids[0], "old3");
+        assert_eq!(ids.len(), MAX_NODE_IDS);
+        add_node_id(&mut ids, "new");
+        assert_eq!(ids[0], "new");
+        assert_eq!(ids.len(), MAX_NODE_IDS);
+        assert!(!ids.contains(&format!("old{}", MAX_NODE_IDS - 1)));
     }
 
     #[test]

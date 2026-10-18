@@ -1000,6 +1000,12 @@ async fn drive_resource_exists(store: &atomic_lib::Db) -> bool {
 
 const PEER_SYNC_ATTEMPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(22);
 const PKARR_RESOLVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
+/// How many of the NodeIDs a drive's pkarr record names are dialled at once.
+const PKARR_PEERS_TO_TRY: usize = 4;
+
+fn short_id(node_id: &str) -> &str {
+    &node_id[..node_id.len().min(12)]
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SyncConnectivityReport {
@@ -1066,26 +1072,39 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         }
     }
 
-    // pkarr discover when still not live to any peer
+    // pkarr discover when still not live to any peer. The record also names
+    // replicas that are gone (an uninstalled app, an old laptop), so several
+    // are dialled at once and the first that answers wins.
     if atomic_lib::sync::peer::live_peer_count() == 0 {
         match tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
             let my_node_id = atomic_lib::sync::peer::get_node_id()
                 .ok_or("Peer not started")?
                 .to_string();
-            atomic_lib::discovery::resolve_node_id_filtered(&drive, Some(&my_node_id)).await
+            atomic_lib::discovery::resolve_node_ids_filtered(&drive, Some(&my_node_id)).await
         })
         .await
         {
-            Ok(Ok(node_id)) => {
-                match tokio::time::timeout(
-                    PEER_SYNC_ATTEMPT_TIMEOUT,
-                    atomic_lib::sync::peer::sync_drive_with_peer_if_needed(&node_id, &drive, store),
-                )
-                .await
-                {
-                    Ok(Ok(count)) => imported += count as i32,
-                    Ok(Err(e)) => errors.push(format!("discover: {e}")),
-                    Err(_) => errors.push("discover: connect timed out".into()),
+            Ok(Ok(node_ids)) => {
+                let tried = node_ids.len().min(PKARR_PEERS_TO_TRY);
+                let drive = drive.as_str();
+                let attempts = node_ids.iter().take(PKARR_PEERS_TO_TRY).map(|node_id| {
+                    Box::pin(async move {
+                        tokio::time::timeout(
+                            PEER_SYNC_ATTEMPT_TIMEOUT,
+                            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(
+                                node_id, drive, store,
+                            ),
+                        )
+                        .await
+                        .map_err(|_| format!("{}: timed out", short_id(node_id)))?
+                        .map_err(|e| format!("{}: {e}", short_id(node_id)))
+                    })
+                });
+                match futures::future::select_ok(attempts).await {
+                    Ok((count, _)) => imported += count as i32,
+                    Err(last) => errors.push(format!(
+                        "None of the {tried} devices that announced your drive answered ({last})"
+                    )),
                 }
             }
             Ok(Err(e)) => errors.push(format!("No peer on network: {e}")),

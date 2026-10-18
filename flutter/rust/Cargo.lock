@@ -3745,6 +3745,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_lib",
  "flutter_rust_bridge",
+ "futures",
  "getrandom 0.3.4",
  "serde",
  "serde_json",
