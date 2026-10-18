@@ -129,11 +129,12 @@ function logFetchFailure(subject: string, e: unknown): void {
   const message = e instanceof Error ? e.message : String(e);
   const unreachable =
     isTransportError(e as Error) ||
-    // The own server's `/path` proxy answers 5xx when the origin it was asked
-    // to fetch is down.
+    // The own server's `/path` proxy answers 502 when the origin it was asked
+    // to fetch is down; its message carries the server's marker (see
+    // UPSTREAM_UNREACHABLE_MARKER in atomic_lib), possibly behind a prefix.
     (e instanceof AtomicError &&
       e.type === ErrorType.Server &&
-      message.startsWith('Error handling path Endpoint'));
+      message.includes('Upstream unreachable: '));
 
   if (!unreachable) {
     console.error(subject, e);

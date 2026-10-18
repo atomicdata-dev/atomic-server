@@ -51,4 +51,36 @@ describe('Client.fetchResourceHTTP unreachable server', () => {
 
     expect(error).toHaveBeenCalledTimes(1);
   });
+
+  it('treats a proxy 502 naming an unreachable upstream as one warning', async ({
+    expect,
+  }) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = new Client(
+      async () =>
+        new Response(
+          'Error handling path Endpoint: Upstream unreachable: Error when fetching https://down.example/x',
+          { status: 502 },
+        ),
+    );
+
+    await client.fetchResourceHTTP('https://down.example/a');
+    await client.fetchResourceHTTP('https://down.example/b');
+
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps logging other handler errors loudly', async ({ expect }) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const client = new Client(
+      async () =>
+        new Response('Error handling path Endpoint: bug', { status: 500 }),
+    );
+
+    await client.fetchResourceHTTP('https://up.example/a');
+
+    expect(error).toHaveBeenCalledTimes(1);
+  });
 });
