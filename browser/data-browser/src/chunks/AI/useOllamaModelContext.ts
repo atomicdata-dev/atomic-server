@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { effectFetch } from '@helpers/effectFetch';
+import { useLocalNetworkBlocked } from '@helpers/localNetworkAccess';
 import { useAISettings } from '@components/AI/AISettingsContext';
 
 type OllamaShowResponse = {
@@ -35,7 +36,9 @@ export function useOllamaModelContextLength(
   modelId: string | undefined,
 ): number | undefined {
   const { ollamaUrl } = useAISettings();
-  const cacheKey = ollamaUrl && modelId ? `${ollamaUrl}:${modelId}` : undefined;
+  const blocked = useLocalNetworkBlocked(ollamaUrl);
+  const cacheKey =
+    ollamaUrl && modelId && !blocked ? `${ollamaUrl}:${modelId}` : undefined;
   const cachedLength = cacheKey ? contextLengthCache.get(cacheKey) : undefined;
 
   const [fetchedLength, setFetchedLength] = useState<

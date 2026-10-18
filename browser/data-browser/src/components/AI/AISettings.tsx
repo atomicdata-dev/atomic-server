@@ -13,6 +13,7 @@ import { effectFetch } from '@helpers/effectFetch';
 import { transition } from '@helpers/transition';
 import { useAISettings } from './AISettingsContext';
 import { useIsOllamaUrlValid } from './useIsOllamaUrlValid';
+import { LocalNetworkNotice } from './LocalNetworkNotice';
 import { Details } from '@components/Details';
 import {
   SettingsContent,
@@ -93,7 +94,8 @@ const AISettings: React.FC = () => {
     genFeaturesModel.provider,
   );
 
-  const { valid: isOllamaUrlValid } = useIsOllamaUrlValid(ollamaUrl);
+  const { valid: isOllamaUrlValid, blocked: ollamaBlocked } =
+    useIsOllamaUrlValid(ollamaUrl);
 
   useEffect(() => {
     if (!openRouterApiKey) {
@@ -317,6 +319,7 @@ const AISettings: React.FC = () => {
                                 Ollama
                               </a>
                             </Subtle>
+                            <LocalNetworkNotice url={ollamaUrl} />
                             <ConditionalSettings
                               fullWidth
                               gap='0.5rem'
@@ -324,6 +327,7 @@ const AISettings: React.FC = () => {
                             >
                               <Row center gap='1ch'>
                                 {ollamaUrl &&
+                                  !ollamaBlocked &&
                                   (isOllamaUrlValid ? (
                                     <FaCheck
                                       title='Server found'

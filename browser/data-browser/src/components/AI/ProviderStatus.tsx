@@ -7,12 +7,15 @@ export interface ProviderStatusProps {
   connected: boolean;
   configured: boolean;
   checking?: boolean;
+  /** Waiting for the user to allow local network access. */
+  blocked?: boolean;
 }
 
 export const ProviderStatus: React.FC<ProviderStatusProps> = ({
   connected,
   configured,
   checking,
+  blocked,
 }) => {
   const theme = useTheme();
 
@@ -25,6 +28,18 @@ export const ProviderStatus: React.FC<ProviderStatusProps> = ({
       <Row center gap='1ch'>
         <FaCheck title='Connected' color={theme.colors.main} />
         <Subtle>Connected</Subtle>
+      </Row>
+    );
+  }
+
+  if (blocked) {
+    return (
+      <Row center gap='1ch'>
+        <FaTriangleExclamation
+          title='Waiting for permission'
+          color={theme.colors.warning}
+        />
+        <Subtle>Waiting for permission</Subtle>
       </Row>
     );
   }

@@ -312,6 +312,7 @@ msgstr "Ollama"
 
 #: src/chunks/AI/AISetupPanel.tsx
 #: src/chunks/Templates/DriveTemplateSetup.tsx
+#: src/components/AI/LocalNetworkNotice.tsx
 msgid "Continue"
 msgstr "Continuer"
 
@@ -13127,4 +13128,13 @@ msgstr ""
 #. 0: Object.keys(slugs).join(', ') || 'none yet'
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+msgstr ""
+
+#: src/components/AI/LocalNetworkNotice.tsx
+msgid "Ollama runs on your own computer. Your browser will ask whether this site may access other apps and services on this device. That is only used to talk to Ollama; nothing else on your network is scanned."
+msgstr ""
+
+#: src/components/AI/ProviderStatus.tsx
+#: src/components/AI/ProviderStatus.tsx
+msgid "Waiting for permission"
 msgstr ""

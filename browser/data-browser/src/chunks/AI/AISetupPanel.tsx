@@ -17,6 +17,7 @@ import { OutlinedSection } from '@components/OutlinedSection';
 import { useIsOllamaUrlValid } from '@components/AI/useIsOllamaUrlValid';
 import { ProviderStatus } from '@components/AI/ProviderStatus';
 import { Button } from '@components/Button';
+import { LocalNetworkNotice } from '@components/AI/LocalNetworkNotice';
 import { effectFetch } from '@helpers/effectFetch';
 import { DEFAULT_CHAT_MODEL } from '@components/AI/AISettingsContext';
 import type { AIModelIdentifier } from './types';
@@ -113,7 +114,8 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
     false,
   );
 
-  const { checking: ollamaChecking } = useIsOllamaUrlValid(ollamaUrl);
+  const { checking: ollamaChecking, blocked: ollamaBlocked } =
+    useIsOllamaUrlValid(ollamaUrl);
   const hasProvider = availableProviders.length > 0;
   const [step, setStep] = useState<SetupStep>(() =>
     getInitialStep(hasProvider),
@@ -328,7 +330,9 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
                 connected={ollamaAvailable}
                 configured={Boolean(ollamaUrl)}
                 checking={ollamaChecking}
+                blocked={ollamaBlocked}
               />
+              <LocalNetworkNotice url={ollamaUrl} />
               <FullWidthField>
                 <InputStyled
                   type='url'

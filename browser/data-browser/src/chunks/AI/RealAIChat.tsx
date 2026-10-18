@@ -82,6 +82,7 @@ import { useVectorIndexStatus } from '@hooks/useVectorIndexStatus';
 import { useLocalStorage } from '@hooks/useLocalStorage';
 import { Spinner } from '@components/Spinner';
 import { LiveConversation } from './LiveConversation';
+import { useLocalNetworkBlocked } from '@helpers/localNetworkAccess';
 
 const AIChatInput = React.lazy(
   () => import('@chunks/RTE/AIChatInput/AsyncAIChatInput'),
@@ -182,9 +183,10 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
   } = useOpenRouterModels();
 
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const ollamaBlocked = useLocalNetworkBlocked(ollamaUrl);
 
   useEffect(() => {
-    if (!ollamaUrl) {
+    if (!ollamaUrl || ollamaBlocked) {
       setOllamaModels([]);
 
       return;
@@ -204,7 +206,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
         setOllamaModels([]);
       },
     );
-  }, [ollamaUrl]);
+  }, [ollamaUrl, ollamaBlocked]);
 
   const currencyFormatter = useRef(
     new Intl.NumberFormat('en-US', {

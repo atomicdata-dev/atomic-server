@@ -1,4 +1,5 @@
 import { effectFetch } from '@helpers/effectFetch';
+import { useLocalNetworkBlocked } from '@helpers/localNetworkAccess';
 import { useDeferredValue, useEffect, useState } from 'react';
 
 const MODEL_API_ROUTE = '/api/tags';
@@ -13,18 +14,21 @@ export type OllamaUrlStatus = {
   valid: boolean;
   /** A URL is configured but no completed check has landed for it yet. */
   checking: boolean;
+  /** Not probed yet: the browser would ask for local network access first. */
+  blocked: boolean;
 };
 
 export const useIsOllamaUrlValid = (
   url: string | undefined,
 ): OllamaUrlStatus => {
   const deferredUrl = useDeferredValue(url);
+  const blocked = useLocalNetworkBlocked(deferredUrl);
   const [checkResult, setCheckResult] = useState<OllamaCheckResult | null>(
     null,
   );
 
   useEffect(() => {
-    if (!deferredUrl) {
+    if (!deferredUrl || blocked) {
       return;
     }
 
@@ -43,10 +47,14 @@ export const useIsOllamaUrlValid = (
         setCheckResult({ url: deferredUrl, valid: false });
       },
     );
-  }, [deferredUrl]);
+  }, [deferredUrl, blocked]);
 
   if (!url) {
-    return { valid: false, checking: false };
+    return { valid: false, checking: false, blocked: false };
+  }
+
+  if (blocked) {
+    return { valid: false, checking: false, blocked: true };
   }
 
   // A settled result exists only when the completed check matches the URL we're
@@ -58,5 +66,6 @@ export const useIsOllamaUrlValid = (
   return {
     valid: settled && checkResult.valid,
     checking: !settled,
+    blocked: false,
   };
 };
