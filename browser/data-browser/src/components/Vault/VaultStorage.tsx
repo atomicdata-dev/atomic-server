@@ -262,8 +262,8 @@ export function VaultStorage({
                   </ul>
                   {devices && devices.length > 0 && (
                     <Hint>
-                      Each device&apos;s share is listed under Devices below,
-                      where you can remove it.
+                      Each browser or app&apos;s share is listed below, where
+                      you can remove it.
                     </Hint>
                   )}
                 </Explain>
@@ -310,7 +310,11 @@ export function VaultStorage({
 
               {devices && devices.length > 0 && (
                 <Section data-testid='vault-devices'>
-                  <strong>Devices</strong>
+                  <strong>Browsers and apps backing up here</strong>
+                  <Hint as='p'>
+                    Every browser or app you signed in on sends its own changes
+                    to this backup. Old or unused ones can pile up.
+                  </Hint>
                   <ul>
                     {devices.map(d => (
                       <li
@@ -320,7 +324,7 @@ export function VaultStorage({
                         <span>
                           {deviceLabel(d.device_pubkey)}
                           {currentDevice === d.device_pubkey && (
-                            <> · This device</>
+                            <> · This browser</>
                           )}
                           <Hint>
                             {formatBytes(d.pack_bytes)}
@@ -335,7 +339,7 @@ export function VaultStorage({
                           onClick={() => setRemoveDevice(d)}
                           disabled={busy}
                         >
-                          Remove history…
+                          Remove its history…
                         </Button>
                       </li>
                     ))}
@@ -460,7 +464,7 @@ export function VaultStorage({
           bindShow={open => {
             if (!open) setRemoveDevice(null);
           }}
-          title='Remove the history of this device?'
+          title='Remove the saved history of this browser or app?'
           confirmLabel='Remove history'
           theme={ConfirmationDialogTheme.Alert}
           onConfirm={() => {
@@ -480,12 +484,13 @@ export function VaultStorage({
         >
           <p data-testid='vault-remove-warning'>
             {removeDevice
-              ? `About ${formatBytes(removeDevice.pack_bytes)} of change history from device ${deviceLabel(removeDevice.device_pubkey)} will be removed from the backup.`
+              ? `About ${formatBytes(removeDevice.pack_bytes)} of saved history from ${deviceLabel(removeDevice.device_pubkey)} will be removed.`
               : ''}
           </p>
           <p>
-            Edits that only this device made and never synced to another device
-            are lost from the backup. Your workspace itself is not touched.
+            This deletes the changes it sent to your backup. Edits made only
+            there, and never synced anywhere else, are lost. Your workspace and
+            your other browsers are not touched.
           </p>
           <p>This cannot be undone.</p>
         </ConfirmationDialog>
@@ -621,15 +626,15 @@ function historyRowsFor(h: VaultHistoryUsage): HistoryRow[] {
       id: 'tip',
       label:
         h.lanes === 1
-          ? 'Newest changes of 1 device'
-          : `Newest changes of each of ${h.lanes} devices`,
+          ? 'Latest changes from 1 browser or app'
+          : `Latest changes from each of ${h.lanes} browsers and apps`,
       hint: 'Always kept',
       bytes: h.tip_bytes,
     },
     {
       id: 'uncovered',
       label: 'Changes not in a snapshot yet',
-      hint: 'A backup from that device adds them',
+      hint: 'The next backup from that browser or app adds them',
       bytes: h.uncovered_bytes,
     },
     {

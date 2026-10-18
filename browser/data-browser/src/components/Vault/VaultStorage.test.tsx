@@ -200,7 +200,9 @@ it('explains what remains of the history when the server says', async () => {
 
   const explain = await screen.findByTestId('vault-history-explain');
 
-  expect(explain.textContent).toContain('Newest changes of each of 2 devices');
+  expect(explain.textContent).toContain(
+    'Latest changes from each of 2 browsers and apps',
+  );
   expect(screen.getByTestId('vault-history-uncovered').textContent).toContain(
     '80 MB',
   );
@@ -329,10 +331,10 @@ it('shows devices with a short label and marks this device', async () => {
 
   const mine = await screen.findByTestId('vault-device-aaaaaaaa1111');
   expect(mine.textContent).toContain('aaaaaaaa');
-  expect(mine.textContent).toContain('This device');
+  expect(mine.textContent).toContain('This browser');
   expect(
     screen.getByTestId('vault-device-bbbbbbbb2222').textContent,
-  ).not.toContain('This device');
+  ).not.toContain('This browser');
 });
 
 it('warns about unsynced edits before removing a device history', async () => {
@@ -345,7 +347,7 @@ it('warns about unsynced edits before removing a device history', async () => {
   );
 
   const dialog = lastDialog();
-  expect(dialog.textContent).toContain('never synced to another device');
+  expect(dialog.textContent).toContain('never synced anywhere else');
   expect(dialog.textContent).toContain('workspace itself is not touched');
   expect(removeMock).not.toHaveBeenCalled();
 

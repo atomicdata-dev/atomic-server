@@ -11420,7 +11420,6 @@ msgstr ""
 msgid "No other devices yet — your data is safe on this one."
 msgstr ""
 
-#: src/components/Vault/VaultStorage.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Devices"
 msgstr ""
@@ -12805,25 +12804,12 @@ msgid "{0} files"
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
-msgid "Newest changes of 1 device"
-msgstr ""
-
-#. 0: h.lanes
-#: src/components/Vault/VaultStorage.tsx
-msgid "Newest changes of each of {0} devices"
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Always kept"
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Changes not in a snapshot yet"
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "A backup from that device adds them"
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
@@ -13138,36 +13124,11 @@ msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(m
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
-msgid "Each device's share is listed under Devices below, where you can remove it."
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
 msgid "Delete"
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older snapshots are removed automatically."
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "· This device"
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Remove history…"
-msgstr ""
-
-#. 0: formatBytes(removeDevice.pack_bytes); 1: deviceLabel(removeDevice.device_pubkey)
-#: src/components/Vault/VaultStorage.tsx
-msgid "About {0} of change history from device {1} will be removed from the backup."
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Edits that only this device made and never synced to another device are lost from the backup. Your workspace itself is not touched."
-msgstr ""
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Remove the history of this device?"
 msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
@@ -13193,4 +13154,50 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Could not delete the snapshot."
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Each browser or app's share is listed below, where you can remove it."
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "· This browser"
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove its history…"
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Browsers and apps backing up here"
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Every browser or app you signed in on sends its own changes to this backup. Old or unused ones can pile up."
+msgstr ""
+
+#. 0: formatBytes(removeDevice.pack_bytes); 1: deviceLabel(removeDevice.device_pubkey)
+#: src/components/Vault/VaultStorage.tsx
+msgid "About {0} of saved history from {1} will be removed."
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "This deletes the changes it sent to your backup. Edits made only there, and never synced anywhere else, are lost. Your workspace and your other browsers are not touched."
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove the saved history of this browser or app?"
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Latest changes from 1 browser or app"
+msgstr ""
+
+#. 0: h.lanes
+#: src/components/Vault/VaultStorage.tsx
+msgid "Latest changes from each of {0} browsers and apps"
+msgstr ""
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "The next backup from that browser or app adds them"
 msgstr ""
