@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -81,30 +83,27 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   Future<void> _load() async {
+    List<String> drives = const [];
     try {
-      final drives = await _backend.listDrives();
-      final names = <String, String>{};
-      for (final d in drives) {
-        try {
-          names[d] = await _backend.getDriveName(d);
-        } catch (_) {
-          names[d] = '';
-        }
-      }
-      final active = _backend.getActiveDrive();
       final agent = await _backend.getActiveAgent();
       final deviceName = await _backend.getDeviceName();
       final peerId = await _backend.getPeerId();
       if (!mounted) return;
+      // Show the screen now; a person with many drives must not wait for
+      // every drive's name before seeing their own devices.
       setState(() {
         _agent = agent;
         _deviceName = deviceName;
         _peerId = peerId;
-        _activeDrive = active;
-        _drives = names;
+        _activeDrive = _backend.getActiveDrive();
         _error = null;
         _loading = false;
       });
+      // Listing the drives reads each one, which is slow with many: after the
+      // screen is up.
+      drives = await _backend.listDrives();
+      if (!mounted) return;
+      setState(() => _drives = {for (final d in drives) d: _drives[d] ?? ''});
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -113,7 +112,19 @@ class _SyncScreenState extends State<SyncScreen> {
         });
       }
     }
-    await _loadAccount();
+    unawaited(_loadAccount());
+    // Names fill in as they arrive, in parallel, each with a deadline.
+    await Future.wait([
+      for (final d in drives)
+        () async {
+          try {
+            final name = await _backend
+                .getDriveName(d)
+                .timeout(const Duration(seconds: 5));
+            if (mounted) setState(() => _drives[d] = name);
+          } catch (_) {}
+        }(),
+    ]);
   }
 
   Future<void> _loadAccount() async {
