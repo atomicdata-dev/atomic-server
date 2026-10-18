@@ -8,6 +8,7 @@ import '../assistant/assistant_api.dart';
 import '../assistant/chats_screen.dart' show timeAgo;
 import '../assistant/resource_web_view.dart';
 import '../atomic/account_store.dart';
+import '../atomic/atomic_client.dart';
 import '../atomic/settings_backend.dart';
 import '../theme.dart';
 
@@ -327,29 +328,51 @@ class _SyncScreenState extends State<SyncScreen> {
                     onServerChanged: _load,
                   ),
                 ),
-                _group(c, 'Workspaces', [
-                  for (final d in _drives.keys)
-                    ListTile(
-                      leading: Icon(
-                          d == _activeDrive
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: c.main),
-                      title: Text(_driveLabel(d)),
-                      subtitle: d == _activeDrive
-                          ? const Text('Active workspace')
-                          : null,
-                      onTap: d == _activeDrive ? null : () => _switch(d),
-                    ),
-                  ListTile(
-                    leading: Icon(Icons.add, color: c.main),
-                    title: const Text('New workspace'),
-                    onTap: _newWorkspace,
-                  ),
-                ]),
+                _workspaces(c),
               ],
             ),
     );
+  }
+
+  /// The workspaces that are on this device, each once. Listed drives that
+  /// have not been received (no name yet) are one line, not forty.
+  Widget _workspaces(AppColors c) {
+    final seen = <String>{};
+    final shown = <String>[];
+    var elsewhere = 0;
+    for (final d in _drives.keys) {
+      if (!seen.add(AtomicClient.driveKey(d))) continue;
+      final named = (_drives[d] ?? '').isNotEmpty;
+      if (named || d == _activeDrive) {
+        shown.add(d);
+      } else {
+        elsewhere++;
+      }
+    }
+    return _group(c, 'Workspaces', [
+      for (final d in shown)
+        ListTile(
+          leading: Icon(
+              d == _activeDrive
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: c.main),
+          title: Text(_driveLabel(d)),
+          subtitle: d == _activeDrive ? const Text('Active workspace') : null,
+          onTap: d == _activeDrive ? null : () => _switch(d),
+        ),
+      if (elsewhere > 0)
+        ListTile(
+          leading: Icon(Icons.cloud_download_outlined, color: c.textSecondary),
+          title: Text(
+              '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet'),
+        ),
+      ListTile(
+        leading: Icon(Icons.add, color: c.main),
+        title: const Text('New workspace'),
+        onTap: _newWorkspace,
+      ),
+    ]);
   }
 
   Widget _group(AppColors c, String title, List<Widget> children) => Padding(

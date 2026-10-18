@@ -269,6 +269,18 @@ void main() {
       expect((recent.single.title, recent.single.openedAt), ('T', 9));
     });
 
+    test('lists each drive once, only those that are on the device', () {
+      final shown = AtomicClient.visibleDrives([
+        (subject: 'did:ad:AAA', name: 'Private'),
+        (subject: 'atomic:AAA', name: 'Private'),
+        (subject: 'did:ad:BBB', name: ''),
+        (subject: 'did:ad:CCC', name: 'Team'),
+        (subject: 'did:ad:DDD', name: ''),
+      ], active: 'atomic:DDD');
+      expect(shown.map((d) => d.subject),
+          ['did:ad:AAA', 'did:ad:CCC', 'did:ad:DDD']);
+    });
+
     test('timeAgo', () {
       final now = DateTime(2026, 10, 18, 12);
       int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;

@@ -277,7 +277,9 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
             ),
           ),
         for (final server in _servers) _serverCard(theme, server),
-        for (final peer in _peers) _peerCard(theme, peer),
+        for (final peer in _peers)
+          if (!_servers.any((s) => _isServerPeer(s, peer)))
+            _peerCard(theme, peer),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -291,7 +293,23 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     );
   }
 
+  /// Whether a paired device *is* this server: the same always-on device
+  /// reached two ways, over https and over Iroh. Pairing with a server's code
+  /// names the peer after it (`atomic.place (node1.example.org)`), and the
+  /// active server reports its own node id. One device is listed once.
+  bool _isServerPeer(String server, Map<String, String> peer) {
+    final host = Uri.tryParse(server)?.host.toLowerCase() ?? '';
+    final name = (peer['name'] ?? '').toLowerCase();
+    if (host.isNotEmpty && name.contains(host)) return true;
+    final nodeId = _info.nodeId;
+    return nodeId != null &&
+        sameOrigin(server, _active) &&
+        isLiveAtomicPeer(peer['node_id'] ?? '', {nodeId});
+  }
+
   Widget _serverCard(ThemeData theme, String server) {
+    final peer = _peers.where((p) => _isServerPeer(server, p)).firstOrNull;
+    final peerSynced = int.tryParse(peer?['last_synced'] ?? '');
     final isActive = sameOrigin(server, _active);
     final scheme = theme.colorScheme;
 
@@ -343,6 +361,21 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
             ],
           ),
           if (isActive) ..._activeDetails(theme),
+          if (peer != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                [
+                  if (isLiveAtomicPeer(peer['node_id'] ?? '', _livePeerIds))
+                    'Connected'
+                  else
+                    'Paired',
+                  if (peerSynced != null)
+                    'last synced ${_relativeTime(peerSynced)}',
+                ].join(' · '),
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

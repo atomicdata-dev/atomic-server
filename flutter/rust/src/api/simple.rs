@@ -961,6 +961,9 @@ pub async fn resume_app_session(
     // there is a loading state for it, not a spinning button.
     if drive_resource_exists(store.as_ref()).await {
         let _ = ensure_sync_connectivity(store.as_ref()).await;
+        if let Some(home) = store.get_active_drive() {
+            tokio::spawn(follow_listed_drives(home));
+        }
 
         return Ok("ok".into());
     }
@@ -1071,6 +1074,10 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         }
     }
 
+    if drive_resource_exists(store).await {
+        tokio::spawn(follow_listed_drives(drive.clone()));
+    }
+
     let live = atomic_lib::sync::peer::live_peer_count() as u32;
     let live_ids: std::collections::HashSet<String> = atomic_lib::sync::peer::live_peer_ids()
         .into_iter()
@@ -1160,23 +1167,98 @@ pub async fn connect_home_server(origin: String) -> Result<(), String> {
     Ok(())
 }
 
-/// The drives the personal drive lists, other than `home`: fetched from the
-/// server the session is on. A drive hosted elsewhere is skipped, not an error.
+/// Node ids of the live peers, then the known (paired) ones, minus `skip`.
+fn peer_ids_to_try(skip: &std::collections::HashSet<String>) -> Vec<String> {
+    let mut ids = atomic_lib::sync::peer::live_peer_ids();
+    let known: Vec<serde_json::Value> =
+        serde_json::from_str(&get_known_peers()).unwrap_or_default();
+    for peer in known {
+        if let Some(id) = peer.get("node_id").and_then(|v| v.as_str()) {
+            if !id.is_empty() && !ids.iter().any(|i| i == id) {
+                ids.push(id.to_string());
+            }
+        }
+    }
+    ids.retain(|id| !skip.contains(id));
+    ids
+}
+
+static OTHER_DRIVES_RUNNING: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// The drives the personal drive lists that this device does not hold yet:
+/// fetched from the server the session is on, or else from a live paired
+/// device. Each drive is tried once per run and a drive nobody here has is
+/// skipped, not an error. One run at a time, in the background.
 async fn follow_listed_drives(home: String) {
-    let Ok(store) = db() else { return };
+    use std::sync::atomic::Ordering;
+    if OTHER_DRIVES_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let Ok(store) = db() else {
+        OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+        return;
+    };
     let drives = match store.list_drives().await {
         Ok(drives) => drives,
         Err(e) => {
             tracing::warn!("[home] cannot list drives: {e}");
+            OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
             return;
         }
     };
-    for drive in drives.into_iter().filter(|d| d.subject != home) {
-        match ws_sync::follow_drive(&drive.subject).await {
-            Ok(()) => tracing::info!("[home] following drive {}", drive.subject),
-            Err(e) => tracing::info!("[home] drive {} not on this server: {e}", drive.subject),
+    let key = |s: &str| {
+        s.trim_start_matches("did:ad:")
+            .trim_start_matches("atomic:")
+            .split('?')
+            .next()
+            .unwrap_or("")
+            .to_string()
+    };
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(key(&home));
+    let (mut followed, mut missing) = (0, 0);
+    let mut dead_peers = std::collections::HashSet::<String>::new();
+    for drive in drives {
+        if !seen.insert(key(&drive.subject)) || store.has_resource_locally(&drive.subject) {
+            continue;
+        }
+        let mut got = ws_sync::follow_drive(&drive.subject).await.is_ok();
+        if !got {
+            // A paired device may have it: the ones connected now, then the
+            // others (a device that sleeps still answers when dialled). One
+            // that did not answer is not asked again in this run.
+            for node_id in peer_ids_to_try(&dead_peers) {
+                let attempt = tokio::time::timeout(
+                    PEER_SYNC_ATTEMPT_TIMEOUT,
+                    atomic_lib::sync::peer::sync_drive_with_peer_if_needed(
+                        &node_id,
+                        &drive.subject,
+                        store.as_ref(),
+                    ),
+                )
+                .await;
+                match attempt {
+                    Ok(Ok(_)) if store.has_resource_locally(&drive.subject) => {
+                        got = true;
+                        break;
+                    }
+                    // Dialled and answered, just not hosting this drive.
+                    Ok(Ok(_)) | Ok(Err(_)) => {}
+                    Err(_) => {
+                        dead_peers.insert(node_id);
+                    }
+                }
+            }
+        }
+        if got {
+            followed += 1;
+        } else {
+            missing += 1;
         }
     }
+    tracing::info!("[home] other drives: {followed} followed, {missing} not available here");
+    OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
 }
 
 /// Iroh: known peers, then pkarr discover. Returns true if any sync ran.

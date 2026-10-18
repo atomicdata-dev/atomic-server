@@ -82,13 +82,36 @@ class AtomicClient {
   static Future<List<String>> listDrives() => ffi.listDrives();
 
   /// The agent's drives with their names (empty when a drive has none yet).
-  static Future<List<DriveInfo>> listDrivesWithNames() async => [
+  static Future<List<DriveInfo>> listDrivesWithNames() async => visibleDrives([
         for (final e in jsonDecode(await ffi.listDrivesWithNames()) as List)
           (
             subject: e['subject'] as String,
             name: e['name'] as String? ?? '',
           ),
-      ];
+      ], active: getActiveDrive());
+
+  /// The identifier without its scheme: `did:ad:X` and `atomic:X` are one drive.
+  static String driveKey(String subject) =>
+      subject.replaceFirst(RegExp(r'^(did:ad:|atomic:)'), '').split('?').first;
+
+  /// The drives worth showing: each drive once (the personal drive is listed
+  /// under both spellings), and only those that are on this device with a name
+  /// — a drive the personal drive lists but this device has not received has
+  /// nothing to show yet. The [active] drive stays whatever its state.
+  @visibleForTesting
+  static List<DriveInfo> visibleDrives(List<DriveInfo> all, {String? active}) {
+    final seen = <String>{};
+    final out = <DriveInfo>[];
+    for (final d in all) {
+      final key = driveKey(d.subject);
+      if (!seen.add(key)) continue;
+      if (d.name.isEmpty && (active == null || driveKey(active) != key)) {
+        continue;
+      }
+      out.add(d);
+    }
+    return out;
+  }
 
   static String? getActiveDrive() => ffi.getActiveDrive();
 
