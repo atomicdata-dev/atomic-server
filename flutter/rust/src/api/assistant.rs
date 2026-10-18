@@ -104,12 +104,18 @@ pub fn note_resource_opened(drive: String, subject: String) {
 pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, String> {
     let store = db()?;
     let mut out = Vec::new();
-    for (subject, opened_at) in recents::opened(&drive, limit as usize * 2) {
+    let opened = recents::opened(&drive, limit as usize * 2);
+    tracing::info!("[recents] {} opened in {drive}", opened.len());
+    for (subject, opened_at) in opened {
         if out.len() >= limit as usize {
             break;
         }
-        let Ok(resource) = store.get_resource(&Subject::from(subject.as_str())).await else {
-            continue;
+        let resource = match store.get_resource(&Subject::from(subject.as_str())).await {
+            Ok(resource) => resource,
+            Err(e) => {
+                tracing::warn!("[recents] {subject} not readable: {e}");
+                continue;
+            }
         };
         out.push(json!({
             "subject": subject,
