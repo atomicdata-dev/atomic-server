@@ -35,6 +35,30 @@ async function waitForEncryptionKey(agent: string) {
     .toBe(true);
 }
 
+/**
+ * Why a document is missing from someone's Created list: can they open it at
+ * all (rights), what does the section show, and is the server connected. The
+ * three causes read differently here, and the plain "not found" does not tell
+ * them apart.
+ */
+async function whatAliceSees(page: Page, subject: string) {
+  return page
+    .evaluate(async doc => {
+      const store = window.store;
+      const resource = await store.getResource(doc).catch(error => error);
+
+      return {
+        opens: resource instanceof Error ? resource.message : !resource.error,
+        error: resource instanceof Error ? undefined : resource.error?.message,
+        serverConnected: store.serverConnected,
+        created:
+          document.querySelector('section[aria-label="Created"]')
+            ?.textContent ?? 'no Created section',
+      };
+    }, subject)
+    .catch(error => ({ diagnosticsFailed: String(error) }));
+}
+
 test.describe('agent page', () => {
   test.beforeEach(before);
 
@@ -80,7 +104,7 @@ test.describe('agent page', () => {
         folderClass: dataBrowser.classes.folder,
       },
     );
-    await bob.evaluate(
+    const bobsPlan = await bob.evaluate(
       async ({ parent, name, folderClass }) => {
         const store = window.store;
         await store.getResource(parent);
@@ -91,6 +115,8 @@ test.describe('agent page', () => {
         });
         await res.save();
         store.notifyResourceManuallyCreated(res);
+
+        return res.subject;
       },
       {
         parent: folder,
@@ -129,7 +155,16 @@ test.describe('agent page', () => {
     await expect(async () => {
       await page.reload();
       await expect(page.getByText('Bobs plan')).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 60_000 });
+    })
+      .toPass({ timeout: 60_000 })
+      .catch(async error => {
+        throw new Error(
+          `Bob's document never reached Alice's Created list: ${JSON.stringify(
+            await whatAliceSees(page, bobsPlan),
+          )}`,
+          { cause: error },
+        );
+      });
     await page.getByRole('button', { name: 'Add a note' }).click();
     const editor = page.locator(
       'section[aria-label="Your notes"] [contenteditable="true"]',
