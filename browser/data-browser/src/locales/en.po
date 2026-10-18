@@ -11137,10 +11137,13 @@ msgid "Could not read storage use."
 msgstr "Could not read storage use."
 
 #. 0: formatBytes(result.bytes_reclaimed)
+#. 0: formatBytes(result.bytes_reclaimed)
+#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Freed {0}."
 msgstr "Freed {0}."
 
+#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Nothing to free."
@@ -11170,6 +11173,7 @@ msgstr "Free up space"
 msgid "Change history"
 msgstr "Change history"
 
+#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Snapshots"
 msgstr "Snapshots"
@@ -11429,6 +11433,7 @@ msgstr "Discover integrations"
 msgid "No other devices yet — your data is safe on this one."
 msgstr "No other devices yet — your data is safe on this one."
 
+#: src/components/Vault/VaultStorage.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Devices"
 msgstr "Devices"
@@ -12558,6 +12563,8 @@ msgid "Discard history"
 msgstr "Discard history"
 
 #: src/components/Vault/VaultStorage.tsx
+#: src/components/Vault/VaultStorage.tsx
+#: src/components/Vault/VaultStorage.tsx
 msgid "This cannot be undone."
 msgstr "This cannot be undone."
 
@@ -12819,6 +12826,7 @@ msgstr "Newest changes of 1 device"
 msgid "Newest changes of each of {0} devices"
 msgstr "Newest changes of each of {0} devices"
 
+#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Always kept"
 msgstr "Always kept"
@@ -13141,3 +13149,61 @@ msgstr "Formula"
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Each device's share is listed under Devices below, where you can remove it."
+msgstr "Each device's share is listed under Devices below, where you can remove it."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete"
+msgstr "Delete"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Older snapshots are removed automatically."
+msgstr "Older snapshots are removed automatically."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "· This device"
+msgstr "· This device"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove history…"
+msgstr "Remove history…"
+
+#. 0: formatBytes(removeDevice.pack_bytes); 1: deviceLabel(removeDevice.device_pubkey)
+#: src/components/Vault/VaultStorage.tsx
+msgid "About {0} of change history from device {1} will be removed from the backup."
+msgstr "About {0} of change history from device {1} will be removed from the backup."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Edits that only this device made and never synced to another device are lost from the backup. Your workspace itself is not touched."
+msgstr "Edits that only this device made and never synced to another device are lost from the backup. Your workspace itself is not touched."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove the history of this device?"
+msgstr "Remove the history of this device?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove history"
+msgstr "Remove history"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not remove the history."
+msgstr "Could not remove the history."
+
+#. 0: formatBytes(deleteSnapshot.bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+msgstr "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete this snapshot?"
+msgstr "Delete this snapshot?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete snapshot"
+msgstr "Delete snapshot"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not delete the snapshot."
+msgstr "Could not delete the snapshot."

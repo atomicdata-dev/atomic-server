@@ -14,11 +14,17 @@ import {
   ConfirmationDialog,
   ConfirmationDialogTheme,
 } from '../ConfirmationDialog';
+import { formatTimeAgo } from '../../helpers/formatTimeAgo';
 import {
   type CompactResult,
+  deleteVaultSnapshot,
   freeUpVaultStorage,
   getVaultUsage,
+  removeVaultDeviceHistory,
+  type VaultDeviceUsage,
+  type VaultFreeUpResult,
   type VaultHistoryUsage,
+  type VaultSnapshotUsage,
   type VaultUsage,
 } from '../../helpers/managed/vault';
 
@@ -37,6 +43,7 @@ export function VaultStorage({
   busy: parentBusy = false,
   suspended = false,
   onCompact,
+  currentDevice = null,
 }: {
   drivePseudonym: string;
   /** A backup, restore or other pass is running somewhere else in the row. */
@@ -48,6 +55,8 @@ export function VaultStorage({
    * when it failed; the host reports why.
    */
   onCompact?: (includeUndoWindow: boolean) => Promise<CompactResult | null>;
+  /** This device's public key, to mark its row among the devices. */
+  currentDevice?: string | null;
   /** Called after storage was freed, so the host can refresh its numbers. */
   onChanged?: () => void;
   /** Called once the dialog has closed. The row's "Manage storage" action opens it. */
@@ -63,6 +72,11 @@ export function VaultStorage({
   const [working, setWorking] = useState(false);
   const busy = working || parentBusy;
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [removeDevice, setRemoveDevice] = useState<VaultDeviceUsage | null>(
+    null,
+  );
+  const [deleteSnapshot, setDeleteSnapshot] =
+    useState<VaultSnapshotUsage | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Reading can fail for reasons that are nobody's fault (the account does not
@@ -113,6 +127,32 @@ export function VaultStorage({
     }
   }
 
+  /** Remove one device's history or one snapshot, report it, refresh usage. */
+  async function manage(
+    action: () => Promise<VaultFreeUpResult>,
+    failure: string,
+  ) {
+    setWorking(true);
+    setMessage(null);
+    setError(null);
+
+    try {
+      const result = await action();
+
+      setMessage(
+        result.bytes_reclaimed > 0
+          ? `Freed ${formatBytes(result.bytes_reclaimed)}.`
+          : 'Nothing to free.',
+      );
+      await load();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : failure);
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function compact(includeUndoWindow: boolean) {
     if (!onCompact) return;
 
@@ -142,6 +182,8 @@ export function VaultStorage({
   const segments = usage ? buildSegments(usage) : [];
   const history = usage?.history;
   const historyRows = history ? historyRowsFor(history) : [];
+  const devices = history?.devices;
+  const snapshots = usage?.snapshots;
 
   return (
     <Dialog {...dialogProps} labelledBy={titleId} width='34rem'>
@@ -218,7 +260,87 @@ export function VaultStorage({
                       </li>
                     ))}
                   </ul>
+                  {devices && devices.length > 0 && (
+                    <Hint>
+                      Each device&apos;s share is listed under Devices below,
+                      where you can remove it.
+                    </Hint>
+                  )}
                 </Explain>
+              )}
+
+              {snapshots && snapshots.length > 0 && (
+                <Section data-testid='vault-snapshots'>
+                  <strong>Snapshots</strong>
+                  <ul>
+                    {snapshots.map(snap => (
+                      <li
+                        key={snap.id}
+                        data-testid={`vault-snapshot-${snap.id}`}
+                      >
+                        <span>
+                          {new Date(snap.created_at * 1000).toLocaleDateString(
+                            undefined,
+                            { dateStyle: 'medium' },
+                          )}
+                          <Hint>{formatBytes(snap.bytes)}</Hint>
+                        </span>
+                        {snap.is_latest ? (
+                          <Muted>Always kept</Muted>
+                        ) : (
+                          <Button
+                            subtle
+                            data-testid={`vault-snapshot-delete-${snap.id}`}
+                            onClick={() => setDeleteSnapshot(snap)}
+                            disabled={busy}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {snapshots.length === 1 && (
+                    <Hint data-testid='vault-snapshots-only-latest'>
+                      Older snapshots are removed automatically.
+                    </Hint>
+                  )}
+                </Section>
+              )}
+
+              {devices && devices.length > 0 && (
+                <Section data-testid='vault-devices'>
+                  <strong>Devices</strong>
+                  <ul>
+                    {devices.map(d => (
+                      <li
+                        key={d.device_pubkey}
+                        data-testid={`vault-device-${d.device_pubkey}`}
+                      >
+                        <span>
+                          {deviceLabel(d.device_pubkey)}
+                          {currentDevice === d.device_pubkey && (
+                            <> · This device</>
+                          )}
+                          <Hint>
+                            {formatBytes(d.pack_bytes)}
+                            {d.last_activity_at
+                              ? ` · last active ${formatTimeAgo(new Date(d.last_activity_at * 1000))}`
+                              : ''}
+                          </Hint>
+                        </span>
+                        <Button
+                          subtle
+                          data-testid={`vault-device-remove-${d.device_pubkey}`}
+                          onClick={() => setRemoveDevice(d)}
+                          disabled={busy}
+                        >
+                          Remove history…
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
               )}
 
               {onCompact && historyBytes(usage) > 0 && (
@@ -333,6 +455,66 @@ export function VaultStorage({
             <p>This cannot be undone.</p>
           </ConfirmationDialog>
         )}
+        <ConfirmationDialog
+          show={removeDevice !== null}
+          bindShow={open => {
+            if (!open) setRemoveDevice(null);
+          }}
+          title='Remove the history of this device?'
+          confirmLabel='Remove history'
+          theme={ConfirmationDialogTheme.Alert}
+          onConfirm={() => {
+            const target = removeDevice;
+
+            if (target) {
+              void manage(
+                () =>
+                  removeVaultDeviceHistory(
+                    drivePseudonym,
+                    target.device_pubkey,
+                  ),
+                'Could not remove the history.',
+              );
+            }
+          }}
+        >
+          <p data-testid='vault-remove-warning'>
+            {removeDevice
+              ? `About ${formatBytes(removeDevice.pack_bytes)} of change history from device ${deviceLabel(removeDevice.device_pubkey)} will be removed from the backup.`
+              : ''}
+          </p>
+          <p>
+            Edits that only this device made and never synced to another device
+            are lost from the backup. Your workspace itself is not touched.
+          </p>
+          <p>This cannot be undone.</p>
+        </ConfirmationDialog>
+        <ConfirmationDialog
+          show={deleteSnapshot !== null}
+          bindShow={open => {
+            if (!open) setDeleteSnapshot(null);
+          }}
+          title='Delete this snapshot?'
+          confirmLabel='Delete snapshot'
+          theme={ConfirmationDialogTheme.Alert}
+          onConfirm={() => {
+            const target = deleteSnapshot;
+
+            if (target) {
+              void manage(
+                () => deleteVaultSnapshot(drivePseudonym, target.id),
+                'Could not delete the snapshot.',
+              );
+            }
+          }}
+        >
+          <p data-testid='vault-delete-warning'>
+            {deleteSnapshot
+              ? `This snapshot uses ${formatBytes(deleteSnapshot.bytes)}. The newest snapshot and your workspace are not touched.`
+              : ''}
+          </p>
+          <p>This cannot be undone.</p>
+        </ConfirmationDialog>
       </DialogContent>
       <DialogActions>
         <Button subtle onClick={() => close()} data-testid='vault-storage-hide'>
@@ -341,6 +523,11 @@ export function VaultStorage({
       </DialogActions>
     </Dialog>
   );
+}
+
+/** A short, recognisable form of a device key. */
+function deviceLabel(pubkey: string): string {
+  return pubkey.slice(0, 8);
 }
 
 type Segment = {
@@ -588,7 +775,15 @@ const Explain = styled.div`
     list-style: none;
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 1rem;
+  }
+`;
+
+const Section = styled(Explain)`
+  button {
+    flex: none;
+    white-space: nowrap;
   }
 `;
 
