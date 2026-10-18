@@ -1297,21 +1297,25 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       [TOOL_NAMES.CREATE_APP]: tool({
         description: CREATE_APP_DESCRIPTION,
         inputSchema: z.object({
-          name: z.string().describe('Display name of the app.'),
+          name: z
+            .string()
+            .describe(
+              'Display name of the app. Choose it yourself from the request ("Chess"); do not ask the user.',
+            ),
           emoji: z
             .string()
             .describe(
-              'One emoji for the app, shown wherever it is listed. Pick something about what the app is FOR, not a generic 📱 or ✨.',
+              'One emoji for the app, shown wherever it is listed. Pick something about what the app is FOR, not a generic 📱 or ✨. Choose it yourself; do not ask the user.',
             ),
           rowNameSingular: z
             .string()
             .describe(
-              "What ONE of the app's records is called, in the user's words: 'Feeding session', 'Contact', 'Workout'. Never 'Item' or 'Record'. This names the class, and it is what the table's rows are called everywhere in the UI.",
+              "What ONE of the app's records is called, in the user's words: 'Feeding session', 'Contact', 'Workout'. Never 'Item' or 'Record'. Choose it yourself ('Move' for a chess app); do not ask the user. This names the class, and it is what the table's rows are called everywhere in the UI.",
             ),
           rowNamePlural: z
             .string()
             .describe(
-              "The plural of rowNameSingular: 'Feeding sessions', 'Contacts', 'Workouts'. This becomes the table's title, so it is what the user reads in the sidebar.",
+              "The plural of rowNameSingular: 'Feeding sessions', 'Contacts', 'Workouts'. This becomes the table's title, so it is what the user reads in the sidebar. Choose it yourself; do not ask the user.",
             ),
           source: z
             .string()
@@ -1371,7 +1375,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               unattended,
               ...(keyProblem ? { keyProblem } : {}),
               ...appCheckReport(check),
-              next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. To change it later, use update_app.',
+              next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. Say what you built and what is not there yet, and offer to add it with update_app (never create_app a second time).',
             };
           } catch (e) {
             return { error: (e as Error).message };

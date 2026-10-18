@@ -74,8 +74,58 @@ describe('the app-building instructions', () => {
   it('gives a test for when an app IS the right answer', () => {
     // Without a rule it can apply, "last resort" is just a tone, and the model
     // will decide its own case is the exception every time.
-    expect(CREATE_APP_DESCRIPTION).toContain('LAST RESORT');
+    expect(CREATE_APP_DESCRIPTION).toContain('FIRST one that fits');
     expect(CREATE_APP_DESCRIPTION).toContain('lost something real');
+  });
+
+  it('does not frame the tool as a forbidden last resort', () => {
+    // "THIS IS THE LAST RESORT" made the model hedge when asked for a game.
+    expect(CREATE_APP_DESCRIPTION).not.toContain('THIS IS THE LAST RESORT');
+  });
+
+  it('says apps are persistent and can be multiplayer, with a recipe', () => {
+    // A user asked for a chess app, then for multiplayer, and was told
+    // multiplayer and a backend were "beyond my current capabilities".
+    expect(CREATE_APP_DESCRIPTION).toContain('PERSISTENT');
+    expect(CREATE_APP_DESCRIPTION).toContain('MULTIPLAYER');
+    expect(CREATE_APP_DESCRIPTION).toContain('no backend');
+    expect(CREATE_APP_DESCRIPTION).toContain('store.subscribe');
+    expect(CREATE_APP_DESCRIPTION).toContain('one row per move');
+  });
+
+  it('treats a game as the legitimate reason to write an app', () => {
+    expect(CREATE_APP_DESCRIPTION).toContain('a game (chess');
+    expect(CREATE_APP_DESCRIPTION).toContain('do not hedge');
+  });
+
+  it('never presents multiplayer or a backend as a limit', () => {
+    for (const phrase of [
+      'beyond my',
+      'beyond what',
+      'current capabilities',
+      'very basic',
+      'cannot do',
+      "can't do",
+    ]) {
+      expect(CREATE_APP_DESCRIPTION.toLowerCase()).not.toContain(phrase);
+    }
+  });
+
+  it('tells the model to choose the names itself and build first', () => {
+    expect(CREATE_APP_DESCRIPTION).toContain('DECIDE, DO NOT ASK');
+
+    for (const field of ['name', 'emoji', 'rowNameSingular', 'rowNamePlural']) {
+      expect(CREATE_APP_DESCRIPTION).toContain(`\`${field}\``);
+    }
+
+    expect(CREATE_APP_DESCRIPTION).toContain('Never ask the user for those');
+    expect(CREATE_APP_DESCRIPTION).toContain('first version that runs');
+  });
+
+  it('has the model report what is missing as a next step via update_app', () => {
+    expect(CREATE_APP_DESCRIPTION).toContain('AFTER IT IS BUILT');
+    expect(CREATE_APP_DESCRIPTION).toContain('what is not there yet');
+    expect(CREATE_APP_DESCRIPTION).toContain('update_app');
   });
 
   it('does not promise a way to attach an app to an existing table', () => {
