@@ -62,6 +62,33 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Gallery back-button background.
   final Color backButtonBg;
 
+  // Tokens of the web app's `buildTheme` (browser/data-browser/src/styling.tsx),
+  // with the main color #1b50d8 (dark: lightened by 0.2).
+
+  /// Brand color (web `colors.main`).
+  final Color main;
+
+  /// Selected / own-message background (`mainSelectedBg`).
+  final Color mainSelectedBg;
+
+  /// Text on `mainSelectedBg` (`mainSelectedFg`).
+  final Color mainSelectedFg;
+
+  /// Page background of the assistant screens (`bgBody`).
+  final Color bgBody;
+
+  /// Raised surface, e.g. assistant message (`bg1`).
+  final Color bg1;
+
+  /// Strongest neutral surface (`bg2`).
+  final Color bg2;
+
+  /// Errors (`alert`).
+  final Color alert;
+
+  /// Confirmations, readable on `bgBody` (`success`).
+  final Color success;
+
   const AppColors({
     required this.canvasBg,
     required this.panelBg,
@@ -83,6 +110,14 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.warningBorder,
     required this.errorBg,
     required this.backButtonBg,
+    required this.main,
+    required this.mainSelectedBg,
+    required this.mainSelectedFg,
+    required this.bgBody,
+    required this.bg1,
+    required this.bg2,
+    required this.alert,
+    required this.success,
   });
 
   static const dark = AppColors(
@@ -106,6 +141,14 @@ class AppColors extends ThemeExtension<AppColors> {
     warningBorder: Color(0xFFE65100),
     errorBg: Color(0xFF3E0000),
     backButtonBg: Color(0xFF1A1A1A),
+    main: Color(0xFF6C90ED),
+    mainSelectedBg: Color(0xFF030817),
+    mainSelectedFg: Color(0xFF7798EE),
+    bgBody: Color(0xFF000000),
+    bg1: Color(0xFF1A1A1A),
+    bg2: Color(0xFF4D4D4D),
+    alert: Color(0xFFCF5B5B),
+    success: Color(0xFF4CC27A),
   );
 
   static const light = AppColors(
@@ -129,6 +172,14 @@ class AppColors extends ThemeExtension<AppColors> {
     warningBorder: Color(0xFFFF9800),
     errorBg: Color(0xFFFFEBEE),
     backButtonBg: Color(0xFFFFFFFF),
+    main: Color(0xFF1B50D8),
+    mainSelectedBg: Color(0xFFF1F5FD),
+    mainSelectedFg: Color(0xFF0E2A71),
+    bgBody: Color(0xFFFAFAFA),
+    bg1: Color(0xFFF2F2F2),
+    bg2: Color(0xFFCCCCCC),
+    alert: Color(0xFFCF5B5B),
+    success: Color(0xFF237A42),
   );
 
   @override
@@ -153,6 +204,14 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? warningBorder,
     Color? errorBg,
     Color? backButtonBg,
+    Color? main,
+    Color? mainSelectedBg,
+    Color? mainSelectedFg,
+    Color? bgBody,
+    Color? bg1,
+    Color? bg2,
+    Color? alert,
+    Color? success,
   }) {
     return AppColors(
       canvasBg: canvasBg ?? this.canvasBg,
@@ -175,6 +234,14 @@ class AppColors extends ThemeExtension<AppColors> {
       warningBorder: warningBorder ?? this.warningBorder,
       errorBg: errorBg ?? this.errorBg,
       backButtonBg: backButtonBg ?? this.backButtonBg,
+      main: main ?? this.main,
+      mainSelectedBg: mainSelectedBg ?? this.mainSelectedBg,
+      mainSelectedFg: mainSelectedFg ?? this.mainSelectedFg,
+      bgBody: bgBody ?? this.bgBody,
+      bg1: bg1 ?? this.bg1,
+      bg2: bg2 ?? this.bg2,
+      alert: alert ?? this.alert,
+      success: success ?? this.success,
     );
   }
 
@@ -203,6 +270,14 @@ class AppColors extends ThemeExtension<AppColors> {
       warningBorder: Color.lerp(warningBorder, other.warningBorder, t)!,
       errorBg: Color.lerp(errorBg, other.errorBg, t)!,
       backButtonBg: Color.lerp(backButtonBg, other.backButtonBg, t)!,
+      main: Color.lerp(main, other.main, t)!,
+      mainSelectedBg: Color.lerp(mainSelectedBg, other.mainSelectedBg, t)!,
+      mainSelectedFg: Color.lerp(mainSelectedFg, other.mainSelectedFg, t)!,
+      bgBody: Color.lerp(bgBody, other.bgBody, t)!,
+      bg1: Color.lerp(bg1, other.bg1, t)!,
+      bg2: Color.lerp(bg2, other.bg2, t)!,
+      alert: Color.lerp(alert, other.alert, t)!,
+      success: Color.lerp(success, other.success, t)!,
     );
   }
 }
