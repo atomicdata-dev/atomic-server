@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
 import '../src/rust/api/simple.dart' as ffi;
 import '../src/rust/api/simple/types.dart'
@@ -264,6 +266,68 @@ class AtomicClient {
       server: m['server'] as String?,
     );
   }
+
+  /// Finds the server that hosts [drive] from the DID alone and connects to it.
+  ///
+  /// pkarr names candidate origins (anyone may add one), each is asked for the
+  /// drive's genesis certificate, and only one whose certificate verifies
+  /// against the DID is trusted. The asking is done here, with the platform's
+  /// own HTTPS stack, in parallel with a short deadline each, so a dead origin
+  /// cannot hold up the rest. Returns the origin, or null when none verified.
+  static Future<String?> discoverHomeServer(
+    String drive, {
+    http.Client? client,
+    Future<List<String>> Function(String drive)? resolve,
+    bool Function(String body, String drive)? verifies,
+    Future<void> Function(String origin)? connect,
+    Duration timeout = const Duration(seconds: 4),
+    int maxOrigins = 3,
+  }) async {
+    final origins =
+        (await (resolve ?? _resolveOrigins)(drive)).take(maxOrigins).toList();
+    if (origins.isEmpty) return null;
+
+    final http_ = client ?? http.Client();
+    final found = Completer<String?>();
+    var pending = origins.length;
+
+    Future<void> probe(String origin) async {
+      var ok = false;
+      try {
+        final request = http.Request(
+            'GET',
+            Uri.parse('$origin/genesis')
+                .replace(queryParameters: {'subject': drive}))
+          ..followRedirects = false
+          ..headers['Accept'] = 'application/ad+json';
+        final response = await http.Response.fromStream(
+            await http_.send(request).timeout(timeout));
+        ok = response.statusCode == 200 &&
+            (verifies ?? _verifies)(response.body, drive);
+      } catch (e) {
+        debugPrint('[home] $origin: $e');
+      }
+      debugPrint('[home] $origin serves the genesis: $ok');
+      if (ok && !found.isCompleted) found.complete(origin);
+      if (--pending == 0 && !found.isCompleted) found.complete(null);
+    }
+
+    for (final origin in origins) {
+      unawaited(probe(origin));
+    }
+    final origin = await found.future;
+    if (client == null) http_.close();
+    if (origin == null) return null;
+    await (connect ?? _connect)(origin);
+    return origin;
+  }
+
+  static Future<List<String>> _resolveOrigins(String drive) =>
+      ffi.resolveDriveOrigins(drive: drive);
+  static bool _verifies(String body, String drive) =>
+      ffi.genesisAnswerVerifies(body: body, drive: drive);
+  static Future<void> _connect(String origin) =>
+      ffi.connectHomeServer(origin: origin);
 
   // ── 8. Known peers ──────────────────────────────────────────────────────
 

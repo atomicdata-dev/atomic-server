@@ -1009,18 +1009,6 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
 
     let mut imported: i32 = 0;
     let mut errors: Vec<String> = Vec::new();
-    let mut server: Option<String> = None;
-
-    // A drive that is not here yet may be hosted by a server that announced it
-    // in pkarr. Ask first: it is one HTTPS round trip, not a peer dial.
-    if !drive_resource_exists(store).await {
-        match tokio::time::timeout(HOME_DISCOVERY_TIMEOUT, discover_home_server(&drive)).await {
-            Ok(Ok(Some(origin))) => server = Some(origin),
-            Ok(Ok(None)) => errors.push("No server announced your drive".into()),
-            Ok(Err(e)) => errors.push(format!("Home server: {e}")),
-            Err(_) => errors.push("Home server lookup timed out".into()),
-        }
-    }
 
     // Known peers first (fast path after QR pairing)
     let peers_json = get_known_peers();
@@ -1103,9 +1091,7 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             }
         })
         .collect();
-    let message = if let Some(origin) = &server {
-        format!("Found your drive on {origin}")
-    } else if live > 0 {
+    let message = if live > 0 {
         if live_names.is_empty() {
             format!(
                 "Connected to {live} device{}",
@@ -1126,31 +1112,52 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         imported,
         live_peers: live,
         message,
-        server,
+        server: None,
     })
 }
 
-const HOME_DISCOVERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+/// The https origins the drive's pkarr record names. The record is public and
+/// anyone may add to it, so none of them is trusted yet: the host fetches each
+/// one's `/genesis` and asks [`genesis_answer_verifies`]. (The fetch is the
+/// host's, not Rust's: the platform's own HTTPS stack is the one that is known
+/// to trust the device's certificates.)
+pub async fn resolve_drive_origins(drive: String) -> Result<Vec<String>, String> {
+    let record = tokio::time::timeout(
+        PKARR_RESOLVE_TIMEOUT,
+        atomic_lib::discovery::resolve_drive_record(&drive),
+    )
+    .await
+    .map_err(|_| "Server lookup timed out (pkarr)".to_string())?
+    .map_err(err)?;
+    tracing::info!(
+        "[home] {drive} names {} origins {:?}",
+        record.http_origins.len(),
+        record.http_origins
+    );
+    Ok(record.http_origins)
+}
 
-/// Find the server that hosts `drive` from the DID alone: the pkarr record
-/// names origins, and only one that serves the drive's own genesis certificate
-/// (checked against the DID) is trusted. Connect to it — that fetches the drive
-/// and follows its commits — and in the background follow the drives the
-/// personal drive lists.
-async fn discover_home_server(drive: &str) -> Result<Option<String>, String> {
-    let Some(origin) = atomic_lib::discovery::verified_home_origin(drive)
-        .await
-        .map_err(err)?
-    else {
-        return Ok(None);
-    };
-    tracing::info!("[home] {drive} is hosted on {origin}");
+/// Whether `body`, the answer of `GET /genesis?subject=<drive>`, is the drive's
+/// own genesis certificate and verifies against the DID.
+#[frb(sync)]
+pub fn genesis_answer_verifies(body: String, drive: String) -> bool {
+    atomic_lib::discovery::genesis_body_verifies(&body, &drive)
+}
+
+/// Connect to the server that hosts the active drive: fetches the drive and
+/// follows its commits over WS, then, in the background, follows the drives the
+/// personal drive lists. Call it only for an origin whose genesis verified.
+pub async fn connect_home_server(origin: String) -> Result<(), String> {
+    let store = db()?;
     ws_sync::open_ws_sync(&origin).await?;
-    if !drive_resource_exists(db()?.as_ref()).await {
+    let Some(drive) = store.get_active_drive() else {
+        return Err("No active drive".into());
+    };
+    if !drive_resource_exists(store.as_ref()).await {
         return Err(format!("{origin} did not send the drive"));
     }
-    tokio::spawn(follow_listed_drives(drive.to_string()));
-    Ok(Some(origin))
+    tokio::spawn(follow_listed_drives(drive));
+    Ok(())
 }
 
 /// The drives the personal drive lists, other than `home`: fetched from the

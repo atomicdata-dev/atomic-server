@@ -255,27 +255,37 @@ pub fn genesis_body_verifies(body: &str, drive_did: &str) -> bool {
 /// An anonymous GET that returns the certificate and nothing else, no
 /// redirects, a short deadline; any failure counts as "not verified".
 pub async fn origin_serves_genesis(origin: &str, drive_did: &str) -> bool {
-    let Ok(client) = reqwest::Client::builder()
+    let client = match reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(GENESIS_PROBE_TIMEOUT)
         .build()
-    else {
-        return false;
+    {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::warn!("Discovery: cannot build an HTTP client: {e}");
+            return false;
+        }
     };
     let url = format!(
         "{}/genesis?subject={}",
         origin.trim_end_matches('/'),
         urlencoding::encode(drive_did)
     );
-    let Ok(response) = client
+    tracing::info!("Discovery: GET {url}");
+    let response = match client
         .get(url)
         .header("Accept", "application/ad+json")
         .send()
         .await
-    else {
-        return false;
+    {
+        Ok(response) => response,
+        Err(e) => {
+            tracing::warn!("Discovery: {origin} unreachable: {e:?}");
+            return false;
+        }
     };
     if !response.status().is_success() {
+        tracing::info!("Discovery: {origin} answered {}", response.status());
         return false;
     }
     match response.text().await {
@@ -288,8 +298,17 @@ pub async fn origin_serves_genesis(origin: &str, drive_did: &str) -> bool {
 /// verified genesis: where the drive is hosted, found from the DID alone.
 pub async fn verified_home_origin(drive_did: &str) -> AtomicResult<Option<String>> {
     let record = resolve_drive_record(drive_did).await?;
+    tracing::info!(
+        "Discovery: {} names {} NodeIDs and {} origins {:?}",
+        drive_did,
+        record.node_ids.len(),
+        record.http_origins.len(),
+        record.http_origins
+    );
     for origin in record.http_origins.iter().take(MAX_ORIGIN_CANDIDATES) {
-        if origin_serves_genesis(origin, drive_did).await {
+        let verified = origin_serves_genesis(origin, drive_did).await;
+        tracing::info!("Discovery: {origin} serves the genesis: {verified}");
+        if verified {
             return Ok(Some(origin.clone()));
         }
     }
@@ -440,6 +459,15 @@ mod tests {
         json[crate::urls::GENESIS] = "AAAA".into();
         assert!(!genesis_body_verifies(&json.to_string(), &did));
         assert!(!genesis_body_verifies(&body, "did:ad:nonsense"));
+    }
+
+    /// Hits the real network: a known public drive, served by public nodes.
+    #[tokio::test]
+    #[ignore = "needs the network"]
+    async fn a_public_node_serves_a_verifiable_genesis() {
+        let did = "atomic:W2Q3m_ZUK0cz2qOStZPkmPRRYMPRJh6owaGmXw5MPm41ETEpVCCPLZFoPdJ0e5Why1bZj7jgKD8AcTV9ZvVLCQ";
+        assert!(origin_serves_genesis("https://atomic.ontola.io", did).await);
+        assert!(!origin_serves_genesis("https://atomic.ontola.io", &fake_drive_did(7)).await);
     }
 
     #[test]

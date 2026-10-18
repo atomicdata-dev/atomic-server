@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `refresh_editing_session`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
+// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `follow_listed_drives`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `refresh_editing_session`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.
@@ -214,6 +214,26 @@ Future<String> resumeAppSession(
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
 Future<String> syncConnectivityNow() =>
     RustLib.instance.api.crateApiSimpleSyncConnectivityNow();
+
+/// The https origins the drive's pkarr record names. The record is public and
+/// anyone may add to it, so none of them is trusted yet: the host fetches each
+/// one's `/genesis` and asks [`genesis_answer_verifies`]. (The fetch is the
+/// host's, not Rust's: the platform's own HTTPS stack is the one that is known
+/// to trust the device's certificates.)
+Future<List<String>> resolveDriveOrigins({required String drive}) =>
+    RustLib.instance.api.crateApiSimpleResolveDriveOrigins(drive: drive);
+
+/// Whether `body`, the answer of `GET /genesis?subject=<drive>`, is the drive's
+/// own genesis certificate and verifies against the DID.
+bool genesisAnswerVerifies({required String body, required String drive}) =>
+    RustLib.instance.api
+        .crateApiSimpleGenesisAnswerVerifies(body: body, drive: drive);
+
+/// Connect to the server that hosts the active drive: fetches the drive and
+/// follows its commits over WS, then, in the background, follows the drives the
+/// personal drive lists. Call it only for an origin whose genesis verified.
+Future<void> connectHomeServer({required String origin}) =>
+    RustLib.instance.api.crateApiSimpleConnectHomeServer(origin: origin);
 
 /// Subscribe to live updates for an open canvas over WebSocket.
 Future<void> wsSubscribeCanvas({required String subject}) =>

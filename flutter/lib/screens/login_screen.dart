@@ -32,6 +32,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _generatedSecret;
   bool _peerSyncAttempted = false;
 
+  /// What the sync step is doing right now, while it is busy.
+  String? _status;
+
   @override
   void initState() {
     super.initState();
@@ -51,10 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
   String get _serverOrigin => normalizeServerUrl(_serverController.text);
 
   /// Open WS sync to the server (primary path for multi-device).
-  Future<void> _startNetworking(String driveSubject, {String? serverUrl}) async {
-    final origin = (serverUrl != null && serverUrl.isNotEmpty)
-        ? serverUrl
-        : _serverOrigin;
+  Future<void> _startNetworking(String driveSubject,
+      {String? serverUrl}) async {
+    final origin =
+        (serverUrl != null && serverUrl.isNotEmpty) ? serverUrl : _serverOrigin;
     try {
       await AtomicClient.openWsSync(origin);
     } catch (e) {
@@ -125,11 +128,29 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
+      // A drive that is not here yet may live on a server that announced it in
+      // pkarr: one HTTPS round trip, so it goes before the device search.
+      final wanted = AtomicClient.getActiveDrive();
+      if (wanted != null && !await _driveReady()) {
+        setState(() => _status = 'Looking for the server your drive lives on…');
+        String? found;
+        try {
+          found = await AtomicClient.discoverHomeServer(wanted);
+        } catch (e) {
+          debugPrint('Home server lookup failed: $e');
+        }
+        if (found != null) {
+          // Remember where it lives, so the next start reconnects there.
+          await AtomicSession.setActiveServer(found);
+          await AtomicSession.saveDrive(wanted);
+          if (await _driveReady()) {
+            widget.onLoggedIn();
+            return;
+          }
+        }
+      }
+      if (mounted) setState(() => _status = 'Looking for your devices…');
       final report = await AtomicClient.syncConnectivityNow();
-      // Found through pkarr: remember where the drive lives, so the next start
-      // reconnects there without being told.
-      final found = report.server;
-      if (found != null) await AtomicSession.setActiveServer(found);
 
       final drive = AtomicClient.getActiveDrive();
       if (drive != null) {
@@ -144,11 +165,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() => _error = report.imported > 0 || report.livePeers > 0
           ? 'Synced, but your workspace isn’t here yet — try again'
-          : 'No other device reachable yet. Pair one with its QR code.');
+          : report.message);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status = null;
+        });
+      }
     }
   }
 
@@ -506,8 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 size: 20,
               ),
               tooltip: _obscureSecret ? 'Show' : 'Hide',
-              onPressed: () =>
-                  setState(() => _obscureSecret = !_obscureSecret),
+              onPressed: () => setState(() => _obscureSecret = !_obscureSecret),
             ),
           ),
         ),
@@ -535,7 +560,8 @@ class _LoginScreenState extends State<LoginScreen> {
               icon: const Icon(Icons.content_paste, size: 18),
               label: const Text('Paste'),
               style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12)),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 14, horizontal: 12)),
             ),
           ],
         ),
@@ -570,6 +596,12 @@ class _LoginScreenState extends State<LoginScreen> {
           style: TextStyle(fontSize: 14, color: c.iconDisabled),
           textAlign: TextAlign.center,
         ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(_error!,
+              style: TextStyle(fontSize: 13, color: c.alert),
+              textAlign: TextAlign.center),
+        ],
         const SizedBox(height: 24),
         ElevatedButton.icon(
           icon: _busy
@@ -578,7 +610,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.sync),
-          label: Text(_busy ? 'Looking for your devices…' : 'Try again'),
+          label: Text(
+              _busy ? (_status ?? 'Looking for your devices…') : 'Try again'),
           style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
           onPressed: _busy ? null : _retryPeerSync,
