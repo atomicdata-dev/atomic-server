@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `get_canvas`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
+// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `refresh_editing_session`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.
@@ -130,7 +130,11 @@ Future<List<CanvasListItem>> listCanvases() =>
 Future<String> listCanvasesJson() =>
     RustLib.instance.api.crateApiSimpleListCanvasesJson();
 
-/// Delete a canvas (or any resource) with a signed destroy commit.
+/// Delete a canvas (or any resource): move it to the active drive's Trash
+/// folder (created on first use) and remember its old parent in `trashedFrom`.
+/// Nothing is destroyed, so `atomic_lib::trash::restore` can bring it back.
+/// A canvas already in the Trash is left alone. Trashed canvases drop out of
+/// `list_canvases*`, which list the drive's direct children.
 Future<void> deleteCanvas({required String subject}) =>
     RustLib.instance.api.crateApiSimpleDeleteCanvas(subject: subject);
 
