@@ -314,6 +314,10 @@ class AtomicClient {
   /// against the DID is trusted. The asking is done here, with the platform's
   /// own HTTPS stack, in parallel with a short deadline each, so a dead origin
   /// cannot hold up the rest. Returns the origin, or null when none verified.
+  /// What the last [discoverHomeServer] did, one line per step, for showing
+  /// to the person when it did not work out.
+  static final List<String> discoveryLog = [];
+
   static Future<String?> discoverHomeServer(
     String drive, {
     http.Client? client,
@@ -344,8 +348,13 @@ class AtomicClient {
             await http_.send(request).timeout(timeout));
         ok = response.statusCode == 200 &&
             (verifies ?? _verifies)(response.body, drive);
+        if (!ok) {
+          discoveryLog.add(response.statusCode == 200
+              ? '$origin: its answer is not this drive\'s certificate'
+              : '$origin: HTTP ${response.statusCode}');
+        }
       } catch (e) {
-        debugPrint('[home] $origin: $e');
+        discoveryLog.add('$origin: ${_short(e)}');
       }
       debugPrint('[home] $origin serves the genesis: $ok');
       if (ok && !found.isCompleted) found.complete(origin);
@@ -358,8 +367,19 @@ class AtomicClient {
     final origin = await found.future;
     if (client == null) http_.close();
     if (origin == null) return null;
-    await (connect ?? _connect)(origin);
+    discoveryLog.add('$origin: certificate verified, connecting');
+    try {
+      await (connect ?? _connect)(origin);
+    } catch (e) {
+      discoveryLog.add('$origin: ${_short(e)}');
+      rethrow;
+    }
     return origin;
+  }
+
+  static String _short(Object e) {
+    final text = '$e'.replaceFirst('Exception: ', '');
+    return text.length > 140 ? '${text.substring(0, 140)}…' : text;
   }
 
   static Future<List<String>> _resolveOrigins(String drive) =>

@@ -35,6 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
   /// What the sync step is doing right now, while it is busy.
   String? _status;
 
+  /// What the server lookup did, for the error text.
+  String _lookup = '';
+
   @override
   void initState() {
     super.initState();
@@ -139,6 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
         } catch (e) {
           debugPrint('Home server lookup failed: $e');
         }
+        // Said on screen if the devices fail to help either: it is the answer
+        // to "why is nothing here".
+        _lookup = AtomicClient.discoveryLog.join('\n');
         if (found != null) {
           // Remember where it lives, so the next start reconnects there.
           await AtomicSession.setActiveServer(found);
@@ -163,9 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      setState(() => _error = report.imported > 0 || report.livePeers > 0
-          ? 'Synced, but your workspace isn’t here yet — try again'
-          : report.message);
+      setState(() => _error = [
+            if (_lookup.isNotEmpty) _lookup,
+            report.imported > 0 || report.livePeers > 0
+                ? 'Synced, but your workspace isn’t here yet — try again'
+                : report.message,
+          ].join('\n'));
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
