@@ -36,7 +36,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_opaque = RustOpaqueMoi,
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2138145956;
 
 // Section: executor
