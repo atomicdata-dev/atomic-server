@@ -613,6 +613,8 @@ Both matter because `iroh_transport` holds the router and node identity in
 | **`POST /iroh-sync` request shape, both sides** | `testdata/pairing-request.json` + `pairing.test.ts` + `iroh_pairing.rs` | shared fixture binds them |
 | Dart pairing-code parser, peer-sync result formatting | `flutter/test/atomic/` | pure parsers |
 | Rotation does not treat a metrics-change pop as "back to gallery" | `flutter/test/canvas/rotation_pop_test.dart` | |
+| Assistant reads: chat entries merged across `ChatLog` pages oldest first, AI chats of the drive by last activity, search by prefix with title and class, web URL of the connected server | `flutter/rust/src/api/assistant/tests.rs` | real temp store; pages signed by the agent through the library's commit path |
+| Assistant screens (chats list, chat, type-ahead search) with a fake `AssistantApi`; JSON parsing of chats, text parts and hits | `flutter/test/assistant/assistant_screens_test.dart` | not covered: `ResourceWebView` (needs a platform webview), the real FFI, Android/iOS devices |
 | `AtomicNode`: `mutate` on one node, `apply_commit(IngestPolicy::Peer)` on another, query + `DbEvent` reflect it | `lib/src/runtime/node.rs` | in-process, no transport; `LocalCache` skips signature check, `Peer` does not |
 
 ## Local full-text search
@@ -627,7 +629,7 @@ Both matter because `iroh_transport` holds the router and node identity in
 | `Store.search` offline hits `ClientDb.search` | JS | `browser/lib/src/store.test.ts` |
 | Search-result excerpts: document preference, exact/prefix before fuzzy, Unicode source offsets, token boundaries, bounded context including long matches | JS | `browser/data-browser/src/helpers/searchResultHint.test.ts` |
 
-Not covered: table `contains`; Playwright search overlay on the KV path and assertion for the search-result excerpt; Flutter bridge `search`. Hosted `/search` is `atomic_lib::search` (Tantivy and MiniSearch are gone). Offline E2E polls `ClientDb.search`. Filters (`isA`, tags) are covered by `lib/src/search/tests.rs` and `server/tests/it/file_search_repro.rs`.
+Not covered: table `contains`; Playwright search overlay on the KV path and assertion for the search-result excerpt; the Flutter bridge `search` only through `assistant/tests.rs` (one prefix query). Hosted `/search` is `atomic_lib::search` (Tantivy and MiniSearch are gone). Offline E2E polls `ClientDb.search`. Filters (`isA`, tags) are covered by `lib/src/search/tests.rs` and `server/tests/it/file_search_repro.rs`.
 
 ### Flow — the thin layer
 
