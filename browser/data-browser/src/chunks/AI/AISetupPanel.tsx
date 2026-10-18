@@ -17,6 +17,7 @@ import { OutlinedSection } from '@components/OutlinedSection';
 import { useIsOllamaUrlValid } from '@components/AI/useIsOllamaUrlValid';
 import { ProviderStatus } from '@components/AI/ProviderStatus';
 import { Button } from '@components/Button';
+import { LocalNetworkNotice } from '@components/AI/LocalNetworkNotice';
 import { effectFetch } from '@helpers/effectFetch';
 import { DEFAULT_CHAT_MODEL } from '@components/AI/AISettingsContext';
 import type { AIModelIdentifier } from './types';
@@ -97,6 +98,8 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
     openRouterApiKey,
     setOpenRouterApiKey,
     ollamaUrl,
+    ollamaEndpoint,
+    ollamaBlocked,
     setOllamaUrl,
     defaultChatModel,
     setDefaultChatModel,
@@ -113,7 +116,7 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
     false,
   );
 
-  const { checking: ollamaChecking } = useIsOllamaUrlValid(ollamaUrl);
+  const { checking: ollamaChecking } = useIsOllamaUrlValid(ollamaEndpoint);
   const hasProvider = availableProviders.length > 0;
   const [step, setStep] = useState<SetupStep>(() =>
     getInitialStep(hasProvider),
@@ -132,11 +135,11 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
       return;
     }
 
-    if (!ollamaAvailable || !ollamaUrl) {
+    if (!ollamaAvailable || !ollamaEndpoint) {
       return;
     }
 
-    return effectFetch(`${ollamaUrl}/api/tags`)(data => {
+    return effectFetch(`${ollamaEndpoint}/api/tags`)(data => {
       const models = (data.models ?? []) as OllamaTag[];
       const suggestedId = pickSuggestedOllamaModel(models);
 
@@ -155,7 +158,7 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
   }, [
     step,
     ollamaAvailable,
-    ollamaUrl,
+    ollamaEndpoint,
     openRouterAvailable,
     isProviderAvailable,
   ]);
@@ -328,7 +331,9 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
                 connected={ollamaAvailable}
                 configured={Boolean(ollamaUrl)}
                 checking={ollamaChecking}
+                blocked={ollamaBlocked}
               />
+              <LocalNetworkNotice url={ollamaUrl} />
               <FullWidthField>
                 <InputStyled
                   type='url'
