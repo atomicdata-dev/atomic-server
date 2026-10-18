@@ -312,6 +312,7 @@ msgstr "Ollama"
 
 #: src/chunks/AI/AISetupPanel.tsx
 #: src/chunks/Templates/DriveTemplateSetup.tsx
+#: src/components/AI/LocalNetworkNotice.tsx
 msgid "Continue"
 msgstr "Continuer"
 
@@ -13126,4 +13127,13 @@ msgstr ""
 
 #: src/components/Cloud/CloudServerDetails.tsx
 msgid "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+msgstr ""
+
+#: src/components/AI/LocalNetworkNotice.tsx
+msgid "Ollama runs on your own computer. Your browser will ask whether this site may access other apps and services on this device. That is only used to talk to Ollama; nothing else on your network is scanned."
+msgstr ""
+
+#: src/components/AI/ProviderStatus.tsx
+#: src/components/AI/ProviderStatus.tsx
+msgid "Waiting for permission"
 msgstr ""

@@ -34,7 +34,7 @@ function parseContextLengthFromShow(
 export function useOllamaModelContextLength(
   modelId: string | undefined,
 ): number | undefined {
-  const { ollamaUrl } = useAISettings();
+  const { ollamaEndpoint: ollamaUrl } = useAISettings();
   const cacheKey = ollamaUrl && modelId ? `${ollamaUrl}:${modelId}` : undefined;
   const cachedLength = cacheKey ? contextLengthCache.get(cacheKey) : undefined;
 
