@@ -72,6 +72,8 @@ const AISettings: React.FC = () => {
     showTokenUsage,
     setShowTokenUsage,
     ollamaUrl,
+    ollamaEndpoint,
+    ollamaBlocked,
     setOllamaUrl,
     isProviderAvailable,
     shouldGenerateTitles,
@@ -94,8 +96,7 @@ const AISettings: React.FC = () => {
     genFeaturesModel.provider,
   );
 
-  const { valid: isOllamaUrlValid, blocked: ollamaBlocked } =
-    useIsOllamaUrlValid(ollamaUrl);
+  const { valid: isOllamaUrlValid } = useIsOllamaUrlValid(ollamaEndpoint);
 
   useEffect(() => {
     if (!openRouterApiKey) {

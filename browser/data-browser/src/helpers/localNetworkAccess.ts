@@ -1,5 +1,6 @@
 import { useLocalStorage } from '@hooks/useLocalStorage';
 import { isRunningInTauri } from './tauri';
+import { isLoopbackHost } from './runtimeSetting';
 
 /**
  * Chrome asks "wants to access other apps and services on this device" the
@@ -10,15 +11,12 @@ import { isRunningInTauri } from './tauri';
 const PRIVATE_IPV4 =
   /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)\d{1,3}(\.\d{1,3}){0,2}$/;
 
+/** `rawHost` is as `URL.hostname` gives it, so IPv6 keeps its brackets. */
 function isLocalHostname(rawHost: string): boolean {
-  const host = rawHost.toLowerCase().replace(/^\[|\]$/g, '');
+  const host = rawHost.toLowerCase();
 
   return (
-    host === 'localhost' ||
-    host === '::1' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    PRIVATE_IPV4.test(host)
+    isLoopbackHost(host) || host.endsWith('.local') || PRIVATE_IPV4.test(host)
   );
 }
 

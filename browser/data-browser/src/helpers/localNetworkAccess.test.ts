@@ -60,4 +60,11 @@ describe('requiresLocalNetworkPermission', () => {
       false,
     );
   });
+
+  it('is not required when the page itself is on [::1]', () => {
+    setHost('[::1]');
+    expect(requiresLocalNetworkPermission('http://localhost:11434')).toBe(
+      false,
+    );
+  });
 });

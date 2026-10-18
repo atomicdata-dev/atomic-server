@@ -98,6 +98,8 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
     openRouterApiKey,
     setOpenRouterApiKey,
     ollamaUrl,
+    ollamaEndpoint,
+    ollamaBlocked,
     setOllamaUrl,
     defaultChatModel,
     setDefaultChatModel,
@@ -114,8 +116,7 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
     false,
   );
 
-  const { checking: ollamaChecking, blocked: ollamaBlocked } =
-    useIsOllamaUrlValid(ollamaUrl);
+  const { checking: ollamaChecking } = useIsOllamaUrlValid(ollamaEndpoint);
   const hasProvider = availableProviders.length > 0;
   const [step, setStep] = useState<SetupStep>(() =>
     getInitialStep(hasProvider),
@@ -134,11 +135,11 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
       return;
     }
 
-    if (!ollamaAvailable || !ollamaUrl) {
+    if (!ollamaAvailable || !ollamaEndpoint) {
       return;
     }
 
-    return effectFetch(`${ollamaUrl}/api/tags`)(data => {
+    return effectFetch(`${ollamaEndpoint}/api/tags`)(data => {
       const models = (data.models ?? []) as OllamaTag[];
       const suggestedId = pickSuggestedOllamaModel(models);
 
@@ -157,7 +158,7 @@ const AISetupPanelSession: React.FC<{ onDismiss?: () => void }> = ({
   }, [
     step,
     ollamaAvailable,
-    ollamaUrl,
+    ollamaEndpoint,
     openRouterAvailable,
     isProviderAvailable,
   ]);
