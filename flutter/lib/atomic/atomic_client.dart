@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
+import 'session.dart';
 import '../src/rust/api/simple.dart' as ffi;
 import '../src/rust/api/simple/types.dart'
     show AgentInfo, CanvasListItem, VersionMetadata;
@@ -409,12 +410,81 @@ class AtomicClient {
     required String serverUrl,
     required String secret,
     String? drive,
-  }) {
-    return ffi.resumeAppSession(
+  }) async {
+    final status = await ffi.resumeAppSession(
       serverUrl: serverUrl,
       secret: secret,
       driveHint: drive,
     );
+    // No server in use, but known ones (paired with a code, say): the drive is
+    // very likely on one of them. Looked for in the background.
+    final active = getActiveDrive();
+    if (status == 'ok' && serverUrl.trim().isEmpty && active != null) {
+      unawaited(connectKnownServer(active).catchError((Object e) {
+        debugPrint('Known server lookup failed: $e');
+        return null;
+      }));
+    }
+    return status;
+  }
+
+  /// When no server is in use, finds the known server that hosts [drive] (its
+  /// genesis verifies against the DID), connects to it and makes it the one in
+  /// use. Which drives of the person it also hosts is then fetched from it.
+  /// Returns the server, or null.
+  ///
+  /// One lookup at a time: the boot path and the sign-in screen both resume the
+  /// session, and a second connect would close the first one's WS session.
+  static Future<String?>? _knownServerLookup;
+
+  static Future<String?> connectKnownServer(
+    String drive, {
+    Future<String?> Function()? activeServer,
+    Future<List<String>> Function()? knownServers,
+    Future<void> Function(String origin)? setActiveServer,
+    http.Client? client,
+    bool Function(String body, String drive)? verifies,
+    Future<void> Function(String origin)? connect,
+  }) {
+    final running = _knownServerLookup;
+    if (running != null) return running;
+    final lookup = _connectKnownServer(
+      drive,
+      activeServer: activeServer,
+      knownServers: knownServers,
+      setActiveServer: setActiveServer,
+      client: client,
+      verifies: verifies,
+      connect: connect,
+    ).whenComplete(() => _knownServerLookup = null);
+    return _knownServerLookup = lookup;
+  }
+
+  static Future<String?> _connectKnownServer(
+    String drive, {
+    Future<String?> Function()? activeServer,
+    Future<List<String>> Function()? knownServers,
+    Future<void> Function(String origin)? setActiveServer,
+    http.Client? client,
+    bool Function(String body, String drive)? verifies,
+    Future<void> Function(String origin)? connect,
+  }) async {
+    if (await (activeServer ?? AtomicSession.activeServer)() != null) {
+      return null;
+    }
+    final servers = await (knownServers ?? AtomicSession.knownServers)();
+    if (servers.isEmpty) return null;
+    final origin = await discoverHomeServer(
+      drive,
+      resolve: (_) async => servers,
+      client: client,
+      verifies: verifies,
+      connect: connect,
+    );
+    if (origin != null) {
+      await (setActiveServer ?? AtomicSession.setActiveServer)(origin);
+    }
+    return origin;
   }
 
   static Future<void> wsSubscribeCanvas(String subject) =>

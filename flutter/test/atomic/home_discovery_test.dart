@@ -74,4 +74,70 @@ void main() {
       isNull,
     );
   });
+
+  group('connectKnownServer', () {
+    test('connects to the known server that serves the drive and uses it',
+        () async {
+      String? connected, active;
+      final origin = await AtomicClient.connectKnownServer(
+        drive,
+        activeServer: () async => null,
+        knownServers: () async =>
+            ['https://other.example', 'https://home.example'],
+        setActiveServer: (o) async => active = o,
+        client: MockClient((request) async => request.url.host == 'home.example'
+            ? http.Response('{"ok":1}', 200)
+            : http.Response('no', 404)),
+        verifies: (body, _) => body.contains('ok'),
+        connect: (o) async => connected = o,
+      );
+      expect(origin, 'https://home.example');
+      expect(connected, 'https://home.example');
+      expect(active, 'https://home.example');
+    });
+
+    test('two lookups at once connect once', () async {
+      var connects = 0;
+      Future<String?> look() => AtomicClient.connectKnownServer(
+            drive,
+            activeServer: () async => null,
+            knownServers: () async => ['https://home.example'],
+            setActiveServer: (_) async {},
+            client: MockClient((_) async => http.Response('{}', 200)),
+            verifies: (_, __) => true,
+            connect: (_) async {
+              connects++;
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+            },
+          );
+      final results = await Future.wait([look(), look()]);
+      expect(results, ['https://home.example', 'https://home.example']);
+      expect(connects, 1);
+    });
+
+    test('leaves a server in use alone', () async {
+      var asked = false;
+      final origin = await AtomicClient.connectKnownServer(
+        drive,
+        activeServer: () async => 'https://in-use.example',
+        knownServers: () async {
+          asked = true;
+          return ['https://home.example'];
+        },
+      );
+      expect(origin, isNull);
+      expect(asked, isFalse);
+    });
+
+    test('no known server, nothing to connect', () async {
+      expect(
+        await AtomicClient.connectKnownServer(
+          drive,
+          activeServer: () async => null,
+          knownServers: () async => [],
+        ),
+        isNull,
+      );
+    });
+  });
 }
