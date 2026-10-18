@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../atomic/atomic_client.dart';
-import '../atomic/widgets/agent_settings_dialog.dart';
+import '../screens/sync_screen.dart';
 import '../theme.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
@@ -40,6 +40,7 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _loadDrives();
   late Future<List<ChatSummary>> _chats = widget.api.chats();
+  late Future<String?> _agentName = widget.api.agentName();
   PageController? _pages;
   int _page = 0;
 
@@ -78,11 +79,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Future<void> _settings() async {
-    final signedOut = await AgentSettingsDialog.show(context);
+    final signedOut = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(builder: (_) => const SyncScreen()),
+        ) ??
+        false;
     if (signedOut) {
       widget.onSignOut?.call();
     } else {
-      setState(() => _drives = _loadDrives());
+      setState(() {
+        _drives = _loadDrives();
+        _agentName = widget.api.agentName();
+      });
       _reload();
     }
   }
@@ -109,8 +116,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 onPressed: widget.onOpenGallery,
               ),
               IconButton(
-                tooltip: 'Settings',
-                icon: const Icon(Icons.settings_outlined),
+                tooltip: 'Your agent and sync',
+                icon: FutureBuilder<String?>(
+                  future: _agentName,
+                  builder: (_, s) => AgentAvatar(name: s.data),
+                ),
                 onPressed: _settings,
               ),
             ],

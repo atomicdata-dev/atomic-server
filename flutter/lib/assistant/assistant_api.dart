@@ -15,5 +15,7 @@ class AssistantApi {
       AtomicClient.recentResources(drive);
   void noteOpened(String drive, String subject) =>
       AtomicClient.noteResourceOpened(drive, subject);
+  Future<String?> agentName() async =>
+      (await AtomicClient.getActiveAgent())?.name;
   String webUrl(String subject) => AtomicClient.resourceWebUrl(subject);
 }

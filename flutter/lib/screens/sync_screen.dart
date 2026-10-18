@@ -1,0 +1,513 @@
+import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../assistant/assistant_api.dart';
+import '../assistant/chats_screen.dart' show timeAgo;
+import '../assistant/resource_web_view.dart';
+import '../atomic/account_store.dart';
+import '../atomic/settings_backend.dart';
+import '../theme.dart';
+
+/// The person's initial in a circle: the way into the agent and sync screen.
+class AgentAvatar extends StatelessWidget {
+  final String? name;
+  final double radius;
+
+  const AgentAvatar({super.key, this.name, this.radius = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final trimmed = name?.trim() ?? '';
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: c.mainSelectedBg,
+      child: trimmed.isEmpty
+          ? Icon(Icons.person, size: radius * 1.1, color: c.mainSelectedFg)
+          : Text(trimmed.characters.first.toUpperCase(),
+              style: TextStyle(
+                  color: c.mainSelectedFg,
+                  fontWeight: FontWeight.w600,
+                  fontSize: radius * 0.9)),
+    );
+  }
+}
+
+/// Your agent and everything that syncs, after the web app's Sync page:
+/// who you are, the account that hosts your data (only when one is linked),
+/// this device and the devices it syncs with, and the workspaces. Sync is set
+/// per workspace; the account section speaks about the active one.
+///
+/// Pops with true when the person signed out.
+class SyncScreen extends StatefulWidget {
+  final shared.AtomicSettingsBackend? backend;
+  final Future<AccountSummary?> Function(String? drive)? loadAccount;
+  final Future<void> Function(BuildContext context, String portal)? linkAccount;
+
+  const SyncScreen({
+    super.key,
+    this.backend,
+    this.loadAccount,
+    this.linkAccount,
+  });
+
+  @override
+  State<SyncScreen> createState() => _SyncScreenState();
+}
+
+class _SyncScreenState extends State<SyncScreen> {
+  late final shared.AtomicSettingsBackend _backend =
+      widget.backend ?? CanvasSettingsBackend();
+
+  bool _loading = true;
+  String? _error;
+  shared.AtomicIdentity? _agent;
+  String _deviceName = '';
+  String? _peerId;
+  String? _activeDrive;
+  Map<String, String> _drives = {};
+  AccountSummary? _account;
+  String? _accountError;
+
+  /// Where the active server is administered, when it is a managed one: the
+  /// only place an account can be linked from.
+  String? _portal;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final drives = await _backend.listDrives();
+      final names = <String, String>{};
+      for (final d in drives) {
+        try {
+          names[d] = await _backend.getDriveName(d);
+        } catch (_) {
+          names[d] = '';
+        }
+      }
+      final active = _backend.getActiveDrive();
+      final agent = await _backend.getActiveAgent();
+      final deviceName = await _backend.getDeviceName();
+      final peerId = await _backend.getPeerId();
+      if (!mounted) return;
+      setState(() {
+        _agent = agent;
+        _deviceName = deviceName;
+        _peerId = peerId;
+        _activeDrive = active;
+        _drives = names;
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
+      }
+    }
+    await _loadAccount();
+  }
+
+  Future<void> _loadAccount() async {
+    AccountSummary? account;
+    String? accountError;
+    String? portal;
+    try {
+      account =
+          await (widget.loadAccount ?? AccountStore.summary)(_activeDrive);
+    } catch (e) {
+      accountError = '$e';
+    }
+    if (account == null) {
+      try {
+        final servers = _backend.servers;
+        final active = await servers?.activeServer();
+        if (active != null) {
+          final info = await servers!.serverInfo(active);
+          if (info.managed) portal = info.portalUrl;
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _account = account;
+      _accountError = accountError;
+      _portal = portal;
+    });
+  }
+
+  void _copy(String text, String what) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$what copied')));
+  }
+
+  void _fail(String what, Object e) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text('$what: $e')));
+
+  Future<String?> _ask(String title, String hint, {String initial = ''}) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: hint),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _rename() async {
+    final name =
+        await _ask('Device name', 'Name this device', initial: _deviceName);
+    if (name == null || name.isEmpty) return;
+    try {
+      await _backend.setDeviceName(name);
+      if (mounted) setState(() => _deviceName = name);
+    } catch (e) {
+      if (mounted) _fail('Could not rename the device', e);
+    }
+  }
+
+  Future<void> _newWorkspace() async {
+    final name = await _ask('New workspace', 'Name');
+    if (name == null || name.isEmpty) return;
+    try {
+      await _backend.createDrive(name);
+      await _load();
+    } catch (e) {
+      if (mounted) _fail('Could not create the workspace', e);
+    }
+  }
+
+  Future<void> _switch(String drive) async {
+    try {
+      await _backend.switchDrive(drive);
+      await _load();
+    } catch (e) {
+      if (mounted) _fail('Could not switch workspace', e);
+    }
+  }
+
+  Future<void> _copySecret() async {
+    try {
+      _copy(await _backend.exportSecret(), 'Secret key');
+    } catch (e) {
+      if (mounted) _fail('Could not copy the secret key', e);
+    }
+  }
+
+  Future<void> _signOut() async {
+    final navigator = Navigator.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+            "Your data stays on this device, but you'll need your secret key to sign back in."),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Sign out')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await AccountStore.clear();
+      await _backend.signOut!();
+      if (navigator.mounted) navigator.pop(true);
+    } catch (e) {
+      if (mounted) _fail('Could not sign out', e);
+    }
+  }
+
+  void _openPortal(Uri url) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ResourceWebView(
+          api: const AssistantApi(),
+          subject: url.toString(),
+          url: url.toString(),
+          title: url.host,
+        ),
+      ));
+
+  Future<void> _link(String portal) async {
+    try {
+      if (widget.linkAccount != null) {
+        await widget.linkAccount!(context, portal);
+      } else {
+        await shared.AtomicAccountLinkDialog.show(
+          context,
+          client: shared.AtomicAccountClient(portal),
+          deviceName: _deviceName.isEmpty ? 'Atomic Canvas' : _deviceName,
+          openUrl: (uri) async => _openPortal(uri),
+          install: (identity, session) async {
+            if (identity.subject != _agent?.subject) {
+              throw StateError(
+                  'This account belongs to another identity than this device');
+            }
+            await AccountStore.save(session);
+          },
+        );
+      }
+      await _loadAccount();
+    } catch (e) {
+      if (mounted) _fail('Could not link the account', e);
+    }
+  }
+
+  Future<void> _unlink() async {
+    await AccountStore.clear();
+    await _loadAccount();
+  }
+
+  String _driveLabel(String drive) =>
+      (_drives[drive]?.isNotEmpty ?? false) ? _drives[drive]! : 'Workspace';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppBar(backgroundColor: c.bgBody, title: const Text('Sync')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(_error!, style: TextStyle(color: c.alert)),
+                  ),
+                _identity(c),
+                if (_account != null || _accountError != null) _account_(c),
+                if (_account == null && _portal != null) _linkRow(c, _portal!),
+                _group(c, 'This device', [_thisDevice(c)]),
+                // Servers, paired devices and the pairing code: the browser's
+                // Devices list.
+                Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: shared.ServerSettingsSection(
+                    backend: _backend,
+                    onServerChanged: _load,
+                  ),
+                ),
+                _group(c, 'Workspaces', [
+                  for (final d in _drives.keys)
+                    ListTile(
+                      leading: Icon(
+                          d == _activeDrive
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          color: c.main),
+                      title: Text(_driveLabel(d)),
+                      subtitle: d == _activeDrive
+                          ? const Text('Active workspace')
+                          : null,
+                      onTap: d == _activeDrive ? null : () => _switch(d),
+                    ),
+                  ListTile(
+                    leading: Icon(Icons.add, color: c.main),
+                    title: const Text('New workspace'),
+                    onTap: _newWorkspace,
+                  ),
+                ]),
+              ],
+            ),
+    );
+  }
+
+  Widget _group(AppColors c, String title, List<Widget> children) => Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(title,
+                  style: TextStyle(
+                      color: c.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+            ),
+            Material(
+              color: c.bg1,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: children),
+            ),
+          ],
+        ),
+      );
+
+  Widget _identity(AppColors c) {
+    final agent = _agent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          AgentAvatar(name: agent?.name, radius: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (agent?.name?.isNotEmpty ?? false) ? agent!.name! : 'You',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (agent != null)
+                  GestureDetector(
+                    onTap: () => _copy(agent.subject, 'Agent ID'),
+                    child: Text(_short(agent.subject),
+                        style: TextStyle(color: c.textSecondary, fontSize: 12)),
+                  ),
+              ],
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.key, size: 16),
+            label: const Text('Copy secret key'),
+            onPressed: _copySecret,
+          ),
+          if (_backend.signOut != null)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Sign out'),
+              onPressed: _signOut,
+            ),
+        ]),
+      ],
+    );
+  }
+
+  /// Only for a linked account: address, Cloud Vault and Cloud Server for the
+  /// active workspace, and the way to the portal.
+  Widget _account_(AppColors c) {
+    final account = _account;
+    if (account == null) {
+      return _group(c, 'Account', [
+        ListTile(
+          leading: Icon(Icons.error_outline, color: c.alert),
+          title: const Text('Could not read your account'),
+          subtitle: Text(_accountError ?? ''),
+          trailing:
+              TextButton(onPressed: _loadAccount, child: const Text('Retry')),
+        ),
+      ]);
+    }
+    final vault = account.vault;
+    final server = account.server;
+    return _group(c, 'Account', [
+      ListTile(
+        leading: Icon(Icons.alternate_email, color: c.main),
+        title: Text(account.address),
+        subtitle: Text(account.portal.host),
+      ),
+      ListTile(
+        leading: Icon(Icons.shield_outlined, color: c.main),
+        title: const Text('Cloud Vault'),
+        subtitle: Text(vault == null
+            ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
+            : _vaultLine(vault)),
+      ),
+      ListTile(
+        leading: Icon(Icons.cloud_outlined, color: c.main),
+        title: const Text('Cloud Server'),
+        subtitle: Text(server == null
+            ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
+            : _serverLine(server)),
+      ),
+      ListTile(
+        leading: Icon(Icons.open_in_new, color: c.main),
+        title: const Text('Manage in the portal'),
+        onTap: () => _openPortal(account.portal),
+      ),
+      ListTile(
+        leading: Icon(Icons.link_off, color: c.textSecondary),
+        title: const Text('Unlink this device'),
+        onTap: _unlink,
+      ),
+    ]);
+  }
+
+  String _vaultLine(Map<String, dynamic> vault) {
+    final last = vault['last_backup_at'];
+    final used = vault['used_bytes'];
+    return [
+      'On',
+      if (last is num && last > 0)
+        'last backup ${timeAgo(last.toInt() > 100000000000 ? last.toInt() : last.toInt() * 1000)}',
+      if (used is num) shared.formatBytes(used.toInt()),
+    ].join(' · ');
+  }
+
+  String _serverLine(Map<String, dynamic> server) {
+    final origin = server['http_origin'];
+    final count = server['resource_count'];
+    final bytes = ((server['blob_bytes'] as num?) ?? 0) +
+        ((server['loro_bytes'] as num?) ?? 0);
+    return [
+      'On',
+      if (origin is String && origin.isNotEmpty) Uri.parse(origin).host,
+      if (count is num) '${count.toInt()} resources',
+      if (bytes > 0) shared.formatBytes(bytes.toInt()),
+    ].join(' · ');
+  }
+
+  Widget _linkRow(AppColors c, String portal) => _group(c, 'Account', [
+        ListTile(
+          leading: Icon(Icons.link, color: c.main),
+          title: const Text('Link your account'),
+          subtitle: Text(
+              'Show Cloud Vault and Cloud Server from ${Uri.tryParse(portal)?.host ?? portal}'),
+          onTap: () => _link(portal),
+        ),
+      ]);
+
+  Widget _thisDevice(AppColors c) {
+    final online = _peerId != null;
+    return ListTile(
+      leading: Icon(Icons.phone_android, color: c.main),
+      title: Text(_deviceName.isEmpty ? 'This device' : _deviceName),
+      subtitle: Text([
+        online ? 'Online' : 'Offline',
+        if (_peerId != null) _short(_peerId!),
+      ].join(' · ')),
+      trailing: const Icon(Icons.edit_outlined, size: 18),
+      onTap: _rename,
+      onLongPress: _peerId == null ? null : () => _copy(_peerId!, 'Device ID'),
+    );
+  }
+
+  static String _short(String id) => id.length <= 22
+      ? id
+      : '${id.substring(0, 12)}…${id.substring(id.length - 6)}';
+}

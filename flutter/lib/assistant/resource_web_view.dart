@@ -4,17 +4,19 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../theme.dart';
 import 'assistant_api.dart';
 
-/// Shows a resource in the connected server's web app.
+/// Shows a resource in the connected server's web app, or any page [url].
 class ResourceWebView extends StatefulWidget {
   final AssistantApi api;
   final String subject;
   final String title;
+  final String? url;
 
   const ResourceWebView({
     super.key,
     required this.api,
     required this.subject,
     this.title = '',
+    this.url,
   });
 
   @override
@@ -31,7 +33,8 @@ class _ResourceWebViewState extends State<ResourceWebView> {
     try {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..loadRequest(Uri.parse(widget.api.webUrl(widget.subject)));
+        ..loadRequest(
+            Uri.parse(widget.url ?? widget.api.webUrl(widget.subject)));
     } catch (e) {
       _error = e;
     }

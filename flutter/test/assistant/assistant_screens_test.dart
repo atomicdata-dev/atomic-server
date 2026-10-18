@@ -27,6 +27,8 @@ class FakeApi extends AssistantApi {
   });
 
   @override
+  Future<String?> agentName() async => 'Joep';
+  @override
   Future<List<DriveInfo>> drives() async => driveList;
   @override
   Future<List<ChatSummary>> chats() async => chatList;
@@ -140,6 +142,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Search in Beta'), findsOneWidget);
       expect(find.text('Any drive chat'), findsOneWidget);
+    });
+
+    testWidgets('the agent avatar is the way to agent and sync',
+        (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('J'), findsOneWidget);
+      expect(find.byTooltip('Your agent and sync'), findsOneWidget);
+      expect(find.byIcon(Icons.settings_outlined), findsNothing);
     });
 
     testWidgets('opens on the drive it is given', (tester) async {
@@ -270,6 +282,5 @@ void main() {
 
 class _Failing extends FakeApi {
   @override
-  Future<List<ChatSummary>> chats() =>
-      Future.error('No active drive');
+  Future<List<ChatSummary>> chats() => Future.error('No active drive');
 }

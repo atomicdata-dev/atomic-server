@@ -27,6 +27,10 @@ class AtomicAccountClient {
     return uri.replace(path: '', query: null, fragment: null);
   }
 
+  /// The portal a saved session belongs to.
+  static Uri sessionOrigin(String saved) => providerOrigin(
+      (jsonDecode(saved) as Map<String, dynamic>)['origin'] as String);
+
   /// Only the host credential store should persist this value, never UI/logs.
   String exportSession() =>
       jsonEncode({'origin': origin.toString(), 'token': _token});
@@ -184,6 +188,9 @@ class AtomicAccountClient {
   }
 
   Future<List<Map<String, dynamic>>> devices() => _list('devices', 'devices');
+  /// Cloud Vault enrollments: one blind, encrypted backup per drive.
+  Future<List<Map<String, dynamic>>> vaultDrives() =>
+      _list('cloud-vault/drives', 'drives');
   Future<List<Map<String, dynamic>>> enrollments() =>
       _list('sync-enrollments', 'enrollments');
 
