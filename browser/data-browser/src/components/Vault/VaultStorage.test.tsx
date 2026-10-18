@@ -348,7 +348,7 @@ it('warns about unsynced edits before removing a device history', async () => {
 
   const dialog = lastDialog();
   expect(dialog.textContent).toContain('never synced anywhere else');
-  expect(dialog.textContent).toContain('workspace itself is not touched');
+  expect(dialog.textContent).toContain('other browsers are not touched');
   expect(removeMock).not.toHaveBeenCalled();
 
   fireEvent.click(within(dialog).getByText('Remove history'));
