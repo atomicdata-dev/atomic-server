@@ -784,6 +784,10 @@ export class Store {
   private clientDbExpected = false;
   /** Callbacks parked in {@link waitForClientDb} until the attach happens. */
   private clientDbWaiters = new Set<() => void>();
+  /** Subjects whose write to the local database waits for the outbox to say
+   *  whether an unsynced offline edit is stored there, see
+   *  {@link writeToClientDb}. */
+  private deferredClientDbWrites = new Set<string>();
   /**
    * Single durable queue replacing the old `dirtyForSync` Set +
    * `atomic.dirtyForSync` + `atomic.offline.<subject>` quartet.
@@ -793,6 +797,7 @@ export class Store {
   public readonly outbox: LocalOutbox = new LocalOutbox(() => {
     this.emitSyncStatus();
     this.scheduleOutboxDrain();
+    this.flushDeferredClientDbWrites();
   });
   private outboxDrainTimer: ReturnType<typeof setTimeout> | undefined;
   /**
@@ -1066,8 +1071,10 @@ export class Store {
     const db = this.clientDb;
 
     if (!attached || !db || !isOutboxDatabase(db)) {
-      // Nothing to move into (yet). A later `setClientDb` binds it then.
-      if (!db) this.outbox.databaseUnavailable(agent);
+      // Nothing to move into (yet). A later `setClientDb` binds it then. A
+      // database that cannot hold the queue never will: the localStorage queue
+      // is complete.
+      if (!db || !isOutboxDatabase(db)) this.outbox.databaseUnavailable(agent);
 
       return;
     }
@@ -3130,9 +3137,52 @@ export class Store {
     }
   }
 
+  /** Write what {@link writeToClientDb} held back, for every subject the
+   *  outbox has now ruled out or finished with. */
+  private flushDeferredClientDbWrites(): void {
+    // Undefined while the outbox is still being constructed.
+    if (
+      !this.deferredClientDbWrites ||
+      this.deferredClientDbWrites.size === 0
+    ) {
+      return;
+    }
+
+    for (const subject of [...this.deferredClientDbWrites]) {
+      if (this.outbox.mayHavePending(subject)) continue;
+
+      this.deferredClientDbWrites.delete(subject);
+      const resource = this._resources.get(
+        this.aliases.get(subject) ?? subject,
+      );
+
+      if (resource) this.writeToClientDb(resource);
+    }
+  }
+
   /** Persist a resource's current state to the local database, if there is one
    *  and this state is worth writing. */
   private writeToClientDb(resource: Resource): void {
+    // An unsynced offline edit lives ONLY in the local database until the
+    // outbox drain reads it back. A copy that arrived from the server, with
+    // none of that edit in it, would replace it: on a reload the database takes
+    // seconds to open, the server's copy lands first, is queued as a write
+    // behind the open, and the drain then reads the server's state back as if
+    // it were the edit's. Nothing past the synced baseline, so the entry was
+    // cleared and the edit lost. While the outbox cannot yet say (its rows come
+    // from that same database) or holds an entry, a doc with no edit of its
+    // own waits; the write is made once the entry is gone.
+    if (
+      this.outbox.mayHavePending(resource.subject) &&
+      !resource.hasUnsavedChanges()
+    ) {
+      this.deferredClientDbWrites.add(resource.subject);
+
+      return;
+    }
+
+    this.deferredClientDbWrites.delete(resource.subject);
+
     if (
       // Skip persisting when the worker has a known init failure (e.g.
       // OPFS leader-election couldn't steal the lock — Firefox doesn't

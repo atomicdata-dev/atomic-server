@@ -1633,6 +1633,7 @@ function SyncPage() {
             quotaBytes={quotaBytes}
             signedIn={!!managedAccount}
             managed={paysForDrive}
+            managedBy={nodeUsage?.managedBy}
           />
         ) : undefined,
         actions: managePlan,

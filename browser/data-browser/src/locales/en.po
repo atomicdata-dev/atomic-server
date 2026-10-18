@@ -13090,10 +13090,6 @@ msgstr "Row menu"
 msgid "Commented"
 msgstr "Commented"
 
-#: src/components/Cloud/CloudServerDetails.tsx
-msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-msgstr "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Live duration"
 msgstr "Live duration"
@@ -13136,6 +13132,19 @@ msgstr "Formula"
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 
+#. 0: managedBy
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Each browser or app's share is listed below, where you can remove it."
+msgstr "Each browser or app's share is listed below, where you can remove it."
+
 #: src/components/Vault/VaultStorage.tsx
 msgid "Delete"
 msgstr "Delete"
@@ -13143,35 +13152,6 @@ msgstr "Delete"
 #: src/components/Vault/VaultStorage.tsx
 msgid "Older snapshots are removed automatically."
 msgstr "Older snapshots are removed automatically."
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Remove history"
-msgstr "Remove history"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Could not remove the history."
-msgstr "Could not remove the history."
-
-#. 0: formatBytes(deleteSnapshot.bytes)
-#: src/components/Vault/VaultStorage.tsx
-msgid "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
-msgstr "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Delete this snapshot?"
-msgstr "Delete this snapshot?"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Delete snapshot"
-msgstr "Delete snapshot"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Could not delete the snapshot."
-msgstr "Could not delete the snapshot."
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "Each browser or app's share is listed below, where you can remove it."
-msgstr "Each browser or app's share is listed below, where you can remove it."
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "· This browser"
@@ -13201,6 +13181,31 @@ msgstr "This deletes the changes it sent to your backup. Edits made only there, 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Remove the saved history of this browser or app?"
 msgstr "Remove the saved history of this browser or app?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove history"
+msgstr "Remove history"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not remove the history."
+msgstr "Could not remove the history."
+
+#. 0: formatBytes(deleteSnapshot.bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+msgstr "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete this snapshot?"
+msgstr "Delete this snapshot?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete snapshot"
+msgstr "Delete snapshot"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not delete the snapshot."
+msgstr "Could not delete the snapshot."
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Latest changes from 1 browser or app"

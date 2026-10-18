@@ -1282,6 +1282,28 @@ async fn drive_usage_reports_enrollment_on_a_managed_node() {
     policy.record_drive_usage([(drive_did.to_string(), 10)]);
     let json = usage!();
     assert_eq!(json["enrolled"], true, "{json}");
+
+    // No label pushed: the field is absent, not null.
+    assert!(json.get("managedBy").is_none(), "{json}");
+
+    // A label shows for an enrolled drive, trimmed.
+    policy.set_drive_policies_labeled([(
+        drive_did.to_string(),
+        None,
+        Some("  Acme Ltd  ".to_string()),
+    )]);
+    let json = usage!();
+    assert_eq!(json["managedBy"], "Acme Ltd", "{json}");
+
+    // Not enrolled: no label, even if one was set for another drive.
+    policy.set_drive_policies_labeled([(
+        "did:ad:someotherdrive".to_string(),
+        None,
+        Some("Acme Ltd".to_string()),
+    )]);
+    let json = usage!();
+    assert_eq!(json["enrolled"], false, "{json}");
+    assert!(json.get("managedBy").is_none(), "{json}");
 }
 
 /// `GET /server` describes the node itself as a `Server` resource, replacing the

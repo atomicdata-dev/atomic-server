@@ -734,12 +734,16 @@ export class LocalOutbox {
   }
 
   private setHydrated(hydrated: boolean): void {
+    const was = this._hydrated;
     this._hydrated = hydrated;
     if (!hydrated) return;
 
     const waiters = this.hydratedWaiters;
     this.hydratedWaiters = [];
     for (const resolve of waiters) resolve();
+
+    // What waited to know whether an entry exists can go on.
+    if (!was) this.onChange();
   }
 
   /** Record a mutation of `subject`'s entry: persist it and tell the store. */

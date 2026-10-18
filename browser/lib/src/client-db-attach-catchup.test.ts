@@ -41,7 +41,7 @@ describe('state that arrives while no local database is attached', () => {
     };
   };
 
-  it('is written once a database attaches', () => {
+  it('is written once a database attaches', async () => {
     const store = new Store({ serverUrl: 'https://example.com' });
     store.expectClientDb();
 
@@ -52,6 +52,9 @@ describe('state that arrives while no local database is attached', () => {
     expect(putResourceWithSnapshot).not.toHaveBeenCalled();
 
     store.setClientDb(worker);
+    // A write waits for the outbox to say whether an offline edit is stored in
+    // the database it is about to go to.
+    await store.outbox.whenHydrated();
 
     expect(putResourceWithSnapshot).toHaveBeenCalledOnce();
     // The store normalises on the way in, so ask the resource for its subject
@@ -71,7 +74,7 @@ describe('state that arrives while no local database is attached', () => {
     expect(putResourceWithSnapshot).not.toHaveBeenCalled();
   });
 
-  it('goes to the database the sign-in attached, not the one it replaced', () => {
+  it('goes to the database the sign-in attached, not the one it replaced', async () => {
     // The sequence a second device actually runs: the anonymous database is
     // open, signing in detaches it, the drive sync lands in the gap, and the
     // agent's own database attaches after it.
@@ -87,6 +90,7 @@ describe('state that arrives while no local database is attached', () => {
 
     const owned = fakeWorker();
     store.setClientDb(owned.worker);
+    await store.outbox.whenHydrated();
 
     expect(owned.putResourceWithSnapshot).toHaveBeenCalledOnce();
     expect(owned.putResourceWithSnapshot.mock.calls[0][0]).toBe(child.subject);

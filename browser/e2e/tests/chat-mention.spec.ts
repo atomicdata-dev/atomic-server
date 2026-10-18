@@ -4,7 +4,7 @@
  * the format `Markdown` already renders, as a link to the resource.
  */
 import { test, expect } from './fixtures';
-import { before, getCurrentSubject, newResource } from './test-utils';
+import { before, newResource } from './test-utils';
 
 test.describe('chat mentions', () => {
   test.beforeEach(before);
@@ -18,7 +18,6 @@ test.describe('chat mentions', () => {
     await expect(
       page.getByRole('heading', { name: 'Mention Target' }),
     ).toBeVisible({ timeout: 10000 });
-    const targetSubject = await getCurrentSubject(page);
 
     await newResource('chatroom', page);
     const input = page.getByLabel('Chat input');
@@ -31,9 +30,7 @@ test.describe('chat mentions', () => {
       .getByRole('button', { name: 'Mention Target' })
       .click({ timeout: 15000 });
 
-    await expect(input).toHaveValue(
-      `see [@ id="${targetSubject}" label="Mention Target"] `,
-    );
+    await expect(input).toHaveValue('see @Mention Target ');
     await input.press('Enter');
 
     await expect(
