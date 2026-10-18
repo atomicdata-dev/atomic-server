@@ -11,11 +11,13 @@ import 'search_screen.dart';
 /// gallery.
 class ChatsScreen extends StatefulWidget {
   final AssistantApi api;
+  final String drive;
   final VoidCallback onOpenGallery;
   final VoidCallback? onSignOut;
 
   const ChatsScreen({
     super.key,
+    required this.drive,
     this.api = const AssistantApi(),
     required this.onOpenGallery,
     this.onSignOut,
@@ -26,10 +28,10 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  late Future<List<ChatSummary>> _chats = widget.api.chats();
+  late Future<List<ChatSummary>> _chats = widget.api.chats(widget.drive);
 
   Future<void> _reload() async {
-    final next = widget.api.chats();
+    final next = widget.api.chats(widget.drive);
     setState(() => _chats = next);
     await next.catchError((_) => <ChatSummary>[]);
   }
@@ -83,7 +85,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onTap: () => _push(SearchScreen(api: widget.api)),
+              onTap: () =>
+                  _push(SearchScreen(drive: widget.drive, api: widget.api)),
             ),
           ),
           Expanded(

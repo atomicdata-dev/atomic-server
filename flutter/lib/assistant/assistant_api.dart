@@ -5,9 +5,11 @@ import '../atomic/atomic_client.dart';
 class AssistantApi {
   const AssistantApi();
 
-  Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
+  Future<List<ChatSummary>> chats(String drive) =>
+      AtomicClient.listAiChats(drive);
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
-  Future<List<SearchHit>> search(String query) => AtomicClient.search(query);
+  Future<List<SearchHit>> search(String drive, String query) =>
+      AtomicClient.search(drive, query);
   String webUrl(String subject) => AtomicClient.resourceWebUrl(subject);
 }

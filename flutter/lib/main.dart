@@ -301,6 +301,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
           ? LoginScreen(onLoggedIn: _onLoggedIn)
           : _openCanvas == null && !_showGallery
               ? ChatsScreen(
+                  drive: AtomicClient.getActiveDrive() ?? '',
                   onOpenGallery: () => setState(() => _showGallery = true),
                   onSignOut: _signedOut,
                 )

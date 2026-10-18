@@ -86,14 +86,16 @@ class AtomicClient {
 
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
 
-  static Future<List<ChatSummary>> listAiChats() async =>
-      parseChats(await assistant.listAiChats());
+  static Future<List<ChatSummary>> listAiChats(String drive) async =>
+      parseChats(await assistant.listAiChats(drive: drive));
 
   static Future<List<ChatMessage>> readChat(String subject) async =>
       parseChatMessages(await assistant.readChat(subject: subject));
 
-  static Future<List<SearchHit>> search(String query, {int limit = 20}) async =>
-      parseHits(await assistant.search(query: query, limit: limit));
+  static Future<List<SearchHit>> search(String drive, String query,
+          {int limit = 20}) async =>
+      parseHits(
+          await assistant.search(drive: drive, query: query, limit: limit));
 
   /// Where the connected server's web app shows [subject]. Throws when no
   /// server is connected.

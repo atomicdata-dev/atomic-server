@@ -22,11 +22,11 @@ class FakeApi extends AssistantApi {
   });
 
   @override
-  Future<List<ChatSummary>> chats() async => chatList;
+  Future<List<ChatSummary>> chats(String drive) async => chatList;
   @override
   Future<List<ChatMessage>> messages(String chat) async => messageList;
   @override
-  Future<List<SearchHit>> search(String query) async {
+  Future<List<SearchHit>> search(String drive, String query) async {
     asked.add(query);
     return hits;
   }
@@ -60,7 +60,8 @@ void main() {
           (id: 'p#2', role: 'assistant', text: 'Lisbon.', createdAt: 2),
         ],
       );
-      await tester.pumpWidget(app(ChatsScreen(api: api, onOpenGallery: () {})));
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
       expect(find.text('Trip plan'), findsOneWidget);
@@ -75,8 +76,8 @@ void main() {
     });
 
     testWidgets('says so when there are no chats', (tester) async {
-      await tester.pumpWidget(
-          app(ChatsScreen(api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('No chats yet'), findsOneWidget);
     });
@@ -84,7 +85,10 @@ void main() {
     testWidgets('reaches the canvas gallery and the search', (tester) async {
       var gallery = 0;
       await tester.pumpWidget(app(
-        ChatsScreen(api: FakeApi(), onOpenGallery: () => gallery++),
+        ChatsScreen(
+            drive: 'did:ad:drive',
+            api: FakeApi(),
+            onOpenGallery: () => gallery++),
         brightness: Brightness.dark,
       ));
       await tester.pumpAndSettle();
@@ -100,7 +104,8 @@ void main() {
     testWidgets('shows the error when the chats cannot be read',
         (tester) async {
       final api = _Failing();
-      await tester.pumpWidget(app(ChatsScreen(api: api, onOpenGallery: () {})));
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.textContaining('No active drive'), findsOneWidget);
     });
@@ -111,7 +116,8 @@ void main() {
       final api = FakeApi(hits: [
         (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
       ]);
-      await tester.pumpWidget(app(SearchScreen(api: api)));
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
 
       await tester.enterText(find.byType(TextField), 'ze');
       await tester.pump(const Duration(milliseconds: 50));
@@ -190,5 +196,5 @@ void main() {
 
 class _Failing extends FakeApi {
   @override
-  Future<List<ChatSummary>> chats() => Future.error('No active drive');
+  Future<List<ChatSummary>> chats(String drive) => Future.error('No active drive');
 }

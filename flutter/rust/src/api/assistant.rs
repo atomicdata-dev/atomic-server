@@ -1,6 +1,6 @@
 //! Read-only access for the assistant screens: AI chats, chat entries, search.
 //!
-//! Generic on purpose: everything works on resources of the active drive and
+//! Generic on purpose: everything works on resources of the drive it is given and
 //! returns JSON, with no canvas logic. Chat messages are `ChatLog` entries, as
 //! the web app stores them (`planning/chat-log.md`, "Step 3: AI chat").
 
@@ -65,11 +65,10 @@ async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String> {
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
 }
 
-/// AI chats of the active drive, newest activity first, as JSON
+/// AI chats of `drive`, newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-pub async fn list_ai_chats() -> Result<String, String> {
+pub async fn list_ai_chats(drive: String) -> Result<String, String> {
     let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
     let drive_id = Subject::from(drive.as_str()).pure_id();
     let found = store.query(&Query::new_class(AI_CHAT)).await.map_err(err)?;
 
@@ -109,11 +108,10 @@ pub async fn read_chat(subject: String) -> Result<String, String> {
     serde_json::to_string(&entries).map_err(|e| e.to_string())
 }
 
-/// Full-text search in the active drive (type-ahead on the last word). JSON
+/// Full-text search in `drive` (type-ahead on the last word). JSON
 /// `[{subject, title, class_name, score}]`, best first.
-pub async fn search(query: String, limit: u32) -> Result<String, String> {
+pub async fn search(drive: String, query: String, limit: u32) -> Result<String, String> {
     let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
     let opts = atomic_lib::client::search::SearchOpts {
         limit: Some(limit),
         parents: Some(vec![drive]),

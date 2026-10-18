@@ -94,7 +94,8 @@ async fn assistant_lists_chats_of_the_drive_by_last_activity() {
     add_page(&old, &[("1-00000001", ai_entry("user", "hi", 1_000))]).await;
     add_page(&new, &[("1-00000001", ai_entry("user", "hi", 9_000))]).await;
 
-    let list: Vec<Json> = serde_json::from_str(&list_ai_chats().await.unwrap()).unwrap();
+    let drive = shared_drive().await.to_string();
+    let list: Vec<Json> = serde_json::from_str(&list_ai_chats(drive).await.unwrap()).unwrap();
     let position = |subject: &str| list.iter().position(|c| c["subject"] == subject).unwrap();
     assert!(position(&new) < position(&old));
     assert!(position(&old) < position(&empty));
@@ -111,14 +112,29 @@ async fn assistant_list_leaves_out_other_classes() {
         .create_resource(urls::FOLDER, drive, "Not a chat", None)
         .await
         .unwrap();
-    let list = list_ai_chats().await.unwrap();
+    let list = list_ai_chats(drive.to_string()).await.unwrap();
     assert!(!list.contains(&folder));
+}
+
+#[tokio::test]
+async fn assistant_list_and_search_are_scoped_to_the_given_drive() {
+    let chat = new_chat("Quokka scoping chat").await;
+    let other = "https://example.test/not-this-drive".to_string();
+    let list = list_ai_chats(other.clone()).await.unwrap();
+    assert!(!list.contains(&chat));
+    let hits = search(other, "quokka".into(), 5).await.unwrap();
+    assert!(!hits.contains(&chat));
+    let drive = shared_drive().await.to_string();
+    let hits = search(drive, "quokka".into(), 5).await.unwrap();
+    assert!(hits.contains(&chat));
 }
 
 #[tokio::test]
 async fn assistant_search_finds_a_prefix_with_title_and_class() {
     let chat = new_chat("Zebrafinch migration notes").await;
-    let hits: Vec<Json> = serde_json::from_str(&search("zebraf".into(), 5).await.unwrap()).unwrap();
+    let drive = shared_drive().await.to_string();
+    let hits: Vec<Json> =
+        serde_json::from_str(&search(drive.clone(), "zebraf".into(), 5).await.unwrap()).unwrap();
     let hit = hits
         .iter()
         .find(|h| h["subject"] == chat.as_str())
@@ -127,7 +143,7 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     assert!(hit["score"].as_f64().unwrap() > 0.0);
     assert!(hit["class_name"].as_str().is_some_and(|c| !c.is_empty()));
 
-    let none = search("qqqxxnothing".into(), 5).await.unwrap();
+    let none = search(drive, "qqqxxnothing".into(), 5).await.unwrap();
     assert_eq!(none, "[]");
 }
 

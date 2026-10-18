@@ -7,11 +7,16 @@ import '../theme.dart';
 import 'assistant_api.dart';
 import 'resource_web_view.dart';
 
-/// Type-ahead search over the active drive; a hit opens in the web view.
+/// Type-ahead search over [drive]; a hit opens in the web view.
 class SearchScreen extends StatefulWidget {
   final AssistantApi api;
+  final String drive;
 
-  const SearchScreen({super.key, this.api = const AssistantApi()});
+  const SearchScreen({
+    super.key,
+    required this.drive,
+    this.api = const AssistantApi(),
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -39,7 +44,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 200), () async {
       final asked = _query;
       try {
-        final hits = await widget.api.search(asked);
+        final hits = await widget.api.search(widget.drive, asked);
         if (mounted && asked == _query) {
           setState(() {
             _hits = hits;
