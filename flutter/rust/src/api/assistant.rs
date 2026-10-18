@@ -79,11 +79,11 @@ pub(crate) async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String>
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
 }
 
-/// The newest `limit` AI chats of `drive`, newest activity first, as JSON
+/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
 /// Read from the recents index, not rebuilt from the chats' pages.
-pub async fn list_ai_chats(drive: String, limit: u32) -> Result<String, String> {
-    let chats = recents::recent_chats(&drive, limit as usize).await?;
+pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
+    let chats = recents::recent_chats(limit as usize).await?;
     let list: Vec<Json> = chats
         .into_iter()
         .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))

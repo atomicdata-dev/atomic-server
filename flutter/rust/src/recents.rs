@@ -2,8 +2,9 @@
 //!
 //! Which chat spoke last used to be found by rebuilding every chat's Loro pages
 //! in every drive. Now a listener on the store's change events keeps a small
-//! per-drive index: the newest entry time of each AI chat, and the resources
-//! this device opened recently. It lives in `recents.json` beside the store,
+//! index: the newest entry time of each AI chat (chats belong to the person,
+//! so across all drives), and per drive the resources this device opened
+//! recently. It lives in `recents.json` beside the store,
 //! is local to the device (opening a resource commits nothing), and is
 //! rebuilt from the store when it is missing or the listener fell behind.
 
@@ -18,18 +19,17 @@ const OPENED_CAP: usize = 100;
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 struct DriveRecents {
-    /// Chat subject → newest entry time (ms), 0 for a chat without entries.
-    chats: HashMap<String, i64>,
     /// Resource subject → when this device opened it (ms).
     opened: HashMap<String, i64>,
-    /// Whether `chats` was filled from the store (and not only from events).
-    #[serde(default)]
-    chats_scanned: bool,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 struct Recents {
-    /// Keyed by the drive's `pure_id`.
+    /// Chat subject → newest entry time (ms), 0 for a chat without entries.
+    chats: HashMap<String, i64>,
+    /// Whether `chats` was filled from the store (and not only from events).
+    chats_scanned: bool,
+    /// Opened resources, keyed by the drive's `pure_id`.
     drives: HashMap<String, DriveRecents>,
 }
 
@@ -102,13 +102,6 @@ fn page_last_activity(page: &Resource) -> i64 {
         .unwrap_or(0)
 }
 
-fn drive_of(resource: &Resource) -> Option<String> {
-    resource
-        .get(urls::DRIVE_PROP)
-        .ok()
-        .map(|d| drive_id(&d.to_string()))
-}
-
 fn is_ai_chat(resource: &Resource) -> bool {
     resource
         .get(urls::IS_A)
@@ -117,16 +110,9 @@ fn is_ai_chat(resource: &Resource) -> bool {
         .is_some_and(|classes| classes.iter().any(|c| c == AI_CHAT))
 }
 
-fn bump_chat(drive: &str, chat: &str, at: i64) {
+fn bump_chat(chat: &str, at: i64) {
     with(|s| {
-        let slot = s
-            .recents
-            .drives
-            .entry(drive.to_string())
-            .or_default()
-            .chats
-            .entry(chat.to_string())
-            .or_insert(0);
+        let slot = s.recents.chats.entry(chat.to_string()).or_insert(0);
         *slot = (*slot).max(at);
         s.dirty = true;
     });
@@ -140,37 +126,22 @@ pub(crate) async fn handle_event(store: &Db, event: DbEvent) {
                 return;
             };
             if is_ai_chat(&resource) {
-                if let Some(drive) = drive_of(&resource) {
-                    bump_chat(&drive, &subject.to_string(), 0);
-                }
+                bump_chat(&subject.to_string(), 0);
             } else if atomic_lib::hierarchy::is_chat_log(&resource) {
                 let Ok(parent) = resource.get(urls::PARENT) else {
                     return;
                 };
-                let chat = parent.to_string();
-                let Ok(chat_resource) = store.get_resource(&Subject::from(chat.as_str())).await
-                else {
-                    return;
-                };
-                if let Some(drive) = drive_of(&chat_resource) {
-                    bump_chat(&drive, &chat, page_last_activity(&resource));
-                }
+                bump_chat(&parent.to_string(), page_last_activity(&resource));
             }
         }
-        DbEvent::Destroyed { subject, drive, .. } => {
+        DbEvent::Destroyed { subject, .. } => {
             let subject = subject.to_string();
             with(|s| {
-                let drives: Vec<_> = match &drive {
-                    Some(d) => vec![drive_id(&d.to_string())],
-                    None => s.recents.drives.keys().cloned().collect(),
-                };
-                for d in drives {
-                    if let Some(r) = s.recents.drives.get_mut(&d) {
-                        let removed = r.chats.remove(&subject).is_some()
-                            | r.opened.remove(&subject).is_some();
-                        s.dirty |= removed;
-                    }
+                let mut removed = s.recents.chats.remove(&subject).is_some();
+                for r in s.recents.drives.values_mut() {
+                    removed |= r.opened.remove(&subject).is_some();
                 }
+                s.dirty |= removed;
             });
         }
         DbEvent::QueryMembershipChanged { .. } => {}
@@ -190,11 +161,7 @@ pub(crate) fn spawn_listener(store: std::sync::Arc<Db>) {
             match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
                 Ok(Ok(event)) => handle_event(&store, event).await,
                 // Events were dropped: what the index knows may be stale.
-                Ok(Err(RecvError::Lagged(_))) => with(|s| {
-                    for r in s.recents.drives.values_mut() {
-                        r.chats_scanned = false;
-                    }
-                }),
+                Ok(Err(RecvError::Lagged(_))) => with(|s| s.recents.chats_scanned = false),
                 Ok(Err(RecvError::Closed)) => break,
                 Err(_) => {}
             }
@@ -211,10 +178,9 @@ pub(crate) fn spawn_listener(store: std::sync::Arc<Db>) {
     });
 }
 
-/// Fill a drive's chat index from the store the first time it is asked for.
-pub(crate) async fn ensure_scanned(drive: &str) -> Result<(), String> {
-    let id = drive_id(drive);
-    if with(|s| s.recents.drives.get(&id).is_some_and(|r| r.chats_scanned)) {
+/// Fill the chat index from the store the first time it is asked for.
+pub(crate) async fn ensure_scanned() -> Result<(), String> {
+    if with(|s| s.recents.chats_scanned) {
         return Ok(());
     }
     let store = db()?;
@@ -223,36 +189,26 @@ pub(crate) async fn ensure_scanned(drive: &str) -> Result<(), String> {
         .await
         .map_err(err)?;
     for subject in &found.subjects {
-        let Ok(chat) = store.get_resource(subject).await else {
-            continue;
-        };
-        if drive_of(&chat).as_deref() != Some(id.as_str()) {
-            continue;
-        }
-        let subject = chat.get_subject().to_string();
+        let subject = subject.to_string();
         let last = chat_entries(&subject).await?.last().map_or(0, |(c, _)| *c);
-        bump_chat(&id, &subject, last);
+        bump_chat(&subject, last);
     }
     with(|s| {
-        s.recents.drives.entry(id).or_default().chats_scanned = true;
+        s.recents.chats_scanned = true;
         s.dirty = true;
     });
     Ok(())
 }
 
-/// The `limit` newest chats of `drive` as `(subject, name, last_activity)`.
-pub(crate) async fn recent_chats(
-    drive: &str,
-    limit: usize,
-) -> Result<Vec<(String, String, i64)>, String> {
-    ensure_scanned(drive).await?;
-    let id = drive_id(drive);
+/// The `limit` newest chats as `(subject, name, last_activity)`.
+pub(crate) async fn recent_chats(limit: usize) -> Result<Vec<(String, String, i64)>, String> {
+    ensure_scanned().await?;
     let mut chats: Vec<(String, i64)> = with(|s| {
         s.recents
-            .drives
-            .get(&id)
-            .map(|r| r.chats.iter().map(|(k, v)| (k.clone(), *v)).collect())
-            .unwrap_or_default()
+            .chats
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect()
     });
     chats.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     let store = db()?;

@@ -266,7 +266,11 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
     final isDark = View.of(context).platformDispatcher.platformBrightness ==
         Brightness.dark;
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      systemNavigationBarColor: Colors.transparent,
+      // Black bar with light buttons in dark mode, white with dark ones in
+      // light mode; Android must not tint it back to a scrim.
+      systemNavigationBarColor: isDark ? Colors.black : Colors.white,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarContrastEnforced: false,
       systemNavigationBarIconBrightness:
           isDark ? Brightness.light : Brightness.dark,
       statusBarColor: Colors.transparent,

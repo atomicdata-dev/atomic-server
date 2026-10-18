@@ -9,9 +9,14 @@ import 'resource_row.dart';
 import 'resource_web_view.dart';
 import 'search_screen.dart';
 
-/// Home screen: one page per drive, swiped sideways. Each page is a search
-/// field, the drive's recent AI chats and the resources opened lately. The
-/// neighbouring pages are built ahead so a swipe lands on a filled page.
+/// Chats shown on the home; the rest is one tap away in a chat list later.
+const _homeChats = 5;
+
+/// Home screen. AI chats belong to the person, so the search field and the
+/// newest chats sit on top whatever drive is showing. Below, one page per
+/// drive, swiped sideways, lists the resources opened lately; the search
+/// field looks in the drive of the visible page. The neighbouring pages are
+/// built ahead so a swipe lands on a filled page.
 class ChatsScreen extends StatefulWidget {
   final AssistantApi api;
 
@@ -34,8 +39,13 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _loadDrives();
+  late Future<List<ChatSummary>> _chats = widget.api.chats();
   PageController? _pages;
   int _page = 0;
+
+  /// Bumped when the user comes back from another screen, so the pages read
+  /// again.
+  int _generation = 0;
 
   /// The agent's drives; when there are none (not synced yet) just the one
   /// the app opened on.
@@ -56,14 +66,24 @@ class _ChatsScreenState extends State<ChatsScreen> {
     super.dispose();
   }
 
+  void _reload() => setState(() {
+        _generation++;
+        _chats = widget.api.chats();
+      });
+
+  Future<void> _push(Widget screen) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => screen));
+    if (mounted) _reload();
+  }
+
   Future<void> _settings() async {
     final signedOut = await AgentSettingsDialog.show(context);
     if (signedOut) {
       widget.onSignOut?.call();
     } else {
-      setState(() {
-        _drives = _loadDrives();
-      });
+      setState(() => _drives = _loadDrives());
+      _reload();
     }
   }
 
@@ -74,21 +94,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
       future: _drives,
       builder: (context, snapshot) {
         final drives = snapshot.data;
-        final title = drives == null || drives.isEmpty
-            ? 'Chats'
-            : drives[_page.clamp(0, drives.length - 1)].name;
+        final drive = drives == null || drives.isEmpty
+            ? null
+            : drives[_page.clamp(0, drives.length - 1)];
         return Scaffold(
           backgroundColor: c.bgBody,
           appBar: AppBar(
             backgroundColor: c.bgBody,
-            title: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title.isEmpty ? 'Chats' : title),
-                if (drives != null && drives.length > 1)
-                  _Dots(count: drives.length, current: _page),
-              ],
-            ),
+            title: const Text('Chats'),
             actions: [
               IconButton(
                 tooltip: 'Canvases',
@@ -107,19 +120,108 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   child: Text('${snapshot.error}',
                       style: TextStyle(color: c.alert)),
                 )
-              : drives == null
+              : drives == null || drive == null
                   ? const Center(child: CircularProgressIndicator())
-                  : PageView.builder(
-                      controller: _pages,
-                      allowImplicitScrolling: true,
-                      itemCount: drives.length,
-                      onPageChanged: (i) => setState(() => _page = i),
-                      itemBuilder: (_, i) => _DrivePage(
-                        key: ValueKey(drives[i].subject),
-                        api: widget.api,
-                        drive: drives[i].subject,
-                      ),
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: TextField(
+                            readOnly: true,
+                            decoration: InputDecoration(
+                              hintText: drives.length > 1
+                                  ? 'Search in ${drive.name}'
+                                  : 'Search',
+                              prefixIcon: const Icon(Icons.search),
+                              filled: true,
+                              fillColor: c.bg1,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(9),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            onTap: () => _push(SearchScreen(
+                                drive: drive.subject, api: widget.api)),
+                          ),
+                        ),
+                        _ChatsSection(
+                          chats: _chats,
+                          onOpen: (chat) => _push(ChatScreen(
+                            api: widget.api,
+                            subject: chat.subject,
+                            title: chat.name,
+                          )),
+                        ),
+                        if (drives.length > 1)
+                          _Dots(
+                            count: drives.length,
+                            current: _page,
+                          ),
+                        Expanded(
+                          child: PageView.builder(
+                            controller: _pages,
+                            allowImplicitScrolling: true,
+                            itemCount: drives.length,
+                            onPageChanged: (i) => setState(() => _page = i),
+                            itemBuilder: (_, i) => _OpenedPage(
+                              key: ValueKey(drives[i].subject),
+                              api: widget.api,
+                              drive: drives[i].subject,
+                              generation: _generation,
+                              onOpen: _push,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+        );
+      },
+    );
+  }
+}
+
+/// The person's newest chats, whatever drive they were started in.
+class _ChatsSection extends StatelessWidget {
+  final Future<List<ChatSummary>> chats;
+  final void Function(ChatSummary) onOpen;
+
+  const _ChatsSection({required this.chats, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return FutureBuilder<List<ChatSummary>>(
+      future: chats,
+      builder: (context, snapshot) {
+        final list = snapshot.data;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Heading('Recent chats', c),
+            if (snapshot.hasError)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child:
+                    Text('${snapshot.error}', style: TextStyle(color: c.alert)),
+              )
+            else if (list == null)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (list.isEmpty)
+              _Empty('No chats yet', c)
+            else
+              for (final chat in list.take(_homeChats))
+                ResourceRow(
+                  icon: Icons.chat_bubble_outline,
+                  title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
+                  detail: chat.lastActivity == 0
+                      ? null
+                      : timeAgo(chat.lastActivity),
+                  onTap: () => onOpen(chat),
+                ),
+          ],
         );
       },
     );
@@ -156,129 +258,81 @@ class _Dots extends StatelessWidget {
   }
 }
 
-typedef _Lists = (List<ChatSummary>, List<RecentResource>);
-
-/// One drive: search, recent chats, recently opened resources. Kept alive so
-/// a page swiped away and back is not read again.
-class _DrivePage extends StatefulWidget {
+/// One drive: the resources opened lately. Kept alive so a page swiped away
+/// and back is not read again.
+class _OpenedPage extends StatefulWidget {
   final AssistantApi api;
   final String drive;
+  final int generation;
+  final Future<void> Function(Widget) onOpen;
 
-  const _DrivePage({super.key, required this.api, required this.drive});
+  const _OpenedPage({
+    super.key,
+    required this.api,
+    required this.drive,
+    required this.generation,
+    required this.onOpen,
+  });
 
   @override
-  State<_DrivePage> createState() => _DrivePageState();
+  State<_OpenedPage> createState() => _OpenedPageState();
 }
 
-class _DrivePageState extends State<_DrivePage>
+class _OpenedPageState extends State<_OpenedPage>
     with AutomaticKeepAliveClientMixin {
-  late Future<_Lists> _lists = _load();
+  late Future<List<RecentResource>> _recent =
+      widget.api.recentResources(widget.drive);
 
   @override
   bool get wantKeepAlive => true;
 
-  Future<_Lists> _load() async {
-    final (chats, recent) = await (
-      widget.api.chats(widget.drive),
-      widget.api.recentResources(widget.drive),
-    ).wait;
-    return (chats, recent);
-  }
-
-  Future<void> _reload() async {
-    final next = _load();
-    setState(() => _lists = next);
-    await next.catchError((_) => (<ChatSummary>[], <RecentResource>[]));
-  }
-
-  Future<void> _push(Widget screen) async {
-    await Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => screen));
-    if (mounted) await _reload();
+  @override
+  void didUpdateWidget(_OpenedPage old) {
+    super.didUpdateWidget(old);
+    if (old.generation != widget.generation) {
+      _recent = widget.api.recentResources(widget.drive);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.appColors;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: TextField(
-            readOnly: true,
-            decoration: InputDecoration(
-              hintText: 'Search',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: c.bg1,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(9),
-                borderSide: BorderSide.none,
+    return FutureBuilder<List<RecentResource>>(
+      future: _recent,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('${snapshot.error}', style: TextStyle(color: c.alert)),
+          );
+        }
+        final recent = snapshot.data;
+        if (recent == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ListView(
+          children: [
+            _Heading('Recently opened', c),
+            if (recent.isEmpty) _Empty('Nothing opened yet', c),
+            for (final r in recent)
+              ResourceRow(
+                icon: Icons.description_outlined,
+                title: r.title.isEmpty ? r.subject : r.title,
+                detail: [r.className, timeAgo(r.openedAt)]
+                    .where((t) => t.isNotEmpty)
+                    .join(' · '),
+                onTap: () {
+                  widget.api.noteOpened(widget.drive, r.subject);
+                  widget.onOpen(ResourceWebView(
+                    api: widget.api,
+                    subject: r.subject,
+                    title: r.title,
+                  ));
+                },
               ),
-            ),
-            onTap: () =>
-                _push(SearchScreen(drive: widget.drive, api: widget.api)),
-          ),
-        ),
-        Expanded(
-          child: FutureBuilder<_Lists>(
-            future: _lists,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text('${snapshot.error}',
-                      style: TextStyle(color: c.alert)),
-                );
-              }
-              final lists = snapshot.data;
-              if (lists == null) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final (chats, recent) = lists;
-              return RefreshIndicator(
-                onRefresh: _reload,
-                child: ListView(
-                  children: [
-                    _Heading('Recent chats', c),
-                    if (chats.isEmpty) _Empty('No chats yet', c),
-                    for (final chat in chats)
-                      ResourceRow(
-                        icon: Icons.chat_bubble_outline,
-                        title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
-                        detail: chat.lastActivity == 0
-                            ? null
-                            : timeAgo(chat.lastActivity),
-                        onTap: () => _push(ChatScreen(
-                          api: widget.api,
-                          subject: chat.subject,
-                          title: chat.name,
-                        )),
-                      ),
-                    if (recent.isNotEmpty) _Heading('Recently opened', c),
-                    for (final r in recent)
-                      ResourceRow(
-                        icon: Icons.description_outlined,
-                        title: r.title.isEmpty ? r.subject : r.title,
-                        detail: [r.className, timeAgo(r.openedAt)]
-                            .where((t) => t.isNotEmpty)
-                            .join(' · '),
-                        onTap: () {
-                          widget.api.noteOpened(widget.drive, r.subject);
-                          _push(ResourceWebView(
-                            api: widget.api,
-                            subject: r.subject,
-                            title: r.title,
-                          ));
-                        },
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

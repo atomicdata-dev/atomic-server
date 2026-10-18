@@ -11,7 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeApi extends AssistantApi {
   final List<DriveInfo> driveList;
-  final Map<String, List<ChatSummary>> chatsByDrive;
   final List<RecentResource> recent;
   final List<ChatSummary> chatList;
   final List<ChatMessage> messageList;
@@ -21,7 +20,6 @@ class FakeApi extends AssistantApi {
 
   FakeApi({
     this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
-    this.chatsByDrive = const {},
     this.recent = const [],
     this.chatList = const [],
     this.messageList = const [],
@@ -31,8 +29,7 @@ class FakeApi extends AssistantApi {
   @override
   Future<List<DriveInfo>> drives() async => driveList;
   @override
-  Future<List<ChatSummary>> chats(String drive) async =>
-      chatsByDrive[drive] ?? chatList;
+  Future<List<ChatSummary>> chats() async => chatList;
   @override
   Future<List<RecentResource>> recentResources(String drive) async => recent;
   @override
@@ -115,17 +112,13 @@ void main() {
       expect(find.byType(SearchScreen), findsOneWidget);
     });
 
-    testWidgets('swipes between the drives, each with its own chats',
-        (tester) async {
+    testWidgets('chats stay put while the drives swipe', (tester) async {
       final api = FakeApi(
         driveList: [
           (subject: 'did:ad:a', name: 'Alpha'),
           (subject: 'did:ad:b', name: 'Beta'),
         ],
-        chatsByDrive: {
-          'did:ad:a': [(subject: 'c1', name: 'Alpha chat', lastActivity: 0)],
-          'did:ad:b': [(subject: 'c2', name: 'Beta chat', lastActivity: 0)],
-        },
+        chatList: [(subject: 'c1', name: 'Any drive chat', lastActivity: 0)],
         recent: [
           (
             subject: 'r1',
@@ -139,15 +132,14 @@ void main() {
           app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(find.text('Alpha chat'), findsOneWidget);
+      expect(find.text('Any drive chat'), findsOneWidget);
       expect(find.text('Opened doc'), findsOneWidget);
+      expect(find.text('Search in Alpha'), findsOneWidget);
 
-      await tester.fling(find.text('Alpha chat'), const Offset(-600, 0), 2000);
+      await tester.fling(find.text('Opened doc'), const Offset(-600, 0), 2000);
       await tester.pumpAndSettle();
-      expect(find.text('Beta'), findsOneWidget);
-      expect(find.text('Beta chat'), findsOneWidget);
-      expect(find.text('Alpha chat'), findsNothing);
+      expect(find.text('Search in Beta'), findsOneWidget);
+      expect(find.text('Any drive chat'), findsOneWidget);
     });
 
     testWidgets('opens on the drive it is given', (tester) async {
@@ -158,7 +150,7 @@ void main() {
       await tester.pumpWidget(
           app(ChatsScreen(drive: 'did:ad:b', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
-      expect(find.text('Beta'), findsOneWidget);
+      expect(find.text('Search in Beta'), findsOneWidget);
     });
 
     testWidgets('shows the error when the chats cannot be read',
@@ -278,6 +270,6 @@ void main() {
 
 class _Failing extends FakeApi {
   @override
-  Future<List<ChatSummary>> chats(String drive) =>
+  Future<List<ChatSummary>> chats() =>
       Future.error('No active drive');
 }

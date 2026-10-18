@@ -8,12 +8,11 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`
 
-/// The newest `limit` AI chats of `drive`, newest activity first, as JSON
+/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
 /// Read from the recents index, not rebuilt from the chats' pages.
-Future<String> listAiChats({required String drive, required int limit}) =>
-    RustLib.instance.api
-        .crateApiAssistantListAiChats(drive: drive, limit: limit);
+Future<String> listAiChats({required int limit}) =>
+    RustLib.instance.api.crateApiAssistantListAiChats(limit: limit);
 
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.

@@ -955,14 +955,12 @@ fn wire__crate__api__assistant__list_ai_chats_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_drive = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::assistant::list_ai_chats(api_drive, api_limit).await?;
+                        let output_ok = crate::api::assistant::list_ai_chats(api_limit).await?;
                         Ok(output_ok)
                     })()
                     .await,

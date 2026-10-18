@@ -104,9 +104,9 @@ class AtomicClient {
 
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
 
-  static Future<List<ChatSummary>> listAiChats(String drive,
-          {int limit = 50}) async =>
-      parseChats(await assistant.listAiChats(drive: drive, limit: limit));
+  /// The person's newest AI chats, across all drives.
+  static Future<List<ChatSummary>> listAiChats({int limit = 50}) async =>
+      parseChats(await assistant.listAiChats(limit: limit));
 
   /// Remember that this device opened [subject]; local, nothing is synced.
   static void noteResourceOpened(String drive, String subject) =>

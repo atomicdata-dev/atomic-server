@@ -6,8 +6,7 @@ class AssistantApi {
   const AssistantApi();
 
   Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
-  Future<List<ChatSummary>> chats(String drive) =>
-      AtomicClient.listAiChats(drive);
+  Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
   Future<List<SearchHit>> search(String drive, String query) =>

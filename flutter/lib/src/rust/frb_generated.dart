@@ -143,8 +143,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiSimpleInitApp();
 
-  Future<String> crateApiAssistantListAiChats(
-      {required String drive, required int limit});
+  Future<String> crateApiAssistantListAiChats({required int limit});
 
   Future<List<CanvasListItem>> crateApiSimpleListCanvases();
 
@@ -893,12 +892,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<String> crateApiAssistantListAiChats(
-      {required String drive, required int limit}) {
+  Future<String> crateApiAssistantListAiChats({required int limit}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 27, port: port_);
@@ -908,7 +905,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_String,
       ),
       constMeta: kCrateApiAssistantListAiChatsConstMeta,
-      argValues: [drive, limit],
+      argValues: [limit],
       apiImpl: this,
     ));
   }
@@ -916,7 +913,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAssistantListAiChatsConstMeta =>
       const TaskConstMeta(
         debugName: "list_ai_chats",
-        argNames: ["drive", "limit"],
+        argNames: ["limit"],
       );
 
   @override
