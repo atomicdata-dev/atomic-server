@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CanvasStroke } from '@tomic/lib';
 import {
+  contentBounds,
   elementBounds,
   lassoSelect,
   pointInPolygon,
@@ -94,6 +95,43 @@ describe('canvas-elements', () => {
     const a = stroke([[1, 1]]);
 
     expect(transformSelection([a], [], 3, 0, 0, 9, 9)[0]).toBe(a);
+  });
+
+  it('content bounds include images by their box, not just strokes', () => {
+    const image: CanvasStroke = {
+      ...stroke([[500, 400]], 0.01),
+      kind: 'image',
+      src: 'data:,',
+      w: 200,
+      h: 100,
+    };
+    const line = stroke(
+      [
+        [0, 0],
+        [10, 10],
+      ],
+      0,
+    );
+
+    expect(contentBounds([line])).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 10,
+      maxY: 10,
+    });
+    expect(contentBounds([line, image])).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 700,
+      maxY: 500,
+    });
+    expect(contentBounds([image])).toEqual({
+      minX: 500,
+      minY: 400,
+      maxX: 700,
+      maxY: 500,
+    });
+    expect(contentBounds([])).toBeNull();
   });
 
   it('pads stroke bounds by half the width', () => {

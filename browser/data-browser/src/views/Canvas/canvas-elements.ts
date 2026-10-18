@@ -82,6 +82,13 @@ export function unionBounds(list: Bounds[]): Bounds | null {
   }));
 }
 
+/** Bounds of everything on the canvas (strokes, text and images), or null when empty. */
+export function contentBounds(elements: CanvasStroke[]): Bounds | null {
+  return unionBounds(
+    elements.filter(el => el.path.length > 0).map(elementBounds),
+  );
+}
+
 /** Ray-casting point-in-polygon test. */
 export function pointInPolygon(
   x: number,
