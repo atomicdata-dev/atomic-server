@@ -54,8 +54,8 @@ export function CloudServerDetails({
       ) : (
         <Managed data-testid='cloud-server-managed-elsewhere'>
           {managedBy
-            ? `This drive is on Cloud Server, managed by ${managedBy}. Only that account can change the plan or the web address.`
-            : 'This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address.'}
+            ? `This drive is on Cloud Server (managed by ${managedBy}). Only that account can change the plan or the web address.`
+            : 'This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address.'}
         </Managed>
       )}
     </>
