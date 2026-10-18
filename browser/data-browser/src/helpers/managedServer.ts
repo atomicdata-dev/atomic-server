@@ -321,6 +321,14 @@ export async function forgetServerPeer(
   }
 }
 
+/** A non-empty, trimmed name, or undefined. */
+export function readManagedBy(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const name = value.trim();
+
+  return name.length > 0 ? name : undefined;
+}
+
 export type NodeDriveUsage = {
   driveName: string | null;
   resourceCount: number;
@@ -332,6 +340,11 @@ export type NodeDriveUsage = {
    * not as false.
    */
   enrolled?: boolean;
+  /**
+   * The name the paying account chose to show members. Only set when the node
+   * sent a non-empty string; absent on self-hosted nodes.
+   */
+  managedBy?: string;
 };
 
 /**
@@ -372,6 +385,7 @@ export async function fetchNodeDriveUsage(
       blobBytes: Number(data?.blobBytes ?? 0),
       loroBytes: Number(data?.loroBytes ?? 0),
       enrolled: typeof data?.enrolled === 'boolean' ? data.enrolled : undefined,
+      managedBy: readManagedBy(data?.managedBy),
     };
   } catch {
     return null;

@@ -3,6 +3,7 @@ import {
   accountCreationTarget,
   forgetServerPeer,
   fetchManagedInfo,
+  readManagedBy,
   isAtomicServer,
   EMPTY_NODE_INFO,
   type ManagedInfo,
@@ -249,5 +250,15 @@ describe('accountCreationTarget in a hosted distribution', () => {
     expect(accountCreationTarget({ managed: false, portalUrl: null })).toEqual({
       kind: 'local',
     });
+  });
+});
+
+describe('readManagedBy', () => {
+  it('keeps a trimmed non-empty string and drops everything else', () => {
+    expect(readManagedBy('  Acme Ltd ')).toBe('Acme Ltd');
+    expect(readManagedBy('   ')).toBeUndefined();
+    expect(readManagedBy('')).toBeUndefined();
+    expect(readManagedBy(null)).toBeUndefined();
+    expect(readManagedBy(42)).toBeUndefined();
   });
 });
