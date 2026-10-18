@@ -20,6 +20,7 @@ export function CloudServerDetails({
   quotaBytes,
   signedIn,
   managed,
+  managedBy,
 }: {
   drive: string;
   usage: NodeDriveUsage | null;
@@ -28,6 +29,8 @@ export function CloudServerDetails({
   signedIn: boolean;
   /** This account pays for the drive's plan. Everyone else just sees it. */
   managed: boolean;
+  /** Name the paying account chose to show members, when the node sent one. */
+  managedBy?: string;
 }) {
   const used = usage ? usage.blobBytes + usage.loroBytes : null;
 
@@ -50,8 +53,9 @@ export function CloudServerDetails({
         signedIn && <DriveAddress drive={drive} />
       ) : (
         <Managed data-testid='cloud-server-managed-elsewhere'>
-          This drive is on Cloud Server, managed by another account. Only that
-          account can change the plan or the web address.
+          {managedBy
+            ? `This drive is on Cloud Server (managed by ${managedBy}). Only that account can change the plan or the web address.`
+            : 'This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address.'}
         </Managed>
       )}
     </>

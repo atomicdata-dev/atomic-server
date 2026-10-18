@@ -83,6 +83,14 @@ pub trait SyncPolicy: Send + Sync {
     /// has no answer that is safe to inherit by omission.
     fn may_enroll_drive(&self, drive_subject: &str, agent: &crate::agents::ForAgent) -> bool;
 
+    /// The display name of whoever manages `drive_subject`, if this node was
+    /// told one. Lets members see who runs the drive. `None` when unknown, and
+    /// always `None` for a drive this policy does not admit. Purely
+    /// informational: it never affects admission.
+    fn drive_manager_label(&self, _drive_subject: &str) -> Option<String> {
+        None
+    }
+
     /// Remember that this node now hosts `drive_subject`, so later writes to it
     /// are admitted. A no-op for policies with nothing to remember.
     fn enroll_drive(&self, _drive_subject: &str) {}
@@ -128,6 +136,8 @@ impl SyncPolicy for OpenPolicy {
 #[derive(Clone, Default)]
 pub struct DrivePolicy {
     pub quota_bytes: Option<u64>,
+    /// Display name of whoever manages the drive, as chosen by them. Optional.
+    pub manager_label: Option<String>,
 }
 
 /// A generic allowlist-plus-quota policy: only enrolled drives may sync, each
@@ -199,12 +209,28 @@ impl AllowlistPolicy {
         I: IntoIterator<Item = (S, Option<u64>)>,
         S: Into<String>,
     {
+        self.set_drive_policies_labeled(drives.into_iter().map(|(s, q)| (s, q, None)));
+    }
+
+    /// Like [`set_drive_policies`](Self::set_drive_policies), with an optional
+    /// manager label per drive (drive subject, byte quota, manager label).
+    pub fn set_drive_policies_labeled<I, S>(&self, drives: I)
+    where
+        I: IntoIterator<Item = (S, Option<u64>, Option<String>)>,
+        S: Into<String>,
+    {
         let mut allowed = HashMap::new();
         let mut names = HashMap::new();
-        for (subject, quota_bytes) in drives {
+        for (subject, quota_bytes, manager_label) in drives {
             let subject: String = subject.into();
             let key = drive_key(&subject);
-            allowed.insert(key.clone(), DrivePolicy { quota_bytes });
+            allowed.insert(
+                key.clone(),
+                DrivePolicy {
+                    quota_bytes,
+                    manager_label,
+                },
+            );
             names.insert(key, subject);
         }
         if let Ok(mut guard) = self.inner.write() {
@@ -315,6 +341,16 @@ impl SyncPolicy for AllowlistPolicy {
 
     fn admit_decision(&self, drive_subject: &str) -> AdmitDecision {
         self.decide_at(drive_subject, Instant::now())
+    }
+
+    fn drive_manager_label(&self, drive_subject: &str) -> Option<String> {
+        self.inner
+            .read()
+            .ok()?
+            .allowed
+            .get(&drive_key(drive_subject))?
+            .manager_label
+            .clone()
     }
 
     /// Nobody, by asking. A managed node's allowlist is the control plane's to
@@ -454,6 +490,22 @@ mod tests {
         let mut hosted = p.allowed_drive_subjects();
         hosted.sort();
         assert_eq!(hosted, ["atomic:drivekey", "http://atomic.example.de/"]);
+    }
+
+    #[test]
+    fn manager_label_is_returned_only_for_enrolled_drives() {
+        let p = AllowlistPolicy::new();
+        p.set_drive_policies_labeled([
+            ("did:ad:a", None, Some("Acme".to_string())),
+            ("did:ad:b", None, None),
+        ]);
+        assert_eq!(p.drive_manager_label("did:ad:a").as_deref(), Some("Acme"));
+        assert_eq!(p.drive_manager_label("did:ad:b"), None);
+        assert_eq!(p.drive_manager_label("did:ad:c"), None);
+        // The unlabeled setter drops any label, and OpenPolicy has none.
+        p.set_drive_policies([("did:ad:a", None)]);
+        assert_eq!(p.drive_manager_label("did:ad:a"), None);
+        assert_eq!(OpenPolicy.drive_manager_label("did:ad:a"), None);
     }
 
     #[test]

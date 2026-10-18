@@ -13096,10 +13096,6 @@ msgstr "Row menu"
 msgid "Commented"
 msgstr "Commented"
 
-#: src/components/Cloud/CloudServerDetails.tsx
-msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-msgstr "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Live duration"
 msgstr "Live duration"
@@ -13141,3 +13137,12 @@ msgstr "Formula"
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+
+#. 0: managedBy
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
