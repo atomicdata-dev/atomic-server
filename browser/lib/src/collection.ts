@@ -4,7 +4,7 @@ import { Collections, collections } from './ontologies/collections.js';
 import { Resource, normalizeLoroChangeTimestampMs } from './resource.js';
 import { decodeB64 } from './base64.js';
 import { decodeGenesisCert } from './genesis.js';
-import { GENESIS } from './urls.js';
+import { GENESIS, properties } from './urls.js';
 import type { Store } from './store.js';
 import { commits } from './ontologies/commits.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
@@ -108,7 +108,14 @@ function constraintMatches(
   value: string,
   operator: FilterOperator = 'eq',
 ): boolean {
-  const propVal = resource.get(property);
+  // The server materializes `createdBy` for its index, but a client resource
+  // carries the creator in its genesis certificate and has no such property.
+  // Reading only the property made every member of a `createdBy` query read as
+  // no longer matching the moment its resource was loaded, and the live update
+  // stripped it from the list the server had just answered.
+  const propVal =
+    resource.get(property) ??
+    (property === properties.createdBy ? resource.getCreatedBy() : undefined);
 
   if (Array.isArray(propVal)) {
     return propVal.some(v => valueMatches(`${v}`, value, operator));

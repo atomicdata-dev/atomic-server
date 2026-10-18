@@ -151,12 +151,17 @@ test.describe('agent page', () => {
     ).toBeVisible({
       timeout: 30_000,
     });
-    // The query runs on the server, which may not have his commit yet.
+    // The query runs on the server, which may not have his commit yet. Give
+    // each reload time to boot and answer: reloading every 5 s cuts a page
+    // that is still booting short, so one that stalls on the splash never gets
+    // the chance to heal itself.
     await expect(async () => {
       await page.reload();
-      await expect(page.getByText('Bobs plan')).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText('Bobs plan')).toBeVisible({
+        timeout: 20_000,
+      });
     })
-      .toPass({ timeout: 60_000 })
+      .toPass({ timeout: 90_000 })
       .catch(async error => {
         throw new Error(
           `Bob's document never reached Alice's Created list: ${JSON.stringify(
