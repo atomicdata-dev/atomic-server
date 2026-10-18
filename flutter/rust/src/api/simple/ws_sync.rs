@@ -108,6 +108,10 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
     if let Some(drive) = store.get_active_drive() {
         if let Err(e) = ensure_drive_materialized(store.as_ref(), &drive).await {
             tracing::warn!("[ws_sync] drive fetch skipped: {e}");
+        } else {
+            // The session now knows a server: the person's other drives may
+            // be on it.
+            tokio::spawn(super::follow_listed_drives(drive));
         }
     }
 

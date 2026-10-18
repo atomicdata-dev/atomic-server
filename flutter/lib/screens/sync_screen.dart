@@ -274,7 +274,7 @@ class _SyncScreenState extends State<SyncScreen> {
         await shared.AtomicAccountLinkDialog.show(
           context,
           client: shared.AtomicAccountClient(portal),
-          deviceName: _deviceName.isEmpty ? 'Atomic Canvas' : _deviceName,
+          deviceName: _deviceName.isEmpty ? 'atomic.place' : _deviceName,
           openUrl: (uri) async => _openPortal(uri),
           install: (identity, session) async {
             if (identity.subject != _agent?.subject) {

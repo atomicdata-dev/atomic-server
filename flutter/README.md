@@ -1,4 +1,4 @@
-# Atomic Canvas
+# atomic.place
 
 - An android app note taking / infinite canvas drawing / vector app with pen & draw support
 - Extremely snappy, no-nonsense

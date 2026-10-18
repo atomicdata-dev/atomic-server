@@ -1217,54 +1217,99 @@ async fn follow_listed_drives(home: String) {
     };
     let mut seen = std::collections::HashSet::new();
     seen.insert(key(&home));
-    let (mut followed, mut missing) = (0, 0);
-    let mut dead_peers = std::collections::HashSet::<String>::new();
-    for drive in drives {
-        if !seen.insert(key(&drive.subject)) || store.has_resource_locally(&drive.subject) {
-            continue;
+    let wanted: Vec<String> = drives
+        .into_iter()
+        .filter(|d| seen.insert(key(&d.subject)) && !store.has_resource_locally(&d.subject))
+        .map(|d| d.subject)
+        .collect();
+    tracing::info!("[home] fetching {} other drives", wanted.len());
+    let dead_peers = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashSet::new()));
+    let mut followed = 0;
+    // A few at a time: each one is a round trip or a dial.
+    for chunk in wanted.chunks(OTHER_DRIVES_PARALLEL) {
+        let mut tasks = tokio::task::JoinSet::new();
+        for drive in chunk {
+            tasks.spawn(fetch_other_drive(drive.clone(), dead_peers.clone()));
         }
-        let mut got = ws_sync::follow_drive(&drive.subject).await.is_ok();
-        if !got {
-            // A paired device may have it: the ones connected now, then the
-            // others (a device that sleeps still answers when dialled). One
-            // that did not answer is not asked again in this run.
-            for node_id in peer_ids_to_try(&dead_peers) {
-                let attempt = tokio::time::timeout(
-                    PEER_SYNC_ATTEMPT_TIMEOUT,
-                    atomic_lib::sync::peer::sync_drive_with_peer_if_needed(
-                        &node_id,
-                        &drive.subject,
-                        store.as_ref(),
-                    ),
-                )
-                .await;
-                match attempt {
-                    Ok(Ok(_)) if store.has_resource_locally(&drive.subject) => {
-                        got = true;
-                        break;
-                    }
-                    Ok(Ok(_)) => {}
-                    // The device did not answer at all: do not dial it again
-                    // for the next drive. A device that answered but lacks
-                    // this drive is a different failure, and stays in.
-                    Ok(Err(e)) if e.to_string().contains("timed out") => {
-                        dead_peers.insert(node_id);
-                    }
-                    Ok(Err(_)) => {}
-                    Err(_) => {
-                        dead_peers.insert(node_id);
-                    }
+        while let Some(done) = tasks.join_next().await {
+            if matches!(done, Ok(true)) {
+                followed += 1;
+            }
+        }
+    }
+    tracing::info!(
+        "[home] other drives: {followed} followed, {} not available here",
+        wanted.len() - followed
+    );
+    OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+}
+
+const OTHER_DRIVES_PARALLEL: usize = 4;
+
+/// One drive of the person that this device lacks, tried where it is most
+/// likely to be: the server the session is connected to, then the paired
+/// devices, then whatever pkarr says hosts this drive (its announced Iroh
+/// nodes). Whether it arrived is whether it is stored here afterwards.
+async fn fetch_other_drive(
+    drive: String,
+    dead_peers: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+) -> bool {
+    let Ok(store) = db() else { return false };
+    let store = store.as_ref();
+
+    // 1. The connected server.
+    match ws_sync::follow_drive(&drive).await {
+        Ok(()) if store.has_resource_locally(&drive) => return true,
+        Ok(()) => tracing::info!("[home] {drive}: the server sent nothing"),
+        Err(e) => tracing::info!("[home] {drive}: not on the connected server: {e}"),
+    }
+
+    // 2. Paired devices, then 3. pkarr's nodes for this drive.
+    let mut candidates = peer_ids_to_try(&dead_peers.lock().map(|d| d.clone()).unwrap_or_default());
+    let own = atomic_lib::sync::peer::get_node_id().map(|n| n.to_string());
+    match tokio::time::timeout(
+        PKARR_RESOLVE_TIMEOUT,
+        atomic_lib::discovery::resolve_drive_record(&drive),
+    )
+    .await
+    {
+        Ok(Ok(record)) => {
+            for node in record.node_ids {
+                if own.as_deref() != Some(node.as_str()) && !candidates.contains(&node) {
+                    candidates.push(node);
                 }
             }
         }
-        if got {
-            followed += 1;
-        } else {
-            missing += 1;
+        Ok(Err(e)) => tracing::info!("[home] {drive}: pkarr: {e}"),
+        Err(_) => tracing::info!("[home] {drive}: pkarr timed out"),
+    }
+    for node_id in candidates.into_iter().take(6) {
+        let attempt = tokio::time::timeout(
+            PEER_SYNC_ATTEMPT_TIMEOUT,
+            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(&node_id, &drive, store),
+        )
+        .await;
+        match attempt {
+            Ok(Ok(_)) if store.has_resource_locally(&drive) => return true,
+            Ok(Ok(_)) => {}
+            // Did not answer: not dialled again for the next drive.
+            Ok(Err(e)) if e.to_string().contains("timed out") => {
+                if let Ok(mut dead) = dead_peers.lock() {
+                    dead.insert(node_id);
+                }
+            }
+            Ok(Err(e)) => tracing::info!(
+                "[home] {drive} at {}: {e}",
+                &node_id[..node_id.len().min(12)]
+            ),
+            Err(_) => {
+                if let Ok(mut dead) = dead_peers.lock() {
+                    dead.insert(node_id);
+                }
+            }
         }
     }
-    tracing::info!("[home] other drives: {followed} followed, {missing} not available here");
-    OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+    false
 }
 
 /// Iroh: known peers, then pkarr discover. Returns true if any sync ran.

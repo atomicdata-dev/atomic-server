@@ -3,7 +3,7 @@
    <uses-permission android:name="android.permission.INTERNET" />
    <uses-permission android:name="android.permission.CAMERA" />
    <application
-        android:label="Atomic Canvas"
+        android:label="atomic.place"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
         <activity

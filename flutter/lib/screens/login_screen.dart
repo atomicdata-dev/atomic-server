@@ -330,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const Icon(Icons.brush, size: 48, color: Colors.blue),
         const SizedBox(height: 16),
         const Text(
-          'Atomic Canvas',
+          'atomic.place',
           style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),

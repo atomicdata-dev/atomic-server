@@ -1,4 +1,4 @@
-# Atomic Canvas Flutter — Agent Context
+# atomic.place Flutter — Agent Context
 
 ## Sync & onboarding — read first
 

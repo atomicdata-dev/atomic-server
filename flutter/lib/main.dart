@@ -278,7 +278,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
     ));
     return MaterialApp(
       navigatorKey: _navKey,
-      title: 'Atomic Canvas',
+      title: 'atomic.place',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
       theme: ThemeData(
