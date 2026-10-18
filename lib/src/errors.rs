@@ -17,6 +17,10 @@ use crate::{urls, Resource, Value};
 /// The default Error type for all Atomic Lib Errors.
 pub type AtomicResult<T> = std::result::Result<T, AtomicError>;
 
+/// Starts the message of an [AtomicErrorType::UpstreamUnreachable] error, so
+/// reporters that only see the text (Sentry) can recognise it.
+pub const UPSTREAM_UNREACHABLE_MARKER: &str = "Upstream unreachable: ";
+
 #[derive(Clone, Debug)]
 pub struct AtomicError {
     pub message: String,
@@ -31,6 +35,9 @@ pub enum AtomicErrorType {
     ParseError,
     OtherError,
     MethodNotAllowed,
+    /// Another host, asked on a caller's behalf, did not answer at all
+    /// (connection refused, DNS, timeout). A server answers 502.
+    UpstreamUnreachable,
 }
 
 impl std::error::Error for AtomicError {
@@ -88,6 +95,15 @@ impl AtomicError {
         AtomicError {
             message,
             error_type: AtomicErrorType::OtherError,
+            subject: None,
+        }
+    }
+
+    /// Another host did not answer; see [AtomicErrorType::UpstreamUnreachable].
+    pub fn upstream_unreachable(message: String) -> AtomicError {
+        AtomicError {
+            message: format!("{UPSTREAM_UNREACHABLE_MARKER}{message}"),
+            error_type: AtomicErrorType::UpstreamUnreachable,
             subject: None,
         }
     }

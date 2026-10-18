@@ -389,11 +389,12 @@ pub async fn fetch_bytes_untrusted(url: &str, max_bytes: usize) -> AtomicResult<
         .build()
         .map_err(|e| format!("Could not build HTTP client: {}", e))?;
 
-    let resp = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
+    let resp = client.get(url).send().await.map_err(|e| {
+        crate::errors::AtomicError::upstream_unreachable(format!(
+            "Error when fetching {}: {}",
+            url, e
+        ))
+    })?;
     let status = resp.status().as_u16();
     if status != 200 {
         return Err(format!("Could not fetch url '{}'. Status: {}", url, status).into());
@@ -499,10 +500,12 @@ async fn fetch_body_with_client(
         }
     }
 
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
+    let resp = req.send().await.map_err(|e| {
+        crate::errors::AtomicError::upstream_unreachable(format!(
+            "Error when fetching {}: {}",
+            url, e
+        ))
+    })?;
     let status = resp.status().as_u16();
     // Without reqwest's `charset` feature `text()` is exactly this lossy
     // UTF-8 decode, so the bounded path decodes the same way.
@@ -989,5 +992,27 @@ mod content_type_tests {
         });
 
         assert!(super::fetch_resource(&url, &store, None).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_host_that_does_not_answer_is_typed_as_unreachable() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let url = format!("http://127.0.0.1:{port}/drive/x");
+        let err = super::fetch_body_with_client(
+            &reqwest::Client::new(),
+            &url,
+            "application/ad+json",
+            None,
+            None,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.error_type, crate::AtomicErrorType::UpstreamUnreachable);
+        assert!(err
+            .message
+            .starts_with(crate::errors::UPSTREAM_UNREACHABLE_MARKER));
     }
 }
