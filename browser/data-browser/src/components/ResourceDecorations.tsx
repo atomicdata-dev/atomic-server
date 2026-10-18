@@ -19,13 +19,11 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { styled, css } from 'styled-components';
-import * as RadixPopover from '@radix-ui/react-popover';
 import { FaFaceSmile, FaFolderOpen, FaImage } from 'react-icons/fa6';
-import { EmojiInput } from './forms/EmojiInput';
 import { FilePickerDialog } from './forms/FilePicker/FilePickerDialog';
 import { useUpload } from '../hooks/useUpload';
 import { atomicArgu } from '../ontologies/atomic-argu';
-import { Button, ghostButtonStyles } from './Button';
+import { Button } from './Button';
 import { Column, Row } from './Row';
 import { ErrorBoundary } from '../views/ErrorPage';
 import { Dialog, DialogContent, DialogTitle, useDialog } from './Dialog';
@@ -252,138 +250,27 @@ export function ResourceCoverImage({
   );
 }
 
-/**
- * The image-icon flow for the icon slot, with two entry points:
- *
- * - `openImagePicker`: pick a file from disk → crop/zoom in the
- *   AvatarCropper → bake a small square webp client-side → upload → set
- *   `icon` (which replaces any emoji).
- * - `openFilePicker`: pick an EXISTING File resource via the same
- *   file-search dialog covers use → set `icon` directly, no crop step
- *   (mirrors `CoverPicker`'s `onResourcePicked`). Skipping the crop is fine
- *   here: `ResourceGlyph`'s `GlyphImage` already renders icons with
- *   `object-fit: cover`, so an uncropped existing file still renders
- *   correctly. `FilePickerDialog` is mounted here with no `onNewFilePicked`,
- *   so its own "Upload" button doesn't appear — upload-with-crop already
- *   has its own entry point via `openImagePicker`, and a second, crop-less
- *   upload path would just be confusing.
- *
- * Returns both openers and `elements` to mount: an always-mounted hidden
- * file input, the cropper dialog, and the file-picker dialog. All of this
- * deliberately lives OUTSIDE any popover — closing a Radix Popover unmounts
- * its contents, and a file picked (or dialog opened) into an
- * about-to-unmount tree is silently dropped. `Dialog` itself renders via
- * `createPortal` into its own portal root, so mounting `FilePickerDialog`
- * here is safe regardless of where `elements` ends up in the tree.
- */
-function useIconImageUpload(resource: Resource) {
-  const { upload } = useUpload(resource);
-  const [, setIconImage] = useSubject(
-    resource,
-    dataBrowser.properties.icon,
-    valueOpts,
-  );
-  const [, setEmoji] = useString(
-    resource,
-    dataBrowser.properties.emoji,
-    valueOpts,
-  );
-  const [isA] = useArray(resource, core.properties.isA);
-  const [pendingFile, setPendingFile] = useState<File>();
-  const [showFilePicker, setShowFilePicker] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const openImagePicker = () => inputRef.current?.click();
-  const openFilePicker = () => setShowFilePicker(true);
-
-  const handleCropped = async (cropped: File) => {
-    // Upload failures toast via useUpload's own errorHandler.
-    const [subject] = await upload([cropped]);
-
-    if (!subject) {
-      return;
-    }
-
-    try {
-      await setIconImage(subject);
-      await setEmoji(undefined);
-    } catch (e) {
-      errorHandler(e as Error);
-    }
-  };
-
-  const handleExistingPicked = async (subject: string) => {
-    try {
-      await setIconImage(subject);
-      await setEmoji(undefined);
-    } catch (e) {
-      errorHandler(e as Error);
-    }
-  };
-
-  const elements = (
-    <>
-      <HiddenFileInput
-        ref={inputRef}
-        type='file'
-        accept='image/*'
-        onChange={e => {
-          const file = e.currentTarget.files?.[0];
-
-          if (file) {
-            setPendingFile(file);
-          }
-
-          // Allow re-picking the same file.
-          e.currentTarget.value = '';
-        }}
-      />
-      {pendingFile && (
-        <AvatarCropper
-          file={pendingFile}
-          show
-          circle={isA.includes(core.classes.agent)}
-          onShowChange={open => {
-            if (!open) {
-              setPendingFile(undefined);
-            }
-          }}
-          onCropped={handleCropped}
-        />
-      )}
-      <FilePickerDialog
-        show={showFilePicker}
-        onShowChange={setShowFilePicker}
-        onResourcePicked={handleExistingPicked}
-        allowedMimes={IMAGE_MIMES}
-      />
-    </>
-  );
-
-  return { openImagePicker, openFilePicker, elements };
+export interface TitleIconProps extends ResourceDecorationProps {
+  /** Opens the icon picker, which the caller mounts outside the title. */
+  onPickIcon: () => void;
 }
 
 /**
  * The resource's icon (emoji or avatar image), rendered inline at title
- * size. Clicking it opens the picker (when the user can edit). Rendered by
- * EditableTitle.
+ * size. Clicking it opens the icon picker (when the user can edit). Rendered
+ * by EditableTitle.
  */
 export function TitleIcon({
   resource,
-}: ResourceDecorationProps): JSX.Element | null {
+  onPickIcon,
+}: TitleIconProps): JSX.Element | null {
   const canEdit = useCanWrite(resource);
-  const [emoji, setEmoji] = useString(
-    resource,
-    dataBrowser.properties.emoji,
-    valueOpts,
-  );
-  const [iconImage, setIconImage] = useSubject(
+  const [emoji] = useString(resource, dataBrowser.properties.emoji, valueOpts);
+  const [iconImage] = useSubject(
     resource,
     dataBrowser.properties.icon,
     valueOpts,
   );
-  const { openImagePicker, openFilePicker, elements } =
-    useIconImageUpload(resource);
 
   if (!emoji && !iconImage) {
     return null;
@@ -396,30 +283,17 @@ export function TitleIcon({
   }
 
   return (
-    <>
-      <EmojiInput
-        key={resource.subject}
-        initialValue={emoji}
-        showRemove
-        onUploadImage={openImagePicker}
-        onPickExisting={openFilePicker}
-        onChange={value => {
-          // Picking an emoji replaces an image icon; Remove clears both.
-          setEmoji(value);
-          setIconImage(undefined);
-        }}
-        Trigger={
-          <GlyphTrigger title='Change icon' onClick={e => e.stopPropagation()}>
-            {display}
-          </GlyphTrigger>
-        }
-      />
-      {/* This fragment renders INSIDE the click-to-edit page title (h1).
-          The cropper's native <dialog> escapes it visually but not in the
-          DOM tree, so its clicks (Save, drag, slider) would bubble into the
-          title and flip it into editing mode. Fence them off. */}
-      <ClickFence onClick={e => e.stopPropagation()}>{elements}</ClickFence>
-    </>
+    <GlyphTrigger
+      type='button'
+      title='Change icon'
+      onClick={e => {
+        // This sits inside the click-to-edit title; don't flip it to editing.
+        e.stopPropagation();
+        onPickIcon();
+      }}
+    >
+      {display}
+    </GlyphTrigger>
   );
 }
 
@@ -430,18 +304,13 @@ export function TitleIcon({
  */
 export function TitleDecorationAffordances({
   resource,
-}: ResourceDecorationProps): JSX.Element | null {
+  onPickIcon,
+}: TitleIconProps): JSX.Element | null {
   const canEdit = useCanWrite(resource);
-  const [emoji, setEmoji] = useString(
-    resource,
-    dataBrowser.properties.emoji,
-    valueOpts,
-  );
+  const [emoji] = useString(resource, dataBrowser.properties.emoji, valueOpts);
   const [iconImage] = useSubject(resource, dataBrowser.properties.icon);
   const [cover, applyCover] = useCoverImage(resource);
   const [showPicker, setShowPicker] = useState(false);
-  const { openImagePicker, openFilePicker, elements } =
-    useIconImageUpload(resource);
 
   const hasIcon = !!(emoji || iconImage);
 
@@ -453,17 +322,9 @@ export function TitleDecorationAffordances({
     <>
       <AffordanceRow gap='0.5rem'>
         {!hasIcon && (
-          <EmojiInput
-            key={resource.subject}
-            onChange={setEmoji}
-            onUploadImage={openImagePicker}
-            onPickExisting={openFilePicker}
-            Trigger={
-              <AffordanceTrigger>
-                <FaFaceSmile key='icon' aria-hidden /> Add icon
-              </AffordanceTrigger>
-            }
-          />
+          <Button ghost onClick={onPickIcon}>
+            <FaFaceSmile key='icon' aria-hidden /> Add icon
+          </Button>
         )}
         {!cover && (
           <Button ghost onClick={() => setShowPicker(true)}>
@@ -479,7 +340,6 @@ export function TitleDecorationAffordances({
           onPicked={applyCover}
         />
       )}
-      {elements}
     </>
   );
 }
@@ -490,12 +350,25 @@ interface PickerDialogProps {
   onShowChange: (show: boolean) => void;
 }
 
-/** Emoji picker in a dialog, for surfaces without an anchor (the ⌘M menu). */
-export function EmojiPickerDialog({
+/**
+ * The one icon picker: an emoji, an uploaded image (cropped to a small square
+ * webp, then uploaded) or an existing File. Opened by the title icon, the
+ * "Add icon" button and the resource menu alike. Picking an emoji clears the
+ * image, picking an image clears the emoji, Remove clears both.
+ *
+ * Mount it OUTSIDE the click-to-edit title and keep it mounted while the
+ * picker is in use: the dialog closes itself before the file input, cropper
+ * or file picker takes over, and anything those are mounted in must survive
+ * that. `Dialog` portals to its own root, but React events still bubble
+ * through the component tree, so a mount inside the title also turns every
+ * click in these dialogs into a title click.
+ */
+export function IconPickerDialog({
   resource,
   show,
   onShowChange,
 }: PickerDialogProps): JSX.Element {
+  const { upload } = useUpload(resource);
   const [emoji, setEmoji] = useString(
     resource,
     dataBrowser.properties.emoji,
@@ -506,8 +379,10 @@ export function EmojiPickerDialog({
     dataBrowser.properties.icon,
     valueOpts,
   );
-  const { openImagePicker, openFilePicker, elements } =
-    useIconImageUpload(resource);
+  const [isA] = useArray(resource, core.properties.isA);
+  const [pendingFile, setPendingFile] = useState<File>();
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [dialogProps, showDialog, closeDialog] = useDialog({
     bindShow: onShowChange,
   });
@@ -518,6 +393,28 @@ export function EmojiPickerDialog({
     }
   }, [show, showDialog]);
 
+  // The image `icon` replaces any emoji. Failures toast via errorHandler
+  // (uploads via useUpload's own).
+  const setImage = async (subject: string | undefined) => {
+    try {
+      await setIconImage(subject);
+      await setEmoji(undefined);
+    } catch (e) {
+      errorHandler(e as Error);
+    }
+  };
+
+  const handleCropped = async (cropped: File) => {
+    const [subject] = await upload([cropped]);
+
+    if (subject) {
+      await setImage(subject);
+    }
+  };
+
+  // No crop step for an existing file: `GlyphImage` renders icons with
+  // `object-fit: cover`. No `onNewFilePicked` either, so the file picker's own
+  // "Upload" button stays hidden; uploading goes through the cropper.
   return (
     <>
       <Dialog {...dialogProps}>
@@ -528,12 +425,12 @@ export function EmojiPickerDialog({
             </DialogTitle>
             <DialogContent>
               <Column>
-                <Row justify='flex-end' gap='0.5rem'>
+                <Row justify='flex-end' gap='0.5rem' wrapItems>
                   <Button
                     subtle
                     onClick={() => {
                       closeDialog(true);
-                      openImagePicker();
+                      inputRef.current?.click();
                     }}
                   >
                     <FaImage aria-hidden /> Upload image
@@ -542,7 +439,7 @@ export function EmojiPickerDialog({
                     subtle
                     onClick={() => {
                       closeDialog(true);
-                      openFilePicker();
+                      setShowFilePicker(true);
                     }}
                   >
                     <FaFolderOpen aria-hidden /> Pick existing
@@ -574,7 +471,40 @@ export function EmojiPickerDialog({
           </>
         )}
       </Dialog>
-      {elements}
+      <HiddenFileInput
+        ref={inputRef}
+        type='file'
+        accept='image/*'
+        onChange={e => {
+          const file = e.currentTarget.files?.[0];
+
+          if (file) {
+            setPendingFile(file);
+          }
+
+          // Allow re-picking the same file.
+          e.currentTarget.value = '';
+        }}
+      />
+      {pendingFile && (
+        <AvatarCropper
+          file={pendingFile}
+          show
+          circle={isA.includes(core.classes.agent)}
+          onShowChange={open => {
+            if (!open) {
+              setPendingFile(undefined);
+            }
+          }}
+          onCropped={handleCropped}
+        />
+      )}
+      <FilePickerDialog
+        show={showFilePicker}
+        onShowChange={setShowFilePicker}
+        onResourcePicked={setImage}
+        allowedMimes={IMAGE_MIMES}
+      />
     </>
   );
 }
@@ -599,11 +529,6 @@ export function CoverPickerDialog({
 
 const HiddenFileInput = styled.input`
   display: none;
-`;
-
-/** Boxless wrapper that keeps descendant clicks from bubbling further. */
-const ClickFence = styled.span`
-  display: contents;
 `;
 
 const CoverWrapper = styled.div<{ $repositioning?: boolean }>`
@@ -667,7 +592,7 @@ const StaticGlyph = styled.span`
   ${glyphStyles}
 `;
 
-const GlyphTrigger = styled(RadixPopover.Trigger)`
+const GlyphTrigger = styled.button`
   ${glyphStyles}
   border: none;
   background: transparent;
@@ -680,12 +605,6 @@ const GlyphTrigger = styled(RadixPopover.Trigger)`
   &:focus-visible {
     transform: scale(1.1);
   }
-`;
-
-const AffordanceTrigger = styled(RadixPopover.Trigger)`
-  ${ghostButtonStyles}
-  font-weight: normal;
-  cursor: pointer;
 `;
 
 /**

@@ -4565,7 +4565,6 @@ msgstr ""
 msgid "Pick an emoji or image shown next to this resource wherever it appears."
 msgstr ""
 
-#: src/chunks/EmojiInput/EmojiInput.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Upload image"
 msgstr ""
@@ -4575,7 +4574,6 @@ msgstr ""
 msgid "Could not display \"{0}\" — it may not be a supported image format"
 msgstr ""
 
-#: src/chunks/EmojiInput/EmojiInput.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Pick existing"
 msgstr ""
@@ -11462,10 +11460,6 @@ msgstr ""
 #. 0: ' '; 1: nummberFormatter.format(usage.input); 2: ' '; 3: nummberFormatter.format(usage.output)
 #: src/chunks/AI/RealAIChat.tsx
 msgid "Tokens used:{0} {1} input,{2} {3} output"
-msgstr ""
-
-#: src/chunks/EmojiInput/EmojiInput.tsx
-msgid "<0/> Remove"
 msgstr ""
 
 #. 0: review.author
