@@ -32,8 +32,8 @@ export const appRoute = createRoute({
   notFoundComponent: () => <p>404 Not found</p>,
 });
 
-/** Render the children after the first screen has had its time. */
-const AfterFirstPaint: React.FC<React.PropsWithChildren> = ({ children }) => {
+/** Render the children after a fixed 1500 ms delay, keeping their work out of the first screen. */
+const Deferred: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -64,14 +64,14 @@ export const rootRoute = createRootRoute({
         <DeviceLockWatcher />
         {/* These three have nothing to do for the first screen; mounting them
             after the first paint keeps their work out of it. */}
-        <AfterFirstPaint>
+        <Deferred>
           {/* Enrols the personal drive in Cloud Vault and backs it up after
               edits (no-op without an account session). */}
           <CloudVaultWatcher />
           <BrowserPeerWatcher />
           {/* Lets others start an encrypted conversation with this agent. */}
           <EncryptionKeyPublisher />
-        </AfterFirstPaint>
+        </Deferred>
       </PairingFlowProvider>
       {/* Uncomment to get Tanstack Router Devtools */}
       {/* <TanStackRouterDevtools position='bottom-right' /> */}

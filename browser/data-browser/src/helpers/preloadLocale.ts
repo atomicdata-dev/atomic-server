@@ -4,7 +4,15 @@ import { loadLocale } from 'wuchale/load-utils';
 // being fetched and evaluated. LocaleProvider holds the whole app back until
 // the catalog is in, and used to begin loading it only from an effect after
 // its own first commit: a serial hop in front of the first real render.
-const SUPPORTED = ['en', 'es', 'fr', 'de'];
+//
+// No React imports here: this must stay the first import in index.tsx.
+export const SUPPORTED_LOCALES = ['en', 'es', 'fr', 'de'];
+
+export function getBrowserLocale(): string {
+  const locales = navigator.languages.map(x => x.trim().split(/-|_/)[0]);
+
+  return locales.find(x => SUPPORTED_LOCALES.includes(x)) ?? 'en';
+}
 
 function startLocale(): string {
   try {
@@ -15,11 +23,7 @@ function startLocale(): string {
     // Fall through to the browser language.
   }
 
-  const fromBrowser = navigator.languages
-    .map(x => x.trim().split(/-|_/)[0])
-    .find(x => SUPPORTED.includes(x));
-
-  return fromBrowser ?? 'en';
+  return getBrowserLocale();
 }
 
 void loadLocale(startLocale()).catch(() => undefined);
