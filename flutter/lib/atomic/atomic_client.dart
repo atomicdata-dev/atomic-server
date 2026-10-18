@@ -261,6 +261,7 @@ class AtomicClient {
       imported: (m['imported'] as num?)?.toInt() ?? 0,
       livePeers: (m['live_peers'] as num?)?.toInt() ?? 0,
       message: m['message'] as String? ?? '',
+      server: m['server'] as String?,
     );
   }
 
@@ -480,10 +481,14 @@ class SyncConnectivityReport {
   final int livePeers;
   final String message;
 
+  /// The server the drive was found on through pkarr, when it was.
+  final String? server;
+
   const SyncConnectivityReport({
     required this.imported,
     required this.livePeers,
     required this.message,
+    this.server,
   });
 }
 

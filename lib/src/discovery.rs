@@ -205,6 +205,97 @@ pub async fn resolve_node_id_filtered(
     Ok(peer.clone())
 }
 
+/// What the pkarr relay says about where a drive lives: its replicas' Iroh
+/// NodeIDs and public https origins. Anyone may have written to the record, so
+/// an origin from it proves nothing until [`verified_home_origin`] checks it.
+pub async fn resolve_drive_record(drive_did: &str) -> AtomicResult<DriveRecord> {
+    let keypair = drive_did_to_pkarr_keypair(drive_did)?;
+    let client = build_client()?;
+    Ok(resolve_record_raw(&client, &keypair.public_key()).await)
+}
+
+/// How many announced origins are looked at: the record is public.
+const MAX_ORIGIN_CANDIDATES: usize = 3;
+const GENESIS_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
+const MAX_GENESIS_BODY_BYTES: usize = 256 * 1024;
+
+/// Whether `body` (the answer of `GET /genesis?subject=<drive>`) carries the
+/// drive's own genesis certificate and it verifies against the DID.
+///
+/// The DID is the genesis signature, so this is self-certifying: nobody
+/// without the owner's key can produce a certificate that signs to it,
+/// wherever they host it. A server that merely answers, or serves some other
+/// drive, does not pass.
+pub fn genesis_body_verifies(body: &str, drive_did: &str) -> bool {
+    if body.len() > MAX_GENESIS_BODY_BYTES {
+        return false;
+    }
+    let Some(signature) = crate::identifiers::identifier_body(drive_did) else {
+        return false;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(body) else {
+        return false;
+    };
+    let Some(encoded) = json
+        .get(crate::urls::GENESIS)
+        .and_then(|v| v.as_str())
+        .filter(|v| !v.is_empty())
+    else {
+        return false;
+    };
+    let Ok(bytes) = crate::agents::decode_base64(encoded) else {
+        return false;
+    };
+    crate::genesis::GenesisCert::decode(&bytes)
+        .and_then(|cert| cert.verify_signed_bytes(&bytes, signature))
+        .is_ok()
+}
+
+/// Whether the node at `origin` serves `drive_did`'s genesis and it verifies.
+/// An anonymous GET that returns the certificate and nothing else, no
+/// redirects, a short deadline; any failure counts as "not verified".
+pub async fn origin_serves_genesis(origin: &str, drive_did: &str) -> bool {
+    let Ok(client) = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(GENESIS_PROBE_TIMEOUT)
+        .build()
+    else {
+        return false;
+    };
+    let url = format!(
+        "{}/genesis?subject={}",
+        origin.trim_end_matches('/'),
+        urlencoding::encode(drive_did)
+    );
+    let Ok(response) = client
+        .get(url)
+        .header("Accept", "application/ad+json")
+        .send()
+        .await
+    else {
+        return false;
+    };
+    if !response.status().is_success() {
+        return false;
+    }
+    match response.text().await {
+        Ok(body) => genesis_body_verifies(&body, drive_did),
+        Err(_) => false,
+    }
+}
+
+/// The first https origin the pkarr record names that serves the drive's
+/// verified genesis: where the drive is hosted, found from the DID alone.
+pub async fn verified_home_origin(drive_did: &str) -> AtomicResult<Option<String>> {
+    let record = resolve_drive_record(drive_did).await?;
+    for origin in record.http_origins.iter().take(MAX_ORIGIN_CANDIDATES) {
+        if origin_serves_genesis(origin, drive_did).await {
+            return Ok(Some(origin.clone()));
+        }
+    }
+    Ok(None)
+}
+
 /// Resolve all NodeIDs from the pkarr relay for a given public key.
 async fn resolve_node_ids_raw(
     client: &pkarr::Client,
@@ -307,6 +398,48 @@ mod tests {
     fn fake_drive_did(seed_byte: u8) -> String {
         let sig = [seed_byte; 64];
         format!("did:ad:{}", crate::agents::encode_base64(&sig))
+    }
+
+    /// An agent's private-drive DID and the body `GET /genesis` answers for it.
+    fn genesis_answer() -> (String, String) {
+        let agent = crate::agents::Agent::new(Some("t")).unwrap();
+        let private_key = agent.private_key.clone().unwrap();
+        let did = crate::genesis::GenesisCert::private_drive_subject(&private_key).unwrap();
+        let pubkey: [u8; 32] = crate::agents::decode_base64(&agent.public_key)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let cert = crate::genesis::GenesisCert::for_private_drive(pubkey);
+        let body = serde_json::json!({
+            "@id": did,
+            crate::urls::GENESIS: crate::agents::encode_base64(&cert.encode()),
+        })
+        .to_string();
+        (did, body)
+    }
+
+    #[test]
+    fn a_genesis_answer_for_the_drive_verifies() {
+        let (did, body) = genesis_answer();
+        assert!(genesis_body_verifies(&body, &did));
+    }
+
+    #[test]
+    fn a_genesis_answer_for_another_drive_does_not() {
+        let (_, body) = genesis_answer();
+        let (other_did, _) = genesis_answer();
+        assert!(!genesis_body_verifies(&body, &other_did));
+    }
+
+    #[test]
+    fn a_missing_or_broken_genesis_does_not_verify() {
+        let (did, body) = genesis_answer();
+        assert!(!genesis_body_verifies("not json", &did));
+        assert!(!genesis_body_verifies("{}", &did));
+        let mut json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        json[crate::urls::GENESIS] = "AAAA".into();
+        assert!(!genesis_body_verifies(&json.to_string(), &did));
+        assert!(!genesis_body_verifies(&body, "did:ad:nonsense"));
     }
 
     #[test]

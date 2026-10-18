@@ -126,6 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       final report = await AtomicClient.syncConnectivityNow();
+      // Found through pkarr: remember where the drive lives, so the next start
+      // reconnects there without being told.
+      final found = report.server;
+      if (found != null) await AtomicSession.setActiveServer(found);
 
       final drive = AtomicClient.getActiveDrive();
       if (drive != null) {

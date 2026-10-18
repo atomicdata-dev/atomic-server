@@ -123,7 +123,10 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
 
 /// Fetch the active drive from the server when the agent secret references a drive
 /// that is not yet in the local DB (second device, same account).
-async fn ensure_drive_materialized(store: &atomic_lib::Db, drive: &str) -> Result<(), String> {
+pub(crate) async fn ensure_drive_materialized(
+    store: &atomic_lib::Db,
+    drive: &str,
+) -> Result<(), String> {
     let subject = atomic_lib::Subject::from_raw(drive, store.get_base_domain().as_deref());
     if store.get_resource(&subject).await.is_ok() {
         return Ok(());
@@ -248,6 +251,19 @@ pub async fn subscribe_canvas(subject: &str) -> Result<(), String> {
     client.subscribe_resource(subject).await.map_err(err)?;
     client.subscribe_loro_sync(subject).await.map_err(err)?;
     Ok(())
+}
+
+/// Follow another drive of the person over the open WS session: fetch it when
+/// missing and subscribe to its commits. Fails when the server does not host it.
+pub(crate) async fn follow_drive(drive: &str) -> Result<(), String> {
+    let client = ws_client_slot()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or_else(|| "WS session not open".to_string())?;
+    let store = db()?;
+    client.subscribe_drive(drive).await.map_err(err)?;
+    ensure_drive_materialized(store.as_ref(), drive).await
 }
 
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).

@@ -922,8 +922,19 @@ pub async fn resume_app_session(
     let store = db()?;
     store.load_agent_from_secret(&secret).await.map_err(err)?;
 
-    if let Some(drive) = drive_hint.filter(|s| !s.is_empty()) {
-        let _ = store.set_active_drive(&drive);
+    match drive_hint.filter(|s| !s.is_empty()) {
+        Some(drive) => {
+            let _ = store.set_active_drive(&drive);
+        }
+        // A secret holds an identity and nothing else — but the one drive that
+        // follows from the key alone is the agent's personal drive. Work on
+        // that, not on whatever the previous agent left active; the sync
+        // screen then finds where it is hosted.
+        None => {
+            if let Ok(home) = store.private_drive_subject() {
+                let _ = store.set_active_drive(&home);
+            }
+        }
     }
 
     let origin = server_url.trim();
@@ -973,6 +984,9 @@ pub struct SyncConnectivityReport {
     pub imported: i32,
     pub live_peers: u32,
     pub message: String,
+    /// The server the drive was found on through pkarr, when it was.
+    #[serde(default)]
+    pub server: Option<String>,
 }
 
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
@@ -995,6 +1009,18 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
 
     let mut imported: i32 = 0;
     let mut errors: Vec<String> = Vec::new();
+    let mut server: Option<String> = None;
+
+    // A drive that is not here yet may be hosted by a server that announced it
+    // in pkarr. Ask first: it is one HTTPS round trip, not a peer dial.
+    if !drive_resource_exists(store).await {
+        match tokio::time::timeout(HOME_DISCOVERY_TIMEOUT, discover_home_server(&drive)).await {
+            Ok(Ok(Some(origin))) => server = Some(origin),
+            Ok(Ok(None)) => errors.push("No server announced your drive".into()),
+            Ok(Err(e)) => errors.push(format!("Home server: {e}")),
+            Err(_) => errors.push("Home server lookup timed out".into()),
+        }
+    }
 
     // Known peers first (fast path after QR pairing)
     let peers_json = get_known_peers();
@@ -1077,7 +1103,9 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             }
         })
         .collect();
-    let message = if live > 0 {
+    let message = if let Some(origin) = &server {
+        format!("Found your drive on {origin}")
+    } else if live > 0 {
         if live_names.is_empty() {
             format!(
                 "Connected to {live} device{}",
@@ -1098,7 +1126,50 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         imported,
         live_peers: live,
         message,
+        server,
     })
+}
+
+const HOME_DISCOVERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Find the server that hosts `drive` from the DID alone: the pkarr record
+/// names origins, and only one that serves the drive's own genesis certificate
+/// (checked against the DID) is trusted. Connect to it — that fetches the drive
+/// and follows its commits — and in the background follow the drives the
+/// personal drive lists.
+async fn discover_home_server(drive: &str) -> Result<Option<String>, String> {
+    let Some(origin) = atomic_lib::discovery::verified_home_origin(drive)
+        .await
+        .map_err(err)?
+    else {
+        return Ok(None);
+    };
+    tracing::info!("[home] {drive} is hosted on {origin}");
+    ws_sync::open_ws_sync(&origin).await?;
+    if !drive_resource_exists(db()?.as_ref()).await {
+        return Err(format!("{origin} did not send the drive"));
+    }
+    tokio::spawn(follow_listed_drives(drive.to_string()));
+    Ok(Some(origin))
+}
+
+/// The drives the personal drive lists, other than `home`: fetched from the
+/// server the session is on. A drive hosted elsewhere is skipped, not an error.
+async fn follow_listed_drives(home: String) {
+    let Ok(store) = db() else { return };
+    let drives = match store.list_drives().await {
+        Ok(drives) => drives,
+        Err(e) => {
+            tracing::warn!("[home] cannot list drives: {e}");
+            return;
+        }
+    };
+    for drive in drives.into_iter().filter(|d| d.subject != home) {
+        match ws_sync::follow_drive(&drive.subject).await {
+            Ok(()) => tracing::info!("[home] following drive {}", drive.subject),
+            Err(e) => tracing::info!("[home] drive {} not on this server: {e}", drive.subject),
+        }
+    }
 }
 
 /// Iroh: known peers, then pkarr discover. Returns true if any sync ran.
