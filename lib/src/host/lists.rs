@@ -173,14 +173,22 @@ pub async fn list_favorites(store: &Db, limit: usize) -> AtomicResult<Vec<Json>>
 /// store, or only in `drive` when given (and not empty), as
 /// `[{subject, title, class_name, drive, score, emoji?}]`, best first; `drive`
 /// is the drive the hit lives in ("" when unknown).
+///
+/// Across every drive, what lives in a drive (the person's own things) comes
+/// before what does not (the built-in ontologies' classes and properties):
+/// otherwise a short query such as "re" listed only `requested-subject`-like
+/// properties and never the person's "Recipes".
 pub fn search(
     store: &Db,
     drive: Option<&str>,
     query: &str,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
+    let scoped = drive.is_some_and(|d| !d.is_empty());
+    // Room to move the person's things forward past schema hits.
+    let fetch = if scoped { limit } else { limit.saturating_mul(4) };
     let opts = crate::client::search::SearchOpts {
-        limit: Some(limit as u32),
+        limit: Some(fetch as u32),
         parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]),
         ..Default::default()
     };
@@ -191,7 +199,7 @@ pub fn search(
     let mut drives = DriveCache::default();
     let mut classes: HashMap<String, String> = Default::default();
     let mut out = Vec::new();
-    for hit in hits.into_iter().take(limit) {
+    for hit in hits.into_iter().take(fetch) {
         let Ok(resource) = store.get_resource_shallow(&hit.subject) else {
             continue;
         };
@@ -218,6 +226,11 @@ pub fn search(
             &resource,
         ));
     }
+    if !scoped {
+        // Stable: within each group the search's own order stays.
+        out.sort_by_key(|row| row["drive"].as_str().is_none_or(str::is_empty));
+    }
+    out.truncate(limit);
     Ok(out)
 }
 
@@ -388,6 +401,41 @@ mod tests {
         let only = search(&d.store, Some(second), "pangolin", 10).unwrap();
         assert_eq!(only.len(), 1);
         assert!(only[0]["subject"].as_str().unwrap().ends_with(&there[9..]));
+    }
+
+    #[tokio::test]
+    async fn search_lists_the_persons_things_before_schema() {
+        let d = Device::new().await;
+        // Schema outside any drive, with a title the query matches best.
+        let mut schema = Vec::new();
+        for i in 0..6 {
+            schema.push(
+                d.synced(
+                    &sync_subject("schema", 700 + i),
+                    "https://example.test/not-local/ontology",
+                    "Wombat",
+                    Some(urls::PROPERTY),
+                    None,
+                )
+                .await,
+            );
+        }
+        let mine = d
+            .synced(
+                &sync_subject("mine", 701),
+                &d.drive,
+                "Wombat recipes for the weekend",
+                Some(urls::FOLDER),
+                Some(&d.drive),
+            )
+            .await;
+        let hits = search(&d.store, None, "wombat", 3).unwrap();
+        assert_eq!(hits.len(), 3, "{hits:?}");
+        assert!(
+            hits[0]["subject"].as_str().unwrap().ends_with(&mine[9..]),
+            "{hits:?}"
+        );
+        assert!(hits[1..].iter().all(|h| h["drive"] == ""), "{hits:?}");
     }
 
     #[tokio::test]
