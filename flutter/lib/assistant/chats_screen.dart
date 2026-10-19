@@ -10,7 +10,7 @@ import 'resource_web_view.dart';
 import 'search_screen.dart';
 
 /// Chats shown on the home; the rest is one tap away in a chat list later.
-const _homeChats = 5;
+const _homeChats = 8;
 
 /// Home screen. AI chats belong to the person, so the search field and the
 /// newest chats sit on top whatever drive is showing. Below, one page per
@@ -207,7 +207,6 @@ class _ChatsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Heading('Recent chats', c),
             ResourceRow(
               icon: Icons.add,
               title: 'New chat',
@@ -227,15 +226,15 @@ class _ChatsSection extends StatelessWidget {
             else if (list.isEmpty)
               _Empty('No chats yet', c)
             else
-              for (final chat in list.take(_homeChats))
-                ResourceRow(
-                  icon: Icons.chat_bubble_outline,
-                  title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
-                  detail: chat.lastActivity == 0
-                      ? null
-                      : timeAgo(chat.lastActivity),
-                  onTap: () => onOpen(chat),
-                ),
+              for (final (label, group)
+                  in groupChatsByAge(list.take(_homeChats).toList())) ...[
+                _Heading(label, c),
+                for (final chat in group)
+                  ResourceRow(
+                    title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
+                    onTap: () => onOpen(chat),
+                  ),
+              ],
           ],
         );
       },
@@ -389,6 +388,36 @@ class _Empty extends StatelessWidget {
         child:
             Center(child: Text(text, style: TextStyle(color: c.textSecondary))),
       );
+}
+
+/// [chats] (newest first) under small headings by how long ago they were
+/// last active: Today, Yesterday, This week, This month, Earlier. A heading
+/// appears only when it has chats; a chat without any activity goes last.
+List<(String, List<ChatSummary>)> groupChatsByAge(List<ChatSummary> chats,
+    {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final start = DateTime(today.year, today.month, today.day);
+  String label(ChatSummary chat) {
+    if (chat.lastActivity == 0) return 'Earlier';
+    final then = DateTime.fromMillisecondsSinceEpoch(chat.lastActivity);
+    final day = DateTime(then.year, then.month, then.day);
+    final days = start.difference(day).inDays;
+    if (days <= 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    if (days < 7) return 'This week';
+    if (days < 31) return 'This month';
+    return 'Earlier';
+  }
+
+  const order = ['Today', 'Yesterday', 'This week', 'This month', 'Earlier'];
+  final groups = <String, List<ChatSummary>>{};
+  for (final chat in chats) {
+    groups.putIfAbsent(label(chat), () => []).add(chat);
+  }
+  return [
+    for (final name in order)
+      if (groups[name] != null) (name, groups[name]!),
+  ];
 }
 
 /// "just now", "5 min ago", "3 h ago", "2 d ago", then the date.

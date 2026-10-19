@@ -95,7 +95,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Trip plan'), findsOneWidget);
-      expect(find.text('just now'), findsOneWidget);
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('Earlier'), findsOneWidget);
       expect(find.text('Untitled chat'), findsOneWidget);
 
       await tester.tap(find.text('Trip plan'));
@@ -289,6 +290,51 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);
+    });
+  });
+
+  group('groupChatsByAge', () {
+    final now = DateTime(2026, 10, 19, 15);
+    int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;
+    ChatSummary chat(String name, int at) =>
+        (subject: name, name: name, lastActivity: at);
+
+    test('groups by day, keeps the order, skips empty groups', () {
+      final groups = groupChatsByAge([
+        chat('a', ago(const Duration(hours: 2))),
+        chat('b', ago(const Duration(hours: 20))),
+        chat('c', ago(const Duration(days: 3))),
+        chat('d', ago(const Duration(days: 4))),
+        chat('e', ago(const Duration(days: 40))),
+        chat('f', 0),
+      ], now: now);
+      expect(groups.map((g) => g.$1).toList(),
+          ['Today', 'Yesterday', 'This week', 'Earlier']);
+      expect(groups.map((g) => g.$2.map((c) => c.name).join()).toList(),
+          ['a', 'b', 'cd', 'ef']);
+    });
+
+    test('nothing, no groups', () {
+      expect(groupChatsByAge([], now: now), isEmpty);
+    });
+
+    testWidgets('the home shows the headings and no chat icons',
+        (tester) async {
+      final api = FakeApi(chatList: [
+        chat('Fresh chat', DateTime.now().millisecondsSinceEpoch),
+        chat(
+            'Old chat',
+            DateTime.now()
+                .subtract(const Duration(days: 90))
+                .millisecondsSinceEpoch),
+      ]);
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('Earlier'), findsOneWidget);
+      expect(find.text('Recent chats'), findsNothing);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
     });
   });
 
