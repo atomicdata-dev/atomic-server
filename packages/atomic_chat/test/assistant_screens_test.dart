@@ -57,32 +57,59 @@ class FakeApi extends UnimplementedApi {
     this.icons = const {},
   });
 
+  /// How many times each list was asked for, by method name.
+  final Map<String, int> calls = {};
+  void _count(String what) => calls[what] = (calls[what] ?? 0) + 1;
+
   @override
-  Future<Map<String, String>> resourceIcons(List<String> subjects) async => {
-        for (final e in icons.entries)
-          if (subjects.contains(e.key)) e.key: e.value,
-      };
+  Future<Map<String, String>> resourceIcons(List<String> subjects) async {
+    _count('resourceIcons');
+    return {
+      for (final e in icons.entries)
+        if (subjects.contains(e.key)) e.key: e.value,
+    };
+  }
 
   @override
   Future<String?> agentName() async => 'Joep';
   @override
   Future<List<DriveInfo>> drives() async {
     drivesCalls++;
+    _count('drives');
     await drivesGate;
     return driveList;
   }
 
   @override
-  Future<List<ChatSummary>> chats() async => chatList;
+  Future<List<ChatSummary>> chats() async {
+    _count('chats');
+    return chatList;
+  }
+
   @override
-  Future<List<ActivityEntry>> activity(int limit) async =>
-      activityList.take(limit).toList();
+  Future<List<ActivityEntry>> activity(int limit) async {
+    _count('activity');
+    return activityList.take(limit).toList();
+  }
+
   @override
-  Future<List<RecentResource>> recentResources(String drive) async => recent;
+  Future<List<RecentResource>> recentResources(String drive) async {
+    _count('recentResources');
+    return recent;
+  }
+
   @override
-  Future<List<RecentResource>> favorites() async => favoriteList;
+  Future<List<RecentResource>> favorites() async {
+    _count('favorites');
+    return favoriteList;
+  }
+
   @override
-  Future<List<NotificationItem>> notifications() async => notificationList;
+  Future<List<NotificationItem>> notifications() async {
+    _count('notifications');
+    return notificationList;
+  }
+
   @override
   Future<void> markNotificationRead(String subject) async {
     markedRead.add(subject);
@@ -103,10 +130,14 @@ class FakeApi extends UnimplementedApi {
   }
 
   @override
-  Future<List<ConversationRow>> conversations() async => [
-        for (final r in conversationList)
-          (resource: r, lastMessage: lastMessages[r.subject] ?? ''),
-      ];
+  Future<List<ConversationRow>> conversations() async {
+    _count('conversations');
+    return [
+      for (final r in conversationList)
+        (resource: r, lastMessage: lastMessages[r.subject] ?? ''),
+    ];
+  }
+
   @override
   Future<List<ChatMessage>> messages(String chat) async => messageList;
   @override
@@ -255,6 +286,93 @@ Widget shellApp(ChatsScreen home, {Brightness brightness = Brightness.light}) =>
 
 void main() {
   group('ChatsScreen', () {
+    // On a phone, scrolling the home back up never reached the top: each
+    // section that scrolled out of the list's cache was rebuilt with a
+    // spinner when it came back and only then got its rows, so the list
+    // placed it too small, found the top was not at 0 and corrected the
+    // offset downwards: the page kept moving down while being pulled up.
+    testWidgets(
+        'the home scrolls back to the top without jumping, and idling or '
+        'pulling at the top asks for nothing again', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(tester.view.reset);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      RecentResource res(String s) => (
+            subject: s,
+            title: 'Doc $s',
+            className: 'Document',
+            openedAt: now - 60 * 60 * 1000,
+            emoji: null
+          );
+      final api = FakeApi(
+        driveList: [
+          for (var i = 0; i < 6; i++)
+            (subject: 'did:ad:drive$i', name: 'Drive $i', emoji: '📁'),
+        ],
+        recent: [for (var i = 0; i < 6; i++) res('r$i')],
+        favoriteList: [for (var i = 0; i < 6; i++) res('f$i')],
+        conversationList: [for (var i = 0; i < 6; i++) res('c$i')],
+        activityList: [for (var i = 0; i < 6; i++) _activity('a$i', 'A $i')],
+        chatList: [
+          for (var i = 0; i < 6; i++)
+            (subject: 'chat$i', name: 'Chat $i', lastActivity: now),
+        ],
+        notificationList: [
+          for (var i = 0; i < 6; i++)
+            (
+              subject: 'n$i',
+              title: 'Note $i',
+              body: 'body',
+              about: 'x$i',
+              kind: 'chat',
+              occurredAt: now,
+              read: false
+            ),
+        ],
+      );
+      await tester
+          .pumpWidget(shellApp(ChatsScreen(drive: 'did:ad:drive0', api: api)));
+      await tester.pumpAndSettle();
+      final asked = Map.of(api.calls);
+
+      final position =
+          tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+      expect(position.maxScrollExtent, greaterThan(1000));
+
+      // Down to the bottom, one finger stroke at a time.
+      final list = find.byType(ListView).first;
+      while (position.pixels < position.maxScrollExtent) {
+        await tester.drag(list, const Offset(0, -300));
+        await tester.pumpAndSettle();
+      }
+
+      // Then pulled up slowly: the page follows the finger, and stops at the
+      // top.
+      final g = await tester.startGesture(tester.getCenter(list));
+      var last = position.pixels;
+      final jumps = <String>[];
+      for (var i = 0; i < 400; i++) {
+        await g.moveBy(const Offset(0, 20));
+        await tester.pump(const Duration(milliseconds: 16));
+        // The finger moved 20 px: so does the page, or less at the top.
+        final moved = last - position.pixels;
+        if (moved < -0.5 || moved > 20.5) {
+          jumps.add('${last.round()} -> ${position.pixels.round()}');
+        }
+        last = position.pixels;
+      }
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(jumps, isEmpty, reason: 'the page jumped while pulled up');
+      expect(position.pixels, 0);
+
+      // Idle for half a minute: nothing reloads.
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(api.calls, asked);
+    });
+
     testWidgets('lists the chats and opens one', (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(

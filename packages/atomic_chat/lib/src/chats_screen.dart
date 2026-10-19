@@ -552,6 +552,12 @@ ResourceRow _resourceRow(RecentResource r,
 /// previous one stay until the new data is there, so a refresh neither
 /// flashes a spinner nor moves the page. The spinner shows only for the very
 /// first load, and a refresh that fails keeps the old rows without an error.
+///
+/// Kept alive while scrolled out of view. Otherwise the list disposes it, and
+/// when it scrolls back in it is built afresh with a spinner for a frame (its
+/// future's answer arrives a microtask later), so the list places it at the
+/// wrong height and then corrects: scrolling back up the page jumped, and
+/// at the top went down again.
 class _Section<T> extends StatefulWidget {
   final String title;
   final _Fold fold;
@@ -579,8 +585,12 @@ class _Section<T> extends StatefulWidget {
   State<_Section<T>> createState() => _SectionState<T>();
 }
 
-class _SectionState<T> extends State<_Section<T>> {
+class _SectionState<T> extends State<_Section<T>>
+    with AutomaticKeepAliveClientMixin {
   List<T>? _list;
+
+  @override
+  bool get wantKeepAlive => true;
   Object? _error;
 
   @override
@@ -645,6 +655,7 @@ class _SectionState<T> extends State<_Section<T>> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final c = context.appColors;
     final list = _list;
     final error = list == null ? _error : null;
