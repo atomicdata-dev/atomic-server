@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -120,7 +121,26 @@ class _ResourceViewState extends State<ResourceView> {
             ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
             : controller == null
                 ? const Center(child: CircularProgressIndicator())
-                : WebViewWidget(controller: controller),
+                : Stack(children: [
+                    // The page owns every touch on it (scrolling a long menu
+                    // or document must not be taken over by the swipe back
+                    // when a finger drifts sideways); swipe back starts at the
+                    // left edge.
+                    WebViewWidget(
+                      controller: controller,
+                      gestureRecognizers: const {
+                        Factory<OneSequenceGestureRecognizer>(
+                            EagerGestureRecognizer.new),
+                      },
+                    ),
+                    const Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 24,
+                      child: _EdgeStrip(),
+                    ),
+                  ]),
       ),
       // The same bar as everywhere; "more" is the page's own resource menu
       // (the web app's navbar menu, drawn by the page).
@@ -133,4 +153,14 @@ class _ResourceViewState extends State<ResourceView> {
       ),
     );
   }
+}
+
+/// Catches touches at the screen's left edge so the swipe back works over the
+/// page.
+class _EdgeStrip extends StatelessWidget {
+  const _EdgeStrip();
+
+  @override
+  Widget build(BuildContext context) => const Listener(
+      behavior: HitTestBehavior.opaque, child: SizedBox.expand());
 }
