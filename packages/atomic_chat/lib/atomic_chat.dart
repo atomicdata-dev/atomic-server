@@ -4,7 +4,7 @@
 library;
 
 export 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, HoldFan, HoldFanItem;
+    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
 
 // The seam to the host's store, and what goes through it.
 export 'src/assistant_api.dart';
@@ -14,6 +14,7 @@ export 'src/hosted_ai.dart';
 // The shell: pages above a bottom bar that never moves.
 export 'src/app_shell.dart';
 export 'src/app_bottom_bar.dart';
+export 'src/app_top_bar.dart';
 export 'src/slide_back_route.dart';
 export 'src/covered_insets_freeze.dart';
 

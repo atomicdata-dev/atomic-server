@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'app_top_bar.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -283,9 +284,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
       builder: (context, snapshot) {
         return Scaffold(
           backgroundColor: c.bgBody,
-          appBar: AppBar(
-            backgroundColor: c.bgBody,
-            title: const Text('Home'),
+          appBar: AppTopBar(
+            titleWidget: const AtomicWordmark(),
             actions: [
               if (widget.onOpenGallery != null)
                 IconButton(
@@ -503,7 +503,7 @@ class _ListPage extends StatelessWidget {
     final c = context.appColors;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(backgroundColor: c.bgBody, title: Text(title)),
+      appBar: AppTopBar(title: title),
       body: ListView(children: children),
     );
   }

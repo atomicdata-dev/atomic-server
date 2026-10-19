@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:atomic_chat/atomic_chat.dart' show AppTopBar;
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -357,7 +358,7 @@ class _PairScreenState extends State<PairScreen> {
     final theme = Theme.of(context);
     final actions = _buildActions(theme);
     return Scaffold(
-      appBar: AppBar(title: const Text('Pair a device')),
+      appBar: const AppTopBar(title: 'Pair a device'),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

@@ -1,6 +1,7 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
 import 'package:flutter/material.dart';
+import 'app_top_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
@@ -729,15 +730,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final c = context.appColors;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: Text(
-          widget.title.isEmpty
-              ? (_chat == null
-                  ? (widget.voiceMode ? 'Voice chat' : 'New chat')
-                  : 'Untitled chat')
-              : widget.title,
-        ),
+      appBar: AppTopBar(
+        title: widget.title.isEmpty
+            ? (_chat == null
+                ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+                : 'Untitled chat')
+            : widget.title,
         actions: [
           IconButton(
             tooltip: _readAloud ? 'Stop reading aloud' : 'Read answers aloud',

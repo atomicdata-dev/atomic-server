@@ -4,6 +4,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'app_top_bar.dart';
 
 import 'models.dart';
 import 'assistant_api.dart';
@@ -165,10 +166,8 @@ class _ConversationScreenState extends State<ConversationScreen>
     final c = context.appColors;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: Text(widget.title.isEmpty ? 'Conversation' : widget.title),
-      ),
+      appBar: AppTopBar(
+          title: widget.title.isEmpty ? 'Conversation' : widget.title),
       body: Column(
         children: [
           Expanded(child: _list(c)),

@@ -1,6 +1,6 @@
-import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
+import 'app_top_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -92,14 +92,8 @@ class _ResourceWebViewState extends State<ResourceWebView> {
     final c = context.appColors;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: Text(
-          widget.title.isEmpty ? widget.subject : widget.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
+      appBar: AppTopBar(
+          title: widget.title.isEmpty ? widget.subject : widget.title),
       body: _error != null
           ? Center(
               child: Text('$_error', style: TextStyle(color: c.alert)),
