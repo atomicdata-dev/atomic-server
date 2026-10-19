@@ -101,8 +101,13 @@ class FakeSpeechInput implements SpeechInput {
   int stops = 0;
   bool _on = false;
   void Function(String, bool)? onText;
+  void Function(String)? onError;
+  void Function(double)? onLevel;
 
-  FakeSpeechInput({this.available = true});
+  /// Simulates the permission prompt before listening begins.
+  final Duration startDelay;
+
+  FakeSpeechInput({this.available = true, this.startDelay = Duration.zero});
 
   @override
   bool get listening => _on;
@@ -111,10 +116,14 @@ class FakeSpeechInput implements SpeechInput {
   Future<bool> start({
     required void Function(String text, bool isFinal) onText,
     required void Function(String error) onError,
+    void Function(double level)? onLevel,
   }) async {
     starts++;
+    if (startDelay > Duration.zero) await Future<void>.delayed(startDelay);
     if (!available) return false;
     this.onText = onText;
+    this.onError = onError;
+    this.onLevel = onLevel;
     _on = true;
     return true;
   }
@@ -837,10 +846,149 @@ void main() {
             tester, FakeSpeechInput(available: false), FakeSpeechOutput());
         await tester.tap(find.byIcon(Icons.mic));
         await tester.pump();
-        expect(find.text('Voice input is not available on this device.'),
+        expect(find.textContaining('Voice input is not available'),
             findsOneWidget);
         expect(find.byIcon(Icons.mic), findsOneWidget);
         expect(find.byType(TextField), findsOneWidget);
+      });
+
+      for (final code in ['error_no_match', 'error_speech_timeout']) {
+        testWidgets('$code ends listening silently, keeps the text',
+            (tester) async {
+          final input = FakeSpeechInput();
+          await open(tester, input, FakeSpeechOutput());
+          await tester.tap(find.byIcon(Icons.mic));
+          await tester.pump();
+          input.onText!('some words', false);
+          input.onError!(code);
+          await tester.pump();
+          expect(find.byIcon(Icons.mic), findsOneWidget);
+          expect(find.textContaining('Voice input'), findsNothing);
+          expect(find.textContaining('error_'), findsNothing);
+          expect(field(tester), 'some words');
+        });
+      }
+
+      testWidgets('real errors show a short message', (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onError!('error_network');
+        await tester.pump();
+        expect(find.text('No internet connection for speech recognition.'),
+            findsOneWidget);
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onError!('error_weird');
+        await tester.pump();
+        expect(find.text('Voice input failed.'), findsOneWidget);
+      });
+
+      test('maps common error codes', () {
+        expect(voiceErrorMessage('error_permission'),
+            'Microphone permission is needed.');
+        expect(voiceErrorMessage('error_recognizer_busy'),
+            'Voice input is busy, try again.');
+        expect(voiceErrorMessage('error_no_match'), isNull);
+      });
+
+      test('normalises sound levels defensively', () {
+        expect(normaliseSoundLevel(-50), 0);
+        expect(normaliseSoundLevel(100), 1);
+        expect(normaliseSoundLevel(double.nan), 0);
+        expect(normaliseSoundLevel(4), closeTo(0.5, 0.01));
+      });
+
+      testWidgets('the ring follows the input level', (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        expect(find.byKey(const Key('mic-level-ring')), findsNothing);
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        double ring() =>
+            tester.getSize(find.byKey(const Key('mic-level-ring'))).width;
+        input.onLevel!(0);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        final quiet = ring();
+        input.onLevel!(1);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        final loud = ring();
+        expect(loud, greaterThan(quiet));
+        expect(loud, closeTo(48 * 1.6, 0.5));
+        expect(quiet, lessThan(48 * 1.2));
+
+        await tester.tap(find.byIcon(Icons.stop));
+        await tester.pump();
+        expect(find.byKey(const Key('mic-level-ring')), findsNothing);
+      });
+
+      testWidgets('partials replace each other after the typed prefix',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.enterText(find.byType(TextField), 'Note:');
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        for (final t in ['a', 'a b', 'a b c']) {
+          input.onText!(t, false);
+          await tester.pump();
+          expect(field(tester), 'Note: $t');
+        }
+        input.onText!('a b c d', true);
+        await tester.pump();
+        expect(field(tester), 'Note: a b c d');
+      });
+
+      testWidgets('a waveform shows while listening and follows the levels',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        expect(find.byKey(const Key('mic-waveform')), findsNothing);
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(find.byKey(const Key('mic-waveform')), findsOneWidget);
+        expect(
+            find.descendant(
+                of: find.byKey(const Key('mic-waveform')),
+                matching: find.byType(AnimatedContainer)),
+            findsNWidgets(24));
+        input.onLevel!(1);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        final bars = find.descendant(
+            of: find.byKey(const Key('mic-waveform')),
+            matching: find.byType(AnimatedContainer));
+        expect(tester.getSize(bars.last).height,
+            greaterThan(tester.getSize(bars.first).height));
+        await tester.tap(find.byIcon(Icons.stop));
+        await tester.pump();
+        expect(find.byKey(const Key('mic-waveform')), findsNothing);
+      });
+
+      testWidgets('a first start that waits for permission ends up listening',
+          (tester) async {
+        final input =
+            FakeSpeechInput(startDelay: const Duration(milliseconds: 500));
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        // The prompt pauses the app; that must not cancel the start.
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(input.starts, 1);
+        expect(input.listening, isTrue);
+        expect(find.byIcon(Icons.stop), findsOneWidget);
+        input.onText!('hello', false);
+        await tester.pump();
+        expect(field(tester), 'hello');
       });
 
       testWidgets('sending stops listening', (tester) async {

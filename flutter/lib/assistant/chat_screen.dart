@@ -78,6 +78,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   SpeechInput? _inputInst;
   SpeechOutput? _outputInst;
   bool _listening = false;
+
+  /// True from the tap until the recogniser is really listening; the
+  /// permission prompt pauses the app and must not cancel that.
+  bool _starting = false;
+  double _level = 0;
+
+  /// The last input levels, newest last, for the waveform.
+  final List<double> _levels = [];
   bool _readAloud = false;
 
   /// Bumped whenever listening starts or is cancelled, so late results of an
@@ -110,7 +118,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _stopListening();
+    if (state != AppLifecycleState.resumed && !_starting) _stopListening();
   }
 
   Future<void> _loadReadAloud() async {
@@ -136,6 +144,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (!_listening) return;
     _listenSession++;
     _listening = false;
+    _starting = false;
+    _level = 0;
     _inputInst?.stop();
     if (mounted) setState(() {});
   }
@@ -154,6 +164,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final session = ++_listenSession;
     setState(() {
       _listening = true;
+      _starting = true;
+      _level = 0;
+      _levels.clear();
       _error = null;
     });
     // Speech from the speaker would be heard as input.
@@ -165,21 +178,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           text: '$base$text',
           selection: TextSelection.collapsed(offset: base.length + text.length),
         );
-        if (isFinal) setState(() => _listening = false);
+        if (isFinal) {
+          setState(() {
+            _listening = false;
+            _level = 0;
+          });
+        }
       },
       onError: (e) {
         if (!mounted || session != _listenSession) return;
+        final message = voiceErrorMessage(e);
         setState(() {
           _listening = false;
-          _error = 'Voice input failed: $e';
+          _level = 0;
+          // Hearing nothing is a normal end, not a failure.
+          if (message != null) _error = message;
+        });
+      },
+      onLevel: (level) {
+        if (!mounted || session != _listenSession || !_listening) return;
+        setState(() {
+          _level = level.clamp(0.0, 1.0);
+          _levels.add(_level);
+          if (_levels.length > 24) _levels.removeAt(0);
         });
       },
     );
+    if (session == _listenSession) _starting = false;
     if (!mounted || session != _listenSession) return;
     if (!ok) {
       setState(() {
         _listening = false;
-        _error = 'Voice input is not available on this device.';
+        _level = 0;
+        _error = 'Voice input is not available. Allow the microphone in '
+            'system settings.';
       });
     }
   }
@@ -599,6 +631,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
             if (_attached.isNotEmpty) _chips(),
+            if (_listening) _Waveform(levels: _levels),
             Row(
               children: [
                 Expanded(
@@ -625,12 +658,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                IconButton(
-                  tooltip:
-                      _listening ? 'Stop voice input' : 'Start voice input',
+                _MicButton(
+                  listening: _listening,
+                  level: _level,
                   onPressed: ai == null ? null : _toggleListening,
-                  color: _listening ? c.main : null,
-                  icon: Icon(_listening ? Icons.stop : Icons.mic),
                 ),
                 IconButton.filled(
                   tooltip: 'Send',
@@ -639,6 +670,173 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Short wording for a recogniser error; null when it is not a failure (the
+/// recogniser just heard nothing usable).
+String? voiceErrorMessage(String code) {
+  switch (code) {
+    case 'error_no_match':
+    case 'error_speech_timeout':
+      return null;
+    case 'error_network':
+    case 'error_network_timeout':
+    case 'error_server':
+      return 'No internet connection for speech recognition.';
+    case 'error_permission':
+    case 'error_insufficient_permissions':
+      return 'Microphone permission is needed.';
+    case 'error_recognizer_busy':
+    case 'error_busy':
+      return 'Voice input is busy, try again.';
+    default:
+      return 'Voice input failed.';
+  }
+}
+
+/// The mic button; while listening a soft ring behind the stop icon follows
+/// the input level and breathes gently when it is quiet.
+class _MicButton extends StatefulWidget {
+  final bool listening;
+  final double level;
+  final VoidCallback? onPressed;
+
+  const _MicButton({
+    required this.listening,
+    required this.level,
+    required this.onPressed,
+  });
+
+  @override
+  State<_MicButton> createState() => _MicButtonState();
+}
+
+class _MicButtonState extends State<_MicButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _breath;
+
+  @override
+  void initState() {
+    super.initState();
+    _breath = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    if (widget.listening) _breath.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_MicButton old) {
+    super.didUpdateWidget(old);
+    if (widget.listening && !_breath.isAnimating) {
+      _breath.repeat(reverse: true);
+    } else if (!widget.listening && _breath.isAnimating) {
+      _breath.stop();
+      _breath.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _breath.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    const area = 48.0;
+    return SizedBox(
+      width: area,
+      height: area,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          if (widget.listening)
+            AnimatedBuilder(
+              animation: _breath,
+              builder: (context, _) {
+                // Between 1.0x and 1.6x; the idle breath stays under 1.15x.
+                final strength = widget.level > _breath.value * 0.25
+                    ? widget.level
+                    : _breath.value * 0.25;
+                final size = area * (1 + 0.6 * strength.clamp(0.0, 1.0));
+                return IgnorePointer(
+                  child: OverflowBox(
+                    maxWidth: area * 2,
+                    maxHeight: area * 2,
+                    child: AnimatedContainer(
+                      key: const Key('mic-level-ring'),
+                      duration: const Duration(milliseconds: 100),
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: c.main.withValues(alpha: 0.18),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          IconButton(
+            tooltip:
+                widget.listening ? 'Stop voice input' : 'Start voice input',
+            onPressed: widget.onPressed,
+            color: widget.listening ? c.main : null,
+            icon: Icon(widget.listening ? Icons.stop : Icons.mic),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A compact strip of thin rounded bars, one per recent input level.
+class _Waveform extends StatelessWidget {
+  final List<double> levels;
+
+  const _Waveform({required this.levels});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    const count = 24;
+    const maxH = 28.0;
+    const minH = 3.0;
+    // Pad on the left so the newest bar is always at the right.
+    final shown = [
+      for (var i = 0; i < count - levels.length; i++) 0.0,
+      ...levels,
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: SizedBox(
+        key: const Key('mic-waveform'),
+        height: maxH,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (final l in shown)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 100),
+                  width: 3,
+                  height: minH + (maxH - minH) * l.clamp(0.0, 1.0),
+                  decoration: BoxDecoration(
+                    color: c.main,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

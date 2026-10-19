@@ -7,15 +7,25 @@ abstract class SpeechInput {
   /// Starts listening. [onText] gets the words heard so far (the whole
   /// utterance, not a delta) and whether that is the final result. Returns
   /// false when recognition is not available or not allowed; [onError] is
-  /// called for errors while listening.
+  /// called for errors while listening. [onLevel] gets the input loudness
+  /// normalised to 0..1, a few times a second. The returned future completes
+  /// once listening has started (after the permission prompt, the first time).
   Future<bool> start({
     required void Function(String text, bool isFinal) onText,
     required void Function(String error) onError,
+    void Function(double level)? onLevel,
   });
 
   Future<void> stop();
 
   bool get listening;
+}
+
+/// Maps the recogniser's dB-ish level (about -2..10 on Android, other ranges
+/// elsewhere) to 0..1.
+double normaliseSoundLevel(double db) {
+  if (db.isNaN) return 0;
+  return ((db + 2) / 12).clamp(0.0, 1.0);
 }
 
 /// Text to speech.
@@ -46,6 +56,7 @@ class PluginSpeechInput implements SpeechInput {
   Future<bool> start({
     required void Function(String text, bool isFinal) onText,
     required void Function(String error) onError,
+    void Function(double level)? onLevel,
   }) async {
     _onText = onText;
     _onError = onError;
@@ -57,6 +68,8 @@ class PluginSpeechInput implements SpeechInput {
           if (s == 'done' || s == 'notListening') _finish();
         },
       );
+      // initialize() returns once the permission prompt was answered; on
+      // grant, carry straight on to listening (no second tap needed).
       if (!ok) return false;
       _last = '';
       _finished = false;
@@ -70,7 +83,16 @@ class PluginSpeechInput implements SpeechInput {
             _onText?.call(_last, false);
           }
         },
-        listenOptions: SpeechListenOptions(partialResults: true),
+        onSoundLevelChange:
+            onLevel == null ? null : (db) => onLevel(normaliseSoundLevel(db)),
+        listenOptions: SpeechListenOptions(
+          // Words show up while speaking; each partial replaces the last.
+          partialResults: true,
+          cancelOnError: false,
+          listenMode: ListenMode.dictation,
+          pauseFor: const Duration(seconds: 4),
+          listenFor: const Duration(seconds: 60),
+        ),
       );
       return true;
     } catch (_) {
