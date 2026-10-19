@@ -308,7 +308,17 @@ impl RecentsIndex {
                     let Ok(parent) = resource.get(urls::PARENT) else {
                         return;
                     };
-                    self.bump_chat(&parent.to_string(), page_last_activity(&resource));
+                    let parent = parent.to_string();
+                    // A chat room or a meeting keeps its messages in the same
+                    // log pages; only an AI chat's belong in this index. A
+                    // parent not here yet is taken for one (its own event
+                    // sorts it out).
+                    let other_owner = store
+                        .get_resource_shallow(&Subject::from(parent.as_str()))
+                        .is_ok_and(|owner| !is_ai_chat(&owner));
+                    if !other_owner {
+                        self.bump_chat(&parent, page_last_activity(&resource));
+                    }
                 } else {
                     self.note_changed(store, &subject, &resource, is_new).await;
                 }
@@ -413,6 +423,10 @@ impl RecentsIndex {
             let Some(resource) = row_resource(store, &Subject::from(subject.as_str())).await else {
                 continue;
             };
+            // Indexes written before chat rooms were told apart hold them.
+            if !is_ai_chat(&resource) {
+                continue;
+            }
             out.push((subject, name_of(&resource), last));
         }
         Ok(out)
@@ -644,6 +658,33 @@ mod tests {
         );
         let one = d.recents.recent_chats(&d.store, 1).await.unwrap();
         assert_eq!(one.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_meetings_messages_do_not_make_it_an_ai_chat() {
+        let d = Device::new().await;
+        d.recents.ensure_scanned(&d.store).await.unwrap();
+        let mut rx = d.store.subscribe_events();
+        let meeting = d
+            .store
+            .create_resource(urls::FOLDER, &d.drive, "Standup", None)
+            .await
+            .unwrap();
+        d.add_page(
+            &meeting,
+            &[("1-00000001", d.ai_entry("user", "hello team", 7_000_000))],
+        )
+        .await;
+        d.pump(&mut rx).await;
+        let chats = d.recents.recent_chats(&d.store, 500).await.unwrap();
+        assert!(
+            chats.iter().all(|(subject, _, _)| subject != &meeting),
+            "{chats:?}"
+        );
+        // Also when an older index already holds it.
+        d.recents.with(|s| s.recents.chats.insert(meeting.clone(), 7_000_000));
+        let chats = d.recents.recent_chats(&d.store, 500).await.unwrap();
+        assert!(chats.iter().all(|(subject, _, _)| subject != &meeting));
     }
 
     #[tokio::test]
