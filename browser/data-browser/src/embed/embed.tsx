@@ -57,12 +57,13 @@ import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
-import { createEmbedStore } from './embedStore';
+import { createEmbedStore, registerEmbedActions } from './embedStore';
 import { closeTopOverlay } from './overlayBack';
 import { setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
 
 enableEmbedMode();
+registerEmbedActions();
 
 // The app already lays the page out inside the system bars, but the web view
 // still reports their size as `env(safe-area-inset-*)`, so the page would leave

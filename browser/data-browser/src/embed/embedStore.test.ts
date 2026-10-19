@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // @wc-ignore-file
 import { expect, it } from 'vitest';
-import { core, server, type NativeChannel } from '@tomic/react';
+import { core, dataBrowser, server, type NativeChannel } from '@tomic/react';
 import { fetchPluginList } from '../components/CustomViewProvider';
-import { createEmbedStore } from './embedStore';
+import { hasBasicInstanceHandler } from '../components/forms/NewForm/useNewResourceUI';
+import { createEmbedStore, registerEmbedActions } from './embedStore';
 
 const AGENT = 'atomic:agent:pZyZYvKoOcwczHXJoYvYctgrHXn2pZ7qfeWMyoUfQ_8';
 const DRIVE = 'atomic:50cViRzEn58gVUYWYypS4CRIFwx4AvFVtNjxLMCc5tg4p0DLZmnD2YV';
@@ -75,4 +76,16 @@ it('lists no server plugins, without signing a request', async () => {
   expect(views.size).toBe(0);
   expect(manifests.size).toBe(0);
   expect(refused).toEqual([]);
+});
+
+it('makes a document, folder or chat room without a form, like the web app', () => {
+  registerEmbedActions();
+
+  for (const c of [
+    dataBrowser.classes.documentV2,
+    dataBrowser.classes.folder,
+    dataBrowser.classes.chatroom,
+  ]) {
+    expect(hasBasicInstanceHandler(c)).toBe(true);
+  }
 });

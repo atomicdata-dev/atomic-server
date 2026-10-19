@@ -6,6 +6,8 @@ import {
   type ClientDbWorker,
   type NativeChannel,
 } from '@tomic/react';
+import { registerCustomCreateActions } from '../components/forms/NewForm/CustomCreateActions';
+import { registerCustomDeleteDialogs } from '../components/ResourceContextMenu/customDeleteDialogs';
 
 /**
  * The embed's store: the host app (Rust `atomic_lib`) is its only database and
@@ -41,4 +43,15 @@ export async function createEmbedStore(
   await db.waitForInit();
 
   return { store, db };
+}
+
+/**
+ * What the web app registers at start (`App.tsx`) and the page needs too.
+ * Without the create actions, "Document" (and Folder, Table, the native New
+ * → Other page) opened the bare property form of a new resource instead of
+ * making one and opening its editor.
+ */
+export function registerEmbedActions(): void {
+  registerCustomCreateActions();
+  registerCustomDeleteDialogs();
 }
