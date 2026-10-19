@@ -26,3 +26,19 @@ atomic_lib = { path = "../../lib", default-features = false, features = ["db-red
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+# This crate is outside the root workspace, so the root's profiles do not apply.
+# Without these a debug build carries full debug info for every dependency: a
+# library of hundreds of MB that is slow to link and to push over USB. The
+# dependencies are also optimised, so a debug app starts and syncs at a usable
+# speed; they compile once and stay cached. atomic_lib, which changes often,
+# keeps a quick compile.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
+
+[profile.dev.package.atomic_lib]
+opt-level = 1
