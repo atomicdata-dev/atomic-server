@@ -35,6 +35,14 @@ import { enableEmbedMode } from '../helpers/embedMode';
 import { Providers } from '../Providers';
 import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
+import { paths } from '../routes/paths';
+import { NewRoute } from '../routes/NewResource/NewRoute';
+import { EditRoute } from '../routes/EditRoute';
+import { DataRoute } from '../routes/DataRoute';
+import { HistoryRoute } from '../routes/History/HistoryRoute';
+import { ShareRoute } from '../routes/Share/ShareRoute';
+import { ImportRoute } from '../routes/ImportRoute';
+import { StorageRoute } from '../routes/StorageRoute';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 
@@ -50,6 +58,7 @@ declare global {
       show(subject: string): void;
       changed(subjects: string[]): void;
       openMenu(): void;
+      back(): boolean;
     };
   }
 }
@@ -125,6 +134,28 @@ const showRoute = createRoute({
   },
 });
 
+/** The pages the resource menu leads to: the web app's own route components,
+ * mounted under this root (they are made for the app's root, which the embed
+ * does not use). */
+const actionRoutes = [
+  [paths.new, NewRoute],
+  [paths.edit, EditRoute],
+  [paths.data, DataRoute],
+  [paths.history, HistoryRoute],
+  [paths.share, ShareRoute],
+  [paths.import, ImportRoute],
+  [paths.storage, StorageRoute],
+].map(([path, source]) =>
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: path as string,
+    // @ts-expect-error - options are shared with the app's route of that page
+    validateSearch: source.options.validateSearch,
+    // @ts-expect-error - same component, other parent
+    component: source.options.component,
+  }),
+);
+
 const history = createMemoryHistory({
   initialEntries: [
     `/app/show?subject=${encodeURIComponent(
@@ -134,7 +165,7 @@ const history = createMemoryHistory({
 });
 
 const router = createRouter({
-  routeTree: rootRoute.addChildren([showRoute]),
+  routeTree: rootRoute.addChildren([showRoute, ...actionRoutes]),
   history,
 });
 
@@ -144,6 +175,16 @@ window.atomicEmbed = {
   },
   changed(subjects) {
     for (const subject of subjects) void store.getResource(subject);
+  },
+  /** One step back in the page's own history; false when there is none. */
+  back() {
+    if (!history.canGoBack()) {
+      return false;
+    }
+
+    history.back();
+
+    return true;
   },
   openMenu() {
     window.dispatchEvent(new Event('atomic-embed-menu'));

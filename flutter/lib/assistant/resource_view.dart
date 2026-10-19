@@ -109,49 +109,69 @@ class _ResourceViewState extends State<ResourceView> {
     await _controller?.runJavaScript('window.__atomicReply($id,$reply)');
   }
 
+  /// Back goes one page back inside the page first (after an action opened
+  /// its form, say), and leaves the resource when there is none.
+  Future<void> _back() async {
+    final controller = _controller;
+    if (controller != null) {
+      final went = await controller
+          .runJavaScriptReturningResult('window.atomicEmbed?.back() === true');
+      if ('$went' == 'true' || went == true) return;
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
     final controller = _controller;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      body: SafeArea(
-        bottom: false,
-        child: _error != null
-            ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
-            : controller == null
-                ? const Center(child: CircularProgressIndicator())
-                : Stack(children: [
-                    // The page owns every touch on it (scrolling a long menu
-                    // or document must not be taken over by the swipe back
-                    // when a finger drifts sideways); swipe back starts at the
-                    // left edge.
-                    WebViewWidget(
-                      controller: controller,
-                      gestureRecognizers: const {
-                        Factory<OneSequenceGestureRecognizer>(
-                            EagerGestureRecognizer.new),
-                      },
-                    ),
-                    const Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 24,
-                      child: _EdgeStrip(),
-                    ),
-                  ]),
-      ),
-      // The same bar as everywhere; "more" is the page's own resource menu
-      // (the web app's navbar menu, drawn by the page).
-      bottomNavigationBar: AppBottomBar(
-        api: widget.api,
-        drive: widget.drive,
-        onMore: controller == null
-            ? null
-            : () => controller.runJavaScript('window.atomicEmbed?.openMenu()'),
-      ),
-    );
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _back();
+        },
+        child: Scaffold(
+          backgroundColor: c.bgBody,
+          body: SafeArea(
+            bottom: false,
+            child: _error != null
+                ? Center(
+                    child: Text('$_error', style: TextStyle(color: c.alert)))
+                : controller == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : Stack(children: [
+                        // The page owns every touch on it (scrolling a long menu
+                        // or document must not be taken over by the swipe back
+                        // when a finger drifts sideways); swipe back starts at the
+                        // left edge.
+                        WebViewWidget(
+                          controller: controller,
+                          gestureRecognizers: const {
+                            Factory<OneSequenceGestureRecognizer>(
+                                EagerGestureRecognizer.new),
+                          },
+                        ),
+                        const Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 24,
+                          child: _EdgeStrip(),
+                        ),
+                      ]),
+          ),
+          // The same bar as everywhere; "more" is the page's own resource menu
+          // (the web app's navbar menu, drawn by the page).
+          bottomNavigationBar: AppBottomBar(
+            api: widget.api,
+            drive: widget.drive,
+            onBack: _back,
+            onMore: controller == null
+                ? null
+                : () =>
+                    controller.runJavaScript('window.atomicEmbed?.openMenu()'),
+          ),
+        ));
   }
 }
 

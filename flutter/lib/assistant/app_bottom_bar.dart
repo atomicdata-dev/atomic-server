@@ -20,6 +20,9 @@ class AppBottomBar extends StatelessWidget {
   /// Opens the resource menu. Without a resource there is no menu to open.
   final VoidCallback? onMore;
 
+  /// Goes back; by default pops the screen.
+  final VoidCallback? onBack;
+
   /// Pushes a screen; the home screen uses it to refresh when it comes back.
   final Future<void> Function(Widget screen)? onPush;
 
@@ -29,6 +32,7 @@ class AppBottomBar extends StatelessWidget {
     required this.drive,
     this.hint = 'Search',
     this.onMore,
+    this.onBack,
     this.onPush,
   });
 
@@ -51,7 +55,7 @@ class AppBottomBar extends StatelessWidget {
             if (Navigator.of(context).canPop())
               IconButton(
                 tooltip: 'Back',
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                 icon: const Icon(Icons.arrow_back),
               )
             else
