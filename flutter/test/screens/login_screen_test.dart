@@ -84,4 +84,12 @@ void main() {
     expect(find.text('Finish setting up your workspace in the browser first'),
         findsOneWidget);
   });
+
+  test('a secret that is not one gets a sentence, not a decoder error', () {
+    expect(
+        signInError(
+            'Invalid key. Not valid Base64. Invalid last symbol 116, offset 9.'),
+        startsWith('That is not a secret.'));
+    expect(signInError(StateError('No connection')), 'No connection');
+  });
 }

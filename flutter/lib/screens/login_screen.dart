@@ -354,8 +354,9 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Sign in: $e');
       setState(() {
-        _error = e.toString();
+        _error = signInError(e);
         _busy = false;
       });
     }
@@ -864,8 +865,28 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(_error!,
-            style: const TextStyle(color: Colors.red, fontSize: 12)),
+            style: TextStyle(
+                color: Theme.of(context).extension<AppColors>()?.alert ??
+                    Colors.red,
+                fontSize: 13)),
       ),
     );
   }
+}
+
+/// What a failed sign-in with a secret says: a secret that is not one (cut
+/// short, a word, something else on the clipboard) gets a sentence a person
+/// can act on, not the decoder's "Not valid Base64. Invalid last symbol 116,
+/// offset 9."; anything else as it came.
+String signInError(Object error) {
+  final text = '$error';
+  final notASecret = RegExp(r'Invalid key|Base64|base64|Invalid secret|decode',
+          caseSensitive: false)
+      .hasMatch(text);
+  if (notASecret) {
+    return 'That is not a secret. A secret is the long code you saved when '
+        'you made your identity; on a device that is signed in, Sync → '
+        'Copy secret key gives it.';
+  }
+  return text.replaceFirst('Bad state: ', '');
 }
