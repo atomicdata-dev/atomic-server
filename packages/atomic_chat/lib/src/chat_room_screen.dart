@@ -49,6 +49,53 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
+
+  /// The name given here, shown instead of [ChatRoomScreen.title].
+  String? _renamed;
+
+  String get _title => _renamed ?? widget.title;
+
+  /// A chat room has no page of its own on the phone (this screen replaces
+  /// it), so its name is changed here: a new room is called "ChatRoom".
+  Future<void> _rename() async {
+    final controller = TextEditingController(text: _title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename chat'),
+        content: TextField(
+          key: const Key('chat-room-name'),
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          onSubmitted: (v) => Navigator.of(context).pop(v),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    // Not disposed here: the dialog still animates out with it.
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed == _title || !mounted) return;
+    final before = _renamed;
+    setState(() => _renamed = trimmed);
+    try {
+      await widget.api.renameResource(widget.subject, trimmed);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _renamed = before;
+        _error = "Couldn't rename: $e";
+      });
+    }
+  }
+
   final _scroll = ScrollController();
   List<ChatRoomMessage> _messages = const [];
   Object? _loadError;
@@ -196,7 +243,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final c = context.appColors;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppTopBar(title: widget.title.isEmpty ? 'Chat' : widget.title),
+      appBar: AppTopBar(
+        title: _title.isEmpty ? 'Chat' : _title,
+        actions: [
+          IconButton(
+            tooltip: 'Rename',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _rename,
+          ),
+        ],
+      ),
       body: ListAndField(list: _list(c), field: _composer(c)),
     );
   }

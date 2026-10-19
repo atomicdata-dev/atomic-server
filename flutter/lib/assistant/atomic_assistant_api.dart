@@ -87,4 +87,8 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<String> embedCall(String method, String argsJson) =>
       AtomicClient.embedCall(method, argsJson);
+  @override
+  Future<void> renameResource(String subject, String name) =>
+      AtomicClient.setProperty(
+          subject, 'https://atomicdata.dev/properties/name', name);
 }

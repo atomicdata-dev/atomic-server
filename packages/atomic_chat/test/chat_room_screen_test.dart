@@ -64,6 +64,11 @@ class _RoomApi extends UnimplementedApi {
 
   @override
   void noteOpened(String drive, String subject) => opened.add(subject);
+
+  final List<(String, String)> renamed = [];
+  @override
+  Future<void> renameResource(String subject, String name) async =>
+      renamed.add((subject, name));
 }
 
 Widget _app(Widget home) => MaterialApp(
@@ -89,6 +94,19 @@ void main() {
     tester.view.viewInsets = FakeViewPadding.zero;
     await tester.pumpAndSettle();
     expect(find.text('Hi'), findsOneWidget);
+  });
+
+  testWidgets('the room is renamed from its top bar', (tester) async {
+    final api = _RoomApi([]);
+    await _open(tester, api, title: 'ChatRoom');
+    await tester.tap(find.byTooltip('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('chat-room-name')), ' Family ');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(api.renamed, [('did:ad:room', 'Family')]);
+    expect(find.text('Family'), findsOneWidget);
+    expect(find.text('ChatRoom'), findsNothing);
   });
 
   testWidgets('parses the host JSON into messages and events', (tester) async {
@@ -217,13 +235,17 @@ void main() {
       (tester) async {
     final api = _RoomApi([_msg('1', 'alice', 'Hi', _t0)]);
     await _open(tester, api);
-    IconButton send() => tester.widget(find.byType(IconButton));
+    IconButton send() => tester.widget(find
+        .ancestor(
+            of: find.byTooltip('Send'),
+            matching: find.widgetWithIcon(IconButton, Icons.arrow_upward))
+        .first);
     expect(send().onPressed, isNull);
 
     await tester.enterText(find.byType(TextField), '  Hello room  ');
     await tester.pump();
     expect(send().onPressed, isNotNull);
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_upward));
     await tester.pumpAndSettle();
 
     expect(api.sent, [('did:ad:room', 'Hello room')]);
@@ -239,7 +261,7 @@ void main() {
     await _open(tester, api);
     await tester.enterText(find.byType(TextField), 'Hello');
     await tester.pump();
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_upward));
     await tester.pumpAndSettle();
     expect(find.textContaining("Couldn't send"), findsOneWidget);
     expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,

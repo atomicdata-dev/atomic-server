@@ -86,4 +86,8 @@ abstract class AssistantApi {
   /// One call from the embedded renderer's page to the store: a method and
   /// its arguments as JSON, answered as JSON (see `ResourceView`).
   Future<String> embedCall(String method, String argsJson);
+
+  /// Gives [subject] a new name (a chat room shown natively, which has no web
+  /// page to edit its title on).
+  Future<void> renameResource(String subject, String name);
 }

@@ -68,4 +68,7 @@ class UnimplementedApi extends AssistantApi {
   String webUrl(String subject) => _no('webUrl');
   @override
   Future<String> embedCall(String method, String argsJson) => _no('embedCall');
+  @override
+  Future<void> renameResource(String subject, String name) =>
+      _no('renameResource');
 }
