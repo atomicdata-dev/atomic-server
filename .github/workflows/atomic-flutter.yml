@@ -1,12 +1,15 @@
 name: Atomic Flutter package
 on:
   pull_request:
-    paths: ['packages/atomic_flutter/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
+    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
   push:
-    paths: ['packages/atomic_flutter/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
+    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
 jobs:
   package:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [atomic_flutter, atomic_chat]
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -15,11 +18,11 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-        working-directory: packages/atomic_flutter
+        working-directory: packages/${{ matrix.package }}
       - run: flutter analyze
-        working-directory: packages/atomic_flutter
+        working-directory: packages/${{ matrix.package }}
       - run: flutter test
-        working-directory: packages/atomic_flutter
+        working-directory: packages/${{ matrix.package }}
   embed-size:
     runs-on: ubuntu-latest
     steps:

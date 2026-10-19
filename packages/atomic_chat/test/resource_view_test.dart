@@ -1,11 +1,10 @@
 import 'dart:convert';
 
-import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
-import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
-import 'package:atomiccanvas_flutter/theme.dart';
-import 'package:atomiccanvas_flutter/widgets/slide_back_route.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'unimplemented_api.dart';
 
 /// The page in a web view, without the web view: records what it is asked to
 /// run, and answers a flush only when the test says so.
@@ -60,7 +59,7 @@ void main() {
     ));
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     Widget page(BuildContext _) =>
-        const ResourceView(api: AssistantApi(), drive: 'd', subject: 's');
+        const ResourceView(api: UnimplementedApi(), drive: 'd', subject: 's');
     navigator.push(slideBack
         ? SlideBackRoute<void>(builder: page)
         : MaterialPageRoute<void>(builder: page));

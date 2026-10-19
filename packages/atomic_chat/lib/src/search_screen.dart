@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColors, AppColorsExt;
 import 'package:flutter/material.dart';
 
-import '../atomic/atomic_client.dart';
-import '../theme.dart';
-import '../widgets/covered_insets_freeze.dart';
-import '../widgets/slide_back_route.dart';
+import 'models.dart';
+import 'covered_insets_freeze.dart';
+import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
@@ -20,14 +21,14 @@ class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
     required this.drive,
-    this.api = const AssistantApi(),
+    required this.api,
   });
 
   /// A quick fade and short rise instead of the page slide: the keyboard rises
   /// at the same time, and a long slide on top of it feels slow.
   static Route<void> route({
     required String drive,
-    AssistantApi api = const AssistantApi(),
+    required AssistantApi api,
   }) =>
       PageRouteBuilder<void>(
         pageBuilder: (_, __, ___) =>
@@ -136,7 +137,7 @@ class _SearchScreenState extends State<SearchScreen> {
   static String _id(String subject) =>
       subject.replaceFirst('did:ad:', '').replaceFirst('atomic:', '');
 
-  /// "<class> · <drive name>": every result says which drive it is in.
+  /// `<class> · <drive name>`: every result says which drive it is in.
   String _detail(String className, String drive) {
     final id = _id(drive);
     final name = drive.isEmpty

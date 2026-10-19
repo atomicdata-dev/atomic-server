@@ -1,8 +1,9 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../theme.dart';
 import 'assistant_api.dart';
 
 /// Shows a resource in the connected server's web app, or any page [url].

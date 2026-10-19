@@ -1,10 +1,11 @@
 import 'dart:async';
 
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColors, AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../atomic/atomic_client.dart';
-import '../theme.dart';
+import 'models.dart';
 import 'assistant_api.dart';
 
 /// How often the open conversation is read again for messages that arrived

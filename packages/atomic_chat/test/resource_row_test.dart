@@ -1,5 +1,4 @@
-import 'package:atomiccanvas_flutter/assistant/resource_row.dart';
-import 'package:atomiccanvas_flutter/theme.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

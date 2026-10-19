@@ -1,50 +1,75 @@
+import 'package:atomic_chat/atomic_chat.dart';
+
+import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
-import 'hosted_ai.dart';
 
-/// What the assistant screens read. The default goes to the local node through
-/// [AtomicClient]; tests pass a subclass with canned answers.
-class AssistantApi {
-  const AssistantApi();
+/// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust
+/// bridge), and the linked account from [AccountStore].
+class AtomicAssistantApi extends AssistantApi {
+  const AtomicAssistantApi();
 
+  @override
   Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
+  @override
   Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
+  @override
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
-
-  /// Searches every drive, or only [drive] when given.
+  @override
   Future<List<SearchHit>> search(String query, {String? drive}) =>
       AtomicClient.search(query, drive: drive);
+  @override
   Future<List<RecentResource>> recentResources(String drive) =>
       AtomicClient.recentResources(drive);
+  @override
   Future<List<RecentResource>> favorites() => AtomicClient.favorites();
+  @override
   Future<List<ConversationRow>> conversations() => AtomicClient.conversations();
-
-  /// The messages of a conversation, oldest first.
+  @override
   Future<List<ConversationMessage>> conversationMessages(String subject) =>
       AtomicClient.readConversation(subject);
+  @override
   Future<void> sendConversationMessage(String subject, String text) =>
       AtomicClient.sendConversationMessage(subject, text);
-
-  /// Get the conversation onto this device and follow it; best effort.
+  @override
   Future<void> followConversation(String subject) =>
       AtomicClient.followConversation(subject);
+  @override
   Future<List<ActivityEntry>> activity(int limit) =>
       AtomicClient.activity(limit: limit);
-
-  /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
+  @override
   Future<Map<String, String>> resourceIcons(List<String> subjects) =>
       AtomicClient.resourceIcons(subjects);
+  @override
   void noteOpened(String drive, String subject) =>
       AtomicClient.noteResourceOpened(drive, subject);
+  @override
   Future<String?> agentName() async =>
       (await AtomicClient.getActiveAgent())?.name;
 
-  /// The AI of the linked account; null when none is linked.
-  Future<HostedAi?> hostedAi() => HostedAi.load();
+  /// The linked account's AI. With no session saved, the active agent signs
+  /// the account in first (as the web app does).
+  @override
+  Future<HostedAi?> hostedAi() async {
+    var saved = await AccountStore.read();
+    if (saved == null && await AccountStore.signInWithAgent()) {
+      saved = await AccountStore.read();
+    }
+    if (saved == null) return null;
+    return HostedAi.forSession(saved);
+  }
+
+  @override
   Future<String> newChat(String name) => AtomicClient.createAiChat(name);
+  @override
   Future<void> addMessage(String chat, String role, String text) =>
       AtomicClient.appendChatEntry(chat, role, text);
+  @override
   Future<String> resourceText(String subject, {int maxChars = 4000}) =>
       AtomicClient.resourceText(subject, maxChars: maxChars);
+  @override
   String webUrl(String subject) => AtomicClient.resourceWebUrl(subject);
+  @override
+  Future<String> embedCall(String method, String argsJson) =>
+      AtomicClient.embedCall(method, argsJson);
 }

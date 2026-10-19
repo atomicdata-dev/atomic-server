@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
-import 'assistant/app_shell.dart';
-import 'assistant/chats_screen.dart';
+import 'package:atomic_chat/atomic_chat.dart' show AppShell, ChatsScreen;
+import 'assistant/atomic_assistant_api.dart';
 import 'canvas/infinite_canvas.dart';
 import 'gallery/canvas_store.dart';
 import 'gallery/gallery_screen.dart';
 import 'models/canvas_entry.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
+import 'screens/sync_screen.dart';
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
@@ -281,8 +282,11 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
           ? LoginScreen(onLoggedIn: _onLoggedIn)
           : _openCanvas == null && !_showGallery
               ? AppShell(
+                  api: const AtomicAssistantApi(),
                   drive: AtomicClient.getActiveDrive() ?? '',
+                  profile: (_) => const SyncScreen(),
                   home: ChatsScreen(
+                    api: const AtomicAssistantApi(),
                     drive: AtomicClient.getActiveDrive() ?? '',
                     onOpenGallery: () => setState(() => _showGallery = true),
                     onSignOut: _signedOut,

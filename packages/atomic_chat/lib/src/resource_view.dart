@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import '../atomic/atomic_client.dart';
-import '../theme.dart';
-import '../widgets/slide_back_route.dart';
+import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
@@ -296,7 +296,7 @@ class _ResourceViewState extends State<ResourceView>
       debugPrint('[embed] call $method (${message.length} chars)');
     }
     try {
-      final answer = await (widget.call ?? AtomicClient.embedCall)(
+      final answer = await (widget.call ?? widget.api.embedCall)(
           method, jsonEncode(request['args'] ?? const []));
       reply = 'true,${jsonEncode(answer)}';
       if (_firstRead && method == 'getResourcesWithSnapshots') {

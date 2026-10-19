@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../widgets/covered_insets_freeze.dart';
+import 'covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
-import '../atomic/atomic_client.dart';
+import 'models.dart';
 import 'assistant_api.dart';
 
 /// What the static bottom bar needs to know about the pages above it. The
@@ -19,10 +19,15 @@ class ShellController extends ChangeNotifier {
   final ValueNotifier<String> drive;
 
   /// Opens the user's page; the home sets it (it handles sign-out). Without
-  /// one the bar opens the sync screen.
+  /// one the bar opens [profile].
   VoidCallback? onUser;
 
-  ShellController({String drive = ''}) : drive = ValueNotifier(drive);
+  /// Builds the user's page (agent, sync and account), which the host app
+  /// owns. It pops with `true` when the person signed out there.
+  final WidgetBuilder? profile;
+
+  ShellController({String drive = '', this.profile})
+      : drive = ValueNotifier(drive);
 
   /// What search last knew (drives and recently opened), so it can paint the
   /// list on its first frame and refresh behind it.
@@ -134,11 +139,15 @@ class AppShell extends StatefulWidget {
   /// The first page.
   final Widget home;
 
+  /// The user's page the Profile button opens (see [ShellController.profile]).
+  final WidgetBuilder? profile;
+
   const AppShell({
     super.key,
-    this.api = const AssistantApi(),
+    required this.api,
     required this.drive,
     required this.home,
+    this.profile,
   });
 
   @override
@@ -146,7 +155,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  late final ShellController _shell = ShellController(drive: widget.drive);
+  late final ShellController _shell =
+      ShellController(drive: widget.drive, profile: widget.profile);
   late final _TopObserver _observer = _TopObserver(_shell);
 
   /// One instance for the life of the shell: the keyboard animation rebuilds

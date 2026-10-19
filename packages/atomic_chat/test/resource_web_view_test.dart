@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
-import 'package:atomiccanvas_flutter/assistant/resource_web_view.dart';
-import 'package:atomiccanvas_flutter/theme.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import 'unimplemented_api.dart';
 
 class _Controller implements WebViewController {
   _Controller(this.log);
@@ -33,7 +33,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData(extensions: const [AppColors.dark]),
       home: ResourceWebView(
-        api: const AssistantApi(),
+        api: const UnimplementedApi(),
         subject: 'https://portal.example',
         url: 'https://portal.example',
         cookies: const [

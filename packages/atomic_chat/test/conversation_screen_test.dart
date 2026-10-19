@@ -1,11 +1,8 @@
-import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
-import 'package:atomiccanvas_flutter/assistant/conversation_screen.dart';
-import 'package:atomiccanvas_flutter/assistant/native_views.dart';
-import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
-import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
-import 'package:atomiccanvas_flutter/theme.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'unimplemented_api.dart';
 
 const _t0 = 1700000000000;
 const _minute = 60 * 1000;
@@ -21,7 +18,7 @@ ConversationMessage _msg(String id, String who, String text, int at,
       createdAt: at,
     );
 
-class _ConversationApi extends AssistantApi {
+class _ConversationApi extends UnimplementedApi {
   List<ConversationMessage> log;
   final List<(String, String)> sent = [];
   final List<String> followed = [];
@@ -265,7 +262,7 @@ void main() {
   });
 
   test('the bridge JSON of a conversation parses', () {
-    final messages = AtomicClient.parseConversationMessages(
+    final messages = AssistantJson.parseConversationMessages(
         '[{"id":"m","author":"a","author_name":"Alice","mine":false,'
         '"text":null,"c":5}]');
     expect(messages.single.authorName, 'Alice');

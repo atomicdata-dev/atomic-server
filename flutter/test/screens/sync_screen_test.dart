@@ -1,5 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
-import 'package:atomiccanvas_flutter/assistant/resource_web_view.dart';
+import 'package:atomic_chat/atomic_chat.dart' show ResourceWebView;
 import 'package:atomiccanvas_flutter/atomic/account_store.dart';
 import 'package:atomiccanvas_flutter/screens/sync_screen.dart';
 import 'package:atomiccanvas_flutter/theme.dart';

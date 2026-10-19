@@ -1,10 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:atomic_chat/atomic_chat.dart'
+    show
+        ActivityEntry,
+        AssistantJson,
+        ChatMessage,
+        ChatSummary,
+        ConversationMessage,
+        ConversationRow,
+        DriveInfo,
+        RecentResource,
+        SearchHit;
+import 'package:atomic_chat/atomic_chat.dart' as chat show driveKey;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
-import '../src/rust/api/assistant.dart' show ActivityEntry;
 import '../src/rust/api/context.dart' as context;
 import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
@@ -14,51 +25,6 @@ import '../src/rust/api/simple/types.dart'
 
 export '../src/rust/api/simple/types.dart'
     show AgentInfo, CanvasListItem, VersionMetadata;
-export '../src/rust/api/assistant.dart' show ActivityEntry;
-
-/// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
-typedef ChatSummary = ({String subject, String name, int lastActivity});
-
-/// One message of a chat: the text parts of an entry, `role` user or assistant.
-typedef ChatMessage = ({String id, String role, String text, int createdAt});
-
-/// One message of a conversation (a DM or group chat): who wrote it, and its
-/// text once opened (null when this device cannot decrypt it).
-typedef ConversationMessage = ({
-  String id,
-  String author,
-  String authorName,
-  bool mine,
-  String? text,
-  int createdAt
-});
-
-/// A row of the Messages list: the conversation and the text of its newest
-/// message ('' when there is none or it cannot be read). `resource.openedAt`
-/// is the time of that message in ms (0 when none).
-typedef ConversationRow = ({RecentResource resource, String lastMessage});
-
-typedef SearchHit = ({
-  String subject,
-  String title,
-  String className,
-  // The drive the hit lives in; '' when unknown.
-  String drive,
-  double score,
-  // The resource's own icon (an emoji); null when it has none.
-  String? emoji
-});
-
-typedef DriveInfo = ({String subject, String name, String? emoji});
-
-typedef RecentResource = ({
-  String subject,
-  String title,
-  String className,
-  int openedAt,
-  // The resource's own icon (an emoji); null when it has none.
-  String? emoji
-});
 
 /// Atomic Data SDK — local-first with optional sync.
 ///
@@ -108,38 +74,14 @@ class AtomicClient {
 
   static Future<List<String>> listDrives() => ffi.listDrives();
 
-  /// The agent's drives with their names (empty when a drive has none yet).
-  static Future<List<DriveInfo>> listDrivesWithNames() async => visibleDrives([
-        for (final e in jsonDecode(await ffi.listDrivesWithNames()) as List)
-          (
-            subject: e['subject'] as String,
-            name: e['name'] as String? ?? '',
-            emoji: _emoji(e),
-          ),
-      ], active: getActiveDrive());
+  /// The agent's drives with their names (empty when a drive has none yet),
+  /// as [visibleDrives] keeps them.
+  static Future<List<DriveInfo>> listDrivesWithNames() async =>
+      AssistantJson.parseDrives(await ffi.listDrivesWithNames(),
+          active: getActiveDrive());
 
   /// The identifier without its scheme: `did:ad:X` and `atomic:X` are one drive.
-  static String driveKey(String subject) =>
-      subject.replaceFirst(RegExp(r'^(did:ad:|atomic:)'), '').split('?').first;
-
-  /// The drives worth showing: each drive once (the personal drive is listed
-  /// under both spellings), and only those that are on this device with a name
-  /// — a drive the personal drive lists but this device has not received has
-  /// nothing to show yet. The [active] drive stays whatever its state.
-  @visibleForTesting
-  static List<DriveInfo> visibleDrives(List<DriveInfo> all, {String? active}) {
-    final seen = <String>{};
-    final out = <DriveInfo>[];
-    for (final d in all) {
-      final key = driveKey(d.subject);
-      if (!seen.add(key)) continue;
-      if (d.name.isEmpty && (active == null || driveKey(active) != key)) {
-        continue;
-      }
-      out.add(d);
-    }
-    return out;
-  }
+  static String driveKey(String subject) => chat.driveKey(subject);
 
   static String? getActiveDrive() => ffi.getActiveDrive();
 
@@ -156,10 +98,11 @@ class AtomicClient {
       ffi.setProperty(subject: subject, property: property, value: value);
 
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
+  // The JSON of `atomic_lib::host` is read by `AssistantJson` (atomic_chat).
 
   /// The person's newest AI chats, across all drives.
   static Future<List<ChatSummary>> listAiChats({int limit = 50}) async =>
-      parseChats(await assistant.listAiChats(limit: limit));
+      AssistantJson.parseChats(await assistant.listAiChats(limit: limit));
 
   /// Remember that this device opened [subject]; local, nothing is synced.
   static void noteResourceOpened(String drive, String subject) =>
@@ -167,32 +110,24 @@ class AtomicClient {
 
   static Future<List<RecentResource>> recentResources(String drive,
           {int limit = 20}) async =>
-      parseRecentResources(
+      AssistantJson.parseRecentResources(
           await assistant.listRecentResources(drive: drive, limit: limit));
 
   /// The person's favorites (all drives), newest added first. `openedAt` is 0.
   static Future<List<RecentResource>> favorites({int limit = 100}) async =>
-      parseRecentResources(await assistant.listFavorites(limit: limit));
+      AssistantJson.parseRecentResources(
+          await assistant.listFavorites(limit: limit));
 
   /// The person's conversations (DMs and group chats), titled by who is in
   /// them, newest message first.
-  static Future<List<ConversationRow>> conversations({int limit = 100}) async {
-    final json = await assistant.listConversations(limit: limit);
-    final rows = jsonDecode(json) as List;
-    final resources = parseRecentResources(json);
-    return [
-      for (var i = 0; i < rows.length; i++)
-        (
-          resource: resources[i],
-          lastMessage: (rows[i]['last_message'] as String?) ?? '',
-        ),
-    ];
-  }
+  static Future<List<ConversationRow>> conversations({int limit = 100}) async =>
+      AssistantJson.parseConversations(
+          await assistant.listConversations(limit: limit));
 
   /// The messages of a conversation, oldest first, read from the local store.
   static Future<List<ConversationMessage>> readConversation(
           String subject) async =>
-      parseConversationMessages(
+      AssistantJson.parseConversationMessages(
           await assistant.readConversation(subject: subject));
 
   /// Sends [text] in a conversation as this device's agent (sealed, signed,
@@ -205,39 +140,25 @@ class AtomicClient {
   static Future<void> followConversation(String subject) =>
       assistant.followConversation(subject: subject);
 
-  @visibleForTesting
-  static List<ConversationMessage> parseConversationMessages(String json) => [
-        for (final e in jsonDecode(json) as List)
-          (
-            id: e['id'] as String,
-            author: e['author'] as String? ?? '',
-            authorName: e['author_name'] as String? ?? '',
-            mine: e['mine'] == true,
-            text: e['text'] as String?,
-            createdAt: (e['c'] as num?)?.toInt() ?? 0,
-          ),
-      ];
-
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   static Future<Map<String, String>> resourceIcons(
           List<String> subjects) async =>
-      parseIcons(await assistant.resourceIcons(subjects: subjects));
-
-  @visibleForTesting
-  static Map<String, String> parseIcons(String json) => {
-        for (final e in (jsonDecode(json) as Map).entries)
-          if (e.value is String && (e.value as String).isNotEmpty)
-            e.key as String: e.value as String,
-      };
-
-  static String? _emoji(Map e) {
-    final v = e['emoji'];
-    return v is String && v.isNotEmpty ? v : null;
-  }
+      AssistantJson.parseIcons(
+          await assistant.resourceIcons(subjects: subjects));
 
   /// What changed lately in every drive, newest first, by whom.
-  static Future<List<ActivityEntry>> activity({int limit = 100}) =>
-      assistant.listActivity(limit: limit);
+  static Future<List<ActivityEntry>> activity({int limit = 100}) async => [
+        for (final a in await assistant.listActivity(limit: limit))
+          ActivityEntry(
+            subject: a.subject,
+            drive: a.drive,
+            kind: a.kind,
+            at: a.at.toInt(),
+            actor: a.actor,
+            name: a.name,
+            className: a.className,
+          ),
+      ];
 
   /// Starts an AI chat named [name] in the private drive; returns its subject.
   static Future<String> createAiChat(String name) =>
@@ -250,9 +171,7 @@ class AtomicClient {
       assistant.appendChatEntry(
         chat: chat,
         role: role,
-        partsJson: jsonEncode([
-          {'type': 'text', 'text': text}
-        ]),
+        partsJson: AssistantJson.textParts(text),
       );
 
   /// Readable text of [subject] from the local store (title, class,
@@ -261,76 +180,19 @@ class AtomicClient {
       context.readResourceText(subject: subject, maxChars: maxChars);
 
   static Future<List<ChatMessage>> readChat(String subject) async =>
-      parseChatMessages(await assistant.readChat(subject: subject));
+      AssistantJson.parseChatMessages(
+          await assistant.readChat(subject: subject));
 
   /// Searches every drive; only in [drive] when it is given.
   static Future<List<SearchHit>> search(String query,
           {String? drive, int limit = 20}) async =>
-      parseHits(
+      AssistantJson.parseHits(
           await assistant.search(drive: drive, query: query, limit: limit));
 
   /// Where the connected server's web app shows [subject]. Throws when no
   /// server is connected.
   static String resourceWebUrl(String subject) =>
       assistant.resourceWebUrl(subject: subject);
-
-  @visibleForTesting
-  static List<ChatSummary> parseChats(String json) => [
-        for (final e in jsonDecode(json) as List)
-          (
-            subject: e['subject'] as String,
-            name: e['name'] as String? ?? '',
-            lastActivity: (e['last_activity'] as num?)?.toInt() ?? 0,
-          ),
-      ];
-
-  /// Text parts only (tool calls, reasoning and files are left out); entries
-  /// without text, and roles other than user and assistant, are skipped.
-  @visibleForTesting
-  static List<ChatMessage> parseChatMessages(String json) {
-    final out = <ChatMessage>[];
-    for (final e in jsonDecode(json) as List) {
-      final role = e['role'] as String? ?? '';
-      if (role != 'user' && role != 'assistant') continue;
-      final text = [
-        for (final p in (e['parts'] as List? ?? const []))
-          if (p is Map && p['type'] == 'text') p['text'] as String? ?? '',
-      ].join('\n\n').trim();
-      if (text.isEmpty) continue;
-      out.add((
-        id: e['id'] as String,
-        role: role,
-        text: text,
-        createdAt: (e['c'] as num?)?.toInt() ?? 0,
-      ));
-    }
-    return out;
-  }
-
-  @visibleForTesting
-  static List<RecentResource> parseRecentResources(String json) => [
-        for (final e in jsonDecode(json) as List)
-          (
-            subject: e['subject'] as String,
-            title: e['title'] as String? ?? '',
-            className: e['class_name'] as String? ?? '',
-            openedAt: (e['opened_at'] as num?)?.toInt() ?? 0,
-            emoji: _emoji(e),
-          ),
-      ];
-
-  @visibleForTesting
-  static List<SearchHit> parseHits(String json) => [
-        for (final e in jsonDecode(json) as List)
-          (
-            subject: e['subject'] as String,
-            title: e['title'] as String? ?? '',
-            className: e['class_name'] as String? ?? '',
-            drive: e['drive'] as String? ?? '',
-            score: (e['score'] as num?)?.toDouble() ?? 0,
-            emoji: _emoji(e),
-          ),
-      ];
 
   // ── 5. Canvas CRUD ───────────────────────────────────────────────────────
 

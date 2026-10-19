@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-export 'package:atomic_flutter/atomic_flutter.dart' show AppColors, AppColorsExt;
+export 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColors, AppColorsExt;
 
 Color adjustColorForDarkMode(Color color, bool isDarkMode) {
   if (!isDarkMode) return color;

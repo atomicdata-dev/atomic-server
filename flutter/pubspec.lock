@@ -25,6 +25,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.11.0"
+  atomic_chat:
+    dependency: "direct main"
+    description:
+      path: "../packages/atomic_chat"
+      relative: true
+    source: path
+    version: "0.1.0"
   atomic_flutter:
     dependency: "direct main"
     description:
@@ -224,7 +231,7 @@ packages:
     source: sdk
     version: "0.0.0"
   flutter_tts:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: flutter_tts
       sha256: ce5eb209b40e95f2f4a1397116c87ab2fcdff32257d04ed7a764e75894c03775
@@ -439,7 +446,7 @@ packages:
     source: hosted
     version: "4.1.0"
   record:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: record
       sha256: "7c4467dec63435c9206db183f8a4672cf8a62f5e5579e45803ceada8330756e7"
@@ -579,7 +586,7 @@ packages:
     source: hosted
     version: "1.10.0"
   speech_to_text:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: speech_to_text
       sha256: f2fabd017b5cb07f4e06d496b2d4b957e39534bc848f92b1e6acac80a10f4967
@@ -763,7 +770,7 @@ packages:
     source: hosted
     version: "4.14.1"
   webview_flutter_android:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: webview_flutter_android
       sha256: "4de8b3d1ff4ebe1bdb42e68a5e4f809194a3cb0117a8f495f590004f00da3964"

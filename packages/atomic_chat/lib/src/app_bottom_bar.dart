@@ -1,9 +1,9 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt;
 import 'package:flutter/material.dart';
 
-import '../screens/sync_screen.dart';
-import '../theme.dart';
-import '../widgets/atomic_place_mark.dart';
-import '../widgets/slide_back_route.dart';
+import 'atomic_place_mark.dart';
+import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
@@ -67,8 +67,13 @@ class AppBottomBar extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Profile',
-                      onPressed:
-                          shell.onUser ?? () => _push(const SyncScreen()),
+                      onPressed: shell.onUser ??
+                          switch (shell.profile) {
+                            final profile? => () => shell
+                                .navigatorKey.currentState
+                                ?.push(SlideBackRoute<void>(builder: profile)),
+                            null => null,
+                          },
                       icon: const Icon(Icons.person_outline),
                     ),
                     // The only button that changes with the page.

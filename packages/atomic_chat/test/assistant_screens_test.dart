@@ -2,25 +2,14 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:atomiccanvas_flutter/assistant/app_bottom_bar.dart';
-import 'package:atomiccanvas_flutter/assistant/app_shell.dart';
-import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
-import 'package:atomiccanvas_flutter/assistant/native_views.dart';
-import 'package:atomiccanvas_flutter/assistant/hosted_ai.dart';
-import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
-import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
-import 'package:atomiccanvas_flutter/assistant/conversation_screen.dart';
-import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
-import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
-import 'package:atomiccanvas_flutter/assistant/voice.dart';
-import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
-import 'package:atomiccanvas_flutter/theme.dart';
-import 'package:atomiccanvas_flutter/widgets/covered_insets_freeze.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class FakeApi extends AssistantApi {
+import 'unimplemented_api.dart';
+
+class FakeApi extends UnimplementedApi {
   final List<DriveInfo> driveList;
   final List<RecentResource> recent;
   final List<RecentResource> favoriteList;
@@ -801,14 +790,14 @@ void main() {
     });
 
     test('parsing carries the emoji, empty or absent is none', () {
-      final rows = AtomicClient.parseRecentResources(
+      final rows = AssistantJson.parseRecentResources(
           '[{"subject":"a","title":"A","class_name":"","opened_at":1,"emoji":"🦊"},'
           '{"subject":"b","title":"B","class_name":"","opened_at":1}]');
       expect(rows.map((r) => r.emoji), ['🦊', null]);
-      final hits = AtomicClient.parseHits(
+      final hits = AssistantJson.parseHits(
           '[{"subject":"a","title":"A","class_name":"","drive":"","score":1,"emoji":""}]');
       expect(hits.single.emoji, isNull);
-      expect(AtomicClient.parseIcons('{"a":"🦊","b":""}'), {'a': '🦊'});
+      expect(AssistantJson.parseIcons('{"a":"🦊","b":""}'), {'a': '🦊'});
     });
   });
 
@@ -1768,6 +1757,69 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
     });
+
+    testWidgets('a host registers its own native view, and removes it',
+        (tester) async {
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      addTearDown(() => registerNativeView('table', null));
+      registerNativeView('https://atomicdata.dev/classes/Table',
+          (api, drive, subject, title) => Text('table $title'));
+      Widget open() => openResourceView(
+          api: FakeApi(),
+          drive: 'did:ad:drive',
+          subject: 'did:ad:x',
+          title: 'Sales',
+          className: 'Table');
+
+      await tester.pumpWidget(app(open()));
+      expect(find.text('table Sales'), findsOneWidget);
+
+      registerNativeView('table', null);
+      await tester.pumpWidget(app(open()));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+    });
+  });
+
+  group('host pages', () {
+    testWidgets('Profile opens the host\'s page; signing out there reaches '
+        'the host', (tester) async {
+      var signedOut = 0;
+      final home = ChatsScreen(
+          drive: 'did:ad:drive',
+          api: FakeApi(),
+          onSignOut: () => signedOut++);
+      await tester.pumpWidget(app(AppShell(
+        api: home.api,
+        drive: home.drive,
+        home: home,
+        profile: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ),
+      )));
+      await tester.pumpAndSettle();
+      // No gallery callback: no Canvases button.
+      expect(find.byTooltip('Canvases'), findsNothing);
+
+      await tester.tap(find.byTooltip('Profile'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      expect(signedOut, 1);
+    });
+
+    testWidgets('without a profile page the Profile button is off',
+        (tester) async {
+      await tester.pumpWidget(app(const AppShell(
+          api: UnimplementedApi(), drive: 'd', home: SizedBox())));
+      final button = tester.widget<IconButton>(find.ancestor(
+          of: find.byIcon(Icons.person_outline),
+          matching: find.byType(IconButton)));
+      expect(button.onPressed, isNull);
+    });
   });
 
   group('AppShell', () {
@@ -1797,6 +1849,7 @@ void main() {
       addTearDown(tester.view.reset);
       addTearDown(tester.view.resetViewInsets);
       await tester.pumpWidget(app(const AppShell(
+        api: UnimplementedApi(),
         drive: 'd',
         home: Scaffold(
           body: SafeArea(
@@ -1994,9 +2047,9 @@ void main() {
     });
   });
 
-  group('AtomicClient parsing', () {
+  group('AssistantJson parsing', () {
     test('keeps the text parts of user and assistant entries only', () {
-      final messages = AtomicClient.parseChatMessages(jsonEncode([
+      final messages = AssistantJson.parseChatMessages(jsonEncode([
         {
           'id': 'p#1',
           'role': 'user',
@@ -2033,23 +2086,23 @@ void main() {
     });
 
     test('reads chats and hits', () {
-      final chats = AtomicClient.parseChats(
+      final chats = AssistantJson.parseChats(
           '[{"subject":"did:ad:1","name":"A","last_activity":7}]');
       expect(chats.single.lastActivity, 7);
-      final hits = AtomicClient.parseHits(
+      final hits = AssistantJson.parseHits(
           '[{"subject":"did:ad:1","title":"T","class_name":"C","score":0.5}]');
       expect((hits.single.title, hits.single.className, hits.single.score),
           ('T', 'C', 0.5));
     });
 
     test('reads recently opened resources', () {
-      final recent = AtomicClient.parseRecentResources(
+      final recent = AssistantJson.parseRecentResources(
           '[{"subject":"did:ad:1","title":"T","class_name":"C","opened_at":9}]');
       expect((recent.single.title, recent.single.openedAt), ('T', 9));
     });
 
     test('lists each drive once, only those that are on the device', () {
-      final shown = AtomicClient.visibleDrives([
+      final shown = visibleDrives([
         (subject: 'did:ad:AAA', name: 'Private', emoji: null),
         (subject: 'atomic:AAA', name: 'Private', emoji: null),
         (subject: 'did:ad:BBB', name: '', emoji: null),
@@ -2058,6 +2111,22 @@ void main() {
       ], active: 'atomic:DDD');
       expect(shown.map((d) => d.subject),
           ['did:ad:AAA', 'did:ad:CCC', 'did:ad:DDD']);
+    });
+
+    test('reads drives and conversations, and writes a text entry', () {
+      final drives = AssistantJson.parseDrives(
+          '[{"subject":"did:ad:A","name":"Home","emoji":"🏠"},'
+          '{"subject":"atomic:A","name":"Home"},'
+          '{"subject":"did:ad:B","name":""}]');
+      expect(drives, [(subject: 'did:ad:A', name: 'Home', emoji: '🏠')]);
+      final rows = AssistantJson.parseConversations(
+          '[{"subject":"did:ad:c","title":"Ann","class_name":"conversation",'
+          '"opened_at":3,"last_message":"hi"},{"subject":"did:ad:d"}]');
+      expect([for (final r in rows) (r.resource.subject, r.lastMessage)],
+          [('did:ad:c', 'hi'), ('did:ad:d', '')]);
+      expect(jsonDecode(AssistantJson.textParts('yo')), [
+        {'type': 'text', 'text': 'yo'}
+      ]);
     });
 
     test('timeAgo', () {

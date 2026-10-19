@@ -1,8 +1,9 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColors, AppColorsExt;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../atomic/atomic_client.dart';
-import '../theme.dart';
+import 'models.dart';
 import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';

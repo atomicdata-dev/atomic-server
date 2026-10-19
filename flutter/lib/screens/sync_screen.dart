@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
-import '../assistant/assistant_api.dart';
-import '../assistant/chats_screen.dart' show timeAgo;
-import '../assistant/resource_web_view.dart';
+import 'package:atomic_chat/atomic_chat.dart' show ResourceWebView, timeAgo;
+
+import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/settings_backend.dart';
@@ -303,7 +303,7 @@ class _SyncScreenState extends State<SyncScreen> {
     if (!mounted) return;
     setState(() => _openingPortal = false);
     final page = ResourceWebView(
-      api: const AssistantApi(),
+      api: const AtomicAssistantApi(),
       subject: url.toString(),
       url: url.toString(),
       title: url.host,

@@ -1,6 +1,6 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt;
 import 'package:flutter/material.dart';
-
-import '../theme.dart';
 
 /// The icon of a class, by the class's name as the rows carry it (the class's
 /// own name, or the last part of its subject), as the web app's

@@ -1,5 +1,4 @@
-import 'package:atomiccanvas_flutter/assistant/fading_text.dart';
-import 'package:atomiccanvas_flutter/widgets/slide_back_route.dart';
+import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

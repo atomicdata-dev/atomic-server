@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Serves the embedded renderer's own files (`assets/embed/`) to the app's web
-/// view, on the loopback address. A web view cannot run the renderer's modules
+/// Serves the embedded renderer's own files ([assetRoot], `assets/embed/` by
+/// default) to the app's web view, on the loopback address. A web view cannot run the renderer's modules
 /// from `file://`, and this keeps the page on a real origin.
 ///
 /// Only static files, read from the app's bundle: no data goes through it. The
@@ -17,6 +17,15 @@ class EmbedServer {
   static Future<EmbedServer>? _running;
 
   final HttpServer _server;
+
+  /// Where the renderer's files are in [bundle]: the host app declares them
+  /// as assets (the atomic.place app builds them with
+  /// `flutter/scripts/build_embed.sh` into its own `assets/embed/`). Set
+  /// before the first [instance].
+  static String assetRoot = 'assets/embed';
+
+  /// The bundle the files are read from; the app's own by default.
+  static AssetBundle bundle = rootBundle;
 
   /// One server for the app's life; started the first time it is asked for.
   static Future<EmbedServer> instance() => _running ??= _start();
@@ -77,11 +86,11 @@ class EmbedServer {
     await response.close();
   }
 
-  /// A file of the bundle, or null. Only paths inside `assets/embed/`.
+  /// A file of the bundle, or null. Only paths inside [assetRoot].
   static Future<Uint8List?> _read(String path) async {
     if (path.contains('..') || path.contains('\\')) return null;
     try {
-      final data = await rootBundle.load('assets/embed$path');
+      final data = await bundle.load('$assetRoot$path');
       return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     } catch (_) {
       return null;

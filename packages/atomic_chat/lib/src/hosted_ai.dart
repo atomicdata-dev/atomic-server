@@ -1,8 +1,7 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/foundation.dart';
 
-import '../atomic/account_store.dart';
-import '../atomic/atomic_client.dart';
+import 'models.dart';
 
 /// What the model is told before the conversation. Not shown to the person.
 const _systemPrompt =
@@ -65,17 +64,14 @@ class HostedAi {
     return _stream(messages, model);
   }
 
-  /// The linked account's AI, or null when no account is linked or the
-  /// provider offers none. Throws when the provider cannot be reached.
-  static Future<HostedAi?> load() async {
-    var saved = await AccountStore.read();
-    if (saved == null && await AccountStore.signInWithAgent()) {
-      saved = await AccountStore.read();
-    }
-    if (saved == null) return null;
+  /// The AI of the account whose saved session is [session] (as
+  /// [shared.AtomicAccountClient.restoreSession] takes it), or null when the
+  /// provider offers none. Throws when the provider cannot be reached. The
+  /// host reads the session from its own storage.
+  static Future<HostedAi?> forSession(String session) async {
     final client = shared.AtomicAccountClient(
-      shared.AtomicAccountClient.sessionOrigin(saved).toString(),
-    )..restoreSession(saved);
+      shared.AtomicAccountClient.sessionOrigin(session).toString(),
+    )..restoreSession(session);
     final status = await client.aiStatus();
     if (status == null) {
       client.close();

@@ -1,10 +1,10 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColors, AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../atomic/atomic_client.dart';
-import '../screens/sync_screen.dart';
-import '../theme.dart';
-import '../widgets/slide_back_route.dart';
+import 'models.dart';
+import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
@@ -32,15 +32,23 @@ class ChatsScreen extends StatefulWidget {
 
   /// The drive the home opens on; the search looks in it.
   final String drive;
-  final VoidCallback onOpenGallery;
+
+  /// The host's other part (the canvases of atomic.place), opened from the
+  /// app bar; no button when null.
+  final VoidCallback? onOpenGallery;
   final VoidCallback? onSignOut;
+
+  /// The user's page; the shell's [ShellController.profile] when null. It
+  /// pops with `true` when the person signed out there.
+  final WidgetBuilder? profile;
 
   const ChatsScreen({
     super.key,
     required this.drive,
-    this.api = const AssistantApi(),
-    required this.onOpenGallery,
+    required this.api,
+    this.onOpenGallery,
     this.onSignOut,
+    this.profile,
   });
 
   @override
@@ -78,7 +86,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     super.didChangeDependencies();
     _shell = ShellScope.maybeOf(context);
     // The profile button of the shell signs out through the home.
-    _shell?.onUser = _settings;
+    if (_profile != null) _shell?.onUser = _settings;
   }
 
   @override
@@ -163,10 +171,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (mounted && _changesData(screen)) _reload();
   }
 
+  WidgetBuilder? get _profile => widget.profile ?? _shell?.profile;
+
   Future<void> _settings() async {
+    final profile = _profile;
+    if (profile == null) return;
     // In the shell's navigator, so the bottom bar stays under it.
     final signedOut = await Navigator.of(context).push<bool>(
-          SlideBackRoute<bool>(builder: (_) => const SyncScreen()),
+          SlideBackRoute<bool>(builder: profile),
         ) ??
         false;
     if (signedOut) {
@@ -238,7 +250,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  /// "<who> created/changed/deleted · <when>". A deleted resource is gone, so
+  /// `<who> created/changed/deleted · <when>`. A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
         icon: iconForClass(a.className),
@@ -270,11 +282,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
             backgroundColor: c.bgBody,
             title: const Text('Home'),
             actions: [
-              IconButton(
-                tooltip: 'Canvases',
-                icon: const Icon(Icons.draw_outlined),
-                onPressed: widget.onOpenGallery,
-              ),
+              if (widget.onOpenGallery != null)
+                IconButton(
+                  tooltip: 'Canvases',
+                  icon: const Icon(Icons.draw_outlined),
+                  onPressed: widget.onOpenGallery,
+                ),
             ],
           ),
           body: ListView(

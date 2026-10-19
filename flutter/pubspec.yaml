@@ -9,6 +9,8 @@ environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  atomic_chat:
+    path: ../packages/atomic_chat
   atomic_flutter:
     path: ../packages/atomic_flutter
   flutter:
@@ -25,11 +27,7 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
   webview_flutter: ^4.14.1
-  webview_flutter_android: ^4.10.0
   url_launcher: ^6.3.0
-  speech_to_text: ^7.5.0
-  flutter_tts: ^4.2.5
-  record: ^7.1.2
 
 dev_dependencies:
   integration_test:
@@ -41,6 +39,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    # The embedded renderer, built by scripts/build_embed.sh.
+    # The embedded renderer, built by scripts/build_embed.sh; atomic_chat's
+    # EmbedServer serves it from here (EmbedServer.assetRoot).
     - assets/embed/
     - assets/embed/assets/
