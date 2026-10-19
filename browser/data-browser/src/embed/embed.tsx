@@ -35,6 +35,8 @@ import { enableEmbedMode } from '../helpers/embedMode';
 import { Providers } from '../Providers';
 import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
+import { BreadCrumbs } from '../components/BreadCrumbs';
+import { CalculatedPageHeight } from '../globalCssVars';
 import { paths } from '../routes/paths';
 import { NewRoute } from '../routes/NewResource/NewRoute';
 import { EditRoute } from '../routes/EditRoute';
@@ -45,6 +47,7 @@ import { ImportRoute } from '../routes/ImportRoute';
 import { StorageRoute } from '../routes/StorageRoute';
 import { NotificationsRoute } from '../routes/NotificationsRoute';
 import { AppSettingsRoute } from '../routes/AppSettings';
+import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 
@@ -118,6 +121,37 @@ const rootRoute = createRootRoute({
   ),
 });
 
+const HEADER_HEIGHT = '36px';
+const OuterHeight = 'var(--embed-outer-height)';
+
+/** The page area as the layout computed it, before the header took its part. */
+const ShowFrame = styled.div`
+  display: contents;
+  --embed-outer-height: ${CalculatedPageHeight.var()};
+`;
+
+const EmbedHeader = styled.header`
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: ${HEADER_HEIGHT};
+  box-sizing: border-box;
+  background: ${p => p.theme.colors.bg};
+  border-bottom: 1px solid ${p => p.theme.colors.bg2};
+
+  & > nav {
+    flex: 1;
+  }
+`;
+
+/** Gives the page (whose `main` scrolls) the height left under the header. */
+const BelowHeader = styled.div`
+  display: contents;
+  ${CalculatedPageHeight.define(`calc(${OuterHeight} - ${HEADER_HEIGHT})`)}
+`;
+
 const showRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/app/show',
@@ -143,8 +177,21 @@ const showRoute = createRoute({
     }
 
     return (
-      <>
-        <ResourcePage key={subject} subject={subject} />
+      <ShowFrame>
+        <EmbedHeader>
+          <BreadCrumbs
+            subject={subject}
+            onNavigate={target =>
+              void router.navigate({
+                to: '/app/show',
+                search: { subject: target },
+              })
+            }
+          />
+        </EmbedHeader>
+        <BelowHeader>
+          <ResourcePage key={subject} subject={subject} />
+        </BelowHeader>
         {menuId > 0 && (
           <ResourceContextMenu
             key={menuId}
@@ -153,7 +200,7 @@ const showRoute = createRoute({
             anchorPoint={{ x: 16, y: window.innerHeight }}
           />
         )}
-      </>
+      </ShowFrame>
     );
   },
 });
