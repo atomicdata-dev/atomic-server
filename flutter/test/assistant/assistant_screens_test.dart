@@ -1842,7 +1842,7 @@ void main() {
       expect(builds, greaterThan(back));
     });
 
-    testWidgets('the bar hides at once with the keyboard and returns',
+    testWidgets('the bar hides at once with the keyboard and fades back in',
         (tester) async {
       await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
@@ -1855,8 +1855,12 @@ void main() {
       expect(find.byTooltip('Search'), findsNothing);
       expect(tester.hasRunningAnimations, isFalse);
 
+      // It comes back by growing and fading in, not by popping up.
       tester.view.resetViewInsets();
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.hasRunningAnimations, isTrue);
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.byTooltip('Search'), findsOneWidget);
     });
 

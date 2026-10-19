@@ -199,14 +199,55 @@ class _PagesInset extends StatelessWidget {
 /// steps aside, at once and without animating, while the keyboard is open: the
 /// page region then ends at the screen bottom and its insets are exact, and
 /// only the keyboard animates the layout. Only this widget reads the insets.
-class _BarSlot extends StatelessWidget {
+class _BarSlot extends StatefulWidget {
   final Widget child;
 
   const _BarSlot({required this.child});
 
   @override
-  Widget build(BuildContext context) => Offstage(
-      offstage: MediaQuery.viewInsetsOf(context).bottom > 0, child: child);
+  State<_BarSlot> createState() => _BarSlotState();
+}
+
+class _BarSlotState extends State<_BarSlot>
+    with SingleTickerProviderStateMixin {
+  /// 0 = hidden (keyboard open), 1 = shown. Hiding is at once; coming back
+  /// grows and fades in, so the bar does not pop up when the keyboard is gone.
+  late final AnimationController _shown = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 220))
+    ..value = 1;
+
+  @override
+  void dispose() {
+    _shown.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    if (keyboardOpen) {
+      _shown.value = 0;
+    } else if (_shown.value == 0 && !_shown.isAnimating) {
+      _shown.forward();
+    }
+    return AnimatedBuilder(
+      animation: _shown,
+      child: widget.child,
+      builder: (context, child) {
+        final t = Curves.easeOutCubic.transform(_shown.value);
+        return Offstage(
+          offstage: keyboardOpen || _shown.value == 0,
+          child: ClipRect(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              heightFactor: t,
+              child: Opacity(opacity: t, child: child),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Drives and recently opened resources as search last saw them.
