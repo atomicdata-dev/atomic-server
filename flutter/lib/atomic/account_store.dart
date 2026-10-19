@@ -44,7 +44,7 @@ class AccountStore {
   static Future<String?> read() => _secure.read(key: _key);
 
   /// The portal agents sign in to when no portal is linked yet.
-  static const defaultPortal = 'https://atomicserver.eu';
+  static const defaultPortal = 'https://atomic.place';
 
   static String? _attemptedAgent;
 
