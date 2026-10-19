@@ -84,6 +84,9 @@ class ShellController extends ChangeNotifier {
   /// The kind ([ShellPage]) of the page on top, if it has one.
   String? get topKind => _top == null ? null : kindOf(_top!);
 
+  /// Whether the first page (the home) is the one showing.
+  bool get atHome => _stack.length <= 1;
+
   /// Whether a page of [kind] is anywhere in the stack.
   bool hasPage(String kind) => _stack.any((r) => kindOf(r) == kind);
 

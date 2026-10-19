@@ -618,6 +618,27 @@ void main() {
       expect(find.byType(SearchScreen), findsOneWidget);
     });
 
+    // Seen on a phone: a document made with New, typed in and found with
+    // Search was missing from Recents and Activity back on the home, which
+    // only reloaded after pages it had opened itself.
+    testWidgets('reads its lists again when a page of the bar closes',
+        (tester) async {
+      final api = FakeApi();
+      await tester
+          .pumpWidget(shellApp(ChatsScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      final before = api.calls['activity'];
+
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(api.calls['activity'], before, reason: 'not while covered');
+      Navigator.of(tester.element(find.byType(SearchScreen))).pop();
+      await tester.pumpAndSettle();
+
+      expect(api.calls['activity'], before! + 1);
+      expect(api.calls['chats'], greaterThan(1));
+    });
+
     testWidgets('sections come in order: Drives, Recents, AI chats',
         (tester) async {
       final api = FakeApi(

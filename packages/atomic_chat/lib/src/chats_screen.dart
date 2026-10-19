@@ -146,13 +146,37 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _shell = ShellScope.maybeOf(context);
+    final shell = ShellScope.maybeOf(context);
+    if (!identical(shell, _shell)) {
+      _shell?.removeListener(_onShellChanged);
+      shell?.addListener(_onShellChanged);
+    }
+    _shell = shell;
     // The profile button of the shell signs out through the home.
     if (_profile != null) _shell?.onUser = _settings;
   }
 
+  /// A page of the bar (search, a new document, a resource opened from
+  /// search) covered the home.
+  bool _covered = false;
+
+  /// Back on the home after the bar's pages: they can have opened, made or
+  /// changed resources, so the lists are read again (the home's own pages
+  /// reload in [_push]).
+  void _onShellChanged() {
+    final shell = _shell;
+    if (shell == null) return;
+    if (!shell.atHome) {
+      _covered = true;
+    } else if (_covered) {
+      _covered = false;
+      _reload();
+    }
+  }
+
   @override
   void dispose() {
+    _shell?.removeListener(_onShellChanged);
     if (_shell?.onUser == _settings) _shell?.onUser = null;
     super.dispose();
   }
