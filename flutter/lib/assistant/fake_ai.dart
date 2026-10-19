@@ -7,7 +7,8 @@ import 'package:flutter/foundation.dart';
 /// and only when built with `--dart-define=FAKE_AI=1`. Never in a release
 /// build ([kDebugMode] is a constant there, so this is compiled out).
 const bool fakeAiEnabled =
-    kDebugMode && bool.fromEnvironment('FAKE_AI', defaultValue: false);
+    kDebugMode && (_fakeAi == '1' || _fakeAi == 'true');
+const _fakeAi = String.fromEnvironment('FAKE_AI');
 
 /// The pretend AI: it searches the drives with the real tool (the first
 /// question of each message), then answers in canned Markdown with a bit of
