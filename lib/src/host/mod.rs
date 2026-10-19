@@ -17,6 +17,7 @@
 //! - [`chats`]: AI chats stored as `ChatLog` pages: read, start, append.
 //! - [`conversations`]: end-to-end encrypted conversations: list, read, send.
 //! - [`context`]: a resource as plain text, to hand to an AI.
+//! - [`create`]: a new resource of a class in a drive (the "New" buttons).
 //! - [`recents`]: the event-driven, persisted index behind the home lists.
 //! - [`embed`]: the dispatcher the embedded web renderer's `NativeClientDb`
 //!   talks to, with its signing policy.
@@ -38,6 +39,7 @@
 pub mod chats;
 pub mod context;
 pub mod conversations;
+pub mod create;
 pub mod embed;
 pub mod lists;
 pub mod profiles;
