@@ -163,12 +163,22 @@ make sense on a phone (allow-list: `src/embed/settings.ts`, used by
 | AI (providers, keys, Ollama, MCP, voice, models) | Not relevant/broken: the AI chat is native with its own settings and voice; Ollama/MCP/local discovery are desktop concepts | Hidden |
 | Integration (proxy, plugin catalog) | Not relevant: desktop/server plugin catalog | Hidden |
 
+The page's Theme choice is the app's too: the page reports its saved and every
+new choice (`reportTheme` in `src/embed/hostActions.ts`, a `theme` call with
+`auto`/`dark`/`light`), and the app saves it and switches its own screens
+(`AppThemeMode` in `packages/atomic_chat`, read by `MaterialApp` in
+`flutter/lib/main.dart`). Before, picking Light left the app's bars and home
+dark around a light page. The host reports its resulting scheme back with
+`atomicEmbed.setColorScheme` (`ResourceView._tellColorScheme`), so "Auto"
+follows the system through the app. In the embed the page has no "Settings"
+heading or search field (the app's top bar has the title, one section needs no
+search), and Appearance starts open.
+
 Tests: `src/embed/settings.test.tsx` (allow-list, and the page rendered
 embedded vs not), `src/helpers/useDarkMode.test.tsx` (persistence under the web
-key, auto vs explicit, host scheme). Not verified without a device: that the
-Android web view reports `prefers-color-scheme` as the app's mode (the host
-should call `atomicEmbed.setColorScheme` on start and on theme change; that Dart
-call is not wired yet), and the transparent web view background in dark mode.
+key, auto vs explicit, host scheme, the choice reported to the app),
+`hostActions.test.ts`, `resource_view_test.dart` (the `theme` call). Not
+verified without a device: the transparent web view background in dark mode.
 
 ## Meetings in the embed
 

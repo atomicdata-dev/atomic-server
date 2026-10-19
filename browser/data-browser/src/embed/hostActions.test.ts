@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   openNative,
   reportShown,
+  reportTheme,
   setActionsHost,
   SHOWN_DELAY_MS,
 } from './hostActions';
@@ -76,4 +77,17 @@ describe('reportShown', () => {
     vi.advanceTimersByTime(SHOWN_DELAY_MS);
     await vi.runAllTimersAsync();
   });
+});
+
+it('tells the app the theme chosen on the page', () => {
+  const call = vi.fn().mockResolvedValue(true);
+
+  reportTheme('dark');
+  setActionsHost({ call });
+  reportTheme('light');
+  reportTheme('auto');
+  expect(call.mock.calls).toEqual([
+    ['theme', ['light']],
+    ['theme', ['auto']],
+  ]);
 });

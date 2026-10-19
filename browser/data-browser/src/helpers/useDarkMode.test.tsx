@@ -4,6 +4,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DarkModeOption, useDarkMode } from './useDarkMode';
 import * as embedMode from './embedMode';
+import { setActionsHost } from '../embed/hostActions';
 
 let systemDark = false;
 const listeners = new Set<() => void>();
@@ -23,6 +24,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setActionsHost(undefined);
   embedMode.setHostColorScheme(undefined);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -79,4 +81,17 @@ it('in the embed, auto follows the host app scheme and sets color-scheme', () =>
   act(() => result.current[1](false));
   expect(result.current[0]).toBe(false);
   expect(document.documentElement.style.colorScheme).toBe('light');
+});
+
+it('tells the app the saved choice and every new one', () => {
+  localStorage.setItem('darkMode', '"never"');
+  const call = vi.fn().mockResolvedValue(true);
+  setActionsHost({ call });
+  const hook = renderHook(() => useDarkMode());
+
+  expect(call).toHaveBeenLastCalledWith('theme', ['light']);
+  act(() => hook.result.current[1](true));
+  expect(call).toHaveBeenLastCalledWith('theme', ['dark']);
+  act(() => hook.result.current[1](undefined));
+  expect(call).toHaveBeenLastCalledWith('theme', ['auto']);
 });

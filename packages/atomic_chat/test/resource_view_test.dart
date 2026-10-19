@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'unimplemented_api.dart';
 
@@ -94,6 +95,34 @@ void main() {
     expect(find.byType(ChatRoomScreen), findsOneWidget);
     expect(page.scripts, contains('window.__atomicReply(7,true,"true")'));
     // Closed without an answer to its flush: wait the timers out.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 6));
+  });
+
+  testWidgets('a theme chosen on the page becomes the app\'s', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => AppThemeMode.mode.value = ThemeMode.system);
+    await open(tester);
+    page.scripts.clear();
+
+    page.send(jsonEncode({
+      'id': 9,
+      'method': 'theme',
+      'args': ['light'],
+    }));
+    await tester.pumpAndSettle();
+    expect(AppThemeMode.mode.value, ThemeMode.light);
+    expect(page.scripts, contains('window.__atomicReply(9,true,"true")'));
+    final saved = await SharedPreferences.getInstance();
+    expect(saved.getString(AppThemeMode.key), 'light');
+
+    page.send(jsonEncode({
+      'id': 10,
+      'method': 'theme',
+      'args': ['auto'],
+    }));
+    await tester.pumpAndSettle();
+    expect(AppThemeMode.mode.value, ThemeMode.system);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 6));
   });

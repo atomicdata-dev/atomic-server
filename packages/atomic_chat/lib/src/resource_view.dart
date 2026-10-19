@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
 import 'slide_back_route.dart';
 import 'app_shell.dart';
+import 'app_theme.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
 import 'native_views.dart';
@@ -312,6 +313,17 @@ class _ResourceViewState extends State<ResourceView>
     final method = request['method'] as String;
     if (method == 'openNative') {
       await _answerOpenNative(id, request['args']);
+      return;
+    }
+    if (method == 'theme') {
+      // The theme chosen on the settings page: the app's own screens follow.
+      final args = request['args'];
+      unawaited(AppThemeMode.choose(
+          args is List && args.isNotEmpty ? '${args.first}' : ''));
+      try {
+        await _page?.runJavaScript(
+            'window.__atomicReply($id,true,${jsonEncode('true')})');
+      } catch (_) {}
       return;
     }
     final started = _clock.elapsedMilliseconds;

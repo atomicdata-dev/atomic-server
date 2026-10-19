@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
-import 'package:atomic_chat/atomic_chat.dart' show AppShell, ChatsScreen;
+import 'package:atomic_chat/atomic_chat.dart'
+    show AppShell, AppThemeMode, ChatsScreen;
 import 'assistant/atomic_assistant_api.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
@@ -18,6 +19,7 @@ void main() async {
   final dir = await getApplicationDocumentsDirectory();
   await AtomicClient.openDb(dir.path);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  await AppThemeMode.load();
   runApp(const AtomicApp());
 }
 
@@ -28,8 +30,7 @@ class AtomicApp extends StatefulWidget {
   State<AtomicApp> createState() => _AtomicAppState();
 }
 
-class _AtomicAppState extends State<AtomicApp>
-    with WidgetsBindingObserver {
+class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   bool _loggedIn = false;
   final _navKey = GlobalKey<NavigatorState>();
   static const _linkChannel = MethodChannel('app.atomicdata.app/deeplink');
@@ -41,6 +42,8 @@ class _AtomicAppState extends State<AtomicApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // The theme chosen on the settings page (the embedded web page).
+    AppThemeMode.mode.addListener(_themeChanged);
     _handleInitialLink();
     _linkChannel.setMethodCallHandler(_handleLinkCall);
     _resumeFromSession();
@@ -75,6 +78,7 @@ class _AtomicAppState extends State<AtomicApp>
   @override
   void dispose() {
     _eventPoller?.cancel();
+    AppThemeMode.mode.removeListener(_themeChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -185,10 +189,20 @@ class _AtomicAppState extends State<AtomicApp>
     });
   }
 
+  void _themeChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = View.of(context).platformDispatcher.platformBrightness ==
-        Brightness.dark;
+    final themeMode = AppThemeMode.mode.value;
+    final isDark = switch (themeMode) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      ThemeMode.system =>
+        View.of(context).platformDispatcher.platformBrightness ==
+            Brightness.dark,
+    };
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       // The bottom bar's own surface behind the OS buttons, so they form one
       // block; Android must not tint it back to a scrim.
@@ -205,7 +219,7 @@ class _AtomicAppState extends State<AtomicApp>
       navigatorKey: _navKey,
       title: 'atomic.place',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1976D2),

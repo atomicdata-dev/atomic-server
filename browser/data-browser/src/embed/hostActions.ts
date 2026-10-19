@@ -61,3 +61,16 @@ export function reportShown(subject: string | undefined): void {
     channel.call('opened', [subject]).catch(() => undefined);
   }, SHOWN_DELAY_MS);
 }
+
+/** The theme choice of the settings page, as the app hears it. */
+export type HostThemeChoice = 'auto' | 'dark' | 'light';
+
+/**
+ * Tells the app the person chose a theme on the settings page, so the app's
+ * own screens (top bar, bottom bar, home, chat) follow and the two halves of
+ * the screen never disagree. "auto" hands the choice back to the system. An
+ * app that does not know the call keeps its own.
+ */
+export function reportTheme(choice: HostThemeChoice): void {
+  host?.call('theme', [choice]).catch(() => undefined);
+}

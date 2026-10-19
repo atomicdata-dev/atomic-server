@@ -5,6 +5,7 @@ import {
   HOST_COLOR_SCHEME_EVENT,
   isEmbedded,
 } from './embedMode';
+import { reportTheme } from '../embed/hostActions';
 
 export enum DarkModeOption {
   /** Always use dark mode */
@@ -77,6 +78,18 @@ export const useDarkMode = (): [
       document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
     }
   }, [dark]);
+
+  // In the app, its own screens follow the choice, also the one saved before
+  // (nothing happens outside the app).
+  useEffect(() => {
+    reportTheme(
+      darkLocal === DarkModeOption.always
+        ? 'dark'
+        : darkLocal === DarkModeOption.never
+          ? 'light'
+          : 'auto',
+    );
+  }, [darkLocal]);
 
   useEffect(() => {
     if (darkLocal === DarkModeOption.auto) {
