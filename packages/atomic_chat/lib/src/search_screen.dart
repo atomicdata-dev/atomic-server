@@ -86,6 +86,9 @@ class _SearchModel extends ChangeNotifier {
   Object? error;
   String query = '';
 
+  /// The query [hits] answer (they lag the field by the debounce).
+  String hitsFor = '';
+
   /// The one drive searched, or null for all of them.
   String? scope;
 
@@ -258,6 +261,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (scope != _model.scope) return;
         if (mounted && query == _model.query) {
           _model.hits = hits;
+          _model.hitsFor = query;
           _model.error = null;
           _model.changed();
         }
@@ -285,14 +289,16 @@ class _SearchScreenState extends State<SearchScreen> {
         ]
       : [
           for (final h in _model.hits)
-            (
-              drive: h.drive.isEmpty ? widget.drive : h.drive,
-              shown: h.drive,
-              subject: h.subject,
-              title: h.title,
-              className: h.className,
-              emoji: h.emoji
-            )
+            // Searching in a drive, the drive itself is not a hit.
+            if (_model.scope == null || _id(h.subject) != _id(_model.scope!))
+              (
+                drive: h.drive.isEmpty ? widget.drive : h.drive,
+                shown: h.drive,
+                subject: h.subject,
+                title: h.title,
+                className: h.className,
+                emoji: h.emoji
+              )
         ];
 
   /// Enter / the keyboard's search action opens the best hit.
@@ -395,6 +401,11 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Text('${_model.error}', style: TextStyle(color: c.alert)));
     }
     final items = _items;
+    if (items.isEmpty &&
+        _model.query.isNotEmpty &&
+        _model.hitsFor == _model.query) {
+      return _nothingFound(c);
+    }
     final heading = _model.query.isEmpty && _model.recent.isNotEmpty;
     return ListView.builder(
       // Best first, drawn from the bottom up: nearest the thumb.
@@ -415,6 +426,32 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
+  /// A query without hits: said where the first hit would be, just above
+  /// the field, with the way to every drive while scoped.
+  Widget _nothingFound(AppColors c) => Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Nothing found for “${_model.query}”'
+                '${_model.scope == null ? '' : ' in this drive'}',
+                key: const Key('search-nothing-found'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textSecondary),
+              ),
+              if (_model.scope != null)
+                TextButton(
+                  onPressed: _clearScope,
+                  child: const Text('Search all drives'),
+                ),
+            ],
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {

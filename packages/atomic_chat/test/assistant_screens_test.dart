@@ -1136,6 +1136,44 @@ void main() {
       expect(find.text('Zebra'), findsNothing);
     });
 
+    testWidgets('a query without hits says so, not a blank page',
+        (tester) async {
+      final api = FakeApi(hits: const []);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.enterText(find.byType(TextField), 'qqzz');
+      // Before the answer: nothing claimed yet.
+      expect(find.byKey(const Key('search-nothing-found')), findsNothing);
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.text('Nothing found for “qqzz”'), findsOneWidget);
+      expect(find.text('Search all drives'), findsNothing);
+    });
+
+    testWidgets('in a drive, the drive is no hit of its own', (tester) async {
+      final api = FakeApi(hits: [
+        (
+          subject: 'did:ad:drive',
+          title: 'My drive',
+          className: 'Drive',
+          drive: 'did:ad:drive',
+          score: 2,
+          emoji: null
+        ),
+      ]);
+      await tester.pumpWidget(app(SearchScreen(
+          drive: 'did:ad:drive', api: api, scopeDrive: 'did:ad:drive')));
+      await tester.enterText(find.byType(TextField), 'my');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.text('My drive'), findsNothing);
+      expect(find.text('Nothing found for “my” in this drive'), findsOneWidget);
+      await tester.tap(find.text('Search all drives'));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.text('My drive'), findsOneWidget);
+    });
+
     testWidgets('an empty query lists what was opened lately', (tester) async {
       final api = FakeApi(
         recent: [
