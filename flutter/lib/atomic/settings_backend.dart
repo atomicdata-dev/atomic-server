@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'atomic_client.dart';
@@ -12,10 +14,31 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
   @override
   Future<shared.AtomicIdentity?> getActiveAgent() async {
     final agent = await AtomicClient.getActiveAgent();
-    return agent == null
-        ? null
-        : shared.AtomicIdentity(subject: agent.subject, name: agent.name);
+    if (agent == null) return null;
+    try {
+      final p = jsonDecode(await AtomicClient.getOwnProfile())
+          as Map<String, dynamic>;
+      String? text(String key) {
+        final v = (p[key] as String?)?.trim();
+        return v == null || v.isEmpty ? null : v;
+      }
+
+      return shared.AtomicIdentity(
+        subject: agent.subject,
+        name: text('name') ?? agent.name,
+        description: text('description'),
+        imageUrl: text('imageUrl'),
+        emoji: text('emoji'),
+      );
+    } catch (_) {
+      return shared.AtomicIdentity(subject: agent.subject, name: agent.name);
+    }
   }
+
+  @override
+  Future<void> Function({required String name, required String description})
+      get saveProfile => ({required name, required description}) =>
+          AtomicClient.setAgentProfile(name, description);
 
   @override
   Future<String> exportSecret() async {

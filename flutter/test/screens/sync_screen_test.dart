@@ -40,11 +40,30 @@ class _Backend extends shared.AtomicSettingsBackend {
   final List<String> switched = [];
   String active = 'did:ad:a';
 
-  _Backend({shared.AtomicServerBackend? servers}) : _servers = servers;
+  /// Whether the profile can be edited natively (the app's backend can).
+  final bool editable;
+  String name = 'Joep';
+  String description = '';
+  String? emoji;
+
+  _Backend({shared.AtomicServerBackend? servers, this.editable = false})
+      : _servers = servers;
 
   @override
   Future<shared.AtomicIdentity?> getActiveAgent() async =>
-      const shared.AtomicIdentity(subject: 'did:ad:agent', name: 'Joep');
+      shared.AtomicIdentity(
+          subject: 'did:ad:agent',
+          name: name,
+          description: description,
+          emoji: emoji);
+  @override
+  Future<void> Function({required String name, required String description})?
+      get saveProfile => editable
+          ? ({required name, required description}) async {
+              this.name = name;
+              this.description = description;
+            }
+          : null;
   @override
   Future<String> exportSecret() async => 'secret';
   @override
@@ -124,6 +143,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('profile page'), findsOneWidget);
     expect(opened, 'did:ad:agent');
+  });
+
+  testWidgets('tapping the identity edits the profile, saved and shown',
+      (tester) async {
+    final backend = _Backend(editable: true);
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Joep'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('profile-name')), ' Pelican ');
+    await tester.enterText(
+        find.byKey(const Key('profile-description')), 'Likes fish');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(backend.name, 'Pelican');
+    expect(backend.description, 'Likes fish');
+    // Back on the Sync page, which read the profile again.
+    expect(find.text('Profile'), findsNothing);
+    expect(find.text('Pelican'), findsOneWidget);
+    expect(find.text('P'), findsOneWidget);
+  });
+
+  testWidgets('an empty name cannot be saved', (tester) async {
+    final backend = _Backend(editable: true);
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Joep'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('profile-name')), '  ');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Profile'), findsOneWidget);
+    expect(backend.name, 'Joep');
+  });
+
+  testWidgets('the identity shows its emoji icon over the initial',
+      (tester) async {
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend()..emoji = '🦩',
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('🦩'), findsOneWidget);
+    expect(find.text('J'), findsNothing);
   });
 
   testWidgets('a linked account shows address, vault and server',

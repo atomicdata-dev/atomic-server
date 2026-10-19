@@ -64,6 +64,14 @@ class AtomicClient {
 
   static Future<AgentInfo?> getActiveAgent() => ffi.getActiveAgent();
 
+  /// The active agent's profile as JSON `{subject, name, description, emoji?,
+  /// imageUrl?}`.
+  static Future<String> getOwnProfile() => ffi.getOwnProfile();
+
+  /// Save the active agent's name and description (a commit by the agent).
+  static Future<void> setAgentProfile(String name, String description) =>
+      ffi.setAgentProfile(name: name, description: description);
+
   static AgentInfo createAgent(String name) => ffi.createAgent(name: name);
 
   static AgentInfo agentFromSecret(String secret) =>

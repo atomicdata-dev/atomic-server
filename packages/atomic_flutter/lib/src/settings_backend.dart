@@ -3,9 +3,22 @@ import 'server_info.dart';
 
 /// Public identity only. Secrets are retrieved on explicit user action.
 class AtomicIdentity {
-  const AtomicIdentity({required this.subject, this.name});
+  const AtomicIdentity({
+    required this.subject,
+    this.name,
+    this.description,
+    this.imageUrl,
+    this.emoji,
+  });
   final String subject;
   final String? name;
+  final String? description;
+
+  /// The agent's picture (the download URL of its `icon` File), if any.
+  final String? imageUrl;
+
+  /// The agent's emoji icon, if it has one and no picture.
+  final String? emoji;
 }
 
 /// Host-owned persistence, authentication and transport for the settings UI.
@@ -37,6 +50,11 @@ abstract class AtomicSettingsBackend {
   String? get accountStatus => null;
   Future<void> Function()? get signOut => null;
   Future<void> Function(BuildContext context)? get signIn => null;
+
+  /// Saves the agent's own profile (a commit by the agent, synced like any
+  /// edit). Without it the profile is only shown, not edited natively.
+  Future<void> Function({required String name, required String description})?
+      get saveProfile => null;
 }
 
 /// Optional always-on server support. The host keeps credentials and signed

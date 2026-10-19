@@ -15,28 +15,62 @@ import '../atomic/atomic_client.dart';
 import '../atomic/settings_backend.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
+import 'edit_profile_screen.dart';
 
-/// The person's initial in a circle: the way into the agent and sync screen.
+/// The person's picture in a circle when they have one, else their emoji icon,
+/// else their initial: the way into the agent and sync screen.
 class AgentAvatar extends StatelessWidget {
   final String? name;
   final double radius;
 
-  const AgentAvatar({super.key, this.name, this.radius = 16});
+  /// The agent's picture (its `icon` File's download URL).
+  final String? imageUrl;
+
+  /// The agent's emoji icon.
+  final String? emoji;
+
+  const AgentAvatar(
+      {super.key, this.name, this.radius = 16, this.imageUrl, this.emoji});
+
+  /// The same circle for an identity.
+  factory AgentAvatar.of(shared.AtomicIdentity? agent, {double radius = 16}) =>
+      AgentAvatar(
+          name: agent?.name,
+          imageUrl: agent?.imageUrl,
+          emoji: agent?.emoji,
+          radius: radius);
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
     final trimmed = name?.trim() ?? '';
+    final icon = emoji?.trim() ?? '';
+    final Widget fallback = icon.isNotEmpty
+        ? Text(icon, style: TextStyle(fontSize: radius))
+        : trimmed.isEmpty
+            ? Icon(Icons.person, size: radius * 1.1, color: c.mainSelectedFg)
+            : Text(trimmed.characters.first.toUpperCase(),
+                style: TextStyle(
+                    color: c.mainSelectedFg,
+                    fontWeight: FontWeight.w600,
+                    fontSize: radius * 0.9));
+    final url = imageUrl?.trim() ?? '';
     return CircleAvatar(
       radius: radius,
       backgroundColor: c.mainSelectedBg,
-      child: trimmed.isEmpty
-          ? Icon(Icons.person, size: radius * 1.1, color: c.mainSelectedFg)
-          : Text(trimmed.characters.first.toUpperCase(),
-              style: TextStyle(
-                  color: c.mainSelectedFg,
-                  fontWeight: FontWeight.w600,
-                  fontSize: radius * 0.9)),
+      child: url.isEmpty
+          ? fallback
+          : ClipOval(
+              child: Image.network(
+                url,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                // Offline, or a picture this device may not read: the
+                // initial instead.
+                errorBuilder: (_, __, ___) => Center(child: fallback),
+              ),
+            ),
     );
   }
 }
@@ -281,22 +315,31 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
-  /// The agent's own page in the embedded web renderer.
+  /// The agent's profile: the native editor when the backend can save it,
+  /// else the agent's own page in the embedded web renderer.
   Future<void> _openProfile() async {
     final agent = _agent;
     final drive = _activeDrive;
-    if (agent == null || drive == null) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) =>
-          widget.profilePage?.call(agent.subject) ??
-          openResourceView(
-            api: const AtomicAssistantApi(),
-            drive: drive,
-            subject: agent.subject,
-            title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
-            className: 'agent',
-          ),
-    ));
+    if (agent == null) return;
+    final save = _backend.saveProfile;
+    if (save != null && widget.profilePage == null) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => EditProfileScreen(agent: agent, save: save),
+      ));
+    } else {
+      if (drive == null) return;
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) =>
+            widget.profilePage?.call(agent.subject) ??
+            openResourceView(
+              api: const AtomicAssistantApi(),
+              drive: drive,
+              subject: agent.subject,
+              title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
+              className: 'agent',
+            ),
+      ));
+    }
     if (mounted) await _load();
   }
 
@@ -577,7 +620,7 @@ class _SyncScreenState extends State<SyncScreen> {
           onTap: agent == null ? null : _openProfile,
           borderRadius: BorderRadius.circular(12),
           child: Row(children: [
-            AgentAvatar(name: agent?.name, radius: 28),
+            AgentAvatar.of(agent, radius: 28),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
