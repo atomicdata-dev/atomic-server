@@ -33,6 +33,7 @@ import { paths, pathNames } from '../routes/paths';
 import { useRootWelcomeLayout } from '../context/RootWelcomeLayoutContext';
 import { isHostedDistribution } from '../helpers/managedServer';
 import { isRunningInTauri } from '../helpers/tauri';
+import { isEmbedded } from '../helpers/embedMode';
 
 interface NavWrapperProps {
   children: React.ReactNode;
@@ -65,7 +66,10 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
   // public share) stands on its own. A self-hosted node keeps its chrome
   // for anonymous browsing.
   const signedOutHosted = isHostedDistribution() && !agent;
+  // The Flutter app's embedded renderer shows the page alone.
+  const embedded = isEmbedded();
   const hideGlobalChrome =
+    embedded ||
     rootWelcomeChromeHidden ||
     onboardingOrChild ||
     welcomeOrChild ||
@@ -136,7 +140,7 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
                 </HideInPrint>
               )}
             </SideBarWrapper>
-            {hideGlobalChrome && <OnboardingFeedback />}
+            {hideGlobalChrome && !embedded && <OnboardingFeedback />}
             <OverlayContainer />
             <ShareDialogHost />
           </AppSetupProvider>

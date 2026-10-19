@@ -160,6 +160,40 @@ the webview, a rendering bug cannot read it.
    files, chat, plugin/app pages): offline, large documents, files and images (blobs), error
    states, accessibility, dark mode, and memory on the tablet.
 
+## Step 1: result (2026-10-19)
+
+Built: `NativeClientDb` and `NativeCryptoProvider` (`browser/lib/src/client-db.native.ts`,
+7 unit tests), the `embed.html` entry (`src/embed/embed.tsx`), `isEmbedded()`
+(`helpers/embedMode.ts`) and `vite.embed.config.ts`. A mock host
+(`src/embed/mockHost.ts`: the default ontology plus three resources) stands in
+for Rust.
+
+- `ResourcePage` renders alone. `NavWrapper` already has a "hide the global
+  chrome" mode (`hideGlobalChrome`, used by onboarding); the embed turns it on
+  with one flag, which keeps the contexts the page's components expect
+  (AI sidebar context, right-panel, dialogs) and drops the top bar, sidebar and
+  panels. No fork of the provider tree.
+- The page reads only through the channel. The first load made these calls:
+  `init`, `outboxEntries`/`outboxWrite`, `getResourcesWithSnapshots`, `query`
+  (by `originalSubject`), and a handful more for the class and properties.
+  With `connect: false` and DID subjects it makes no HTTP request. A non-DID
+  subject (`https://…`) still makes the store fetch over HTTP: such a resource
+  has to be on the device under that subject, or served as a DID.
+- Subjects arrive as `atomic:…` while stored under `did:ad:…`: the host must
+  treat both spellings as one resource (the Rust store already does).
+- The dev server rewrites the `.po` catalogs; they were reverted, and are not
+  part of the change.
+
+Bundle (`TAURI=1 vite build -c vite.embed.config.ts`, 4 s): 145 JS chunks,
+9.0 MB (2.8 MB gzip all text), Loro WASM 3.2 MB. What loads for the first
+resource: the 297 kB entry and the 1.7 MB (553 kB gzip) providers chunk; the
+rest (tables 600 kB, the PDF viewer, the code editors, Loro) loads when a
+resource needs it. The output also carries the web app's public files (icons,
+`robots.txt`, `_config.yml`): to be left out of the Flutter assets.
+
+Not done in step 1: the folder view with its children in the mock (the mock's
+classes are not the real ones), and running it under the Flutter webview.
+
 ## Open decisions (Joep)
 
 1. Resource-to-resource navigation: native stack with a *second warm webview*
