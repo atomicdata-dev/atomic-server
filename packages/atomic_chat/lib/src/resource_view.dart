@@ -380,14 +380,19 @@ class _ResourceViewState extends State<ResourceView>
       if (mounted && subject.isNotEmpty && hasNativeView(kind)) {
         handled = true;
         widget.api.noteOpened(widget.drive, subject);
-        unawaited(Navigator.of(context).push(SlideBackRoute<void>(
-          builder: (_) => openResourceView(
-              api: widget.api,
-              drive: widget.drive,
-              subject: subject,
-              title: title,
-              className: kind),
-        )));
+        unawaited(Navigator.of(context)
+            .push(SlideBackRoute<void>(
+              builder: (_) => openResourceView(
+                  api: widget.api,
+                  drive: widget.drive,
+                  subject: subject,
+                  title: title,
+                  className: kind),
+            ))
+            // The native screen can have changed it (renamed a chat room):
+            // the page reads it again.
+            .then((_) => _page?.runJavaScript(
+                'window.atomicEmbed?.changed(${jsonEncode([subject])})')));
       }
     }
     try {

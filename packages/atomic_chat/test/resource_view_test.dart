@@ -94,6 +94,11 @@ void main() {
     // The room is on top, and the page was told it was taken.
     expect(find.byType(ChatRoomScreen), findsOneWidget);
     expect(page.scripts, contains('window.__atomicReply(7,true,"true")'));
+    // Back on the page, it reads the room again (it may have been renamed).
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await tester.pumpAndSettle();
+    expect(
+        page.scripts, contains('window.atomicEmbed?.changed(["did:ad:room"])'));
     // Closed without an answer to its flush: wait the timers out.
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 6));

@@ -301,7 +301,13 @@ window.atomicEmbed = {
     });
   },
   changed(subjects) {
-    for (const subject of subjects) void store.getResource(subject);
+    // `getResource` answers a resource the page already holds from memory,
+    // so a change made outside the page (renamed in the app's own screen)
+    // never showed: read it from the host again.
+    for (const subject of subjects) {
+      if (store.getResourceLoading(subject).hasPendingCommits) continue;
+      void store.reloadResource(subject).catch(() => undefined);
+    }
   },
   /** One step back in the page's own history; false when there is none. */
   back() {
