@@ -230,13 +230,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _composer(AppColors c) {
     final ai = _ai;
     Widget hint(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Text(
-        text,
-        style: TextStyle(color: c.textSecondary, fontSize: 13),
-        textAlign: TextAlign.center,
-      ),
-    );
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Text(
+            text,
+            style: TextStyle(color: c.textSecondary, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+        );
     if (!_aiLooked) return const SizedBox(height: 8);
     if (ai == null) {
       return SafeArea(child: hint(_error ?? 'No AI is set up on this device.'));

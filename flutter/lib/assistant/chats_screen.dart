@@ -263,14 +263,16 @@ class _Dots extends StatelessWidget {
     if (count > 8) {
       return Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text('${current + 1} / $count',
-            style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        child: Center(
+          child: Text('${current + 1} / $count',
+              style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        ),
       );
     }
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           for (var i = 0; i < count; i++)
             Container(
