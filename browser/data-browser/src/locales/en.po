@@ -854,6 +854,7 @@ msgstr "Invalid Resource"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
+#: src/components/SideBar/AIPanel.tsx
 #: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Untitled Chat"
@@ -13001,14 +13002,14 @@ msgid "Upgrade to Cloud Server from {0}"
 msgstr "Upgrade to Cloud Server from {0}"
 
 #: src/components/SideBar/MessagesPanel.tsx
-#: src/components/SideBar/MessagesPanel.tsx
 msgid "Search messages"
 msgstr "Search messages"
 
-#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/SidebarSearch.tsx
 msgid "Search by name"
 msgstr "Search by name"
 
+#: src/components/SideBar/AIPanel.tsx
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
 msgstr "No matches"
@@ -13223,3 +13224,7 @@ msgstr "Latest changes from each of {0} browsers and apps"
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
 msgstr "The next backup from that browser or app adds them"
+
+#: src/components/SideBar/AIPanel.tsx
+msgid "Search chats"
+msgstr "Search chats"

@@ -19,12 +19,21 @@ import {
   SideBarMenuItemLink,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
+import { Empty, useSidebarSearch } from './SidebarSearch';
 import { Panel, panelTitle } from './usePanelList';
 
 /** Discover chats throughout the private drive, including legacy duplicate folders. */
 export function AIChatsPanel(): JSX.Element | null {
   const { privateDrive } = usePrivateDrive();
   const chats = useDriveChats(privateDrive);
+  const { query, button, input } = useSidebarSearch(
+    'Search chats',
+    'search-ai-chats',
+  );
+  // Which chats match the query, reported by their links.
+  const [matches, setMatches] = useState<Record<string, boolean>>({});
+  const noMatches =
+    query.trim() !== '' && chats.every(subject => matches[subject] === false);
 
   if (chats.length === 0) return null;
 
@@ -34,10 +43,26 @@ export function AIChatsPanel(): JSX.Element | null {
       panel={Panel.AIChats}
       heightStorageKey='aiChatsPanelHeight'
       data-testid='ai-chats-panel'
-      actions={<NewSidebarChatButton />}
+      actions={
+        <>
+          {button}
+          <NewSidebarChatButton />
+        </>
+      }
     >
+      {input}
+      {noMatches && <Empty>No matches</Empty>}
       {chats.map(subject => (
-        <ChatLink key={subject} subject={subject} />
+        <ChatLink
+          key={subject}
+          subject={subject}
+          query={query}
+          onMatch={match =>
+            setMatches(prev =>
+              prev[subject] === match ? prev : { ...prev, [subject]: match },
+            )
+          }
+        />
       ))}
     </SideBarPanel>
   );
@@ -114,13 +139,28 @@ export function NewSidebarChatButton() {
   );
 }
 
-function ChatLink({ subject }: { subject: string }) {
+function ChatLink({
+  subject,
+  query,
+  onMatch,
+}: {
+  subject: string;
+  query: string;
+  onMatch: (match: boolean) => void;
+}) {
   const resource = useResource(subject);
   const [title] = useTitle(resource);
   const emoji = resource.get(dataBrowser.properties.emoji) as
     | string
     | undefined;
   const { openChat } = useAISidebar();
+  const match = (title || 'Untitled Chat')
+    .toLowerCase()
+    .includes(query.trim().toLowerCase());
+
+  useEffect(() => onMatch(match), [match, onMatch]);
+
+  if (!match) return null;
 
   return (
     <SideBarMenuItemLink

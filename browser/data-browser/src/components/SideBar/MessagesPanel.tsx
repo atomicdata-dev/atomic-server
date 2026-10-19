@@ -1,7 +1,6 @@
 import { useResource } from '@tomic/react';
 import { useEffect, useState, type JSX } from 'react';
-import { FaMagnifyingGlass, FaPlus } from 'react-icons/fa6';
-import { styled } from 'styled-components';
+import { FaPlus } from 'react-icons/fa6';
 import { useConversations } from '../../helpers/conversations/useConversations';
 import { ConversationIcon } from '../../views/Conversation/ConversationIcon';
 import {
@@ -18,6 +17,7 @@ import {
   SideBarMenuRowLabel,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
+import { Empty, useSidebarSearch } from './SidebarSearch';
 import { Panel, panelTitle } from './usePanelList';
 
 interface MessagesPanelProps {
@@ -30,18 +30,15 @@ export function MessagesPanel({
 }: MessagesPanelProps): JSX.Element {
   const conversations = useConversations();
   const [dialogProps, show, close, isOpen] = useDialog();
-  const [searching, setSearching] = useState(false);
-  const [query, setQuery] = useState('');
+  const { query, button, input } = useSidebarSearch(
+    'Search messages',
+    'search-messages',
+  );
   // Which conversations match the query, reported by their links.
   const [matches, setMatches] = useState<Record<string, boolean>>({});
-  const filtering = searching && query.trim() !== '';
+  const filtering = query.trim() !== '';
   const noMatches =
     filtering && conversations.every(subject => matches[subject] === false);
-
-  const closeSearch = () => {
-    setSearching(false);
-    setQuery('');
-  };
 
   return (
     <>
@@ -53,17 +50,7 @@ export function MessagesPanel({
         data-testid='messages-panel'
         actions={
           <>
-            {conversations.length > 0 && (
-              <IconButton
-                title='Search messages'
-                size='small'
-                color='textLight'
-                onClick={() => (searching ? closeSearch() : setSearching(true))}
-                data-testid='search-messages'
-              >
-                <FaMagnifyingGlass />
-              </IconButton>
-            )}
+            {conversations.length > 0 && button}
             <IconButton
               title='New message'
               size='small'
@@ -80,26 +67,13 @@ export function MessagesPanel({
           <Empty>No messages yet</Empty>
         ) : (
           <>
-            {searching && (
-              <SearchInput
-                autoFocus
-                type='search'
-                aria-label='Search messages'
-                placeholder='Search by name'
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Escape') closeSearch();
-                }}
-                data-testid='search-messages-input'
-              />
-            )}
+            {input}
             {noMatches && <Empty>No matches</Empty>}
             {conversations.map(subject => (
               <ConversationLink
                 key={subject}
                 subject={subject}
-                query={searching ? query : ''}
+                query={query}
                 onMatch={match =>
                   setMatches(prev =>
                     prev[subject] === match
@@ -160,27 +134,3 @@ export function ConversationLink({
     </SideBarMenuItemLink>
   );
 }
-
-const SearchInput = styled.input`
-  box-sizing: border-box;
-  width: calc(100% - 1rem);
-  margin: 0.25rem 0.5rem;
-  padding: 0.3rem 0.5rem;
-  font: inherit;
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.text};
-  background: ${p => p.theme.colors.bg};
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-
-  &:focus-visible {
-    outline: 2px solid ${p => p.theme.colors.main};
-  }
-`;
-
-const Empty = styled.p`
-  margin: 0;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.textLight};
-`;
