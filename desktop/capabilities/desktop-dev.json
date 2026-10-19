@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-dev",
+  "description": "Test driver (mcp-bridge) permissions. Desktop only: the plugin is not compiled on mobile.",
+  "windows": ["main"],
+  "platforms": ["linux", "macOS", "windows"],
+  "permissions": ["mcp-bridge:default"]
+}
