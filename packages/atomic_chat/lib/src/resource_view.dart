@@ -5,6 +5,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'app_top_bar.dart';
 import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
@@ -406,6 +407,11 @@ class _ResourceViewState extends State<ResourceView>
         },
         child: Scaffold(
           backgroundColor: c.bgBody,
+          // A page of the app's own (settings) has no breadcrumb of a
+          // resource, so it gets the title bar of the native screens.
+          appBar: widget.path != null && widget.title.isNotEmpty
+              ? AppTopBar(title: widget.title)
+              : null,
           body: SafeArea(
             bottom: false,
             child: _error != null

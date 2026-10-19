@@ -88,6 +88,24 @@ void main() {
     expect(find.byIcon(Icons.home_outlined), findsOneWidget);
   });
 
+  testWidgets('Settings has the top bar with a back arrow that pops it',
+      (tester) async {
+    await tester.pumpWidget(_shell(_BarApi()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text('Settings')),
+        findsOneWidget);
+    expect(_controller(tester).topKind, ShellPage.settings);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byType(BackButton).last);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(_controller(tester).topKind, ShellPage.home);
+  });
+
   group('wide screen', () {
     void wide(WidgetTester tester) {
       tester.view.physicalSize = const Size(1800, 2880);

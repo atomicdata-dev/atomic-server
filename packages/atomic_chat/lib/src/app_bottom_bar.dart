@@ -196,6 +196,7 @@ class AppBottomBar extends StatelessWidget {
                                         (_) => ResourceView(
                                             api: api,
                                             drive: shell.drive.value,
+                                            title: 'Settings',
                                             path: '/app/settings')),
                                 icon: const Icon(Icons.settings_outlined),
                               ),
