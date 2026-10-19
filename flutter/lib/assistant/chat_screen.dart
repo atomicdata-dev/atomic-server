@@ -6,7 +6,6 @@ import '../theme.dart';
 import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';
-import 'resource_row.dart';
 import 'voice.dart';
 
 /// SharedPreferences key: speak each new answer aloud.
@@ -24,6 +23,9 @@ const _maxContextChars = 12000;
 
 /// Most recently opened resources offered in the picker.
 const _maxRecent = 6;
+
+/// Most pills in the new-chat context picker.
+const _maxPills = 5;
 
 /// A chat: the text of each message, newest at the bottom, and, when an AI is
 /// available, a field to write to it. A chat without a [subject] is new: it is
@@ -558,69 +560,81 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _heading(AppColors c, String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: c.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+  /// A small pill; the selected one is told apart by colour, not an icon.
+  Widget _pill(AppColors c, _Attached item) {
+    final on = _attached.any((a) => a.subject == item.subject);
+    final label =
+        item.title.length > 22 ? '${item.title.substring(0, 21)}…' : item.title;
+    return Material(
+      color: on ? c.main.withValues(alpha: 0.12) : c.bg1,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: on ? c.main.withValues(alpha: 0.6) : c.bg1,
+        ),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: () => _toggle(item),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: on ? c.main : c.textSecondary,
+            ),
           ),
         ),
-      );
-
-  Widget _pickRow(
-    AppColors c, {
-    required IconData icon,
-    required String title,
-    required String className,
-    required String subject,
-    String? detail,
-  }) {
-    final item = (subject: subject, title: title, className: className);
-    final on = _attached.any((a) => a.subject == subject);
-    return ResourceRow(
-      icon: icon,
-      title: title,
-      detail: detail,
-      trailing: on ? Icon(Icons.check, color: c.main) : null,
-      onTap: () => _toggle(item),
+      ),
     );
   }
 
-  /// What a new chat shows instead of messages: resources to give the AI as
-  /// context. Optional; the chat starts without if nothing is picked.
+  /// What a new chat shows instead of messages: a few resources to give the
+  /// AI as context (up to 5: two drives, then the latest opened). Optional;
+  /// the chat starts without if nothing is picked.
   Widget _picker(AppColors c) {
     final drives = _drives ?? const <DriveInfo>[];
     final recent = _recent ?? const <(String, RecentResource)>[];
-    return ListView(
-      children: [
-        _heading(c, 'Add context'),
-        if (drives.isNotEmpty) ...[
-          _heading(c, 'Drives'),
-          for (final d in drives)
-            _pickRow(
-              c,
-              icon: Icons.folder_outlined,
-              title: d.name.isEmpty ? 'Untitled drive' : d.name,
-              className: 'Drive',
-              subject: d.subject,
+    final options = <_Attached>[
+      for (final d in drives.take(2))
+        (
+          subject: d.subject,
+          title: d.name.isEmpty ? 'Untitled drive' : d.name,
+          className: 'Drive',
+        ),
+    ];
+    for (final (_, r) in recent) {
+      if (options.length >= _maxPills) break;
+      if (options.any((o) => o.subject == r.subject)) continue;
+      options.add((
+        subject: r.subject,
+        title: r.title.isEmpty ? 'Untitled' : r.title,
+        className: r.className,
+      ));
+    }
+    if (options.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Add context?',
+              style: TextStyle(color: c.textSecondary, fontSize: 12),
             ),
-        ],
-        if (recent.isNotEmpty) ...[
-          _heading(c, 'Recent'),
-          for (final (_, r) in recent)
-            _pickRow(
-              c,
-              icon: Icons.history,
-              title: r.title.isEmpty ? 'Untitled' : r.title,
-              className: r.className,
-              subject: r.subject,
-              detail: r.className,
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 6,
+              runSpacing: 8,
+              children: [for (final o in options) _pill(c, o)],
             ),
-        ],
-      ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -704,7 +718,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   style: TextStyle(color: c.alert, fontSize: 12),
                 ),
               ),
-            if (_attached.isNotEmpty) _chips(),
+            if (_attached.isNotEmpty && _messages.isNotEmpty) _chips(),
             if (_listening) _Waveform(levels: _levels),
             Row(
               children: [

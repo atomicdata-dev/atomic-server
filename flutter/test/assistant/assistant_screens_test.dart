@@ -869,11 +869,11 @@ void main() {
       final api = _SlowAi(lookup.future);
       await tester.pumpWidget(app(ChatScreen(api: api)));
       await tester.pump();
-      final before = tester.getTopLeft(find.text('Add context')).dy;
+      final before = tester.getTopLeft(find.text('Add context?')).dy;
       lookup.complete(ai());
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
-      expect(tester.getTopLeft(find.text('Add context')).dy, before);
+      expect(tester.getTopLeft(find.text('Add context?')).dy, before);
     });
 
     testWidgets('an existing chat sends its history along', (tester) async {
@@ -1305,13 +1305,16 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('No messages'), findsNothing);
-        expect(find.text('Add context'), findsOneWidget);
-        expect(find.text('Drives'), findsOneWidget);
+        expect(find.text('Add context?'), findsOneWidget);
+        expect(find.text('Drives'), findsNothing);
+        expect(find.text('Recent'), findsNothing);
         expect(find.text('Home'), findsOneWidget);
-        expect(find.text('Recent'), findsOneWidget);
-        // Newest first.
-        expect(tester.getTopLeft(find.text('Budget')).dy,
-            lessThan(tester.getTopLeft(find.text('Trip plan')).dy));
+        // Newest first, after the drive.
+        expect(tester.getTopLeft(find.text('Budget')).dx,
+            lessThan(tester.getTopLeft(find.text('Trip plan')).dx));
+        expect(
+            find.descendant(of: find.byType(Wrap), matching: find.byType(Icon)),
+            findsNothing);
       });
 
       testWidgets('an existing chat with messages shows them, not the picker',
@@ -1323,7 +1326,7 @@ void main() {
             app(ChatScreen(api: api, subject: 'did:ad:chat', title: 'Trip')));
         await tester.pumpAndSettle();
         expect(find.text('Where to?'), findsOneWidget);
-        expect(find.text('Add context'), findsNothing);
+        expect(find.text('Add context?'), findsNothing);
         expect(
             tester
                 .widget<TextField>(find.byType(TextField))
@@ -1336,7 +1339,7 @@ void main() {
         await tester.pumpWidget(app(ChatScreen(
             api: FakeApi(ai: ai(), recent: recent), subject: 'did:ad:chat')));
         await tester.pumpAndSettle();
-        expect(find.text('Add context'), findsOneWidget);
+        expect(find.text('Add context?'), findsOneWidget);
       });
 
       testWidgets('the input has focus once the AI is ready', (tester) async {
@@ -1349,27 +1352,44 @@ void main() {
         expect(field.focusNode!.hasFocus, isTrue);
       });
 
-      testWidgets('picking shows a chip, its x removes it', (tester) async {
+      testWidgets('tapping a pill toggles it by colour, with no icon',
+          (tester) async {
         await tester.pumpWidget(
             app(ChatScreen(api: FakeApi(ai: ai(), recent: recent))));
         await tester.pumpAndSettle();
-
+        Color? colour() =>
+            tester.widget<Text>(find.text('Trip plan')).style!.color;
+        final off = colour();
         await tester.tap(find.text('Trip plan'));
         await tester.pump();
-        expect(find.byType(Chip), findsOneWidget);
-        expect(find.byIcon(Icons.check), findsOneWidget);
-
-        await tester.tap(find.byTooltip('Remove Trip plan'));
-        await tester.pump();
+        expect(colour(), isNot(off));
         expect(find.byType(Chip), findsNothing);
         expect(find.byIcon(Icons.check), findsNothing);
-
-        // Tapping the row again toggles it off too.
         await tester.tap(find.text('Trip plan'));
         await tester.pump();
-        await tester.tap(find.text('Trip plan').first);
-        await tester.pump();
-        expect(find.byType(Chip), findsNothing);
+        expect(colour(), off);
+      });
+
+      testWidgets('at most 5 pills: two drives, then the latest',
+          (tester) async {
+        final many = [
+          for (var i = 0; i < 8; i++)
+            (
+              subject: 'r$i',
+              title: 'Res $i',
+              className: 'Document',
+              openedAt: i
+            ),
+        ];
+        await tester
+            .pumpWidget(app(ChatScreen(api: FakeApi(ai: ai(), recent: many))));
+        await tester.pumpAndSettle();
+        // The one drive plus the four latest resources.
+        expect(find.text('Home'), findsOneWidget);
+        expect(find.textContaining('Res '), findsNWidgets(4));
+        expect(find.text('Res 7'), findsOneWidget);
+        expect(find.text('Res 4'), findsOneWidget);
+        expect(find.text('Res 3'), findsNothing);
       });
 
       testWidgets('sending gives the AI the text of what was picked',
@@ -1519,14 +1539,14 @@ void main() {
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
       addTearDown(tester.view.resetViewInsets);
-      await tester.pumpWidget(app(AppShell(
+      await tester.pumpWidget(app(const AppShell(
         drive: 'd',
         home: Scaffold(
           body: SafeArea(
             top: false,
             child: Column(children: [
-              const Spacer(),
-              TextField(key: const Key('bottom-field')),
+              Spacer(),
+              TextField(key: Key('bottom-field')),
             ]),
           ),
         ),
