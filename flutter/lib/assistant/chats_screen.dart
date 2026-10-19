@@ -146,6 +146,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// Favorites and conversations are not tied to one drive: they open in the
   /// current one.
   Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
+
   /// "<who> created/changed/deleted · <when>". A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
@@ -316,10 +317,19 @@ class _Section<T> extends StatelessWidget {
           children: [
             Row(children: [
               Expanded(child: _Heading(title, c)),
+              // Same size, weight and padding as the heading, so the two sit on
+              // one baseline.
               if (more)
-                TextButton(
-                  onPressed: () => onShowAll(list),
-                  child: const Text('Show all'),
+                InkWell(
+                  onTap: () => onShowAll(list),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('Show all',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                  ),
                 ),
             ]),
             if (snapshot.hasError)
