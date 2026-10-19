@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +42,19 @@ Widget _shell(AssistantApi api, {WidgetBuilder? profile}) => app(AppShell(
       profile: profile,
       home: ChatsScreen(drive: 'did:ad:home', api: api),
     ));
+
+/// A host that is slow to create a chat: [gate] lets it go on.
+class _SlowChatApi extends _BarApi {
+  final gate = Completer<void>();
+
+  _SlowChatApi({super.ai});
+
+  @override
+  Future<String> newChat(String name) async {
+    await gate.future;
+    return super.newChat(name);
+  }
+}
 
 ShellController _controller(WidgetTester tester) =>
     tester.widget<ShellScope>(find.byType(ShellScope)).controller;
@@ -453,6 +468,78 @@ void main() {
       await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
+    });
+  });
+
+  group('New (+) always makes a new chat', () {
+    HostedAi ai() => HostedAi(
+          status: {'enabled': true, 'consent': true, 'model': 'm'},
+          stream: (messages, model) => Stream.value('ok'),
+          enable: () async => {},
+        );
+
+    for (final (name, size) in [
+      ('phone', null),
+      ('tablet', const Size(1280, 800)),
+    ]) {
+      testWidgets('from inside a chat with messages ($name)', (tester) async {
+        if (size != null) {
+          tester.view.devicePixelRatio = 2;
+          tester.view.physicalSize = size * 2;
+          addTearDown(tester.view.reset);
+        }
+        // The chat is still being created (a slow host): it has a message
+        // on screen but no subject yet.
+        final api = _SlowChatApi(ai: ai());
+        await tester.pumpWidget(_shell(api));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('New chat'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Hi there');
+        await tester.pump();
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Hi there'), findsOneWidget);
+
+        await tester.tap(find.byTooltip('New chat'));
+        await tester.pumpAndSettle();
+        // A new, empty chat is the one shown.
+        expect(find.text('New chat'), findsWidgets);
+        expect(find.text('Hi there'), findsNothing);
+        final shown = tester.widget<ChatScreen>(find.byType(ChatScreen).last);
+        expect(shown.subject, isNull);
+        expect(_controller(tester).topKind, ShellPage.newChat);
+        api.gate.complete();
+        await tester.pumpAndSettle();
+      });
+    }
+
+    testWidgets('on an empty new chat it stays the one (no second)',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi(ai: ai())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
+      // Its field has the cursor.
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.focusNode?.hasFocus, isTrue);
+    });
+
+    testWidgets('on a voice chat it opens a typed one', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New chat'), 'AI voice');
+      expect(_controller(tester).topKind, ShellPage.voiceChat);
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      expect(_controller(tester).topKind, ShellPage.newChat);
+      expect(tester.widget<ChatScreen>(find.byType(ChatScreen).last).voiceMode,
+          isFalse);
     });
   });
 

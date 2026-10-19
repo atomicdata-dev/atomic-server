@@ -166,6 +166,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _readMessages();
     _lookUpAi();
     if (_chat == null) _readPicker();
+    // New on a new chat that is still empty: its field gets the cursor.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route != null) {
+        ShellScope.maybeOf(context)?.onReselect(route, _focusInput);
+      }
+    });
   }
 
   bool _hadText = false;
@@ -685,6 +693,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _messages = asked;
       _partial = [];
     });
+    // Written in: New makes another chat from now on, also while the chat
+    // itself is still being created.
+    if (_chat == null) _noLongerNew();
     // The user message is saved in the background; the chat exists from the
     // first message on, named after it.
     _persist('user message', () async {

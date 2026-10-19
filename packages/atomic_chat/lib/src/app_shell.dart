@@ -158,15 +158,20 @@ class ShellController extends ChangeNotifier {
   /// A push from the bar happened a moment ago: a second tap is ignored.
   Timer? _settling;
 
-  /// Opens the page of [kind] the bar asks for, at most once: nothing
-  /// happens when it is on top already or a push is under way (a double
-  /// tap), and when it is further down the stack the pages above it are
+  /// Opens the page of [kind] the bar asks for, at most once: when it is on
+  /// top already the page's [onReselect] action runs (a new chat's field
+  /// gets the cursor), and nothing happens while a push is under way (a
+  /// double tap), and when it is further down the stack the pages above it are
   /// popped instead of a second one pushed. Answers what the pushed page pops
   /// with; null when nothing was pushed.
   Future<T?> open<T>(
       String kind, Route<T> Function(RouteSettings settings) route) async {
     final navigator = navigatorKey.currentState;
-    if (navigator == null || topKind == kind || _settling != null) return null;
+    if (navigator == null || _settling != null) return null;
+    if (topKind == kind) {
+      _reselect[_top]?.call();
+      return null;
+    }
     if (hasPage(kind)) {
       navigator.popUntil((r) => kindOf(r) == kind);
       return null;
@@ -231,6 +236,13 @@ class ShellController extends ChangeNotifier {
     _changed();
   }
 
+  final Map<Route<dynamic>, VoidCallback> _reselect = {};
+
+  /// What a tap on the bar's button of [route]'s kind does while [route] is
+  /// on top (instead of opening a second one).
+  void onReselect(Route<dynamic> route, VoidCallback action) =>
+      _reselect[route] = action;
+
   void unregisterMenu(Route<dynamic> route) {
     if (_menus.remove(route) != null) _changed();
   }
@@ -244,6 +256,7 @@ class ShellController extends ChangeNotifier {
     _stack.remove(route);
     _kinds.remove(route);
     _menus.remove(route);
+    _reselect.remove(route);
     if (_details.remove(route) != null) _changed();
   }
 
@@ -675,9 +688,10 @@ class _Pane extends StatelessWidget {
 class _PaneDivider extends StatelessWidget {
   const _PaneDivider();
 
+  /// The theme's divider: a hairline that is quiet in light and dark.
   @override
   Widget build(BuildContext context) => ColoredBox(
-      color: context.appColors.bg2.withValues(alpha: 0.5),
+      color: Theme.of(context).colorScheme.outlineVariant,
       child: const SizedBox(width: 1));
 }
 

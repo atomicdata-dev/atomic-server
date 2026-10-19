@@ -96,7 +96,8 @@ class AppBottomBar extends StatelessWidget {
                       child: HoldFan<NewChoice>(
                         tooltip: 'New chat',
                         selected: newCurrent,
-                        onTap: newCurrent ? null : _newChat,
+                        // Always a new chat (on an empty one: its field).
+                        onTap: _newChat,
                         items: _newItems,
                         onSelected: (choice) => _new(context, choice),
                         child: _barIcon(context, Icons.add, newCurrent),
@@ -307,7 +308,7 @@ class AppNavRail extends StatelessWidget {
                       tooltip: 'New chat',
                       selected: newCurrent,
                       layout: HoldFanLayout.side,
-                      onTap: newCurrent ? null : actions.newChat,
+                      onTap: actions.newChat,
                       items: _newItems,
                       onSelected: (choice) => actions.newOf(context, choice),
                       child: _barIcon(context, Icons.add, newCurrent),

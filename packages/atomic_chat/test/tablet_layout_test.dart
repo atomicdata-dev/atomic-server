@@ -158,6 +158,14 @@ void main() {
       expect(_controller(tester).pages, hasLength(1));
       expect(api.opened, ['did:ad:plans', 'did:ad:notes']);
 
+      // A page of the rail in its place: no row is marked.
+      await tester.tap(find.byTooltip('Settings'));
+      await _settle(tester);
+      expect(tile('Notes').selected, isFalse);
+      await tester.tap(find.text('Notes'));
+      await _settle(tester);
+      expect(tile('Notes').selected, isTrue);
+
       // Back goes back inside the pane: to nothing opened.
       await tester.binding.handlePopRoute();
       await _settle(tester);
@@ -253,6 +261,16 @@ void main() {
     expect(find.byType(ResourceView), findsOneWidget);
     expect(find.byType(SearchScreen), findsOneWidget);
     expect(find.text('Found it'), findsOneWidget);
+    ListTile tile(String title) => tester.widget<ListTile>(
+        find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
+    expect(tile('Found it').selected, isTrue);
+    // Settings in its place: the hit is no longer marked; opened again it is.
+    await tester.tap(find.byTooltip('Settings'));
+    await _settle(tester);
+    expect(tile('Found it').selected, isFalse);
+    await tester.tap(find.text('Found it'));
+    await _settle(tester);
+    expect(tile('Found it').selected, isTrue);
 
     // Back: the page first, then the search goes back to the home.
     await tester.binding.handlePopRoute();
