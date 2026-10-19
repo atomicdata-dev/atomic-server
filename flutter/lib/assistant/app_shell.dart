@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../widgets/covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
+import '../atomic/atomic_client.dart';
 import 'assistant_api.dart';
 
 /// What the static bottom bar needs to know about the pages above it. The
@@ -17,6 +19,10 @@ class ShellController extends ChangeNotifier {
   VoidCallback? onUser;
 
   ShellController({String drive = ''}) : drive = ValueNotifier(drive);
+
+  /// What search last knew (drives and recently opened), so it can paint the
+  /// list on its first frame and refresh behind it.
+  SearchCache? searchCache;
 
   final Map<Route<dynamic>, VoidCallback> _menus = {};
   Route<dynamic>? _top;
@@ -139,6 +145,18 @@ class _AppShellState extends State<AppShell> {
   late final ShellController _shell = ShellController(drive: widget.drive);
   late final _TopObserver _observer = _TopObserver(_shell);
 
+  /// One instance for the life of the shell: the keyboard animation rebuilds
+  /// the tiny widgets around it, never the pages.
+  late final Widget _navigator = Navigator(
+    key: _shell.navigatorKey,
+    observers: [_observer],
+    onGenerateRoute: (_) => MaterialPageRoute<void>(
+      builder: (_) => CoveredInsetsFreeze(child: widget.home),
+    ),
+  );
+
+  late final Widget _bar = AppBottomBar(api: widget.api, shell: _shell);
+
   @override
   void dispose() {
     _shell.dispose();
@@ -147,51 +165,54 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    // The keyboard overlays the screen and every page's Scaffold shrinks its
-    // body by the full keyboard height. With the bar still below the pages
-    // they would shrink by the bar's height too much (a gap above the
-    // keyboard). So the bar steps aside while the keyboard is open: the page
-    // region then ends at the screen bottom and its insets are exact.
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return ShellScope(
       controller: _shell,
       // Android back pops the pages first and leaves the app on the home.
       child: NavigatorPopHandler(
         onPopWithResult: (_) => _shell.navigatorKey.currentState?.maybePop(),
         child: Column(children: [
-          Expanded(
-            // The bar below takes the system inset; the pages must not
-            // reserve it a second time.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeBottom: true,
-              child: Navigator(
-                key: _shell.navigatorKey,
-                observers: [_observer],
-                onGenerateRoute: (_) => MaterialPageRoute<void>(
-                  builder: (_) => widget.home,
-                ),
-              ),
-            ),
-          ),
-          TweenAnimationBuilder<double>(
-            tween: Tween(end: keyboard ? 0.0 : 1.0),
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            child: AppBottomBar(api: widget.api, shell: _shell),
-            builder: (context, v, child) => Offstage(
-              offstage: v == 0,
-              child: ClipRect(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  heightFactor: v,
-                  child: child,
-                ),
-              ),
-            ),
-          ),
+          // The bar below takes the system inset; the pages must not reserve
+          // it a second time.
+          Expanded(child: _PagesInset(child: _navigator)),
+          _BarSlot(child: _bar),
         ]),
       ),
     );
   }
+}
+
+/// Removes the bottom system inset from the pages. It follows MediaQuery, so
+/// it is kept this small; its child is stable.
+class _PagesInset extends StatelessWidget {
+  final Widget child;
+
+  const _PagesInset({required this.child});
+
+  @override
+  Widget build(BuildContext context) => MediaQuery.removePadding(
+      context: context, removeBottom: true, child: child);
+}
+
+/// The keyboard overlays the screen and every page's Scaffold shrinks its body
+/// by the full keyboard height. With the bar still below the pages they would
+/// shrink by the bar's height too much (a gap above the keyboard). So the bar
+/// steps aside, at once and without animating, while the keyboard is open: the
+/// page region then ends at the screen bottom and its insets are exact, and
+/// only the keyboard animates the layout. Only this widget reads the insets.
+class _BarSlot extends StatelessWidget {
+  final Widget child;
+
+  const _BarSlot({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Offstage(
+      offstage: MediaQuery.viewInsetsOf(context).bottom > 0, child: child);
+}
+
+/// Drives and recently opened resources as search last saw them.
+class SearchCache {
+  final List<DriveInfo> drives;
+  final List<({String drive, RecentResource resource})> recent;
+
+  const SearchCache(this.drives, this.recent);
 }

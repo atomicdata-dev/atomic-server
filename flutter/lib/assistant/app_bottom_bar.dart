@@ -25,6 +25,12 @@ class AppBottomBar extends StatelessWidget {
         ?.push(SlideBackRoute<void>(builder: (_) => screen));
   }
 
+  /// Search opens fast: the keyboard comes up with it.
+  Future<void> _openSearch() async {
+    await shell.navigatorKey.currentState
+        ?.push(SearchScreen.route(drive: shell.drive.value, api: api));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -43,8 +49,7 @@ class AppBottomBar extends StatelessWidget {
                   children: [
                     IconButton(
                       tooltip: 'Search',
-                      onPressed: () => _push(
-                          SearchScreen(drive: shell.drive.value, api: api)),
+                      onPressed: _openSearch,
                       icon: const Icon(Icons.search),
                     ),
                     IconButton(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
+import 'covered_insets_freeze.dart';
+
 /// A page that slides in from the right over the page it was opened from, and
 /// that the whole page can be dragged back to the right to leave: the page
 /// below is there on the left while it moves. The back button and the system
@@ -8,7 +10,8 @@ import 'package:flutter/physics.dart';
 class SlideBackRoute<T> extends PageRouteBuilder<T> {
   SlideBackRoute({required WidgetBuilder builder})
       : super(
-          pageBuilder: (context, _, __) => builder(context),
+          pageBuilder: (context, _, __) =>
+              CoveredInsetsFreeze(child: builder(context)),
           transitionDuration: const Duration(milliseconds: 380),
           reverseTransitionDuration: const Duration(milliseconds: 320),
         );

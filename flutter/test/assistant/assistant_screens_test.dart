@@ -13,6 +13,7 @@ import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/voice.dart';
 import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
 import 'package:atomiccanvas_flutter/theme.dart';
+import 'package:atomiccanvas_flutter/widgets/covered_insets_freeze.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +35,10 @@ class FakeApi extends AssistantApi {
   final List<String> created = [];
   final Map<String, String> texts;
 
+  /// How many times `drives()` was asked, and an optional gate it waits on.
+  int drivesCalls = 0;
+  Future<void>? drivesGate;
+
   FakeApi({
     this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
     this.recent = const [],
@@ -50,7 +55,12 @@ class FakeApi extends AssistantApi {
   @override
   Future<String?> agentName() async => 'Joep';
   @override
-  Future<List<DriveInfo>> drives() async => driveList;
+  Future<List<DriveInfo>> drives() async {
+    drivesCalls++;
+    await drivesGate;
+    return driveList;
+  }
+
   @override
   Future<List<ChatSummary>> chats() async => chatList;
   @override
@@ -1772,6 +1782,122 @@ void main() {
       expect(timeAgo(ago(const Duration(hours: 3)), now: now), '3 h ago');
       expect(timeAgo(ago(const Duration(days: 2)), now: now), '2 d ago');
       expect(timeAgo(ago(const Duration(days: 30)), now: now), '2026-09-18');
+    });
+  });
+  group('SearchScreen opens fast', () {
+    testWidgets('settles within 160 ms, field at the bottom', (tester) async {
+      await tester.pumpWidget(shellApp(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 160));
+      final settled = tester.getTopLeft(find.byType(TextField));
+      final fade = find
+          .ancestor(
+              of: find.byType(SearchScreen), matching: find.byType(Opacity))
+          .first;
+      expect(tester.widget<Opacity>(fade).opacity, 1);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.byType(TextField)), settled);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(settled.dy, greaterThan(screen.height * 0.7));
+    });
+
+    testWidgets('the covered page does not follow the keyboard',
+        (tester) async {
+      var builds = 0;
+      await tester.pumpWidget(app(AppShell(
+        api: FakeApi(),
+        drive: 'did:ad:drive',
+        home: Builder(builder: (context) {
+          MediaQuery.of(context);
+          builds++;
+          return const Scaffold(body: Text('probe page'));
+        }),
+      )));
+      await tester.pumpAndSettle();
+      addTearDown(tester.view.resetViewInsets);
+
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      final before = builds;
+      for (var b = 50.0; b <= 500; b += 50) {
+        tester.view.viewInsets = FakeViewPadding(bottom: b);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(builds, before);
+      // The page on top does follow it.
+      expect(find.byType(SearchScreen), findsOneWidget);
+
+      // Back on top, it is live again.
+      tester.view.resetViewInsets();
+      await tester.pump();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      await tester.pump(CoveredInsetsFreeze.hold);
+      final back = builds;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pump();
+      expect(builds, greaterThan(back));
+    });
+
+    testWidgets('the bar hides at once with the keyboard and returns',
+        (tester) async {
+      await tester.pumpWidget(shellApp(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      addTearDown(tester.view.resetViewInsets);
+      expect(find.byTooltip('Search'), findsOneWidget);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 10);
+      await tester.pump();
+      expect(find.byTooltip('Search'), findsNothing);
+      expect(tester.hasRunningAnimations, isFalse);
+
+      tester.view.resetViewInsets();
+      await tester.pump();
+      expect(find.byTooltip('Search'), findsOneWidget);
+    });
+
+    testWidgets(
+        'one drives call per open; the second open shows cached recents',
+        (tester) async {
+      Finder inSearch(String t) => find.descendant(
+          of: find.byType(SearchScreen), matching: find.text(t));
+      final api = FakeApi(recent: [
+        (
+          subject: 'r1',
+          title: 'Opened doc',
+          className: 'Document',
+          openedAt: 1
+        ),
+      ]);
+      await tester.pumpWidget(shellApp(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+
+      var calls = api.drivesCalls;
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(api.drivesCalls - calls, 1);
+      expect(inSearch('Opened doc'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      // The refresh is still on its way when the list is first painted.
+      final gate = Completer<void>();
+      api.drivesGate = gate.future;
+      calls = api.drivesCalls;
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pump();
+      expect(inSearch('Opened doc'), findsOneWidget);
+      expect(api.drivesCalls - calls, 1);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(api.drivesCalls - calls, 1);
+      expect(inSearch('Opened doc'), findsOneWidget);
     });
   });
 }
