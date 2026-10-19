@@ -75,6 +75,9 @@ class _LoginScreenState extends State<LoginScreen> {
       {String? serverUrl}) async {
     final origin =
         (serverUrl != null && serverUrl.isNotEmpty) ? serverUrl : _serverOrigin;
+    // A local-only identity (Get Started without a server) has nothing to
+    // connect to; asking anyway failed on `ws:///ws`.
+    if (origin.isEmpty) return;
     try {
       await AtomicClient.openWsSync(origin);
     } catch (e) {
