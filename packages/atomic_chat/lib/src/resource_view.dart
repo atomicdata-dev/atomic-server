@@ -9,6 +9,7 @@ import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
+import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 
 /// A resource as the web app draws it, without the web app around it: the
@@ -301,6 +302,10 @@ class _ResourceViewState extends State<ResourceView>
     }
     final id = request['id'] as int;
     final method = request['method'] as String;
+    if (method == 'openNative') {
+      await _answerOpenNative(id, request['args']);
+      return;
+    }
     final started = _clock.elapsedMilliseconds;
     String reply;
     // Writes show up in logcat, so what the page persists can be followed.
@@ -328,6 +333,37 @@ class _ResourceViewState extends State<ResourceView>
       await _page?.runJavaScript('window.__atomicReply($id,$reply)');
     } catch (e) {
       debugPrint('[embed] reply to $method not delivered: $e');
+    }
+  }
+
+  /// The page asks to show a resource in the app's own screen
+  /// (`openNative(kind, subject, title)`): opened when the app has a native
+  /// view for that kind, and the answer says whether it did, so the page draws
+  /// the resource itself when not.
+  Future<void> _answerOpenNative(int id, Object? args) async {
+    var handled = false;
+    if (args is List && args.length >= 2) {
+      final kind = '${args[0]}';
+      final subject = '${args[1]}';
+      final title = args.length > 2 ? '${args[2]}' : '';
+      if (mounted && subject.isNotEmpty && hasNativeView(kind)) {
+        handled = true;
+        widget.api.noteOpened(widget.drive, subject);
+        unawaited(Navigator.of(context).push(SlideBackRoute<void>(
+          builder: (_) => openResourceView(
+              api: widget.api,
+              drive: widget.drive,
+              subject: subject,
+              title: title,
+              className: kind),
+        )));
+      }
+    }
+    try {
+      await _page?.runJavaScript('window.__atomicReply($id,true,'
+          '${jsonEncode(jsonEncode(handled))})');
+    } catch (e) {
+      debugPrint('[embed] reply to openNative not delivered: $e');
     }
   }
 

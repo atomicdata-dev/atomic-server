@@ -41,6 +41,12 @@ class AtomicAssistantApi extends AssistantApi {
   Future<void> followConversation(String subject) =>
       AtomicClient.followConversation(subject);
   @override
+  Future<List<ChatRoomMessage>> chatRoomMessages(String subject) =>
+      AtomicClient.readChatRoom(subject);
+  @override
+  Future<void> sendChatRoomMessage(String subject, String text) =>
+      AtomicClient.sendChatRoomMessage(subject, text);
+  @override
   Future<List<ActivityEntry>> activity(int limit) =>
       AtomicClient.activity(limit: limit);
   @override

@@ -6,6 +6,7 @@ import 'package:atomic_chat/atomic_chat.dart'
         ActivityEntry,
         AssistantJson,
         ChatMessage,
+        ChatRoomMessage,
         ChatSummary,
         ConversationMessage,
         ConversationRow,
@@ -143,6 +144,15 @@ class AtomicClient {
   /// synced like any edit); returns the message's subject.
   static Future<String> sendConversationMessage(String subject, String text) =>
       assistant.sendConversationMessage(subject: subject, text: text);
+
+  /// The chat of a meeting or chat room, oldest first, from the local store.
+  static Future<List<ChatRoomMessage>> readChatRoom(String subject) async =>
+      AssistantJson.parseChatRoomMessages(
+          await assistant.readChatRoom(subject: subject));
+
+  /// Sends [text] in a meeting or chat room as this device's agent.
+  static Future<String> sendChatRoomMessage(String subject, String text) =>
+      assistant.sendChatRoomMessage(subject: subject, text: text);
 
   /// Gets a conversation onto this device and follows its new messages over
   /// the open sync session. Best effort: throws when there is no session.

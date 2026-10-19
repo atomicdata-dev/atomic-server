@@ -45,6 +45,12 @@ abstract class AssistantApi {
   /// Get the conversation onto this device and follow it; best effort.
   Future<void> followConversation(String subject);
 
+  /// The chat of a meeting or chat room, oldest first.
+  Future<List<ChatRoomMessage>> chatRoomMessages(String subject);
+
+  /// Sends [text] in a meeting or chat room as this device's agent.
+  Future<void> sendChatRoomMessage(String subject, String text);
+
   /// What changed lately in every drive, newest first, by whom.
   Future<List<ActivityEntry>> activity(int limit);
 

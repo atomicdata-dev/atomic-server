@@ -8,6 +8,16 @@ import 'unimplemented_api.dart';
 
 /// The page in a web view, without the web view: records what it is asked to
 /// run, and answers a flush only when the test says so.
+/// Opens whatever the page asks for, and has no chat to show.
+class _OpeningApi extends UnimplementedApi {
+  const _OpeningApi();
+  @override
+  void noteOpened(String drive, String subject) {}
+  @override
+  Future<List<ChatRoomMessage>> chatRoomMessages(String subject) async =>
+      const [];
+}
+
 class FakePage implements EmbedPage {
   final void Function(String message) send;
   final scripts = <String>[];
@@ -59,7 +69,7 @@ void main() {
     ));
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     Widget page(BuildContext _) =>
-        const ResourceView(api: UnimplementedApi(), drive: 'd', subject: 's');
+        const ResourceView(api: _OpeningApi(), drive: 'd', subject: 's');
     navigator.push(slideBack
         ? SlideBackRoute<void>(builder: page)
         : MaterialPageRoute<void>(builder: page));
@@ -67,6 +77,45 @@ void main() {
     expect(find.text('the page'), findsOneWidget);
     return navigator;
   }
+
+  testWidgets('openNative opens the native view and answers the page',
+      (tester) async {
+    await open(tester);
+    page.scripts.clear();
+
+    page.send(jsonEncode({
+      'id': 7,
+      'method': 'openNative',
+      'args': ['chatroom', 'did:ad:room', 'Standup'],
+    }));
+    await tester.pumpAndSettle();
+
+    // The room is on top, and the page was told it was taken.
+    expect(find.byType(ChatRoomScreen), findsOneWidget);
+    expect(page.scripts, contains('window.__atomicReply(7,true,"true")'));
+    // Closed without an answer to its flush: wait the timers out.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 6));
+  });
+
+  testWidgets('openNative for a kind the app has no view for says false',
+      (tester) async {
+    await open(tester);
+    page.scripts.clear();
+
+    page.send(jsonEncode({
+      'id': 8,
+      'method': 'openNative',
+      'args': ['hologram', 'did:ad:x', ''],
+    }));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChatRoomScreen), findsNothing);
+    expect(find.text('the page'), findsOneWidget);
+    expect(page.scripts.last, 'window.__atomicReply(8,true,"false")');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 6));
+  });
 
   testWidgets('back waits until the page has handed over its edits',
       (tester) async {

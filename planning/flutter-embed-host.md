@@ -176,10 +176,21 @@ call is not wired yet), and the transparent web view background in dark mode.
 follow-session side panel; the embed renders no side panels except comments, so
 nothing appeared. Decision:
 
-- **Open chat**: `src/embed/MeetingChatOverlay.tsx` shows the meeting's chat
+- **Open chat**: the page asks the app to show the chat in its own screen
+  (`openNative('chatroom', subject, title)`, `src/embed/hostActions.ts`, a call
+  on the AtomicFlutter channel answered `true` when the app opened it). The
+  app's `ResourceView` handles it (`openNative` in `resource_view.dart`): when
+  `nativeViews` has the kind it pushes `ChatRoomScreen` over the page and
+  answers true. A meeting is a chat room of its own (the log sits under the
+  meeting), so the same screen shows both. A link to a `ChatRoom` inside the
+  page does the same (`useNativeChatRoom`), and the page goes back to where the
+  link was. `ChatRoom` is also in the native views registry, so opening one from
+  a list or search skips the web page.
+- **Fallback**: `src/embed/MeetingChatOverlay.tsx` shows the meeting's chat
   (the web app's `ChatRoomView`: messages and composer, writing through the
-  commit transport like every other write) full screen, with a close button.
-  The call and the presence list of the web panel are left out.
+  commit transport like every other write) full screen, with a close button,
+  when the app answers false or does not know the call (desktop mock, an older
+  app). The call and the presence list of the web panel are left out.
 - **Back**: the overlay registers in `src/embed/overlayBack.ts`;
   `atomicEmbed.back()` closes the topmost overlay first and returns true.
 - **Start meeting**: hidden in the embed (`showMeetingStart` in
@@ -188,9 +199,23 @@ nothing appeared. Decision:
   camera, which the host does not grant the web view. "End meeting" only shows
   for a meeting started on the page, so it follows.
 
-Tests: `src/embed/MeetingChatOverlay.test.tsx`. Not verified without a device:
-the chat on the phone (keyboard resize, live messages from others, which need
-the host to push `changed`).
+The native chat: `lib/src/host/chat_rooms.rs` reads the room's `ChatLog` entries
+plus old `Message` resources (an old message that has its entry is left out) as
+`text` or `event` lines (entry kind `FollowEvent`; a "Viewing [title](subject)"
+trail line carries the viewed resource) and writes an entry like the web's
+`appendToChatLog` (`t`, `a`, `c`, `r`, same page rule), so web clients show it.
+Any other entry kind shows as plain text (`t`, else `description`, else AI-style
+text parts). Bridge: `read_chat_room`, `send_chat_room_message`. Screen:
+`ChatRoomScreen` in `packages/atomic_chat` (bubbles with author name and
+initial, grey one-line event rows that open the viewed resource, composer),
+re-read every few seconds like the conversation screen.
+
+Tests: `src/embed/MeetingChatOverlay.test.tsx`, `hostActions.test.ts`, the host
+tests in `chat_rooms.rs`, `chat_room_screen_test.dart`, `resource_view_test.dart`.
+Not verified without a device: the screens on a phone (keyboard resize, live
+messages from others, which need the host to push `changed`; the native screen
+polls instead), and the web bundle with these page changes (the thread session
+rebuilds it).
 
 ## Not planned
 

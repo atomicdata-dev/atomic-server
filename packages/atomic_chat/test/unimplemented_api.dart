@@ -37,6 +37,12 @@ class UnimplementedApi extends AssistantApi {
   @override
   Future<void> followConversation(String subject) => _no('followConversation');
   @override
+  Future<List<ChatRoomMessage>> chatRoomMessages(String subject) =>
+      _no('chatRoomMessages');
+  @override
+  Future<void> sendChatRoomMessage(String subject, String text) =>
+      _no('sendChatRoomMessage');
+  @override
   Future<List<ActivityEntry>> activity(int limit) => _no('activity');
   @override
   Future<Map<String, String>> resourceIcons(List<String> subjects) =>

@@ -20,6 +20,7 @@ export 'src/covered_insets_freeze.dart';
 
 // Screens.
 export 'src/chats_screen.dart';
+export 'src/chat_room_screen.dart';
 export 'src/chat_screen.dart';
 export 'src/conversation_screen.dart';
 export 'src/search_screen.dart';

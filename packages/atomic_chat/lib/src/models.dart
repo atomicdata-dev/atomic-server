@@ -17,6 +17,26 @@ typedef ConversationMessage = ({
   int createdAt
 });
 
+/// What a line of a meeting or chat room is: a message from someone, or a
+/// system line of a meeting ("Joep is viewing Roadmap", "Started the meeting").
+enum ChatRoomKind { text, event }
+
+/// One line of a meeting or chat room (`atomic_lib::host::chat_rooms`): a
+/// message with its author, or an event line. `authorName` is '' until the
+/// name is known. An event that follows someone to a resource has `about` (that
+/// resource) and `aboutTitle`.
+typedef ChatRoomMessage = ({
+  String id,
+  ChatRoomKind kind,
+  String author,
+  String authorName,
+  bool mine,
+  String text,
+  int createdAt,
+  String? about,
+  String aboutTitle
+});
+
 /// A row of the Messages list: the conversation and the text of its newest
 /// message ('' when there is none or it cannot be read). `resource.openedAt`
 /// is the time of that message in ms (0 when none).
@@ -151,6 +171,21 @@ abstract final class AssistantJson {
             mine: e['mine'] == true,
             text: e['text'] as String?,
             createdAt: (e['c'] as num?)?.toInt() ?? 0,
+          ),
+      ];
+
+  static List<ChatRoomMessage> parseChatRoomMessages(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            id: e['id'] as String,
+            kind: e['kind'] == 'event' ? ChatRoomKind.event : ChatRoomKind.text,
+            author: e['author'] as String? ?? '',
+            authorName: e['author_name'] as String? ?? '',
+            mine: e['mine'] == true,
+            text: e['text'] as String? ?? '',
+            createdAt: (e['c'] as num?)?.toInt() ?? 0,
+            about: e['about'] as String?,
+            aboutTitle: e['about_title'] as String? ?? '',
           ),
       ];
 
