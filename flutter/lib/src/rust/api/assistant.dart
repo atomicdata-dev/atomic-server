@@ -6,7 +6,13 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `drive_of`, `fetch_agent_name`, `fetched_agent_name`, `name_from_json_ad`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`
+// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `drive_of`, `emoji_of`, `fetch_agent_name`, `fetched_agent_name`, `name_from_json_ad`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`, `row_resource`, `with_emoji`
+
+/// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
+/// have one. For rows that do not carry their icon themselves (the activity
+/// feed), read from the stored propvals like the other rows.
+Future<String> resourceIcons({required List<String> subjects}) =>
+    RustLib.instance.api.crateApiAssistantResourceIcons(subjects: subjects);
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).

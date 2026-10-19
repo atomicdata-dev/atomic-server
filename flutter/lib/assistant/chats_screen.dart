@@ -52,8 +52,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<_Recent>> _recents = _loadRecents();
   late Future<List<RecentResource>> _favorites = widget.api.favorites();
   late Future<List<RecentResource>> _conversations = widget.api.conversations();
-  late Future<List<ActivityEntry>> _activity =
-      widget.api.activity(_maxActivity);
+  late Future<List<ActivityEntry>> _activity = _loadActivity();
+
+  /// The emojis of the activity's resources, filled in after the list shows.
+  Map<String, String> _icons = const {};
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
@@ -77,7 +79,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// the app opened on.
   Future<List<DriveInfo>> _loadDrives() async {
     var drives = await widget.api.drives();
-    if (drives.isEmpty) drives = [(subject: widget.drive, name: '')];
+    if (drives.isEmpty) {
+      drives = [(subject: widget.drive, name: '', emoji: null)];
+    }
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
         : drives.first.subject;
@@ -99,6 +103,20 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
   }
 
+  /// The activity feed; its rows do not carry the resources' own icons, so
+  /// those are looked up after the list is out (never blocking it).
+  Future<List<ActivityEntry>> _loadActivity() async {
+    final list = await widget.api.activity(_maxActivity);
+    widget.api.resourceIcons([for (final a in list) a.subject]).then((icons) {
+      if (mounted && !_sameIcons(icons)) setState(() => _icons = icons);
+    }).catchError((Object _) {});
+    return list;
+  }
+
+  bool _sameIcons(Map<String, String> icons) =>
+      icons.length == _icons.length &&
+      icons.entries.every((e) => _icons[e.key] == e.value);
+
   bool _reloadQueued = false;
 
   /// Fetch every section again. Calls in the same frame are one reload; the
@@ -114,7 +132,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _recents = _loadRecents();
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
-        _activity = widget.api.activity(_maxActivity);
+        _activity = _loadActivity();
       });
     });
     // A frame must run for the callback to fire.
@@ -167,6 +185,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Widget _driveRow(DriveInfo d) => ResourceRow(
         icon: Icons.folder_outlined,
+        emoji: d.emoji,
         title: d.name.isEmpty ? 'Untitled drive' : d.name,
         // The drive itself, drawn by the page: everything in it, read from
         // the store with the same query the web app uses.
@@ -192,7 +211,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// "<who> created/changed/deleted · <when>". A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
-        icon: Icons.description_outlined,
+        icon: iconForClass(a.className),
+        emoji: _icons[a.subject],
         title: a.name.isEmpty ? a.subject : a.name,
         detail: '${a.actor ?? 'Someone'} ${a.kind} · ${timeAgo(a.at.toInt())}',
         onTap: a.kind == 'deleted'
@@ -304,7 +324,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
 ResourceRow _resourceRow(RecentResource r,
         void Function(String drive, RecentResource) onOpen, String drive) =>
     ResourceRow(
-      icon: Icons.description_outlined,
+      icon: iconForClass(r.className),
+      emoji: r.emoji,
       title: r.title.isEmpty ? r.subject : r.title,
       detail: [r.className, if (r.openedAt > 0) timeAgo(r.openedAt)]
           .where((t) => t.isNotEmpty)

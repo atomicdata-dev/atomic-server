@@ -28,16 +28,20 @@ typedef SearchHit = ({
   String className,
   // The drive the hit lives in; '' when unknown.
   String drive,
-  double score
+  double score,
+  // The resource's own icon (an emoji); null when it has none.
+  String? emoji
 });
 
-typedef DriveInfo = ({String subject, String name});
+typedef DriveInfo = ({String subject, String name, String? emoji});
 
 typedef RecentResource = ({
   String subject,
   String title,
   String className,
-  int openedAt
+  int openedAt,
+  // The resource's own icon (an emoji); null when it has none.
+  String? emoji
 });
 
 /// Atomic Data SDK — local-first with optional sync.
@@ -94,6 +98,7 @@ class AtomicClient {
           (
             subject: e['subject'] as String,
             name: e['name'] as String? ?? '',
+            emoji: _emoji(e),
           ),
       ], active: getActiveDrive());
 
@@ -157,6 +162,23 @@ class AtomicClient {
   /// them. `openedAt` is 0.
   static Future<List<RecentResource>> conversations({int limit = 100}) async =>
       parseRecentResources(await assistant.listConversations(limit: limit));
+
+  /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
+  static Future<Map<String, String>> resourceIcons(
+          List<String> subjects) async =>
+      parseIcons(await assistant.resourceIcons(subjects: subjects));
+
+  @visibleForTesting
+  static Map<String, String> parseIcons(String json) => {
+        for (final e in (jsonDecode(json) as Map).entries)
+          if (e.value is String && (e.value as String).isNotEmpty)
+            e.key as String: e.value as String,
+      };
+
+  static String? _emoji(Map e) {
+    final v = e['emoji'];
+    return v is String && v.isNotEmpty ? v : null;
+  }
 
   /// What changed lately in every drive, newest first, by whom.
   static Future<List<ActivityEntry>> activity({int limit = 100}) =>
@@ -238,6 +260,7 @@ class AtomicClient {
             title: e['title'] as String? ?? '',
             className: e['class_name'] as String? ?? '',
             openedAt: (e['opened_at'] as num?)?.toInt() ?? 0,
+            emoji: _emoji(e),
           ),
       ];
 
@@ -250,6 +273,7 @@ class AtomicClient {
             className: e['class_name'] as String? ?? '',
             drive: e['drive'] as String? ?? '',
             score: (e['score'] as num?)?.toDouble() ?? 0,
+            emoji: _emoji(e),
           ),
       ];
 

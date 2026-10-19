@@ -97,14 +97,55 @@ pub(crate) async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String>
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
 }
 
-/// A `{subject, title, class_name, <extra>}` row of the resource lists.
+/// The resource's own icon: the emoji the web app's "Add icon" stores. Empty
+/// when it has none.
+pub(crate) fn emoji_of(resource: &Resource) -> String {
+    resource
+        .get(urls::EMOJI)
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+/// Add `emoji` to a row when the resource has one (absent otherwise).
+pub(crate) fn with_emoji(mut row: Json, resource: &Resource) -> Json {
+    let emoji = emoji_of(resource);
+    if !emoji.is_empty() {
+        row["emoji"] = json!(emoji);
+    }
+    row
+}
+
+/// A `{subject, title, class_name, <extra>, emoji?}` row of the resource lists.
 async fn resource_row(subject: &str, resource: &Resource, extra: (&str, Json)) -> Json {
-    json!({
-        "subject": subject,
-        "title": name_of(resource),
-        "class_name": class_name_of(resource).await,
-        extra.0: extra.1,
-    })
+    with_emoji(
+        json!({
+            "subject": subject,
+            "title": name_of(resource),
+            "class_name": class_name_of(resource).await,
+            extra.0: extra.1,
+        }),
+        resource,
+    )
+}
+
+/// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
+/// have one. For rows that do not carry their icon themselves (the activity
+/// feed), read from the stored propvals like the other rows.
+pub async fn resource_icons(subjects: Vec<String>) -> Result<String, String> {
+    let store = db()?;
+    let mut out = serde_json::Map::new();
+    for subject in subjects {
+        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
+            continue;
+        };
+        let emoji = emoji_of(&resource);
+        if !emoji.is_empty() {
+            out.insert(subject, json!(emoji));
+        }
+    }
+    serde_json::to_string(&out).map_err(|e| e.to_string())
 }
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
@@ -355,12 +396,15 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
         } else {
             names.join(", ")
         };
-        out.push(json!({
-            "subject": subject,
-            "title": title,
-            "class_name": "",
-            "opened_at": 0,
-        }));
+        out.push(with_emoji(
+            json!({
+                "subject": subject,
+                "title": title,
+                "class_name": "",
+                "opened_at": 0,
+            }),
+            &conversation,
+        ));
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }

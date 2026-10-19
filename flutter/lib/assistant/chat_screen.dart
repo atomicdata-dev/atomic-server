@@ -16,7 +16,12 @@ const _readAloudKey = 'chat_read_aloud';
 const voiceLocaleKey = 'voice_locale';
 
 /// A resource the person attached to a new chat as context.
-typedef _Attached = ({String subject, String title, String className});
+typedef _Attached = ({
+  String subject,
+  String title,
+  String className,
+  String? emoji
+});
 
 /// Most characters of one attached resource, and of all of them, sent to the AI.
 const _maxItemChars = 4000;
@@ -689,8 +694,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// A small pill; the selected one is told apart by colour, not an icon.
   Widget _pill(AppColors c, _Attached item) {
     final on = _attached.any((a) => a.subject == item.subject);
-    final label =
+    final title =
         item.title.length > 22 ? '${item.title.substring(0, 21)}…' : item.title;
+    final label = item.emoji == null ? title : '${item.emoji} $title';
     return Material(
       color: on ? c.main.withValues(alpha: 0.12) : c.bg1,
       shape: StadiumBorder(
@@ -729,6 +735,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           subject: d.subject,
           title: d.name.isEmpty ? 'Untitled drive' : d.name,
           className: 'Drive',
+          emoji: d.emoji,
         ),
     ];
     for (final (_, r) in recent) {
@@ -738,6 +745,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         subject: r.subject,
         title: r.title.isEmpty ? 'Untitled' : r.title,
         className: r.className,
+        emoji: r.emoji,
       ));
     }
     if (options.isEmpty) return const SizedBox.shrink();

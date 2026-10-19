@@ -36,12 +36,17 @@ class FakeApi extends AssistantApi {
   final List<String> created = [];
   final Map<String, String> texts;
 
+  /// The emojis `resourceIcons` answers with.
+  final Map<String, String> icons;
+
   /// How many times `drives()` was asked, and an optional gate it waits on.
   int drivesCalls = 0;
   Future<void>? drivesGate;
 
   FakeApi({
-    this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
+    this.driveList = const [
+      (subject: 'did:ad:drive', name: 'Home', emoji: null)
+    ],
     this.recent = const [],
     this.favoriteList = const [],
     this.conversationList = const [],
@@ -51,7 +56,14 @@ class FakeApi extends AssistantApi {
     this.messageList = const [],
     this.hits = const [],
     this.texts = const {},
+    this.icons = const {},
   });
+
+  @override
+  Future<Map<String, String>> resourceIcons(List<String> subjects) async => {
+        for (final e in icons.entries)
+          if (subjects.contains(e.key)) e.key: e.value,
+      };
 
   @override
   Future<String?> agentName() async => 'Joep';
@@ -331,7 +343,13 @@ void main() {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
         recent: [
-          (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1),
+          (
+            subject: 'r1',
+            title: 'A doc',
+            className: 'Document',
+            openedAt: 1,
+            emoji: null
+          ),
         ],
       );
       await tester.pumpWidget(app(
@@ -362,10 +380,22 @@ void main() {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
         favoriteList: [
-          (subject: 'f1', title: 'Starred', className: 'Folder', openedAt: 0),
+          (
+            subject: 'f1',
+            title: 'Starred',
+            className: 'Folder',
+            openedAt: 0,
+            emoji: null
+          ),
         ],
         conversationList: [
-          (subject: 'm1', title: 'Alice, Bob', className: '', openedAt: 0),
+          (
+            subject: 'm1',
+            title: 'Alice, Bob',
+            className: '',
+            openedAt: 0,
+            emoji: null
+          ),
         ],
       );
       await pump(api);
@@ -385,7 +415,13 @@ void main() {
     testWidgets('Favorites shows 4, Show all lists the rest', (tester) async {
       final api = FakeApi(favoriteList: [
         for (var i = 0; i < 6; i++)
-          (subject: 'f$i', title: 'Fav $i', className: '', openedAt: 0),
+          (
+            subject: 'f$i',
+            title: 'Fav $i',
+            className: '',
+            openedAt: 0,
+            emoji: null
+          ),
       ]);
       await tester.pumpWidget(app(
           ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
@@ -420,7 +456,13 @@ void main() {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
         recent: [
-          (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1),
+          (
+            subject: 'r1',
+            title: 'A doc',
+            className: 'Document',
+            openedAt: 1,
+            emoji: null
+          ),
         ],
         activityList: [_activity('a1', 'Plan')],
       );
@@ -488,18 +530,48 @@ void main() {
     testWidgets('recents merge all drives, newest first', (tester) async {
       final api = _PerDrive(
         driveList: [
-          (subject: 'did:ad:a', name: 'Alpha'),
-          (subject: 'did:ad:b', name: 'Beta'),
+          (subject: 'did:ad:a', name: 'Alpha', emoji: null),
+          (subject: 'did:ad:b', name: 'Beta', emoji: null),
         ],
         byDrive: {
           'did:ad:a': [
-            (subject: 'a1', title: 'Old a', className: '', openedAt: 10),
-            (subject: 'a2', title: 'Newest a', className: '', openedAt: 50),
+            (
+              subject: 'a1',
+              title: 'Old a',
+              className: '',
+              openedAt: 10,
+              emoji: null
+            ),
+            (
+              subject: 'a2',
+              title: 'Newest a',
+              className: '',
+              openedAt: 50,
+              emoji: null
+            ),
           ],
           'did:ad:b': [
-            (subject: 'b1', title: 'Mid b', className: '', openedAt: 30),
-            (subject: 'b2', title: 'Oldest b', className: '', openedAt: 5),
-            (subject: 'b3', title: 'Second b', className: '', openedAt: 40),
+            (
+              subject: 'b1',
+              title: 'Mid b',
+              className: '',
+              openedAt: 30,
+              emoji: null
+            ),
+            (
+              subject: 'b2',
+              title: 'Oldest b',
+              className: '',
+              openedAt: 5,
+              emoji: null
+            ),
+            (
+              subject: 'b3',
+              title: 'Second b',
+              className: '',
+              openedAt: 40,
+              emoji: null
+            ),
           ],
         },
       );
@@ -520,11 +592,17 @@ void main() {
 
     testWidgets('a drive opens as a resource page', (tester) async {
       final api = _PerDrive(
-        driveList: [(subject: 'did:ad:a', name: 'Alpha')],
+        driveList: [(subject: 'did:ad:a', name: 'Alpha', emoji: null)],
         byDrive: {
           'did:ad:a': [
             for (var i = 0; i < 6; i++)
-              (subject: 'a$i', title: 'Doc $i', className: '', openedAt: i),
+              (
+                subject: 'a$i',
+                title: 'Doc $i',
+                className: '',
+                openedAt: i,
+                emoji: null
+              ),
           ],
         },
       );
@@ -602,6 +680,100 @@ void main() {
     });
   });
 
+  group('resource icons', () {
+    testWidgets('home Recents shows the emoji of a row that has one',
+        (tester) async {
+      final api = FakeApi(recent: [
+        (
+          subject: 'r1',
+          title: 'Fox doc',
+          className: 'Document',
+          openedAt: 2,
+          emoji: '🦊'
+        ),
+        (
+          subject: 'r2',
+          title: 'Plain table',
+          className: 'Table',
+          openedAt: 1,
+          emoji: null
+        ),
+      ], driveList: const [
+        (subject: 'did:ad:drive', name: 'Home', emoji: '🏔'),
+      ], activityList: [
+        _activity('a1', 'Active thing'),
+      ], icons: {
+        'a1': '🚀'
+      });
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('🦊'), findsOneWidget);
+      expect(find.text('🏔'), findsOneWidget);
+      // Filled in after the activity list was shown.
+      expect(find.text('🚀'), findsOneWidget);
+      expect(find.byIcon(Icons.table_chart_outlined), findsOneWidget);
+      // The drive with an emoji has no folder icon.
+      expect(find.byIcon(Icons.folder_outlined), findsNothing);
+    });
+
+    testWidgets('search results show the emoji, else the class icon',
+        (tester) async {
+      final api = FakeApi(hits: [
+        (
+          subject: 'did:ad:1',
+          title: 'Fox',
+          className: 'Document',
+          drive: '',
+          score: 2.0,
+          emoji: '🦊'
+        ),
+        (
+          subject: 'did:ad:2',
+          title: 'Board',
+          className: 'Canvas',
+          drive: '',
+          score: 1.0,
+          emoji: null
+        ),
+      ]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.enterText(find.byType(TextField), 'f');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.text('🦊'), findsOneWidget);
+      expect(find.byIcon(Icons.draw_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.description_outlined), findsNothing);
+    });
+
+    testWidgets('the new-chat context pills prefix the emoji', (tester) async {
+      final api = FakeApi(recent: [
+        (
+          subject: 'r1',
+          title: 'Fox doc',
+          className: 'Document',
+          openedAt: 2,
+          emoji: '🦊'
+        ),
+      ]);
+      await tester.pumpWidget(app(ChatScreen(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.text('🦊 Fox doc'), findsOneWidget);
+    });
+
+    test('parsing carries the emoji, empty or absent is none', () {
+      final rows = AtomicClient.parseRecentResources(
+          '[{"subject":"a","title":"A","class_name":"","opened_at":1,"emoji":"🦊"},'
+          '{"subject":"b","title":"B","class_name":"","opened_at":1}]');
+      expect(rows.map((r) => r.emoji), ['🦊', null]);
+      final hits = AtomicClient.parseHits(
+          '[{"subject":"a","title":"A","class_name":"","drive":"","score":1,"emoji":""}]');
+      expect(hits.single.emoji, isNull);
+      expect(AtomicClient.parseIcons('{"a":"🦊","b":""}'), {'a': '🦊'});
+    });
+  });
+
   group('SearchScreen', () {
     testWidgets('searches as you type, once per pause', (tester) async {
       final api = FakeApi(hits: [
@@ -610,7 +782,8 @@ void main() {
           title: 'Zebra',
           className: 'Folder',
           drive: '',
-          score: 1.5
+          score: 1.5,
+          emoji: null
         ),
       ]);
       await tester
@@ -638,7 +811,8 @@ void main() {
             subject: 'r1',
             title: 'Opened doc',
             className: 'Document',
-            openedAt: 1
+            openedAt: 1,
+            emoji: null
           ),
         ],
         hits: [
@@ -647,7 +821,8 @@ void main() {
             title: 'Zebra',
             className: 'Folder',
             drive: '',
-            score: 1.0
+            score: 1.0,
+            emoji: null
           ),
         ],
       );
@@ -683,7 +858,8 @@ void main() {
           title: 'Zebra',
           className: 'Folder',
           drive: '',
-          score: 1.5
+          score: 1.5,
+          emoji: null
         ),
       ]);
       await tester
@@ -704,7 +880,8 @@ void main() {
           title: title,
           className: 'Folder',
           drive: '',
-          score: score
+          score: score,
+          emoji: null
         );
 
     Future<void> type(WidgetTester tester, String text) async {
@@ -784,8 +961,20 @@ void main() {
 
     testWidgets('recents: newest at the bottom, outlined', (tester) async {
       final api = FakeApi(recent: [
-        (subject: 'r2', title: 'Newer', className: 'Document', openedAt: 2),
-        (subject: 'r1', title: 'Older', className: 'Document', openedAt: 1),
+        (
+          subject: 'r2',
+          title: 'Newer',
+          className: 'Document',
+          openedAt: 2,
+          emoji: null
+        ),
+        (
+          subject: 'r1',
+          title: 'Older',
+          className: 'Document',
+          openedAt: 1,
+          emoji: null
+        ),
       ]);
       await tester
           .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
@@ -808,8 +997,8 @@ void main() {
         (tester) async {
       final api = FakeApi(
         driveList: [
-          (subject: 'did:ad:drive', name: 'Home'),
-          (subject: 'did:ad:work', name: 'Work'),
+          (subject: 'did:ad:drive', name: 'Home', emoji: null),
+          (subject: 'did:ad:work', name: 'Work', emoji: null),
         ],
         hits: [
           (
@@ -817,14 +1006,16 @@ void main() {
             title: 'Zebra home',
             className: 'Folder',
             drive: 'did:ad:drive',
-            score: 2.0
+            score: 2.0,
+            emoji: null
           ),
           (
             subject: 'did:ad:b',
             title: 'Zebra work',
             className: 'Document',
             drive: 'did:ad:work',
-            score: 1.0
+            score: 1.0,
+            emoji: null
           ),
         ],
       );
@@ -1305,8 +1496,20 @@ void main() {
 
     group('context picker', () {
       final recent = [
-        (subject: 'r1', title: 'Trip plan', className: 'Document', openedAt: 5),
-        (subject: 'r2', title: 'Budget', className: 'Table', openedAt: 9),
+        (
+          subject: 'r1',
+          title: 'Trip plan',
+          className: 'Document',
+          openedAt: 5,
+          emoji: null
+        ),
+        (
+          subject: 'r2',
+          title: 'Budget',
+          className: 'Table',
+          openedAt: 9,
+          emoji: null
+        ),
       ];
 
       testWidgets('a new chat offers drives and recent, not "No messages"',
@@ -1389,7 +1592,8 @@ void main() {
               subject: 'r$i',
               title: 'Res $i',
               className: 'Document',
-              openedAt: i
+              openedAt: i,
+              emoji: null
             ),
         ];
         await tester
@@ -1529,8 +1733,13 @@ void main() {
   });
 
   group('AppShell', () {
-    const doc =
-        (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1);
+    const doc = (
+      subject: 'r1',
+      title: 'A doc',
+      className: 'Document',
+      openedAt: 1,
+      emoji: null
+    );
 
     Future<void> pumpHome(WidgetTester tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
@@ -1803,11 +2012,11 @@ void main() {
 
     test('lists each drive once, only those that are on the device', () {
       final shown = AtomicClient.visibleDrives([
-        (subject: 'did:ad:AAA', name: 'Private'),
-        (subject: 'atomic:AAA', name: 'Private'),
-        (subject: 'did:ad:BBB', name: ''),
-        (subject: 'did:ad:CCC', name: 'Team'),
-        (subject: 'did:ad:DDD', name: ''),
+        (subject: 'did:ad:AAA', name: 'Private', emoji: null),
+        (subject: 'atomic:AAA', name: 'Private', emoji: null),
+        (subject: 'did:ad:BBB', name: '', emoji: null),
+        (subject: 'did:ad:CCC', name: 'Team', emoji: null),
+        (subject: 'did:ad:DDD', name: '', emoji: null),
       ], active: 'atomic:DDD');
       expect(shown.map((d) => d.subject),
           ['did:ad:AAA', 'did:ad:CCC', 'did:ad:DDD']);
@@ -1915,7 +2124,8 @@ void main() {
           subject: 'r1',
           title: 'Opened doc',
           className: 'Document',
-          openedAt: 1
+          openedAt: 1,
+          emoji: null
         ),
       ]);
       await tester.pumpWidget(shellApp(

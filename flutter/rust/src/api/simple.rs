@@ -358,10 +358,23 @@ pub async fn list_drives() -> Result<Vec<String>, String> {
     Ok(drives.iter().map(|d| d.subject.clone()).collect())
 }
 
-/// List drives with names. Returns JSON-encoded array of {subject, name}.
+/// List drives with names. Returns JSON-encoded array of {subject, name,
+/// emoji?} (`emoji` is the drive's own icon, absent when it has none).
 pub async fn list_drives_with_names() -> Result<String, String> {
-    let drives = db()?.list_drives().await.map_err(err)?;
-    serde_json::to_string(&drives).map_err(|e| e.to_string())
+    let store = db()?;
+    let drives = store.list_drives().await.map_err(err)?;
+    let mut rows = serde_json::to_value(&drives).map_err(|e| e.to_string())?;
+    if let Some(rows) = rows.as_array_mut() {
+        for row in rows {
+            let Some(subject) = row["subject"].as_str() else {
+                continue;
+            };
+            if let Some(drive) = super::assistant::row_resource(&store, &subject.into()).await {
+                *row = super::assistant::with_emoji(row.take(), &drive);
+            }
+        }
+    }
+    serde_json::to_string(&rows).map_err(|e| e.to_string())
 }
 
 // ── 4. Resource ────────────────────────────────────────────────────────────

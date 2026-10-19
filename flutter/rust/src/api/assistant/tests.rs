@@ -708,3 +708,72 @@ async fn search_finds_the_drive_through_local_parents_without_full_reads() {
         serde_json::from_str(&search(None, "narwhal".into(), 1).await.unwrap()).unwrap();
     assert_eq!(one.len(), 1);
 }
+
+/// Give `subject` an icon the way the web app's "Add icon" does.
+async fn set_emoji(subject: &str, emoji: &str) {
+    let store = db().unwrap();
+    let mut r = store.get_resource(&subject.into()).await.unwrap();
+    r.set_string(urls::EMOJI.into(), emoji, store.as_ref())
+        .await
+        .unwrap();
+    r.save_locally(store.as_ref()).await.unwrap();
+}
+
+#[tokio::test]
+async fn rows_carry_the_resources_own_emoji_when_it_has_one() {
+    let drive = shared_drive().await.to_string();
+    let with = new_chat("Icon with").await;
+    let without = new_chat("Icon without").await;
+    set_emoji(&with, "🦊").await;
+    recents::note_opened(&drive, &with, 1);
+    recents::note_opened(&drive, &without, 2);
+    set_home_list(FAVORITES, &[&with, &without]).await;
+
+    let find = |rows: &[Json], subject: &str| -> Json {
+        rows.iter()
+            .find(|r| r["subject"] == subject)
+            .unwrap_or_else(|| panic!("{subject} not in {rows:?}"))
+            .clone()
+    };
+
+    let recent: Vec<Json> =
+        serde_json::from_str(&list_recent_resources(drive.clone(), 500).await.unwrap()).unwrap();
+    assert_eq!(find(&recent, &with)["emoji"], "🦊");
+    assert!(find(&recent, &without).get("emoji").is_none());
+    assert!(!find(&recent, &with)["class_name"]
+        .as_str()
+        .unwrap()
+        .is_empty());
+
+    let favs: Vec<Json> = serde_json::from_str(&list_favorites(50).await.unwrap()).unwrap();
+    assert_eq!(find(&favs, &with)["emoji"], "🦊");
+    assert!(find(&favs, &without).get("emoji").is_none());
+
+    let hits: Vec<Json> = serde_json::from_str(
+        &search(Some(drive.clone()), "icon".into(), 20)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(find(&hits, &with)["emoji"], "🦊");
+    assert!(find(&hits, &without).get("emoji").is_none());
+
+    let icons: serde_json::Map<String, Json> = serde_json::from_str(
+        &resource_icons(vec![
+            with.clone(),
+            without.clone(),
+            "https://example.test/gone".into(),
+        ])
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(icons.len(), 1);
+    assert_eq!(icons[&with], "🦊");
+
+    // A drive's own icon comes with the drive list.
+    set_emoji(&drive, "🏔").await;
+    let drives: Vec<Json> =
+        serde_json::from_str(&crate::api::simple::list_drives_with_names().await.unwrap()).unwrap();
+    assert_eq!(find(&drives, &drive)["emoji"], "🏔");
+}

@@ -20,6 +20,10 @@ class AssistantApi {
   Future<List<RecentResource>> conversations() => AtomicClient.conversations();
   Future<List<ActivityEntry>> activity(int limit) =>
       AtomicClient.activity(limit: limit);
+
+  /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
+  Future<Map<String, String>> resourceIcons(List<String> subjects) =>
+      AtomicClient.resourceIcons(subjects);
   void noteOpened(String drive, String subject) =>
       AtomicClient.noteResourceOpened(drive, subject);
   Future<String?> agentName() async =>

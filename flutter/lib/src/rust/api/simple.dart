@@ -67,7 +67,8 @@ Future<void> setActiveDrive({required String subject}) =>
 Future<List<String>> listDrives() =>
     RustLib.instance.api.crateApiSimpleListDrives();
 
-/// List drives with names. Returns JSON-encoded array of {subject, name}.
+/// List drives with names. Returns JSON-encoded array of {subject, name,
+/// emoji?} (`emoji` is the drive's own icon, absent when it has none).
 Future<String> listDrivesWithNames() =>
     RustLib.instance.api.crateApiSimpleListDrivesWithNames();
 

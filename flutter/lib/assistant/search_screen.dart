@@ -62,7 +62,8 @@ typedef _Item = ({
   String shown,
   String subject,
   String title,
-  String className
+  String className,
+  String? emoji
 });
 
 /// What the list shows. The screen is built once; only the list listens.
@@ -212,7 +213,8 @@ class _SearchScreenState extends State<SearchScreen> {
               shown: drive,
               subject: r.subject,
               title: r.title,
-              className: r.className
+              className: r.className,
+              emoji: r.emoji
             )
         ]
       : [
@@ -222,7 +224,8 @@ class _SearchScreenState extends State<SearchScreen> {
               shown: h.drive,
               subject: h.subject,
               title: h.title,
-              className: h.className
+              className: h.className,
+              emoji: h.emoji
             )
         ];
 
@@ -337,7 +340,8 @@ class _SearchScreenState extends State<SearchScreen> {
     required bool top,
   }) {
     final row = ResourceRow(
-      icon: Icons.description_outlined,
+      icon: iconForClass(i.className),
+      emoji: i.emoji,
       title: i.title.isEmpty ? i.subject : i.title,
       detail: _detail(i.className, i.shown),
       onTap: () => _open(i.drive, i.subject, i.title, i.className),
