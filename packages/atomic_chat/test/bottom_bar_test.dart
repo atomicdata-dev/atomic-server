@@ -229,6 +229,18 @@ void main() {
     });
   });
 
+  testWidgets('the bar is drawn on the bar surface, not the page colour',
+      (tester) async {
+    await tester.pumpWidget(_shell(_BarApi()));
+    await tester.pumpAndSettle();
+    final material = tester.widget<Material>(find
+        .ancestor(
+            of: find.byTooltip('Search'), matching: find.byType(Material))
+        .last);
+    expect(material.color, AppColors.light.barSurface);
+    expect(material.color, isNot(AppColors.light.bgBody));
+  });
+
   group('Where you are', () {
     testWidgets('the current button is in the main colour, with no dot',
         (tester) async {

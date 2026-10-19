@@ -97,7 +97,7 @@ class AppBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
     return Material(
-      color: c.bgBody,
+      color: c.barSurface,
       child: SafeArea(
         top: false,
         child: Padding(

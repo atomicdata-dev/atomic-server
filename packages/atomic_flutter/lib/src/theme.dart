@@ -184,6 +184,15 @@ class AppColors extends ThemeExtension<AppColors> {
     success: Color(0xFF237A42),
   );
 
+  /// Surface of the bottom bar and, behind the OS buttons, of the Android
+  /// navigation bar: a step above the page, with a little of [main] in it
+  /// (a faintly blue dark grey, or an off-white).
+  Color get barSurface {
+    final dark = bgBody.computeLuminance() < 0.5;
+    return Color.alphaBlend(
+        main.withValues(alpha: dark ? 0.07 : 0.05), dark ? bg1 : bgBody);
+  }
+
   @override
   AppColors copyWith({
     Color? canvasBg,
