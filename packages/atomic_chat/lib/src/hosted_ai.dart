@@ -29,6 +29,10 @@ class HostedAi {
   /// when the portal offers none.
   final Future<Map<String, dynamic>?> Function()? voiceStatus;
 
+  /// The most of a chat sent to the model: its latest messages.
+  static const maxHistoryMessages = 40;
+  static const maxHistoryChars = 24000;
+
   Map<String, dynamic> status;
   final Stream<String> Function(List<Map<String, String>>, String model)
       _stream;
@@ -53,14 +57,26 @@ class HostedAi {
   /// [context], when given, is sent as a second system message ahead of the
   /// history: resources the person attached. It is not part of the chat.
   Stream<String> answer(List<ChatMessage> history, {String? context}) {
+    // A long chat is cut to its latest part: the model reads (and the
+    // account bills) every token, and an old chat made the first word slow.
+    var recent = history.length > maxHistoryMessages
+        ? history.sublist(history.length - maxHistoryMessages)
+        : history;
+    var chars = 0;
+    var start = recent.length;
+    while (
+        start > 0 && chars + recent[start - 1].text.length <= maxHistoryChars) {
+      chars += recent[--start].text.length;
+    }
+    recent = recent.sublist(start == recent.length ? start - 1 : start);
     final messages = [
       {'role': 'system', 'content': _systemPrompt},
       if (context != null && context.isNotEmpty)
         {'role': 'system', 'content': context},
-      for (final m in history) {'role': m.role, 'content': m.text},
+      for (final m in recent) {'role': m.role, 'content': m.text},
     ];
     debugPrint('[ai] sending ${messages.length} messages '
-        '(${history.length} of the chat) to model "$model"');
+        '(${recent.length} of ${history.length} of the chat) to model "$model"');
     return _stream(messages, model);
   }
 

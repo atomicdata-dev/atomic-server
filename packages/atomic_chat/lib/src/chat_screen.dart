@@ -1,6 +1,8 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'app_top_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,7 +15,6 @@ import 'hosted_voice.dart';
 import 'voice.dart';
 
 /// SharedPreferences key: speak each new answer aloud.
-const _readAloudKey = 'chat_read_aloud';
 
 /// SharedPreferences key: the recogniser language the person picked.
 const voiceLocaleKey = 'voice_locale';
@@ -129,7 +130,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// The last input levels, newest last, for the waveform.
   final List<double> _levels = [];
-  bool _readAloud = false;
 
   /// Bumped whenever listening starts or is cancelled, so late results of an
   /// older session are ignored.
@@ -161,12 +161,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _hostedInst = widget.hostedSpeechInput;
     _input.addListener(_inputChanged);
     _outputInst = widget.speechOutput;
-    // Voice mode reads aloud, whatever the saved setting.
-    if (widget.voiceMode) {
-      _readAloud = true;
-    } else {
-      _loadReadAloud();
-    }
     _chat = widget.subject;
     _readMessages();
     _lookUpAi();
@@ -185,6 +179,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _sub?.cancel();
     _input.removeListener(_inputChanged);
     WidgetsBinding.instance.removeObserver(this);
     _listenSession++;
@@ -206,26 +201,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // The voice loop ends with the app in the background: nothing is sent.
     if (_voiceLoop || _speaking) return _stopVoice();
     _stopListening();
-  }
-
-  Future<void> _loadReadAloud() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final on = prefs.getBool(_readAloudKey) ?? false;
-      if (mounted && on != _readAloud) setState(() => _readAloud = on);
-    } catch (_) {}
-  }
-
-  Future<void> _toggleReadAloud() async {
-    final on = !_readAloud;
-    setState(() => _readAloud = on);
-    if (!on) _outputInst?.stop();
-    // Voice mode's reading aloud is for this chat only.
-    if (widget.voiceMode) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_readAloudKey, on);
-    } catch (_) {}
   }
 
   HostedSpeechInput get _hosted =>
@@ -476,6 +451,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// aloud stops.
   void _stopVoice() {
     _listenSession++;
+    if (_sending) _stopAnswer();
     if (_hostedActive && (_listening || _transcribing)) _hosted.cancel();
     if (_listening && !_hostedActive) _inputInst?.stop();
     _outputInst?.stop();
@@ -654,6 +630,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Local writes run one after another (the user message before the answer)
+  /// but never hold up the model request or the screen.
+  Future<void> _persistTail = Future.value();
+  int _localId = 0;
+
+  void _persist(String label, Future<void> Function() job) {
+    _persistTail = _persistTail.then((_) async {
+      final sw = Stopwatch()..start();
+      try {
+        await job();
+      } catch (e) {
+        if (mounted) setState(() => _error = '$e');
+      }
+      debugPrint('[chat] persist $label took ${sw.elapsedMilliseconds}ms');
+    });
+  }
+
+  StreamSubscription<String>? _sub;
+  Completer<void>? _streamDone;
+
+  /// Stop writing the reply: the request is cancelled and what came so far
+  /// stays as the answer (nothing is kept when it is empty).
+  void _stopAnswer() {
+    _sub?.cancel();
+    _sub = null;
+    final done = _streamDone;
+    if (done != null && !done.isCompleted) done.complete();
+  }
+
   Future<void> _send() async {
     final text = _input.text.trim();
     final ai = _ai;
@@ -663,42 +668,62 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _stopListening();
     _outputInst?.stop();
     _input.clear();
-    final asked = [
-      ..._messages,
-      (id: 'new', role: 'user', text: text, createdAt: 0),
-    ];
+    final sw = Stopwatch()..start();
+    void lap(String what) =>
+        debugPrint('[chat] +${sw.elapsedMilliseconds}ms $what');
+    final userMessage = (
+      id: 'local-${_localId++}',
+      role: 'user',
+      text: text,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    final asked = [..._messages, userMessage];
     setState(() {
       _sending = true;
       _error = null;
       _messages = asked;
       _partial = [];
     });
-    String? spoken;
-    try {
-      // The chat exists from the first message on, named after it.
+    // The user message is saved in the background; the chat exists from the
+    // first message on, named after it.
+    _persist('user message', () async {
       final isNew = _chat == null;
       final chat = _chat ??= await widget.api.newChat(
         text.length > 40 ? '${text.substring(0, 40)}…' : text,
       );
       if (isNew) _noLongerNew();
       await widget.api.addMessage(chat, 'user', text);
-      var answer = '';
+    });
+    String? spoken;
+    var answer = '';
+    var stopped = false;
+    try {
       final context = await _contextText();
-      await for (final delta in ai.answer(asked, context: context)) {
-        answer += delta;
-        if (mounted) {
-          setState(() => _partial = [..._partial!, (delta, DateTime.now())]);
-        }
-      }
-      if (answer.trim().isNotEmpty) {
-        await widget.api.addMessage(chat, 'assistant', answer);
-      }
-      await _readMessages();
-      if (_voiceLoop) {
-        spoken = answer;
-      } else if (_readAloud && mounted && answer.trim().isNotEmpty) {
-        (_outputInst ??= PluginSpeechOutput()).speak(answer);
-      }
+      lap('context ready');
+      final done = _streamDone = Completer<void>();
+      var first = true;
+      _sub = ai.answer(asked, context: context).listen(
+        (delta) {
+          if (first) {
+            first = false;
+            lap('first delta');
+          }
+          answer += delta;
+          if (mounted) {
+            setState(() => _partial = [..._partial!, (delta, DateTime.now())]);
+          }
+        },
+        onError: (Object e, StackTrace st) {
+          if (!done.isCompleted) done.completeError(e, st);
+        },
+        onDone: () {
+          if (!done.isCompleted) done.complete();
+        },
+        cancelOnError: true,
+      );
+      await done.future;
+      stopped = _sub == null;
+      lap(stopped ? 'stopped' : 'stream done');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -707,12 +732,38 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
     } finally {
+      _sub?.cancel();
+      _sub = null;
+      _streamDone = null;
+      final keep = answer.trim().isNotEmpty;
+      if (keep) {
+        final reply = (
+          id: 'local-${_localId++}',
+          role: 'assistant',
+          text: answer,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        );
+        _persist('assistant message', () async {
+          final chat = _chat;
+          if (chat != null) {
+            await widget.api.addMessage(chat, 'assistant', answer);
+          }
+        });
+        if (mounted) _messages = [..._messages, reply];
+      }
       if (mounted) {
         setState(() {
           _sending = false;
           _partial = null;
         });
       }
+      lap('done');
+    }
+    if (stopped || answer.trim().isEmpty) return;
+    if (_voiceLoop) {
+      spoken = answer;
+    } else if (widget.voiceMode && mounted) {
+      (_outputInst ??= PluginSpeechOutput()).speak(answer);
     }
     if (spoken != null && mounted && _voiceLoop) await _speakThenListen(spoken);
   }
@@ -736,13 +787,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ? (widget.voiceMode ? 'Voice chat' : 'New chat')
                 : 'Untitled chat')
             : widget.title,
-        actions: [
-          IconButton(
-            tooltip: _readAloud ? 'Stop reading aloud' : 'Read answers aloud',
-            onPressed: _toggleReadAloud,
-            icon: Icon(_readAloud ? Icons.volume_up : Icons.volume_off),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -1008,14 +1052,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       ai == null || _transcribing ? null : _openVoiceSheet,
                   onPressed: ai == null ? null : _toggleListening,
                 ),
-                IconButton.filled(
-                  tooltip: 'Send',
-                  onPressed:
-                      _sending || _transcribing || ai == null || !_hadText
-                          ? null
-                          : _send,
-                  icon: const Icon(Icons.arrow_upward),
-                ),
+                if (_sending)
+                  IconButton.filled(
+                    key: const Key('chat-stop'),
+                    tooltip: 'Stop',
+                    onPressed: _stopAnswer,
+                    icon: const Icon(Icons.stop),
+                  )
+                else
+                  IconButton.filled(
+                    tooltip: 'Send',
+                    onPressed:
+                        _transcribing || ai == null || !_hadText ? null : _send,
+                    icon: const Icon(Icons.arrow_upward),
+                  ),
               ],
             ),
             if (_voiceNote != null)
