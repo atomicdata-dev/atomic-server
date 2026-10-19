@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/sync_screen.dart';
 import '../theme.dart';
+import '../widgets/atomic_place_mark.dart';
 import '../widgets/slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
@@ -10,7 +11,7 @@ import 'resource_view.dart';
 import 'search_screen.dart';
 
 /// The one row at the bottom of the app, within the thumb's reach, the same on
-/// every page and never moving with them: search, a new chat, the user (agent,
+/// every page and never moving with them: home (the atomic.place mark), search, a new chat, the user (agent,
 /// sync and account) and, last, settings, or the "more" menu of the resource
 /// the page on top shows. Back is the system back and the swipe from the left
 /// edge.
@@ -47,6 +48,12 @@ class AppBottomBar extends StatelessWidget {
               return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    IconButton(
+                      tooltip: 'Home',
+                      onPressed: () => shell.navigatorKey.currentState
+                          ?.popUntil((route) => route.isFirst),
+                      icon: const AtomicPlaceMark(size: 24),
+                    ),
                     IconButton(
                       tooltip: 'Search',
                       onPressed: _openSearch,

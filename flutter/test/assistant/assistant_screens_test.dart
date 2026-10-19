@@ -1842,6 +1842,23 @@ void main() {
       expect(builds, greaterThan(back));
     });
 
+    testWidgets('Home goes back to the home screen from any page',
+        (tester) async {
+      await tester.pumpWidget(shellApp(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+      // Home sits first in the row.
+      expect(tester.getCenter(find.byTooltip('Home')).dx,
+          lessThan(tester.getCenter(find.byTooltip('Search')).dx));
+      await tester.tap(find.byTooltip('Home'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsNothing);
+      expect(find.byType(ChatsScreen), findsOneWidget);
+    });
+
     testWidgets('the bar hides at once with the keyboard and fades back in',
         (tester) async {
       await tester.pumpWidget(shellApp(ChatsScreen(
