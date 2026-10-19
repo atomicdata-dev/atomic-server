@@ -154,31 +154,39 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                 drive: drive.subject, api: widget.api)),
                           ),
                         ),
-                        _ChatsSection(
-                          chats: _chats,
-                          onOpen: (chat) => _push(ChatScreen(
-                            api: widget.api,
-                            subject: chat?.subject,
-                            title: chat?.name ?? '',
-                          )),
-                        ),
-                        if (drives.length > 1)
-                          _Dots(
-                            count: drives.length,
-                            current: _page,
-                          ),
+                        // The chats scroll away above the drive pages, so
+                        // the pages always get the screen's height to swipe
+                        // and scroll in, however many chats there are.
                         Expanded(
-                          child: PageView.builder(
-                            controller: _pages,
-                            allowImplicitScrolling: true,
-                            itemCount: drives.length,
-                            onPageChanged: (i) => setState(() => _page = i),
-                            itemBuilder: (_, i) => _OpenedPage(
-                              key: ValueKey(drives[i].subject),
-                              api: widget.api,
-                              drive: drives[i].subject,
-                              generation: _generation,
-                              onOpen: _push,
+                          child: NestedScrollView(
+                            headerSliverBuilder: (_, __) => [
+                              SliverToBoxAdapter(
+                                child: Column(children: [
+                                  _ChatsSection(
+                                    chats: _chats,
+                                    onOpen: (chat) => _push(ChatScreen(
+                                      api: widget.api,
+                                      subject: chat?.subject,
+                                      title: chat?.name ?? '',
+                                    )),
+                                  ),
+                                  if (drives.length > 1)
+                                    _Dots(count: drives.length, current: _page),
+                                ]),
+                              ),
+                            ],
+                            body: PageView.builder(
+                              controller: _pages,
+                              allowImplicitScrolling: true,
+                              itemCount: drives.length,
+                              onPageChanged: (i) => setState(() => _page = i),
+                              itemBuilder: (_, i) => _OpenedPage(
+                                key: ValueKey(drives[i].subject),
+                                api: widget.api,
+                                drive: drives[i].subject,
+                                generation: _generation,
+                                onOpen: _push,
+                              ),
                             ),
                           ),
                         ),

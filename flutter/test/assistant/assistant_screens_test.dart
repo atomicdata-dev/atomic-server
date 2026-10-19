@@ -162,6 +162,45 @@ void main() {
       expect(find.text('Any drive chat'), findsOneWidget);
     });
 
+    testWidgets('on a phone with five chats, the drives still swipe and scroll',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 1920);
+      tester.view.devicePixelRatio = 3; // 360 x 640
+      addTearDown(tester.view.reset);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final api = FakeApi(
+        driveList: [
+          (subject: 'did:ad:a', name: 'Alpha'),
+          (subject: 'did:ad:b', name: 'Beta'),
+        ],
+        chatList: [
+          for (var i = 0; i < 5; i++)
+            (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+        ],
+        recent: [
+          for (var i = 0; i < 20; i++)
+            (
+              subject: 'r$i',
+              title: 'Doc $i',
+              className: 'Document',
+              openedAt: now,
+            ),
+        ],
+      );
+      await tester.pumpWidget(
+          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+
+      // Scrolling up moves the chats away and reaches the last opened doc.
+      await tester.dragUntilVisible(find.text('Doc 19'),
+          find.byType(NestedScrollView), const Offset(0, -300));
+      expect(find.text('Doc 19'), findsOneWidget);
+
+      await tester.fling(find.text('Doc 19'), const Offset(-300, 0), 2000);
+      await tester.pumpAndSettle();
+      expect(find.text('Search in Beta'), findsOneWidget);
+    });
+
     testWidgets('the agent avatar is the way to agent and sync',
         (tester) async {
       await tester.pumpWidget(app(ChatsScreen(
