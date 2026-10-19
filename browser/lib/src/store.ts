@@ -203,6 +203,14 @@ type DriveCallback = (drive: string) => void;
 /** Called when the server reports vector index activity for a drive (via websocket). */
 export type IndexingStatusCallback = (indexing: boolean) => void;
 
+/**
+ * Delivers a signed commit somewhere other than a server: a host app that
+ * holds the real store (the Flutter app's embedded renderer hands it to Rust
+ * over a JS channel). Resolves with the commit as stored, like a server's
+ * answer to `POST /commit`; rejects when the commit was refused.
+ */
+export type CommitTransport = (commit: Commit) => Promise<Commit>;
+
 /** How long a migration fetch may take before the answer stops being useful.
  *  These are servers the device may never reach; sign-in must not wait on
  *  them. */
@@ -268,6 +276,8 @@ export interface StoreOpts {
   connect?: boolean;
   /** Native shells have no ClientDb, so a disconnected node cannot save edits. */
   requireOnlineWrites?: boolean;
+  /** Where commits go instead of a server, see {@link Store.setCommitTransport}. */
+  commitTransport?: CommitTransport;
 }
 
 export interface StoreSyncStatus {
@@ -820,7 +830,7 @@ export class Store {
    * land instead of stranding until the next user keystroke.
    */
   private scheduleOutboxDrain(): void {
-    if (!this._serverConnected) return;
+    if (!this.canCommit) return;
     if (this.outbox.size === 0) return;
     if (!this.getAgent()) return;
     // Wake when the soonest entry is due (0 = due now), honoring per-entry
@@ -843,7 +853,7 @@ export class Store {
     if (this.outboxDrainTimer) clearTimeout(this.outboxDrainTimer);
     this.outboxDrainTimer = setTimeout(() => {
       this.outboxDrainTimer = undefined;
-      if (!this._serverConnected) return;
+      if (!this.canCommit) return;
       void this.syncDirtyResources().catch(() => undefined);
     }, delay);
   }
@@ -924,9 +934,11 @@ export class Store {
 
   private client: Client;
   public readonly requireOnlineWrites: boolean;
+  private commitTransport: CommitTransport | undefined;
 
   public constructor(opts: StoreOpts = {}) {
     this.requireOnlineWrites = opts.requireOnlineWrites ?? false;
+    this.commitTransport = opts.commitTransport;
     initOntologies();
     this._resources = new Map();
     this.webSockets = new Map();
@@ -5716,6 +5728,31 @@ export class Store {
     return this._serverConnected;
   }
 
+  /**
+   * Whether a signed commit can be delivered right now: to the server, or to
+   * the {@link setCommitTransport commit transport}. The WRITE side asks
+   * this (save, destroy, the outbox drain); reads and live subscriptions keep
+   * asking {@link serverConnected}, so a transport never makes the store
+   * fetch from a server it does not have.
+   */
+  public get canCommit(): boolean {
+    return this._serverConnected || this.commitTransport !== undefined;
+  }
+
+  /**
+   * Send every commit to `transport` instead of a server. For a page whose
+   * store lives in a host app: the page runs `connect: false`, so without a
+   * transport its edits would only ever reach the offline path (snapshot and
+   * outbox rows in the local database), which such a host does not keep.
+   * With one, saving works as when online: the outbox drains, each commit is
+   * signed here and handed over, and `save()` resolves once the host has it.
+   */
+  public setCommitTransport(transport: CommitTransport | undefined): void {
+    this.commitTransport = transport;
+    this.emitSyncStatus();
+    this.scheduleOutboxDrain();
+  }
+
   /** Called by WebSocket client when connection state changes. */
   public setServerConnected(connected: boolean, error?: string): void {
     const nextError = connected ? undefined : error;
@@ -5826,7 +5863,7 @@ export class Store {
 
   private saveStatus = new SaveStatusCoordinator({
     getOutboxEntry: subject => this.outbox.getEntry(subject),
-    isConnected: () => this._serverConnected,
+    isConnected: () => this.canCommit,
     changePending: delta => {
       this._scheduledSaves += delta;
       this.emitSyncStatus();
@@ -7760,6 +7797,8 @@ export class Store {
    * commits still work; they just always reach every subscriber.
    */
   private async sendCommit(commit: Commit, endpoint: string): Promise<Commit> {
+    if (this.commitTransport) return this.commitTransport(commit);
+
     const ws = this.getWebSocketForEndpoint(endpoint);
 
     if (ws && ws.readyState === WebSocket.OPEN) {

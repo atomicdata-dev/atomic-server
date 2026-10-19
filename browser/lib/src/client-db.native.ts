@@ -22,6 +22,7 @@ import type {
   ClientDbQueryOpts,
   ClientDbQueryResult,
 } from './client-db.js';
+import { serializeDeterministically, type Commit } from './commit.js';
 
 /** How the page talks to the host app. One request, one answer. */
 export interface NativeChannel {
@@ -204,6 +205,20 @@ export class NativeClientDb {
   async applyCommit(commitJsonAd: string): Promise<void> {
     await this.channel.call('applyCommit', [commitJsonAd]);
   }
+
+  /**
+   * The page's commit transport (`Store.setCommitTransport`): every commit
+   * the store would send to a server goes to the host instead, in the body
+   * `Client.postCommit` would post. The host applies it to its store and
+   * queues it for the server and peers; the commit is stored once that call
+   * answers. Without it, a page with `connect: false` saves only offline,
+   * into a database the host does not keep.
+   */
+  readonly commitTransport = async (commit: Commit): Promise<Commit> => {
+    await this.applyCommit(serializeDeterministically({ ...commit }, true));
+
+    return commit;
+  };
 
   /** A commit that came from elsewhere. */
   async applyPeerCommit(commitJsonAd: string): Promise<void> {
