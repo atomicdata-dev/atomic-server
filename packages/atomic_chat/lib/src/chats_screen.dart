@@ -769,11 +769,13 @@ class _Empty extends StatelessWidget {
 
   const _Empty(this.text, this.c);
 
+  /// One quiet line under the heading, where the first row would start: a
+  /// centred block with 32 px around it made an empty section taller than a
+  /// full one.
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(32),
-        child:
-            Center(child: Text(text, style: TextStyle(color: c.textSecondary))),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Text(text, style: TextStyle(color: c.textSecondary)),
       );
 }
 
