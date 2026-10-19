@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
 
@@ -93,11 +94,13 @@ class AtomicAccountClient {
     _cookie = cookie;
     return true;
   }
+
   void close() => _http.close();
 
   Future<http.Response> _request(String method, String path,
       {Map<String, dynamic>? body,
       Map<String, String>? query,
+      Duration timeout = const Duration(seconds: 20),
       bool authenticated = true}) async {
     if (authenticated && !linked) throw StateError('Sign in first');
     final req = http.Request(
@@ -112,7 +115,7 @@ class AtomicAccountClient {
     try {
       return await (() async =>
               http.Response.fromStream(await _http.send(req)))()
-          .timeout(const Duration(seconds: 20));
+          .timeout(timeout);
     } catch (_) {
       // Network exceptions can contain the polling URL, including device_code.
       throw StateError('Could not reach the account provider');
@@ -264,6 +267,56 @@ class AtomicAccountClient {
   Future<Map<String, dynamic>> aiConsent() async =>
       _object(await _request('POST', 'ai/consent', body: {'accepted': true}));
 
+  /// Whether the account may transcribe speech (`enabled`) and the credits
+  /// left (`remaining_micros`). Null when the portal offers none (404) or the
+  /// session is not valid (401).
+  Future<Map<String, dynamic>?> voiceStatus() async {
+    final response = await _request('GET', 'ai/voice/status');
+    if (response.statusCode == 404 || response.statusCode == 401) return null;
+    return _object(response);
+  }
+
+  /// Transcribes [wav] (16-bit mono PCM WAV, as the data-browser sends it)
+  /// with the account's Whisper, paid from its credits. [language] is an
+  /// ISO-639-1 hint; null lets Whisper detect it. Returns the text, empty when
+  /// nothing was heard. Throws [AtomicVoiceError].
+  Future<String> transcribe(Uint8List wav, {String? language}) async {
+    if (!linked) throw const AtomicVoiceError(AtomicVoiceFailure.notLinked);
+    final http.Response response;
+    try {
+      response = await _request('POST', 'ai/voice',
+          timeout: const Duration(seconds: 60),
+          body: {
+            'kind': 'transcribe',
+            'data': base64Encode(wav),
+            'accepted': true,
+            if (language != null && language.isNotEmpty) 'language': language,
+          });
+    } catch (_) {
+      throw const AtomicVoiceError(AtomicVoiceFailure.offline);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      var message = '';
+      try {
+        final json = jsonDecode(response.body);
+        if (json is Map && json['error'] is String) {
+          message = json['error'] as String;
+        }
+      } catch (_) {}
+      final failure = switch (response.statusCode) {
+        401 => AtomicVoiceFailure.notLinked,
+        402 => AtomicVoiceFailure.noCredits,
+        _ when message.toLowerCase().contains('credit') =>
+          AtomicVoiceFailure.noCredits,
+        _ => AtomicVoiceFailure.server,
+      };
+      throw AtomicVoiceError(failure, message: message);
+    }
+    final json = _decode(response.body);
+    final text = json is Map ? json['text'] : null;
+    return text is String ? text.trim() : '';
+  }
+
   /// One streamed answer from the account's included AI: the text deltas of an
   /// OpenAI-compatible `chat/completions` stream. Throws with the portal's own
   /// message when it refuses (no credits, no consent).
@@ -366,6 +419,20 @@ class AtomicAccountClient {
       throw StateError('Your account could not unlock this backup');
     }
   }
+}
+
+/// Why a transcription did not happen.
+enum AtomicVoiceFailure { notLinked, noCredits, offline, server }
+
+class AtomicVoiceError implements Exception {
+  const AtomicVoiceError(this.failure, {this.message = ''});
+  final AtomicVoiceFailure failure;
+
+  /// The portal's own words, when it gave any.
+  final String message;
+
+  @override
+  String toString() => 'AtomicVoiceError($failure)';
 }
 
 enum AtomicLinkProgress { pending, approved, expired }

@@ -6,6 +6,7 @@ import '../theme.dart';
 import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';
+import 'hosted_voice.dart';
 import 'voice.dart';
 
 /// SharedPreferences key: speak each new answer aloud.
@@ -40,6 +41,13 @@ class ChatScreen extends StatefulWidget {
   final SpeechInput? speechInput;
   final SpeechOutput? speechOutput;
 
+  /// The account (Whisper) speech to text; made from the linked account's AI
+  /// when null.
+  final HostedSpeechInput? hostedSpeechInput;
+
+  /// Whether the language sheet lists languages for the account engine.
+  final bool accountLanguageHints;
+
   const ChatScreen({
     super.key,
     required this.api,
@@ -47,6 +55,8 @@ class ChatScreen extends StatefulWidget {
     this.title = '',
     this.speechInput,
     this.speechOutput,
+    this.hostedSpeechInput,
+    this.accountLanguageHints = hostedLanguageHintSupported,
   });
 
   @override
@@ -82,7 +92,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   SpeechInput? _inputInst;
   SpeechOutput? _outputInst;
+  HostedSpeechInput? _hostedInst;
   bool _listening = false;
+
+  /// The recording was ended and the account is transcribing it.
+  bool _transcribing = false;
+
+  /// The current listen is on the account engine, not the device's.
+  bool _hostedActive = false;
+
+  /// A one-line note about the engine, e.g. why the device's was used.
+  String? _voiceNote;
 
   /// True from the tap until the recogniser is really listening; the
   /// permission prompt pauses the app and must not cancel that.
@@ -111,6 +131,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _inputInst = widget.speechInput;
+    _hostedInst = widget.hostedSpeechInput;
     _input.addListener(_inputChanged);
     _outputInst = widget.speechOutput;
     _loadReadAloud();
@@ -136,6 +157,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _listenSession++;
     _inputInst?.stop();
+    if (widget.hostedSpeechInput == null) {
+      _hostedInst?.dispose();
+    } else {
+      _hostedInst?.cancel();
+    }
     _outputInst?.stop();
     _focus.dispose();
     _input.dispose();
@@ -165,9 +191,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  HostedSpeechInput get _hosted =>
+      _hostedInst ??= HostedSpeechInput.forAccount(_ai);
+
+  /// Throws away an account recording or transcription under way.
+  void _cancelHosted() {
+    if (!_hostedActive || !(_listening || _transcribing)) return;
+    _listenSession++;
+    _listening = false;
+    _starting = false;
+    _transcribing = false;
+    _level = 0;
+    _hosted.cancel();
+    if (mounted) setState(() {});
+  }
+
   /// Ends listening; what was heard so far stays in the field.
   void _stopListening() {
     if (!_listening) return;
+    if (_hostedActive) {
+      // Still waiting for the microphone: nothing to transcribe.
+      if (_starting) return _cancelHosted();
+      // The recording is sent for transcription; its text arrives later.
+      final session = _listenSession;
+      _listening = false;
+      _level = 0;
+      _transcribing = true;
+      final hosted = _hosted;
+      hosted.stop().whenComplete(() {
+        if (mounted && session == _listenSession && _transcribing) {
+          setState(() => _transcribing = false);
+        }
+      });
+      if (mounted) setState(() {});
+      return;
+    }
     _listenSession++;
     _listening = false;
     _starting = false;
@@ -177,20 +235,54 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  Future<SharedPreferences?> _prefs() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Which engine to use now: the chosen one, else the account's when it can
+  /// be used. [note] says why the device's was used instead of the chosen one.
+  Future<({String engine, String? note})> _resolveEngine(
+      SharedPreferences? prefs) async {
+    final chosen = prefs?.getString(voiceEngineKey);
+    if (chosen == voiceEngineDevice) {
+      return (engine: voiceEngineDevice, note: null);
+    }
+    HostedAvailability avail;
+    try {
+      avail = await _hosted.availability();
+    } catch (_) {
+      avail =
+          const HostedAvailability.unavailable('Could not reach your account.');
+    }
+    if (avail.ok) return (engine: voiceEngineAccount, note: null);
+    if (chosen == null) return (engine: voiceEngineDevice, note: null);
+    return (
+      engine: voiceEngineDevice,
+      note: '${avail.reason ?? 'The account is not available.'} '
+          'Using this device instead.',
+    );
+  }
+
   Future<void> _toggleListening() async {
     if (_listening) {
       _stopListening();
       return;
     }
-    final input = _inputInst ??= PluginSpeechInput();
+    if (_transcribing) return;
     // Typed text stays; what is heard is appended after it.
-    final typed = _input.text;
-    final base = typed.isEmpty || typed.endsWith(' ') || typed.endsWith('\n')
-        ? typed
-        : '$typed ';
+    String baseOf(String typed) =>
+        typed.isEmpty || typed.endsWith(' ') || typed.endsWith('\n')
+            ? typed
+            : '$typed ';
     final session = ++_listenSession;
+    _hostedActive = false;
     setState(() {
       _noSpeechHint = false;
+      _voiceNote = null;
       _heard = false;
       _listening = true;
       _starting = true;
@@ -200,26 +292,55 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     // Speech from the speaker would be heard as input.
     _outputInst?.stop();
-    String? localeId;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      localeId = prefs.getString(voiceLocaleKey);
-    } catch (_) {}
-    localeId ??= await input.systemLocale();
+    final prefs = await _prefs();
+    final choice = await _resolveEngine(prefs);
+    final hosted = choice.engine == voiceEngineAccount;
     if (!mounted || session != _listenSession) return;
-    setState(() => _activeLocale = localeId?.replaceAll('_', '-'));
+    _hostedActive = hosted;
+    final SpeechInput input =
+        hosted ? _hosted : (_inputInst ??= PluginSpeechInput());
+    String? localeId;
+    if (hosted) {
+      if (widget.accountLanguageHints) {
+        localeId = prefs?.getString(voiceLanguageKey);
+      }
+    } else {
+      localeId = prefs?.getString(voiceLocaleKey);
+      localeId ??= await input.systemLocale();
+      if (!mounted || session != _listenSession) return;
+    }
+    final base = baseOf(_input.text);
+    setState(() {
+      _voiceNote = choice.note;
+      _activeLocale = hosted ? 'whisper' : localeId?.replaceAll('_', '-');
+    });
+    if (hosted) {
+      _hosted.onTranscribing = (on) {
+        if (!mounted || session != _listenSession) return;
+        setState(() {
+          _listening = false;
+          _starting = false;
+          _level = 0;
+          _transcribing = on;
+        });
+      };
+    }
     final ok = await input.start(
       localeId: localeId,
       onText: (text, isFinal) {
         if (!mounted || session != _listenSession) return;
         if (text.isNotEmpty) _heard = true;
+        // Account text arrives once, at the end: after whatever was typed
+        // meanwhile.
+        final at = hosted ? baseOf(_input.text) : base;
         _input.value = TextEditingValue(
-          text: '$base$text',
-          selection: TextSelection.collapsed(offset: base.length + text.length),
+          text: '$at$text',
+          selection: TextSelection.collapsed(offset: at.length + text.length),
         );
         if (isFinal) {
           setState(() {
             _listening = false;
+            _transcribing = false;
             _level = 0;
             _noSpeechHint = !_heard;
           });
@@ -229,9 +350,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       },
       onError: (e) {
         if (!mounted || session != _listenSession) return;
-        final message = voiceErrorMessage(e);
+        // The account engine gives plain messages, the device codes.
+        final message = hosted ? e : voiceErrorMessage(e);
         setState(() {
           _listening = false;
+          _transcribing = false;
           _level = 0;
           // Hearing nothing is a normal end, not a failure.
           if (message != null) {
@@ -251,7 +374,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       },
     );
     if (session == _listenSession) _starting = false;
-    if (!mounted || session != _listenSession) return;
+    if (!mounted || session != _listenSession) {
+      if (ok && hosted) _hosted.cancel();
+      return;
+    }
     if (!ok) {
       setState(() {
         _listening = false;
@@ -262,33 +388,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Long-press on the mic: pick the language the recogniser listens for.
-  Future<void> _pickLocale() async {
+  /// Long-press on the mic: pick the engine and its language.
+  Future<void> _openVoiceSheet() async {
     _stopListening();
     final input = _inputInst ??= PluginSpeechInput();
     final all = await input.locales();
     final system = await input.systemLocale();
-    String? current;
-    try {
-      current = (await SharedPreferences.getInstance()).getString(
-        voiceLocaleKey,
-      );
-    } catch (_) {}
+    final prefs = await _prefs();
     if (!mounted) return;
-    final picked = await showModalBottomSheet<String>(
+    final availability = _hosted.availability().catchError(
+          (Object _) => const HostedAvailability.unavailable(
+              'Could not reach your account.'),
+        );
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _LocaleSheet(
+      builder: (_) => _VoiceSheet(
         locales: all,
         systemId: system,
-        currentId: current ?? system,
+        currentLocale: prefs?.getString(voiceLocaleKey) ?? system,
+        availability: availability,
+        engine: prefs?.getString(voiceEngineKey),
+        language: prefs?.getString(voiceLanguageKey),
+        languageHints: widget.accountLanguageHints,
       ),
     );
-    if (picked == null) return;
-    try {
-      await (await SharedPreferences.getInstance())
-          .setString(voiceLocaleKey, picked);
-    } catch (_) {}
     if (mounted) setState(() => _noSpeechHint = false);
   }
 
@@ -429,7 +553,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _send() async {
     final text = _input.text.trim();
     final ai = _ai;
-    if (text.isEmpty || ai == null || _sending) return;
+    if (text.isEmpty || ai == null || _sending || _transcribing) return;
+    // A recording for the account is dropped, not sent along.
+    _cancelHosted();
     _stopListening();
     _outputInst?.stop();
     _input.clear();
@@ -733,6 +859,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     // second send), and submitting keeps focus: the keyboard
                     // stays open for the next message.
                     enabled: ai != null,
+                    readOnly: _transcribing,
                     onEditingComplete: () {},
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
@@ -750,16 +877,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   listening: _listening,
                   level: _level,
                   locale: _activeLocale,
-                  onLongPress: ai == null ? null : _pickLocale,
+                  transcribing: _transcribing,
+                  onLongPress:
+                      ai == null || _transcribing ? null : _openVoiceSheet,
                   onPressed: ai == null ? null : _toggleListening,
                 ),
                 IconButton.filled(
                   tooltip: 'Send',
-                  onPressed: _sending || ai == null || !_hadText ? null : _send,
+                  onPressed:
+                      _sending || _transcribing || ai == null || !_hadText
+                          ? null
+                          : _send,
                   icon: const Icon(Icons.arrow_upward),
                 ),
               ],
             ),
+            if (_voiceNote != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _voiceNote!,
+                  key: const Key('voice-note'),
+                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                ),
+              ),
             if (_noSpeechHint && !_listening)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -807,6 +948,7 @@ class _MicButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final VoidCallback? onLongPress;
   final String? locale;
+  final bool transcribing;
 
   const _MicButton({
     required this.listening,
@@ -814,6 +956,7 @@ class _MicButton extends StatefulWidget {
     required this.onPressed,
     this.onLongPress,
     this.locale,
+    this.transcribing = false,
   });
 
   @override
@@ -889,26 +1032,37 @@ class _MicButtonState extends State<_MicButton>
                 );
               },
             ),
-          Tooltip(
-            message:
-                widget.listening ? 'Stop voice input' : 'Start voice input',
-            // Long-press picks the language instead.
-            triggerMode: TooltipTriggerMode.manual,
-            child: GestureDetector(
-              onLongPress: widget.onLongPress,
-              child: IconButton(
-                onPressed: widget.onPressed,
-                color: widget.listening ? c.main : null,
-                icon: Icon(widget.listening ? Icons.stop : Icons.mic),
+          if (widget.transcribing)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                key: Key('mic-transcribing'),
+                strokeWidth: 2.5,
+              ),
+            )
+          else
+            Tooltip(
+              message:
+                  widget.listening ? 'Stop voice input' : 'Start voice input',
+              // Long-press picks the language instead.
+              triggerMode: TooltipTriggerMode.manual,
+              child: GestureDetector(
+                onLongPress: widget.onLongPress,
+                child: IconButton(
+                  onPressed: widget.onPressed,
+                  color: widget.listening ? c.main : null,
+                  icon: Icon(widget.listening ? Icons.stop : Icons.mic),
+                ),
               ),
             ),
-          ),
-          if (widget.listening && widget.locale != null)
+          if (widget.transcribing ||
+              (widget.listening && widget.locale != null))
             Positioned(
               bottom: 1,
               child: IgnorePointer(
                 child: Text(
-                  widget.locale!,
+                  widget.transcribing ? 'transcribing…' : widget.locale!,
                   key: const Key('mic-locale'),
                   style: TextStyle(color: c.textSecondary, fontSize: 9),
                 ),
@@ -966,25 +1120,82 @@ class _Waveform extends StatelessWidget {
   }
 }
 
-/// The languages the recogniser offers: suggested ones first, then the rest
-/// alphabetically, with a search field.
-class _LocaleSheet extends StatefulWidget {
+/// The voice input sheet: which engine transcribes, and its language. The
+/// device engine lists the recogniser's languages (suggested ones first, with
+/// a search field); the account engine detects the language by itself, with
+/// an optional hint when the server takes one. Choices are saved as they are
+/// made.
+class _VoiceSheet extends StatefulWidget {
   final List<SpeechLocale> locales;
   final String? systemId;
-  final String? currentId;
+  final String? currentLocale;
+  final Future<HostedAvailability> availability;
+  final String? engine;
+  final String? language;
+  final bool languageHints;
 
-  const _LocaleSheet({
+  const _VoiceSheet({
     required this.locales,
     required this.systemId,
-    required this.currentId,
+    required this.currentLocale,
+    required this.availability,
+    required this.engine,
+    required this.language,
+    required this.languageHints,
   });
 
   @override
-  State<_LocaleSheet> createState() => _LocaleSheetState();
+  State<_VoiceSheet> createState() => _VoiceSheetState();
 }
 
-class _LocaleSheetState extends State<_LocaleSheet> {
+class _VoiceSheetState extends State<_VoiceSheet> {
   String _query = '';
+  HostedAvailability? _avail;
+  String? _engine;
+  String? _language;
+
+  @override
+  void initState() {
+    super.initState();
+    _engine = widget.engine;
+    _language = widget.language;
+    widget.availability.then((a) {
+      if (mounted) setState(() => _avail = a);
+    });
+  }
+
+  /// The engine in effect: the chosen one, else the account's when usable;
+  /// the account's is never in effect while unusable.
+  String get _effective {
+    if (_engine == voiceEngineDevice) return voiceEngineDevice;
+    return _avail?.ok == true ? voiceEngineAccount : voiceEngineDevice;
+  }
+
+  Future<void> _save(String key, String? value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (value == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, value);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickEngine(String engine) async {
+    setState(() => _engine = engine);
+    await _save(voiceEngineKey, engine);
+  }
+
+  Future<void> _pickLocale(String id) async {
+    await _save(voiceLocaleKey, id);
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _pickLanguage(String? code) async {
+    await _save(voiceLanguageKey, code);
+    if (mounted) Navigator.pop(context);
+  }
 
   bool _match(SpeechLocale l) {
     final q = _query.trim().toLowerCase();
@@ -993,8 +1204,47 @@ class _LocaleSheetState extends State<_LocaleSheet> {
         l.id.toLowerCase().contains(q);
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _heading(String t) {
+    final c = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+      child: Text(t, style: TextStyle(color: c.textSecondary, fontSize: 12)),
+    );
+  }
+
+  Widget _engineTile({
+    required Key key,
+    required String engine,
+    required String title,
+    required String subtitle,
+    String? reason,
+    bool enabled = true,
+  }) {
+    final c = context.appColors;
+    final on = _effective == engine;
+    return ListTile(
+      key: key,
+      dense: true,
+      enabled: enabled,
+      leading: Icon(
+        on ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+        color: on ? c.main : null,
+      ),
+      title: Text(title),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(subtitle),
+          if (reason != null)
+            Text(reason, style: TextStyle(color: c.alert, fontSize: 12)),
+        ],
+      ),
+      selected: on,
+      onTap: enabled ? () => _pickEngine(engine) : null,
+    );
+  }
+
+  Widget _deviceLanguages() {
     final c = context.appColors;
     final byId = {for (final l in widget.locales) l.id: l};
     final suggested = <SpeechLocale>[];
@@ -1010,50 +1260,113 @@ class _LocaleSheetState extends State<_LocaleSheet> {
           dense: true,
           title: Text(l.name),
           subtitle: Text(l.id),
-          selected: l.id == widget.currentId,
-          onTap: () => Navigator.pop(context, l.id),
-        );
-    Widget heading(String t) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
-          child:
-              Text(t, style: TextStyle(color: c.textSecondary, fontSize: 12)),
+          selected: l.id == widget.currentLocale,
+          onTap: () => _pickLocale(l.id),
         );
     final sug = suggested.where(_match).toList();
     final others = rest.where(_match).toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          child: TextField(
+            key: const Key('locale-search'),
+            decoration: const InputDecoration(
+              hintText: 'Search language',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ),
+        Expanded(
+          child: widget.locales.isEmpty
+              ? Center(
+                  child: Text(
+                    'No languages available.',
+                    style: TextStyle(color: c.textSecondary),
+                  ),
+                )
+              : ListView(children: [
+                  if (sug.isNotEmpty) _heading('Suggested'),
+                  for (final l in sug) tile(l),
+                  if (sug.isNotEmpty && others.isNotEmpty)
+                    _heading('All languages'),
+                  for (final l in others) tile(l),
+                ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _accountLanguages() {
+    final auto = _language == null || _language!.isEmpty;
+    return ListView(children: [
+      ListTile(
+        key: const Key('language-auto'),
+        dense: true,
+        title: const Text('Auto-detect'),
+        subtitle: widget.languageHints
+            ? null
+            : const Text('Whisper recognises the language by itself.'),
+        selected: auto,
+        onTap: () => _pickLanguage(null),
+      ),
+      if (widget.languageHints)
+        for (final (code, name) in hostedLanguages)
+          ListTile(
+            key: Key('language-$code'),
+            dense: true,
+            title: Text(name),
+            subtitle: Text(code),
+            selected: _language == code,
+            onTap: () => _pickLanguage(code),
+          ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avail = _avail;
+    final accountOk = avail?.ok == true;
     return SafeArea(
       child: Padding(
         padding:
             EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.6,
+          height: MediaQuery.sizeOf(context).height * 0.75,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  key: const Key('locale-search'),
-                  decoration: const InputDecoration(
-                    hintText: 'Search language',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onChanged: (v) => setState(() => _query = v),
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text('Voice input',
+                    style: Theme.of(context).textTheme.titleMedium),
               ),
+              _heading('Engine'),
+              _engineTile(
+                key: const Key('engine-account'),
+                engine: voiceEngineAccount,
+                title: 'atomic.place account',
+                subtitle: 'Whisper, any language, uses credits',
+                enabled: accountOk,
+                reason: avail == null
+                    ? 'Checking your account…'
+                    : avail.ok
+                        ? null
+                        : avail.reason,
+              ),
+              _engineTile(
+                key: const Key('engine-device'),
+                engine: voiceEngineDevice,
+                title: 'This device',
+                subtitle: 'Google speech recognition, free, live words',
+              ),
+              const Divider(height: 8),
+              _heading('Language'),
               Expanded(
-                child: widget.locales.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No languages available.',
-                          style: TextStyle(color: c.textSecondary),
-                        ),
-                      )
-                    : ListView(children: [
-                        if (sug.isNotEmpty) heading('Suggested'),
-                        for (final l in sug) tile(l),
-                        if (sug.isNotEmpty && others.isNotEmpty)
-                          heading('All languages'),
-                        for (final l in others) tile(l),
-                      ]),
+                child: _effective == voiceEngineAccount
+                    ? _accountLanguages()
+                    : _deviceLanguages(),
               ),
             ],
           ),

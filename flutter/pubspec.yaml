@@ -29,6 +29,7 @@ dependencies:
   url_launcher: ^6.3.0
   speech_to_text: ^7.5.0
   flutter_tts: ^4.2.5
+  record: ^7.1.2
 
 dev_dependencies:
   integration_test:

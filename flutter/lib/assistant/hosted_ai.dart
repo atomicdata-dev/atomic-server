@@ -17,8 +17,18 @@ class HostedAi {
     required Stream<String> Function(List<Map<String, String>>, String model)
         stream,
     required Future<Map<String, dynamic>> Function() enable,
+    this.transcribe,
+    this.voiceStatus,
   })  : _stream = stream,
         _enable = enable;
+
+  /// Speech to text through the account's Whisper (a 16-bit mono PCM WAV and
+  /// an optional ISO-639-1 language hint); null when not offered.
+  final Future<String> Function(Uint8List wav, {String? language})? transcribe;
+
+  /// The account's voice status (`enabled`, `remaining_micros`); null result
+  /// when the portal offers none.
+  final Future<Map<String, dynamic>?> Function()? voiceStatus;
 
   Map<String, dynamic> status;
   final Stream<String> Function(List<Map<String, String>>, String model)
@@ -76,6 +86,9 @@ class HostedAi {
       stream: (messages, model) =>
           client.chatCompletion(messages, model: model),
       enable: client.aiConsent,
+      transcribe: (wav, {language}) =>
+          client.transcribe(wav, language: language),
+      voiceStatus: client.voiceStatus,
     );
   }
 }
