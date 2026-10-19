@@ -22,10 +22,10 @@ import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
 import '../src/rust/api/simple.dart' as ffi;
 import '../src/rust/api/simple/types.dart'
-    show AgentInfo, CanvasListItem, VersionMetadata;
+    show AgentInfo, VersionMetadata;
 
 export '../src/rust/api/simple/types.dart'
-    show AgentInfo, CanvasListItem, VersionMetadata;
+    show AgentInfo, VersionMetadata;
 
 /// Atomic Data SDK — local-first with optional sync.
 ///
@@ -34,7 +34,6 @@ export '../src/rust/api/simple/types.dart'
 ///   2. Agent     — setup(), loadAgent(), getActiveAgent(), clearAgent()
 ///   3. Drive     — createDrive(), listDrives(), getActiveDrive(), setActiveDrive()
 ///   4. Resource  — getProperty(), setProperty()
-///   5. Canvas    — createCanvas(), save/load/list/delete/rename
 ///   6. History   — warmResourceHistory(), getResourceHistory(), getResourceAtVersion()
 ///   7. Peer      — startPeer(), getPeerId(), peerAnnounce(), peerSync(), peerDiscoverSync()
 ///
@@ -211,36 +210,6 @@ class AtomicClient {
   /// server is connected.
   static String resourceWebUrl(String subject) =>
       assistant.resourceWebUrl(subject: subject);
-
-  // ── 5. Canvas CRUD ───────────────────────────────────────────────────────
-
-  static Future<String> createCanvas(String name, {String? folderId}) =>
-      ffi.createCanvasWithFolder(name: name, folderId: folderId);
-
-  static Future<String> loadCanvasStrokes(String subject) =>
-      ffi.loadCanvasStrokes(subject: subject);
-
-  static Future<List<CanvasListItem>> listCanvases() => ffi.listCanvases();
-
-  static Future<Map<String, String>> listCanvasFolderIds() async {
-    final json = await ffi.listCanvasesJson();
-    final list = jsonDecode(json) as List;
-    return {
-      for (final e in list)
-        if ((e['folder_id'] as String?)?.isNotEmpty ?? false)
-          e['subject'] as String: e['folder_id'] as String,
-    };
-  }
-
-  static Future<void> deleteCanvas(String subject) =>
-      ffi.deleteCanvas(subject: subject);
-
-  static Future<void> renameCanvas(String subject, String name) =>
-      ffi.renameCanvas(subject: subject, name: name);
-
-  /// Rename a gallery folder (same signed commit path as [renameCanvas]).
-  static Future<void> renameFolder(String subject, String name) =>
-      renameCanvas(subject, name);
 
   // ── 6. History ───────────────────────────────────────────────────────────
 
@@ -513,25 +482,6 @@ class AtomicClient {
     return origin;
   }
 
-  static Future<void> wsSubscribeCanvas(String subject) =>
-      ffi.wsSubscribeCanvas(subject: subject);
-
-  static Future<String> createFolder(String name) =>
-      ffi.createFolder(name: name);
-
-  static Future<List<({String subject, String name})>> listFolders() async {
-    final list = await ffi.listFolders();
-    return list
-        .map((e) => (
-              subject: e.subject,
-              name: e.name,
-            ))
-        .toList();
-  }
-
-  static Future<void> setCanvasFolder(String subject, String? folderId) =>
-      ffi.setCanvasFolder(subject: subject, folderId: folderId);
-
   /// Block until a DB event (changed / destroyed / query membership). Null on timeout.
   static Future<Map<String, dynamic>?> pollDbEvent(
       {int timeoutMs = 60000}) async {
@@ -552,37 +502,6 @@ class AtomicClient {
   /// Set device name (persisted in DB).
   static Future<void> setDeviceName(String name) async =>
       ffi.setDeviceName(name: name);
-
-  /// Push a single stroke to a canvas (CRDT-friendly append).
-  static Future<void> pushStroke(String subject, String strokeJson) =>
-      ffi.pushStroke(subject: subject, strokeJson: strokeJson);
-
-  /// Undo the last stroke edit. Persists and syncs. Returns new stroke count.
-  static Future<int> undoCanvas(String subject) =>
-      ffi.undoCanvas(subject: subject);
-
-  /// Redo the last undone stroke edit. Persists and syncs. Returns new stroke count.
-  static Future<int> redoCanvas(String subject) =>
-      ffi.redoCanvas(subject: subject);
-
-  static Future<bool> canUndoCanvas(String subject) =>
-      ffi.canUndoCanvas(subject: subject);
-
-  static Future<bool> canRedoCanvas(String subject) =>
-      ffi.canRedoCanvas(subject: subject);
-
-  /// Replace all strokes (used after undo/scrub). Clears and re-sets the full list.
-  static Future<void> setStrokes(String subject, String strokesJson) =>
-      ffi.setStrokes(subject: subject, strokesJson: strokesJson);
-
-  /// Move canvas to a synced Loro history version and persist (history scrub).
-  static Future<void> checkoutCanvasVersion(
-      String subject, List<int> versionId) {
-    return setStrokes(
-      subject,
-      jsonEncode({'checkout_version_id': versionId}),
-    );
-  }
 
   /// Get the number of currently connected live peers.
   static Future<int> livePeerCount() async => ffi.livePeerCount();

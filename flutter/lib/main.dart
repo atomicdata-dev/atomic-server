@@ -5,10 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart' show AppShell, ChatsScreen;
 import 'assistant/atomic_assistant_api.dart';
-import 'canvas/infinite_canvas.dart';
-import 'gallery/canvas_store.dart';
-import 'gallery/gallery_screen.dart';
-import 'models/canvas_entry.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
 import 'screens/sync_screen.dart';
@@ -34,10 +30,7 @@ class AtomicCanvasApp extends StatefulWidget {
 
 class _AtomicCanvasAppState extends State<AtomicCanvasApp>
     with WidgetsBindingObserver {
-  final CanvasStore _store = CanvasStore();
-  CanvasEntry? _openCanvas;
   bool _loggedIn = false;
-  bool _showGallery = false;
   final _navKey = GlobalKey<NavigatorState>();
   static const _linkChannel = MethodChannel('app.atomicdata.canvas/deeplink');
   Timer? _eventPoller;
@@ -139,13 +132,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
   }
 
   void _onLoggedIn() {
-    _store.isDarkMode =
-        View.of(context).platformDispatcher.platformBrightness ==
-            Brightness.dark;
     setState(() => _loggedIn = true);
-    _store.load().then((_) {
-      if (mounted) setState(() {});
-    });
     _startEventListener();
     _startBackgroundSync();
   }
@@ -195,47 +182,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
   void _signedOut() {
     setState(() {
       _loggedIn = false;
-      _showGallery = false;
-      _openCanvas = null;
-      _store.canvases.clear();
     });
-  }
-
-  void _openFromGallery(CanvasEntry canvas) async {
-    final isDarkMode = View.of(context).platformDispatcher.platformBrightness ==
-        Brightness.dark;
-    await _store.loadStrokes(canvas, isDarkMode: isDarkMode);
-    if (canvas.id.isNotEmpty) {
-      AtomicClient.wsSubscribeCanvas(canvas.id).catchError((_) {});
-    }
-    if (mounted) setState(() => _openCanvas = canvas);
-  }
-
-  void _newCanvas({String? folderId}) {
-    if (_openCanvas != null && _openCanvas!.strokes.isEmpty) {
-      _store.deleteCanvases([_openCanvas!.id]);
-    }
-    final canvas = _store.createCanvas(folderId: folderId);
-    setState(() => _openCanvas = canvas);
-    if (canvas.id.isNotEmpty) {
-      AtomicClient.wsSubscribeCanvas(canvas.id).catchError((_) {});
-    }
-  }
-
-  void _closeCanvas() {
-    if (_openCanvas != null) {
-      final isDarkMode =
-          View.of(context).platformDispatcher.platformBrightness ==
-              Brightness.dark;
-      _store.onCanvasChanged(_openCanvas!, _openCanvas!.strokes,
-          isDarkMode: isDarkMode,
-          penColor: _openCanvas!.penColor,
-          prevColor: _openCanvas!.prevColor);
-    }
-    if (_openCanvas != null && _openCanvas!.strokes.isEmpty) {
-      _store.deleteCanvases([_openCanvas!.id]);
-    }
-    setState(() => _openCanvas = null);
   }
 
   @override
@@ -281,41 +228,16 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
       ),
       home: !_loggedIn
           ? LoginScreen(onLoggedIn: _onLoggedIn)
-          : _openCanvas == null && !_showGallery
-              ? AppShell(
-                  api: const AtomicAssistantApi(),
-                  drive: AtomicClient.getActiveDrive() ?? '',
-                  profile: (_) => const SyncScreen(),
-                  home: ChatsScreen(
-                    api: const AtomicAssistantApi(),
-                    drive: AtomicClient.getActiveDrive() ?? '',
-                    onOpenGallery: () => setState(() => _showGallery = true),
-                    onSignOut: _signedOut,
-                  ),
-                )
-              : !_store.isLoaded
-                  ? Scaffold(
-                      backgroundColor:
-                          Theme.of(context).extension<AppColors>()?.canvasBg ??
-                              AppColors.dark.canvasBg,
-                      body: const SafeArea(
-                          child: Center(child: CircularProgressIndicator())),
-                    )
-                  : _openCanvas != null
-                      ? InfiniteCanvas(
-                          key: ValueKey(_openCanvas!.id),
-                          canvas: _openCanvas!,
-                          store: _store,
-                          onClose: _closeCanvas,
-                          onNewCanvas: _newCanvas,
-                        )
-                      : GalleryScreen(
-                          store: _store,
-                          onOpen: _openFromGallery,
-                          onNew: ({folderId}) => _newCanvas(folderId: folderId),
-                          onExit: () => setState(() => _showGallery = false),
-                          onSignOut: _signedOut,
-                        ),
+          : AppShell(
+              api: const AtomicAssistantApi(),
+              drive: AtomicClient.getActiveDrive() ?? '',
+              profile: (_) => const SyncScreen(),
+              home: ChatsScreen(
+                api: const AtomicAssistantApi(),
+                drive: AtomicClient.getActiveDrive() ?? '',
+                onSignOut: _signedOut,
+              ),
+            ),
     );
   }
 }
