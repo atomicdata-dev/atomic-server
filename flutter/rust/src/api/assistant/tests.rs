@@ -438,9 +438,10 @@ fn agent_name_is_read_from_json_ad() {
 }
 
 /// Times the home lists over 3 drives x 20 resources (run with
-/// `--nocapture` to see the numbers). The lists read propvals only, so no
+/// `--ignored --nocapture` to see the numbers). The lists read propvals only, so no
 /// resource row decodes a Loro snapshot.
 #[tokio::test]
+#[ignore = "timing; creates extra drives other tests share state with"]
 async fn home_lists_do_not_decode_snapshots_per_row() {
     let first = shared_drive().await.to_string();
     let store = db().unwrap();
