@@ -11,6 +11,7 @@ class _BarApi extends FakeApi {
   final List<(String, String, String)> made = [];
   final List<(String, String?)> searched = [];
   Object? createError;
+  List<SearchHit> searchHits = const [];
 
   _BarApi({super.ai})
       : super(driveList: const [
@@ -29,7 +30,7 @@ class _BarApi extends FakeApi {
   @override
   Future<List<SearchHit>> search(String query, {String? drive}) async {
     searched.add((query, drive));
-    return const [];
+    return searchHits;
   }
 }
 
@@ -190,6 +191,33 @@ void main() {
       expect(api.searched.last, ('plan', null));
     });
 
+    testWidgets('picking a drive in the results filters the search to it',
+        (tester) async {
+      final api = _BarApi()
+        ..searchHits = const [
+          (
+            subject: 'did:ad:work',
+            title: 'Work drive',
+            className: 'Drive',
+            drive: 'did:ad:home',
+            score: 1.0,
+            emoji: null
+          ),
+        ];
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('search-scope')), findsNothing);
+      await tester.enterText(find.byType(TextField), 'wor');
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.text('Work drive'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(find.text('In: Work'), findsOneWidget);
+      expect(api.searched.last, ('wor', 'did:ad:work'));
+    });
+
     testWidgets('All drives searches everywhere', (tester) async {
       final api = _BarApi();
       await tester.pumpWidget(_shell(api));
@@ -202,6 +230,32 @@ void main() {
   });
 
   group('Where you are', () {
+    testWidgets('the current button is in the main colour, with no dot',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      Color? iconColor(String tooltip) => tester
+          .widget<Icon>(find
+              .descendant(
+                  of: find.byWidgetPredicate(
+                      (w) => w is HoldFan && w.tooltip == tooltip),
+                  matching: find.byType(Icon))
+              .first)
+          .color;
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(iconColor('Search'), AppColors.light.main);
+      expect(iconColor('New chat'), isNot(AppColors.light.main));
+      // No dot widget (a small circle) is drawn under the current button.
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Container &&
+              w.decoration is BoxDecoration &&
+              (w.decoration as BoxDecoration).shape == BoxShape.circle &&
+              w.constraints?.maxWidth == 4),
+          findsNothing);
+    });
+
     testWidgets('the button of the page on top is the current one',
         (tester) async {
       await tester

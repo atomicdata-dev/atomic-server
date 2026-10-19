@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
 import 'package:flutter/material.dart';
+import 'app_top_bar.dart';
 
 import 'models.dart';
 import 'covered_insets_freeze.dart';
@@ -133,6 +134,28 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.isNotEmpty) _changed(query);
   }
 
+  /// A drive in the results is a filter, not a page: the search goes on
+  /// inside it. True when [subject] was taken as such.
+  bool _scopeToDrive(String subject, String className) {
+    final isDrive = className.split(RegExp(r'[/#]')).last == 'Drive' ||
+        _model.drives.any((d) => _id(d.subject) == _id(subject));
+    if (!isDrive || subject.isEmpty) return false;
+    if (_model.scope != null && _id(_model.scope!) == _id(subject)) {
+      return true;
+    }
+    _model.scope = subject;
+    final route = ModalRoute.of(context);
+    if (route != null) _shell?.setKind(route, ShellPage.search);
+    final query = _model.query;
+    _model.query = '';
+    _model.hits = const [];
+    _model.recent = _inScope(_model.recent);
+    _model.changed();
+    _loadRecent(_model.drives);
+    if (query.isNotEmpty) _changed(query);
+    return true;
+  }
+
   /// One drives call for both the names and the recents; it paints the cached
   /// list first and refreshes behind it.
   Future<void> _load() async {
@@ -193,6 +216,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Opens a resource, notes it as opened, and refreshes the list after.
   Future<void> _open(
       String drive, String subject, String title, String className) async {
+    if (_scopeToDrive(subject, className)) return;
     widget.api.noteOpened(drive, subject);
     await Navigator.of(context).push(
       SlideBackRoute<void>(
@@ -329,18 +353,9 @@ class _SearchScreenState extends State<SearchScreen> {
     child: SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+        padding: const EdgeInsets.fromLTRB(16, 4, 12, 12),
         child: Row(
           children: [
-            IconButton(
-              tooltip: 'Back',
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                // Straight back, even with the keyboard open.
-                FocusManager.instance.primaryFocus?.unfocus();
-                Navigator.of(context).pop();
-              },
-            ),
             Expanded(
               child: Builder(builder: (context) {
                 final c = context.appColors;
@@ -407,7 +422,9 @@ class _SearchScreenState extends State<SearchScreen> {
     // Built once per theme: typing and loading only rebuild the list.
     return Scaffold(
       backgroundColor: c.bgBody,
+      appBar: const AppTopBar(title: 'Search'),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
