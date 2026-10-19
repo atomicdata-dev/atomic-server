@@ -154,8 +154,13 @@ class _ResourceViewState extends State<ResourceView>
           onNavigationRequest: (request) => request.url.startsWith(origin)
               ? NavigationDecision.navigate
               : NavigationDecision.prevent,
-          onPageFinished: (_) => debugPrint(
-              '[embed] page loaded after ${_clock.elapsedMilliseconds} ms'),
+          onPageFinished: (_) {
+            debugPrint(
+                '[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
+            // The page follows the app's light/dark mode for its own 'auto'.
+            _scheme = null;
+            if (mounted) _tellColorScheme();
+          },
         ))
         ..loadRequest(server.page.replace(queryParameters: {
           if (widget.path != null)
@@ -192,9 +197,22 @@ class _ResourceViewState extends State<ResourceView>
         route, () => _page?.runJavaScript('window.atomicEmbed?.openMenu()'));
   }
 
+  /// The app's light/dark mode as the page last heard it.
+  String? _scheme;
+
+  void _tellColorScheme() {
+    final scheme =
+        Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light';
+    if (scheme == _scheme || _page == null) return;
+    _scheme = scheme;
+    unawaited(_page!
+        .runJavaScript("window.atomicEmbed?.setColorScheme?.('$scheme')"));
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _tellColorScheme();
     // Another page was opened over this one (search, a linked resource):
     // this one may never be shown again, so its edits go now.
     final current = ModalRoute.of(context)?.isCurrent ?? true;
