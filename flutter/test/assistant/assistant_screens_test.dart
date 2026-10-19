@@ -9,6 +9,7 @@ import 'package:atomiccanvas_flutter/assistant/native_views.dart';
 import 'package:atomiccanvas_flutter/assistant/hosted_ai.dart';
 import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
+import 'package:atomiccanvas_flutter/assistant/conversation_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
 import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/voice.dart';
@@ -24,6 +25,9 @@ class FakeApi extends AssistantApi {
   final List<RecentResource> recent;
   final List<RecentResource> favoriteList;
   final List<RecentResource> conversationList;
+
+  /// The newest message text of each conversation, by subject.
+  final Map<String, String> lastMessages;
   final List<ActivityEntry> activityList;
   final List<ChatSummary> chatList;
   final List<ChatMessage> messageList;
@@ -50,6 +54,7 @@ class FakeApi extends AssistantApi {
     this.recent = const [],
     this.favoriteList = const [],
     this.conversationList = const [],
+    this.lastMessages = const {},
     this.activityList = const [],
     this.ai,
     this.chatList = const [],
@@ -84,9 +89,17 @@ class FakeApi extends AssistantApi {
   @override
   Future<List<RecentResource>> favorites() async => favoriteList;
   @override
-  Future<List<RecentResource>> conversations() async => conversationList;
+  Future<List<ConversationRow>> conversations() async => [
+        for (final r in conversationList)
+          (resource: r, lastMessage: lastMessages[r.subject] ?? ''),
+      ];
   @override
   Future<List<ChatMessage>> messages(String chat) async => messageList;
+  @override
+  Future<List<ConversationMessage>> conversationMessages(String s) async =>
+      const [];
+  @override
+  Future<void> followConversation(String subject) async {}
   @override
   Future<List<SearchHit>> search(String query, {String? drive}) async {
     asked.add(query);
@@ -410,6 +423,31 @@ void main() {
       await tester.pumpAndSettle();
       expect(api.opened, ['m1']);
       expect(find.byType(ResourceView), findsOneWidget);
+    });
+
+    testWidgets('Messages rows show the newest message and open natively',
+        (tester) async {
+      final api = FakeApi(
+        conversationList: [
+          (
+            subject: 'm1',
+            title: 'Alice, Bob',
+            className: 'conversation',
+            openedAt: 0,
+            emoji: null
+          ),
+        ],
+        lastMessages: {'m1': 'See you\n  tomorrow'},
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('See you tomorrow'), findsOneWidget);
+
+      await tester.tap(find.text('Alice, Bob'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConversationScreen), findsOneWidget);
+      expect(find.byType(ResourceView), findsNothing);
     });
 
     testWidgets('Favorites shows 4, Show all lists the rest', (tester) async {

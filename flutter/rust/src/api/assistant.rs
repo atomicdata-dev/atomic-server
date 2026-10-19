@@ -358,15 +358,236 @@ fn name_from_json_ad(body: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The display name of a conversation member: the agent resource when this
+/// device holds it, else the cached name of a background lookup, else
+/// [`UNKNOWN_MEMBER`]. Never waits on the network.
+async fn member_name(store: &atomic_lib::Db, member: &str) -> String {
+    let local = match row_resource(store, &Subject::from(member)).await {
+        Some(agent) => name_of(&agent),
+        None => String::new(),
+    };
+    if !local.is_empty() {
+        return local;
+    }
+    let fetched = fetched_agent_name(member);
+    if fetched.is_empty() {
+        UNKNOWN_MEMBER.to_string()
+    } else {
+        fetched
+    }
+}
+
+/// The members of a conversation: its `read` list.
+fn members_of(conversation: &Resource) -> Vec<String> {
+    conversation
+        .get(urls::READ)
+        .ok()
+        .and_then(|v| v.to_subjects(None).ok())
+        .unwrap_or_default()
+}
+
+/// Whether two spellings name the same agent (`did:ad:agent:X`, `atomic:agent:X`).
+fn same_agent(a: &str, b: &str) -> bool {
+    use atomic_lib::identifiers::agent_public_key;
+    a == b || matches!((agent_public_key(a), agent_public_key(b)), (Some(x), Some(y)) if x == y)
+}
+
+/// A conversation has no name of its own: its title is who else is in it (its
+/// `read` list minus this agent), as the web app shows it.
+async fn conversation_title(store: &atomic_lib::Db, conversation: &Resource, me: &str) -> String {
+    let members = members_of(conversation);
+    let others = members.iter().filter(|m| !same_agent(m, me));
+    let names = futures::future::join_all(others.map(|member| member_name(store, member))).await;
+    if names.is_empty() {
+        "Only you".to_string()
+    } else {
+        names.join(", ")
+    }
+}
+
+/// `vault_proof` of an agent: its signature over the fixed vault message, the
+/// key material of its conversation keys (the web app derives the same).
+fn vault_proof(agent: &atomic_lib::agents::Agent) -> Result<Vec<u8>, String> {
+    let secret = agent
+        .private_key
+        .as_ref()
+        .ok_or("This device has no agent key to read messages with")?;
+    let signature = atomic_lib::agents::sign_message(
+        atomic_lib::vault::secret_envelope::AGENT_VAULT_PROOF_MESSAGE,
+        secret,
+    )
+    .map_err(err)?;
+    atomic_lib::agents::decode_base64(&signature).map_err(err)
+}
+
+/// The spellings the keyring may know `agent` by.
+fn agent_spellings(agent: &str) -> Vec<String> {
+    let mut out = vec![agent.to_string()];
+    for other in [
+        atomic_lib::identifiers::canonicalize_scheme(agent),
+        atomic_lib::identifiers::to_legacy_scheme(agent),
+    ] {
+        if !out.contains(&other) {
+            out.push(other);
+        }
+    }
+    out
+}
+
+/// The epoch keys of `keyring` that `agent` can open (oldest first); empty
+/// when this agent is not in it.
+fn open_keyring(
+    keyring: &str,
+    agent: &str,
+    proof: &[u8],
+) -> Vec<atomic_lib::conversation::ConversationKey> {
+    let Ok(keyring) = atomic_lib::conversation::Keyring::from_json(keyring) else {
+        return Vec::new();
+    };
+    for spelling in agent_spellings(agent) {
+        if let Ok(keys) = keyring.open(&spelling, proof) {
+            if !keys.is_empty() {
+                return keys;
+            }
+        }
+    }
+    Vec::new()
+}
+
+/// A sealed message after opening, cached for good: a message is sealed once.
+#[derive(Clone)]
+struct OpenedMessage {
+    author: String,
+    text: Option<String>,
+    created_at: i64,
+    reply_to: Option<String>,
+}
+
+static OPENED_MESSAGES: std::sync::Mutex<Option<std::collections::HashMap<String, OpenedMessage>>> =
+    std::sync::Mutex::new(None);
+
+fn cached_message(key: &str) -> Option<OpenedMessage> {
+    OPENED_MESSAGES
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|m| m.get(key).cloned()))
+}
+
+fn cache_message(key: String, message: &OpenedMessage) {
+    if let Ok(mut guard) = OPENED_MESSAGES.lock() {
+        guard
+            .get_or_insert_with(Default::default)
+            .insert(key, message.clone());
+    }
+}
+
+/// The subjects of the messages in a conversation (children of it), oldest
+/// first by creation time; the newest `limit` only (still oldest first) when
+/// given.
+async fn conversation_message_subjects(
+    store: &atomic_lib::Db,
+    conversation: &str,
+    limit: Option<usize>,
+) -> Result<Vec<Subject>, String> {
+    let mut query = Query::new_prop_val(urls::PARENT, conversation);
+    // A conversation is a drive of its own, and its messages live in it.
+    query.drive = Some(Subject::from(conversation));
+    query.sort_by = Some(urls::CREATED_AT.to_string());
+    query.sort_desc = limit.is_some();
+    query.limit = limit;
+    let mut subjects = store.query(&query).await.map_err(err)?.subjects;
+    if limit.is_some() {
+        subjects.reverse();
+    }
+    Ok(subjects)
+}
+
+/// Open one sealed message: from the cache, else decrypted with `keys`. `None`
+/// when `subject` is not a sealed message (this device has not got it, or it is
+/// something else). A message this reader cannot open has `text: None`.
+async fn open_message(
+    store: &atomic_lib::Db,
+    me: &str,
+    conversation: &str,
+    keys: &[atomic_lib::conversation::ConversationKey],
+    subject: &Subject,
+) -> Option<OpenedMessage> {
+    let cache_key = format!("{me}|{subject}");
+    if let Some(known) = cached_message(&cache_key) {
+        return Some(known);
+    }
+    let mut resource = row_resource(store, subject).await?;
+    if resource.get(urls::SEALED).is_err() {
+        resource = store.get_resource(subject).await.ok()?;
+    }
+    let sealed = resource.get(urls::SEALED).ok()?.to_string();
+    let author = resource
+        .get(urls::CREATED_BY)
+        .map(|v| v.to_string())
+        .ok()
+        .or_else(|| resource.genesis_signer())
+        .or_else(|| {
+            resource
+                .get(urls::WRITE)
+                .ok()
+                .and_then(|v| v.to_subjects(None).ok())
+                .and_then(|w| w.into_iter().next())
+        })
+        .unwrap_or_default();
+    let created_at = resource
+        .get(urls::CREATED_AT)
+        .ok()
+        .and_then(|v| v.to_int().ok())
+        .unwrap_or(0);
+    let payload = atomic_lib::conversation::open_message(keys, conversation, &sealed)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Json>(&bytes).ok());
+    let text = payload
+        .as_ref()
+        .and_then(|p| p.get("text"))
+        .and_then(|t| t.as_str())
+        .map(str::to_string);
+    let reply_to = payload
+        .as_ref()
+        .and_then(|p| p.get("replyTo"))
+        .and_then(|t| t.as_str())
+        .map(str::to_string);
+    let opened = OpenedMessage {
+        author,
+        text,
+        created_at,
+        reply_to,
+    };
+    // A message that failed to open may open after the keyring grows: only
+    // successes are remembered.
+    if opened.text.is_some() {
+        cache_message(cache_key, &opened);
+    }
+    Some(opened)
+}
+
+/// The conversation's keyring.
+fn keyring_of(conversation: &Resource) -> String {
+    conversation
+        .get(urls::CONVERSATION_KEYS)
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+}
+
 /// The person's conversations (DMs and group chats), as JSON
-/// `[{subject, title, class_name, opened_at}]`, in the order the private drive
-/// lists them. A conversation has no name of its own: its title is who else is
-/// in it (its `read` list minus this agent), as the web app shows it. Last
-/// activity is not cheap to know, so `opened_at` is 0.
+/// `[{subject, title, class_name, opened_at, last_message, emoji?}]`, newest
+/// activity first (`opened_at` is the time of the last message in ms, 0 for an
+/// empty or unreadable one, which come last in the order the private drive
+/// lists them). A conversation has no name of its own: its title is who else is
+/// in it, as the web app shows it. `last_message` is the text of the newest
+/// message ("" when there is none or it cannot be opened). `class_name` is
+/// `conversation`, which the app opens natively.
 pub async fn list_conversations(limit: u32) -> Result<String, String> {
     let store = db()?;
-    let me = store.get_default_agent().map_err(err)?.subject.to_string();
-    let mut out = Vec::new();
+    let agent = store.get_default_agent().map_err(err)?;
+    let me = agent.subject.to_string();
+    let proof = vault_proof(&agent).ok();
+    let mut out: Vec<(i64, Json)> = Vec::new();
     for subject in private_drive_list(urls::CONVERSATIONS).await? {
         if out.len() >= limit as usize {
             break;
@@ -375,44 +596,139 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
         else {
             continue;
         };
-        let members = conversation
-            .get(urls::READ)
-            .ok()
-            .and_then(|v| v.to_subjects(None).ok())
-            .unwrap_or_default();
-        let others: Vec<&String> = members.iter().filter(|m| **m != me).collect();
-        let names = futures::future::join_all(others.into_iter().map(|member| async {
-            let local = match row_resource(&store, &Subject::from(member.as_str())).await {
-                Some(agent) => name_of(&agent),
-                None => String::new(),
-            };
-            if !local.is_empty() {
-                return local;
+        let title = conversation_title(&store, &conversation, &me).await;
+        let (mut last_at, mut last_text) = (0, String::new());
+        if let Some(proof) = &proof {
+            let keys = open_keyring(&keyring_of(&conversation), &me, proof);
+            if let Ok(newest) = conversation_message_subjects(&store, &subject, Some(1)).await {
+                if let Some(message) = newest.first() {
+                    if let Some(m) = open_message(&store, &me, &subject, &keys, message).await {
+                        last_at = m.created_at;
+                        last_text = m.text.unwrap_or_default();
+                    }
+                }
             }
-            let fetched = fetched_agent_name(member);
-            if fetched.is_empty() {
-                UNKNOWN_MEMBER.to_string()
-            } else {
-                fetched
-            }
-        }))
-        .await;
-        let title = if names.is_empty() {
-            "Only you".to_string()
-        } else {
-            names.join(", ")
-        };
-        out.push(with_emoji(
-            json!({
-                "subject": subject,
-                "title": title,
-                "class_name": "",
-                "opened_at": 0,
-            }),
-            &conversation,
+        }
+        out.push((
+            last_at,
+            with_emoji(
+                json!({
+                    "subject": subject,
+                    "title": title,
+                    "class_name": "conversation",
+                    "opened_at": last_at,
+                    "last_message": last_text,
+                }),
+                &conversation,
+            ),
         ));
     }
+    // Stable: conversations without activity keep the drive's order.
+    out.sort_by(|a, b| b.0.cmp(&a.0));
+    let list: Vec<Json> = out.into_iter().map(|(_, row)| row).collect();
+    serde_json::to_string(&list).map_err(|e| e.to_string())
+}
+
+/// The messages of a conversation, oldest first, as JSON `[{id, author,
+/// author_name, mine, text, c, reply_to?}]`: `id` the message's subject,
+/// `author` who signed it (an agent subject), `author_name` their name (the
+/// cached name or "Unknown member", never waiting on the network), `mine` when
+/// this device's agent wrote it, `text` the decrypted text (null when this
+/// agent cannot open it) and `c` its time in ms. Read from the local store;
+/// see [`follow_conversation`] to get the conversation onto this device.
+pub async fn read_conversation(subject: String) -> Result<String, String> {
+    let store = db()?;
+    let agent = store.get_default_agent().map_err(err)?;
+    let me = agent.subject.to_string();
+    let proof = vault_proof(&agent)?;
+    let conversation = row_resource(&store, &Subject::from(subject.as_str()))
+        .await
+        .ok_or("This conversation is not on this device yet")?;
+    let keys = open_keyring(&keyring_of(&conversation), &me, &proof);
+    let mut messages: Vec<(i64, String, OpenedMessage)> = Vec::new();
+    for message in conversation_message_subjects(&store, &subject, None).await? {
+        if let Some(m) = open_message(&store, &me, &subject, &keys, &message).await {
+            messages.push((m.created_at, message.to_string(), m));
+        }
+    }
+    messages.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+    let mut names: std::collections::HashMap<String, String> = Default::default();
+    let mut out = Vec::new();
+    for (_, id, m) in messages {
+        if !names.contains_key(&m.author) {
+            let name = member_name(&store, &m.author).await;
+            names.insert(m.author.clone(), name);
+        }
+        let mut row = json!({
+            "id": id,
+            "author": m.author,
+            "author_name": names[&m.author],
+            "mine": same_agent(&m.author, &me),
+            "text": m.text,
+            "c": m.created_at,
+        });
+        if let Some(reply) = m.reply_to {
+            row["reply_to"] = json!(reply);
+        }
+        out.push(row);
+    }
     serde_json::to_string(&out).map_err(|e| e.to_string())
+}
+
+/// Post `text` in a conversation as this device's agent: sealed with the
+/// conversation's newest epoch key, saved as a `SealedMessage` under it that
+/// only the author may write (as the web app does), and synced like any
+/// other edit. Returns the message's subject.
+pub async fn send_conversation_message(subject: String, text: String) -> Result<String, String> {
+    let store = db()?;
+    let agent = store.get_default_agent().map_err(err)?;
+    let me = agent.subject.to_string();
+    let proof = vault_proof(&agent)?;
+    let conversation = store
+        .get_resource(&Subject::from(subject.as_str()))
+        .await
+        .map_err(|_| "This conversation is not on this device yet".to_string())?;
+    let keys = open_keyring(&keyring_of(&conversation), &me, &proof);
+    let current = keys
+        .into_iter()
+        .max_by_key(|k| k.epoch)
+        .ok_or("You are not a member of this conversation's current keys")?;
+    let sealed = atomic_lib::conversation::seal_message(
+        &current,
+        &subject,
+        json!({ "text": text }).to_string().as_bytes(),
+    )
+    .map_err(err)?;
+
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        Value::ResourceArray(vec![urls::SEALED_MESSAGE.into()]),
+    );
+    builder.set(
+        urls::PARENT.into(),
+        Value::AtomicUrl(subject.as_str().into()),
+    );
+    builder.set(urls::SEALED.into(), Value::String(sealed));
+    builder.set(
+        urls::WRITE.into(),
+        Value::ResourceArray(vec![me.as_str().into()]),
+    );
+    let commit = Commit::create_did(builder, &agent, store.as_ref())
+        .await
+        .map_err(err)?;
+    let message = commit.subject.to_string();
+    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
+    super::simple::push_local_write(&response, store.as_ref()).await;
+    Ok(message)
+}
+
+/// Get a conversation onto this device and follow it: fetched from the
+/// connected server when missing, and its new messages arrive over the open
+/// sync session. Errors (no session, not hosted there) are for the caller to
+/// ignore; reading what is already local does not need this.
+pub async fn follow_conversation(subject: String) -> Result<(), String> {
+    super::simple::ws_sync::follow_drive(&subject).await
 }
 
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
@@ -486,6 +802,7 @@ fn first_class(resource: &Resource) -> String {
 /// one found by walking up the parents through local propvals only. Every
 /// resource on a walked chain is remembered, so siblings cost one lookup.
 #[derive(Default)]
+#[frb(ignore)]
 struct DriveCache(std::collections::HashMap<String, String>);
 
 impl DriveCache {

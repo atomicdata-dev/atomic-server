@@ -813,3 +813,254 @@ async fn rows_carry_the_resources_own_emoji_when_it_has_one() {
         serde_json::from_str(&crate::api::simple::list_drives_with_names().await.unwrap()).unwrap();
     assert_eq!(find(&drives, &drive)["emoji"], "🏔");
 }
+
+// ── Conversations: sealed messages between two agents ────────────────────
+
+use atomic_lib::agents::Agent;
+use atomic_lib::conversation::{
+    encryption_public_key, open_message as open_sealed, seal_message, Keyring, Member,
+};
+
+struct Talk {
+    conversation: String,
+    keyring: Keyring,
+    other: Agent,
+    other_proof: Vec<u8>,
+}
+
+/// A conversation between the device's agent and a new agent called `name`
+/// (whose Agent resource this device holds, so the name is known), with a
+/// keyring both can open, as the web app makes them.
+async fn new_talk(name: &str) -> Talk {
+    shared_drive().await;
+    let store = db().unwrap();
+    let me = store.get_default_agent().unwrap();
+    let other = Agent::new(Some(name)).unwrap();
+    store
+        .add_resource(&other.to_resource().unwrap())
+        .await
+        .unwrap();
+    let (my_proof, other_proof) = (vault_proof(&me).unwrap(), vault_proof(&other).unwrap());
+    let mut keyring = Keyring::default();
+    keyring
+        .add_epoch(&[
+            Member {
+                agent: me.subject.to_string(),
+                encryption_key: encryption_public_key(&my_proof),
+            },
+            Member {
+                agent: other.subject.to_string(),
+                encryption_key: encryption_public_key(&other_proof),
+            },
+        ])
+        .unwrap();
+
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        Value::ResourceArray(vec![urls::CONVERSATION.into(), urls::DRIVE.into()]),
+    );
+    builder.set(urls::NAME.into(), Value::String("Conversation".into()));
+    builder.set(
+        urls::READ.into(),
+        Value::ResourceArray(vec![
+            me.subject.to_string().into(),
+            other.subject.to_string().into(),
+        ]),
+    );
+    builder.set(
+        urls::CONVERSATION_KEYS.into(),
+        Value::String(keyring.to_json().unwrap()),
+    );
+    let commit = Commit::create_did(builder, &me, store.as_ref())
+        .await
+        .unwrap();
+    let conversation = commit.subject.to_string();
+    super::super::simple::node_apply_local(commit, &own_commit_opts())
+        .await
+        .unwrap();
+    Talk {
+        conversation,
+        keyring,
+        other,
+        other_proof,
+    }
+}
+
+impl Talk {
+    /// A message the other agent signed and sealed with the shared keyring.
+    async fn say_as_other(&self, text: &str) {
+        let store = db().unwrap();
+        let key = self
+            .keyring
+            .open_current(&self.other.subject.to_string(), &self.other_proof)
+            .unwrap();
+        let sealed = seal_message(
+            &key,
+            &self.conversation,
+            json!({ "text": text }).to_string().as_bytes(),
+        )
+        .unwrap();
+        let mut builder = CommitBuilder::new("placeholder".into());
+        builder.set(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::SEALED_MESSAGE.into()]),
+        );
+        builder.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(self.conversation.as_str().into()),
+        );
+        builder.set(urls::SEALED.into(), Value::String(sealed));
+        let commit = Commit::create_did(builder, &self.other, store.as_ref())
+            .await
+            .unwrap();
+        store
+            .apply_commit(commit, &own_commit_opts())
+            .await
+            .unwrap();
+    }
+}
+
+async fn read_talk(conversation: &str) -> Vec<Json> {
+    serde_json::from_str(&read_conversation(conversation.to_string()).await.unwrap()).unwrap()
+}
+
+/// Messages are ordered by their creation time in ms.
+async fn tick() {
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+}
+
+#[tokio::test]
+async fn a_conversation_reads_back_both_sides_in_order_with_names() {
+    let talk = new_talk("Alice").await;
+    talk.say_as_other("Hoi!").await;
+    tick().await;
+    send_conversation_message(talk.conversation.clone(), "Hallo Alice".into())
+        .await
+        .unwrap();
+    tick().await;
+    talk.say_as_other("Hoe gaat het?").await;
+
+    let messages = read_talk(&talk.conversation).await;
+    let seen: Vec<(&str, &str, bool)> = messages
+        .iter()
+        .map(|m| {
+            (
+                m["author_name"].as_str().unwrap(),
+                m["text"].as_str().unwrap(),
+                m["mine"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(seen[0], ("Alice", "Hoi!", false));
+    assert_eq!(seen[2], ("Alice", "Hoe gaat het?", false));
+    assert_eq!(seen[1].1, "Hallo Alice");
+    assert!(seen[1].2);
+    assert_eq!(messages.len(), 3);
+    assert_eq!(messages[0]["author"], talk.other.subject.to_string());
+    assert!(messages[0]["c"].as_i64().unwrap() > 0);
+}
+
+#[tokio::test]
+async fn a_sent_message_is_sealed_and_attributed_to_the_device_agent() {
+    let talk = new_talk("Bob").await;
+    let id = send_conversation_message(talk.conversation.clone(), "Geheim".into())
+        .await
+        .unwrap();
+
+    let store = db().unwrap();
+    let me = store.get_default_agent().unwrap().subject.to_string();
+    let message = store
+        .get_resource(&Subject::from(id.as_str()))
+        .await
+        .unwrap();
+    // Stored as ciphertext under the conversation, writable by its author only.
+    let sealed = message.get(urls::SEALED).unwrap().to_string();
+    assert!(!sealed.contains("Geheim"));
+    assert_eq!(
+        message.get(urls::PARENT).unwrap().to_string(),
+        talk.conversation
+    );
+    assert_eq!(message.get(urls::CREATED_BY).unwrap().to_string(), me);
+    let write = message.get(urls::WRITE).unwrap().to_subjects(None).unwrap();
+    assert_eq!(write, [me.clone()]);
+    // The other member opens it with their own key.
+    let keys = talk
+        .keyring
+        .open(&talk.other.subject.to_string(), &talk.other_proof)
+        .unwrap();
+    let opened = open_sealed(&keys, &talk.conversation, &sealed).unwrap();
+    let payload: Json = serde_json::from_slice(&opened).unwrap();
+    assert_eq!(payload["text"], "Geheim");
+
+    let messages = read_talk(&talk.conversation).await;
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["author"], me.as_str());
+    assert_eq!(messages[0]["mine"], true);
+}
+
+#[tokio::test]
+async fn conversations_list_the_last_message_newest_first() {
+    let quiet = new_talk("Quiet").await;
+    let busy = new_talk("Busy").await;
+    quiet.say_as_other("old news").await;
+    tick().await;
+    busy.say_as_other("first").await;
+    tick().await;
+    busy.say_as_other("latest word").await;
+    // The one with the older message is listed first in the private drive.
+    set_home_list(
+        urls::CONVERSATIONS,
+        &[&quiet.conversation, &busy.conversation],
+    )
+    .await;
+
+    let list: Vec<Json> = serde_json::from_str(&list_conversations(10).await.unwrap()).unwrap();
+    assert_eq!(list[0]["subject"], busy.conversation.as_str());
+    assert_eq!(list[0]["last_message"], "latest word");
+    assert_eq!(list[0]["title"], "Busy");
+    assert_eq!(list[0]["class_name"], "conversation");
+    assert_eq!(list[1]["last_message"], "old news");
+    assert!(list[0]["opened_at"].as_i64().unwrap() > list[1]["opened_at"].as_i64().unwrap());
+}
+
+#[tokio::test]
+async fn a_message_sealed_for_someone_else_reads_as_unopenable() {
+    let talk = new_talk("Carol").await;
+    // Sealed under a key that is not in the conversation's keyring.
+    let stranger = Agent::new(None).unwrap();
+    let proof = vault_proof(&stranger).unwrap();
+    let mut other_ring = Keyring::default();
+    other_ring
+        .add_epoch(&[Member {
+            agent: stranger.subject.to_string(),
+            encryption_key: encryption_public_key(&proof),
+        }])
+        .unwrap();
+    let key = other_ring
+        .open_current(&stranger.subject.to_string(), &proof)
+        .unwrap();
+    let sealed = seal_message(&key, &talk.conversation, br#"{"text":"nope"}"#).unwrap();
+    let store = db().unwrap();
+    let mut builder = CommitBuilder::new("placeholder".into());
+    builder.set(
+        urls::IS_A.into(),
+        Value::ResourceArray(vec![urls::SEALED_MESSAGE.into()]),
+    );
+    builder.set(
+        urls::PARENT.into(),
+        Value::AtomicUrl(talk.conversation.as_str().into()),
+    );
+    builder.set(urls::SEALED.into(), Value::String(sealed));
+    let commit = Commit::create_did(builder, &talk.other, store.as_ref())
+        .await
+        .unwrap();
+    store
+        .apply_commit(commit, &own_commit_opts())
+        .await
+        .unwrap();
+
+    let messages = read_talk(&talk.conversation).await;
+    assert_eq!(messages.len(), 1);
+    assert!(messages[0]["text"].is_null());
+}

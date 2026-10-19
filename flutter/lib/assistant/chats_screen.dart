@@ -53,7 +53,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<_Recent>> _recents = _timed('recents', _loadRecents());
   late Future<List<RecentResource>> _favorites =
       _timed('favorites', widget.api.favorites());
-  late Future<List<RecentResource>> _conversations =
+  late Future<List<ConversationRow>> _conversations =
       _timed('conversations', widget.api.conversations());
   late Future<List<ActivityEntry>> _activity =
       _timed('activity', _loadActivity());
@@ -220,6 +220,24 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// current one.
   Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
 
+  /// A conversation: who is in it, the newest message and when it was sent.
+  Widget _conversationRow(ConversationRow c) {
+    final r = c.resource;
+    final preview = c.lastMessage.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return ResourceRow(
+      icon: iconForClass(r.className),
+      emoji: r.emoji,
+      title: r.title.isEmpty ? r.subject : r.title,
+      detail: preview.length > 80 ? '${preview.substring(0, 79)}…' : preview,
+      trailing: r.openedAt > 0
+          ? Text(timeAgo(r.openedAt),
+              style: TextStyle(
+                  color: context.appColors.textSecondary, fontSize: 12))
+          : null,
+      onTap: () => _openResource(_drive, r),
+    );
+  }
+
   /// "<who> created/changed/deleted · <when>". A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
@@ -313,15 +331,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     title: 'Favorites',
                     children: [for (final r in list) _homeRow(r)])),
               ),
-              _Section<RecentResource>(
+              _Section<ConversationRow>(
                 title: 'Messages',
                 future: _conversations,
                 empty: 'No messages yet',
                 hideEmpty: true,
-                rows: (list) => [for (final r in list) _homeRow(r)],
+                rows: (list) => [for (final r in list) _conversationRow(r)],
                 onShowAll: (list) => _push(_ListPage(
                     title: 'Messages',
-                    children: [for (final r in list) _homeRow(r)])),
+                    children: [for (final r in list) _conversationRow(r)])),
               ),
             ],
           ),

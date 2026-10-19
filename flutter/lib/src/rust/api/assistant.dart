@@ -6,7 +6,10 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `drive_of`, `emoji_of`, `fetch_agent_name`, `fetched_agent_name`, `name_from_json_ad`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`, `row_resource`, `with_emoji`
+// These functions are ignored because they are not marked as `pub`: `agent_spellings`, `cache_message`, `cached_message`, `chat_entries`, `class_name_of`, `conversation_message_subjects`, `conversation_title`, `emoji_of`, `fetch_agent_name`, `fetched_agent_name`, `first_class`, `keyring_of`, `member_name`, `members_of`, `name_from_json_ad`, `name_of`, `of`, `open_keyring`, `open_message`, `own_commit_opts`, `private_drive_list`, `resource_row`, `row_resource`, `same_agent`, `vault_proof`, `with_emoji`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `DriveCache`, `OpenedMessage`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`
+// These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
 
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
 /// have one. For rows that do not carry their icon themselves (the activity
@@ -46,12 +49,41 @@ Future<String> listFavorites({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListFavorites(limit: limit);
 
 /// The person's conversations (DMs and group chats), as JSON
-/// `[{subject, title, class_name, opened_at}]`, in the order the private drive
-/// lists them. A conversation has no name of its own: its title is who else is
-/// in it (its `read` list minus this agent), as the web app shows it. Last
-/// activity is not cheap to know, so `opened_at` is 0.
+/// `[{subject, title, class_name, opened_at, last_message, emoji?}]`, newest
+/// activity first (`opened_at` is the time of the last message in ms, 0 for an
+/// empty or unreadable one, which come last in the order the private drive
+/// lists them). A conversation has no name of its own: its title is who else is
+/// in it, as the web app shows it. `last_message` is the text of the newest
+/// message ("" when there is none or it cannot be opened). `class_name` is
+/// `conversation`, which the app opens natively.
 Future<String> listConversations({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListConversations(limit: limit);
+
+/// The messages of a conversation, oldest first, as JSON `[{id, author,
+/// author_name, mine, text, c, reply_to?}]`: `id` the message's subject,
+/// `author` who signed it (an agent subject), `author_name` their name (the
+/// cached name or "Unknown member", never waiting on the network), `mine` when
+/// this device's agent wrote it, `text` the decrypted text (null when this
+/// agent cannot open it) and `c` its time in ms. Read from the local store;
+/// see [`follow_conversation`] to get the conversation onto this device.
+Future<String> readConversation({required String subject}) =>
+    RustLib.instance.api.crateApiAssistantReadConversation(subject: subject);
+
+/// Post `text` in a conversation as this device's agent: sealed with the
+/// conversation's newest epoch key, saved as a `SealedMessage` under it that
+/// only the author may write (as the web app does), and synced like any
+/// other edit. Returns the message's subject.
+Future<String> sendConversationMessage(
+        {required String subject, required String text}) =>
+    RustLib.instance.api
+        .crateApiAssistantSendConversationMessage(subject: subject, text: text);
+
+/// Get a conversation onto this device and follow it: fetched from the
+/// connected server when missing, and its new messages arrive over the open
+/// sync session. Errors (no session, not hosted there) are for the caller to
+/// ignore; reading what is already local does not need this.
+Future<void> followConversation({required String subject}) =>
+    RustLib.instance.api.crateApiAssistantFollowConversation(subject: subject);
 
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
 /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.

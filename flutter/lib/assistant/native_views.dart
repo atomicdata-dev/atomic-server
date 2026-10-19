@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'assistant_api.dart';
 import 'chat_screen.dart';
+import 'conversation_screen.dart';
 import 'resource_view.dart';
 
 typedef _NativeBuilder = Widget Function(
@@ -14,6 +15,8 @@ typedef _NativeBuilder = Widget Function(
 final Map<String, _NativeBuilder> _nativeViews = {
   'ai-chat': (api, drive, subject, title) =>
       ChatScreen(api: api, subject: subject, title: title),
+  'conversation': (api, drive, subject, title) =>
+      ConversationScreen(api: api, subject: subject, title: title),
 };
 
 /// The view to open a resource in: the native one for its class when there is

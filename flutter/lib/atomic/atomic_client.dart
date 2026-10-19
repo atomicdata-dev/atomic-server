@@ -22,6 +22,22 @@ typedef ChatSummary = ({String subject, String name, int lastActivity});
 /// One message of a chat: the text parts of an entry, `role` user or assistant.
 typedef ChatMessage = ({String id, String role, String text, int createdAt});
 
+/// One message of a conversation (a DM or group chat): who wrote it, and its
+/// text once opened (null when this device cannot decrypt it).
+typedef ConversationMessage = ({
+  String id,
+  String author,
+  String authorName,
+  bool mine,
+  String? text,
+  int createdAt
+});
+
+/// A row of the Messages list: the conversation and the text of its newest
+/// message ('' when there is none or it cannot be read). `resource.openedAt`
+/// is the time of that message in ms (0 when none).
+typedef ConversationRow = ({RecentResource resource, String lastMessage});
+
 typedef SearchHit = ({
   String subject,
   String title,
@@ -159,9 +175,48 @@ class AtomicClient {
       parseRecentResources(await assistant.listFavorites(limit: limit));
 
   /// The person's conversations (DMs and group chats), titled by who is in
-  /// them. `openedAt` is 0.
-  static Future<List<RecentResource>> conversations({int limit = 100}) async =>
-      parseRecentResources(await assistant.listConversations(limit: limit));
+  /// them, newest message first.
+  static Future<List<ConversationRow>> conversations({int limit = 100}) async {
+    final json = await assistant.listConversations(limit: limit);
+    final rows = jsonDecode(json) as List;
+    final resources = parseRecentResources(json);
+    return [
+      for (var i = 0; i < rows.length; i++)
+        (
+          resource: resources[i],
+          lastMessage: (rows[i]['last_message'] as String?) ?? '',
+        ),
+    ];
+  }
+
+  /// The messages of a conversation, oldest first, read from the local store.
+  static Future<List<ConversationMessage>> readConversation(
+          String subject) async =>
+      parseConversationMessages(
+          await assistant.readConversation(subject: subject));
+
+  /// Sends [text] in a conversation as this device's agent (sealed, signed,
+  /// synced like any edit); returns the message's subject.
+  static Future<String> sendConversationMessage(String subject, String text) =>
+      assistant.sendConversationMessage(subject: subject, text: text);
+
+  /// Gets a conversation onto this device and follows its new messages over
+  /// the open sync session. Best effort: throws when there is no session.
+  static Future<void> followConversation(String subject) =>
+      assistant.followConversation(subject: subject);
+
+  @visibleForTesting
+  static List<ConversationMessage> parseConversationMessages(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            id: e['id'] as String,
+            author: e['author'] as String? ?? '',
+            authorName: e['author_name'] as String? ?? '',
+            mine: e['mine'] == true,
+            text: e['text'] as String?,
+            createdAt: (e['c'] as num?)?.toInt() ?? 0,
+          ),
+      ];
 
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   static Future<Map<String, String>> resourceIcons(

@@ -17,7 +17,17 @@ class AssistantApi {
   Future<List<RecentResource>> recentResources(String drive) =>
       AtomicClient.recentResources(drive);
   Future<List<RecentResource>> favorites() => AtomicClient.favorites();
-  Future<List<RecentResource>> conversations() => AtomicClient.conversations();
+  Future<List<ConversationRow>> conversations() => AtomicClient.conversations();
+
+  /// The messages of a conversation, oldest first.
+  Future<List<ConversationMessage>> conversationMessages(String subject) =>
+      AtomicClient.readConversation(subject);
+  Future<void> sendConversationMessage(String subject, String text) =>
+      AtomicClient.sendConversationMessage(subject, text);
+
+  /// Get the conversation onto this device and follow it; best effort.
+  Future<void> followConversation(String subject) =>
+      AtomicClient.followConversation(subject);
   Future<List<ActivityEntry>> activity(int limit) =>
       AtomicClient.activity(limit: limit);
 
