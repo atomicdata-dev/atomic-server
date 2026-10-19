@@ -59,6 +59,7 @@ import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
+import { closeTopOverlay } from './overlayBack';
 
 enableEmbedMode();
 
@@ -278,6 +279,11 @@ window.atomicEmbed = {
   },
   /** One step back in the page's own history; false when there is none. */
   back() {
+    // An open overlay (the meeting chat) goes first.
+    if (closeTopOverlay()) {
+      return true;
+    }
+
     if (!history.canGoBack()) {
       return false;
     }

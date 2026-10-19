@@ -34,6 +34,7 @@ import { useRootWelcomeLayout } from '../context/RootWelcomeLayoutContext';
 import { isHostedDistribution } from '../helpers/managedServer';
 import { isRunningInTauri } from '../helpers/tauri';
 import { isEmbedded } from '../helpers/embedMode';
+import { MeetingChatOverlay } from '../embed/MeetingChatOverlay';
 
 interface NavWrapperProps {
   children: React.ReactNode;
@@ -140,11 +141,13 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
                 </HideInPrint>
               )}
               {/* The app's resource page has no side panels except comments,
-               * which open over the page (a narrow screen overlays them). The
-               * AI chat is the app's own native one. */}
+               * which open over the page (a narrow screen overlays them), and
+               * a meeting's chat, full screen. The AI chat is the app's own
+               * native one. */}
               {embedded && (
                 <HideInPrint>
                   <CommentsPanelMemo />
+                  <MeetingChatOverlay />
                 </HideInPrint>
               )}
             </SideBarWrapper>

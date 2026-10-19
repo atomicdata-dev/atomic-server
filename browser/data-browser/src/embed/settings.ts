@@ -52,3 +52,13 @@ export function showAppearanceOption(
 ): boolean {
   return !embedded || embedAppearanceOptions.has(id);
 }
+
+/**
+ * Is "Start meeting" shown? A live meeting needs the server connection (the
+ * presence session) and a WebRTC call with microphone and camera; the app's
+ * web view has neither. Chat of an existing meeting does work. See "Meetings in
+ * the embed" in planning/flutter-embed-host.md.
+ */
+export function showMeetingStart(embedded: boolean = isEmbedded()): boolean {
+  return !embedded;
+}

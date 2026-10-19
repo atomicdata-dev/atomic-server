@@ -108,6 +108,28 @@ Android web view reports `prefers-color-scheme` as the app's mode (the host
 should call `atomicEmbed.setColorScheme` on start and on theme change; that Dart
 call is not wired yet), and the transparent web view background in dark mode.
 
+## Meetings in the embed
+
+"Open chat" on a meeting page called `openMeetingPanel`, which only selects the
+follow-session side panel; the embed renders no side panels except comments, so
+nothing appeared. Decision:
+
+- **Open chat**: `src/embed/MeetingChatOverlay.tsx` shows the meeting's chat
+  (the web app's `ChatRoomView`: messages and composer, writing through the
+  commit transport like every other write) full screen, with a close button.
+  The call and the presence list of the web panel are left out.
+- **Back**: the overlay registers in `src/embed/overlayBack.ts`;
+  `atomicEmbed.back()` closes the topmost overlay first and returns true.
+- **Start meeting**: hidden in the embed (`showMeetingStart` in
+  `src/embed/settings.ts`). It starts a presence session over the server
+  connection (the embed has none) and a WebRTC call needing microphone and
+  camera, which the host does not grant the web view. "End meeting" only shows
+  for a meeting started on the page, so it follows.
+
+Tests: `src/embed/MeetingChatOverlay.test.tsx`. Not verified without a device:
+the chat on the phone (keyboard resize, live messages from others, which need
+the host to push `changed`).
+
 ## Not planned
 
 - Running the web app's own router or sidebar in the embed.
