@@ -1,13 +1,13 @@
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _app(Widget bar) => MaterialApp(
       theme: ThemeData(extensions: const [AppColors.light]),
       home: Builder(
         builder: (context) => Scaffold(
-          appBar:
-              bar is PreferredSizeWidget ? bar : null,
+          appBar: bar is PreferredSizeWidget ? bar : null,
           body: ElevatedButton(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => Scaffold(
@@ -34,8 +34,9 @@ void main() {
   testWidgets('the home bar can show the wordmark', (tester) async {
     await tester
         .pumpWidget(_app(const AppTopBar(titleWidget: AtomicWordmark())));
-    expect(find.text('atomic'), findsOneWidget);
-    expect(find.text('place'), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('atomic-wordmark'))).height, 22);
+    expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('atomic-wordmark')), findsOneWidget);
   });
 

@@ -1,5 +1,8 @@
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import 'atomic_wordmark_svg.dart';
 
 /// The top bar of every native screen: the same height, padding, title style,
 /// back affordance (shown when the route can pop) and safe-area handling
@@ -57,40 +60,27 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// The atomic.place wordmark as text: "atomic", a small dot in the brand blue,
-/// "place".
+/// The atomic.place wordmark: the web logo's artwork (see
+/// `atomic_wordmark_svg.dart`) in the theme's text colour, with the gradient
+/// full stop. Left-aligned, [height] tall.
 class AtomicWordmark extends StatelessWidget {
-  final double fontSize;
+  final double height;
 
-  const AtomicWordmark({super.key, this.fontSize = 22});
+  const AtomicWordmark({super.key, this.height = 22});
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
-    final style = TextStyle(
-      color: c.textPrimary,
-      fontSize: fontSize,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.5,
-    );
+    final color = context.appColors.textPrimary;
+    final hex =
+        '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
     return Semantics(
       label: 'atomic.place',
       excludeSemantics: true,
-      child: Row(
+      child: SvgPicture.string(
+        atomicWordmarkSvg.replaceAll('currentColor', hex),
         key: const Key('atomic-wordmark'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('atomic', style: style),
-          Container(
-            width: fontSize * 0.3,
-            height: fontSize * 0.3,
-            margin: EdgeInsets.symmetric(horizontal: fontSize * 0.1),
-            decoration: BoxDecoration(color: c.main, shape: BoxShape.circle),
-          ),
-          Text('place', style: style),
-        ],
+        height: height,
+        alignment: Alignment.centerLeft,
       ),
     );
   }
