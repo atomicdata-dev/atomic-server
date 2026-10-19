@@ -134,9 +134,12 @@ async fn assistant_search_is_scoped_to_the_given_drive() {
 async fn assistant_lists_the_chats_of_every_drive() {
     let drive = shared_drive().await.to_string();
     let mut rx = db().unwrap().subscribe_events();
-    let second = crate::api::simple::create_drive("Second drive".into())
-        .await
-        .unwrap();
+    let second = {
+        let _one_at_a_time = crate::api::simple::tests::PRIVATE_DRIVE.lock().await;
+        crate::api::simple::create_drive("Second drive".into())
+            .await
+            .unwrap()
+    };
     assert_ne!(second, drive);
     // Creating a drive makes it the active one; the other tests expect theirs.
     db().unwrap().set_active_drive(&drive).unwrap();
@@ -333,6 +336,7 @@ async fn a_chat_started_here_takes_messages_in_order_on_one_page() {
 
 /// Put `subjects` in a list property of the private drive, as the web app does.
 async fn set_home_list(property: &str, subjects: &[&str]) {
+    let _one_at_a_time = crate::api::simple::tests::PRIVATE_DRIVE.lock().await;
     let store = db().unwrap();
     let home = store.ensure_private_drive().await.unwrap();
     let mut drive = store
@@ -469,9 +473,13 @@ async fn home_lists_do_not_decode_snapshots_per_row() {
             // Some history, as a real resource has.
             for edit in 0..5 {
                 let mut r = store.get_resource(&subject.as_str().into()).await.unwrap();
-                r.set_string(urls::DESCRIPTION.into(), &format!("edit {edit}"), store.as_ref())
-                    .await
-                    .unwrap();
+                r.set_string(
+                    urls::DESCRIPTION.into(),
+                    &format!("edit {edit}"),
+                    store.as_ref(),
+                )
+                .await
+                .unwrap();
                 r.save_locally(store.as_ref()).await.unwrap();
             }
             recents::note_opened(drive, &subject, 10_000 + i);

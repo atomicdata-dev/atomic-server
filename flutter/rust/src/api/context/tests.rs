@@ -7,12 +7,12 @@ use crate::api::simple::tests::shared_drive;
 /// rewrite its lists (favorites, conversations).
 async fn own_drive(name: &str) -> String {
     shared_drive().await;
+    let _one_at_a_time = crate::api::simple::tests::PRIVATE_DRIVE.lock().await;
     db().unwrap().create_drive(name).await.unwrap()
 }
 
 async fn folder(parent: &str, name: &str) -> String {
-    db()
-        .unwrap()
+    db().unwrap()
         .create_resource(urls::FOLDER, parent, name, None)
         .await
         .unwrap()

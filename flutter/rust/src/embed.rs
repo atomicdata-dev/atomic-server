@@ -262,8 +262,12 @@ pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String
         "outboxWrite" => Json::Null,
         // The page's local cache writes back what it just read; the real store
         // already has it, so there is nothing to keep.
-        "putResource" | "putResources" | "putResourceWithSnapshot" | "putBlob"
-        | "applyPeerCommit" | "removeResource" => Json::Null,
+        "putResource"
+        | "putResources"
+        | "putResourceWithSnapshot"
+        | "putBlob"
+        | "applyPeerCommit"
+        | "removeResource" => Json::Null,
         "publicKey" => match store.get_default_agent() {
             Ok(agent) => json!(agent.public_key),
             Err(_) => Json::Null,
@@ -416,6 +420,9 @@ mod tests {
         })
         .to_string();
         let signature = ask("sign", json!([mine])).await;
-        assert!(signature.as_str().is_some_and(|s| s.len() > 60), "{signature}");
+        assert!(
+            signature.as_str().is_some_and(|s| s.len() > 60),
+            "{signature}"
+        );
     }
 }
