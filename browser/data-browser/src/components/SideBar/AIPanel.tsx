@@ -107,7 +107,7 @@ export function NewSidebarChatButton() {
       title='New Chat'
       size='small'
       color='textLight'
-      onClick={() => openChat()}
+      onClick={() => openChat(undefined, { withoutContext: true })}
     >
       <FaPlus />
     </IconButton>
