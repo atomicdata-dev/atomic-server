@@ -101,6 +101,10 @@ void main() {
     await _open(tester, api, title: 'ChatRoom');
     await tester.tap(find.byTooltip('Rename'));
     await tester.pumpAndSettle();
+    final field =
+        tester.widget<TextField>(find.byKey(const Key('chat-room-name')));
+    expect(field.controller!.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 8));
     await tester.enterText(find.byKey(const Key('chat-room-name')), ' Family ');
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();

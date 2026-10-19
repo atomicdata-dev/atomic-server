@@ -58,7 +58,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   /// A chat room has no page of its own on the phone (this screen replaces
   /// it), so its name is changed here: a new room is called "ChatRoom".
   Future<void> _rename() async {
-    final controller = TextEditingController(text: _title);
+    // All selected: typing replaces the old name ("ChatRoom" on a new room).
+    final controller = TextEditingController(text: _title)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: _title.length);
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
