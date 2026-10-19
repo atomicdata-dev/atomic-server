@@ -11,7 +11,11 @@ class AtomicAccountClient {
   final Uri origin;
   final http.Client _http;
   String? _token;
-  bool get linked => _token != null;
+
+  /// The `session_token` cookie value of an agent sign-in, the alternative to
+  /// a linked device's bearer token.
+  String? _cookie;
+  bool get linked => _token != null || _cookie != null;
 
   static Uri providerOrigin(String input) {
     final uri = Uri.tryParse(input);
@@ -32,28 +36,75 @@ class AtomicAccountClient {
       (jsonDecode(saved) as Map<String, dynamic>)['origin'] as String);
 
   /// Only the host credential store should persist this value, never UI/logs.
-  String exportSession() =>
-      jsonEncode({'origin': origin.toString(), 'token': _token});
+  String exportSession() => jsonEncode({
+        'origin': origin.toString(),
+        if (_token != null) 'token': _token else 'cookie': _cookie,
+      });
   void restoreSession(String saved) {
     final data = jsonDecode(saved) as Map<String, dynamic>;
+    final key = data['token'] is String ? 'token' : 'cookie';
     if (providerOrigin(data['origin'] as String) != origin ||
-        data['token'] is! String ||
-        (data['token'] as String).isEmpty) {
+        data[key] is! String ||
+        (data[key] as String).isEmpty) {
       throw StateError('This session belongs to another provider');
     }
-    _token = data['token'] as String;
+    _token = key == 'token' ? data[key] as String : null;
+    _cookie = key == 'cookie' ? data[key] as String : null;
   }
 
-  void forgetSession() => _token = null;
+  void forgetSession() {
+    _token = null;
+    _cookie = null;
+  }
+
+  /// Sign in with the Atomic agent, as the web app does: the portal issues a
+  /// challenge, [sign] signs `"<challenge> <timestamp>"` with the agent key,
+  /// and the portal answers 204 with a session cookie. Returns false when the
+  /// agent is not an account's identity (no session is created); throws when
+  /// the portal cannot be reached.
+  Future<bool> signInWithAgent(
+      String agentSubject, Future<String> Function(String message) sign) async {
+    final issued = await _request('POST', 'auth/agent/challenge',
+        authenticated: false, body: {'agent_subject': agentSubject});
+    if (issued.statusCode != 200) return false;
+    final challenge = _decode(issued.body);
+    if (challenge is! Map ||
+        challenge['nonce'] is! String ||
+        challenge['challenge'] is! String) {
+      return false;
+    }
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final signature = await sign('${challenge['challenge']} $timestamp');
+    final response = await _request('POST', 'auth/agent',
+        query: {'if_linked': 'true'},
+        authenticated: false,
+        body: {
+          'nonce': challenge['nonce'],
+          'timestamp': timestamp,
+          'signature': signature,
+        });
+    // Only 204 makes a session; 200 with signed_in:false means no account.
+    if (response.statusCode != 204) return false;
+    final cookie = RegExp(r'(?:^|[\s,])session_token=([^;,\s]+)')
+        .firstMatch(response.headers['set-cookie'] ?? '')
+        ?.group(1);
+    if (cookie == null || cookie.isEmpty) return false;
+    _token = null;
+    _cookie = cookie;
+    return true;
+  }
   void close() => _http.close();
 
   Future<http.Response> _request(String method, String path,
-      {Map<String, dynamic>? body, bool authenticated = true}) async {
-    if (authenticated && _token == null) throw StateError('Sign in first');
-    final req = http.Request(method, origin.replace(path: '/api/$path'))
+      {Map<String, dynamic>? body,
+      Map<String, String>? query,
+      bool authenticated = true}) async {
+    if (authenticated && !linked) throw StateError('Sign in first');
+    final req = http.Request(
+        method, origin.replace(path: '/api/$path', queryParameters: query))
       ..followRedirects = false
       ..headers['Accept'] = 'application/json';
-    if (authenticated) req.headers['Authorization'] = 'Bearer $_token';
+    if (authenticated) _authorize(req);
     if (body != null) {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(body);
@@ -65,6 +116,17 @@ class AtomicAccountClient {
     } catch (_) {
       // Network exceptions can contain the polling URL, including device_code.
       throw StateError('Could not reach the account provider');
+    }
+  }
+
+  /// A bearer token needs nothing more. A cookie session also names the portal
+  /// as `Origin`, which the portal requires of cookie-authenticated writes.
+  void _authorize(http.BaseRequest req) {
+    if (_token != null) {
+      req.headers['Authorization'] = 'Bearer $_token';
+    } else {
+      req.headers['Cookie'] = 'session_token=$_cookie';
+      req.headers['Origin'] = origin.toString().replaceAll(RegExp(r'/$'), '');
     }
   }
 
@@ -209,15 +271,15 @@ class AtomicAccountClient {
     List<Map<String, String>> messages, {
     required String model,
   }) async* {
-    if (_token == null) throw StateError('Sign in first');
+    if (!linked) throw StateError('Sign in first');
     final request = http.Request(
         'POST', origin.replace(path: '/api/ai/chat/completions'))
       ..followRedirects = false
-      ..headers['Authorization'] = 'Bearer $_token'
       ..headers['Content-Type'] = 'application/json'
       ..headers['Accept'] = 'text/event-stream'
       ..body =
           jsonEncode({'model': model, 'messages': messages, 'stream': true});
+    _authorize(request);
     final http.StreamedResponse response;
     try {
       response = await _http.send(request).timeout(const Duration(seconds: 30));

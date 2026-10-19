@@ -158,4 +158,63 @@ void main() {
     expect(tester.takeException(), isNull);
     client.close();
   });
+  group('agent sign-in', () {
+    Future<String> fakeSign(String m) async => 'sig:$m';
+    MockClient portal(int status, List<http.Request> seen) =>
+        MockClient((request) async {
+          seen.add(request);
+          switch (request.url.path) {
+            case '/api/auth/agent/challenge':
+              return http.Response(
+                jsonEncode({'nonce': 'n1', 'challenge': 'chal'}),
+                200,
+              );
+            case '/api/auth/agent':
+              return status == 204
+                  ? http.Response(
+                      '',
+                      204,
+                      headers: {
+                        'set-cookie':
+                            'session_token=abc123; Path=/; HttpOnly; Secure',
+                      },
+                    )
+                  : http.Response(jsonEncode({'signed_in': false}), status);
+            default:
+              return http.Response(jsonEncode({'enabled': true}), 200);
+          }
+        });
+
+    test('204 makes a cookie session that is sent on later requests', () async {
+      final seen = <http.Request>[];
+      final client = AtomicAccountClient(
+        'https://provider.example',
+        client: portal(204, seen),
+      );
+      expect(await client.signInWithAgent('did:ad:agent:x', fakeSign), isTrue);
+      expect(client.linked, isTrue);
+      final body = jsonDecode(seen[1].body) as Map;
+      expect(seen[1].url.query, 'if_linked=true');
+      expect(body['nonce'], 'n1');
+      expect(body['signature'], 'sig:chal ${body['timestamp']}');
+      await client.aiStatus();
+      expect(seen.last.headers['Cookie'], 'session_token=abc123');
+      expect(seen.last.headers.containsKey('Authorization'), isFalse);
+      expect(seen.last.headers['Origin'], 'https://provider.example');
+      final restored = AtomicAccountClient('https://provider.example')
+        ..restoreSession(client.exportSession());
+      expect(restored.linked, isTrue);
+    });
+
+    test('200 signed_in:false leaves the client signed out', () async {
+      final seen = <http.Request>[];
+      final client = AtomicAccountClient(
+        'https://provider.example',
+        client: portal(200, seen),
+      );
+      expect(await client.signInWithAgent('did:ad:agent:x', fakeSign), isFalse);
+      expect(client.linked, isFalse);
+      await expectLater(client.aiStatus(), throwsStateError);
+    });
+  });
 }

@@ -47,7 +47,10 @@ class HostedAi {
   /// The linked account's AI, or null when no account is linked or the
   /// provider offers none. Throws when the provider cannot be reached.
   static Future<HostedAi?> load() async {
-    final saved = await AccountStore.read();
+    var saved = await AccountStore.read();
+    if (saved == null && await AccountStore.signInWithAgent()) {
+      saved = await AccountStore.read();
+    }
     if (saved == null) return null;
     final client = shared.AtomicAccountClient(
         shared.AtomicAccountClient.sessionOrigin(saved).toString())

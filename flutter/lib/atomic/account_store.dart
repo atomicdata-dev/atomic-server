@@ -1,6 +1,9 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'atomic_auth.dart';
+import 'atomic_client.dart';
+
 /// What the person's managed account says about one workspace: the address it
 /// belongs to, and whether Cloud Vault (encrypted backup) and Cloud Server
 /// (a hosted, readable copy) are on for it.
@@ -23,7 +26,7 @@ class AccountSummary {
   final Map<String, dynamic>? server;
 }
 
-/// The linked account's session. It is a bearer token for one portal, so it
+/// The linked account's session. It is a bearer token or cookie for one portal, so it
 /// lives in platform secure storage like the agent secret, never in prefs.
 class AccountStore {
   static const _key = 'atomic_account_session';
@@ -39,6 +42,39 @@ class AccountStore {
   /// The saved session, for a client to restore; null when no account is
   /// linked.
   static Future<String?> read() => _secure.read(key: _key);
+
+  /// The portal agents sign in to when no portal is linked yet.
+  static const defaultPortal = 'https://atomicserver.eu';
+
+  static String? _attemptedAgent;
+
+  /// Signs the account in with the active agent when nothing is saved, the way
+  /// the web app does, so an agent that is an account identity needs no link
+  /// code. True when a session is now saved. Silent otherwise: no account, no
+  /// agent or no network all leave things as they were, and a network failure
+  /// is tried again on the next start.
+  static Future<bool> signInWithAgent({String portal = defaultPortal}) async {
+    try {
+      if (await read() != null) return true;
+      final info = await AtomicClient.getActiveAgent();
+      if (info == null || _attemptedAgent == info.subject) return false;
+      final agent = AtomicAgent.fromSecret(info.secret);
+      final client = shared.AtomicAccountClient(portal);
+      try {
+        final signedIn = await client.signInWithAgent(agent.subject,
+            (message) async => signMessage(message, agent.privateKeyB64));
+        // A refusal is final for this run; an unreachable portal throws below.
+        _attemptedAgent = info.subject;
+        if (!signedIn) return false;
+        await save(client.exportSession());
+        return true;
+      } finally {
+        client.close();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// The linked account's state for [drive]; null when no account is linked.
   /// Throws when it is linked but the portal cannot be read, so a failed read
