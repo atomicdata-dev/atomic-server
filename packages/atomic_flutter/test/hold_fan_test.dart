@@ -360,6 +360,31 @@ void main() {
     expect(rects[2].top, greaterThan(rects[1].bottom));
   });
 
+  test('holdFanSideLayout stacks the pills right of the button, going down',
+      () {
+    final rects = holdFanSideLayout(
+      anchor: const Offset(40, 200),
+      sizes: const [Size(80, 44), Size(120, 44), Size(100, 44)],
+      bounds: const Rect.fromLTWH(0, 0, 1280, 800),
+    );
+    expect(rects.map((r) => r.width).toSet(), {120});
+    // Right of the button (its right edge is 24 from the centre).
+    expect(rects.first.left, greaterThan(64));
+    expect(rects.first.center.dy, 200);
+    expect(rects[1].top, greaterThan(rects[0].bottom));
+    expect(rects[2].top, greaterThan(rects[1].bottom));
+  });
+
+  test('holdFanSideLayout moves up when it would pass the bottom', () {
+    final rects = holdFanSideLayout(
+      anchor: const Offset(40, 380),
+      sizes: const [Size(80, 44), Size(80, 44), Size(80, 44)],
+      bounds: const Rect.fromLTWH(0, 0, 900, 400),
+    );
+    expect(rects.last.bottom, lessThanOrEqualTo(400));
+    expect(rects.first.top, greaterThanOrEqualTo(0));
+  });
+
   testWidgets('a list fan opens at the short hold and draws no line',
       (tester) async {
     await tester.pumpWidget(MaterialApp(

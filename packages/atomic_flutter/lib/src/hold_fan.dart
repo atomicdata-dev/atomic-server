@@ -28,6 +28,12 @@ enum HoldFanLayout {
   /// Stacked straight above (or, with no room above, below) the button: for
   /// choices taken from a list (drives, recent resources, chats).
   list,
+
+  /// Stacked to the right of the button, the first level with it, going
+  /// down (up when there is no room below): for a button in a navigation
+  /// rail at the left edge, where above would cover the rail's other
+  /// buttons.
+  side,
 }
 
 /// A button with more than one action, after the colour and width fans of
@@ -189,6 +195,35 @@ List<Rect> holdFanListLayout({
   return rects;
 }
 
+/// Where the pills of a [HoldFanLayout.side] menu go: one under the other,
+/// all as wide as the widest, [gap] right of [anchor] (the button's centre,
+/// [reach] from its right edge), the first level with the button. Pills that
+/// would pass the bottom of [bounds] move up together.
+List<Rect> holdFanSideLayout({
+  required Offset anchor,
+  required List<Size> sizes,
+  required Rect bounds,
+  double reach = 24,
+  double gap = 8,
+}) {
+  if (sizes.isEmpty) return const [];
+  final width = sizes.map((s) => s.width).reduce(math.max);
+  var left = anchor.dx + reach + gap;
+  left = left.clamp(bounds.left, math.max(bounds.left, bounds.right - width));
+  var top = anchor.dy - sizes.first.height / 2;
+  final rects = <Rect>[];
+  for (final s in sizes) {
+    rects.add(Rect.fromLTWH(left, top, width, s.height));
+    top += s.height + gap;
+  }
+  var shift = 0.0;
+  if (rects.last.bottom > bounds.bottom) shift = bounds.bottom - rects.last.bottom;
+  if (rects.first.top + shift < bounds.top) shift = bounds.top - rects.first.top;
+  return shift == 0
+      ? rects
+      : [for (final r in rects) r.shift(Offset(0, shift))];
+}
+
 /// The pill under [point], or null: a pill counts a little beyond its edges,
 /// and of two candidates the one whose centre is nearer wins.
 int? holdFanHit(List<Rect> rects, Offset point, {double slop = 10}) {
@@ -301,9 +336,17 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       for (final item in _shown)
         _pillSize(item.text, scaler, _style, area.width),
     ];
-    _rects = widget.layout == HoldFanLayout.list
-        ? holdFanListLayout(anchor: _anchor, sizes: sizes, bounds: area)
-        : holdFanLayout(anchor: _anchor, sizes: sizes, bounds: area);
+    _rects = switch (widget.layout) {
+      HoldFanLayout.list =>
+        holdFanListLayout(anchor: _anchor, sizes: sizes, bounds: area),
+      HoldFanLayout.side => holdFanSideLayout(
+          anchor: _anchor,
+          sizes: sizes,
+          bounds: area,
+          reach: box.size.width / 2),
+      HoldFanLayout.fan =>
+        holdFanLayout(anchor: _anchor, sizes: sizes, bounds: area),
+    };
     _hover.value = null;
     _entry = OverlayEntry(builder: _buildFan);
     overlay.insert(_entry!);
