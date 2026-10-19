@@ -147,6 +147,12 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // The keyboard overlays the screen and every page's Scaffold shrinks its
+    // body by the full keyboard height. With the bar still below the pages
+    // they would shrink by the bar's height too much (a gap above the
+    // keyboard). So the bar steps aside while the keyboard is open: the page
+    // region then ends at the screen bottom and its insets are exact.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return ShellScope(
       controller: _shell,
       // Android back pops the pages first and leaves the app on the home.
@@ -168,7 +174,22 @@ class _AppShellState extends State<AppShell> {
               ),
             ),
           ),
-          AppBottomBar(api: widget.api, shell: _shell),
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: keyboard ? 0.0 : 1.0),
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            child: AppBottomBar(api: widget.api, shell: _shell),
+            builder: (context, v, child) => Offstage(
+              offstage: v == 0,
+              child: ClipRect(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: v,
+                  child: child,
+                ),
+              ),
+            ),
+          ),
         ]),
       ),
     );

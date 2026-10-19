@@ -109,6 +109,19 @@ class FakeSpeechInput implements SpeechInput {
 
   FakeSpeechInput({this.available = true, this.startDelay = Duration.zero});
 
+  String? lastLocale;
+  List<SpeechLocale> available_ = const [
+    SpeechLocale('en_US', 'English (United States)'),
+    SpeechLocale('nl_NL', 'Dutch (Netherlands)'),
+    SpeechLocale('de_DE', 'German (Germany)'),
+  ];
+
+  @override
+  Future<List<SpeechLocale>> locales() async => available_;
+
+  @override
+  Future<String?> systemLocale() async => 'en_US';
+
   @override
   bool get listening => _on;
 
@@ -117,8 +130,10 @@ class FakeSpeechInput implements SpeechInput {
     required void Function(String text, bool isFinal) onText,
     required void Function(String error) onError,
     void Function(double level)? onLevel,
+    String? localeId,
   }) async {
     starts++;
+    lastLocale = localeId;
     if (startDelay > Duration.zero) await Future<void>.delayed(startDelay);
     if (!available) return false;
     this.onText = onText;
@@ -836,6 +851,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'Hallo daar');
+      await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
 
@@ -881,6 +897,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'And food?');
+      await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
 
@@ -1096,6 +1113,117 @@ void main() {
         expect(field(tester), 'hello');
       });
 
+      testWidgets('a final result with no words shows a hint, typing clears it',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(find.byKey(const Key('voice-hint')), findsNothing);
+        input.onText!('', true);
+        await tester.pump();
+        expect(find.byKey(const Key('voice-hint')), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'x');
+        await tester.pump();
+        expect(find.byKey(const Key('voice-hint')), findsNothing);
+
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onError!('error_no_match');
+        await tester.pump();
+        expect(find.byKey(const Key('voice-hint')), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(find.byKey(const Key('voice-hint')), findsNothing);
+      });
+
+      testWidgets('the system locale is used and shown while listening',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(input.lastLocale, 'en_US');
+        expect(find.text('en-US'), findsOneWidget);
+      });
+
+      testWidgets('a language chosen in the sheet is used and remembered',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.longPress(find.byIcon(Icons.mic));
+        await tester.pumpAndSettle();
+        expect(find.text('Suggested'), findsOneWidget);
+        await tester.enterText(find.byKey(const Key('locale-search')), 'dutch');
+        await tester.pumpAndSettle();
+        expect(find.text('German (Germany)'), findsNothing);
+        await tester.tap(find.text('Dutch (Netherlands)'));
+        await tester.pumpAndSettle();
+        expect(
+            (await SharedPreferences.getInstance()).getString('voice_locale'),
+            'nl_NL');
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(input.lastLocale, 'nl_NL');
+        expect(find.text('nl-NL'), findsOneWidget);
+      });
+
+      testWidgets('partials after a permission pause update the field',
+          (tester) async {
+        final input =
+            FakeSpeechInput(startDelay: const Duration(milliseconds: 500));
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        for (final st in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(st);
+        }
+        await tester.pump(const Duration(milliseconds: 600));
+        for (final t in ['goe', 'goedemorgen']) {
+          input.onText!(t, false);
+          await tester.pump();
+          expect(field(tester), t);
+        }
+        input.onText!('goedemorgen allemaal', true);
+        await tester.pump();
+        expect(field(tester), 'goedemorgen allemaal');
+        expect(find.byKey(const Key('voice-hint')), findsNothing);
+      });
+
+      testWidgets('send is disabled for empty text and enabled with text',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        bool enabled() =>
+            tester
+                .widget<IconButton>(
+                    find.widgetWithIcon(IconButton, Icons.arrow_upward))
+                .onPressed !=
+            null;
+        expect(enabled(), isFalse);
+        await tester.enterText(find.byType(TextField), '   ');
+        await tester.pump();
+        expect(enabled(), isFalse);
+        await tester.enterText(find.byType(TextField), 'hi');
+        await tester.pump();
+        expect(enabled(), isTrue);
+        await tester.enterText(find.byType(TextField), '');
+        await tester.pump();
+        expect(enabled(), isFalse);
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onText!('dictated', false);
+        await tester.pump();
+        expect(enabled(), isTrue);
+      });
+
       testWidgets('sending stops listening', (tester) async {
         final input = FakeSpeechInput();
         await open(tester, input, FakeSpeechOutput());
@@ -1118,6 +1246,7 @@ void main() {
         await open(tester, FakeSpeechInput(), output);
         expect(find.byIcon(Icons.volume_up), findsOneWidget);
         await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         expect(output.spoken, ['Hoi!']);
@@ -1128,6 +1257,7 @@ void main() {
         await open(tester, FakeSpeechInput(), output);
         expect(find.byIcon(Icons.volume_off), findsOneWidget);
         await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         expect(output.spoken, isEmpty);
@@ -1153,6 +1283,7 @@ void main() {
             isTrue);
 
         await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         // Sending stopped speech first, then the new answer was read.
@@ -1262,9 +1393,11 @@ void main() {
         await tester.pump();
 
         await tester.enterText(find.byType(TextField), 'Summarize');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'More');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
 
@@ -1296,6 +1429,7 @@ void main() {
         await tester.pumpWidget(app(ChatScreen(api: api)));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         expect(sent, hasLength(2));
@@ -1378,6 +1512,39 @@ void main() {
 
     double x(WidgetTester tester, String tip) =>
         tester.getCenter(find.byTooltip(tip)).dx;
+
+    testWidgets('the bar steps aside for the keyboard, no gap above it',
+        (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(app(AppShell(
+        drive: 'd',
+        home: Scaffold(
+          body: SafeArea(
+            top: false,
+            child: Column(children: [
+              const Spacer(),
+              TextField(key: const Key('bottom-field')),
+            ]),
+          ),
+        ),
+      )));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppBottomBar), findsOneWidget);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      await tester.pumpAndSettle();
+      expect(find.byType(AppBottomBar), findsNothing);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      final field = tester.getBottomLeft(find.byKey(const Key('bottom-field')));
+      expect(field.dy, closeTo(screen.height - 300, 0.5));
+
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(find.byType(AppBottomBar), findsOneWidget);
+    });
 
     testWidgets('the bar stays put while a page slides in', (tester) async {
       await pumpHome(tester);

@@ -12,6 +12,9 @@ import 'voice.dart';
 /// SharedPreferences key: speak each new answer aloud.
 const _readAloudKey = 'chat_read_aloud';
 
+/// SharedPreferences key: the recogniser language the person picked.
+const voiceLocaleKey = 'voice_locale';
+
 /// A resource the person attached to a new chat as context.
 typedef _Attached = ({String subject, String title, String className});
 
@@ -92,11 +95,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// older session are ignored.
   int _listenSession = 0;
 
+  /// The language tag shown on the mic while listening, e.g. `nl-NL`.
+  String? _activeLocale;
+
+  /// Text recognised in the current listen.
+  bool _heard = false;
+
+  /// Listening ended without any words: a gentle hint instead of silence.
+  bool _noSpeechHint = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _inputInst = widget.speechInput;
+    _input.addListener(_inputChanged);
     _outputInst = widget.speechOutput;
     _loadReadAloud();
     _chat = widget.subject;
@@ -105,8 +118,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_chat == null) _readPicker();
   }
 
+  bool _hadText = false;
+
+  void _inputChanged() {
+    final has = _input.text.trim().isNotEmpty;
+    if (has == _hadText && !_noSpeechHint) return;
+    _hadText = has;
+    // Typing clears the hint.
+    if (mounted) setState(() => _noSpeechHint = false);
+  }
+
   @override
   void dispose() {
+    _input.removeListener(_inputChanged);
     WidgetsBinding.instance.removeObserver(this);
     _listenSession++;
     _inputInst?.stop();
@@ -146,6 +170,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _listening = false;
     _starting = false;
     _level = 0;
+    if (!_heard) _noSpeechHint = true;
     _inputInst?.stop();
     if (mounted) setState(() {});
   }
@@ -163,6 +188,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         : '$typed ';
     final session = ++_listenSession;
     setState(() {
+      _noSpeechHint = false;
+      _heard = false;
       _listening = true;
       _starting = true;
       _level = 0;
@@ -171,9 +198,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     // Speech from the speaker would be heard as input.
     _outputInst?.stop();
+    String? localeId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      localeId = prefs.getString(voiceLocaleKey);
+    } catch (_) {}
+    localeId ??= await input.systemLocale();
+    if (!mounted || session != _listenSession) return;
+    setState(() => _activeLocale = localeId?.replaceAll('_', '-'));
     final ok = await input.start(
+      localeId: localeId,
       onText: (text, isFinal) {
         if (!mounted || session != _listenSession) return;
+        if (text.isNotEmpty) _heard = true;
         _input.value = TextEditingValue(
           text: '$base$text',
           selection: TextSelection.collapsed(offset: base.length + text.length),
@@ -182,7 +219,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           setState(() {
             _listening = false;
             _level = 0;
+            _noSpeechHint = !_heard;
           });
+        } else if (_noSpeechHint) {
+          setState(() => _noSpeechHint = false);
         }
       },
       onError: (e) {
@@ -192,7 +232,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _listening = false;
           _level = 0;
           // Hearing nothing is a normal end, not a failure.
-          if (message != null) _error = message;
+          if (message != null) {
+            _error = message;
+          } else if (!_heard) {
+            _noSpeechHint = true;
+          }
         });
       },
       onLevel: (level) {
@@ -214,6 +258,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'system settings.';
       });
     }
+  }
+
+  /// Long-press on the mic: pick the language the recogniser listens for.
+  Future<void> _pickLocale() async {
+    _stopListening();
+    final input = _inputInst ??= PluginSpeechInput();
+    final all = await input.locales();
+    final system = await input.systemLocale();
+    String? current;
+    try {
+      current = (await SharedPreferences.getInstance()).getString(
+        voiceLocaleKey,
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _LocaleSheet(
+        locales: all,
+        systemId: system,
+        currentId: current ?? system,
+      ),
+    );
+    if (picked == null) return;
+    try {
+      await (await SharedPreferences.getInstance())
+          .setString(voiceLocaleKey, picked);
+    } catch (_) {}
+    if (mounted) setState(() => _noSpeechHint = false);
   }
 
   Future<void> _readMessages() async {
@@ -661,15 +735,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 _MicButton(
                   listening: _listening,
                   level: _level,
+                  locale: _activeLocale,
+                  onLongPress: ai == null ? null : _pickLocale,
                   onPressed: ai == null ? null : _toggleListening,
                 ),
                 IconButton.filled(
                   tooltip: 'Send',
-                  onPressed: _sending || ai == null ? null : _send,
+                  onPressed: _sending || ai == null || !_hadText ? null : _send,
                   icon: const Icon(Icons.arrow_upward),
                 ),
               ],
             ),
+            if (_noSpeechHint && !_listening)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  "Didn't hear anything. Check the language (long-press the "
+                  'mic) and try again.',
+                  key: const Key('voice-hint'),
+                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                ),
+              ),
           ],
         ),
       ),
@@ -705,11 +791,15 @@ class _MicButton extends StatefulWidget {
   final bool listening;
   final double level;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
+  final String? locale;
 
   const _MicButton({
     required this.listening,
     required this.level,
     required this.onPressed,
+    this.onLongPress,
+    this.locale,
   });
 
   @override
@@ -785,13 +875,31 @@ class _MicButtonState extends State<_MicButton>
                 );
               },
             ),
-          IconButton(
-            tooltip:
+          Tooltip(
+            message:
                 widget.listening ? 'Stop voice input' : 'Start voice input',
-            onPressed: widget.onPressed,
-            color: widget.listening ? c.main : null,
-            icon: Icon(widget.listening ? Icons.stop : Icons.mic),
+            // Long-press picks the language instead.
+            triggerMode: TooltipTriggerMode.manual,
+            child: GestureDetector(
+              onLongPress: widget.onLongPress,
+              child: IconButton(
+                onPressed: widget.onPressed,
+                color: widget.listening ? c.main : null,
+                icon: Icon(widget.listening ? Icons.stop : Icons.mic),
+              ),
+            ),
           ),
+          if (widget.listening && widget.locale != null)
+            Positioned(
+              bottom: 1,
+              child: IgnorePointer(
+                child: Text(
+                  widget.locale!,
+                  key: const Key('mic-locale'),
+                  style: TextStyle(color: c.textSecondary, fontSize: 9),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -838,6 +946,103 @@ class _Waveform extends StatelessWidget {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The languages the recogniser offers: suggested ones first, then the rest
+/// alphabetically, with a search field.
+class _LocaleSheet extends StatefulWidget {
+  final List<SpeechLocale> locales;
+  final String? systemId;
+  final String? currentId;
+
+  const _LocaleSheet({
+    required this.locales,
+    required this.systemId,
+    required this.currentId,
+  });
+
+  @override
+  State<_LocaleSheet> createState() => _LocaleSheetState();
+}
+
+class _LocaleSheetState extends State<_LocaleSheet> {
+  String _query = '';
+
+  bool _match(SpeechLocale l) {
+    final q = _query.trim().toLowerCase();
+    return q.isEmpty ||
+        l.name.toLowerCase().contains(q) ||
+        l.id.toLowerCase().contains(q);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final byId = {for (final l in widget.locales) l.id: l};
+    final suggested = <SpeechLocale>[];
+    for (final id in [widget.systemId, 'nl_NL', 'en_US', 'en_GB']) {
+      final l = id == null ? null : byId[id];
+      if (l != null && !suggested.contains(l)) suggested.add(l);
+    }
+    final rest = [
+      for (final l in widget.locales)
+        if (!suggested.contains(l)) l,
+    ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    Widget tile(SpeechLocale l) => ListTile(
+          dense: true,
+          title: Text(l.name),
+          subtitle: Text(l.id),
+          selected: l.id == widget.currentId,
+          onTap: () => Navigator.pop(context, l.id),
+        );
+    Widget heading(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+          child:
+              Text(t, style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        );
+    final sug = suggested.where(_match).toList();
+    final others = rest.where(_match).toList();
+    return SafeArea(
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.6,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  key: const Key('locale-search'),
+                  decoration: const InputDecoration(
+                    hintText: 'Search language',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
+              Expanded(
+                child: widget.locales.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No languages available.',
+                          style: TextStyle(color: c.textSecondary),
+                        ),
+                      )
+                    : ListView(children: [
+                        if (sug.isNotEmpty) heading('Suggested'),
+                        for (final l in sug) tile(l),
+                        if (sug.isNotEmpty && others.isNotEmpty)
+                          heading('All languages'),
+                        for (final l in others) tile(l),
+                      ]),
+              ),
+            ],
+          ),
         ),
       ),
     );
