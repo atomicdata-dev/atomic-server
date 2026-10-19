@@ -78,7 +78,56 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(taps, 0);
+    // Let go where it was held: the fan stays as a menu, until a tap
+    // elsewhere closes it.
+    expect(find.text('AI chat'), findsOneWidget);
+    await tester.tapAt(const Offset(2, 2));
+    await tester.pumpAndSettle();
     expect(find.text('AI chat'), findsNothing);
+    expect(picked, isEmpty);
+    expect(taps, 0);
+  });
+
+  testWidgets('after a plain long press a tap on a pill picks it',
+      (tester) async {
+    await tester.pumpWidget(app());
+    final gesture = await hold(tester);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI voice'));
+    await tester.pumpAndSettle();
+    expect(picked, ['voice']);
+    expect(taps, 0);
+    expect(find.text('AI voice'), findsNothing);
+  });
+
+  testWidgets('a wide target opens its list over the finger', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.center,
+          child: HoldFan<String>(
+            width: double.infinity,
+            size: 40,
+            layout: HoldFanLayout.list,
+            defaultIndex: null,
+            onSelected: picked.add,
+            items: const [HoldFanItem('Hide', 'h')],
+            child: const Text('Heading'),
+          ),
+        ),
+      ),
+    ));
+    final at = tester.getTopLeft(find.text('Heading')) + const Offset(20, 10);
+    final g = await tester.startGesture(at);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 200));
+    final pill = tester.getRect(find.byKey(const ValueKey('hold-fan-item-0')));
+    expect(pill.left, lessThan(at.dx));
+    expect(pill.right, greaterThan(at.dx));
+    await g.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('dragging onto an item and letting go picks it', (tester) async {

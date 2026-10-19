@@ -35,7 +35,10 @@ enum HoldFanLayout {
 /// and holding (a short moment, with a haptic tick) fans [items] out above the
 /// button, and the finger, still down, slides onto one (a tick on each
 /// change) and lets go to pick it ([onSelected]). Letting go anywhere else,
-/// or the touch being cancelled, closes the fan without a choice.
+/// or the touch being cancelled, closes the fan without a choice. Letting go
+/// where the hold started (the finger never went anywhere, as after a plain
+/// long press) keeps the fan open as a menu: a tap on a pill picks it, a tap
+/// anywhere else closes it.
 ///
 /// The fan is drawn in the root [Overlay], over everything, with the page
 /// dimmed a little; the button itself does not move. It opens upwards, the
@@ -231,6 +234,13 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   Offset _anchor = Offset.zero;
   final ValueNotifier<int?> _hover = ValueNotifier(null);
 
+  /// Where the hold started, and whether the finger has left it since.
+  Offset _downAt = Offset.zero;
+  bool _wandered = false;
+
+  /// The fan stays open after the finger lifted and waits for a tap.
+  bool _sticky = false;
+
   /// The fan is open and follows the finger.
   bool get _open => _entry != null && _anim.status != AnimationStatus.reverse;
 
@@ -261,6 +271,15 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     _shown = List.of(items);
     _anchor = overlayBox
         .globalToLocal(box.localToGlobal(box.size.center(Offset.zero)));
+    // A wide target (a heading): the menu opens over the finger, not over the
+    // middle of the row.
+    if (widget.width != null) {
+      _anchor = Offset(
+          overlayBox.globalToLocal(details.globalPosition).dx, _anchor.dy);
+    }
+    _downAt = details.globalPosition;
+    _wandered = false;
+    _sticky = false;
     final media = MediaQuery.of(context);
     final scaler = MediaQuery.textScalerOf(context);
     // The overlay's Material styles the pill text with the theme's body
@@ -312,6 +331,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   void _move(PointerMoveEvent event) {
     final box = _overlayBox;
     if (!_open || box == null) return;
+    if ((event.position - _downAt).distance > kTouchSlop) _wandered = true;
     final local = box.globalToLocal(event.position);
     final hit = holdFanHit(_rects, local);
     if (hit != _hover.value) {
@@ -321,18 +341,39 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   }
 
   void _up(PointerUpEvent event) {
-    if (!_open) return;
+    if (!_open || _sticky) return;
     final box = _overlayBox;
     final hit = box == null
         ? _hover.value
         : holdFanHit(_rects, box.globalToLocal(event.position));
+    if (hit == null && !_wandered) {
+      // A plain long press: keep the menu up for a tap.
+      _sticky = true;
+      _entry?.markNeedsBuild();
+      return;
+    }
+    _pick(hit);
+  }
+
+  void _pick(int? hit) {
     final items = _shown;
     _close();
     if (hit != null && hit < items.length) widget.onSelected(items[hit].value);
   }
 
+  /// A tap while the fan waits as a menu: a pill picks it, elsewhere closes.
+  void _tapSticky(TapUpDetails details) {
+    if (!_sticky) return;
+    final box = _overlayBox;
+    _pick(box == null
+        ? null
+        : holdFanHit(_rects, box.globalToLocal(details.globalPosition),
+            slop: 0));
+  }
+
   void _close() {
     if (_entry == null) return;
+    _sticky = false;
     _hover.value = null;
     _anim.reverse().whenCompleteOrCancel(() {
       if (mounted && _anim.status == AnimationStatus.dismissed) _removeEntry();
@@ -374,46 +415,52 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   Widget _buildFan(BuildContext context) {
     final c = context.appColors;
     return IgnorePointer(
-      child: Material(
-        type: MaterialType.transparency,
-        child: AnimatedBuilder(
-          animation: _anim,
-          builder: (context, _) {
-            final t = Curves.easeOutCubic.transform(_anim.value);
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: t,
-                    child: ColoredBox(color: c.overlayDim),
+      ignoring: !_sticky,
+      child: GestureDetector(
+        key: const ValueKey('hold-fan-menu'),
+        behavior: HitTestBehavior.opaque,
+        onTapUp: _tapSticky,
+        child: Material(
+          type: MaterialType.transparency,
+          child: AnimatedBuilder(
+            animation: _anim,
+            builder: (context, _) {
+              final t = Curves.easeOutCubic.transform(_anim.value);
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: t,
+                      child: ColoredBox(color: c.overlayDim),
+                    ),
                   ),
-                ),
-                for (var i = 0; i < _rects.length; i++)
-                  Positioned.fromRect(
-                    rect: _rects[i],
-                    child: Transform.translate(
-                      offset: (_anchor - _rects[i].center) * (1 - t),
-                      child: Transform.scale(
-                        scale: 0.6 + 0.4 * t,
-                        child: Opacity(
-                          opacity: t,
-                          child: ValueListenableBuilder<int?>(
-                            valueListenable: _hover,
-                            builder: (context, hover, _) => _Pill(
-                              key: ValueKey('hold-fan-item-$i'),
-                              text: _shown[i].text,
-                              style: _style,
-                              hovered: hover == i,
-                              isDefault: widget.defaultIndex == i,
+                  for (var i = 0; i < _rects.length; i++)
+                    Positioned.fromRect(
+                      rect: _rects[i],
+                      child: Transform.translate(
+                        offset: (_anchor - _rects[i].center) * (1 - t),
+                        child: Transform.scale(
+                          scale: 0.6 + 0.4 * t,
+                          child: Opacity(
+                            opacity: t,
+                            child: ValueListenableBuilder<int?>(
+                              valueListenable: _hover,
+                              builder: (context, hover, _) => _Pill(
+                                key: ValueKey('hold-fan-item-$i'),
+                                text: _shown[i].text,
+                                style: _style,
+                                hovered: hover == i,
+                                isDefault: widget.defaultIndex == i,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -445,7 +492,9 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       target = Listener(
         onPointerMove: _move,
         onPointerUp: _up,
-        onPointerCancel: (_) => _close(),
+        onPointerCancel: (_) {
+          if (!_sticky) _close();
+        },
         child: RawGestureDetector(
           excludeFromSemantics: true,
           gestures: {
