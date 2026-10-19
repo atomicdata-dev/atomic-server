@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:atomic_chat/atomic_chat.dart' show AtomicWordmark;
+import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'package:url_launcher/url_launcher.dart';
+import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/server_url.dart';
 import '../atomic/session.dart';
 import '../theme.dart';
+import 'account_link_dialog.dart';
 import 'pair_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoggedIn;
 
-  const LoginScreen({super.key, required this.onLoggedIn});
+  /// Signs in with the person's atomic.place account and returns the identity
+  /// its backup holds; null when cancelled. Replaceable in tests.
+  final Future<shared.AtomicRecoveredIdentity?> Function(BuildContext context)?
+      accountSignIn;
+
+  const LoginScreen({super.key, required this.onLoggedIn, this.accountSignIn});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -253,7 +262,60 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Paste your secret');
       return;
     }
+    await _signInWithSecret(secret);
+  }
 
+  /// "Sign in with atomic.place": the account sign-in (a code approved on a
+  /// device or in the browser), then the identity its backup holds, which
+  /// signs the app in exactly like a pasted secret.
+  Future<void> _signInWithAccount() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    shared.AtomicRecoveredIdentity? identity;
+    try {
+      identity = await (widget.accountSignIn ?? _defaultAccountSignIn)(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = '$e'.replaceFirst('Bad state: ', '');
+        });
+      }
+      return;
+    }
+    if (identity == null) {
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+    await _signInWithSecret(identity.secret, drive: identity.drive);
+  }
+
+  Future<shared.AtomicRecoveredIdentity?> _defaultAccountSignIn(
+      BuildContext context) async {
+    final client = shared.AtomicAccountClient(AccountStore.defaultPortal);
+    try {
+      final linked = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AccountLinkDialog(
+          client: client,
+          deviceName: 'atomic.place',
+          save: AccountStore.save,
+          openInBrowser: (url) async {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          },
+        ),
+      );
+      if (linked != true) return null;
+      return await client.recoverIdentity();
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> _signInWithSecret(String secret, {String? drive}) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -262,17 +324,18 @@ class _LoginScreenState extends State<LoginScreen> {
       await AtomicSession.save(
         serverUrl: _serverOrigin,
         secret: secret,
-        drive: null,
+        drive: drive,
       );
 
       final status = await AtomicClient.resumeSession(
         serverUrl: _serverOrigin,
         secret: secret,
+        drive: drive,
       );
 
-      final drive = AtomicClient.getActiveDrive();
-      if (drive != null) {
-        await AtomicSession.saveDrive(drive);
+      final activeDrive = AtomicClient.getActiveDrive();
+      if (activeDrive != null) {
+        await AtomicSession.saveDrive(activeDrive);
       }
 
       // The secret was accepted: let the password manager offer to save it.
@@ -374,6 +437,15 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14)),
           child: const Text('I have a secret — Sign In'),
         ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          key: const ValueKey('sign-in-with-account'),
+          onPressed: _busy ? null : _signInWithAccount,
+          style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14)),
+          child: const Text('Sign in with atomic.place'),
+        ),
+        _errorWidget(),
       ],
     );
   }

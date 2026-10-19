@@ -1,13 +1,17 @@
 import 'package:atomic_app/screens/login_screen.dart';
 import 'package:atomic_app/theme.dart';
+import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _app() => MaterialApp(
+typedef AccountSignIn = Future<shared.AtomicRecoveredIdentity?> Function(
+    BuildContext);
+
+Widget _app({AccountSignIn? accountSignIn}) => MaterialApp(
       theme: ThemeData(extensions: const [AppColors.light]),
-      home: LoginScreen(onLoggedIn: () {}),
+      home: LoginScreen(onLoggedIn: () {}, accountSignIn: accountSignIn),
     );
 
 void main() {
@@ -53,5 +57,31 @@ void main() {
             .widget<TextField>(find.byKey(const ValueKey('signin-secret')))
             .obscureText,
         isFalse);
+  });
+
+  testWidgets('Sign in with atomic.place runs the account flow',
+      (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(_app(accountSignIn: (_) async {
+      calls++;
+      return null; // cancelled
+    }));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in with atomic.place'));
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    // Cancelling leaves the welcome screen as it was.
+    expect(find.text('Get Started'), findsOneWidget);
+  });
+
+  testWidgets('an account failure is shown, not swallowed', (tester) async {
+    await tester.pumpWidget(_app(
+        accountSignIn: (_) async => throw StateError(
+            'Finish setting up your workspace in the browser first')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in with atomic.place'));
+    await tester.pumpAndSettle();
+    expect(find.text('Finish setting up your workspace in the browser first'),
+        findsOneWidget);
   });
 }
