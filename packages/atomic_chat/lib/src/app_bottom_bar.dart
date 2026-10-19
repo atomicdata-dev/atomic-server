@@ -1,5 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt, HoldFan, HoldFanItem;
+    show AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
 import 'package:flutter/material.dart';
 
 import 'atomic_place_mark.dart';
@@ -31,8 +31,8 @@ const _fanDrives = 4;
 /// the page on top shows. Back is the system back and the swipe from the left
 /// edge.
 ///
-/// The button of the page on top is shown as the current one (dimmed, a dot
-/// under it) and does nothing; a page of the bar is never opened twice (see
+/// The button of the page on top is shown as the current one (in the main
+/// colour) and does nothing; a page of the bar is never opened twice (see
 /// [ShellController.open]). Search and New have more choices on touch and
 /// hold ([HoldFan]): Search in one drive; a voice chat, a document or anything
 /// else the web app makes.
@@ -124,10 +124,7 @@ class AppBottomBar extends StatelessWidget {
                       child: IconButton(
                         tooltip: 'Home',
                         onPressed: top == ShellPage.home ? null : shell.goHome,
-                        icon: Opacity(
-                          opacity: top == ShellPage.home ? 0.4 : 1,
-                          child: const AtomicPlaceMark(size: 24),
-                        ),
+                        icon: const AtomicPlaceMark(size: 24),
                       ),
                     ),
                     _Current(
@@ -202,16 +199,16 @@ class AppBottomBar extends StatelessWidget {
   }
 }
 
-/// A bar icon drawn by a [HoldFan] (an [IconButton] draws its own): dimmed
-/// when its page is the current one.
+/// A bar icon drawn by a [HoldFan] (an [IconButton] draws its own): in the
+/// main colour when its page is the current one.
 Widget _barIcon(BuildContext context, IconData icon, bool current) {
   // What an IconButton draws its icon in.
   final color = Theme.of(context).colorScheme.onSurfaceVariant;
-  return Icon(icon, color: current ? color.withValues(alpha: 0.4) : color);
+  return Icon(icon, color: current ? context.appColors.main : color);
 }
 
-/// Marks the button of the page on top: a small dot in the main colour under
-/// it.
+/// Marks the button of the page on top: its icon is drawn in the main colour
+/// (the others stay neutral).
 class _Current extends StatelessWidget {
   final bool current;
   final String label;
@@ -226,28 +223,26 @@ class _Current extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
+    final main = context.appColors.main;
+    // The same tree whether current or not: the button below keeps its state.
     return Semantics(
       selected: current,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          child,
-          if (current)
-            Positioned(
-              bottom: 2,
-              child: IgnorePointer(
-                child: Container(
-                  key: ValueKey('current:$label'),
-                  width: 4,
-                  height: 4,
-                  decoration:
-                      BoxDecoration(color: c.main, shape: BoxShape.circle),
+      child: IconButtonTheme(
+        data: current
+            ? IconButtonThemeData(
+                style: IconButton.styleFrom(
+                  foregroundColor: main,
+                  disabledForegroundColor: main,
                 ),
-              ),
-            ),
-        ],
+              )
+            : const IconButtonThemeData(),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            child,
+            if (current) SizedBox.shrink(key: ValueKey('current:$label')),
+          ],
+        ),
       ),
     );
   }
@@ -328,6 +323,7 @@ class _SearchButtonState extends State<_SearchButton> {
     final drives = _drives;
     return HoldFan<String>(
       tooltip: 'Search',
+      layout: HoldFanLayout.list,
       selected: widget.current,
       onTap: widget.current ? null : () => widget.onSearch(),
       onOpen: _load,

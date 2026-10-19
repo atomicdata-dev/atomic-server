@@ -19,9 +19,20 @@ class HoldFanItem<T> {
   String get text => emoji == null ? label : '$emoji $label';
 }
 
+/// How a [HoldFan] arranges its choices.
+enum HoldFanLayout {
+  /// Curving away from the button along the arc a thumb sweeps: for a few
+  /// kinds of "new" and for drawing tools.
+  fan,
+
+  /// Stacked straight above (or, with no room above, below) the button: for
+  /// choices taken from a list (drives, recent resources, chats).
+  list,
+}
+
 /// A button with more than one action, after the Atomic Canvas colour and
 /// width fans: a tap does [onTap], the default action; touching and holding
-/// (about a third of a second, with a haptic tick) fans [items] out above the
+/// (a short moment, with a haptic tick) fans [items] out above the
 /// button, and the finger, still down, slides onto one (a tick on each
 /// change) and lets go to pick it ([onSelected]). Letting go anywhere else,
 /// or the touch being cancelled, closes the fan without a choice.
@@ -51,6 +62,9 @@ class HoldFan<T> extends StatefulWidget {
   /// The button's tooltip and accessible name.
   final String? tooltip;
 
+  /// How the choices are laid out.
+  final HoldFanLayout layout;
+
   /// How long to hold before the fan opens.
   final Duration holdDuration;
 
@@ -74,7 +88,8 @@ class HoldFan<T> extends StatefulWidget {
     this.onTap,
     this.defaultIndex = 0,
     this.tooltip,
-    this.holdDuration = const Duration(milliseconds: 350),
+    this.layout = HoldFanLayout.fan,
+    this.holdDuration = const Duration(milliseconds: 180),
     this.onOpen,
     this.menuLabel = 'More options',
     this.selected = false,
@@ -124,6 +139,48 @@ List<Rect> holdFanLayout({
   ];
 }
 
+/// Where the pills of a vertical menu go: one above the other, all as wide as
+/// the widest, centred on [anchor]'s x (kept inside [bounds]). The first
+/// is nearest the button: above it, going up, or, when [bounds] has no room
+/// above, below it, going down.
+List<Rect> holdFanListLayout({
+  required Offset anchor,
+  required List<Size> sizes,
+  required Rect bounds,
+  double lift = 40,
+  double gap = 8,
+}) {
+  if (sizes.isEmpty) return const [];
+  final width = sizes.map((s) => s.width).reduce(math.max);
+  final total =
+      sizes.fold<double>(0, (a, s) => a + s.height) + gap * (sizes.length - 1);
+  final above = anchor.dy - lift - total >= bounds.top;
+  var left = anchor.dx - width / 2;
+  left = left.clamp(bounds.left, math.max(bounds.left, bounds.right - width));
+  final rects = <Rect>[];
+  if (above) {
+    var bottom = anchor.dy - lift;
+    for (final s in sizes) {
+      rects.add(Rect.fromLTWH(left, bottom - s.height, width, s.height));
+      bottom -= s.height + gap;
+    }
+  } else {
+    var top = anchor.dy + lift;
+    for (final s in sizes) {
+      rects.add(Rect.fromLTWH(left, top, width, s.height));
+      top += s.height + gap;
+    }
+    // Never past the bottom edge.
+    final over = rects.last.bottom - bounds.bottom;
+    if (over > 0) {
+      for (var i = 0; i < rects.length; i++) {
+        rects[i] = rects[i].shift(Offset(0, -over));
+      }
+    }
+  }
+  return rects;
+}
+
 /// The pill under [point], or null: a pill counts a little beyond its edges,
 /// and of two candidates the one whose centre is nearer wins.
 int? holdFanHit(List<Rect> rects, Offset point, {double slop = 10}) {
@@ -153,7 +210,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 80),
     );
   }
 
@@ -163,7 +220,6 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   List<Rect> _rects = const [];
   Offset _anchor = Offset.zero;
   final ValueNotifier<int?> _hover = ValueNotifier(null);
-  final ValueNotifier<Offset?> _finger = ValueNotifier(null);
 
   /// The fan is open and follows the finger.
   bool get _open => _entry != null && _anim.status != AnimationStatus.reverse;
@@ -173,7 +229,6 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     _removeEntry();
     _anim.dispose();
     _hover.dispose();
-    _finger.dispose();
     super.dispose();
   }
 
@@ -202,18 +257,16 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       for (final item in _shown) _pillSize(item.text, scaler),
     ];
     final bounds = (Offset.zero & overlayBox.size).deflate(8);
-    _rects = holdFanLayout(
-      anchor: _anchor,
-      sizes: sizes,
-      bounds: Rect.fromLTRB(
-        bounds.left + media.padding.left,
-        bounds.top + media.padding.top,
-        bounds.right - media.padding.right,
-        bounds.bottom,
-      ),
+    final area = Rect.fromLTRB(
+      bounds.left + media.padding.left,
+      bounds.top + media.padding.top,
+      bounds.right - media.padding.right,
+      bounds.bottom,
     );
+    _rects = widget.layout == HoldFanLayout.list
+        ? holdFanListLayout(anchor: _anchor, sizes: sizes, bounds: area)
+        : holdFanLayout(anchor: _anchor, sizes: sizes, bounds: area);
     _hover.value = null;
-    _finger.value = overlayBox.globalToLocal(details.globalPosition);
     _entry = OverlayEntry(builder: _buildFan);
     overlay.insert(_entry!);
     _anim.forward(from: 0);
@@ -239,7 +292,6 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     final box = _overlayBox;
     if (!_open || box == null) return;
     final local = box.globalToLocal(event.position);
-    _finger.value = local;
     final hit = holdFanHit(_rects, local);
     if (hit != _hover.value) {
       _hover.value = hit;
@@ -313,18 +365,6 @@ class _HoldFanState<T> extends State<HoldFan<T>>
                   child: Opacity(
                     opacity: t,
                     child: ColoredBox(color: c.overlayDim),
-                  ),
-                ),
-                Positioned.fill(
-                  child: ValueListenableBuilder<Offset?>(
-                    valueListenable: _finger,
-                    builder: (context, finger, _) => CustomPaint(
-                      painter: _LinePainter(
-                        from: _anchor,
-                        to: finger,
-                        color: Colors.white.withValues(alpha: 0.6 * t),
-                      ),
-                    ),
                   ),
                 ),
                 for (var i = 0; i < _rects.length; i++)
@@ -466,32 +506,4 @@ class _Pill extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The thin line from the button to the finger, as in the canvas fans.
-class _LinePainter extends CustomPainter {
-  final Offset from;
-  final Offset? to;
-  final Color color;
-
-  const _LinePainter(
-      {required this.from, required this.to, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final end = to;
-    if (end == null) return;
-    canvas.drawLine(
-      from,
-      end,
-      Paint()
-        ..color = color
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_LinePainter old) =>
-      from != old.from || to != old.to || color != old.color;
 }

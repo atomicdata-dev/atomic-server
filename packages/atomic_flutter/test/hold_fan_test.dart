@@ -187,4 +187,68 @@ void main() {
     expect(holdFanHit(rects, rects[2].center), 2);
     expect(holdFanHit(rects, const Offset(40, 780)), isNull);
   });
+
+  test('holdFanListLayout stacks the pills vertically, first nearest', () {
+    final rects = holdFanListLayout(
+      anchor: const Offset(100, 700),
+      sizes: const [Size(80, 44), Size(120, 44), Size(100, 44)],
+      bounds: const Rect.fromLTWH(0, 0, 400, 800),
+    );
+    expect(rects, hasLength(3));
+    // All as wide as the widest, one column, going up from the button.
+    expect(rects.map((r) => r.width).toSet(), {120});
+    expect(rects.map((r) => r.left).toSet().length, 1);
+    expect(rects[0].bottom, lessThan(700));
+    expect(rects[1].bottom, lessThan(rects[0].top));
+    expect(rects[2].bottom, lessThan(rects[1].top));
+  });
+
+  test('holdFanListLayout goes below when there is no room above', () {
+    final rects = holdFanListLayout(
+      anchor: const Offset(100, 60),
+      sizes: const [Size(80, 44), Size(80, 44), Size(80, 44)],
+      bounds: const Rect.fromLTWH(0, 0, 400, 800),
+    );
+    expect(rects[0].top, greaterThan(60));
+    expect(rects[1].top, greaterThan(rects[0].bottom));
+    expect(rects[2].top, greaterThan(rects[1].bottom));
+  });
+
+  testWidgets('a list fan opens at the short hold and draws no line',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.bottomCenter,
+          child: HoldFan<String>(
+            tooltip: 'Pick',
+            layout: HoldFanLayout.list,
+            onSelected: picked.add,
+            items: const [HoldFanItem('One', '1'), HoldFanItem('Two', '2')],
+            child: const Icon(Icons.search),
+          ),
+        ),
+      ),
+    ));
+    final g =
+        await tester.startGesture(tester.getCenter(find.byIcon(Icons.search)));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('One'), findsOneWidget);
+    final one = tester.getRect(find.byKey(const ValueKey('hold-fan-item-0')));
+    final two = tester.getRect(find.byKey(const ValueKey('hold-fan-item-1')));
+    expect(two.bottom, lessThan(one.top));
+    expect((one.center.dx - two.center.dx).abs(), lessThan(1));
+    // The finger moves; still no connector drawn.
+    await g.moveTo(const Offset(5, 5));
+    await tester.pump();
+    final overlay = find.descendant(
+        of: find.byType(Overlay).last, matching: find.byType(CustomPaint));
+    for (final w in tester.widgetList<CustomPaint>(overlay)) {
+      expect(w.painter?.runtimeType.toString(), isNot('_LinePainter'));
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+  });
 }
