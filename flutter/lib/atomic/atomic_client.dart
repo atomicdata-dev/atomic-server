@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
+import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
 import '../src/rust/api/simple.dart' as ffi;
 import '../src/rust/api/simple/types.dart'
@@ -388,6 +389,11 @@ class AtomicClient {
       ffi.genesisAnswerVerifies(body: body, drive: drive);
   static Future<void> _connect(String origin) =>
       ffi.connectHomeServer(origin: origin);
+
+  /// One call from the embedded renderer's page to the store: a method and its
+  /// arguments as JSON, answered as JSON (see `planning/flutter-resource-webview.md`).
+  static Future<String> embedCall(String method, String argsJson) =>
+      embed.embedCall(method: method, argsJson: argsJson);
 
   // ── 8. Known peers ──────────────────────────────────────────────────────
 

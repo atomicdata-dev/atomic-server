@@ -36,3 +36,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # The embedded renderer, built by scripts/build_embed.sh.
+    - assets/embed/
+    - assets/embed/assets/

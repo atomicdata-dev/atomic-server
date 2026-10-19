@@ -23,6 +23,7 @@ import {
 } from '@tanstack/react-router';
 import {
   Agent,
+  enableLoro,
   NativeClientDb,
   NativeCryptoProvider,
   Store,
@@ -33,6 +34,7 @@ import {
 import { enableEmbedMode } from '../helpers/embedMode';
 import { Providers } from '../Providers';
 import ResourcePage from '../views/ResourcePage';
+import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 
 enableEmbedMode();
@@ -41,6 +43,8 @@ declare global {
   interface Window {
     /** Set by the Flutter host: how the page calls Rust. */
     atomicHost?: NativeChannel;
+    /** Flutter's `JavaScriptChannel`, when the page runs inside the app. */
+    AtomicFlutter?: { postMessage(message: string): void };
     atomicEmbed?: {
       show(subject: string): void;
       changed(subjects: string[]): void;
@@ -48,7 +52,11 @@ declare global {
   }
 }
 
-const channel: NativeChannel = window.atomicHost ?? createMockHost();
+const channel: NativeChannel =
+  window.atomicHost ??
+  (window.AtomicFlutter
+    ? createFlutterHost(window.AtomicFlutter)
+    : createMockHost());
 const db = new NativeClientDb(channel);
 
 const agentSubject = (await channel
@@ -109,6 +117,9 @@ window.atomicEmbed = {
     for (const subject of subjects) void store.getResource(subject);
   },
 };
+
+// Documents, tables and canvases are Loro CRDTs; the module loads lazily.
+enableLoro().catch(e => console.warn('Loro failed to load', e));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

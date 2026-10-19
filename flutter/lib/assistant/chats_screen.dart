@@ -7,7 +7,7 @@ import '../widgets/slide_back_route.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
-import 'resource_web_view.dart';
+import 'resource_view.dart';
 import 'search_screen.dart';
 
 /// Chats shown on the home; the rest is one tap away in a chat list later.
@@ -428,11 +428,8 @@ class _OpenedPageState extends State<_OpenedPage>
                     .join(' · '),
                 onTap: () {
                   widget.api.noteOpened(widget.drive, r.subject);
-                  widget.onOpen(ResourceWebView(
-                    api: widget.api,
-                    subject: r.subject,
-                    title: r.title,
-                  ));
+                  widget
+                      .onOpen(ResourceView(subject: r.subject, title: r.title));
                 },
               ),
           ],

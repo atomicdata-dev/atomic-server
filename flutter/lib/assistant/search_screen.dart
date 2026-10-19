@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
+import '../widgets/slide_back_route.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
-import 'resource_web_view.dart';
+import 'resource_view.dart';
 
 /// Type-ahead search over [drive]; a hit opens in the web view.
 class SearchScreen extends StatefulWidget {
@@ -51,12 +52,8 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _open(String subject, String title) async {
     widget.api.noteOpened(widget.drive, subject);
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ResourceWebView(
-          api: widget.api,
-          subject: subject,
-          title: title,
-        ),
+      SlideBackRoute<void>(
+        builder: (_) => ResourceView(subject: subject, title: title),
       ),
     );
     if (mounted) await _loadRecent();
