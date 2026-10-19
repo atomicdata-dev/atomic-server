@@ -106,9 +106,14 @@ route, so the swipe back and the animation are the same as everywhere else.
 The webview gets `show(subject)` and renders it, with no router and no history.
 Open decision (below): one warm webview shared by the stack, or two.
 
-**What is rendered.** `ResourcePage` (and what it lazily loads: tables,
-documents, canvas, files, chat logs). Mounted under the providers it really
-needs. Anything in the tree that reaches for the router, the sidebar or a
+**What is rendered.** `ResourcePage`, which is the web app's one registry of
+views: it picks the view by the resource's class (`selectComponent`: document,
+table, canvas, folder, file, chat, article, ontology, …) and the per-drive
+pages that cannot be a fixed case (plugins, apps, websites, via
+`useCustomViews`). The embed gets every view with it, nothing is chosen or
+ported per view; the heavy ones are already lazy chunks (`TablePage`,
+`DashboardPage`, website, plugins), so they cost nothing until opened. Mounted
+under the providers it really needs. Anything in the tree that reaches for the router, the sidebar or a
 dialog host gets a small adapter or a no-op, found by running it, not guessed.
 Theme and locale come from the host (`prefers-color-scheme` follows the app).
 
@@ -151,7 +156,8 @@ the webview, a rendering bug cannot read it.
    in Rust and reaches the server and a paired device.
 4. **Live updates and navigation.** `changed`, `open`, stack and slide-back,
    the warm webview (or two).
-5. **Hardening.** Offline, large documents, files and images (blobs), error
+5. **Hardening.** One pass per view family (document, table, canvas, folder,
+   files, chat, plugin/app pages): offline, large documents, files and images (blobs), error
    states, accessibility, dark mode, and memory on the tablet.
 
 ## Open decisions (Joep)
@@ -159,12 +165,10 @@ the webview, a rendering bug cannot read it.
 1. Resource-to-resource navigation: native stack with a *second warm webview*
    so the previous page stays visible under the slide-back (recommended, about
    the cost of one more webview), or one webview and a re-render on back.
-2. Which views first: documents and folders, then tables and canvas, or
-   everything `ResourcePage` offers from the start.
-3. Is a feature flag (`?embed`) in the normal web build acceptable, or should
+2. Is a feature flag (`?embed`) in the normal web build acceptable, or should
    the embed be its own build target so the web app's size and tests are
    untouched? Recommended: own Vite entry, same package.
-4. Files and images: through the channel as base64 at first, or straight away a
+3. Files and images: through the channel as base64 at first, or straight away a
    local asset URL scheme.
 
 ## Risks
@@ -174,5 +178,8 @@ the webview, a rendering bug cannot read it.
   before any Flutter work.
 - Channel latency under heavy views (a table of thousands of rows). Mitigated
   by batching and by the store's existing paging; measured in step 2.
+- Per-drive plugin and app pages run code from the drive; they need their own
+  check (what they load, whether they assume a network). They are in the
+  registry, so they appear; whether they work is step 5.
 - The embed bundle growing with every web feature. Mitigated by the lazy
   chunks `ResourcePage` already has, and a size budget in CI.
