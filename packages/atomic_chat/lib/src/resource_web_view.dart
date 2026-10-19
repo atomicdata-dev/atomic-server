@@ -21,6 +21,10 @@ class ResourceWebView extends StatefulWidget {
   /// page to the system browser.
   final bool keepOnHost;
 
+  /// CSS added to every page this view finishes loading, e.g. to hide a
+  /// site's own navigation bar. Null leaves pages as they are.
+  final String? injectCss;
+
   /// Test seams: how cookies are stored, the controller made, and the view
   /// shown for it.
   @visibleForTesting
@@ -38,6 +42,7 @@ class ResourceWebView extends StatefulWidget {
     this.url,
     this.cookies = const [],
     this.keepOnHost = false,
+    this.injectCss,
     this.setCookie,
     this.controllerFactory,
     this.viewBuilder,
@@ -46,6 +51,17 @@ class ResourceWebView extends StatefulWidget {
   @override
   State<ResourceWebView> createState() => _ResourceWebViewState();
 }
+
+/// JavaScript that adds [css] to the page once, as `<style id="atomic-inject">`.
+@visibleForTesting
+String injectCssScript(String css) =>
+    "(function(){var s=document.getElementById('atomic-inject');"
+    "if(!s){s=document.createElement('style');s.id='atomic-inject';"
+    "(document.head||document.documentElement).appendChild(s);}"
+    "s.textContent=${_jsString(css)};})();";
+
+String _jsString(String v) =>
+    "'${v.replaceAll(r'\\', r'\\\\').replaceAll("'", r"\'").replaceAll('\n', r'\n')}'";
 
 class _ResourceWebViewState extends State<ResourceWebView> {
   WebViewController? _controller;
@@ -62,9 +78,15 @@ class _ResourceWebViewState extends State<ResourceWebView> {
       final target = Uri.parse(widget.url ?? widget.api.webUrl(widget.subject));
       final controller = (widget.controllerFactory ?? WebViewController.new)()
         ..setJavaScriptMode(JavaScriptMode.unrestricted);
-      if (widget.keepOnHost) {
+      final css = widget.injectCss;
+      if (widget.keepOnHost || css != null) {
         controller.setNavigationDelegate(NavigationDelegate(
+          // One id'd <style> per document; in-page (SPA) navigation keeps it.
+          onPageFinished: css == null
+              ? null
+              : (_) => controller.runJavaScript(injectCssScript(css)),
           onNavigationRequest: (request) {
+            if (!widget.keepOnHost) return NavigationDecision.navigate;
             final next = Uri.tryParse(request.url);
             final web = next != null && next.scheme.startsWith('http');
             if (!request.isMainFrame || !web || next.host == target.host) {

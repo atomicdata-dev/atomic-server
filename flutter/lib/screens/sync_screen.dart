@@ -41,6 +41,9 @@ class AgentAvatar extends StatelessWidget {
   }
 }
 
+/// Hides the portal's own top bar: the app already has its own.
+const portalChromeCss = 'nav.topbar{display:none!important}';
+
 /// Your agent and everything that syncs, after the web app's Sync page:
 /// who you are, the account that hosts your data (only when one is linked),
 /// this device and the devices it syncs with, and the workspaces. Sync is set
@@ -351,6 +354,7 @@ class _SyncScreenState extends State<SyncScreen> {
       url: url.toString(),
       title: url.host,
       keepOnHost: true,
+      injectCss: portalChromeCss,
       cookies: [
         if (cookie != null && cookie.isNotEmpty)
           WebViewCookie(name: 'session_token', value: cookie, domain: url.host),

@@ -14,7 +14,16 @@ class _Controller implements WebViewController {
   @override
   Future<void> setJavaScriptMode(JavaScriptMode mode) async {}
   @override
-  Future<void> setNavigationDelegate(NavigationDelegate delegate) async {}
+  Future<void> setNavigationDelegate(NavigationDelegate delegate) async {
+    delegates.add(delegate);
+  }
+
+  final delegates = <NavigationDelegate>[];
+  @override
+  Future<void> runJavaScript(String javaScript) async {
+    log.add('js $javaScript');
+  }
+
   @override
   Future<void> loadRequest(Uri uri,
       {LoadRequestMethod method = LoadRequestMethod.get,
@@ -48,5 +57,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(log, ['cookie session_token=abc', 'load portal.example']);
     expect(find.text('view'), findsOneWidget);
+  });
+
+  test('injectCssScript adds the CSS once, escaped', () {
+    final js = injectCssScript(
+        "nav.topbar{display:none!important}\na::after{content:'x'}");
+    expect(js, contains("getElementById('atomic-inject')"));
+    expect(js, contains('nav.topbar{display:none!important}'));
+    expect(js, contains(r"content:\'x\'"));
+    expect(js, contains(r'\n'));
   });
 }

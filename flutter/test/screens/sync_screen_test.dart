@@ -209,7 +209,8 @@ void main() {
       return 'abc123';
     });
     expect(asked!.origin, 'https://portal.example');
-    expect(page!.url, 'https://portal.example/dashboard/drives?embed=1');
+    expect(page!.url, 'https://portal.example/dashboard');
+    expect(page.injectCss, contains('nav.topbar'));
     expect(find.text('portal page'), findsOneWidget);
     expect(page.cookies, hasLength(1));
     expect(page.cookies.single.name, 'session_token');

@@ -270,7 +270,12 @@ void main() {
     expect(
         AtomicAccountClient.portalDrivesUrl(Uri.parse('https://atomic.place/'))
             .toString(),
-        'https://atomic.place/dashboard/drives?embed=1');
+        'https://atomic.place/dashboard');
+    expect(
+        AtomicAccountClient.portalDrivesUrl(Uri.parse('https://atomic.place'),
+                drive: 'd1')
+            .toString(),
+        'https://atomic.place/dashboard?drive=d1');
     expect(
         () => AtomicAccountClient.portalDrivesUrl(Uri.parse('http://x.test')),
         throwsArgumentError);

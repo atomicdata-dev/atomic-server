@@ -36,17 +36,15 @@ class AtomicAccountClient {
     return uri.replace(path: '', query: null, fragment: null);
   }
 
-  /// Where the portal manages drives. ASSUMED route: the web app only ever
-  /// links `<portal>/dashboard` (AccountRecoveryCard) and `?embed=1` (cloudSync
-  /// sign-in); neither a Drives route nor a chrome-less mode is confirmed in
-  /// this repo (the portal lives in atomic-saas). Change [drivesPath] when it
-  /// differs; the query stays harmless when the portal ignores it.
-  static const drivesPath = '/dashboard/drives';
+  /// The portal's drives live on its dashboard (`?drive=<id>` selects one).
+  static const drivesPath = '/dashboard';
 
-  /// The portal's Drives page, minimal (no nav bar) where the portal supports
-  /// `embed=1`. [portal] must be an HTTPS origin.
-  static Uri portalDrivesUrl(Uri portal) => providerOrigin(portal.toString())
-      .replace(path: drivesPath, queryParameters: {'embed': '1'});
+  /// The portal's Drives page. The portal has no chrome-less mode, so the app
+  /// hides its nav bar itself. [portal] must be an HTTPS origin.
+  static Uri portalDrivesUrl(Uri portal, {String? drive}) =>
+      providerOrigin(portal.toString()).replace(
+          path: drivesPath,
+          queryParameters: drive == null ? null : {'drive': drive});
 
   /// The portal a saved session belongs to.
   static Uri sessionOrigin(String saved) => providerOrigin(
