@@ -9,6 +9,10 @@
  * Host API, on `window.atomicEmbed`:
  *   show(subject)     render this resource
  *   changed(subjects) these resources changed in the host's store
+ *   flush(leaving?)   hand every pending edit to the host; resolves when done
+ *
+ * Saving: the store has no server, so its commits go to the host instead
+ * (`commitTransport`): signed through the host, applied by `applyCommit`.
  */
 import '../helpers/preloadLocale';
 import { StrictMode, useEffect, useState } from 'react';
@@ -50,6 +54,7 @@ import { AppSettingsRoute } from '../routes/AppSettings';
 import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
+import { createFlush } from './flush';
 
 enableEmbedMode();
 
@@ -86,6 +91,7 @@ declare global {
       changed(subjects: string[]): void;
       openMenu(): void;
       back(): boolean;
+      flush(leaving?: boolean): Promise<void>;
     };
   }
 }
@@ -108,10 +114,24 @@ const store = new Store({
   agent: agentSubject
     ? new Agent(new NativeCryptoProvider(channel), agentSubject)
     : undefined,
+  // Edits go to the host, which keeps them and syncs them. Without this the
+  // store, having no server, would only ever save them offline, into a page
+  // database nobody keeps: the typing was gone once the page closed.
+  commitTransport: db.commitTransport,
 });
 
 store.setClientDb(db as unknown as ClientDbWorker);
 await db.waitForInit();
+
+const flush = createFlush(store, db);
+
+// The app going to the background, or the page being torn down: whatever is
+// still in a debounce timer goes now. (Leaving a page, the app also asks for
+// a flush itself and waits for it.)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') void flush();
+});
+window.addEventListener('pagehide', () => void flush());
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -263,6 +283,11 @@ window.atomicEmbed = {
   },
   openMenu() {
     window.dispatchEvent(new Event('atomic-embed-menu'));
+  },
+  /** Every pending edit handed to the host. `leaving`: the page is about to
+   * close, so an edit in progress (a focused field) ends first. */
+  flush(leaving = false) {
+    return flush({ leaving });
   },
 };
 
