@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -10,6 +11,7 @@ import 'covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
 import 'models.dart';
 import 'assistant_api.dart';
+import 'search_screen.dart';
 import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
 
@@ -32,14 +34,65 @@ abstract final class ShellPage {
   static const settings = 'settings';
 }
 
-/// What the static bottom bar needs to know about the pages above it. The
-/// shell owns one; pages find it through [ShellScope].
+/// How the shell arranges itself for the width of the window.
+enum ShellLayout {
+  /// A phone: the pages above a bottom bar.
+  bar,
+
+  /// Wider (a small tablet, a phone sideways): a navigation rail at the
+  /// left instead of the bar, the pages beside it.
+  rail,
+
+  /// A tablet: the rail, the home (or search) as a list pane, and what is
+  /// opened from it in a detail pane next to it.
+  split;
+
+  /// Widths (logical pixels) from which the [rail] and the [split] layouts
+  /// are used.
+  static const railWidth = 600.0;
+  static const splitWidth = 720.0;
+
+  static ShellLayout forWidth(double width) => width >= splitWidth
+      ? split
+      : width >= railWidth
+          ? rail
+          : bar;
+}
+
 /// Opens a page's menu; [anchor] is the bar button that asked, in global
 /// coordinates, so the menu opens at that button.
 typedef ShellMenu = void Function(Rect anchor);
 
+/// What the bottom bar or the rail needs to know about the pages: which is
+/// on top, what the list pane shows, which resource is selected. The shell
+/// owns one; pages find it through [ShellScope].
 class ShellController extends ChangeNotifier {
+  /// The pages' navigator: the whole screen above the bar on a phone, the
+  /// detail pane in the [ShellLayout.split] layout.
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  /// The layout the shell was last built in. Widgets that look different per
+  /// layout read [ShellScope.layoutOf] instead, which rebuilds them.
+  ShellLayout layout = ShellLayout.bar;
+
+  /// Whether the home is in a list pane with the pages next to it.
+  bool get split => layout == ShellLayout.split;
+
+  /// What the list pane shows in the [ShellLayout.split] layout: the home
+  /// ([ShellPage.home]) or a search ([ShellPage.search],
+  /// [ShellPage.searchIn]).
+  final ValueNotifier<String> list = ValueNotifier(ShellPage.home);
+
+  /// The subject of the resource the detail pane shows (what was opened
+  /// from a list), for the list to mark its row; null when none.
+  final ValueNotifier<String?> selected = ValueNotifier(null);
+
+  /// The text and drive of the search that is open, so it survives a change
+  /// of layout (it moves between a page and the list pane).
+  ({String query, String? scope}) search = (query: '', scope: null);
+
+  /// Pages opened for a resource ([openDetail]) and its subject.
+  final Map<Route<dynamic>, String> _details = {};
 
   /// The drive search looks in; the home updates it.
   final ValueNotifier<String> drive;
@@ -90,8 +143,13 @@ class ShellController extends ChangeNotifier {
   /// Whether a page of [kind] is anywhere in the stack.
   bool hasPage(String kind) => _stack.any((r) => kindOf(r) == kind);
 
-  /// [route] is a page of [kind] from now on (null: of none).
+  /// The pages above the first one, bottom first.
+  List<Route<dynamic>> get pages => _stack.skip(1).toList();
+
+  /// [route] is a page of [kind] from now on (null: of none). A route that
+  /// is not one of the shell's pages (the list pane is in none) is ignored.
   void setKind(Route<dynamic> route, String? kind) {
+    if (!_stack.contains(route)) return;
     if (_kinds.containsKey(route) && _kinds[route] == kind) return;
     _kinds[route] = kind;
     if (identical(route, _top)) _changed();
@@ -115,7 +173,44 @@ class ShellController extends ChangeNotifier {
     }
     _settling =
         Timer(const Duration(milliseconds: 300), () => _settling = null);
-    return navigator.push(route(RouteSettings(name: kind)));
+    return _show(navigator, route(RouteSettings(name: kind)));
+  }
+
+  /// Pushes [route]; next to the list it takes the place of what the detail
+  /// pane showed (a row opens there; it does not pile up).
+  Future<T?> _show<T>(NavigatorState navigator, Route<T> route) => split
+      ? navigator.pushAndRemoveUntil(route, (r) => r.isFirst)
+      : navigator.push(route);
+
+  /// Opens the page of a resource picked from a list (the home, search):
+  /// pushed on a phone, in the detail pane next to the list. [subject] marks
+  /// its row as the selected one. Picking the row that is shown already
+  /// does nothing.
+  Future<T?> openDetail<T>(WidgetBuilder builder, {String? subject}) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return null;
+    if (split && subject != null && _top != null && _details[_top] == subject) {
+      return null;
+    }
+    final route = SlideBackRoute<T>(builder: builder);
+    if (subject != null) _details[route] = subject;
+    return _show(navigator, route);
+  }
+
+  /// Shows [kind] in the list pane ([ShellPage.home] or a search); only in
+  /// the split layout.
+  void showList(String kind) {
+    if (list.value == kind) return;
+    if (ShellPage.isSearch(kind)) {
+      search = (
+        query: '',
+        scope: kind == ShellPage.search
+            ? null
+            : kind.substring(ShellPage.search.length + 1)
+      );
+    }
+    list.value = kind;
+    _changed();
   }
 
   /// [open] with the page sliding in from the right.
@@ -149,6 +244,7 @@ class ShellController extends ChangeNotifier {
     _stack.remove(route);
     _kinds.remove(route);
     _menus.remove(route);
+    if (_details.remove(route) != null) _changed();
   }
 
   void _setTop(Route<dynamic>? route) {
@@ -157,17 +253,30 @@ class ShellController extends ChangeNotifier {
     _changed();
   }
 
+  /// The subject of the topmost page opened for a resource.
+  String? get _selectedNow {
+    for (final route in _stack.reversed) {
+      final subject = _details[route];
+      if (subject != null) return subject;
+    }
+    return null;
+  }
+
   // Navigator observers run while the navigator is building at times (its
   // first route), and a listener must not rebuild then.
   void _changed() {
     if (_disposed) return;
+    void notify() {
+      if (_disposed) return;
+      selected.value = _selectedNow;
+      notifyListeners();
+    }
+
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (!_disposed) notifyListeners();
-      });
+      SchedulerBinding.instance.addPostFrameCallback((_) => notify());
     } else {
-      notifyListeners();
+      notify();
     }
   }
 
@@ -178,21 +287,49 @@ class ShellController extends ChangeNotifier {
     _disposed = true;
     _settling?.cancel();
     drive.dispose();
+    list.dispose();
+    selected.dispose();
     super.dispose();
   }
 }
 
-/// Finds the [ShellController] of the shell a page is in, if any.
+/// Finds the [ShellController] of the shell a page is in, if any, and the
+/// shell's [ShellLayout].
 class ShellScope extends InheritedWidget {
   final ShellController controller;
+  final ShellLayout layout;
 
-  const ShellScope({super.key, required this.controller, required super.child});
+  const ShellScope({
+    super.key,
+    required this.controller,
+    this.layout = ShellLayout.bar,
+    required super.child,
+  });
 
   static ShellController? maybeOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<ShellScope>()?.controller;
 
+  /// The shell's layout ([ShellLayout.bar] outside a shell); the caller is
+  /// rebuilt when it changes.
+  static ShellLayout layoutOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ShellScope>()?.layout ??
+      ShellLayout.bar;
+
   @override
-  bool updateShouldNotify(ShellScope old) => controller != old.controller;
+  bool updateShouldNotify(ShellScope old) =>
+      controller != old.controller || layout != old.layout;
+}
+
+/// Opens a resource's page picked from a list: through the shell when there
+/// is one ([ShellController.openDetail]: the detail pane next to the list),
+/// else pushed on the nearest navigator.
+Future<T?> openFromList<T>(BuildContext context, WidgetBuilder builder,
+    {String? subject}) {
+  final shell = ShellScope.maybeOf(context);
+  if (shell != null && shell.navigatorKey.currentState != null) {
+    return shell.openDetail<T>(builder, subject: subject);
+  }
+  return Navigator.of(context).push(SlideBackRoute<T>(builder: builder));
 }
 
 /// Tracks which page route is on top of the shell's navigator. Dialogs and
@@ -271,14 +408,20 @@ class _AppShellState extends State<AppShell> {
       ShellController(drive: widget.drive, profile: widget.profile);
   late final _TopObserver _observer = _TopObserver(_shell);
 
+  /// The home keeps its state wherever it is shown: as the first page, or in
+  /// the list pane next to the pages.
+  final GlobalKey _homeKey = GlobalKey(debugLabel: 'home');
+  late final Widget _home = KeyedSubtree(key: _homeKey, child: widget.home);
+
   /// One instance for the life of the shell: the keyboard animation rebuilds
-  /// the tiny widgets around it, never the pages.
+  /// the tiny widgets around it, never the pages. Its key keeps it (and every
+  /// page in it) when a change of layout moves it.
   late final Widget _navigator = Navigator(
     key: _shell.navigatorKey,
     observers: [_observer],
     onGenerateRoute: (_) => MaterialPageRoute<void>(
       settings: const RouteSettings(name: ShellPage.home),
-      builder: (_) => CoveredInsetsFreeze(child: widget.home),
+      builder: (_) => CoveredInsetsFreeze(child: _HomeSlot(home: _home)),
     ),
   );
 
@@ -286,6 +429,27 @@ class _AppShellState extends State<AppShell> {
 
   late final Widget _bar =
       _FrozenBottomPadding(child: AppBottomBar(api: widget.api, shell: _shell));
+
+  /// Under the rail and the panes: the system's bottom inset (the gesture
+  /// handle, a taskbar) in the bar's colour, kept while the keyboard is up
+  /// as the bar is.
+  late final Widget _strip = const _FrozenBottomPadding(child: _BottomStrip());
+
+  late final Widget _rail = AppNavRail(api: widget.api, shell: _shell);
+
+  late final Widget _detail = _Pane(
+    removeLeft: true,
+    child: Stack(children: [
+      Positioned.fill(child: _navigator),
+      _DetailMore(shell: _shell),
+    ]),
+  );
+
+  late final Widget _listPane = _Pane(
+    removeLeft: true,
+    removeRight: true,
+    child: _ListPane(shell: _shell, api: widget.api, home: _home),
+  );
 
   @override
   void initState() {
@@ -305,20 +469,268 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
+  /// After a change of layout, a search moves between a page (bar, rail)
+  /// and the list pane (split), keeping its text and drive.
+  void _relayout(ShellLayout from, ShellLayout to) {
+    if (!mounted || _shell.layout != to) return;
+    final navigator = _shell.navigatorKey.currentState;
+    if (navigator == null) return;
+    final wasSplit = from == ShellLayout.split;
+    final isSplit = to == ShellLayout.split;
+    if (!wasSplit && isSplit) {
+      final searches = [
+        for (final r in _shell.pages)
+          if (ShellPage.isSearch(_shell.kindOf(r))) r
+      ];
+      if (searches.isEmpty) return;
+      final kind = _shell.kindOf(searches.last)!;
+      for (final r in searches) {
+        navigator.removeRoute(r);
+      }
+      _shell.list.value = kind;
+    } else if (wasSplit && !isSplit) {
+      final kind = _shell.list.value;
+      _shell.list.value = ShellPage.home;
+      if (!ShellPage.isSearch(kind)) return;
+      final search = _shell.search;
+      _shell.open<void>(
+          kind,
+          (settings) => SearchScreen.route(
+              drive: _shell.drive.value,
+              api: widget.api,
+              scopeDrive: search.scope,
+              initialQuery: search.query,
+              settings: settings));
+    }
+  }
+
+  /// Back with nothing left to close in the pages: a search in the list
+  /// pane goes back to the home first.
+  bool get _listCanPop => !_shell.split || _shell.list.value == ShellPage.home;
+
   @override
   Widget build(BuildContext context) {
+    final layout = ShellLayout.forWidth(MediaQuery.sizeOf(context).width);
+    if (layout != _shell.layout) {
+      final from = _shell.layout;
+      _shell.layout = layout;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _relayout(from, layout));
+    }
+    final Widget pages = switch (layout) {
+      ShellLayout.bar => _navigator,
+      ShellLayout.rail => Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [_rail, Expanded(child: _detail)]),
+      ShellLayout.split => LayoutBuilder(
+          builder: (context, box) =>
+              Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _rail,
+            SizedBox(
+                width: _listWidth(box.maxWidth - AppNavRail.width),
+                child: _listPane),
+            const _PaneDivider(),
+            Expanded(child: _detail),
+          ]),
+        ),
+    };
     return ShellScope(
       controller: _shell,
-      // Android back pops the pages first and leaves the app on the home.
-      child: NavigatorPopHandler(
-        onPopWithResult: (_) => _shell.navigatorKey.currentState?.maybePop(),
-        child: Column(children: [
-          // The bar stays laid out at full height; the keyboard covers it and
-          // the pages get the keyboard minus the bar's height.
-          Expanded(
-              child: _PagesInset(barHeight: _barHeight, child: _navigator)),
-          _MeasureHeight(height: _barHeight, child: _bar),
-        ]),
+      layout: layout,
+      child: ValueListenableBuilder<String>(
+        valueListenable: _shell.list,
+        builder: (context, _, child) => PopScope(
+          canPop: _listCanPop,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            if (_shell.navigatorKey.currentState?.canPop() ?? false) return;
+            _shell.showList(ShellPage.home);
+          },
+          child: child!,
+        ),
+        // Android back pops the pages first and leaves the app on the home.
+        child: NavigatorPopHandler(
+          onPopWithResult: (_) => _shell.navigatorKey.currentState?.maybePop(),
+          child: Column(children: [
+            // The bar stays laid out at full height; the keyboard covers it
+            // and the pages get the keyboard minus the bar's height.
+            Expanded(child: _PagesInset(barHeight: _barHeight, child: pages)),
+            _MeasureHeight(
+                height: _barHeight,
+                child: layout == ShellLayout.bar ? _bar : _strip),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// The list pane's width next to the pages: about two fifths of the room,
+/// at least a phone's narrowest list and at most what a list needs.
+double _listWidth(double room) => (room * 0.4).clamp(280.0, 380.0);
+
+/// The first page: the home on a phone; in the split layout the home is in
+/// the list pane, and this shows that nothing is opened yet.
+class _HomeSlot extends StatelessWidget {
+  final Widget home;
+
+  const _HomeSlot({required this.home});
+
+  @override
+  Widget build(BuildContext context) =>
+      ShellScope.layoutOf(context) == ShellLayout.split
+          ? const _NothingOpen()
+          : home;
+}
+
+/// The detail pane before anything is opened.
+class _NothingOpen extends StatelessWidget {
+  const _NothingOpen();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Scaffold(
+      key: const Key('nothing-open'),
+      backgroundColor: c.bgBody,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.article_outlined, size: 40, color: c.textSecondary),
+            const SizedBox(height: 12),
+            Text('Open something from the list',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textSecondary)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// The list pane: the home, or a search over it. The home stays built (and
+/// keeps its scroll and folds) while a search is shown.
+class _ListPane extends StatelessWidget {
+  final ShellController shell;
+  final AssistantApi api;
+  final Widget home;
+
+  const _ListPane({required this.shell, required this.api, required this.home});
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String>(
+        valueListenable: shell.list,
+        builder: (context, kind, _) {
+          final searching = ShellPage.isSearch(kind);
+          return Stack(children: [
+            Positioned.fill(
+              child: Offstage(
+                offstage: searching,
+                child: TickerMode(
+                  enabled: !searching,
+                  // The home only moves for the keyboard of its own pages.
+                  child: MediaQuery.removeViewInsets(
+                      context: context, removeBottom: true, child: home),
+                ),
+              ),
+            ),
+            if (searching)
+              Positioned.fill(
+                child: SearchScreen(
+                  key: ValueKey(kind),
+                  drive: shell.drive.value,
+                  api: api,
+                  scopeDrive: shell.search.scope,
+                  initialQuery: shell.search.query,
+                ),
+              ),
+          ]);
+        },
+      );
+}
+
+/// A pane of the wide layouts: the system insets of the sides it does not
+/// touch are not its business (the rail takes the left one).
+class _Pane extends StatelessWidget {
+  final bool removeLeft;
+  final bool removeRight;
+  final Widget child;
+
+  const _Pane({
+    this.removeLeft = false,
+    this.removeRight = false,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => MediaQuery.removePadding(
+        context: context,
+        removeLeft: removeLeft,
+        removeRight: removeRight,
+        child: child,
+      );
+}
+
+class _PaneDivider extends StatelessWidget {
+  const _PaneDivider();
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+      color: context.appColors.bg2.withValues(alpha: 0.5),
+      child: const SizedBox(width: 1));
+}
+
+/// The bottom system inset under the rail and the panes, in the bar's
+/// colour (the system navigation bar has it too).
+class _BottomStrip extends StatelessWidget {
+  const _BottomStrip();
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+        color: context.appColors.barSurface,
+        child: SizedBox(
+            width: double.infinity,
+            height: MediaQuery.paddingOf(context).bottom),
+      );
+}
+
+/// The "more" menu of the resource the detail pane shows, at the pane's top
+/// right (on a phone it is the bar's last button). The page's own header
+/// row is 36 high; the button sits in it.
+class _DetailMore extends StatelessWidget {
+  final ShellController shell;
+
+  const _DetailMore({required this.shell});
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    return Positioned(
+      top: padding.top,
+      right: padding.right,
+      child: ListenableBuilder(
+        listenable: shell,
+        builder: (context, _) {
+          final onMore = shell.topMenu;
+          if (onMore == null) return const SizedBox.shrink();
+          return Builder(
+            builder: (button) => SizedBox(
+              width: 48,
+              height: 36,
+              child: IconButton(
+                key: const Key('detail-more'),
+                tooltip: 'More',
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  final box = button.findRenderObject() as RenderBox;
+                  onMore(box.localToGlobal(Offset.zero) & box.size);
+                },
+                icon: const Icon(Icons.more_vert),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

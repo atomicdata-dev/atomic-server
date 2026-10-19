@@ -11,6 +11,7 @@ import 'app_shell.dart';
 import 'app_theme.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
+import 'list_and_field.dart';
 import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 
@@ -447,7 +448,7 @@ class _ResourceViewState extends State<ResourceView>
                     child: Text('$_error', style: TextStyle(color: c.alert)))
                 : page == null
                     ? const Center(child: CircularProgressIndicator())
-                    : Stack(children: [
+                    : _readable(Stack(children: [
                         // Swipe back starts at the left edge.
                         page.build(),
                         const Positioned(
@@ -457,10 +458,17 @@ class _ResourceViewState extends State<ResourceView>
                           width: 24,
                           child: _EdgeStrip(),
                         ),
-                      ]),
+                      ])),
           ),
         ));
   }
+}
+
+/// A page of the app's own (settings) is read, not worked in: at most
+/// [ReadableWidth.maxWidth] wide in a wide pane. A resource gets the room.
+extension on _ResourceViewState {
+  Widget _readable(Widget page) =>
+      widget.path != null ? ReadableWidth(child: page) : page;
 }
 
 /// Catches touches at the screen's left edge so the swipe back works over the

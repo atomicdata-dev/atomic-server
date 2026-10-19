@@ -19,9 +19,35 @@ class ListAndField extends StatelessWidget {
   });
 
   @override
+  Widget build(BuildContext context) => ReadableWidth(
+        child: LayoutBuilder(
+          builder: (context, box) => box.maxHeight < minHeight
+              ? SingleChildScrollView(reverse: true, child: field)
+              : Column(children: [Expanded(child: list), field]),
+        ),
+      );
+}
+
+/// Text-heavy pages (a chat, settings, sync) in a wide pane: at most
+/// [maxWidth] wide, centred. Narrower than that (a phone) the child gets the
+/// whole width, unchanged.
+class ReadableWidth extends StatelessWidget {
+  static const maxWidth = 720.0;
+
+  final Widget child;
+
+  const ReadableWidth({super.key, required this.child});
+
+  @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, box) => box.maxHeight < minHeight
-            ? SingleChildScrollView(reverse: true, child: field)
-            : Column(children: [Expanded(child: list), field]),
+        builder: (context, box) => box.maxWidth <= maxWidth
+            ? child
+            : Center(
+                child: SizedBox(
+                  width: maxWidth,
+                  height: box.hasBoundedHeight ? box.maxHeight : null,
+                  child: child,
+                ),
+              ),
       );
 }

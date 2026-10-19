@@ -1,6 +1,8 @@
 import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 
+import 'app_shell.dart';
+
 /// The icon of a class, by the class's name as the rows carry it (the class's
 /// own name, or the last part of its subject), as the web app's
 /// `getIconForClass` does. [Icons.description_outlined] for the rest.
@@ -92,8 +94,13 @@ class ResourceRow extends StatelessWidget {
   /// Shown at the end of the line, e.g. a check mark for a selected row.
   final Widget? trailing;
 
+  /// What the row opens. Next to the detail pane (the split layout of the
+  /// shell) the row is marked while that is the resource shown there.
+  final String? subject;
+
   const ResourceRow({
     super.key,
+    this.subject,
     this.icon,
     this.emoji,
     required this.title,
@@ -122,16 +129,37 @@ class ResourceRow extends StatelessWidget {
     return icon == null ? null : Icon(icon, color: context.appColors.main);
   }
 
+  Widget _tile(BuildContext context, {bool selected = false}) {
+    final c = context.appColors;
+    return ListTile(
+      leading: _leading(context),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
+      // A plain list of titles reads better tight.
+      visualDensity: detail == null && icon == null && !_hasEmoji
+          ? VisualDensity.compact
+          : VisualDensity.standard,
+      trailing: trailing,
+      selected: selected,
+      selectedTileColor: c.mainSelectedBg,
+      selectedColor: c.mainSelectedFg,
+      onTap: onTap,
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => ListTile(
-        leading: _leading(context),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
-        // A plain list of titles reads better tight.
-        visualDensity: detail == null && icon == null && !_hasEmoji
-            ? VisualDensity.compact
-            : VisualDensity.standard,
-        trailing: trailing,
-        onTap: onTap,
-      );
+  Widget build(BuildContext context) {
+    final subject = this.subject;
+    final shell = ShellScope.maybeOf(context);
+    if (subject == null ||
+        shell == null ||
+        ShellScope.layoutOf(context) != ShellLayout.split) {
+      return _tile(context);
+    }
+    return ValueListenableBuilder<String?>(
+      valueListenable: shell.selected,
+      builder: (context, selected, _) =>
+          _tile(context, selected: selected == subject),
+    );
+  }
 }

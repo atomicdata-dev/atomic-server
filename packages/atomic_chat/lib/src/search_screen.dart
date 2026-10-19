@@ -7,7 +7,6 @@ import 'app_top_bar.dart';
 
 import 'models.dart';
 import 'covered_insets_freeze.dart';
-import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
@@ -25,11 +24,16 @@ class SearchScreen extends StatefulWidget {
   final String drive;
   final String? scopeDrive;
 
+  /// What the field starts with (a search that moved to the list pane, or
+  /// back, when the window changed size).
+  final String initialQuery;
+
   const SearchScreen({
     super.key,
     required this.drive,
     required this.api,
     this.scopeDrive,
+    this.initialQuery = '',
   });
 
   /// A quick fade and short rise instead of the page slide: the keyboard rises
@@ -38,13 +42,17 @@ class SearchScreen extends StatefulWidget {
     required String drive,
     required AssistantApi api,
     String? scopeDrive,
+    String initialQuery = '',
     RouteSettings? settings,
   }) =>
       PageRouteBuilder<void>(
         settings: settings,
         pageBuilder: (_, __, ___) => CoveredInsetsFreeze(
-            child:
-                SearchScreen(drive: drive, api: api, scopeDrive: scopeDrive)),
+            child: SearchScreen(
+                drive: drive,
+                api: api,
+                scopeDrive: scopeDrive,
+                initialQuery: initialQuery)),
         transitionDuration: const Duration(milliseconds: 140),
         reverseTransitionDuration: const Duration(milliseconds: 110),
         transitionsBuilder: (context, animation, _, child) => AnimatedBuilder(
@@ -100,6 +108,9 @@ class _SearchScreenState extends State<SearchScreen> {
   final _SearchModel _model = _SearchModel();
   Timer? _debounce;
   ShellController? _shell;
+  late final TextEditingController _text =
+      TextEditingController(text: widget.initialQuery);
+  final FocusNode _focus = FocusNode();
 
   @override
   void initState() {
@@ -111,8 +122,19 @@ class _SearchScreenState extends State<SearchScreen> {
       _model.drives = cache.drives;
       _model.recent = _inScope(cache.recent);
     }
+    _remember();
     _load();
+    // `autofocus` only takes the focus where nothing has it; in the list
+    // pane the page next to it (a web page) may have it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_focus.hasFocus) _focus.requestFocus();
+    });
+    if (widget.initialQuery.trim().isNotEmpty) _changed(widget.initialQuery);
   }
+
+  /// The shell keeps the text and drive, for a search that moves between a
+  /// page and the list pane.
+  void _remember() => _shell?.search = (query: _text.text, scope: _model.scope);
 
   /// [recent] limited to the scope's drive, when there is one.
   List<({String drive, RecentResource resource})> _inScope(
@@ -128,6 +150,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Back to every drive: the same screen, the query searched again.
   void _clearScope() {
     _model.scope = null;
+    _remember();
     final route = ModalRoute.of(context);
     if (route != null) _shell?.setKind(route, ShellPage.search);
     final query = _model.query;
@@ -148,6 +171,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return true;
     }
     _model.scope = subject;
+    _remember();
     final route = ModalRoute.of(context);
     if (route != null) _shell?.setKind(route, ShellPage.search);
     final query = _model.query;
@@ -222,15 +246,15 @@ class _SearchScreenState extends State<SearchScreen> {
       String drive, String subject, String title, String className) async {
     if (_scopeToDrive(subject, className)) return;
     widget.api.noteOpened(drive, subject);
-    await Navigator.of(context).push(
-      SlideBackRoute<void>(
-        builder: (_) => openResourceView(
-            api: widget.api,
-            drive: drive,
-            subject: subject,
-            title: title,
-            className: className),
-      ),
+    await openFromList<void>(
+      context,
+      (_) => openResourceView(
+          api: widget.api,
+          drive: drive,
+          subject: subject,
+          title: title,
+          className: className),
+      subject: subject,
     );
     if (mounted) await _loadRecent(_model.drives);
   }
@@ -239,10 +263,13 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounce?.cancel();
     _model.dispose();
+    _text.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   void _changed(String text) {
+    _remember();
     _debounce?.cancel();
     final query = text.trim();
     if (query == _model.query) return;
@@ -371,6 +398,8 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Builder(builder: (context) {
                 final c = context.appColors;
                 return TextField(
+                  controller: _text,
+                  focusNode: _focus,
                   autofocus: true,
                   textInputAction: TextInputAction.search,
                   // Keeps the keyboard (and focus) after Enter.
@@ -488,6 +517,7 @@ class _SearchScreenState extends State<SearchScreen> {
     required bool top,
   }) {
     final row = ResourceRow(
+      subject: i.subject,
       icon: iconForClass(i.className),
       emoji: i.emoji,
       title: i.title.isEmpty ? i.subject : i.title,

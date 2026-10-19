@@ -2,7 +2,6 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
 import 'package:flutter/material.dart';
 
-import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
@@ -41,56 +40,12 @@ class AppBottomBar extends StatelessWidget {
 
   const AppBottomBar({super.key, required this.api, required this.shell});
 
-  void _newChat() => shell.openPage<void>(
-      ShellPage.newChat, (_) => ChatScreen(api: api, subject: null, title: ''));
+  _ShellActions get _actions => _ShellActions(api, shell);
 
-  void _voiceChat() => shell.openPage<void>(ShellPage.voiceChat,
-      (_) => ChatScreen(api: api, subject: null, title: '', voiceMode: true));
-
-  Future<void> _newDocument(BuildContext context) async {
-    final created = await showNewDocumentSheet(context,
-        api: api, fallbackDrive: shell.drive.value);
-    if (created == null) return;
-    api.noteOpened(created.drive, created.subject);
-    await shell.navigatorKey.currentState?.push(SlideBackRoute<void>(
-      builder: (_) => openResourceView(
-          api: api,
-          drive: created.drive,
-          subject: created.subject,
-          title: created.name),
-    ));
-  }
-
-  Future<void> _newOther() async {
-    final drive = await lastNewResourceDrive() ?? shell.drive.value;
-    await shell.openPage<void>(
-        ShellPage.newResource,
-        (_) =>
-            ResourceView(api: api, drive: drive, path: newResourcePath(drive)));
-  }
-
-  void _new(BuildContext context, NewChoice choice) {
-    switch (choice) {
-      case NewChoice.aiChat:
-        _newChat();
-      case NewChoice.aiVoice:
-        _voiceChat();
-      case NewChoice.document:
-        _newDocument(context);
-      case NewChoice.other:
-        _newOther();
-    }
-  }
-
-  /// Search opens fast: the keyboard comes up with it. [scope] searches one
-  /// drive.
-  Future<void> _openSearch({String? scope}) => shell.open<void>(
-      scope == null ? ShellPage.search : ShellPage.searchIn(scope),
-      (settings) => SearchScreen.route(
-          drive: shell.drive.value,
-          api: api,
-          scopeDrive: scope,
-          settings: settings));
+  void _newChat() => _actions.newChat();
+  void _new(BuildContext context, NewChoice choice) =>
+      _actions.newOf(context, choice);
+  Future<void> _openSearch({String? scope}) => _actions.search(scope: scope);
 
   @override
   Widget build(BuildContext context) {
@@ -106,12 +61,7 @@ class AppBottomBar extends StatelessWidget {
             builder: (context, _) {
               final onMore = shell.topMenu;
               final top = shell.topKind;
-              final onUser = shell.onUser ??
-                  switch (shell.profile) {
-                    final profile? => () =>
-                        shell.openPage<void>(ShellPage.profile, profile),
-                    null => null,
-                  };
+              final onUser = _actions.onUser;
               final newCurrent =
                   top == ShellPage.newChat || top == ShellPage.voiceChat;
               return Row(
@@ -147,12 +97,7 @@ class AppBottomBar extends StatelessWidget {
                         tooltip: 'New chat',
                         selected: newCurrent,
                         onTap: newCurrent ? null : _newChat,
-                        items: const [
-                          HoldFanItem('AI chat', NewChoice.aiChat),
-                          HoldFanItem('AI voice', NewChoice.aiVoice),
-                          HoldFanItem('Document', NewChoice.document),
-                          HoldFanItem('Other', NewChoice.other),
-                        ],
+                        items: _newItems,
                         onSelected: (choice) => _new(context, choice),
                         child: _barIcon(context, Icons.add, newCurrent),
                       ),
@@ -191,13 +136,7 @@ class AppBottomBar extends StatelessWidget {
                                 tooltip: 'Settings',
                                 onPressed: top == ShellPage.settings
                                     ? null
-                                    : () => shell.openPage<void>(
-                                        ShellPage.settings,
-                                        (_) => ResourceView(
-                                            api: api,
-                                            drive: shell.drive.value,
-                                            title: 'Settings',
-                                            path: '/app/settings')),
+                                    : _actions.settings,
                                 icon: const Icon(Icons.settings_outlined),
                               ),
                             ),
@@ -207,6 +146,247 @@ class AppBottomBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// What the bar's and the rail's buttons do.
+class _ShellActions {
+  final AssistantApi api;
+  final ShellController shell;
+
+  const _ShellActions(this.api, this.shell);
+
+  void newChat() => shell.openPage<void>(
+      ShellPage.newChat, (_) => ChatScreen(api: api, subject: null, title: ''));
+
+  void voiceChat() => shell.openPage<void>(ShellPage.voiceChat,
+      (_) => ChatScreen(api: api, subject: null, title: '', voiceMode: true));
+
+  Future<void> newDocument(BuildContext context) async {
+    final created = await showNewDocumentSheet(context,
+        api: api, fallbackDrive: shell.drive.value);
+    if (created == null) return;
+    api.noteOpened(created.drive, created.subject);
+    await shell.openDetail<void>(
+      (_) => openResourceView(
+          api: api,
+          drive: created.drive,
+          subject: created.subject,
+          title: created.name),
+      subject: created.subject,
+    );
+  }
+
+  Future<void> newOther() async {
+    final drive = await lastNewResourceDrive() ?? shell.drive.value;
+    await shell.openPage<void>(
+        ShellPage.newResource,
+        (_) =>
+            ResourceView(api: api, drive: drive, path: newResourcePath(drive)));
+  }
+
+  void newOf(BuildContext context, NewChoice choice) {
+    switch (choice) {
+      case NewChoice.aiChat:
+        newChat();
+      case NewChoice.aiVoice:
+        voiceChat();
+      case NewChoice.document:
+        newDocument(context);
+      case NewChoice.other:
+        newOther();
+    }
+  }
+
+  /// Search opens fast: the keyboard comes up with it. [scope] searches one
+  /// drive. Next to the detail pane it is the list pane that searches.
+  Future<void> search({String? scope}) async {
+    final kind = scope == null ? ShellPage.search : ShellPage.searchIn(scope);
+    if (shell.split) return shell.showList(kind);
+    await shell.open<void>(
+        kind,
+        (settings) => SearchScreen.route(
+            drive: shell.drive.value,
+            api: api,
+            scopeDrive: scope,
+            settings: settings));
+  }
+
+  void settings() => shell.openPage<void>(
+      ShellPage.settings,
+      (_) => ResourceView(
+          api: api,
+          drive: shell.drive.value,
+          title: 'Settings',
+          path: '/app/settings'));
+
+  VoidCallback? get onUser =>
+      shell.onUser ??
+      switch (shell.profile) {
+        final profile? => () =>
+            shell.openPage<void>(ShellPage.profile, profile),
+        null => null,
+      };
+}
+
+/// The bar's buttons in a column at the left edge, for a wide window
+/// ([ShellLayout.rail] and [ShellLayout.split]): the same pages and actions,
+/// each with its name under it. Next to the list pane, Home and Search show
+/// what the list pane holds, the others what the detail pane shows. The
+/// resource's "more" menu is not here but at the detail pane's top right.
+class AppNavRail extends StatelessWidget {
+  final AssistantApi api;
+  final ShellController shell;
+
+  static const width = 80.0;
+
+  const AppNavRail({super.key, required this.api, required this.shell});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final actions = _ShellActions(api, shell);
+    return Material(
+      color: c.barSurface,
+      child: SafeArea(
+        right: false,
+        bottom: false,
+        child: SizedBox(
+          width: width,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([shell, shell.drive, shell.list]),
+            builder: (context, _) {
+              final top = shell.topKind;
+              final split = shell.split;
+              final list = shell.list.value;
+              final homeCurrent =
+                  split ? list == ShellPage.home : top == ShellPage.home;
+              final searchCurrent =
+                  split ? ShellPage.isSearch(list) : ShellPage.isSearch(top);
+              final newCurrent =
+                  top == ShellPage.newChat || top == ShellPage.voiceChat;
+              final onUser = actions.onUser;
+              // Home on the list pane that shows it already closes what
+              // the detail pane shows.
+              final VoidCallback? onHome = split
+                  ? (list != ShellPage.home
+                      ? () => shell.showList(ShellPage.home)
+                      : (shell.atHome ? null : shell.goHome))
+                  : (homeCurrent ? null : shell.goHome);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(children: [
+                  _RailItem(
+                    label: 'Home',
+                    current: homeCurrent,
+                    child: IconButton(
+                      tooltip: 'Home',
+                      onPressed: onHome,
+                      icon: _barIcon(
+                          context,
+                          homeCurrent ? Icons.home : Icons.home_outlined,
+                          homeCurrent),
+                    ),
+                  ),
+                  _RailItem(
+                    label: 'Search',
+                    current: searchCurrent,
+                    child: _SearchButton(
+                      api: api,
+                      current: searchCurrent,
+                      layout: HoldFanLayout.side,
+                      onSearch: actions.search,
+                    ),
+                  ),
+                  _RailItem(
+                    label: 'New',
+                    name: 'New chat',
+                    current: newCurrent,
+                    child: HoldFan<NewChoice>(
+                      tooltip: 'New chat',
+                      selected: newCurrent,
+                      layout: HoldFanLayout.side,
+                      onTap: newCurrent ? null : actions.newChat,
+                      items: _newItems,
+                      onSelected: (choice) => actions.newOf(context, choice),
+                      child: _barIcon(context, Icons.add, newCurrent),
+                    ),
+                  ),
+                  _RailItem(
+                    label: 'Profile',
+                    current: top == ShellPage.profile,
+                    child: IconButton(
+                      tooltip: 'Profile',
+                      onPressed: top == ShellPage.profile ? null : onUser,
+                      icon: const Icon(Icons.person_outline),
+                    ),
+                  ),
+                  _RailItem(
+                    label: 'Settings',
+                    current: top == ShellPage.settings,
+                    child: IconButton(
+                      tooltip: 'Settings',
+                      onPressed:
+                          top == ShellPage.settings ? null : actions.settings,
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ),
+                ]),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _newItems = [
+  HoldFanItem('AI chat', NewChoice.aiChat),
+  HoldFanItem('AI voice', NewChoice.aiVoice),
+  HoldFanItem('Document', NewChoice.document),
+  HoldFanItem('Other', NewChoice.other),
+];
+
+/// A rail button with its name under it, both in the main colour when its
+/// page is the current one.
+class _RailItem extends StatelessWidget {
+  final String label;
+
+  /// The button's name where it differs from the [label] shown (the bar's).
+  final String? name;
+  final bool current;
+  final Widget child;
+
+  const _RailItem({
+    required this.label,
+    this.name,
+    required this.current,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _Current(current: current, label: name ?? label, child: child),
+        ExcludeSemantics(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.fade,
+            softWrap: false,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: current ? FontWeight.w600 : FontWeight.w500,
+              color: current ? c.main : c.textSecondary,
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -266,11 +446,13 @@ class _SearchButton extends StatefulWidget {
   final AssistantApi api;
   final bool current;
   final Future<void> Function({String? scope}) onSearch;
+  final HoldFanLayout layout;
 
   const _SearchButton({
     required this.api,
     required this.current,
     required this.onSearch,
+    this.layout = HoldFanLayout.list,
   });
 
   @override
@@ -335,7 +517,7 @@ class _SearchButtonState extends State<_SearchButton> {
     final drives = _drives;
     return HoldFan<String>(
       tooltip: 'Search',
-      layout: HoldFanLayout.list,
+      layout: widget.layout,
       selected: widget.current,
       onTap: widget.current ? null : () => widget.onSearch(),
       onOpen: _load,

@@ -160,12 +160,24 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// search) covered the home.
   bool _covered = false;
 
+  /// The page the detail pane showed last (split layout).
+  Route<dynamic>? _lastTop;
+
   /// Back on the home after the bar's pages: they can have opened, made or
   /// changed resources, so the lists are read again (the home's own pages
-  /// reload in [_push]).
+  /// reload in [_push]). Next to the detail pane the home is always in view:
+  /// it is read again whenever another page is shown there.
   void _onShellChanged() {
     final shell = _shell;
     if (shell == null) return;
+    if (shell.split) {
+      if (!identical(shell.top, _lastTop)) {
+        _lastTop = shell.top;
+        _reload();
+      }
+      return;
+    }
+    _lastTop = shell.top;
     if (!shell.atHome) {
       _covered = true;
     } else if (_covered) {
@@ -253,9 +265,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
   static bool _changesData(Widget screen) =>
       !(screen is _ListPage || (screen is ResourceView && screen.path != null));
 
-  Future<void> _push(Widget screen) async {
-    await Navigator.of(context)
-        .push(SlideBackRoute<void>(builder: (_) => screen));
+  /// Opens [screen]: pushed over the home on a phone, in the detail pane
+  /// next to it on a tablet. [subject] is what it shows, to mark its row.
+  Future<void> _push(Widget screen, {String? subject}) async {
+    await openFromList<void>(context, (_) => screen, subject: subject);
     if (mounted && _changesData(screen)) _reload();
   }
 
@@ -284,36 +297,44 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
   }
 
-  void _openChat(ChatSummary? chat) => _push(ChatScreen(
+  void _openChat(ChatSummary? chat) => _push(
+      ChatScreen(
         api: widget.api,
         subject: chat?.subject,
         title: chat?.name ?? '',
-      ));
+      ),
+      subject: chat?.subject);
 
   void _openResource(String drive, RecentResource r) {
     widget.api.noteOpened(drive, r.subject);
-    _push(openResourceView(
-        api: widget.api,
-        drive: drive,
-        subject: r.subject,
-        title: r.title,
-        className: r.className));
+    _push(
+        openResourceView(
+            api: widget.api,
+            drive: drive,
+            subject: r.subject,
+            title: r.title,
+            className: r.className),
+        subject: r.subject);
   }
 
   Widget _driveRow(DriveInfo d) => ResourceRow(
+        subject: d.subject,
         icon: Icons.folder_outlined,
         emoji: d.emoji,
         title: d.name.isEmpty ? 'Untitled drive' : d.name,
         // The drive itself, drawn by the page: everything in it, read from
         // the store with the same query the web app uses.
-        onTap: () => _push(openResourceView(
-            api: widget.api,
-            drive: d.subject,
-            subject: d.subject,
-            title: d.name)),
+        onTap: () => _push(
+            openResourceView(
+                api: widget.api,
+                drive: d.subject,
+                subject: d.subject,
+                title: d.name),
+            subject: d.subject),
       );
 
   Widget _chatRow(ChatSummary chat) => ResourceRow(
+        subject: chat.subject,
         title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
         onTap: () => _openChat(chat),
       );
@@ -334,6 +355,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final body = n.body.replaceAll(RegExp(r'\s+'), ' ').trim();
     return ResourceRow(
       key: ValueKey('notification-${n.subject}'),
+      subject: n.about.isEmpty ? null : n.about,
       icon: Icons.notifications_none,
       title: n.title.isEmpty ? n.about : n.title,
       detail: body.length > 80 ? '${body.substring(0, 79)}…' : body,
@@ -366,8 +388,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
     if (n.about.isEmpty) return;
     widget.api.noteOpened(_drive, n.about);
-    _push(openResourceView(
-        api: widget.api, drive: _drive, subject: n.about, title: ''));
+    _push(
+        openResourceView(
+            api: widget.api, drive: _drive, subject: n.about, title: ''),
+        subject: n.about);
   }
 
   /// A conversation: who is in it, the newest message and when it was sent.
@@ -375,6 +399,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final r = c.resource;
     final preview = c.lastMessage.replaceAll(RegExp(r'\s+'), ' ').trim();
     return ResourceRow(
+      subject: r.subject,
       icon: iconForClass(r.className),
       emoji: r.emoji,
       title: r.title.isEmpty ? r.subject : r.title,
@@ -391,6 +416,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// `<who> created/changed/deleted · <when>`. A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
+        subject: a.subject,
         icon: iconForClass(a.className),
         emoji: _icons[a.subject],
         title: a.name.isEmpty ? a.subject : a.name,
@@ -399,12 +425,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
             ? null
             : () {
                 widget.api.noteOpened(a.drive, a.subject);
-                _push(openResourceView(
-                    api: widget.api,
-                    drive: a.drive,
-                    subject: a.subject,
-                    title: a.name,
-                    className: a.className));
+                _push(
+                    openResourceView(
+                        api: widget.api,
+                        drive: a.drive,
+                        subject: a.subject,
+                        title: a.name,
+                        className: a.className),
+                    subject: a.subject);
               },
       );
 
@@ -563,6 +591,7 @@ ResourceRow _resourceRow(RecentResource r,
         void Function(String drive, RecentResource) onOpen, String drive,
         {String? driveName}) =>
     ResourceRow(
+      subject: r.subject,
       icon: iconForClass(r.className),
       emoji: r.emoji,
       title: r.title.isEmpty ? r.subject : r.title,
@@ -600,6 +629,10 @@ class _Section<T> extends StatefulWidget {
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
 
+  /// Most rows "Show all" lists in place (the split layout, where the home
+  /// is the list pane and a page of its own would go to the detail pane).
+  final int maxRows;
+
   const _Section({
     super.key,
     required this.title,
@@ -609,6 +642,7 @@ class _Section<T> extends StatefulWidget {
     required this.rows,
     required this.onShowAll,
     this.hideEmpty = false,
+    this.maxRows = 100,
   });
 
   @override
@@ -622,6 +656,9 @@ class _SectionState<T> extends State<_Section<T>>
   @override
   bool get wantKeepAlive => true;
   Object? _error;
+
+  /// Every row is listed in place (split layout).
+  bool _all = false;
 
   @override
   void initState() {
@@ -696,6 +733,10 @@ class _SectionState<T> extends State<_Section<T>>
       return const SizedBox.shrink();
     }
     final more = list != null && list.length > _homeItems;
+    // In the list pane next to the detail pane, "Show all" lists the rest in
+    // place: a page of its own would cover what is opened.
+    final inPlace = ShellScope.layoutOf(context) == ShellLayout.split;
+    final all = inPlace && _all;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -705,10 +746,12 @@ class _SectionState<T> extends State<_Section<T>>
           // one baseline.
           if (more && !widget.fold.collapsed)
             InkWell(
-              onTap: () => widget.onShowAll(list),
+              onTap: inPlace
+                  ? () => setState(() => _all = !_all)
+                  : () => widget.onShowAll(list),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text('Show all',
+                child: Text(all ? 'Show less' : 'Show all',
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontSize: 13,
@@ -731,7 +774,7 @@ class _SectionState<T> extends State<_Section<T>>
         else if (list.isEmpty)
           _Empty(widget.empty, c)
         else
-          ...widget.rows(list.take(_homeItems).toList()),
+          ...widget.rows(list.take(all ? widget.maxRows : _homeItems).toList()),
       ],
     );
   }

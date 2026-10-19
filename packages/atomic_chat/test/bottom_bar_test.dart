@@ -119,7 +119,9 @@ void main() {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       Rect? anchor;
-      final route = ModalRoute.of(tester.element(find.byType(ChatsScreen)))!;
+      // A tablet: the rail, and the button at the detail pane's top right.
+      expect(find.byType(AppNavRail), findsOneWidget);
+      final route = _controller(tester).top!;
       _controller(tester).registerMenu(route, (a) => anchor = a);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('More'));
@@ -131,7 +133,7 @@ void main() {
       expect(anchor!.center.dx, greaterThan(700));
     });
 
-    testWidgets('the + and Search fans open over their own buttons',
+    testWidgets('the + and Search fans open next to their own buttons',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
@@ -144,7 +146,10 @@ void main() {
             .byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip));
         final gesture = await _hold(tester, tooltip);
         final pill = tester.getRect(find.text(item).last);
-        expect((pill.center.dx - button.center.dx).abs(), lessThan(150),
+        // Right of the rail's button, level with it.
+        expect(pill.left, greaterThan(button.right), reason: tooltip);
+        expect(pill.left - button.right, lessThan(60), reason: tooltip);
+        expect((pill.center.dy - button.center.dy).abs(), lessThan(30),
             reason: tooltip);
         await gesture.moveTo(const Offset(1, 1));
         await gesture.up();

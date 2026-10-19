@@ -41,4 +41,5 @@ export 'src/hosted_voice.dart';
 
 // Small widgets.
 export 'src/fading_text.dart';
+export 'src/list_and_field.dart';
 export 'src/atomic_place_mark.dart';
