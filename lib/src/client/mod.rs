@@ -10,4 +10,6 @@ pub use helpers::*;
 pub mod connected;
 pub mod search;
 #[cfg(feature = "ws")]
+pub(crate) mod tls;
+#[cfg(feature = "ws")]
 pub mod ws;

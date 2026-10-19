@@ -72,6 +72,9 @@ sha2 = "0.10"
 tokio = { version = "1.52.3", features = ["rt", "macros", "sync"] }
 async-trait = "0.1.89"
 tokio-tungstenite = { version = "0.29.0", features = ["rustls-tls-native-roots"], optional = true }
+# Explicit TLS config for the WebSocket client (see `client::tls`).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "1", optional = true }
 
 # For WASM: enable JS-backed randomness via feature unification
 getrandom = { version = "0.4.2", features = ["wasm_js"], optional = true }
@@ -114,7 +117,7 @@ db-sled = ["db", "sled", "bincode1"]
 discovery = ["dep:pkarr"]
 iroh = ["dep:iroh", "anyhow", "dep:hostname"]
 ## WebSocket client. Depends on `db` for the v2 binary protocol (`sync::protocol`).
-ws = ["tokio-tungstenite", "db"]
+ws = ["tokio-tungstenite", "db", "dep:rustls", "dep:webpki-roots"]
 rdf = ["rio_api", "rio_turtle"]
 telemetry = ["opentelemetry"]
 ## Enable JS-backed randomness, time, and OPFS for WASM targets.
