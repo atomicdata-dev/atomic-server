@@ -3,14 +3,13 @@ import {
   Resource,
   Store,
   useStore,
-  type AtomicValue,
 } from '@tomic/react';
 import { useCallback, useState } from 'react';
 
 enum HistoryItemType {
   ValueChange,
   ResourceCreated,
-  ResourceDeleted,
+  ResourceTrashed,
 }
 
 interface ValueChangeItem {
@@ -25,13 +24,17 @@ interface ResourceCreatedItem {
   subject: string;
 }
 
-interface ResourceDeletedItem {
-  type: HistoryItemType.ResourceDeleted;
+/** A row parked in the drive's Trash; undo restores it. */
+interface ResourceTrashedItem {
+  type: HistoryItemType.ResourceTrashed;
   subject: string;
-  propVals: [string, AtomicValue][];
+  drive: string;
 }
 
-type HistoryItem = ValueChangeItem | ResourceCreatedItem | ResourceDeletedItem;
+type HistoryItem =
+  | ValueChangeItem
+  | ResourceCreatedItem
+  | ResourceTrashedItem;
 
 export type HistoryItemBatch = HistoryItem[];
 
@@ -72,14 +75,17 @@ export function createResourceCreatedHistoryItem(
   };
 }
 
-export function createResourceDeletedHistoryItem(
-  resource: Resource,
-): ResourceDeletedItem {
-  return {
-    type: HistoryItemType.ResourceDeleted,
-    subject: resource.subject,
-    propVals: resource.getEntries(),
-  };
+export function createResourceTrashedHistoryItem(
+  subject: string,
+  drive: string,
+): ResourceTrashedItem {
+  return { type: HistoryItemType.ResourceTrashed, subject, drive };
+}
+
+async function undoResourceTrashed(item: ResourceTrashedItem, store: Store) {
+  await store.restore(item.subject, item.drive);
+
+  return true;
 }
 
 async function undoValueChange(item: ValueChangeItem, store: Store) {
@@ -97,28 +103,14 @@ async function undoResourceCreated(item: ResourceCreatedItem, store: Store) {
   return true;
 }
 
-async function undoResourceDeleted(item: ResourceDeletedItem, store: Store) {
-  const resource = store.getResourceLoading(item.subject, {
-    newResource: true,
-  });
-
-  for (const [prop, val] of item.propVals) {
-    await resource.set(prop, val, false);
-  }
-
-  await resource.save();
-
-  return true;
-}
-
 async function undoItem(item: HistoryItem, store: Store) {
   switch (item.type) {
     case HistoryItemType.ValueChange:
       return undoValueChange(item, store);
     case HistoryItemType.ResourceCreated:
       return undoResourceCreated(item, store);
-    case HistoryItemType.ResourceDeleted:
-      return undoResourceDeleted(item, store);
+    case HistoryItemType.ResourceTrashed:
+      return undoResourceTrashed(item, store);
   }
 }
 
