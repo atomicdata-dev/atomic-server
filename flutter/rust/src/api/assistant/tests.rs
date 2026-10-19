@@ -330,6 +330,25 @@ async fn a_conversation_is_read_listed_and_written_through_the_bridge() {
 }
 
 #[tokio::test]
+async fn a_chat_room_is_written_and_read_through_the_bridge() {
+    let drive = shared_drive().await;
+    let room = db()
+        .unwrap()
+        .create_resource(atomic_lib::host::rows::AI_CHAT, drive, "Standup", None)
+        .await
+        .unwrap();
+    send_chat_room_message(room.clone(), "Hallo".into(), None)
+        .await
+        .unwrap();
+    let messages: Vec<Json> =
+        serde_json::from_str(&read_chat_room(room.clone()).await.unwrap()).unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["kind"], "text");
+    assert_eq!(messages[0]["text"], "Hallo");
+    assert_eq!(messages[0]["mine"], true);
+}
+
+#[tokio::test]
 async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
     let drive = shared_drive().await;
     let subject = create_resource_of_class(

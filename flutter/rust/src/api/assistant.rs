@@ -10,7 +10,7 @@
 mod tests;
 
 use super::simple::state::{connected_server, db, err, node};
-use crate::host::{conversations, pusher, recents, to_json};
+use crate::host::{chat_rooms, conversations, pusher, recents, to_json};
 use atomic_lib::host::{chats, lists, notifications};
 use flutter_rust_bridge::frb;
 
@@ -165,6 +165,34 @@ pub async fn follow_conversation(subject: String) -> Result<(), String> {
 /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
 pub async fn read_chat(subject: String) -> Result<String, String> {
     to_json(&chats::read_chat(db()?, &subject).await.map_err(err)?)
+}
+
+/// The chat of a meeting or chat room, oldest first, as JSON `[{id, author,
+/// author_name, mine, kind, text, c, reply_to?, about?, about_title?}]`:
+/// `kind` is `text` (a message) or `event` (a system line of a meeting; a
+/// "Viewing" trail line has `about`, the resource viewed, and `about_title`).
+/// Read from the local store, never waiting on the network.
+pub async fn read_chat_room(subject: String) -> Result<String, String> {
+    to_json(&chat_rooms().read(db()?, &subject).await.map_err(err)?)
+}
+
+/// Post `text` in a meeting or chat room as this device's agent, as the web
+/// app does, so web clients show it. `reply_to` is the `id` of the message it
+/// answers. Returns the entry's id (`<page>#<key>`).
+pub async fn send_chat_room_message(
+    subject: String,
+    text: String,
+    reply_to: Option<String>,
+) -> Result<String, String> {
+    atomic_lib::host::chat_rooms::send_message(
+        &node()?,
+        pusher().as_ref(),
+        &subject,
+        &text,
+        reply_to.as_deref(),
+    )
+    .await
+    .map_err(err)
 }
 
 /// Full-text search (type-ahead on the last word) across every drive of this

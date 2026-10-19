@@ -98,6 +98,22 @@ Future<void> followConversation({required String subject}) =>
 Future<String> readChat({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChat(subject: subject);
 
+/// The chat of a meeting or chat room, oldest first, as JSON `[{id, author,
+/// author_name, mine, kind, text, c, reply_to?, about?, about_title?}]`:
+/// `kind` is `text` (a message) or `event` (a system line of a meeting; a
+/// "Viewing" trail line has `about`, the resource viewed, and `about_title`).
+/// Read from the local store, never waiting on the network.
+Future<String> readChatRoom({required String subject}) =>
+    RustLib.instance.api.crateApiAssistantReadChatRoom(subject: subject);
+
+/// Post `text` in a meeting or chat room as this device's agent, as the web
+/// app does, so web clients show it. `reply_to` is the `id` of the message it
+/// answers. Returns the entry's id (`<page>#<key>`).
+Future<String> sendChatRoomMessage(
+        {required String subject, required String text, String? replyTo}) =>
+    RustLib.instance.api.crateApiAssistantSendChatRoomMessage(
+        subject: subject, text: text, replyTo: replyTo);
+
 /// Full-text search (type-ahead on the last word) across every drive of this
 /// store, or only in `drive` when given. JSON
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the

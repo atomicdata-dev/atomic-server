@@ -8,7 +8,7 @@ use crate::api::simple::state::{connected_server, db};
 use atomic_lib::{
     commit::CommitResponse,
     host::{
-        conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex,
+        chat_rooms::ChatRooms, conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex,
         AgentProfileFetcher, LocalWritePusher,
     },
     Storelike,
@@ -86,6 +86,12 @@ pub(crate) fn recents() -> &'static Arc<RecentsIndex> {
 pub(crate) fn conversations() -> &'static Conversations {
     static CONVERSATIONS: OnceLock<Conversations> = OnceLock::new();
     CONVERSATIONS.get_or_init(|| Conversations::new(profiles()))
+}
+
+/// Chat rooms and meetings, sharing the profile cache.
+pub(crate) fn chat_rooms() -> &'static ChatRooms {
+    static CHAT_ROOMS: OnceLock<ChatRooms> = OnceLock::new();
+    CHAT_ROOMS.get_or_init(|| ChatRooms::new(profiles()))
 }
 
 /// Load the recents index from `dir`, and keep it current for as long as the
