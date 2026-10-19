@@ -237,14 +237,15 @@ class _ChatScreenState extends State<ChatScreen> {
             textAlign: TextAlign.center,
           ),
         );
-    if (!_aiLooked) return const SizedBox(height: 8);
-    if (ai == null) {
+    // While the AI is looked up, the field is there already, switched off:
+    // the messages above stay where they are when the answer lands.
+    if (_aiLooked && ai == null) {
       return SafeArea(child: hint(_error ?? 'No AI is set up on this device.'));
     }
-    if (!ai.available) {
+    if (ai != null && !ai.available) {
       return SafeArea(child: hint('Included AI is not available.'));
     }
-    if (!ai.consent) {
+    if (ai != null && !ai.consent) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -291,7 +292,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     minLines: 1,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
-                    enabled: !_sending,
+                    enabled: !_sending && ai != null,
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
                       hintText: 'Message',
@@ -307,7 +308,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 IconButton.filled(
                   tooltip: 'Send',
-                  onPressed: _sending ? null : _send,
+                  onPressed: _sending || ai == null ? null : _send,
                   icon: const Icon(Icons.arrow_upward),
                 ),
               ],

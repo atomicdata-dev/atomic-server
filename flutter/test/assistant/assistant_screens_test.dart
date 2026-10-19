@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
@@ -326,6 +327,19 @@ void main() {
       ]);
     });
 
+    testWidgets('the messages do not jump when the AI lookup lands',
+        (tester) async {
+      final lookup = Completer<HostedAi?>();
+      final api = _SlowAi(lookup.future);
+      await tester.pumpWidget(app(ChatScreen(api: api)));
+      await tester.pump();
+      final before = tester.getBottomLeft(find.text('No messages')).dy;
+      lookup.complete(ai());
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+      expect(tester.getBottomLeft(find.text('No messages')).dy, before);
+    });
+
     testWidgets('asks for consent before the AI is used', (tester) async {
       final api = FakeApi(ai: ai(consent: false));
       await tester.pumpWidget(app(ChatScreen(api: api)));
@@ -479,6 +493,14 @@ void main() {
       expect(timeAgo(ago(const Duration(days: 30)), now: now), '2026-09-18');
     });
   });
+}
+
+class _SlowAi extends FakeApi {
+  final Future<HostedAi?> lookup;
+  _SlowAi(this.lookup);
+
+  @override
+  Future<HostedAi?> hostedAi() => lookup;
 }
 
 class _Failing extends FakeApi {
