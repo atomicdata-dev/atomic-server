@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:atomic_chat/atomic_chat.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -331,6 +332,43 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Notifications'), findsNothing);
       expect(find.text('No notifications'), findsNothing);
+    });
+
+    testWidgets('flicking down at the top does not stretch or bounce the home',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final api = FakeApi(
+        chatList: [
+          for (var i = 0; i < 6; i++)
+            (subject: 'c$i', name: 'Chat $i', lastActivity: 0),
+        ],
+      );
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      final list = find.byType(ListView);
+      double offset() => tester
+          .state<ScrollableState>(
+              find.descendant(of: list, matching: find.byType(Scrollable)))
+          .position
+          .pixels;
+      expect(offset(), 0);
+      expect(find.byType(StretchingOverscrollIndicator), findsNothing);
+      await tester.fling(list, const Offset(0, 600), 3000);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(offset(), 0);
+      await tester.pumpAndSettle();
+      expect(offset(), 0);
+      // And a flick up to the bottom ends there, not back above it.
+      await tester.fling(list, const Offset(0, -2000), 3000);
+      await tester.pumpAndSettle();
+      final max = tester
+          .state<ScrollableState>(
+              find.descendant(of: list, matching: find.byType(Scrollable)))
+          .position
+          .maxScrollExtent;
+      expect(offset(), max);
+      debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets('a tap on a heading folds its section', (tester) async {

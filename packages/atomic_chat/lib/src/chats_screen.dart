@@ -506,11 +506,20 @@ class _ChatsScreenState extends State<ChatsScreen> {
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
           ),
-          body: ListView(
-            children: [
-              for (final id in _layout.visible) _sectionFor(id, c),
-              if (_layout.visible.isEmpty) _showSectionsButton(),
-            ],
+          // Clamped, with no stretch or glow at the edges: the Material 3
+          // stretch overscroll of Android 12+ pulls the whole page past the
+          // top and springs it back, which on a flick up reads as the list
+          // bouncing down again from the top.
+          body: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+                overscroll: false, physics: const ClampingScrollPhysics()),
+            child: ListView(
+              physics: const ClampingScrollPhysics(),
+              children: [
+                for (final id in _layout.visible) _sectionFor(id, c),
+                if (_layout.visible.isEmpty) _showSectionsButton(),
+              ],
+            ),
           ),
         );
       },
