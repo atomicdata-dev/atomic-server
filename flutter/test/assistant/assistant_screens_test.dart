@@ -241,7 +241,7 @@ void main() {
       expect(ys.every((y) => (y - ys.first).abs() < 1), isTrue);
       final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
       expect(ys.first, greaterThan(screen.height * 0.7));
-      expect(find.text('J'), findsOneWidget);
+      expect(find.byIcon(Icons.person_outline), findsOneWidget);
     });
 
     testWidgets('Search opens the search screen', (tester) async {
