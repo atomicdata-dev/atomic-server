@@ -76,6 +76,38 @@ Each step ships on its own and has a test that fails without it.
   overlay), AI sidebar and "Add to chat" (open the native chat with the resource
   as context), follow-session (leave out), share (web dialog in the embed).
 
+## Settings in the embed
+
+The app's bottom bar opens the web settings page (`?path=/app/settings`). It
+persists in the page's own `localStorage` (same keys as the web app: `darkMode`,
+`mainColor`, `atomic.locale`, `hideTemplates`; the host keeps one stable origin so
+they survive app starts). The page used to show every web section. Which of them
+make sense on a phone (allow-list: `src/embed/settings.ts`, used by
+`routes/AppSettings.tsx`; outside the embed everything is shown as before):
+
+| Section / option | Status in the embed | Action |
+| --- | --- | --- |
+| Appearance > Theme (Auto/Dark/Light) | Worked in principle (theme is derived in JS by `useDarkMode`), but "Auto" depended on `prefers-color-scheme`, which an Android web view only follows with force-dark configured, and a listener closed over its first-render setting, so the OS flipping scheme could override an explicit choice | Fixed: listener reads the live setting; `atomicEmbed.setColorScheme('light'/'dark')` lets the host report the app's mode and "Auto" follows it, else the media query; `color-scheme` is set on `<html>` so scrollbars and controls match. Persists as `darkMode` |
+| Appearance > Main color | Works (pure theme input, `mainColor`) | Kept |
+| Appearance > Language | Works (`atomic.locale`, catalogs are bundled) | Kept |
+| Appearance > Hide templates on new resource page | Works (the embed mounts the New route) | Kept |
+| Appearance > NavBar position | Not relevant: the embed has no navbar, the app has its own bottom bar | Hidden |
+| Appearance > Colorful mode | Not relevant: only tints the sidebar/navbar (`ChromeTheme`), absent here | Hidden |
+| Appearance > Panels (Messages, Favorites, Shared with me, Ontologies, AI Chats) | Not relevant: no sidebar; the app's native screens own chats and navigation | Hidden |
+| Accessibility > page transition animations | Broken/unsupported: experimental, known to misbehave outside desktop Chromium (including Android) | Hidden |
+| Accessibility > keyboard drag & drop in sidebar | Not relevant: no sidebar, no keyboard | Hidden (whole section) |
+| Notifications | Broken: uses the `Notification` API (desktop/Tauri plugin); the Android web view has none, so it only ever said "unsupported". The native app owns notifications. No in-page subset exists (the toggle is the only control) | Hidden |
+| Virtual drive | Not relevant: desktop (Tauri) only; already off on mobile | Hidden |
+| AI (providers, keys, Ollama, MCP, voice, models) | Not relevant/broken: the AI chat is native with its own settings and voice; Ollama/MCP/local discovery are desktop concepts | Hidden |
+| Integration (proxy, plugin catalog) | Not relevant: desktop/server plugin catalog | Hidden |
+
+Tests: `src/embed/settings.test.tsx` (allow-list, and the page rendered
+embedded vs not), `src/helpers/useDarkMode.test.tsx` (persistence under the web
+key, auto vs explicit, host scheme). Not verified without a device: that the
+Android web view reports `prefers-color-scheme` as the app's mode (the host
+should call `atomicEmbed.setColorScheme` on start and on theme change; that Dart
+call is not wired yet), and the transparent web view background in dark mode.
+
 ## Not planned
 
 - Running the web app's own router or sidebar in the embed.

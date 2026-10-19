@@ -1,5 +1,10 @@
-import { Dispatch, useEffect, useState } from 'react';
+import { Dispatch, useEffect, useRef, useState } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import {
+  getHostColorScheme,
+  HOST_COLOR_SCHEME_EVENT,
+  isEmbedded,
+} from './embedMode';
 
 export enum DarkModeOption {
   /** Always use dark mode */
@@ -39,19 +44,39 @@ export const useDarkMode = (): [
     }
   }
 
+  // The listener lives as long as the hook, so it reads the setting from a
+  // ref: a closure over the first render's value ignored later changes.
+  const darkLocalRef = useRef(darkLocal);
   useEffect(() => {
-    const onChange = (e: MediaQueryListEvent) => {
-      if (darkLocal === DarkModeOption.auto) {
-        setDark(e.matches);
+    darkLocalRef.current = darkLocal;
+  }, [darkLocal]);
+
+  useEffect(() => {
+    const onChange = () => {
+      if (darkLocalRef.current === DarkModeOption.auto) {
+        setDark(checkPrefersDark());
       }
     };
 
     const list = window.matchMedia('(prefers-color-scheme: dark)');
     // Is called when user changes color scheme
     list.addEventListener('change', onChange);
+    // The embed's host app reports its own scheme (see embedMode.ts).
+    window.addEventListener(HOST_COLOR_SCHEME_EVENT, onChange);
 
-    return () => list.removeEventListener('change', onChange);
+    return () => {
+      list.removeEventListener('change', onChange);
+      window.removeEventListener(HOST_COLOR_SCHEME_EVENT, onChange);
+    };
   }, []);
+
+  // In the embed, native widgets (scrollbars, form controls) follow the chosen
+  // scheme, not only the OS one: an explicit choice overrides it.
+  useEffect(() => {
+    if (isEmbedded()) {
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    }
+  }, [dark]);
 
   useEffect(() => {
     if (darkLocal === DarkModeOption.auto) {
@@ -66,7 +91,13 @@ export const useDarkMode = (): [
   return [dark, setDarkBoth, darkLocal];
 };
 
-function checkPrefersDark() {
+export function checkPrefersDark(): boolean {
+  const host = getHostColorScheme();
+
+  if (host) {
+    return host === 'dark';
+  }
+
   return (
     window.matchMedia &&
     window.matchMedia('(prefers-color-scheme: dark)').matches

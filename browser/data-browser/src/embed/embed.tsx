@@ -35,7 +35,11 @@ import {
   type ClientDbWorker,
   type NativeChannel,
 } from '@tomic/react';
-import { enableEmbedMode } from '../helpers/embedMode';
+import {
+  enableEmbedMode,
+  setHostColorScheme,
+  type HostColorScheme,
+} from '../helpers/embedMode';
 import { Providers } from '../Providers';
 import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
@@ -92,6 +96,7 @@ declare global {
       openMenu(): void;
       back(): boolean;
       flush(leaving?: boolean): Promise<void>;
+      setColorScheme(scheme: HostColorScheme | undefined): void;
     };
   }
 }
@@ -280,6 +285,10 @@ window.atomicEmbed = {
     history.back();
 
     return true;
+  },
+  /** The app's own light/dark mode; "Auto" in the settings follows it. */
+  setColorScheme(scheme) {
+    setHostColorScheme(scheme);
   },
   openMenu() {
     window.dispatchEvent(new Event('atomic-embed-menu'));
