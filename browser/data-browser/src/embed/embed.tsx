@@ -50,6 +50,28 @@ import { createMockHost } from './mockHost';
 
 enableEmbedMode();
 
+// The app already lays the page out inside the system bars, but the web view
+// still reports their size as `env(safe-area-inset-*)`, so the page would leave
+// that room empty a second time (the canvas toolbar floated 50px above the
+// bottom bar). Nothing here is edge to edge: the insets are zero.
+const withoutInsets = (css: string) =>
+  css.replace(/env\(\s*safe-area-inset-[a-z]+\s*(?:,[^)]*)?\)/g, '0px');
+const insertRule = CSSStyleSheet.prototype.insertRule;
+
+CSSStyleSheet.prototype.insertRule = function (rule, index) {
+  return insertRule.call(this, withoutInsets(rule), index);
+};
+
+new MutationObserver(records => {
+  for (const record of records) {
+    for (const node of record.addedNodes) {
+      if (node instanceof HTMLStyleElement && node.textContent) {
+        node.textContent = withoutInsets(node.textContent);
+      }
+    }
+  }
+}).observe(document.head, { childList: true });
+
 declare global {
   interface Window {
     /** Set by the Flutter host: how the page calls Rust. */
