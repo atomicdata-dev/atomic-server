@@ -402,21 +402,6 @@ export async function putVaultKeyEnvelope(
   });
 }
 
-/**
- * Fetch this drive's wrapped vault key, or null if none was ever stored.
- *
- * `204` rather than `404` when absent, so a caller can tell "no key yet" from
- * "no such drive" — the first is a drive that has never been backed up, the
- * second is a mistake.
- */
-export async function getVaultKeyEnvelope(
-  drivePseudonym: string,
-): Promise<string | null> {
-  const record = await getVaultKeyEnvelopeRecord(drivePseudonym);
-
-  return record?.envelope ?? null;
-}
-
 /** A drive key in hand, and the epoch its envelope wrapped it at. */
 export type DriveKeyHandle = {
   driveKey: Uint8Array;

@@ -102,30 +102,11 @@ export function VaultStorage({
     showDialog();
   }, []);
 
-  async function free(includeUndoWindow: boolean) {
-    setWorking(true);
-    setMessage(null);
-    setError(null);
-
-    try {
-      const result = await freeUpVaultStorage(
-        drivePseudonym,
-        includeUndoWindow,
-      );
-
-      setMessage(
-        result.bytes_reclaimed > 0
-          ? `Freed ${formatBytes(result.bytes_reclaimed)}.`
-          : 'Nothing to free.',
-      );
-      await load();
-      onChanged?.();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not free storage.');
-    } finally {
-      setWorking(false);
-    }
-  }
+  const free = (includeUndoWindow: boolean) =>
+    manage(
+      () => freeUpVaultStorage(drivePseudonym, includeUndoWindow),
+      'Could not free storage.',
+    );
 
   /** Remove one device's history or one snapshot, report it, refresh usage. */
   async function manage(
