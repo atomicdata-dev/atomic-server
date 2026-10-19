@@ -562,7 +562,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Save this secret — it\'s the only way to recover your account on another device.',
+                'Save this secret: it is the only way to sign in as you on another device.',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -618,7 +618,7 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
-          child: const Text('Continue to Atomic'),
+          child: const Text('Continue'),
         ),
       ],
     );
