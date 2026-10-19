@@ -68,6 +68,22 @@ Each step ships on its own and has a test that fails without it.
   `EmbedServer.assetRoot`. `AppColors` moved to `atomic_flutter`. Tests moved
   with the code (`packages/atomic_chat/test`, on fakes); CI runs both packages
   (`atomic-flutter.yml`).
+- [x] **0c. More from the bottom bar.** A reusable `HoldFan` (tap = default,
+  touch-and-hold-drag = a fan of choices, after the canvas fans;
+  `packages/atomic_flutter`) on New (AI chat, AI voice, Document, Other) and
+  Search (all drives, the four drives used last, More…). New document is
+  native: `NewDocumentSheet` → `AssistantApi.createResource` →
+  `create_resource_of_class` (bridge) → `atomic_lib::host::create` (a
+  `DocumentV2` needs only class, name and parent, as the web's basic "New"
+  handler makes it; the editor writes the Loro content on first edit), then
+  the web renderer. Other opens the embed's `/app/new?parentSubject=<drive>`.
+  AI voice is `ChatScreen(voiceMode: true)`, a turn-by-turn loop (listen →
+  send → speak → listen) on the existing speech engines; `/ai/live` stays out.
+  The bar shows the current page and never opens one twice (`ShellPage`
+  route names, `ShellController.open`). Tests: `hold_fan_test.dart`,
+  `bottom_bar_test.dart`, `host::create`, the bridge's
+  `a_document_created_here_…`. Not yet seen on a phone (haptics, fan
+  geometry under a real thumb, TTS completion before listening again).
 - [x] **1. Commit transport and flush.** Store option `commitTransport`,
   `canCommit` for write-side checks, `atomicEmbed.flush()` and the Dart handshake
   before leaving a page. A keystroke now travels: loro-prosemirror commits the
