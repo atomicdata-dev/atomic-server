@@ -349,8 +349,9 @@ class _ResourceViewState extends State<ResourceView>
   /// Recents, so it gets the drive the page is shown in.
   List<Object?> _withDrive(String method, Object? args) {
     final list = args is List ? List<Object?>.of(args) : <Object?>[];
-    if (method == 'opened')
+    if (method == 'opened') {
       return [list.isEmpty ? '' : list.first, widget.drive];
+    }
     return list;
   }
 
