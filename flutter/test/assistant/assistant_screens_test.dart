@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
 
@@ -1543,8 +1544,7 @@ void main() {
     double x(WidgetTester tester, String tip) =>
         tester.getCenter(find.byTooltip(tip)).dx;
 
-    testWidgets('the bar steps aside for the keyboard, no gap above it',
-        (tester) async {
+    Future<void> pumpFieldShell(WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -1562,18 +1562,56 @@ void main() {
         ),
       )));
       await tester.pumpAndSettle();
-      expect(find.byType(AppBottomBar), findsOneWidget);
+    }
+
+    double fieldBottom(WidgetTester tester) =>
+        tester.getBottomLeft(find.byKey(const Key('bottom-field'))).dy;
+
+    testWidgets('the keyboard covers the bar; the page ends on the keyboard',
+        (tester) async {
+      await pumpFieldShell(tester);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      final bar = find.byType(AppBottomBar);
+      expect(bar, findsOneWidget);
+      final barH = tester.getSize(bar).height;
+      expect(fieldBottom(tester), closeTo(screen.height - barH, 0.5));
 
       tester.view.viewInsets = const FakeViewPadding(bottom: 900);
       await tester.pumpAndSettle();
-      expect(find.byType(AppBottomBar), findsNothing);
-      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-      final field = tester.getBottomLeft(find.byKey(const Key('bottom-field')));
-      expect(field.dy, closeTo(screen.height - 300, 0.5));
+      expect(bar, findsOneWidget);
+      expect(fieldBottom(tester), closeTo(screen.height - 300, 0.5));
+
+      // Smaller than the bar: the field must not move below the bar.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 120);
+      await tester.pumpAndSettle();
+      expect(fieldBottom(tester), closeTo(screen.height - barH, 0.5));
 
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
-      expect(find.byType(AppBottomBar), findsOneWidget);
+      expect(fieldBottom(tester), closeTo(screen.height - barH, 0.5));
+    });
+
+    testWidgets('closing the keyboard moves the page and the bar together',
+        (tester) async {
+      await pumpFieldShell(tester);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      final bar = find.byType(AppBottomBar);
+      final barTop = tester.getTopLeft(bar);
+      final barSize = tester.getSize(bar);
+      final barH = barSize.height;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      await tester.pumpAndSettle();
+
+      for (final kb in [300.0, 200.0, 100.0, 40.0, 0.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: kb * 3);
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(fieldBottom(tester),
+            closeTo(screen.height - math.max(kb, barH), 0.5),
+            reason: 'keyboard $kb');
+        expect(tester.getTopLeft(bar), barTop);
+        expect(tester.getSize(bar), barSize);
+      }
+      expect(tester.hasRunningAnimations, isFalse);
     });
 
     testWidgets('the bar stays put while a page slides in', (tester) async {
@@ -1827,6 +1865,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
       expect(builds, before);
+      // Closing it in steps does not rebuild the covered page either.
+      for (var b = 450.0; b >= 0; b -= 50) {
+        tester.view.viewInsets = FakeViewPadding(bottom: b);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(builds, before);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 500);
+      await tester.pump();
       // The page on top does follow it.
       expect(find.byType(SearchScreen), findsOneWidget);
 
@@ -1857,28 +1903,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsNothing);
       expect(find.byType(ChatsScreen), findsOneWidget);
-    });
-
-    testWidgets('the bar hides at once with the keyboard and fades back in',
-        (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
-      await tester.pumpAndSettle();
-      addTearDown(tester.view.resetViewInsets);
-      expect(find.byTooltip('Search'), findsOneWidget);
-
-      tester.view.viewInsets = const FakeViewPadding(bottom: 10);
-      await tester.pump();
-      expect(find.byTooltip('Search'), findsNothing);
-      expect(tester.hasRunningAnimations, isFalse);
-
-      // It comes back by growing and fading in, not by popping up.
-      tester.view.resetViewInsets();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(tester.hasRunningAnimations, isTrue);
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.byTooltip('Search'), findsOneWidget);
     });
 
     testWidgets(

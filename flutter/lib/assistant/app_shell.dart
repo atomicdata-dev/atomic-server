@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../widgets/covered_insets_freeze.dart';
@@ -155,11 +159,15 @@ class _AppShellState extends State<AppShell> {
     ),
   );
 
-  late final Widget _bar = AppBottomBar(api: widget.api, shell: _shell);
+  final ValueNotifier<double> _barHeight = ValueNotifier(0);
+
+  late final Widget _bar =
+      _FrozenBottomPadding(child: AppBottomBar(api: widget.api, shell: _shell));
 
   @override
   void dispose() {
     _shell.dispose();
+    _barHeight.dispose();
     super.dispose();
   }
 
@@ -171,82 +179,111 @@ class _AppShellState extends State<AppShell> {
       child: NavigatorPopHandler(
         onPopWithResult: (_) => _shell.navigatorKey.currentState?.maybePop(),
         child: Column(children: [
-          // The bar below takes the system inset; the pages must not reserve
-          // it a second time.
-          Expanded(child: _PagesInset(child: _navigator)),
-          _BarSlot(child: _bar),
+          // The bar stays laid out at full height; the keyboard covers it and
+          // the pages get the keyboard minus the bar's height.
+          Expanded(
+              child: _PagesInset(barHeight: _barHeight, child: _navigator)),
+          _MeasureHeight(height: _barHeight, child: _bar),
         ]),
       ),
     );
   }
 }
 
-/// Removes the bottom system inset from the pages. It follows MediaQuery, so
-/// it is kept this small; its child is stable.
+/// The pages' region ends above the bar, but the keyboard is drawn over the
+/// bar, not above it. So the pages must see the keyboard minus the bar's
+/// height: their bodies then end exactly at the keyboard's top, and the keyboard
+/// and the bar move together with nothing else animating. The bar's own system
+/// inset is not the pages' business either. Only this widget follows
+/// MediaQuery; its child is stable.
 class _PagesInset extends StatelessWidget {
+  final ValueListenable<double> barHeight;
   final Widget child;
 
-  const _PagesInset({required this.child});
-
-  @override
-  Widget build(BuildContext context) => MediaQuery.removePadding(
-      context: context, removeBottom: true, child: child);
-}
-
-/// The keyboard overlays the screen and every page's Scaffold shrinks its body
-/// by the full keyboard height. With the bar still below the pages they would
-/// shrink by the bar's height too much (a gap above the keyboard). So the bar
-/// steps aside, at once and without animating, while the keyboard is open: the
-/// page region then ends at the screen bottom and its insets are exact, and
-/// only the keyboard animates the layout. Only this widget reads the insets.
-class _BarSlot extends StatefulWidget {
-  final Widget child;
-
-  const _BarSlot({required this.child});
-
-  @override
-  State<_BarSlot> createState() => _BarSlotState();
-}
-
-class _BarSlotState extends State<_BarSlot>
-    with SingleTickerProviderStateMixin {
-  /// 0 = hidden (keyboard open), 1 = shown. Hiding is at once; coming back
-  /// grows and fades in, so the bar does not pop up when the keyboard is gone.
-  late final AnimationController _shown = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 220))
-    ..value = 1;
-
-  @override
-  void dispose() {
-    _shown.dispose();
-    super.dispose();
-  }
+  const _PagesInset({required this.barHeight, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    if (keyboardOpen) {
-      _shown.value = 0;
-    } else if (_shown.value == 0 && !_shown.isAnimating) {
-      _shown.forward();
-    }
-    return AnimatedBuilder(
-      animation: _shown,
-      child: widget.child,
-      builder: (context, child) {
-        final t = Curves.easeOutCubic.transform(_shown.value);
-        return Offstage(
-          offstage: keyboardOpen || _shown.value == 0,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              heightFactor: t,
-              child: Opacity(opacity: t, child: child),
-            ),
-          ),
-        );
-      },
+    final media = MediaQuery.of(context);
+    return ValueListenableBuilder<double>(
+      valueListenable: barHeight,
+      child: child,
+      builder: (context, bar, child) => MediaQuery(
+        data: media.copyWith(
+          padding: media.padding.copyWith(bottom: 0),
+          viewPadding: media.viewPadding.copyWith(bottom: 0),
+          viewInsets: media.viewInsets
+              .copyWith(bottom: math.max(0, media.viewInsets.bottom - bar)),
+        ),
+        child: child!,
+      ),
     );
+  }
+}
+
+/// Gives the bar a bottom system inset that does not shrink while the keyboard
+/// animates (on Android `padding.bottom` drops to 0 with the keyboard, which
+/// would resize the bar mid-animation). It remembers the largest one seen, and
+/// forgets it when the orientation changes.
+class _FrozenBottomPadding extends StatefulWidget {
+  final Widget child;
+
+  const _FrozenBottomPadding({required this.child});
+
+  @override
+  State<_FrozenBottomPadding> createState() => _FrozenBottomPaddingState();
+}
+
+class _FrozenBottomPaddingState extends State<_FrozenBottomPadding> {
+  double _bottom = 0;
+  Orientation? _orientation;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    if (media.orientation != _orientation) {
+      _orientation = media.orientation;
+      _bottom = 0;
+    }
+    _bottom = math.max(_bottom, math.max(media.padding.bottom, 0));
+    return MediaQuery(
+      data: media.copyWith(padding: media.padding.copyWith(bottom: _bottom)),
+      child: widget.child,
+    );
+  }
+}
+
+/// Reports the height of its child after layout, without a layout loop: the
+/// notifier is written in a post-frame callback and only when it changed.
+class _MeasureHeight extends SingleChildRenderObjectWidget {
+  final ValueNotifier<double> height;
+
+  const _MeasureHeight({required this.height, required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMeasureHeight(height);
+
+  @override
+  void updateRenderObject(
+      BuildContext context, _RenderMeasureHeight renderObject) {
+    renderObject.height = height;
+  }
+}
+
+class _RenderMeasureHeight extends RenderProxyBox {
+  ValueNotifier<double> height;
+
+  _RenderMeasureHeight(this.height);
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final h = size.height;
+    if (h == height.value) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (attached && height.value != h) height.value = h;
+    });
   }
 }
 
