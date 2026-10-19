@@ -148,6 +148,8 @@ it('renders the full page outside the embed', () => {
 
   expect(screen.getByLabelText('Integration')).toBeTruthy();
   expect(screen.getByLabelText('Panels & Templates')).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+  expect(screen.getByLabelText('Search settings')).toBeTruthy();
   expect(screen.getByText('NavBar position')).toBeTruthy();
 });
 
@@ -168,6 +170,9 @@ it('renders only Appearance, without the chrome options, in the embed', () => {
   expect(screen.queryByText('NavBar position')).toBeNull();
   expect(screen.queryByText('Colorful mode')).toBeNull();
   expect(screen.queryByText('Show Messages panel')).toBeNull();
+  // The app's top bar has the title; one section needs no search.
+  expect(screen.queryByRole('heading', { name: 'Settings' })).toBeNull();
+  expect(screen.queryByLabelText('Search settings')).toBeNull();
 });
 
 it('turns the web AI off in the embed only', () => {

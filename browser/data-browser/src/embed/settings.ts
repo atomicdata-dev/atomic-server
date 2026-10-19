@@ -72,3 +72,13 @@ export function showMeetingStart(embedded: boolean = isEmbedded()): boolean {
 export function showWebAI(embedded: boolean = isEmbedded()): boolean {
   return !embedded;
 }
+
+/**
+ * Does the settings page show its own "Settings" heading and search field?
+ * Not in the embed: the app's top bar already says "Settings", and a search
+ * over the one section left is a field with nothing to find. The section
+ * starts open there instead.
+ */
+export function showSettingsHeader(embedded: boolean = isEmbedded()): boolean {
+  return !embedded;
+}

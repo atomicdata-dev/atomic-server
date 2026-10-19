@@ -28,7 +28,11 @@ import {
 import { presetColors } from '../styling';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { FaMagnifyingGlass, FaXmark } from 'react-icons/fa6';
-import { showAppearanceOption, showSettingsSection } from '../embed/settings';
+import {
+  showAppearanceOption,
+  showSettingsHeader,
+  showSettingsSection,
+} from '../embed/settings';
 
 /** Touch screens: focusing a field there raises the keyboard. */
 const isTouchDevice = () =>
@@ -97,37 +101,43 @@ const AppSettings: React.FunctionComponent = () => {
     [searchQuery],
   );
 
+  const header = showSettingsHeader();
+
   return (
     <Main>
       <ContainerNarrow>
-        <h1>Settings</h1>
-        <SettingsSearchWrapper hasPrefix>
-          <FaMagnifyingGlass />
-          <InputStyled
-            type='text'
-            placeholder='Search settings...'
-            aria-label='Search settings'
-            // Ready to type on arrival. Not on touch screens, where focusing
-            // pops the keyboard over the settings you came to look at.
-            autoFocus={!isTouchDevice()}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <ClearButton
-              type='button'
-              onClick={() => setSearchQuery('')}
-              title='Clear search'
-            >
-              <FaXmark />
-            </ClearButton>
-          )}
-        </SettingsSearchWrapper>
+        {header && <h1>Settings</h1>}
+        {header && (
+          <SettingsSearchWrapper hasPrefix>
+            <FaMagnifyingGlass />
+            <InputStyled
+              type='text'
+              placeholder='Search settings...'
+              aria-label='Search settings'
+              // Ready to type on arrival. Not on touch screens, where focusing
+              // pops the keyboard over the settings you came to look at.
+              autoFocus={!isTouchDevice()}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <ClearButton
+                type='button'
+                onClick={() => setSearchQuery('')}
+                title='Clear search'
+              >
+                <FaXmark />
+              </ClearButton>
+            )}
+          </SettingsSearchWrapper>
+        )}
         <SettingsSearchProvider value={searchContext}>
           <SettingsGroup>
             {showSettingsSection('appearance') && (
               <SettingsSection
                 label='Appearance'
+                // The only section in the embed: open from the start.
+                {...(header ? {} : { open: true, initialState: true })}
                 childSearchKeywords='language locale panels messages favorites shared with me templates ontology aichats hide templates'
               >
                 <Column gap='1rem'>
