@@ -4,11 +4,11 @@ import '../atomic/atomic_client.dart';
 import '../screens/sync_screen.dart';
 import '../theme.dart';
 import '../widgets/slide_back_route.dart';
-import 'app_bottom_bar.dart';
+import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
-import 'resource_view.dart';
+import 'native_views.dart';
 
 /// Items per section on the home; the rest is behind "Show all".
 const _homeItems = 4;
@@ -56,6 +56,21 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
+  ShellController? _shell;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _shell = ShellScope.maybeOf(context);
+    // The profile button of the shell signs out through the home.
+    _shell?.onUser = _settings;
+  }
+
+  @override
+  void dispose() {
+    if (_shell?.onUser == _settings) _shell?.onUser = null;
+    super.dispose();
+  }
 
   /// The agent's drives; when there are none (not synced yet) just the one
   /// the app opened on.
@@ -65,6 +80,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
         : drives.first.subject;
+    if (mounted) _shell?.drive.value = _drive;
     return drives;
   }
 
@@ -97,10 +113,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Future<void> _settings() async {
-    final signedOut = await Navigator.of(context).push<bool>(
-          MaterialPageRoute<bool>(builder: (_) => const SyncScreen()),
-        ) ??
-        false;
+    final signedOut =
+        await Navigator.of(context, rootNavigator: true).push<bool>(
+              MaterialPageRoute<bool>(builder: (_) => const SyncScreen()),
+            ) ??
+            false;
     if (signedOut) {
       widget.onSignOut?.call();
     } else {
@@ -119,8 +136,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   void _openResource(String drive, RecentResource r) {
     widget.api.noteOpened(drive, r.subject);
-    _push(ResourceView(
-        api: widget.api, drive: drive, subject: r.subject, title: r.title));
+    _push(openResourceView(
+        api: widget.api,
+        drive: drive,
+        subject: r.subject,
+        title: r.title,
+        className: r.className));
   }
 
   Widget _driveRow(DriveInfo d) => ResourceRow(
@@ -128,7 +149,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         title: d.name.isEmpty ? 'Untitled drive' : d.name,
         // The drive itself, drawn by the page: everything in it, read from
         // the store with the same query the web app uses.
-        onTap: () => _push(ResourceView(
+        onTap: () => _push(openResourceView(
             api: widget.api,
             drive: d.subject,
             subject: d.subject,
@@ -157,11 +178,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
             ? null
             : () {
                 widget.api.noteOpened(a.drive, a.subject);
-                _push(ResourceView(
+                _push(openResourceView(
                     api: widget.api,
                     drive: a.drive,
                     subject: a.subject,
-                    title: a.name));
+                    title: a.name,
+                    className: a.className));
               },
       );
 
@@ -171,7 +193,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
     return FutureBuilder<List<DriveInfo>>(
       future: _drives,
       builder: (context, snapshot) {
-        final drives = snapshot.data;
         return Scaffold(
           backgroundColor: c.bgBody,
           appBar: AppBar(
@@ -185,14 +206,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
             ],
           ),
-          bottomNavigationBar: drives == null
-              ? null
-              : AppBottomBar(
-                  api: widget.api,
-                  drive: _drive,
-                  onUser: _settings,
-                  onPush: _push,
-                ),
           body: ListView(
             children: [
               _Section<DriveInfo>(

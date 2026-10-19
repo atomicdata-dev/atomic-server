@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:atomiccanvas_flutter/assistant/app_bottom_bar.dart';
+import 'package:atomiccanvas_flutter/assistant/app_shell.dart';
 import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
+import 'package:atomiccanvas_flutter/assistant/native_views.dart';
 import 'package:atomiccanvas_flutter/assistant/hosted_ai.dart';
 import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
@@ -108,6 +111,11 @@ Widget app(Widget home, {Brightness brightness = Brightness.light}) =>
       home: home,
     );
 
+/// The home in the app shell: the static bottom bar is there.
+Widget shellApp(ChatsScreen home, {Brightness brightness = Brightness.light}) =>
+    app(AppShell(api: home.api, drive: home.drive, home: home),
+        brightness: brightness);
+
 void main() {
   group('ChatsScreen', () {
     testWidgets('lists the chats and opens one', (tester) async {
@@ -145,7 +153,7 @@ void main() {
 
     testWidgets('reaches the canvas gallery and the search', (tester) async {
       var gallery = 0;
-      await tester.pumpWidget(app(
+      await tester.pumpWidget(shellApp(
         ChatsScreen(
             drive: 'did:ad:drive',
             api: FakeApi(),
@@ -378,7 +386,7 @@ void main() {
     testWidgets(
         'the bottom bar is one row: search, new chat, profile, settings',
         (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
+      await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
@@ -386,18 +394,20 @@ void main() {
       for (final t in tips) {
         expect(find.byTooltip(t), findsOneWidget);
       }
-      for (final t in ['Notifications', 'Sync']) {
+      for (final t in ['Notifications', 'Sync', 'Back', 'More']) {
         expect(find.byTooltip(t), findsNothing);
       }
       final ys = [for (final t in tips) tester.getCenter(find.byTooltip(t)).dy];
       expect(ys.every((y) => (y - ys.first).abs() < 1), isTrue);
+      final xs = [for (final t in tips) tester.getCenter(find.byTooltip(t)).dx];
+      expect(xs, orderedEquals([...xs]..sort()));
       final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
       expect(ys.first, greaterThan(screen.height * 0.7));
       expect(find.byIcon(Icons.person_outline), findsOneWidget);
     });
 
     testWidgets('Search opens the search screen', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
+      await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Search'));
@@ -406,7 +416,7 @@ void main() {
     });
 
     testWidgets('New chat opens a chat', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
+      await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('New chat'));
@@ -416,7 +426,7 @@ void main() {
 
     testWidgets('Settings opens the settings page', (tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.pumpWidget(app(ChatsScreen(
+      await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));
@@ -752,7 +762,7 @@ void main() {
     });
 
     testWidgets('a new chat can be started from the home', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
+      await tester.pumpWidget(shellApp(ChatsScreen(
           drive: 'did:ad:drive',
           api: FakeApi(ai: ai()),
           onOpenGallery: () {})));
@@ -762,6 +772,137 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);
+    });
+  });
+
+  group('native views', () {
+    testWidgets('an ai-chat opens the chat, anything else the web view',
+        (tester) async {
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      final api = FakeApi();
+      Widget open(String className) => openResourceView(
+          api: api,
+          drive: 'did:ad:drive',
+          subject: 'did:ad:x',
+          title: 'X',
+          className: className);
+
+      await tester.pumpWidget(app(open('ai-chat')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+      expect(find.byType(ResourceView), findsNothing);
+
+      await tester.pumpWidget(app(open('Document')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(find.byType(ChatScreen), findsNothing);
+
+      await tester.pumpWidget(app(open('')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+    });
+  });
+
+  group('AppShell', () {
+    const doc =
+        (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1);
+
+    Future<void> pumpHome(WidgetTester tester) async {
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.pumpWidget(shellApp(ChatsScreen(
+          drive: 'did:ad:drive',
+          api: FakeApi(recent: [doc]),
+          onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+    }
+
+    double x(WidgetTester tester, String tip) =>
+        tester.getCenter(find.byTooltip(tip)).dx;
+
+    testWidgets('the bar stays put while a page slides in', (tester) async {
+      await pumpHome(tester);
+      final bar = find.byType(AppBottomBar);
+      final before = tester.getTopLeft(bar);
+      final element = tester.element(bar);
+
+      await tester.tap(find.text('A doc'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      // Mid-transition: the page is moving, the bar is not.
+      expect(tester.getTopLeft(bar), before);
+      expect(tester.element(bar), same(element));
+      expect(tester.getTopLeft(find.byType(ResourceView)).dx, greaterThan(0));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(bar), before);
+      expect(tester.element(bar), same(element));
+    });
+
+    testWidgets('buttons keep their order: search, new chat, profile, last',
+        (tester) async {
+      await pumpHome(tester);
+      expect(x(tester, 'Search'), lessThan(x(tester, 'New chat')));
+      expect(x(tester, 'New chat'), lessThan(x(tester, 'Profile')));
+      expect(x(tester, 'Profile'), lessThan(x(tester, 'Settings')));
+      final xs = [
+        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+      ];
+
+      await tester.tap(find.text('A doc'));
+      await tester.pumpAndSettle();
+      expect(x(tester, 'Profile'), lessThan(x(tester, 'More')));
+      expect([
+        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+      ], xs);
+    });
+
+    testWidgets('the last button follows the page on top', (tester) async {
+      await pumpHome(tester);
+      expect(find.byTooltip('Settings'), findsOneWidget);
+      expect(find.byTooltip('More'), findsNothing);
+
+      await tester.tap(find.text('A doc'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(find.byTooltip('More'), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsNothing);
+
+      // Another page over the resource: no menu of its own, so Settings.
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsOneWidget);
+      expect(find.byTooltip('More'), findsNothing);
+
+      // Back to the resource: its menu is the active one again.
+      tester.state<NavigatorState>(find.byType(Navigator).last).pop();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('More'), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsNothing);
+
+      // And back to the home.
+      tester.state<NavigatorState>(find.byType(Navigator).last).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsNothing);
+      expect(find.byTooltip('Settings'), findsOneWidget);
+      expect(find.byTooltip('More'), findsNothing);
+    });
+
+    testWidgets('a settings page has no menu: the bar keeps Settings',
+        (tester) async {
+      await pumpHome(tester);
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsOneWidget);
+      expect(find.byTooltip('More'), findsNothing);
+    });
+
+    testWidgets('there is no Back button anywhere', (tester) async {
+      await pumpHome(tester);
+      expect(find.byTooltip('Back'), findsNothing);
+      await tester.tap(find.text('A doc'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back'), findsNothing);
     });
   });
 

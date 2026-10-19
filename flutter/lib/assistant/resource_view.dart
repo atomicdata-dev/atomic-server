@@ -9,7 +9,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
-import 'app_bottom_bar.dart';
+import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
 
@@ -54,11 +54,17 @@ class _ResourceViewState extends State<ResourceView> {
   Object? _error;
   final _clock = Stopwatch()..start();
   bool _firstRead = true;
+  ShellController? _shell;
+  Route<dynamic>? _route;
 
   @override
   void initState() {
     super.initState();
     _start();
+    // The route is known once this is in the tree.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _registerMenu();
+    });
   }
 
   Future<void> _start() async {
@@ -92,6 +98,29 @@ class _ResourceViewState extends State<ResourceView> {
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }
+  }
+
+  /// The bar's last button becomes this resource's "more" menu (the web app's
+  /// navbar menu, drawn by the page) while this page is the one on top. A
+  /// `path` page (settings) has no resource and no menu.
+  void _registerMenu() {
+    if (widget.path != null) return;
+    final shell = ShellScope.maybeOf(context);
+    final route = ModalRoute.of(context);
+    if (shell == null || route == null) return;
+    _shell = shell;
+    _route = route;
+    // Until the page has loaded there is nothing to open: the tap does
+    // nothing.
+    shell.registerMenu(route,
+        () => _controller?.runJavaScript('window.atomicEmbed?.openMenu()'));
+  }
+
+  @override
+  void dispose() {
+    final route = _route;
+    if (route != null) _shell?.unregisterMenu(route);
+    super.dispose();
   }
 
   /// A call from the page: `{id, method, args}`. Answered with
@@ -168,17 +197,6 @@ class _ResourceViewState extends State<ResourceView> {
                           child: _EdgeStrip(),
                         ),
                       ]),
-          ),
-          // The same bar as everywhere; "more" is the page's own resource menu
-          // (the web app's navbar menu, drawn by the page).
-          bottomNavigationBar: AppBottomBar(
-            api: widget.api,
-            drive: widget.drive,
-            onBack: _back,
-            onMore: controller == null
-                ? null
-                : () =>
-                    controller.runJavaScript('window.atomicEmbed?.openMenu()'),
           ),
         ));
   }

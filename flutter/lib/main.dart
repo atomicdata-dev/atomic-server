@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
+import 'assistant/app_shell.dart';
 import 'assistant/chats_screen.dart';
 import 'canvas/infinite_canvas.dart';
 import 'gallery/canvas_store.dart';
@@ -304,10 +305,13 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
       home: !_loggedIn
           ? LoginScreen(onLoggedIn: _onLoggedIn)
           : _openCanvas == null && !_showGallery
-              ? ChatsScreen(
+              ? AppShell(
                   drive: AtomicClient.getActiveDrive() ?? '',
-                  onOpenGallery: () => setState(() => _showGallery = true),
-                  onSignOut: _signedOut,
+                  home: ChatsScreen(
+                    drive: AtomicClient.getActiveDrive() ?? '',
+                    onOpenGallery: () => setState(() => _showGallery = true),
+                    onSignOut: _signedOut,
+                  ),
                 )
               : !_store.isLoaded
                   ? Scaffold(
