@@ -238,6 +238,24 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     );
   }
 
+  /// The raw id is long and unreadable, so it is not shown: a compact button
+  /// copies it (the tooltip and long-press show it).
+  Widget _copyIdButton(String id, String label) => Tooltip(
+        message: id,
+        child: TextButton.icon(
+          onPressed: () => _copy(id, 'ID'),
+          icon: const Icon(Icons.copy, size: 14),
+          label: const Text('Copy ID'),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            minimumSize: const Size(0, 28),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: const TextStyle(fontSize: 12),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -424,28 +442,17 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
 
     return [
       const SizedBox(height: 6),
-      if (_info.version != null)
-        Text('atomic-server ${_info.version}', style: labelStyle)
-      else
-        Text('Not reachable', style: labelStyle.copyWith(color: Colors.orange)),
-      if (_info.nodeId != null) ...[
-        const SizedBox(height: 4),
-        InkWell(
-          onTap: () => _copy(_info.nodeId!, 'Node ID'),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _info.nodeId!,
-                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(Icons.copy, size: 12, color: scheme.onSurfaceVariant),
-            ],
+      Row(
+        children: [
+          Expanded(
+            child: _info.version != null
+                ? Text('atomic-server ${_info.version}', style: labelStyle)
+                : Text('Not reachable',
+                    style: labelStyle.copyWith(color: Colors.orange)),
           ),
-        ),
-      ],
+          if (_info.nodeId != null) _copyIdButton(_info.nodeId!, 'Node ID'),
+        ],
+      ),
       if (_usage != null) ...[
         const SizedBox(height: 6),
         Text(
@@ -532,31 +539,19 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
               ),
             ],
           ),
-          if (nodeId.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            InkWell(
-              onTap: () => _copy(nodeId, 'Device ID'),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      nodeId,
-                      style: const TextStyle(
-                          fontSize: 10, fontFamily: 'monospace'),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.copy, size: 12, color: scheme.onSurfaceVariant),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 4),
-          Text(
-            lastSynced != null
-                ? 'Last synced ${_relativeTime(lastSynced)}'
-                : 'Not synced yet',
-            style: labelStyle,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  lastSynced != null
+                      ? 'Last synced ${_relativeTime(lastSynced)}'
+                      : 'Not synced yet',
+                  style: labelStyle,
+                ),
+              ),
+              if (nodeId.isNotEmpty) _copyIdButton(nodeId, 'Device ID'),
+            ],
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Servers extends AtomicServerBackend {
@@ -92,5 +93,30 @@ void main() {
 
     expect(find.text('node1.example.org'), findsOneWidget);
     expect(find.text('Mac.home'), findsOneWidget);
+  });
+
+  testWidgets('a paired device hides its raw id behind a Copy ID button',
+      (tester) async {
+    final id = 'bb' * 32;
+    String? copied;
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await _pump(tester, [
+      {'node_id': id, 'name': 'Mac.home', 'last_synced': ''},
+    ]);
+
+    expect(find.text(id), findsNothing);
+    expect(find.text('Not synced yet'), findsOneWidget);
+    await tester.tap(find.text('Copy ID'));
+    await tester.pump();
+    expect(copied, id);
+    expect(find.text('ID copied'), findsOneWidget);
   });
 }
