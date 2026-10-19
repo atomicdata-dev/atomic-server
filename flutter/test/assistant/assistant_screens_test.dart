@@ -127,7 +127,7 @@ void main() {
       await tester.tap(find.byTooltip('Canvases'));
       expect(gallery, 1);
 
-      await tester.tap(find.byType(TextField));
+      await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       expect(find.byType(SearchScreen), findsOneWidget);
     });
@@ -195,7 +195,6 @@ void main() {
       expect(y('Second b'), lessThan(y('Mid b')));
       expect(y('Mid b'), lessThan(y('Old a')));
       expect(find.text('Oldest b'), findsNothing);
-      expect(find.text('Search in Alpha'), findsOneWidget);
 
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Second b'));
@@ -224,80 +223,55 @@ void main() {
       expect(page.drive, 'did:ad:a');
     });
 
-    testWidgets('the icon row has profile, notifications, sync, settings',
+    testWidgets(
+        'the bottom bar is one row: search, new chat, profile, settings',
         (tester) async {
       await tester.pumpWidget(app(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
-      expect(find.text('J'), findsOneWidget);
-      for (final t in ['Profile', 'Notifications', 'Sync', 'Settings']) {
+      expect(find.byType(TextField), findsNothing);
+      final tips = ['Search', 'New chat', 'Profile', 'Settings'];
+      for (final t in tips) {
         expect(find.byTooltip(t), findsOneWidget);
       }
-      expect(find.byTooltip('Your agent and sync'), findsNothing);
+      for (final t in ['Notifications', 'Sync']) {
+        expect(find.byTooltip(t), findsNothing);
+      }
+      final ys = [for (final t in tips) tester.getCenter(find.byTooltip(t)).dy];
+      expect(ys.every((y) => (y - ys.first).abs() < 1), isTrue);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(ys.first, greaterThan(screen.height * 0.7));
+      expect(find.text('J'), findsOneWidget);
     });
 
-    testWidgets('notifications and settings open the web pages',
-        (tester) async {
+    testWidgets('Search opens the search screen', (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+    });
+
+    testWidgets('New chat opens a chat', (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New chat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+    });
+
+    testWidgets('Settings opens the settings page', (tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.pumpWidget(app(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Notifications'));
+      await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
       expect(tester.widget<ResourceView>(find.byType(ResourceView)).path,
-          '/app/notifications');
-    });
-
-    testWidgets('the drive card shows the drive and switches it',
-        (tester) async {
-      final api = FakeApi(driveList: [
-        (subject: 'did:ad:a', name: 'Alpha'),
-        (subject: 'did:ad:b', name: 'Beta'),
-      ]);
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
-      await tester.pumpAndSettle();
-      final card = find.ancestor(
-          of: find.byIcon(Icons.unfold_more), matching: find.byType(InkWell));
-      expect(find.descendant(of: card, matching: find.text('Alpha')), findsOne);
-      expect(find.text('Search in Alpha'), findsOneWidget);
-
-      await tester.tap(card);
-      await tester.pumpAndSettle();
-      final sheet = find.byType(BottomSheet);
-      expect(find.descendant(of: sheet, matching: find.text('Alpha')),
-          findsOneWidget);
-      await tester.tap(find.descendant(of: sheet, matching: find.text('Beta')));
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
-      expect(find.text('Search in Beta'), findsOneWidget);
-      expect(find.descendant(of: card, matching: find.text('Beta')), findsOne);
-    });
-
-    testWidgets('opens on the drive it is given', (tester) async {
-      final api = FakeApi(driveList: [
-        (subject: 'did:ad:a', name: 'Alpha'),
-        (subject: 'did:ad:b', name: 'Beta'),
-      ], recent: [
-        (subject: 'r', title: 'Doc', className: 'Document', openedAt: 1),
-      ]);
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:b', api: api, onOpenGallery: () {})));
-      await tester.pumpAndSettle();
-      expect(find.text('Search in Beta'), findsOneWidget);
-    });
-
-    testWidgets('search and new chat sit in one bar at the bottom',
-        (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
-      await tester.pumpAndSettle();
-      final search = tester.getTopLeft(find.byType(TextField));
-      final add = tester.getTopLeft(find.byTooltip('New chat'));
-      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-      expect(search.dy, greaterThan(screen.height * 0.7));
-      expect((search.dy - add.dy).abs(), lessThan(24));
+          '/app/settings');
     });
 
     testWidgets('shows the error when the chats cannot be read',
