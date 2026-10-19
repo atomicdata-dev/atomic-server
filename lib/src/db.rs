@@ -1627,11 +1627,28 @@ impl Db {
     /// If `drive_needs_sync` is true, the caller must sync with another device
     /// before the user can create resources — the drive's genesis commit is missing.
     pub async fn load_agent_from_secret(&self, secret: &str) -> AtomicResult<AgentLoadResult> {
-        let agent = crate::agents::Agent::from_secret(secret)?;
+        let mut agent = crate::agents::Agent::from_secret(secret)?;
+
+        // A secret carries no name (nor when the agent was made). Signing in
+        // again on the device that made the agent (every app start does) used
+        // to replace its stored resource with this nameless one, so the
+        // agent showed as "Someone" and the embedded page found no name.
+        // What the store already holds wins; the secret fills in the rest.
+        let stored = self.get_resource_shallow(&agent.subject).ok();
+        if agent.name.is_none() {
+            if let Some(Ok(Value::String(name))) = stored.as_ref().map(|r| r.get(urls::NAME)) {
+                agent.name = Some(name.clone());
+            }
+        }
         self.set_default_agent(agent.clone());
 
         // Persist so list_drives() can read the agent's `drives` property
-        let agent_resource = agent.to_resource()?;
+        let mut agent_resource = agent.to_resource()?;
+        if let Some(stored) = stored {
+            for (property, value) in stored.get_propvals().iter() {
+                agent_resource.set_unsafe(property.clone(), value.clone())?;
+            }
+        }
         self.add_resource_opts(&agent_resource, false, false, true)
             .await?;
 

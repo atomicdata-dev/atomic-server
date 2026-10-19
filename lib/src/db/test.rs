@@ -35,6 +35,25 @@ async fn synthetic_agent_reads_have_stable_history_without_persisting() {
 
 /// A profile stored under a padded spelling of the key answers for the
 /// canonical unpadded subject too, instead of an empty synthesized twin.
+/// The Flutter app signs in again with the saved secret on every start. The
+/// secret carries no name, and that used to overwrite the stored agent: a
+/// fresh account's own activity read "Someone created".
+#[tokio::test]
+async fn signing_in_again_with_the_secret_keeps_the_agents_name() {
+    let db = Db::init_redb(None).await.unwrap();
+    let (agent, drive) = db.setup("Tester").await.unwrap();
+    let secret = agent.build_secret().unwrap();
+
+    let loaded = db.load_agent_from_secret(&secret).await.unwrap();
+
+    assert_eq!(loaded.agent.name.as_deref(), Some("Tester"));
+    assert!(!loaded.drive_needs_sync);
+    let stored = db.get_resource(&agent.subject).await.unwrap();
+    assert_eq!(stored.get(urls::NAME).unwrap().to_string(), "Tester");
+    let home = stored.get(urls::PRIVATE_DRIVE).unwrap().to_string();
+    assert_eq!(Subject::from(home.as_str()), Subject::from(drive.as_str()));
+}
+
 #[tokio::test]
 async fn agent_profile_under_padded_key_answers_for_unpadded_subject() {
     let db = Db::init_temp("agent_padded_spelling").await.unwrap();
