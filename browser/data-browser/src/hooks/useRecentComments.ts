@@ -59,7 +59,7 @@ export function useRecentComments(
     let cancelled = false;
 
     void (async () => {
-      await collection.waitForReady();
+      await collection.waitForReady().catch(() => undefined);
       const count = Math.min(RECENT_COMMENT_THREADS, collection.totalMembers);
       const found = await Promise.all(
         Array.from({ length: count }, (_, i) =>

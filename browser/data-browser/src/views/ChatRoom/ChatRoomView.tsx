@@ -1261,7 +1261,13 @@ export function useChatMessages(
     let cancelled = false;
 
     const extractMembers = async () => {
-      await collection.waitForReady();
+      try {
+        await collection.waitForReady();
+      } catch {
+        // The page could not be fetched; the next refresh extracts again.
+        return;
+      }
+
       const count = collection.totalMembers;
       const members: string[] = [];
 

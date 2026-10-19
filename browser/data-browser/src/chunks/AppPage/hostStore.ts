@@ -1,6 +1,6 @@
 import { canViewAccess } from '@helpers/extensions/viewPolicy';
 import type { Store } from '@tomic/react';
-import type { ProxyHost } from '@helpers/proxyConnections';
+import { ProxyError, type ProxyHost } from '@helpers/proxyConnections';
 import { parseViewQuery, runViewQuery } from '@helpers/extensions/viewQuery';
 import { ViewChanges } from '@helpers/extensions/viewApply';
 import { parseViewSearch, runViewSearch } from '@helpers/extensions/viewSearch';
@@ -62,6 +62,25 @@ export interface HostReply {
   id: number | string;
   result?: unknown;
   error?: string;
+  /** The integration proxy's error code, when the failure came from it. */
+  errorCode?: string;
+  /** The integration proxy's HTTP status, when the failure came from it. */
+  errorStatus?: number;
+}
+
+/** A failed request's reply. The proxy's code and status ride along with the message. */
+export function errorReply(id: HostReply['id'], e: unknown): HostReply {
+  const reply: HostReply = {
+    id,
+    error: e instanceof Error ? e.message : String(e),
+  };
+
+  if (e instanceof ProxyError) {
+    if (e.code !== undefined) reply.errorCode = e.code;
+    reply.errorStatus = e.status;
+  }
+
+  return reply;
 }
 
 export function isHostRequest(data: unknown): data is HostRequest {

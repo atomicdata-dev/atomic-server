@@ -125,7 +125,9 @@ describe('a query that outruns the WebSocket handshake', () => {
   }) => {
     const store = new Store({ serverUrl: 'https://example.com' });
     // Every server fetch fails; we only care that one is attempted at all.
+    let attempts = 0;
     store.injectFetch(async () => {
+      attempts++;
       throw new Error('offline');
     });
     store.setClientDb(unpopulatedClientDb());
@@ -137,17 +139,19 @@ describe('a query that outruns the WebSocket handshake', () => {
       value: 'https://example.com',
     });
 
-    let resolved = false;
-    const ready = collection.waitForReady().then(() => {
-      resolved = true;
+    let settled = false;
+    const ready = collection.waitForReady().finally(() => {
+      settled = true;
     });
+    // Once connected the failed fetch is reported, not hidden as an empty page.
+    const rejection = expect(ready).rejects.toThrow();
 
     await new Promise(resolve => setTimeout(resolve, 50));
-    expect(resolved).toBe(false);
+    expect(settled).toBe(false);
 
     store.setServerConnected(true);
-    await ready;
+    await rejection;
 
-    expect(resolved).toBe(true);
+    expect(attempts).toBeGreaterThan(0);
   });
 });

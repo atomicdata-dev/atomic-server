@@ -47,7 +47,17 @@ export function viewSession(
         type: 'atomic.view.response',
         version: 1,
         id,
-        ...(error === undefined ? { result } : { error }),
+        ...(error === undefined
+          ? { result }
+          : {
+              error,
+              ...(typeof message.errorCode === 'string'
+                ? { errorCode: message.errorCode }
+                : {}),
+              ...(typeof message.errorStatus === 'number'
+                ? { errorStatus: message.errorStatus }
+                : {}),
+            }),
       });
     },
   };

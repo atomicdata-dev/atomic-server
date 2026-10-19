@@ -37,3 +37,25 @@ it('gives both adapters the same response and resource shape', () => {
     error: 'Not allowed',
   });
 });
+
+it('forwards the proxy error code and status with an error response', () => {
+  const post = vi.fn();
+  const session = viewSession(
+    { post, isActive: () => true, watch: vi.fn(), unwatch: vi.fn() },
+    'two',
+  );
+  session.post({
+    id: 2,
+    error: 'The proxy refused',
+    errorCode: 'scope_denied',
+    errorStatus: 403,
+  });
+  expect(post).toHaveBeenLastCalledWith({
+    type: 'atomic.view.response',
+    version: 1,
+    id: 'two',
+    error: 'The proxy refused',
+    errorCode: 'scope_denied',
+    errorStatus: 403,
+  });
+});

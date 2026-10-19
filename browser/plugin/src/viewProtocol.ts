@@ -62,6 +62,10 @@ export interface ViewResponse {
   id: string | number;
   result?: unknown;
   error?: string;
+  /** The integration proxy's error code, when the failure came from it. */
+  errorCode?: string;
+  /** The integration proxy's HTTP status, when the failure came from it. */
+  errorStatus?: number;
 }
 export function viewRequest(
   id: string | number,
