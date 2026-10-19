@@ -15,7 +15,8 @@
  *
  * Page to host, besides the store's calls: `openNative(kind, subject, title)`
  * (`hostActions.ts`) asks the app to show the chat of a meeting or chat room in
- * its own screen; the answer is whether it did.
+ * its own screen; the answer is whether it did. `opened(subject)` tells the app
+ * the page settled on a resource, for its Recents.
  *
  * Saving: the store has no server, so its commits go to the host instead
  * (`commitTransport`): signed through the host, applied by `applyCommit`.
@@ -59,7 +60,7 @@ import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
 import { createEmbedStore, registerEmbedActions } from './embedStore';
 import { closeTopOverlay } from './overlayBack';
-import { setActionsHost } from './hostActions';
+import { reportShown, setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
 
 enableEmbedMode();
@@ -199,6 +200,14 @@ const showRoute = createRoute({
     useNativeChatRoom(subject, () => {
       if (history.canGoBack()) history.back();
     });
+
+    // A resource reached inside the page (a folder's child, a link, one just
+    // created) goes into the app's Recents like one opened from the app.
+    useEffect(() => {
+      reportShown(subject);
+
+      return () => reportShown(undefined);
+    }, [subject]);
 
     if (!subject) {
       return null;

@@ -322,7 +322,7 @@ class _ResourceViewState extends State<ResourceView>
     }
     try {
       final answer = await (widget.call ?? widget.api.embedCall)(
-          method, jsonEncode(request['args'] ?? const []));
+          method, jsonEncode(_withDrive(method, request['args'])));
       reply = 'true,${jsonEncode(answer)}';
       if (_firstRead && method == 'getResourcesWithSnapshots') {
         _firstRead = false;
@@ -342,6 +342,16 @@ class _ResourceViewState extends State<ResourceView>
     } catch (e) {
       debugPrint('[embed] reply to $method not delivered: $e');
     }
+  }
+
+  /// `opened(subject)`: the page settled on a resource (reached by a link, a
+  /// folder's child, one just created). The store notes it in this drive's
+  /// Recents, so it gets the drive the page is shown in.
+  List<Object?> _withDrive(String method, Object? args) {
+    final list = args is List ? List<Object?>.of(args) : <Object?>[];
+    if (method == 'opened')
+      return [list.isEmpty ? '' : list.first, widget.drive];
+    return list;
   }
 
   /// The page asks to show a resource in the app's own screen

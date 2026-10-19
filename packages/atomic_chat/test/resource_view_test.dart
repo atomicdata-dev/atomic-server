@@ -117,6 +117,36 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
   });
 
+  testWidgets('a resource the page settles on goes to the store with the drive',
+      (tester) async {
+    final calls = <(String, String)>[];
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: ResourceView(
+        api: const _OpeningApi(),
+        drive: 'did:ad:drive',
+        subject: 'did:ad:folder',
+        call: (method, args) async {
+          calls.add((method, args));
+          return 'true';
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    page.send(jsonEncode({
+      'id': 3,
+      'method': 'opened',
+      'args': ['did:ad:child'],
+    }));
+    await tester.pumpAndSettle();
+
+    expect(calls, [('opened', '["did:ad:child","did:ad:drive"]')]);
+    expect(page.scripts, contains('window.__atomicReply(3,true,"true")'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 6));
+  });
+
   testWidgets('back waits until the page has handed over its edits',
       (tester) async {
     final navigator = await open(tester);

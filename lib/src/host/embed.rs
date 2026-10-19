@@ -17,8 +17,12 @@
 //! hold would be "not found". Those are answered from the host's
 //! [`AgentProfiles`] instead: the profile the connected server has, in memory
 //! only, never written to the store (this device did not sign or verify it).
+//!
+//! Recents: the page says which resource it settled on (`opened`, with the
+//! drive the app shows it in), so one reached inside the page (a folder's
+//! child, a link, one just created) is in the app's Recents too.
 
-use super::{profiles::AgentProfiles, LocalWritePusher};
+use super::{profiles::AgentProfiles, recents::RecentsIndex, LocalWritePusher};
 use crate::{
     agents::ForAgent, runtime::AtomicNode, storelike::Query, Db, Resource, Storelike, Subject,
 };
@@ -322,6 +326,25 @@ pub struct EmbedHost {
     node: AtomicNode,
     pusher: Arc<dyn LocalWritePusher>,
     profiles: AgentProfiles,
+    recents: Option<Arc<RecentsIndex>>,
+}
+
+/// Notes `raw` as opened in `drive`, when it is a resource of this store that
+/// belongs in Recents: not an agent (a profile) and not the drive itself.
+/// Answers whether it was noted.
+fn note_shown(store: &Db, recents: &RecentsIndex, raw: &str, drive: &str) -> bool {
+    if raw.is_empty() || drive.is_empty() {
+        return false;
+    }
+    let subject = subject_of(store, raw);
+    if subject.is_agent_did() || subject.pure_id() == Subject::from(drive).pure_id() {
+        return false;
+    }
+    if store.get_resource_shallow(&subject).is_err() {
+        return false;
+    }
+    recents.note_opened(drive, &subject.to_string(), crate::utils::now());
+    true
 }
 
 impl EmbedHost {
@@ -334,7 +357,14 @@ impl EmbedHost {
             node,
             pusher,
             profiles,
+            recents: None,
         }
+    }
+
+    /// Where `opened` notes the resources the page shows.
+    pub fn with_recents(mut self, recents: Arc<RecentsIndex>) -> Self {
+        self.recents = Some(recents);
+        self
     }
 
     /// One call from the page: `method` and its arguments (a JSON array),
@@ -388,6 +418,16 @@ impl EmbedHost {
             "historyAttribution" => Json::Null,
             "getBlob" => Json::Null,
             "flush" => Json::Null,
+            // `opened(subject, drive)`: the page settled on this resource.
+            "opened" => match &self.recents {
+                Some(recents) => json!(note_shown(
+                    store,
+                    recents,
+                    str_arg(&args, 0)?,
+                    args.get(1).and_then(Json::as_str).unwrap_or_default(),
+                )),
+                None => json!(false),
+            },
             "outboxEntries" => json!([]),
             // The page's outbox bookkeeping: what it has yet to hand over. Its
             // edits reach `applyCommit` within the page's life, so none is kept.
@@ -452,6 +492,45 @@ mod tests {
 
     async fn ask(host: &EmbedHost, method: &str, args: Json) -> Json {
         serde_json::from_str(&host.call(method, &args.to_string()).await.unwrap()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_resource_the_page_settles_on_is_in_recents() {
+        let d = Device::new().await;
+        let recents = Arc::new(RecentsIndex::new());
+        let h = host(&d).with_recents(recents.clone());
+        let folder = d
+            .store
+            .create_resource(urls::FOLDER, &d.drive, "Reached in the page", None)
+            .await
+            .unwrap();
+        let agent = d.store.get_default_agent().unwrap().subject;
+
+        assert_eq!(ask(&h, "opened", json!([folder, d.drive])).await, json!(true));
+        // Not resources for Recents: a profile, the drive itself, something
+        // this device does not have, a page without a drive.
+        for (subject, drive) in [
+            (agent.as_str(), d.drive.as_str()),
+            (d.drive.as_str(), d.drive.as_str()),
+            ("did:ad:not-here", d.drive.as_str()),
+            ("", d.drive.as_str()),
+            (folder.as_str(), ""),
+        ] {
+            assert_eq!(
+                ask(&h, "opened", json!([subject, drive])).await,
+                json!(false),
+                "{subject}"
+            );
+        }
+        let opened: Vec<String> = recents
+            .opened(&d.drive, 10)
+            .into_iter()
+            .map(|(s, _)| s)
+            .collect();
+        assert_eq!(opened, [folder]);
+
+        // Without an index (an older host) the call is answered, not failed.
+        assert_eq!(ask(&host(&d), "opened", json!(["x", d.drive])).await, json!(false));
     }
 
     #[tokio::test]
